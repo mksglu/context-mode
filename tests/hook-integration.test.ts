@@ -497,6 +497,42 @@ async function main() {
     assertPassthrough(result);
   });
 
+  await test("MCP execute + shell + unrecognized command: ask", () => {
+    const result = runHook(
+      {
+        tool_name: "mcp__plugin_context-mode_context-mode__execute",
+        tool_input: { language: "shell", code: "python3 script.py" },
+      },
+      { CLAUDE_PROJECT_DIR: MOCK_PROJECT_DIR },
+    );
+    // python3 is not in deny or allow list → evaluateCommand defaults to "ask"
+    assert.equal(result.exitCode, 0);
+    assert.ok(result.stdout.length > 0, "Expected non-empty stdout for ask");
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.hookSpecificOutput.permissionDecision, "ask");
+  });
+
+  await test("MCP batch_execute + unrecognized command in batch: ask", () => {
+    const result = runHook(
+      {
+        tool_name: "mcp__plugin_context-mode_context-mode__batch_execute",
+        tool_input: {
+          commands: [
+            { label: "list", command: "ls -la" },
+            { label: "unknown", command: "python3 script.py" },
+          ],
+          queries: ["test"],
+        },
+      },
+      { CLAUDE_PROJECT_DIR: MOCK_PROJECT_DIR },
+    );
+    // python3 not in any pattern → "ask" short-circuits the batch
+    assert.equal(result.exitCode, 0);
+    assert.ok(result.stdout.length > 0, "Expected non-empty stdout for ask");
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.hookSpecificOutput.permissionDecision, "ask");
+  });
+
   // Cleanup mock dirs
   try { rmSync(MOCK_PROJECT_DIR, { recursive: true, force: true }); } catch {}
   try { rmSync(ISOLATED_HOME, { recursive: true, force: true }); } catch {}
