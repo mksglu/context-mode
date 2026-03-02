@@ -562,6 +562,15 @@ server.registerTool(
     const pathDenied = checkFilePathDenyPolicy(path, "execute_file");
     if (pathDenied) return pathDenied;
 
+    // Security: check code parameter against Bash deny patterns
+    if (language === "shell") {
+      const codeDenied = checkDenyPolicy(code, "execute_file");
+      if (codeDenied) return codeDenied;
+    } else {
+      const codeDenied = checkNonShellDenyPolicy(code, language, "execute_file");
+      if (codeDenied) return codeDenied;
+    }
+
     try {
       const result = await executor.executeFile({
         path,

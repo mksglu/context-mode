@@ -321,9 +321,10 @@ if (tool.includes("context-mode") && tool.endsWith("__execute")) {
   process.exit(0);
 }
 
-// ─── MCP execute_file: check file path against Read deny patterns ───
+// ─── MCP execute_file: check file path + code against deny patterns ───
 if (tool.includes("context-mode") && tool.endsWith("__execute_file")) {
   if (security) {
+    // Check file path against Read deny patterns
     const filePath = toolInput.path ?? "";
     const denyGlobs = security.readToolDenyPatterns("Read", process.env.CLAUDE_PROJECT_DIR);
     const evalResult = security.evaluateFilePath(filePath, denyGlobs);
@@ -336,6 +337,35 @@ if (tool.includes("context-mode") && tool.endsWith("__execute_file")) {
         },
       }));
       process.exit(0);
+    }
+
+    // Check code parameter against Bash deny patterns (same as execute)
+    const lang = toolInput.language ?? "";
+    const code = toolInput.code ?? "";
+    if (lang === "shell") {
+      const policies = security.readBashPolicies(process.env.CLAUDE_PROJECT_DIR);
+      if (policies.length > 0) {
+        const result = security.evaluateCommand(code, policies);
+        if (result.decision === "deny") {
+          console.log(JSON.stringify({
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse",
+              permissionDecision: "deny",
+              reason: `Blocked by security policy: shell code matches deny pattern ${result.matchedPattern}`,
+            },
+          }));
+          process.exit(0);
+        }
+        if (result.decision === "ask") {
+          console.log(JSON.stringify({
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse",
+              permissionDecision: "ask",
+            },
+          }));
+          process.exit(0);
+        }
+      }
     }
   }
   process.exit(0);

@@ -444,14 +444,29 @@ async function main() {
     );
   });
 
-  await test("MCP execute_file + allowed path: passthrough", () => {
+  await test("MCP execute_file + safe path but denied shell code: denied", () => {
     const result = runHook(
       {
         tool_name: "mcp__plugin_context-mode_context-mode__execute_file",
-        tool_input: { path: "/project/src/main.ts", language: "shell", code: "wc -l $FILE_CONTENT" },
+        tool_input: { path: "/project/src/main.ts", language: "shell", code: "sudo cat $FILE_CONTENT" },
       },
       { CLAUDE_PROJECT_DIR: MOCK_PROJECT_DIR },
     );
+    assert.equal(result.exitCode, 0);
+    assert.ok(result.stdout.length > 0, "Expected non-empty stdout for deny");
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.hookSpecificOutput.permissionDecision, "deny");
+  });
+
+  await test("MCP execute_file + allowed path + allowed code: passthrough", () => {
+    const result = runHook(
+      {
+        tool_name: "mcp__plugin_context-mode_context-mode__execute_file",
+        tool_input: { path: "/project/src/main.ts", language: "python", code: "print(len(FILE_CONTENT))" },
+      },
+      { CLAUDE_PROJECT_DIR: MOCK_PROJECT_DIR },
+    );
+    // Non-shell language → code check skipped; path is safe → passthrough
     assertPassthrough(result);
   });
 
