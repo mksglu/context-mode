@@ -256,6 +256,29 @@ async function doctor(): Promise<number> {
           color.dim("\n  Run: npx context-mode upgrade"),
       );
     }
+
+    // Check SessionStart hook
+    const sessionStart = hooks?.SessionStart as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }> | undefined;
+    if (sessionStart && sessionStart.length > 0) {
+      const hasSessionHook = sessionStart.some((entry) =>
+        entry.hooks?.some((h) => h.command?.includes("sessionstart.mjs")),
+      );
+      if (hasSessionHook) {
+        p.log.success(color.green("SessionStart hook: PASS") + " — SessionStart hook configured");
+      } else {
+        p.log.error(
+          color.red("SessionStart hook: FAIL") +
+            " — SessionStart exists but does not point to sessionstart.mjs" +
+            color.dim("\n  Run: npx context-mode upgrade"),
+        );
+      }
+    } else {
+      p.log.error(
+        color.red("SessionStart hook: FAIL") +
+          " — No SessionStart hooks found" +
+          color.dim("\n  Run: npx context-mode upgrade"),
+      );
+    }
   } else {
     p.log.error(
       color.red("Hooks installed: FAIL") +
@@ -605,6 +628,44 @@ async function upgrade() {
     hooks.PreToolUse = [desiredHookEntry];
     p.log.info(color.dim("Created PreToolUse hooks section"));
     changes.push("Created PreToolUse hooks section");
+  }
+
+  // --- SessionStart hook ---
+  p.log.step("Configuring SessionStart hook...");
+  const sessionHookScriptPath = resolve(pluginRoot, "hooks", "sessionstart.mjs");
+
+  const desiredSessionHookEntry = {
+    matcher: "",
+    hooks: [
+      {
+        type: "command",
+        command: "node " + sessionHookScriptPath,
+      },
+    ],
+  };
+
+  const existingSessionStart = hooks.SessionStart as Array<Record<string, unknown>> | undefined;
+
+  if (existingSessionStart && Array.isArray(existingSessionStart)) {
+    const existingSessionIdx = existingSessionStart.findIndex((entry) => {
+      const entryHooks = entry.hooks as Array<{ command?: string }> | undefined;
+      return entryHooks?.some((h) => h.command?.includes("sessionstart.mjs"));
+    });
+
+    if (existingSessionIdx >= 0) {
+      existingSessionStart[existingSessionIdx] = desiredSessionHookEntry;
+      p.log.info(color.dim("Updated existing SessionStart hook entry"));
+      changes.push("Updated existing SessionStart hook entry");
+    } else {
+      existingSessionStart.push(desiredSessionHookEntry);
+      p.log.info(color.dim("Added SessionStart hook entry"));
+      changes.push("Added SessionStart hook entry to existing hooks");
+    }
+    hooks.SessionStart = existingSessionStart;
+  } else {
+    hooks.SessionStart = [desiredSessionHookEntry];
+    p.log.info(color.dim("Created SessionStart hooks section"));
+    changes.push("Created SessionStart hooks section");
   }
 
   settings.hooks = hooks;
