@@ -46,6 +46,33 @@
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
           }
         ]
+      },
+      {
+        "matcher": "mcp__plugin_context-mode_context-mode__execute",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_context-mode_context-mode__execute_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_context-mode_context-mode__batch_execute",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
       }
     ],
     "SessionStart": [

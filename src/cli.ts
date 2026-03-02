@@ -596,7 +596,7 @@ async function upgrade() {
   const settings = readSettings() ?? {};
 
   const desiredHookEntry = {
-    matcher: "Bash|Read|Grep|Glob|WebFetch|WebSearch|Task",
+    matcher: "Bash|Read|Grep|Glob|WebFetch|WebSearch|Task|mcp__plugin_context-mode_context-mode__execute|mcp__plugin_context-mode_context-mode__execute_file|mcp__plugin_context-mode_context-mode__batch_execute",
     hooks: [
       {
         type: "command",
