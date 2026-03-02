@@ -10,6 +10,16 @@
 
 import type DatabaseConstructor from "better-sqlite3";
 import type { Database as DatabaseInstance } from "better-sqlite3";
+
+// better-sqlite3's `Statement` generic collapses under `ReturnType` to a
+// single-param signature. Use an explicit interface for cached statements
+// that accept varying parameter counts.
+interface PreparedStatement {
+  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+  iterate(...params: unknown[]): IterableIterator<unknown>;
+}
 import { createRequire } from "node:module";
 import { readFileSync, readdirSync, unlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -164,6 +174,31 @@ export class ContentStore {
   #db: DatabaseInstance;
   #dbPath: string;
 
+  // ── Cached Prepared Statements ──
+  // Prepared once at construction, reused on every call to avoid
+  // re-compiling SQL on each invocation.
+
+  // Write path
+  #stmtInsertSourceEmpty!: PreparedStatement;
+  #stmtInsertSource!: PreparedStatement;
+  #stmtInsertChunk!: PreparedStatement;
+  #stmtInsertChunkTrigram!: PreparedStatement;
+  #stmtInsertVocab!: PreparedStatement;
+
+  // Search path (hot)
+  #stmtSearchPorter!: PreparedStatement;
+  #stmtSearchPorterFiltered!: PreparedStatement;
+  #stmtSearchTrigram!: PreparedStatement;
+  #stmtSearchTrigramFiltered!: PreparedStatement;
+  #stmtFuzzyVocab!: PreparedStatement;
+
+  // Read path
+  #stmtListSources!: PreparedStatement;
+  #stmtChunksBySource!: PreparedStatement;
+  #stmtSourceChunkCount!: PreparedStatement;
+  #stmtChunkContent!: PreparedStatement;
+  #stmtStats!: PreparedStatement;
+
   constructor(dbPath?: string) {
     const Database = loadDatabase();
     this.#dbPath =
@@ -172,6 +207,7 @@ export class ContentStore {
     this.#db.pragma("journal_mode = WAL");
     this.#db.pragma("synchronous = NORMAL");
     this.#initSchema();
+    this.#prepareStatements();
   }
 
   /** Delete this session's DB files. Call on process exit. */
@@ -218,6 +254,112 @@ export class ContentStore {
     `);
   }
 
+  #prepareStatements(): void {
+    // Write path
+    this.#stmtInsertSourceEmpty = this.#db.prepare(
+      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, 0, 0)",
+    );
+    this.#stmtInsertSource = this.#db.prepare(
+      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
+    );
+    this.#stmtInsertChunk = this.#db.prepare(
+      "INSERT INTO chunks (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
+    );
+    this.#stmtInsertChunkTrigram = this.#db.prepare(
+      "INSERT INTO chunks_trigram (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
+    );
+    this.#stmtInsertVocab = this.#db.prepare(
+      "INSERT OR IGNORE INTO vocabulary (word) VALUES (?)",
+    );
+
+    // Search path (hot)
+    this.#stmtSearchPorter = this.#db.prepare(`
+      SELECT
+        chunks.title,
+        chunks.content,
+        chunks.content_type,
+        sources.label,
+        bm25(chunks, 2.0, 1.0) AS rank,
+        highlight(chunks, 1, char(2), char(3)) AS highlighted
+      FROM chunks
+      JOIN sources ON sources.id = chunks.source_id
+      WHERE chunks MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+    this.#stmtSearchPorterFiltered = this.#db.prepare(`
+      SELECT
+        chunks.title,
+        chunks.content,
+        chunks.content_type,
+        sources.label,
+        bm25(chunks, 2.0, 1.0) AS rank,
+        highlight(chunks, 1, char(2), char(3)) AS highlighted
+      FROM chunks
+      JOIN sources ON sources.id = chunks.source_id
+      WHERE chunks MATCH ? AND sources.label LIKE ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+    this.#stmtSearchTrigram = this.#db.prepare(`
+      SELECT
+        chunks_trigram.title,
+        chunks_trigram.content,
+        chunks_trigram.content_type,
+        sources.label,
+        bm25(chunks_trigram, 2.0, 1.0) AS rank,
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
+      FROM chunks_trigram
+      JOIN sources ON sources.id = chunks_trigram.source_id
+      WHERE chunks_trigram MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+    this.#stmtSearchTrigramFiltered = this.#db.prepare(`
+      SELECT
+        chunks_trigram.title,
+        chunks_trigram.content,
+        chunks_trigram.content_type,
+        sources.label,
+        bm25(chunks_trigram, 2.0, 1.0) AS rank,
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
+      FROM chunks_trigram
+      JOIN sources ON sources.id = chunks_trigram.source_id
+      WHERE chunks_trigram MATCH ? AND sources.label LIKE ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+
+    // Fuzzy path
+    this.#stmtFuzzyVocab = this.#db.prepare(
+      "SELECT word FROM vocabulary WHERE length(word) BETWEEN ? AND ?",
+    );
+
+    // Read path
+    this.#stmtListSources = this.#db.prepare(
+      "SELECT label, chunk_count as chunkCount FROM sources ORDER BY id DESC",
+    );
+    this.#stmtChunksBySource = this.#db.prepare(
+      `SELECT c.title, c.content, c.content_type, s.label
+       FROM chunks c
+       JOIN sources s ON s.id = c.source_id
+       WHERE c.source_id = ?
+       ORDER BY c.rowid`,
+    );
+    this.#stmtSourceChunkCount = this.#db.prepare(
+      "SELECT chunk_count FROM sources WHERE id = ?",
+    );
+    this.#stmtChunkContent = this.#db.prepare(
+      "SELECT content FROM chunks WHERE source_id = ?",
+    );
+    this.#stmtStats = this.#db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM sources) AS sources,
+        (SELECT COUNT(*) FROM chunks) AS chunks,
+        (SELECT COUNT(*) FROM chunks WHERE content_type = 'code') AS codeChunks
+    `);
+  }
+
   // ── Index ──
 
   index(options: {
@@ -236,10 +378,7 @@ export class ContentStore {
     const chunks = this.#chunkMarkdown(text);
 
     if (chunks.length === 0) {
-      const insertSource = this.#db.prepare(
-        "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, 0, 0)",
-      );
-      const info = insertSource.run(label);
+      const info = this.#stmtInsertSourceEmpty.run(label);
       return {
         sourceId: Number(info.lastInsertRowid),
         label,
@@ -250,24 +389,14 @@ export class ContentStore {
 
     const codeChunks = chunks.filter((c) => c.hasCode).length;
 
-    const insertSource = this.#db.prepare(
-      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
-    );
-    const insertChunk = this.#db.prepare(
-      "INSERT INTO chunks (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-    const insertChunkTrigram = this.#db.prepare(
-      "INSERT INTO chunks_trigram (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-
     const transaction = this.#db.transaction(() => {
-      const info = insertSource.run(label, chunks.length, codeChunks);
+      const info = this.#stmtInsertSource.run(label, chunks.length, codeChunks);
       const sourceId = Number(info.lastInsertRowid);
 
       for (const chunk of chunks) {
         const ct = chunk.hasCode ? "code" : "prose";
-        insertChunk.run(chunk.title, chunk.content, sourceId, ct);
-        insertChunkTrigram.run(chunk.title, chunk.content, sourceId, ct);
+        this.#stmtInsertChunk.run(chunk.title, chunk.content, sourceId, ct);
+        this.#stmtInsertChunkTrigram.run(chunk.title, chunk.content, sourceId, ct);
       }
 
       return sourceId;
@@ -297,10 +426,7 @@ export class ContentStore {
     linesPerChunk: number = 20,
   ): IndexResult {
     if (!content || content.trim().length === 0) {
-      const insertSource = this.#db.prepare(
-        "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, 0, 0)",
-      );
-      const info = insertSource.run(source);
+      const info = this.#stmtInsertSourceEmpty.run(source);
       return {
         sourceId: Number(info.lastInsertRowid),
         label: source,
@@ -311,23 +437,13 @@ export class ContentStore {
 
     const chunks = this.#chunkPlainText(content, linesPerChunk);
 
-    const insertSource = this.#db.prepare(
-      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
-    );
-    const insertChunk = this.#db.prepare(
-      "INSERT INTO chunks (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-    const insertChunkTrigram = this.#db.prepare(
-      "INSERT INTO chunks_trigram (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-
     const transaction = this.#db.transaction(() => {
-      const info = insertSource.run(source, chunks.length, 0);
+      const info = this.#stmtInsertSource.run(source, chunks.length, 0);
       const sourceId = Number(info.lastInsertRowid);
 
       for (const chunk of chunks) {
-        insertChunk.run(chunk.title, chunk.content, sourceId, "prose");
-        insertChunkTrigram.run(chunk.title, chunk.content, sourceId, "prose");
+        this.#stmtInsertChunk.run(chunk.title, chunk.content, sourceId, "prose");
+        this.#stmtInsertChunkTrigram.run(chunk.title, chunk.content, sourceId, "prose");
       }
 
       return sourceId;
@@ -349,22 +465,9 @@ export class ContentStore {
   search(query: string, limit: number = 3, source?: string): SearchResult[] {
     const sanitized = sanitizeQuery(query);
 
-    const sourceFilter = source ? "AND sources.label LIKE ?" : "";
-    const stmt = this.#db.prepare(`
-      SELECT
-        chunks.title,
-        chunks.content,
-        chunks.content_type,
-        sources.label,
-        bm25(chunks, 2.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted
-      FROM chunks
-      JOIN sources ON sources.id = chunks.source_id
-      WHERE chunks MATCH ? ${sourceFilter}
-      ORDER BY rank
-      LIMIT ?
-    `);
-
+    const stmt = source
+      ? this.#stmtSearchPorterFiltered
+      : this.#stmtSearchPorter;
     const params = source
       ? [sanitized, `%${source}%`, limit]
       : [sanitized, limit];
@@ -398,22 +501,9 @@ export class ContentStore {
     const sanitized = sanitizeTrigramQuery(query);
     if (!sanitized) return [];
 
-    const sourceFilter = source ? "AND sources.label LIKE ?" : "";
-    const stmt = this.#db.prepare(`
-      SELECT
-        chunks_trigram.title,
-        chunks_trigram.content,
-        chunks_trigram.content_type,
-        sources.label,
-        bm25(chunks_trigram, 2.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
-      FROM chunks_trigram
-      JOIN sources ON sources.id = chunks_trigram.source_id
-      WHERE chunks_trigram MATCH ? ${sourceFilter}
-      ORDER BY rank
-      LIMIT ?
-    `);
-
+    const stmt = source
+      ? this.#stmtSearchTrigramFiltered
+      : this.#stmtSearchTrigram;
     const params = source
       ? [sanitized, `%${source}%`, limit]
       : [sanitized, limit];
@@ -445,13 +535,10 @@ export class ContentStore {
 
     const maxDist = maxEditDistance(word.length);
 
-    const candidates = this.#db
-      .prepare(
-        "SELECT word FROM vocabulary WHERE length(word) BETWEEN ? AND ?",
-      )
-      .all(word.length - maxDist, word.length + maxDist) as Array<{
-      word: string;
-    }>;
+    const candidates = this.#stmtFuzzyVocab.all(
+      word.length - maxDist,
+      word.length + maxDist,
+    ) as Array<{ word: string }>;
 
     let bestWord: string | null = null;
     let bestDist = maxDist + 1;
@@ -525,11 +612,10 @@ export class ContentStore {
   // ── Sources ──
 
   listSources(): Array<{ label: string; chunkCount: number }> {
-    return this.#db
-      .prepare(
-        "SELECT label, chunk_count as chunkCount FROM sources ORDER BY id DESC",
-      )
-      .all() as Array<{ label: string; chunkCount: number }>;
+    return this.#stmtListSources.all() as Array<{
+      label: string;
+      chunkCount: number;
+    }>;
   }
 
   /**
@@ -537,15 +623,7 @@ export class ContentStore {
    * Use this for inventory/listing where you need all sections, not search.
    */
   getChunksBySource(sourceId: number): SearchResult[] {
-    const rows = this.#db
-      .prepare(
-        `SELECT c.title, c.content, c.content_type, s.label
-         FROM chunks c
-         JOIN sources s ON s.id = c.source_id
-         WHERE c.source_id = ?
-         ORDER BY c.rowid`,
-      )
-      .all(sourceId) as Array<{
+    const rows = this.#stmtChunksBySource.all(sourceId) as Array<{
       title: string;
       content: string;
       content_type: string;
@@ -564,9 +642,9 @@ export class ContentStore {
   // ── Vocabulary ──
 
   getDistinctiveTerms(sourceId: number, maxTerms: number = 40): string[] {
-    const stats = this.#db
-      .prepare("SELECT chunk_count FROM sources WHERE id = ?")
-      .get(sourceId) as { chunk_count: number } | undefined;
+    const stats = this.#stmtSourceChunkCount.get(sourceId) as
+      | { chunk_count: number }
+      | undefined;
 
     if (!stats || stats.chunk_count < 3) return [];
 
@@ -575,14 +653,10 @@ export class ContentStore {
     const maxAppearances = Math.max(3, Math.ceil(totalChunks * 0.4));
 
     // Stream chunks one at a time to avoid loading all content into memory
-    const stmt = this.#db.prepare(
-      "SELECT content FROM chunks WHERE source_id = ?",
-    );
-
     // Count document frequency (how many sections contain each word)
     const docFreq = new Map<string, number>();
 
-    for (const row of stmt.iterate(sourceId) as Iterable<{ content: string }>) {
+    for (const row of this.#stmtChunkContent.iterate(sourceId) as Iterable<{ content: string }>) {
       const words = new Set(
         row.content
           .toLowerCase()
@@ -616,30 +690,17 @@ export class ContentStore {
   // ── Stats ──
 
   getStats(): StoreStats {
-    const sources =
-      (
-        this.#db.prepare("SELECT COUNT(*) as c FROM sources").get() as {
-          c: number;
-        }
-      )?.c ?? 0;
+    const row = this.#stmtStats.get() as {
+      sources: number;
+      chunks: number;
+      codeChunks: number;
+    } | undefined;
 
-    const chunks =
-      (
-        this.#db
-          .prepare("SELECT COUNT(*) as c FROM chunks")
-          .get() as { c: number }
-      )?.c ?? 0;
-
-    const codeChunks =
-      (
-        this.#db
-          .prepare(
-            "SELECT COUNT(*) as c FROM chunks WHERE content_type = 'code'",
-          )
-          .get() as { c: number }
-      )?.c ?? 0;
-
-    return { sources, chunks, codeChunks };
+    return {
+      sources: row?.sources ?? 0,
+      chunks: row?.chunks ?? 0,
+      codeChunks: row?.codeChunks ?? 0,
+    };
   }
 
   // ── Cleanup ──
@@ -657,13 +718,10 @@ export class ContentStore {
       .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
 
     const unique = [...new Set(words)];
-    const insert = this.#db.prepare(
-      "INSERT OR IGNORE INTO vocabulary (word) VALUES (?)",
-    );
 
     this.#db.transaction(() => {
       for (const word of unique) {
-        insert.run(word);
+        this.#stmtInsertVocab.run(word);
       }
     })();
   }
