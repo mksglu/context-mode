@@ -96,9 +96,10 @@ try {
   }
 } catch { /* best effort — don't block hook */ }
 
-let raw = "";
-process.stdin.setEncoding("utf-8");
-for await (const chunk of process.stdin) raw += chunk;
+// Synchronous fd-0 read avoids `for await` on process.stdin which can hang on
+// macOS when stdin is piped via spawnSync (Node async iterator EOF detection
+// is unreliable on some platforms).
+const raw = readFileSync(0, "utf-8");
 
 const input = JSON.parse(raw);
 const tool = input.tool_name ?? "";
