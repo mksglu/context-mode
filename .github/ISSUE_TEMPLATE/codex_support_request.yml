@@ -1,0 +1,92 @@
+name: Codex Support Request
+description: Request support for OpenAI Codex workflows in context-mode
+title: "[Codex Support]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the request.
+
+        **Before filing:**
+        1. [Search existing issues](https://github.com/mksglu/claude-context-mode/issues) for similar Codex requests
+        2. Confirm you're on the latest version with `/context-mode:doctor`
+        3. Explain the concrete workflow you want to enable
+
+  - type: input
+    id: version
+    attributes:
+      label: context-mode version
+      description: Run `/context-mode:doctor` and paste the version here.
+      placeholder: "e.g. 0.9.17"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: codex-surface
+    attributes:
+      label: Codex surface
+      description: Which Codex environment do you want supported?
+      options:
+        - Codex CLI
+        - OpenAI API
+        - ChatGPT Codex
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What are you trying to do today that does not work with Codex?
+      placeholder: Describe the current limitation and impact.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-workflow
+    attributes:
+      label: Desired workflow
+      description: Describe how Codex support should work end-to-end.
+      placeholder: |
+        1. Run command ...
+        2. context-mode should ...
+        3. Codex should ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-commands
+    attributes:
+      label: Expected commands or behavior
+      description: Which commands, prompts, or integrations should be added or adapted?
+      placeholder: Include examples of command names, config, or prompts.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: What would make this request complete for you?
+      placeholder: List clear success criteria.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround or alternative approach you've already tried?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add links, screenshots, logs, or examples that help evaluate the request.
+      render: text
+    validations:
+      required: false
