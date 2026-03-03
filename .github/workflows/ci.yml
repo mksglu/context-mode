@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, next, feat/cross-platform-ci]
+    branches: [main]
   pull_request:
     branches: [main, next]
 
@@ -48,6 +48,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Build
+        run: npm run build
+
       - name: Unit tests
         run: npx tsx tests/executor.test.ts
 
@@ -69,8 +72,26 @@ jobs:
       - name: Hook integration tests
         run: npx tsx tests/hook-integration.test.ts
 
+      - name: SessionStart integration tests
+        run: npx tsx tests/sessionstart-integration.test.ts
+
+      - name: Security tests
+        run: npx tsx tests/security.test.ts
+
+      - name: Extract snippet tests
+        run: npx tsx tests/extract-snippet.test.ts
+
+      - name: Intent search tests
+        run: npx tsx tests/intent-search.test.ts
+
+      - name: Project dir tests
+        run: npx tsx tests/project-dir.test.ts
+
       - name: Subagent budget tests
         run: npx tsx tests/subagent-budget.test.ts
+
+      - name: Turndown tests
+        run: npx tsx tests/turndown.test.ts
 
       - name: Doctor (verify server starts)
         run: npx tsx src/cli.ts doctor

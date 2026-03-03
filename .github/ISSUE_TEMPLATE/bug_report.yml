@@ -96,7 +96,9 @@ body:
       label: Operating System
       options:
         - macOS
-        - Linux
+        - Linux (Ubuntu/Debian)
+        - Linux (Other)
+        - Windows (Native)
         - Windows (WSL)
     validations:
       required: true

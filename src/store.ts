@@ -10,6 +10,16 @@
 
 import type DatabaseConstructor from "better-sqlite3";
 import type { Database as DatabaseInstance } from "better-sqlite3";
+
+// better-sqlite3's `Statement` generic collapses under `ReturnType` to a
+// single-param signature. Use an explicit interface for cached statements
+// that accept varying parameter counts.
+interface PreparedStatement {
+  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+  iterate(...params: unknown[]): IterableIterator<unknown>;
+}
 import { createRequire } from "node:module";
 import { readFileSync, readdirSync, unlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -129,6 +139,11 @@ function maxEditDistance(wordLength: number): number {
   return 3;
 }
 
+// Oversized chunks (e.g., a 50KB section between two headings) hurt BM25
+// length normalization and produce unwieldy search results. Split at paragraph
+// boundaries when a chunk exceeds this cap.
+const MAX_CHUNK_BYTES = 4096;
+
 // ─────────────────────────────────────────────────────────
 // ContentStore
 // ─────────────────────────────────────────────────────────
@@ -164,6 +179,31 @@ export class ContentStore {
   #db: DatabaseInstance;
   #dbPath: string;
 
+  // ── Cached Prepared Statements ──
+  // Prepared once at construction, reused on every call to avoid
+  // re-compiling SQL on each invocation.
+
+  // Write path
+  #stmtInsertSourceEmpty!: PreparedStatement;
+  #stmtInsertSource!: PreparedStatement;
+  #stmtInsertChunk!: PreparedStatement;
+  #stmtInsertChunkTrigram!: PreparedStatement;
+  #stmtInsertVocab!: PreparedStatement;
+
+  // Search path (hot)
+  #stmtSearchPorter!: PreparedStatement;
+  #stmtSearchPorterFiltered!: PreparedStatement;
+  #stmtSearchTrigram!: PreparedStatement;
+  #stmtSearchTrigramFiltered!: PreparedStatement;
+  #stmtFuzzyVocab!: PreparedStatement;
+
+  // Read path
+  #stmtListSources!: PreparedStatement;
+  #stmtChunksBySource!: PreparedStatement;
+  #stmtSourceChunkCount!: PreparedStatement;
+  #stmtChunkContent!: PreparedStatement;
+  #stmtStats!: PreparedStatement;
+
   constructor(dbPath?: string) {
     const Database = loadDatabase();
     this.#dbPath =
@@ -172,6 +212,7 @@ export class ContentStore {
     this.#db.pragma("journal_mode = WAL");
     this.#db.pragma("synchronous = NORMAL");
     this.#initSchema();
+    this.#prepareStatements();
   }
 
   /** Delete this session's DB files. Call on process exit. */
@@ -218,6 +259,112 @@ export class ContentStore {
     `);
   }
 
+  #prepareStatements(): void {
+    // Write path
+    this.#stmtInsertSourceEmpty = this.#db.prepare(
+      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, 0, 0)",
+    );
+    this.#stmtInsertSource = this.#db.prepare(
+      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
+    );
+    this.#stmtInsertChunk = this.#db.prepare(
+      "INSERT INTO chunks (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
+    );
+    this.#stmtInsertChunkTrigram = this.#db.prepare(
+      "INSERT INTO chunks_trigram (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
+    );
+    this.#stmtInsertVocab = this.#db.prepare(
+      "INSERT OR IGNORE INTO vocabulary (word) VALUES (?)",
+    );
+
+    // Search path (hot)
+    this.#stmtSearchPorter = this.#db.prepare(`
+      SELECT
+        chunks.title,
+        chunks.content,
+        chunks.content_type,
+        sources.label,
+        bm25(chunks, 2.0, 1.0) AS rank,
+        highlight(chunks, 1, char(2), char(3)) AS highlighted
+      FROM chunks
+      JOIN sources ON sources.id = chunks.source_id
+      WHERE chunks MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+    this.#stmtSearchPorterFiltered = this.#db.prepare(`
+      SELECT
+        chunks.title,
+        chunks.content,
+        chunks.content_type,
+        sources.label,
+        bm25(chunks, 2.0, 1.0) AS rank,
+        highlight(chunks, 1, char(2), char(3)) AS highlighted
+      FROM chunks
+      JOIN sources ON sources.id = chunks.source_id
+      WHERE chunks MATCH ? AND sources.label LIKE ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+    this.#stmtSearchTrigram = this.#db.prepare(`
+      SELECT
+        chunks_trigram.title,
+        chunks_trigram.content,
+        chunks_trigram.content_type,
+        sources.label,
+        bm25(chunks_trigram, 2.0, 1.0) AS rank,
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
+      FROM chunks_trigram
+      JOIN sources ON sources.id = chunks_trigram.source_id
+      WHERE chunks_trigram MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+    this.#stmtSearchTrigramFiltered = this.#db.prepare(`
+      SELECT
+        chunks_trigram.title,
+        chunks_trigram.content,
+        chunks_trigram.content_type,
+        sources.label,
+        bm25(chunks_trigram, 2.0, 1.0) AS rank,
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
+      FROM chunks_trigram
+      JOIN sources ON sources.id = chunks_trigram.source_id
+      WHERE chunks_trigram MATCH ? AND sources.label LIKE ?
+      ORDER BY rank
+      LIMIT ?
+    `);
+
+    // Fuzzy path
+    this.#stmtFuzzyVocab = this.#db.prepare(
+      "SELECT word FROM vocabulary WHERE length(word) BETWEEN ? AND ?",
+    );
+
+    // Read path
+    this.#stmtListSources = this.#db.prepare(
+      "SELECT label, chunk_count as chunkCount FROM sources ORDER BY id DESC",
+    );
+    this.#stmtChunksBySource = this.#db.prepare(
+      `SELECT c.title, c.content, c.content_type, s.label
+       FROM chunks c
+       JOIN sources s ON s.id = c.source_id
+       WHERE c.source_id = ?
+       ORDER BY c.rowid`,
+    );
+    this.#stmtSourceChunkCount = this.#db.prepare(
+      "SELECT chunk_count FROM sources WHERE id = ?",
+    );
+    this.#stmtChunkContent = this.#db.prepare(
+      "SELECT content FROM chunks WHERE source_id = ?",
+    );
+    this.#stmtStats = this.#db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM sources) AS sources,
+        (SELECT COUNT(*) FROM chunks) AS chunks,
+        (SELECT COUNT(*) FROM chunks WHERE content_type = 'code') AS codeChunks
+    `);
+  }
+
   // ── Index ──
 
   index(options: {
@@ -235,11 +382,79 @@ export class ContentStore {
     const label = source ?? path ?? "untitled";
     const chunks = this.#chunkMarkdown(text);
 
+    return this.#insertChunks(chunks, label, text);
+  }
+
+  // ── Index Plain Text ──
+
+  /**
+   * Index plain-text output (logs, build output, test results) by splitting
+   * into fixed-size line groups. Unlike markdown indexing, this does not
+   * look for headings — it chunks by line count with overlap.
+   */
+  indexPlainText(
+    content: string,
+    source: string,
+    linesPerChunk: number = 20,
+  ): IndexResult {
+    if (!content || content.trim().length === 0) {
+      return this.#insertChunks([], source, "");
+    }
+
+    const chunks = this.#chunkPlainText(content, linesPerChunk);
+
+    return this.#insertChunks(
+      chunks.map((c) => ({ ...c, hasCode: false })),
+      source,
+      content,
+    );
+  }
+
+  // ── Index JSON ──
+
+  /**
+   * Index JSON content by walking the object tree and using key paths
+   * as chunk titles (analogous to heading hierarchy in markdown). Objects
+   * recurse by key; arrays batch items by size.
+   *
+   * Falls back to `indexPlainText` if the content is not valid JSON.
+   */
+  indexJSON(
+    content: string,
+    source: string,
+    maxChunkBytes: number = MAX_CHUNK_BYTES,
+  ): IndexResult {
+    if (!content || content.trim().length === 0) {
+      return this.indexPlainText("", source);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return this.indexPlainText(content, source);
+    }
+
+    const chunks: Chunk[] = [];
+    this.#walkJSON(parsed, [], chunks, maxChunkBytes);
+
     if (chunks.length === 0) {
-      const insertSource = this.#db.prepare(
-        "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, 0, 0)",
-      );
-      const info = insertSource.run(label);
+      return this.indexPlainText(content, source);
+    }
+
+    return this.#insertChunks(chunks, source, content);
+  }
+
+  // ── Shared DB Insertion ──
+
+  /**
+   * Shared DB insertion logic for all index methods. Inserts chunks
+   * into both FTS5 tables within a transaction and extracts vocabulary.
+   * Uses cached prepared statements from #prepareStatements().
+   */
+  #insertChunks(chunks: Chunk[], label: string, text: string): IndexResult {
+    if (chunks.length === 0) {
+      const info = this.#stmtInsertSourceEmpty.run(label);
       return {
         sourceId: Number(info.lastInsertRowid),
         label,
@@ -250,24 +465,14 @@ export class ContentStore {
 
     const codeChunks = chunks.filter((c) => c.hasCode).length;
 
-    const insertSource = this.#db.prepare(
-      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
-    );
-    const insertChunk = this.#db.prepare(
-      "INSERT INTO chunks (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-    const insertChunkTrigram = this.#db.prepare(
-      "INSERT INTO chunks_trigram (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-
     const transaction = this.#db.transaction(() => {
-      const info = insertSource.run(label, chunks.length, codeChunks);
+      const info = this.#stmtInsertSource.run(label, chunks.length, codeChunks);
       const sourceId = Number(info.lastInsertRowid);
 
       for (const chunk of chunks) {
         const ct = chunk.hasCode ? "code" : "prose";
-        insertChunk.run(chunk.title, chunk.content, sourceId, ct);
-        insertChunkTrigram.run(chunk.title, chunk.content, sourceId, ct);
+        this.#stmtInsertChunk.run(chunk.title, chunk.content, sourceId, ct);
+        this.#stmtInsertChunkTrigram.run(chunk.title, chunk.content, sourceId, ct);
       }
 
       return sourceId;
@@ -284,87 +489,14 @@ export class ContentStore {
     };
   }
 
-  // ── Index Plain Text ──
-
-  /**
-   * Index plain-text output (logs, build output, test results) by splitting
-   * into fixed-size line groups. Unlike markdown indexing, this does not
-   * look for headings — it chunks by line count with overlap.
-   */
-  indexPlainText(
-    content: string,
-    source: string,
-    linesPerChunk: number = 20,
-  ): IndexResult {
-    if (!content || content.trim().length === 0) {
-      const insertSource = this.#db.prepare(
-        "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, 0, 0)",
-      );
-      const info = insertSource.run(source);
-      return {
-        sourceId: Number(info.lastInsertRowid),
-        label: source,
-        totalChunks: 0,
-        codeChunks: 0,
-      };
-    }
-
-    const chunks = this.#chunkPlainText(content, linesPerChunk);
-
-    const insertSource = this.#db.prepare(
-      "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
-    );
-    const insertChunk = this.#db.prepare(
-      "INSERT INTO chunks (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-    const insertChunkTrigram = this.#db.prepare(
-      "INSERT INTO chunks_trigram (title, content, source_id, content_type) VALUES (?, ?, ?, ?)",
-    );
-
-    const transaction = this.#db.transaction(() => {
-      const info = insertSource.run(source, chunks.length, 0);
-      const sourceId = Number(info.lastInsertRowid);
-
-      for (const chunk of chunks) {
-        insertChunk.run(chunk.title, chunk.content, sourceId, "prose");
-        insertChunkTrigram.run(chunk.title, chunk.content, sourceId, "prose");
-      }
-
-      return sourceId;
-    });
-
-    const sourceId = transaction();
-    this.#extractAndStoreVocabulary(content);
-
-    return {
-      sourceId,
-      label: source,
-      totalChunks: chunks.length,
-      codeChunks: 0,
-    };
-  }
-
   // ── Search ──
 
   search(query: string, limit: number = 3, source?: string): SearchResult[] {
     const sanitized = sanitizeQuery(query);
 
-    const sourceFilter = source ? "AND sources.label LIKE ?" : "";
-    const stmt = this.#db.prepare(`
-      SELECT
-        chunks.title,
-        chunks.content,
-        chunks.content_type,
-        sources.label,
-        bm25(chunks, 2.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted
-      FROM chunks
-      JOIN sources ON sources.id = chunks.source_id
-      WHERE chunks MATCH ? ${sourceFilter}
-      ORDER BY rank
-      LIMIT ?
-    `);
-
+    const stmt = source
+      ? this.#stmtSearchPorterFiltered
+      : this.#stmtSearchPorter;
     const params = source
       ? [sanitized, `%${source}%`, limit]
       : [sanitized, limit];
@@ -398,22 +530,9 @@ export class ContentStore {
     const sanitized = sanitizeTrigramQuery(query);
     if (!sanitized) return [];
 
-    const sourceFilter = source ? "AND sources.label LIKE ?" : "";
-    const stmt = this.#db.prepare(`
-      SELECT
-        chunks_trigram.title,
-        chunks_trigram.content,
-        chunks_trigram.content_type,
-        sources.label,
-        bm25(chunks_trigram, 2.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
-      FROM chunks_trigram
-      JOIN sources ON sources.id = chunks_trigram.source_id
-      WHERE chunks_trigram MATCH ? ${sourceFilter}
-      ORDER BY rank
-      LIMIT ?
-    `);
-
+    const stmt = source
+      ? this.#stmtSearchTrigramFiltered
+      : this.#stmtSearchTrigram;
     const params = source
       ? [sanitized, `%${source}%`, limit]
       : [sanitized, limit];
@@ -445,13 +564,10 @@ export class ContentStore {
 
     const maxDist = maxEditDistance(word.length);
 
-    const candidates = this.#db
-      .prepare(
-        "SELECT word FROM vocabulary WHERE length(word) BETWEEN ? AND ?",
-      )
-      .all(word.length - maxDist, word.length + maxDist) as Array<{
-      word: string;
-    }>;
+    const candidates = this.#stmtFuzzyVocab.all(
+      word.length - maxDist,
+      word.length + maxDist,
+    ) as Array<{ word: string }>;
 
     let bestWord: string | null = null;
     let bestDist = maxDist + 1;
@@ -525,11 +641,10 @@ export class ContentStore {
   // ── Sources ──
 
   listSources(): Array<{ label: string; chunkCount: number }> {
-    return this.#db
-      .prepare(
-        "SELECT label, chunk_count as chunkCount FROM sources ORDER BY id DESC",
-      )
-      .all() as Array<{ label: string; chunkCount: number }>;
+    return this.#stmtListSources.all() as Array<{
+      label: string;
+      chunkCount: number;
+    }>;
   }
 
   /**
@@ -537,15 +652,7 @@ export class ContentStore {
    * Use this for inventory/listing where you need all sections, not search.
    */
   getChunksBySource(sourceId: number): SearchResult[] {
-    const rows = this.#db
-      .prepare(
-        `SELECT c.title, c.content, c.content_type, s.label
-         FROM chunks c
-         JOIN sources s ON s.id = c.source_id
-         WHERE c.source_id = ?
-         ORDER BY c.rowid`,
-      )
-      .all(sourceId) as Array<{
+    const rows = this.#stmtChunksBySource.all(sourceId) as Array<{
       title: string;
       content: string;
       content_type: string;
@@ -564,9 +671,9 @@ export class ContentStore {
   // ── Vocabulary ──
 
   getDistinctiveTerms(sourceId: number, maxTerms: number = 40): string[] {
-    const stats = this.#db
-      .prepare("SELECT chunk_count FROM sources WHERE id = ?")
-      .get(sourceId) as { chunk_count: number } | undefined;
+    const stats = this.#stmtSourceChunkCount.get(sourceId) as
+      | { chunk_count: number }
+      | undefined;
 
     if (!stats || stats.chunk_count < 3) return [];
 
@@ -575,14 +682,10 @@ export class ContentStore {
     const maxAppearances = Math.max(3, Math.ceil(totalChunks * 0.4));
 
     // Stream chunks one at a time to avoid loading all content into memory
-    const stmt = this.#db.prepare(
-      "SELECT content FROM chunks WHERE source_id = ?",
-    );
-
     // Count document frequency (how many sections contain each word)
     const docFreq = new Map<string, number>();
 
-    for (const row of stmt.iterate(sourceId) as Iterable<{ content: string }>) {
+    for (const row of this.#stmtChunkContent.iterate(sourceId) as Iterable<{ content: string }>) {
       const words = new Set(
         row.content
           .toLowerCase()
@@ -616,30 +719,17 @@ export class ContentStore {
   // ── Stats ──
 
   getStats(): StoreStats {
-    const sources =
-      (
-        this.#db.prepare("SELECT COUNT(*) as c FROM sources").get() as {
-          c: number;
-        }
-      )?.c ?? 0;
+    const row = this.#stmtStats.get() as {
+      sources: number;
+      chunks: number;
+      codeChunks: number;
+    } | undefined;
 
-    const chunks =
-      (
-        this.#db
-          .prepare("SELECT COUNT(*) as c FROM chunks")
-          .get() as { c: number }
-      )?.c ?? 0;
-
-    const codeChunks =
-      (
-        this.#db
-          .prepare(
-            "SELECT COUNT(*) as c FROM chunks WHERE content_type = 'code'",
-          )
-          .get() as { c: number }
-      )?.c ?? 0;
-
-    return { sources, chunks, codeChunks };
+    return {
+      sources: row?.sources ?? 0,
+      chunks: row?.chunks ?? 0,
+      codeChunks: row?.codeChunks ?? 0,
+    };
   }
 
   // ── Cleanup ──
@@ -657,20 +747,17 @@ export class ContentStore {
       .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
 
     const unique = [...new Set(words)];
-    const insert = this.#db.prepare(
-      "INSERT OR IGNORE INTO vocabulary (word) VALUES (?)",
-    );
 
     this.#db.transaction(() => {
       for (const word of unique) {
-        insert.run(word);
+        this.#stmtInsertVocab.run(word);
       }
     })();
   }
 
   // ── Chunking ──
 
-  #chunkMarkdown(text: string): Chunk[] {
+  #chunkMarkdown(text: string, maxChunkBytes: number = MAX_CHUNK_BYTES): Chunk[] {
     const chunks: Chunk[] = [];
     const lines = text.split("\n");
     const headingStack: Array<{ level: number; text: string }> = [];
@@ -681,11 +768,46 @@ export class ContentStore {
       const joined = currentContent.join("\n").trim();
       if (joined.length === 0) return;
 
-      chunks.push({
-        title: this.#buildTitle(headingStack, currentHeading),
-        content: joined,
-        hasCode: currentContent.some((l) => /^`{3,}/.test(l)),
-      });
+      const title = this.#buildTitle(headingStack, currentHeading);
+      const hasCode = currentContent.some((l) => /^`{3,}/.test(l));
+
+      // If under the cap, emit as-is (fast path — most chunks hit this)
+      if (Buffer.byteLength(joined) <= maxChunkBytes) {
+        chunks.push({ title, content: joined, hasCode });
+        currentContent = [];
+        return;
+      }
+
+      // Split oversized chunk at paragraph boundaries (double newlines)
+      const paragraphs = joined.split(/\n\n+/);
+      let accumulator: string[] = [];
+      let partIndex = 1;
+
+      const flushAccumulator = () => {
+        if (accumulator.length === 0) return;
+        const part = accumulator.join("\n\n").trim();
+        if (part.length === 0) return;
+        const partTitle = paragraphs.length > 1 ? `${title} (${partIndex})` : title;
+        partIndex++;
+        chunks.push({
+          title: partTitle,
+          content: part,
+          hasCode: part.includes("```"),
+        });
+        accumulator = [];
+      };
+
+      for (const para of paragraphs) {
+        accumulator.push(para);
+        const candidate = accumulator.join("\n\n");
+        if (Buffer.byteLength(candidate) > maxChunkBytes && accumulator.length > 1) {
+          accumulator.pop();
+          flushAccumulator();
+          accumulator = [para];
+        }
+      }
+      flushAccumulator();
+
       currentContent = [];
     };
 
@@ -802,6 +924,143 @@ export class ContentStore {
     }
 
     return chunks;
+  }
+
+  #walkJSON(
+    value: unknown,
+    path: string[],
+    chunks: Chunk[],
+    maxChunkBytes: number,
+  ): void {
+    const title = path.length > 0 ? path.join(" > ") : "(root)";
+    const serialized = JSON.stringify(value, null, 2);
+
+    // Small enough — emit as a single chunk
+    if (Buffer.byteLength(serialized) <= maxChunkBytes) {
+      // Exception: objects with nested structure (object/array values) always
+      // recurse so that key paths become chunk titles for searchability —
+      // even when the subtree fits in one chunk. Flat objects (all primitive
+      // values) stay as a single chunk since there's no hierarchy to expose.
+      const shouldRecurse =
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value) &&
+        Object.values(value).some(
+          (v) => typeof v === "object" && v !== null,
+        );
+
+      if (!shouldRecurse) {
+        chunks.push({ title, content: serialized, hasCode: true });
+        return;
+      }
+    }
+
+    // Object — recurse into each key
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      const entries = Object.entries(value);
+      if (entries.length > 0) {
+        for (const [key, val] of entries) {
+          this.#walkJSON(val, [...path, key], chunks, maxChunkBytes);
+        }
+        return;
+      }
+      // Empty object — emit as-is
+      chunks.push({ title, content: serialized, hasCode: true });
+      return;
+    }
+
+    // Array — batch by size with identity-field-aware titles
+    if (Array.isArray(value)) {
+      this.#chunkJSONArray(value, path, chunks, maxChunkBytes);
+      return;
+    }
+
+    // Primitive that exceeds maxChunkBytes (e.g., very long string)
+    chunks.push({ title, content: serialized, hasCode: false });
+  }
+
+  /**
+   * Scan the first element of an array of objects for a recognizable
+   * identity field. Returns the field name or null.
+   */
+  #findIdentityField(arr: unknown[]): string | null {
+    if (arr.length === 0) return null;
+    const first = arr[0];
+    if (typeof first !== "object" || first === null || Array.isArray(first)) return null;
+
+    const candidates = ["id", "name", "title", "path", "slug", "key", "label"];
+    const obj = first as Record<string, unknown>;
+    for (const field of candidates) {
+      if (field in obj && (typeof obj[field] === "string" || typeof obj[field] === "number")) {
+        return field;
+      }
+    }
+    return null;
+  }
+
+  #jsonBatchTitle(
+    prefix: string,
+    startIdx: number,
+    endIdx: number,
+    batch: unknown[],
+    identityField: string | null,
+  ): string {
+    const sep = prefix ? `${prefix} > ` : "";
+
+    if (!identityField) {
+      return startIdx === endIdx
+        ? `${sep}[${startIdx}]`
+        : `${sep}[${startIdx}-${endIdx}]`;
+    }
+
+    const getId = (item: unknown) =>
+      String((item as Record<string, unknown>)[identityField]);
+
+    if (batch.length === 1) {
+      return `${sep}${getId(batch[0])}`;
+    }
+    if (batch.length <= 3) {
+      return sep + batch.map(getId).join(", ");
+    }
+    return `${sep}${getId(batch[0])}\u2026${getId(batch[batch.length - 1])}`;
+  }
+
+  #chunkJSONArray(
+    arr: unknown[],
+    path: string[],
+    chunks: Chunk[],
+    maxChunkBytes: number,
+  ): void {
+    const prefix = path.length > 0 ? path.join(" > ") : "(root)";
+    const identityField = this.#findIdentityField(arr);
+
+    let batch: unknown[] = [];
+    let batchStart = 0;
+
+    const flushBatch = (batchEnd: number) => {
+      if (batch.length === 0) return;
+      const title = this.#jsonBatchTitle(prefix, batchStart, batchEnd, batch, identityField);
+      chunks.push({
+        title,
+        content: JSON.stringify(batch, null, 2),
+        hasCode: true,
+      });
+    };
+
+    for (let i = 0; i < arr.length; i++) {
+      batch.push(arr[i]);
+      const candidate = JSON.stringify(batch, null, 2);
+
+      if (Buffer.byteLength(candidate) > maxChunkBytes && batch.length > 1) {
+        batch.pop();
+        flushBatch(i - 1);
+        batch = [arr[i]];
+        batchStart = i;
+      }
+    }
+
+    // Flush remaining
+    flushBatch(batchStart + batch.length - 1);
   }
 
   #buildTitle(

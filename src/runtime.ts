@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 export type Language =
   | "javascript"
@@ -24,7 +25,7 @@ export interface RuntimeMap {
   javascript: string;
   typescript: string | null;
   python: string | null;
-  shell: string | null;
+  shell: string;
   ruby: string | null;
   go: string | null;
   rust: string | null;
@@ -43,6 +44,38 @@ function commandExists(cmd: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * On Windows, resolve the first non-WSL bash in PATH.
+ * WSL bash (C:\Windows\System32\bash.exe) cannot handle Windows paths,
+ * so we skip it and prefer Git Bash or MSYS2 bash instead.
+ */
+function resolveWindowsBash(): string | null {
+  // First, try well-known Git Bash locations directly (works even when
+  // Git\usr\bin is not on PATH, which is common in MCP server environments
+  // that only inherit Git\cmd from the system PATH).
+  const knownPaths = [
+    "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
+  ];
+  for (const p of knownPaths) {
+    if (existsSync(p)) return p;
+  }
+
+  // Fallback: scan PATH via `where bash`, skipping WSL and WindowsApps entries.
+  try {
+    const result = execSync("where bash", { encoding: "utf-8", stdio: "pipe" });
+    const candidates = result.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
+    for (const p of candidates) {
+      const lower = p.toLowerCase();
+      if (lower.includes("system32") || lower.includes("windowsapps")) continue;
+      return p;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -77,15 +110,9 @@ export function detectRuntimes(): RuntimeMap {
       : commandExists("python")
         ? "python"
         : null,
-    shell: commandExists("bash")
-      ? "bash"
-      : commandExists("sh")
-        ? "sh"
-        : commandExists("powershell")
-          ? "powershell"
-          : commandExists("cmd.exe")
-            ? "cmd.exe"
-            : null,
+    shell: isWindows
+      ? (resolveWindowsBash() ?? (commandExists("sh") ? "sh" : commandExists("powershell") ? "powershell" : "cmd.exe"))
+      : commandExists("bash") ? "bash" : "sh",
     ruby: commandExists("ruby") ? "ruby" : null,
     go: commandExists("go") ? "go" : null,
     rust: commandExists("rustc") ? "rustc" : null,
@@ -130,13 +157,9 @@ export function getRuntimeSummary(runtimes: RuntimeMap): string {
     lines.push(`  Python:     not available`);
   }
 
-  if (runtimes.shell) {
-    lines.push(
-      `  Shell:      ${runtimes.shell} (${getVersion(runtimes.shell)})`,
-    );
-  } else {
-    lines.push(`  Shell:      not available`);
-  }
+  lines.push(
+    `  Shell:      ${runtimes.shell} (${getVersion(runtimes.shell)})`,
+  );
 
   // Optional runtimes — only show if available
   if (runtimes.ruby)
@@ -175,8 +198,7 @@ export function getRuntimeSummary(runtimes: RuntimeMap): string {
 }
 
 export function getAvailableLanguages(runtimes: RuntimeMap): Language[] {
-  const langs: Language[] = ["javascript"];
-  if (runtimes.shell) langs.push("shell");
+  const langs: Language[] = ["javascript", "shell"];
   if (runtimes.typescript) langs.push("typescript");
   if (runtimes.python) langs.push("python");
   if (runtimes.ruby) langs.push("ruby");
@@ -219,11 +241,6 @@ export function buildCommand(
       return [runtimes.python, filePath];
 
     case "shell":
-      if (!runtimes.shell) {
-        throw new Error(
-          "No shell runtime available. Install bash, sh, powershell, or cmd.",
-        );
-      }
       return [runtimes.shell, filePath];
 
     case "ruby":

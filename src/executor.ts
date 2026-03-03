@@ -67,27 +67,24 @@ export class PolyglotExecutor {
 
     try {
       const filePath = this.#writeScript(tmpDir, code, language);
-
-      let cmd: string[];
-      try {
-        cmd = buildCommand(this.#runtimes, language, filePath);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { exitCode: 1, stdout: "", stderr: msg, timedOut: false };
-      }
+      const cmd = buildCommand(this.#runtimes, language, filePath);
 
       // Rust: compile then run
       if (cmd[0] === "__rust_compile_run__") {
         return await this.#compileAndRun(filePath, tmpDir, timeout);
       }
 
-      return await this.#spawn(cmd, tmpDir, timeout);
+      // Shell commands run in the project directory so git, relative paths,
+      // and other project-aware tools work naturally. Non-shell languages
+      // run in the temp directory where their script file is written.
+      const cwd = language === "shell" ? this.#projectRoot : tmpDir;
+      return await this.#spawn(cmd, cwd, timeout);
     } finally {
       try {
         rmSync(tmpDir, { recursive: true, force: true });
       } catch {
-        // On Windows, EBUSY/EPERM is common due to delayed handle release
-        // after child process exit. Silently ignore — OS cleans temp dirs.
+        // On Windows, bash may still hold file handles when rmSync runs.
+        // Ignore EPERM/EBUSY — the OS will clean up %TEMP% eventually.
       }
     }
   }
@@ -226,7 +223,22 @@ export class PolyglotExecutor {
       // Only .cmd/.bat shims need shell on Windows; real executables don't.
       // Using shell: true globally causes process-tree kill issues with MSYS2/Git Bash.
       const needsShell = isWin && ["tsx", "ts-node", "elixir"].includes(cmd[0]);
-      const proc = spawn(cmd[0], cmd.slice(1), {
+
+      // On Windows with Git Bash, pass the script as `bash -c "source /posix/path"`
+      // rather than `bash /path/to/script.sh`. This avoids MSYS2 path mangling
+      // while still allowing MSYS_NO_PATHCONV to protect non-ASCII paths in commands.
+      let spawnCmd = cmd[0];
+      let spawnArgs: string[];
+      if (isWin && cmd.length === 2 && cmd[1]) {
+        const posixPath = cmd[1].replace(/\\/g, "/");
+        spawnArgs = [posixPath];
+      } else {
+        spawnArgs = isWin
+          ? cmd.slice(1).map(a => a.replace(/\\/g, "/"))
+          : cmd.slice(1);
+      }
+
+      const proc = spawn(spawnCmd, spawnArgs, {
         cwd,
         stdio: ["ignore", "pipe", "pipe"],
         env: this.#buildSafeEnv(cwd),
@@ -336,6 +348,12 @@ export class PolyglotExecutor {
       // XDG (config paths for gh, gcloud, etc.)
       "XDG_CONFIG_HOME",
       "XDG_DATA_HOME",
+      // SSH agent socket — required for git/jj operations that use SSH remotes.
+      // Without this, subprocesses cannot reach the agent and fall back to
+      // prompting for the key passphrase directly on the TTY, which corrupts
+      // Claude Code's PTY ownership.
+      "SSH_AUTH_SOCK",
+      "SSH_AGENT_PID",
     ];
 
     const env: Record<string, string> = {
@@ -345,6 +363,7 @@ export class PolyglotExecutor {
       LANG: "en_US.UTF-8",
       PYTHONDONTWRITEBYTECODE: "1",
       PYTHONUNBUFFERED: "1",
+      PYTHONUTF8: "1",
       NO_COLOR: "1",
     };
 
@@ -357,6 +376,18 @@ export class PolyglotExecutor {
       ];
       for (const key of winVars) {
         if (process.env[key]) env[key] = process.env[key]!;
+      }
+      // Prevent MSYS2/Git Bash from converting non-ASCII Windows paths
+      // (e.g. Chinese characters in project paths) to POSIX paths.
+      env["MSYS_NO_PATHCONV"] = "1";
+      env["MSYS2_ARG_CONV_EXCL"] = "*";
+      // Ensure Git Bash unix tools (cat, ls, head, etc.) are on PATH.
+      // The MCP server process may not inherit the full user PATH that
+      // includes Git's usr/bin directory.
+      const gitUsrBin = "C:\\Program Files\\Git\\usr\\bin";
+      const gitBin = "C:\\Program Files\\Git\\bin";
+      if (!env["PATH"].includes(gitUsrBin)) {
+        env["PATH"] = `${gitUsrBin};${gitBin};${env["PATH"]}`;
       }
     }
 
@@ -380,14 +411,14 @@ export class PolyglotExecutor {
       case "typescript":
         return `const FILE_CONTENT_PATH = ${escaped};\nconst FILE_CONTENT = require("fs").readFileSync(FILE_CONTENT_PATH, "utf-8");\n${code}`;
       case "python":
-        return `FILE_CONTENT_PATH = ${escaped}\nwith open(FILE_CONTENT_PATH, "r") as _f:\n    FILE_CONTENT = _f.read()\n${code}`;
+        return `FILE_CONTENT_PATH = ${escaped}\nwith open(FILE_CONTENT_PATH, "r", encoding="utf-8") as _f:\n    FILE_CONTENT = _f.read()\n${code}`;
       case "shell": {
         // Single-quote the path to prevent $, backtick, and ! expansion
         const sq = "'" + absolutePath.replace(/'/g, "'\\''") + "'";
         return `FILE_CONTENT_PATH=${sq}\nFILE_CONTENT=$(cat ${sq})\n${code}`;
       }
       case "ruby":
-        return `FILE_CONTENT_PATH = ${escaped}\nFILE_CONTENT = File.read(FILE_CONTENT_PATH)\n${code}`;
+        return `FILE_CONTENT_PATH = ${escaped}\nFILE_CONTENT = File.read(FILE_CONTENT_PATH, encoding: "utf-8")\n${code}`;
       case "go":
         return `package main\n\nimport (\n\t"fmt"\n\t"os"\n)\n\nvar FILE_CONTENT_PATH = ${escaped}\n\nfunc main() {\n\tb, _ := os.ReadFile(FILE_CONTENT_PATH)\n\tFILE_CONTENT := string(b)\n\t_ = FILE_CONTENT\n\t_ = fmt.Sprint()\n${code}\n}\n`;
       case "rust":
@@ -395,9 +426,9 @@ export class PolyglotExecutor {
       case "php":
         return `<?php\n$FILE_CONTENT_PATH = ${escaped};\n$FILE_CONTENT = file_get_contents($FILE_CONTENT_PATH);\n${code}`;
       case "perl":
-        return `my $FILE_CONTENT_PATH = ${escaped};\nopen(my $fh, '<', $FILE_CONTENT_PATH) or die "Cannot open: $!";\nmy $FILE_CONTENT = do { local $/; <$fh> };\nclose($fh);\n${code}`;
+        return `my $FILE_CONTENT_PATH = ${escaped};\nopen(my $fh, '<:encoding(UTF-8)', $FILE_CONTENT_PATH) or die "Cannot open: $!";\nmy $FILE_CONTENT = do { local $/; <$fh> };\nclose($fh);\n${code}`;
       case "r":
-        return `FILE_CONTENT_PATH <- ${escaped}\nFILE_CONTENT <- readLines(FILE_CONTENT_PATH, warn=FALSE)\nFILE_CONTENT <- paste(FILE_CONTENT, collapse="\\n")\n${code}`;
+        return `FILE_CONTENT_PATH <- ${escaped}\nFILE_CONTENT <- readLines(FILE_CONTENT_PATH, warn=FALSE, encoding="UTF-8")\nFILE_CONTENT <- paste(FILE_CONTENT, collapse="\\n")\n${code}`;
       case "elixir":
         return `file_content_path = ${escaped}\nfile_content = File.read!(file_content_path)\n${code}`;
     }

@@ -4,7 +4,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createRequire } from "node:module";
 import { z } from "zod";
 import { PolyglotExecutor } from "./executor.js";
-import { ContentStore, cleanupStaleDBs, type SearchResult } from "./store.js";
+import { ContentStore, cleanupStaleDBs, type SearchResult, type IndexResult } from "./store.js";
+import {
+  readBashPolicies,
+  evaluateCommandDenyOnly,
+  extractShellCommands,
+  readToolDenyPatterns,
+  evaluateFilePath,
+} from "./security.js";
 import {
   detectRuntimes,
   getRuntimeSummary,
@@ -12,7 +19,7 @@ import {
   hasBunRuntime,
 } from "./runtime.js";
 
-const VERSION = "0.8.1";
+const VERSION = "0.9.18";
 const runtimes = detectRuntimes();
 const available = getAvailableLanguages(runtimes);
 const server = new McpServer({
@@ -62,6 +69,93 @@ function trackResponse(toolName: string, response: ToolResult): ToolResult {
 
 function trackIndexed(bytes: number): void {
   sessionStats.bytesIndexed += bytes;
+}
+
+// ==============================================================================
+// Security: server-side deny firewall
+// ==============================================================================
+
+/**
+ * Check a shell command against Bash deny patterns.
+ * Returns an error ToolResult if denied, or null if allowed.
+ */
+function checkDenyPolicy(
+  command: string,
+  toolName: string,
+): ToolResult | null {
+  try {
+    const policies = readBashPolicies(process.env.CLAUDE_PROJECT_DIR);
+    const result = evaluateCommandDenyOnly(command, policies);
+    if (result.decision === "deny") {
+      return trackResponse(toolName, {
+        content: [{
+          type: "text" as const,
+          text: `Command blocked by security policy: matches deny pattern ${result.matchedPattern}`,
+        }],
+        isError: true,
+      });
+    }
+  } catch {
+    // Security check failed — allow through (fail-open for server,
+    // hooks are the primary enforcement layer)
+  }
+  return null;
+}
+
+/**
+ * Check non-shell code for shell-escape calls against deny patterns.
+ */
+function checkNonShellDenyPolicy(
+  code: string,
+  language: string,
+  toolName: string,
+): ToolResult | null {
+  try {
+    const commands = extractShellCommands(code, language);
+    if (commands.length === 0) return null;
+    const policies = readBashPolicies(process.env.CLAUDE_PROJECT_DIR);
+    for (const cmd of commands) {
+      const result = evaluateCommandDenyOnly(cmd, policies);
+      if (result.decision === "deny") {
+        return trackResponse(toolName, {
+          content: [{
+            type: "text" as const,
+            text: `Command blocked by security policy: embedded shell command "${cmd}" matches deny pattern ${result.matchedPattern}`,
+          }],
+          isError: true,
+        });
+      }
+    }
+  } catch {
+    // Fail-open
+  }
+  return null;
+}
+
+/**
+ * Check a file path against Read deny patterns.
+ * Returns an error ToolResult if denied, or null if allowed.
+ */
+function checkFilePathDenyPolicy(
+  filePath: string,
+  toolName: string,
+): ToolResult | null {
+  try {
+    const denyGlobs = readToolDenyPatterns("Read", process.env.CLAUDE_PROJECT_DIR);
+    const result = evaluateFilePath(filePath, denyGlobs);
+    if (result.denied) {
+      return trackResponse(toolName, {
+        content: [{
+          type: "text" as const,
+          text: `File access blocked by security policy: path matches Read deny pattern ${result.matchedPattern}`,
+        }],
+        isError: true,
+      });
+    }
+  } catch {
+    // Fail-open
+  }
+  return null;
 }
 
 // Build description dynamically based on detected runtimes
@@ -198,7 +292,7 @@ server.registerTool(
   "execute",
   {
     title: "Execute Code",
-    description: `Execute code in a sandboxed subprocess. Only stdout enters context — raw data stays in the subprocess. Use instead of bash/cat when output would exceed 20 lines.${bunNote} Available: ${langList}.\n\nPREFER THIS OVER BASH for: API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff), data processing, and ANY CLI command that may produce large output. Bash should only be used for file mutations, git writes, and navigation.`,
+    description: `MANDATORY: Use for any command where output exceeds 20 lines. Execute code in a sandboxed subprocess. Only stdout enters context — raw data stays in the subprocess.${bunNote} Available: ${langList}.\n\nPREFER THIS OVER BASH for: API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff), data processing, and ANY CLI command that may produce large output. Bash should only be used for file mutations, git writes, and navigation.`,
     inputSchema: z.object({
       language: z
         .enum([
@@ -237,6 +331,15 @@ server.registerTool(
     }),
   },
   async ({ language, code, timeout, intent }) => {
+    // Security: deny-only firewall
+    if (language === "shell") {
+      const denied = checkDenyPolicy(code, "execute");
+      if (denied) return denied;
+    } else {
+      const denied = checkNonShellDenyPolicy(code, language, "execute");
+      if (denied) return denied;
+    }
+
     try {
       // For JS/TS: wrap in async IIFE with fetch interceptor to track network bytes
       let instrumentedCode = code;
@@ -455,6 +558,19 @@ server.registerTool(
     }),
   },
   async ({ path, language, code, timeout, intent }) => {
+    // Security: check file path against Read deny patterns
+    const pathDenied = checkFilePathDenyPolicy(path, "execute_file");
+    if (pathDenied) return pathDenied;
+
+    // Security: check code parameter against Bash deny patterns
+    if (language === "shell") {
+      const codeDenied = checkDenyPolicy(code, "execute_file");
+      if (codeDenied) return codeDenied;
+    } else {
+      const codeDenied = checkNonShellDenyPolicy(code, language, "execute_file");
+      if (codeDenied) return codeDenied;
+    }
+
     try {
       const result = await executor.executeFile({
         path,
@@ -780,6 +896,9 @@ function resolveGfmPluginPath(): string {
 // Tool: fetch_and_index
 // ─────────────────────────────────────────────────────────
 
+// Subprocess code that fetches a URL, detects Content-Type, and outputs a
+// __CM_CT__:<type> marker on the first line so the handler can route to the
+// appropriate indexing strategy.  HTML is converted to markdown via Turndown.
 function buildFetchCode(url: string): string {
   const turndownPath = JSON.stringify(resolveTurndownPath());
   const gfmPath = JSON.stringify(resolveGfmPluginPath());
@@ -791,12 +910,38 @@ const url = ${JSON.stringify(url)};
 async function main() {
   const resp = await fetch(url);
   if (!resp.ok) { console.error("HTTP " + resp.status); process.exit(1); }
-  const html = await resp.text();
+  const contentType = resp.headers.get('content-type') || '';
 
-  const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
-  td.use(gfm);
-  td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
-  console.log(td.turndown(html));
+  // --- JSON responses ---
+  if (contentType.includes('application/json') || contentType.includes('+json')) {
+    const text = await resp.text();
+    try {
+      const pretty = JSON.stringify(JSON.parse(text), null, 2);
+      console.log('__CM_CT__:json');
+      console.log(pretty);
+    } catch {
+      // Unparseable "JSON" — fall back to plain text
+      console.log('__CM_CT__:text');
+      console.log(text);
+    }
+    return;
+  }
+
+  // --- HTML responses (default for text/html, application/xhtml+xml) ---
+  if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
+    const html = await resp.text();
+    const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
+    td.use(gfm);
+    td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
+    console.log('__CM_CT__:html');
+    console.log(td.turndown(html));
+    return;
+  }
+
+  // --- Everything else: plain text, CSV, XML, etc. ---
+  const text = await resp.text();
+  console.log('__CM_CT__:text');
+  console.log(text);
 }
 main();
 `;
@@ -809,7 +954,8 @@ server.registerTool(
     description:
       "Fetches URL content, converts HTML to markdown, indexes into searchable knowledge base, " +
       "and returns a ~3KB preview. Full content stays in sandbox — use search() for deeper lookups.\n\n" +
-      "Better than WebFetch: preview is immediate, full content is searchable, raw HTML never enters context.",
+      "Better than WebFetch: preview is immediate, full content is searchable, raw HTML never enters context.\n\n" +
+      "Content-type aware: HTML is converted to markdown, JSON is chunked by key paths, plain text is indexed directly.",
     inputSchema: z.object({
       url: z.string().describe("The URL to fetch and index"),
       source: z
@@ -842,23 +988,38 @@ server.registerTool(
         });
       }
 
-      if (!result.stdout || result.stdout.trim().length === 0) {
+      // Parse content-type marker from subprocess output
+      const store = getStore();
+      const rawOutput = (result.stdout || "").trim();
+      const firstNewline = rawOutput.indexOf("\n");
+      const header = firstNewline >= 0 ? rawOutput.slice(0, firstNewline) : "";
+      const content = firstNewline >= 0 ? rawOutput.slice(firstNewline + 1) : rawOutput;
+      const markdown = content.trim();
+
+      if (markdown.length === 0) {
         return trackResponse("fetch_and_index", {
           content: [
             {
               type: "text" as const,
-              text: `Fetched ${url} but got empty content after HTML conversion`,
+              text: `Fetched ${url} but got empty content`,
             },
           ],
           isError: true,
         });
       }
 
-      // Index the markdown into FTS5
-      const store = getStore();
-      const markdown = result.stdout.trim();
       trackIndexed(Buffer.byteLength(markdown));
-      const indexed = store.index({ content: markdown, source: source ?? url });
+
+      // Route to the appropriate indexing strategy based on Content-Type
+      let indexed: IndexResult;
+      if (header === "__CM_CT__:json") {
+        indexed = store.indexJSON(markdown, source ?? url);
+      } else if (header === "__CM_CT__:text") {
+        indexed = store.indexPlainText(markdown, source ?? url);
+      } else {
+        // HTML (default) — content is already converted to markdown
+        indexed = store.index({ content: markdown, source: source ?? url });
+      }
 
       // Build preview — first ~3KB of markdown for immediate use
       const PREVIEW_LIMIT = 3072;
@@ -939,6 +1100,12 @@ server.registerTool(
     }),
   },
   async ({ commands, queries, timeout }) => {
+    // Security: check each command against deny patterns
+    for (const cmd of commands) {
+      const denied = checkDenyPolicy(cmd.command, "batch_execute");
+      if (denied) return denied;
+    }
+
     try {
       // Build batch script with markdown section headers for proper chunking
       const script = commands

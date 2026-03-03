@@ -1,10 +1,10 @@
 {
   "name": "context-mode",
-  "version": "0.9.17",
+  "version": "0.9.18",
   "type": "module",
   "description": "Claude Code MCP plugin that saves 98% of your context window. Sandboxed code execution, FTS5 knowledge base, and intent-driven search.",
   "author": "Mert Koseoğlu",
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "keywords": [
     "mcp",
     "model-context-protocol",

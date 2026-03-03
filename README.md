@@ -2,7 +2,7 @@
 
 **The other half of the context problem.**
 
-[![users](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.message&label=users&color=brightgreen)](https://www.npmjs.com/package/context-mode) [![npm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.npm&label=npm&color=blue)](https://www.npmjs.com/package/context-mode) [![marketplace](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.marketplace&label=marketplace&color=blue)](https://github.com/mksglu/claude-context-mode) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![users](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.message&label=users&color=brightgreen)](https://www.npmjs.com/package/context-mode) [![npm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.npm&label=npm&color=blue)](https://www.npmjs.com/package/context-mode) [![marketplace](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.marketplace&label=marketplace&color=blue)](https://github.com/mksglu/claude-context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/claude-context-mode?style=flat&color=yellow)](https://github.com/mksglu/claude-context-mode/stargazers) [![GitHub forks](https://img.shields.io/github/forks/mksglu/claude-context-mode?style=flat&color=blue)](https://github.com/mksglu/claude-context-mode/network/members) [![Last commit](https://img.shields.io/github/last-commit/mksglu/claude-context-mode?color=green)](https://github.com/mksglu/claude-context-mode/commits) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 
 Every MCP tool call in Claude Code dumps raw data into your 200K context window. A Playwright snapshot costs 56 KB. Twenty GitHub issues cost 59 KB. One access log — 45 KB. After 30 minutes, 40% of your context is gone.
 
@@ -62,7 +62,7 @@ Code Mode showed that tool definitions can be compressed by 99.9%. Context Mode 
 | `execute_file` | Process files in sandbox. Raw content never leaves. | 45 KB → 155 B |
 | `index` | Chunk markdown into FTS5 with BM25 ranking. | 60 KB → 40 B |
 | `search` | Query indexed content with multiple queries in one call. | On-demand retrieval |
-| `fetch_and_index` | Fetch URL, convert to markdown, index. | 60 KB → 40 B |
+| `fetch_and_index` | Fetch URL, detect content type (HTML/JSON/text), chunk and index. | 60 KB → 40 B |
 
 ## How the Sandbox Works
 
@@ -184,6 +184,130 @@ Fetch the React useEffect docs, index them, and find the cleanup pattern
 with code examples. Then run /context-mode:stats.
 ```
 
+## Security
+
+Context Mode enforces the same permission rules you already use in Claude Code — but extends them to the MCP sandbox. If you block `sudo` in Claude Code, it's also blocked inside `execute`, `execute_file`, and `batch_execute`.
+
+**Zero setup required.** If you haven't configured any permissions, nothing changes. This only activates when you add rules.
+
+### Getting started
+
+Find your settings file:
+
+```bash
+# macOS / Linux
+cat ~/.claude/settings.json
+
+# Windows
+type %USERPROFILE%\.claude\settings.json
+```
+
+Add a `permissions` section (keep your existing settings, just add this block). Then restart Claude Code.
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Read(.env)",
+      "Read(**/.env*)"
+    ],
+    "allow": [
+      "Bash(git:*)",
+      "Bash(npm:*)"
+    ]
+  }
+}
+```
+
+The pattern is `Tool(what to match)` where `*` means "anything".
+
+<details>
+<summary><strong>Common deny patterns</strong> (click to expand)</summary>
+
+**Dangerous commands:**
+```
+"Bash(sudo *)"              — block all sudo commands
+"Bash(rm -rf /*)"           — block recursive delete from root
+"Bash(chmod 777 *)"         — block open permissions
+"Bash(shutdown *)"          — block shutdown/reboot
+"Bash(kill -9 *)"           — block force kill
+"Bash(mkfs *)"              — block filesystem format
+"Bash(dd *)"                — block disk write
+```
+
+**Network access:**
+```
+"Bash(curl *)"              — block curl
+"Bash(wget *)"              — block wget
+"Bash(ssh *)"               — block ssh connections
+"Bash(scp *)"               — block secure copy
+"Bash(nc *)"                — block netcat
+```
+
+**Package managers and deploys:**
+```
+"Bash(npm publish *)"       — block npm publish
+"Bash(docker push *)"       — block docker push
+"Bash(pip install *)"       — block pip install
+"Bash(brew install *)"      — block brew install
+"Bash(apt install *)"       — block apt install
+"Bash(wrangler deploy *)"   — block Cloudflare deploys
+"Bash(terraform apply *)"   — block terraform apply
+"Bash(kubectl delete *)"    — block k8s delete
+```
+
+**Sensitive files:**
+```
+"Read(.env)"                — block .env in project root
+"Read(**/.env*)"            — block .env files everywhere
+"Read(**/*secret*)"         — block files with "secret" in the name
+"Read(**/*credential*)"     — block credential files
+"Read(**/*.pem)"            — block private keys
+"Read(**/*id_rsa*)"         — block SSH keys
+```
+
+</details>
+
+<details>
+<summary><strong>Common allow patterns</strong> (click to expand)</summary>
+
+```
+"Bash(git:*)"               — allow git (with or without args)
+"Bash(npm:*)"               — allow npm
+"Bash(npx:*)"               — allow npx
+"Bash(node:*)"              — allow node
+"Bash(python:*)"            — allow python
+"Bash(ls:*)"                — allow ls
+"Bash(cat:*)"               — allow cat
+"Bash(echo:*)"              — allow echo
+"Bash(grep:*)"              — allow grep
+"Bash(make:*)"              — allow make
+```
+
+</details>
+
+### Chained commands
+
+Commands chained with `&&`, `;`, or `|` are split — each part is checked separately:
+
+```
+echo hello && sudo rm -rf /tmp
+```
+
+Blocked. Even though it starts with `echo`, the `sudo` part matches the deny rule.
+
+### Where to put rules
+
+Rules can go in three places (checked in this order):
+
+1. `.claude/settings.local.json` — this project only (gitignored)
+2. `.claude/settings.json` — this project, shared with team
+3. `~/.claude/settings.json` — all projects
+
+**deny** always wins over **allow**. More specific (project-level) rules override global ones.
+
 ## Requirements
 
 - **Node.js 18+**
@@ -213,4 +337,4 @@ npm run test:all      # full suite
 
 ## License
 
-MIT
+[Elastic License 2.0 (ELv2)](LICENSE) — free to use, modify, and share. You may not rebrand and redistribute this software as a competing plugin, product, or managed service.
