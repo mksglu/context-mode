@@ -48,6 +48,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Build
+        run: npm run build
+
       - name: Unit tests
         run: npx tsx tests/executor.test.ts
 
