@@ -24,9 +24,9 @@ Restart Claude Code. Done. This installs the MCP server + a PreToolUse hook that
 
 | Command | What it does |
 |---|---|
-| `/context-mode:stats` | Show context savings for the current session — per-tool breakdown, tokens consumed, savings ratio. |
-| `/context-mode:doctor` | Run diagnostics — checks runtimes, hooks, FTS5, plugin registration, npm and marketplace versions. |
-| `/context-mode:upgrade` | Pull latest from GitHub, rebuild, migrate cache, fix hooks. |
+| `/context-mode:cm-stats` | Show context savings for the current session — per-tool breakdown, tokens consumed, savings ratio. |
+| `/context-mode:cm-doctor` | Run diagnostics — checks runtimes, hooks, FTS5, plugin registration, npm and marketplace versions. |
+| `/context-mode:cm-upgrade` | Pull latest from GitHub, rebuild, migrate cache, fix hooks. |
 
 <details>
 <summary><strong>MCP-only install</strong> (no hooks or slash commands)</summary>
@@ -151,38 +151,38 @@ Over a full session: 315 KB of raw output becomes 5.4 KB. Session time before sl
 
 ## Try It
 
-These prompts work out of the box. Run `/context-mode:stats` after each to see the savings.
+These prompts work out of the box. Run `/context-mode:cm-stats` after each to see the savings.
 
 **Deep repo research** — 5 calls, 62 KB context (raw: 986 KB, 94% saved)
 ```
 Research https://github.com/modelcontextprotocol/servers — architecture, tech stack,
-top contributors, open issues, and recent activity. Then run /context-mode:stats.
+top contributors, open issues, and recent activity. Then run /context-mode:cm-stats.
 ```
 
 **Git history analysis** — 1 call, 5.6 KB context
 ```
 Clone https://github.com/facebook/react and analyze the last 500 commits:
 top contributors, commit frequency by month, and most changed files.
-Then run /context-mode:stats.
+Then run /context-mode:cm-stats.
 ```
 
 **Web scraping** — 1 call, 3.2 KB context
 ```
 Fetch the Hacker News front page, extract all posts with titles, scores,
-and domains. Group by domain. Then run /context-mode:stats.
+and domains. Group by domain. Then run /context-mode:cm-stats.
 ```
 
 **Large JSON API** — 7.5 MB raw → 0.9 KB context (99% saved)
 ```
 Create a local server that returns a 7.5 MB JSON with 20,000 records and a secret
 hidden at index 13000. Fetch the endpoint, find the hidden record, and show me
-exactly what's in it. Then run /context-mode:stats.
+exactly what's in it. Then run /context-mode:cm-stats.
 ```
 
 **Documentation search** — 2 calls, 1.8 KB context
 ```
 Fetch the React useEffect docs, index them, and find the cleanup pattern
-with code examples. Then run /context-mode:stats.
+with code examples. Then run /context-mode:cm-stats.
 ```
 
 ## Security

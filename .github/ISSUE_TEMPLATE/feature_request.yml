@@ -8,7 +8,7 @@ body:
     attributes:
       label: context-mode version
       description: |
-        Run `/context-mode:doctor` to check. Make sure you're on the latest before requesting -- it may already be implemented.
+        Run `/context-mode:cm-doctor` to check. Make sure you're on the latest before requesting -- it may already be implemented.
         Also [search existing issues](https://github.com/mksglu/claude-context-mode/issues) to avoid duplicates.
       placeholder: "e.g. 0.9.17"
     validations:

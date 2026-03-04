@@ -1,9 +1,9 @@
 ---
-name: upgrade
+name: cm-upgrade
 description: |
   Update context-mode from GitHub and fix hooks/settings.
   Pulls latest, builds, installs, updates npm global, configures hooks.
-  Trigger: /context-mode:upgrade
+  Trigger: /context-mode:cm-upgrade
 user_invocable: true
 ---
 
@@ -13,7 +13,7 @@ Pull latest from GitHub and reinstall the plugin.
 
 ## Instructions
 
-1. Derive the **plugin root** from this skill's base directory (go up 2 levels — remove `/skills/upgrade`).
+1. Derive the **plugin root** from this skill's base directory (go up 2 levels — remove `/skills/cm-upgrade`).
 2. Run with Bash:
    ```
    node "<PLUGIN_ROOT>/build/cli.js" upgrade

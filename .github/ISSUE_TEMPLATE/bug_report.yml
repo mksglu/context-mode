@@ -10,9 +10,9 @@ body:
 
         **Before you file:**
         1. [Search existing issues](https://github.com/mksglu/claude-context-mode/issues) to make sure this hasn't been reported already
-        2. Run `/context-mode:upgrade` to pull the latest version
+        2. Run `/context-mode:cm-upgrade` to pull the latest version
         3. Restart your Claude Code session (`Ctrl+C` then relaunch)
-        4. Run `/context-mode:doctor` to verify all checks PASS
+        4. Run `/context-mode:cm-doctor` to verify all checks PASS
         5. If the issue persists on the latest version, file this report
 
   - type: input
@@ -20,8 +20,8 @@ body:
     attributes:
       label: context-mode version
       description: |
-        Run `/context-mode:doctor` and paste the version here.
-        Must be the latest. If not, upgrade first: `/context-mode:upgrade` then restart.
+        Run `/context-mode:cm-doctor` and paste the version here.
+        Must be the latest. If not, upgrade first: `/context-mode:cm-upgrade` then restart.
       placeholder: "e.g. 0.9.17"
     validations:
       required: true
@@ -31,7 +31,7 @@ body:
     attributes:
       label: Doctor output
       description: |
-        Paste the full output of `/context-mode:doctor`.
+        Paste the full output of `/context-mode:cm-doctor`.
         This helps us verify your environment is healthy.
       render: text
     validations:

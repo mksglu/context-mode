@@ -7,7 +7,7 @@
  *   context-mode setup    → Interactive setup (detect runtimes, install Bun)
  *   context-mode doctor   → Diagnose runtime issues, hooks, FTS5, version
  *   context-mode upgrade  → Fix hooks, permissions, and settings
- *   context-mode stats    → (skill only — /context-mode:stats)
+ *   context-mode stats    → (skill only — /context-mode:cm-stats)
  */
 
 import * as p from "@clack/prompts";
@@ -380,7 +380,7 @@ async function doctor(): Promise<number> {
     p.log.warn(
       color.yellow("npm (MCP): WARN") +
         ` — local v${localVersion}, latest v${latestVersion}` +
-        color.dim("\n  Run: /context-mode:upgrade"),
+        color.dim("\n  Run: /context-mode:cm-upgrade"),
     );
   }
 
@@ -399,7 +399,7 @@ async function doctor(): Promise<number> {
     p.log.warn(
       color.yellow("Marketplace: WARN") +
         ` — v${marketplaceVersion}, latest v${latestVersion}` +
-        color.dim("\n  Run: /context-mode:upgrade"),
+        color.dim("\n  Run: /context-mode:cm-upgrade"),
     );
   } else {
     p.log.info(

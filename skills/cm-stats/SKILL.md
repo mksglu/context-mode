@@ -1,9 +1,9 @@
 ---
-name: stats
+name: cm-stats
 description: |
   Show how much context window context-mode saved this session.
   Displays token consumption, context savings ratio, and per-tool breakdown.
-  Trigger: /context-mode:stats
+  Trigger: /context-mode:cm-stats
 user_invocable: true
 ---
 

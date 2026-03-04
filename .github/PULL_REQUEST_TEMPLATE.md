@@ -55,7 +55,7 @@ Our CI runs on **Ubuntu, macOS, and Windows**. Before submitting:
 
 - [ ] `npm run test:all` passes
 - [ ] `npm run typecheck` passes
-- [ ] `/context-mode:doctor` — all checks PASS on my local build
+- [ ] `/context-mode:cm-doctor` — all checks PASS on my local build
 - [ ] Tested in a live Claude Code session with my local MCP server
 
 ### Test output
@@ -76,7 +76,7 @@ Our CI runs on **Ubuntu, macOS, and Windows**. Before submitting:
 - [ ] Pointed `installed_plugins.json` installPath to my local clone
 - [ ] Updated `settings.json` hook path to my local clone
 - [ ] Killed cached MCP server, verified local server is running
-- [ ] Bumped version in `package.json` and confirmed with `/context-mode:doctor`
+- [ ] Bumped version in `package.json` and confirmed with `/context-mode:cm-doctor`
 
 ## Checklist
 

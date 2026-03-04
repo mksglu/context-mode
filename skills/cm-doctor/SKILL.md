@@ -1,9 +1,9 @@
 ---
-name: doctor
+name: cm-doctor
 description: |
   Run context-mode diagnostics. Checks runtimes, hooks, FTS5,
   plugin registration, npm and marketplace versions.
-  Trigger: /context-mode:doctor
+  Trigger: /context-mode:cm-doctor
 user_invocable: true
 ---
 
@@ -13,7 +13,7 @@ Run diagnostics and display results directly in the conversation.
 
 ## Instructions
 
-1. Derive the **plugin root** from this skill's base directory (go up 2 levels — remove `/skills/doctor`).
+1. Derive the **plugin root** from this skill's base directory (go up 2 levels — remove `/skills/cm-doctor`).
 2. Run with Bash:
    ```
    npx tsx "<PLUGIN_ROOT>/src/cli.ts" doctor
