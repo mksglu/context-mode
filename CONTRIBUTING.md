@@ -24,7 +24,7 @@ This guide covers the local development workflow so you can test changes in a li
 
 ```bash
 git clone https://github.com/mksglu/claude-context-mode.git
-cd claude-context-mode/context-mode
+cd claude-context-mode
 npm install
 npm run build
 ```
