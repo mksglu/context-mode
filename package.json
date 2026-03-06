@@ -36,6 +36,7 @@
   },
   "files": [
     "build",
+    "prebuilds",
     "hooks",
     "configs",
     "server.bundle.mjs",

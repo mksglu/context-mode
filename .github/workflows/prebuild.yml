@@ -1,0 +1,151 @@
+name: Prebuild better-sqlite3
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prebuild-linux-glibc:
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node.js 20
+        run: |
+          curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+          yum install -y nodejs
+      - name: Build better-sqlite3
+        run: |
+          npm install better-sqlite3 --build-from-source
+          mkdir -p prebuilds/linux-x64
+          cp node_modules/better-sqlite3/build/Release/better_sqlite3.node prebuilds/linux-x64/
+          strip prebuilds/linux-x64/better_sqlite3.node
+      - name: Verify binary
+        run: |
+          node -e "
+            const bs3 = require('better-sqlite3');
+            const db = new bs3(':memory:');
+            db.exec('CREATE VIRTUAL TABLE t USING fts5(c)');
+            db.prepare('INSERT INTO t VALUES(?)').run('hello');
+            console.log('FTS5 OK');
+            db.close();
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-linux-x64
+          path: prebuilds/
+
+  prebuild-linux-musl:
+    runs-on: ubuntu-latest
+    container:
+      image: node:20-alpine
+    steps:
+      - uses: actions/checkout@v4
+      - run: apk add --no-cache build-base python3 git
+      - name: Build better-sqlite3
+        run: |
+          npm install better-sqlite3 --build-from-source
+          mkdir -p prebuilds/linux-x64-musl
+          cp node_modules/better-sqlite3/build/Release/better_sqlite3.node prebuilds/linux-x64-musl/
+          strip prebuilds/linux-x64-musl/better_sqlite3.node
+      - name: Verify binary
+        run: |
+          node -e "
+            const bs3 = require('better-sqlite3');
+            const db = new bs3(':memory:');
+            db.exec('CREATE VIRTUAL TABLE t USING fts5(c)');
+            db.prepare('INSERT INTO t VALUES(?)').run('hello');
+            console.log('FTS5 OK');
+            db.close();
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-linux-x64-musl
+          path: prebuilds/
+
+  prebuild-macos:
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-13
+          - arch: arm64
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build better-sqlite3
+        run: |
+          npm install better-sqlite3 --build-from-source
+          mkdir -p prebuilds/darwin-${{ matrix.arch }}
+          cp node_modules/better-sqlite3/build/Release/better_sqlite3.node prebuilds/darwin-${{ matrix.arch }}/
+          strip prebuilds/darwin-${{ matrix.arch }}/better_sqlite3.node
+      - name: Verify binary
+        run: |
+          node -e "
+            const bs3 = require('better-sqlite3');
+            const db = new bs3(':memory:');
+            db.exec('CREATE VIRTUAL TABLE t USING fts5(c)');
+            db.prepare('INSERT INTO t VALUES(?)').run('hello');
+            console.log('FTS5 OK');
+            db.close();
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-darwin-${{ matrix.arch }}
+          path: prebuilds/
+
+  prebuild-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build better-sqlite3
+        run: |
+          npm install better-sqlite3 --build-from-source
+          mkdir -p prebuilds/win32-x64
+          cp node_modules/better-sqlite3/build/Release/better_sqlite3.node prebuilds/win32-x64/
+        shell: bash
+      - name: Verify binary
+        run: |
+          node -e "const bs3 = require('better-sqlite3'); const db = new bs3(':memory:'); db.exec('CREATE VIRTUAL TABLE t USING fts5(c)'); console.log('FTS5 OK'); db.close();"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-win32-x64
+          path: prebuilds/
+
+  package:
+    needs: [prebuild-linux-glibc, prebuild-linux-musl, prebuild-macos, prebuild-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: prebuilds/
+          merge-multiple: true
+      - name: Verify prebuilds
+        run: |
+          echo "=== Prebuilt binaries ==="
+          find prebuilds/ -name '*.node' -exec ls -lh {} \;
+          echo "=== Expected platforms ==="
+          for dir in linux-x64 linux-x64-musl darwin-x64 darwin-arm64 win32-x64; do
+            if [ -f "prebuilds/$dir/better_sqlite3.node" ]; then
+              echo "  ✓ $dir"
+            else
+              echo "  ✗ $dir MISSING" && exit 1
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-prebuilds
+          path: prebuilds/

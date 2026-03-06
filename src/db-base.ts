@@ -9,9 +9,10 @@
 import type DatabaseConstructor from "better-sqlite3";
 import type { Database as DatabaseInstance } from "better-sqlite3";
 import { createRequire } from "node:module";
-import { unlinkSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ─────────────────────────────────────────────────────────
 // Types
@@ -112,6 +113,38 @@ export function defaultDBPath(prefix: string = "context-mode"): string {
 }
 
 // ─────────────────────────────────────────────────────────
+// Prebuild resolution
+// ─────────────────────────────────────────────────────────
+
+const __dirname_db = dirname(fileURLToPath(import.meta.url));
+
+function isMusl(): boolean {
+  if (process.platform !== "linux") return false;
+  try {
+    // Alpine and musl-based distros have the musl dynamic linker
+    return (
+      existsSync("/lib/ld-musl-x86_64.so.1") ||
+      existsSync("/lib/ld-musl-aarch64.so.1")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Find a prebuilt better_sqlite3.node binary shipped with context-mode.
+ * Returns the absolute path if found, null otherwise.
+ */
+export function findPrebuildPath(): string | null {
+  const { platform, arch } = process;
+  let suffix = `${platform}-${arch}`;
+  if (isMusl()) suffix += "-musl";
+
+  const candidate = resolve(__dirname_db, "..", "prebuilds", suffix, "better_sqlite3.node");
+  return existsSync(candidate) ? candidate : null;
+}
+
+// ─────────────────────────────────────────────────────────
 // Base class
 // ─────────────────────────────────────────────────────────
 
@@ -130,7 +163,17 @@ export abstract class SQLiteBase {
   constructor(dbPath: string) {
     const Database = loadDatabase();
     this.#dbPath = dbPath;
-    this.#db = new Database(dbPath, { timeout: 5000 });
+    let db: DatabaseInstance;
+    try {
+      db = new Database(dbPath, { timeout: 5000 });
+    } catch (err) {
+      // Native binary may be missing or incompatible (e.g. glibc mismatch).
+      // Fall back to a prebuilt binary shipped with context-mode.
+      const prebuild = findPrebuildPath();
+      if (!prebuild) throw err;
+      db = new Database(dbPath, { timeout: 5000, nativeBinding: prebuild });
+    }
+    this.#db = db;
     applyWALPragmas(this.#db);
     this.initSchema();
     this.prepareStatements();
