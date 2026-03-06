@@ -18,7 +18,7 @@ import { execSync } from "node:child_process";
 import { readFileSync, cpSync, accessSync, readdirSync, rmSync, closeSync, openSync, constants } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { tmpdir, devNull } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   detectRuntimes,
   getRuntimeSummary,
@@ -86,11 +86,11 @@ const args = process.argv.slice(2);
 // When another package (e.g. OpenCode plugin) does `import("context-mode")`,
 // the package.json "." export resolves here. Without this guard the MCP
 // server's stdio transport would bind stdin/stdout and crash with EALREADY.
-const __cliFile = fileURLToPath(import.meta.url);
+// Compare as URLs to avoid Windows path normalization issues.
+const __cliURL = import.meta.url.replace(/\.ts$/, ".js");
 const isDirectExecution =
   process.argv[1] &&
-  (resolve(process.argv[1]) === resolve(__cliFile) ||
-   resolve(process.argv[1]) === resolve(__cliFile.replace(/\.ts$/, ".js")));
+  pathToFileURL(resolve(process.argv[1])).href === __cliURL;
 
 if (isDirectExecution) {
   if (args[0] === "doctor") {
