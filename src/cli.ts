@@ -82,15 +82,27 @@ async function hookDispatch(platform: string, event: string): Promise<void> {
 
 const args = process.argv.slice(2);
 
-if (args[0] === "doctor") {
-  doctor().then((code) => process.exit(code));
-} else if (args[0] === "upgrade") {
-  upgrade();
-} else if (args[0] === "hook") {
-  hookDispatch(args[1], args[2]);
-} else {
-  // Default: start MCP server
-  import("./server.js");
+// Guard: only run CLI entry point when this file is executed directly.
+// When another package (e.g. OpenCode plugin) does `import("context-mode")`,
+// the package.json "." export resolves here. Without this guard the MCP
+// server's stdio transport would bind stdin/stdout and crash with EALREADY.
+const __cliFile = fileURLToPath(import.meta.url);
+const isDirectExecution =
+  process.argv[1] &&
+  (resolve(process.argv[1]) === resolve(__cliFile) ||
+   resolve(process.argv[1]) === resolve(__cliFile.replace(/\.ts$/, ".js")));
+
+if (isDirectExecution) {
+  if (args[0] === "doctor") {
+    doctor().then((code) => process.exit(code));
+  } else if (args[0] === "upgrade") {
+    upgrade();
+  } else if (args[0] === "hook") {
+    hookDispatch(args[1], args[2]);
+  } else {
+    // Default: start MCP server
+    import("./server.js");
+  }
 }
 
 /* -------------------------------------------------------
