@@ -155,6 +155,21 @@ export class PolyglotExecutor {
     } else {
       writeFileSync(fp, code, "utf-8");
     }
+
+    // JavaScript and TypeScript scripts use require() for dynamic imports and
+    // FILE_CONTENT loading. Without an explicit package.json, Node.js inherits
+    // the nearest ancestor package.json — which in many projects declares
+    // "type": "module", causing "require is not defined in ES module scope".
+    // Writing a CJS package.json into the temp dir ensures scripts are treated
+    // as CommonJS regardless of the project's module type setting.
+    if (language === "javascript" || language === "typescript") {
+      writeFileSync(
+        join(tmpDir, "package.json"),
+        JSON.stringify({ type: "commonjs" }),
+        "utf-8",
+      );
+    }
+
     return fp;
   }
 
