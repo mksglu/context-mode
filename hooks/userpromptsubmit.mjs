@@ -11,7 +11,7 @@ import "./suppress-stderr.mjs";
 
 import { readStdin, getSessionId, getSessionDBPath } from "./session-helpers.mjs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HOOK_DIR = dirname(fileURLToPath(import.meta.url));
 const PKG_SESSION = join(HOOK_DIR, "..", "build", "session");
@@ -30,8 +30,8 @@ try {
     || trimmed.startsWith("<tool-result>");
 
   if (trimmed.length > 0 && !isSystemMessage) {
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
-    const { extractUserEvents } = await import(join(PKG_SESSION, "extract.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
+    const { extractUserEvents } = await import(pathToFileURL(join(PKG_SESSION, "extract.js")).href);
     const dbPath = getSessionDBPath();
     const db = new SessionDB({ dbPath });
     const sessionId = getSessionId(input);

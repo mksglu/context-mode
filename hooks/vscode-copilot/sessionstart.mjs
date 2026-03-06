@@ -18,9 +18,10 @@ import {
 } from "../session-helpers.mjs";
 import { join } from "node:path";
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { homedir } from "node:os";
 
-const HOOK_DIR = new URL(".", import.meta.url).pathname;
+const HOOK_DIR = fileURLToPath(new URL(".", import.meta.url));
 const PKG_SESSION = join(HOOK_DIR, "..", "..", "build", "session");
 const OPTS = VSCODE_OPTS;
 
@@ -32,7 +33,7 @@ try {
   const source = input.source ?? "startup";
 
   if (source === "compact") {
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
     const dbPath = getSessionDBPath(OPTS);
     const db = new SessionDB({ dbPath });
     const sessionId = getSessionId(input, OPTS);
@@ -52,7 +53,7 @@ try {
   } else if (source === "resume") {
     try { unlinkSync(getCleanupFlagPath(OPTS)); } catch { /* no flag */ }
 
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
     const dbPath = getSessionDBPath(OPTS);
     const db = new SessionDB({ dbPath });
 
@@ -64,7 +65,7 @@ try {
 
     db.close();
   } else if (source === "startup") {
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
     const dbPath = getSessionDBPath(OPTS);
     const db = new SessionDB({ dbPath });
     try { unlinkSync(getSessionEventsPath(OPTS)); } catch { /* no stale file */ }

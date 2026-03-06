@@ -12,7 +12,7 @@ import { readStdin, getSessionId, getSessionDBPath, GEMINI_OPTS } from "../sessi
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HOOK_DIR = dirname(fileURLToPath(import.meta.url));
 const PKG_SESSION = join(HOOK_DIR, "..", "..", "build", "session");
@@ -23,8 +23,8 @@ try {
   const raw = await readStdin();
   const input = JSON.parse(raw);
 
-  const { buildResumeSnapshot } = await import(join(PKG_SESSION, "snapshot.js"));
-  const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+  const { buildResumeSnapshot } = await import(pathToFileURL(join(PKG_SESSION, "snapshot.js")).href);
+  const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
 
   const dbPath = getSessionDBPath(OPTS);
   const db = new SessionDB({ dbPath });

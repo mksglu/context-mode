@@ -18,7 +18,7 @@ import { execSync } from "node:child_process";
 import { readFileSync, cpSync, accessSync, readdirSync, rmSync, closeSync, openSync, constants } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { tmpdir, devNull } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   detectRuntimes,
   getRuntimeSummary,
@@ -73,7 +73,7 @@ async function hookDispatch(platform: string, event: string): Promise<void> {
     process.exit(1);
   }
   const pluginRoot = getPluginRoot();
-  await import(join(pluginRoot, scriptPath));
+  await import(pathToFileURL(join(pluginRoot, scriptPath)).href);
 }
 
 /* -------------------------------------------------------

@@ -18,7 +18,7 @@ import { ROUTING_BLOCK } from "./routing-block.mjs";
 import { readStdin, getSessionId, getSessionDBPath, getSessionEventsPath, getCleanupFlagPath } from "./session-helpers.mjs";
 import { writeSessionEventsFile, buildSessionDirective, getAllProjectEvents } from "./session-directive.mjs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 
@@ -35,7 +35,7 @@ try {
 
   if (source === "compact") {
     // Session was compacted — write events to file for auto-indexing, inject directive only
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
     const dbPath = getSessionDBPath();
     const db = new SessionDB({ dbPath });
     const sessionId = getSessionId(input);
@@ -56,7 +56,7 @@ try {
     // User used --continue — clear cleanup flag so startup doesn't wipe data
     try { unlinkSync(getCleanupFlagPath()); } catch { /* no flag */ }
 
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
     const dbPath = getSessionDBPath();
     const db = new SessionDB({ dbPath });
 
@@ -69,7 +69,7 @@ try {
     db.close();
   } else if (source === "startup") {
     // Fresh session (no --continue) — clean slate, capture CLAUDE.md rules.
-    const { SessionDB } = await import(join(PKG_SESSION, "db.js"));
+    const { SessionDB } = await import(pathToFileURL(join(PKG_SESSION, "db.js")).href);
     const dbPath = getSessionDBPath();
     const db = new SessionDB({ dbPath });
     try { unlinkSync(getSessionEventsPath()); } catch { /* no stale file */ }
