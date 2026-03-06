@@ -297,9 +297,7 @@ export type PlatformId =
   | "gemini-cli"
   | "opencode"
   | "codex"
-  | "copilot-cli"
   | "vscode-copilot"
-  | "cursor"
   | "unknown";
 
 /** Detection signal used to identify which platform is running. */

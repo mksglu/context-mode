@@ -19,22 +19,20 @@ describe("detectPlatform", () => {
     delete process.env.CLAUDE_PROJECT_DIR;
     delete process.env.CLAUDE_SESSION_ID;
     delete process.env.GEMINI_PROJECT_DIR;
-    delete process.env.GEMINI_SESSION_ID;
-    delete process.env.OPENCODE_PROJECT_DIR;
-    delete process.env.OPENCODE_SESSION_ID;
+    delete process.env.GEMINI_CLI;
     delete process.env.OPENCODE;
     delete process.env.OPENCODE_PID;
-    delete process.env.GITHUB_COPILOT_AGENT;
-    delete process.env.COPILOT_SESSION_ID;
+    delete process.env.CODEX_CI;
+    delete process.env.CODEX_THREAD_ID;
     delete process.env.VSCODE_PID;
     delete process.env.VSCODE_CWD;
-    delete process.env.CURSOR_SESSION_ID;
-    delete process.env.CURSOR_TRACE_ID;
   });
 
   afterEach(() => {
     process.env = savedEnv;
   });
+
+  // ── Claude Code ────────────────────────────────────────
 
   it("returns claude-code when CLAUDE_PROJECT_DIR is set", () => {
     process.env.CLAUDE_PROJECT_DIR = "/some/project";
@@ -50,40 +48,55 @@ describe("detectPlatform", () => {
     expect(signal.confidence).toBe("high");
   });
 
-  it("returns gemini-cli when GEMINI_PROJECT_DIR is set", () => {
+  // ── Gemini CLI ─────────────────────────────────────────
+
+  it("returns gemini-cli when GEMINI_PROJECT_DIR is set (hooks context)", () => {
     process.env.GEMINI_PROJECT_DIR = "/some/project";
     const signal = detectPlatform();
     expect(signal.platform).toBe("gemini-cli");
     expect(signal.confidence).toBe("high");
   });
 
-  it("returns gemini-cli when GEMINI_SESSION_ID is set", () => {
-    process.env.GEMINI_SESSION_ID = "gemini-sess";
+  it("returns gemini-cli when GEMINI_CLI is set (MCP context)", () => {
+    process.env.GEMINI_CLI = "1";
     const signal = detectPlatform();
     expect(signal.platform).toBe("gemini-cli");
     expect(signal.confidence).toBe("high");
   });
 
-  it("returns opencode when OPENCODE_PROJECT_DIR is set", () => {
-    process.env.OPENCODE_PROJECT_DIR = "/some/project";
-    const signal = detectPlatform();
-    expect(signal.platform).toBe("opencode");
-    expect(signal.confidence).toBe("high");
-  });
+  // ── OpenCode ───────────────────────────────────────────
 
-  it("returns opencode when OPENCODE=1 env var is set", () => {
+  it("returns opencode when OPENCODE=1 is set", () => {
     process.env.OPENCODE = "1";
     const signal = detectPlatform();
     expect(signal.platform).toBe("opencode");
     expect(signal.confidence).toBe("high");
   });
 
-  it("returns opencode when OPENCODE_PID env var is set", () => {
+  it("returns opencode when OPENCODE_PID is set", () => {
     process.env.OPENCODE_PID = "12345";
     const signal = detectPlatform();
     expect(signal.platform).toBe("opencode");
     expect(signal.confidence).toBe("high");
   });
+
+  // ── Codex CLI ──────────────────────────────────────────
+
+  it("returns codex when CODEX_CI is set", () => {
+    process.env.CODEX_CI = "1";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("codex");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("returns codex when CODEX_THREAD_ID is set", () => {
+    process.env.CODEX_THREAD_ID = "thread-abc";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("codex");
+    expect(signal.confidence).toBe("high");
+  });
+
+  // ── VS Code Copilot ────────────────────────────────────
 
   it("returns vscode-copilot when VSCODE_PID is set", () => {
     process.env.VSCODE_PID = "12345";
@@ -92,20 +105,19 @@ describe("detectPlatform", () => {
     expect(signal.confidence).toBe("high");
   });
 
-  it("returns cursor when CURSOR_SESSION_ID is set", () => {
-    process.env.CURSOR_SESSION_ID = "cursor-sess";
+  it("returns vscode-copilot when VSCODE_CWD is set", () => {
+    process.env.VSCODE_CWD = "/some/dir";
     const signal = detectPlatform();
-    expect(signal.platform).toBe("cursor");
+    expect(signal.platform).toBe("vscode-copilot");
     expect(signal.confidence).toBe("high");
   });
 
+  // ── Fallback ───────────────────────────────────────────
+
   it("returns a valid platform as default when no env vars are set", () => {
     // No env vars set — result depends on which config dirs exist on this machine.
-    // On machines with ~/.config/opencode/ → opencode (medium)
-    // On machines with ~/.claude/ → claude-code (medium)
-    // Otherwise → claude-code (low, fallback)
     const signal = detectPlatform();
-    expect(["claude-code", "opencode", "gemini-cli", "cursor"]).toContain(signal.platform);
+    expect(["claude-code", "gemini-cli", "codex", "opencode"]).toContain(signal.platform);
   });
 });
 

@@ -6,13 +6,12 @@
  *   2. Config directory existence (medium confidence)
  *   3. Fallback to Claude Code (low confidence — most common)
  *
- * Each platform sets identifiable env vars or creates config dirs:
- *   - Claude Code:  CLAUDE_PROJECT_DIR, ~/.claude/
- *   - Gemini CLI:   GEMINI_PROJECT_DIR, ~/.gemini/
- *   - OpenCode:     OPENCODE_PROJECT_DIR, .opencode/
- *   - Copilot CLI:  GITHUB_COPILOT_*, ~/.config/github-copilot/
- *   - VS Code:      VSCODE_*, ~/.vscode/
- *   - Cursor:       CURSOR_*, ~/.cursor/
+ * Verified env vars per platform (from source code audit):
+ *   - Claude Code:    CLAUDE_PROJECT_DIR, CLAUDE_SESSION_ID | ~/.claude/
+ *   - Gemini CLI:     GEMINI_PROJECT_DIR (hooks), GEMINI_CLI (MCP) | ~/.gemini/
+ *   - OpenCode:       OPENCODE, OPENCODE_PID | ~/.config/opencode/
+ *   - Codex CLI:      CODEX_CI, CODEX_THREAD_ID | ~/.codex/
+ *   - VS Code Copilot: VSCODE_PID, VSCODE_CWD | ~/.vscode/
  */
 
 import { existsSync } from "node:fs";
@@ -35,28 +34,27 @@ export function detectPlatform(): DetectionSignal {
     };
   }
 
-  if (process.env.GEMINI_PROJECT_DIR || process.env.GEMINI_SESSION_ID) {
+  if (process.env.GEMINI_PROJECT_DIR || process.env.GEMINI_CLI) {
     return {
       platform: "gemini-cli",
       confidence: "high",
-      reason: "GEMINI_PROJECT_DIR or GEMINI_SESSION_ID env var set",
+      reason: "GEMINI_PROJECT_DIR or GEMINI_CLI env var set",
     };
   }
 
-  if (process.env.OPENCODE_PROJECT_DIR || process.env.OPENCODE_SESSION_ID ||
-      process.env.OPENCODE || process.env.OPENCODE_PID) {
+  if (process.env.OPENCODE || process.env.OPENCODE_PID) {
     return {
       platform: "opencode",
       confidence: "high",
-      reason: "OPENCODE* env var set",
+      reason: "OPENCODE or OPENCODE_PID env var set",
     };
   }
 
-  if (process.env.GITHUB_COPILOT_AGENT || process.env.COPILOT_SESSION_ID) {
+  if (process.env.CODEX_CI || process.env.CODEX_THREAD_ID) {
     return {
-      platform: "copilot-cli",
+      platform: "codex",
       confidence: "high",
-      reason: "GITHUB_COPILOT_AGENT or COPILOT_SESSION_ID env var set",
+      reason: "CODEX_CI or CODEX_THREAD_ID env var set",
     };
   }
 
@@ -68,25 +66,9 @@ export function detectPlatform(): DetectionSignal {
     };
   }
 
-  if (process.env.CURSOR_SESSION_ID || process.env.CURSOR_TRACE_ID) {
-    return {
-      platform: "cursor",
-      confidence: "high",
-      reason: "CURSOR_SESSION_ID or CURSOR_TRACE_ID env var set",
-    };
-  }
-
   // ── Medium confidence: config directory existence ──────
 
   const home = homedir();
-
-  if (existsSync(resolve(home, ".config", "opencode"))) {
-    return {
-      platform: "opencode",
-      confidence: "medium",
-      reason: "~/.config/opencode/ directory exists",
-    };
-  }
 
   if (existsSync(resolve(home, ".claude"))) {
     return {
@@ -104,11 +86,19 @@ export function detectPlatform(): DetectionSignal {
     };
   }
 
-  if (existsSync(resolve(home, ".cursor"))) {
+  if (existsSync(resolve(home, ".codex"))) {
     return {
-      platform: "cursor",
+      platform: "codex",
       confidence: "medium",
-      reason: "~/.cursor/ directory exists",
+      reason: "~/.codex/ directory exists",
+    };
+  }
+
+  if (existsSync(resolve(home, ".config", "opencode"))) {
+    return {
+      platform: "opencode",
+      confidence: "medium",
+      reason: "~/.config/opencode/ directory exists",
     };
   }
 
