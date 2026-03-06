@@ -22,6 +22,8 @@ describe("detectPlatform", () => {
     delete process.env.GEMINI_SESSION_ID;
     delete process.env.OPENCODE_PROJECT_DIR;
     delete process.env.OPENCODE_SESSION_ID;
+    delete process.env.OPENCODE;
+    delete process.env.OPENCODE_PID;
     delete process.env.GITHUB_COPILOT_AGENT;
     delete process.env.COPILOT_SESSION_ID;
     delete process.env.VSCODE_PID;
@@ -69,6 +71,20 @@ describe("detectPlatform", () => {
     expect(signal.confidence).toBe("high");
   });
 
+  it("returns opencode when OPENCODE=1 env var is set", () => {
+    process.env.OPENCODE = "1";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("opencode");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("returns opencode when OPENCODE_PID env var is set", () => {
+    process.env.OPENCODE_PID = "12345";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("opencode");
+    expect(signal.confidence).toBe("high");
+  });
+
   it("returns vscode-copilot when VSCODE_PID is set", () => {
     process.env.VSCODE_PID = "12345";
     const signal = detectPlatform();
@@ -83,12 +99,13 @@ describe("detectPlatform", () => {
     expect(signal.confidence).toBe("high");
   });
 
-  it("returns claude-code as default when no platform detected", () => {
-    // No env vars set, and we rely on fallback.
-    // Note: on machines with ~/.claude/ this may return medium confidence
-    // instead of low, but platform should still be "claude-code".
+  it("returns a valid platform as default when no env vars are set", () => {
+    // No env vars set — result depends on which config dirs exist on this machine.
+    // On machines with ~/.config/opencode/ → opencode (medium)
+    // On machines with ~/.claude/ → claude-code (medium)
+    // Otherwise → claude-code (low, fallback)
     const signal = detectPlatform();
-    expect(signal.platform).toBe("claude-code");
+    expect(["claude-code", "opencode", "gemini-cli", "cursor"]).toContain(signal.platform);
   });
 });
 

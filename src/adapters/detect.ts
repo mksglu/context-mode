@@ -43,11 +43,12 @@ export function detectPlatform(): DetectionSignal {
     };
   }
 
-  if (process.env.OPENCODE_PROJECT_DIR || process.env.OPENCODE_SESSION_ID) {
+  if (process.env.OPENCODE_PROJECT_DIR || process.env.OPENCODE_SESSION_ID ||
+      process.env.OPENCODE || process.env.OPENCODE_PID) {
     return {
       platform: "opencode",
       confidence: "high",
-      reason: "OPENCODE_PROJECT_DIR or OPENCODE_SESSION_ID env var set",
+      reason: "OPENCODE* env var set",
     };
   }
 
@@ -78,6 +79,14 @@ export function detectPlatform(): DetectionSignal {
   // ── Medium confidence: config directory existence ──────
 
   const home = homedir();
+
+  if (existsSync(resolve(home, ".config", "opencode"))) {
+    return {
+      platform: "opencode",
+      confidence: "medium",
+      reason: "~/.config/opencode/ directory exists",
+    };
+  }
 
   if (existsSync(resolve(home, ".claude"))) {
     return {
