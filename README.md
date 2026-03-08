@@ -150,7 +150,13 @@ npm install -g context-mode
 }
 ```
 
-**Step 4 — Restart VS Code.** On first run, a `.github/copilot-instructions.md` routing instructions file is auto-created in your project. This works alongside hooks as a parallel enforcement layer — hooks intercept tool calls programmatically, while `copilot-instructions.md` guides the model's tool selection from session start.
+**Step 4 — Restart VS Code.** On first session start, the sessionstart hook automatically manages `.github/copilot-instructions.md` routing instructions in your project:
+
+- **File does not exist** — `.github/` is created and the routing instructions file is written.
+- **File exists without context-mode rules** — routing instructions are appended after your existing content, preserving project-level coding standards.
+- **File already contains context-mode rules** — skipped (idempotent, no duplicate content).
+
+This works alongside hooks as a parallel enforcement layer — hooks intercept tool calls programmatically, while `copilot-instructions.md` guides the model's tool selection from session start.
 
 > **Why hooks matter:** Without hooks, `copilot-instructions.md` guides the model but can't block commands. A single unrouted Playwright snapshot (56 KB) or `gh issue list` (59 KB) wipes out minutes of context savings. With hooks, these calls are intercepted and redirected to the sandbox before they execute.
 

@@ -85,6 +85,13 @@ try {
     const sessionId = getSessionId(input, OPTS);
     const projectDir = getProjectDir(OPTS);
     db.ensureSession(sessionId, projectDir);
+
+    // Auto-write copilot-instructions.md on first startup if not present
+    try {
+      const { VSCodeCopilotAdapter } = await import(pathToFileURL(join(HOOK_DIR, "..", "..", "build", "adapters", "vscode-copilot", "index.js")).href);
+      new VSCodeCopilotAdapter().writeRoutingInstructions(projectDir, join(HOOK_DIR, "..", ".."));
+    } catch { /* best effort — don't block session start */ }
+
     const ruleFilePaths = [
       join(projectDir, ".github", "copilot-instructions.md"),
     ];
