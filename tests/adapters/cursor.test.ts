@@ -253,7 +253,7 @@ describe("CursorAdapter", () => {
 
       const result = adapter.checkPluginRegistration();
       expect(result.status).toBe("pass");
-      expect(result.message).toContain(".cursor/mcp.json");
+      expect(result.message).toContain(join(".cursor", "mcp.json"));
     });
   });
 });
