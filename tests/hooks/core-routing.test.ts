@@ -188,6 +188,26 @@ describe("routePreToolUse", () => {
       expect(result).not.toBeNull();
       expect(result!.reason).toContain(url);
     });
+
+    it("treats mcp_web_fetch as WebFetch and blocks it", () => {
+      const url = "https://example.com";
+      const result = routePreToolUse("mcp_web_fetch", { url });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("deny");
+      expect(result!.reason).toContain("mcp_web_fetch");
+      expect(result!.reason).toContain("fetch_and_index");
+      expect(result!.reason).toContain("ctx_search");
+    });
+
+    it("treats mcp_fetch_tool as WebFetch and blocks it", () => {
+      const url = "https://example.com";
+      const result = routePreToolUse("mcp_fetch_tool", { url });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("deny");
+      expect(result!.reason).toContain("mcp_fetch_tool");
+      expect(result!.reason).toContain("fetch_and_index");
+      expect(result!.reason).toContain("ctx_search");
+    });
   });
 
   // ─── Task routing ──────────────────────────────────────

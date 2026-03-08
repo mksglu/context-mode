@@ -64,6 +64,22 @@ export const formatters = {
       },
     }),
   },
+
+  "cursor": {
+    deny: (reason) => ({
+      permission: "deny",
+      user_message: reason,
+    }),
+    ask: () => ({
+      permission: "ask",
+    }),
+    modify: (updatedInput) => ({
+      updated_input: updatedInput,
+    }),
+    context: (additionalContext) => ({
+      agent_message: additionalContext,
+    }),
+  },
 };
 
 /**

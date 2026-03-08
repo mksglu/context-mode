@@ -11,6 +11,7 @@
  *   - Gemini CLI:     GEMINI_PROJECT_DIR (hooks), GEMINI_CLI (MCP) | ~/.gemini/
  *   - OpenCode:       OPENCODE, OPENCODE_PID | ~/.config/opencode/
  *   - Codex CLI:      CODEX_CI, CODEX_THREAD_ID | ~/.codex/
+ *   - Cursor:         CURSOR_CWD, CURSOR_SESSION_ID, CURSOR_TRACE_ID | ~/.cursor/
  *   - VS Code Copilot: VSCODE_PID, VSCODE_CWD | ~/.vscode/
  */
 
@@ -58,6 +59,18 @@ export function detectPlatform(): DetectionSignal {
     };
   }
 
+  if (
+    process.env.CURSOR_CWD
+    || process.env.CURSOR_SESSION_ID
+    || process.env.CURSOR_TRACE_ID
+  ) {
+    return {
+      platform: "cursor",
+      confidence: "high",
+      reason: "CURSOR_CWD, CURSOR_SESSION_ID, or CURSOR_TRACE_ID env var set",
+    };
+  }
+
   if (process.env.VSCODE_PID || process.env.VSCODE_CWD) {
     return {
       platform: "vscode-copilot",
@@ -91,6 +104,14 @@ export function detectPlatform(): DetectionSignal {
       platform: "codex",
       confidence: "medium",
       reason: "~/.codex/ directory exists",
+    };
+  }
+
+  if (existsSync(resolve(home, ".cursor"))) {
+    return {
+      platform: "cursor",
+      confidence: "medium",
+      reason: "~/.cursor/ directory exists",
     };
   }
 
@@ -142,6 +163,11 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "vscode-copilot": {
       const { VSCodeCopilotAdapter } = await import("./vscode-copilot/index.js");
       return new VSCodeCopilotAdapter();
+    }
+
+    case "cursor": {
+      const { CursorAdapter } = await import("./cursor/index.js");
+      return new CursorAdapter();
     }
 
     default: {

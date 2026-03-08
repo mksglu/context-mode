@@ -159,6 +159,69 @@ Full hook config including PreCompact: [`configs/vscode-copilot/hooks.json`](con
 </details>
 
 <details>
+<summary><strong>Cursor</strong> <sup>(Beta)</sup></summary>
+
+**Step 1 — Install globally:**
+
+```bash
+npm install -g context-mode
+```
+
+**Step 2 — Register the MCP server.** Create `.cursor/mcp.json` in your project root or `~/.cursor/mcp.json` for a global install:
+
+```json
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "context-mode"
+    }
+  }
+}
+```
+
+**Step 3 — Add native Cursor hooks.** Cursor v1 support uses native `.cursor/hooks.json` or `~/.cursor/hooks.json` only. Create either path with:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "command": "context-mode hook cursor pretooluse",
+        "matcher": "Shell|Read|Grep|WebFetch|Task|MCP:ctx_execute|MCP:ctx_execute_file|MCP:ctx_batch_execute"
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "command": "context-mode hook cursor posttooluse"
+      }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "context-mode hook cursor sessionstart"
+      }
+    ]
+  }
+}
+```
+
+Note: the `preToolUse` hook matcher is optional. If you don't provide it, the hook will fire on all tools.
+
+**Step 4 — Restart Cursor or open a new agent session.**
+
+> **Native Cursor scope:** v1 ships `preToolUse`, `postToolUse`, and `sessionStart`. `preCompact` is intentionally not enabled until real Cursor fixtures confirm compatible compaction semantics.
+>
+> **Config precedence:** project `.cursor/hooks.json` overrides `~/.cursor/hooks.json`. Cursor may also load enterprise config at `/Library/Application Support/Cursor/hooks.json`; context-mode treats that layer as read-only informational.
+
+Full native hook config: [`configs/cursor/hooks.json`](configs/cursor/hooks.json)  
+Example MCP registration: [`configs/cursor/mcp.json`](configs/cursor/mcp.json)
+
+</details>
+
+<details>
 <summary><strong>OpenCode</strong> <sup>(Beta)</sup></summary>
 
 **Step 1 — Install globally:**
@@ -278,15 +341,15 @@ Context Mode captures every meaningful event during your session and persists th
 
 Session continuity requires 4 hooks working together:
 
-| Hook | Role | Claude Code | Gemini CLI | VS Code Copilot | OpenCode | Codex CLI |
-|---|---|:---:|:---:|:---:|:---:|:---:|
-| **PostToolUse** | Captures events after each tool call | Yes | Yes | Yes | Plugin | -- |
-| **UserPromptSubmit** | Captures user decisions and corrections | Yes | -- | -- | -- | -- |
-| **PreCompact** | Builds snapshot before compaction | Yes | Yes | Yes | Plugin | -- |
-| **SessionStart** | Restores state after compaction | Yes | Yes | Yes | -- | -- |
-| | **Session completeness** | **Full** | **High** | **High** | **High** | **--** |
+| Hook | Role | Claude Code | Gemini CLI | VS Code Copilot | Cursor | OpenCode | Codex CLI |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **PostToolUse** | Captures events after each tool call | Yes | Yes | Yes | Yes | Plugin | -- |
+| **UserPromptSubmit** | Captures user decisions and corrections | Yes | -- | -- | -- | -- | -- |
+| **PreCompact** | Builds snapshot before compaction | Yes | Yes | Yes | -- | Plugin | -- |
+| **SessionStart** | Restores state after compaction or resume | Yes | Yes | Yes | Yes | -- | -- |
+| | **Session completeness** | **Full** | **High** | **High** | **Medium** | **High** | **--** |
 
-> **Note:** Full session continuity (capture + snapshot + restore) works on **Claude Code**, **Gemini CLI**, **VS Code Copilot**, and **OpenCode**. OpenCode uses the `experimental.session.compacting` plugin hook for compaction recovery — SessionStart is not yet available ([#14808](https://github.com/sst/opencode/issues/14808)), so startup/resume is not supported. Codex CLI has no hook support, so session tracking is not available.
+> **Note:** Full session continuity (capture + snapshot + restore) works on **Claude Code**, **Gemini CLI**, and **VS Code Copilot**, and **OpenCode**. **Cursor** v1 restores from persisted session events via `sessionStart`, but intentionally does not advertise `preCompact` until real native fixtures confirm compaction compatibility. **OpenCode** uses the `experimental.session.compacting` plugin hook for compaction recovery, but SessionStart is not yet available ([#14808](https://github.com/sst/opencode/issues/14808)), so startup/resume is not supported. Codex CLI has no hook support, so session tracking is not available.
 
 <details>
 <summary><strong>What gets captured</strong></summary>
@@ -361,6 +424,8 @@ Detailed event data is also indexed into FTS5 for on-demand retrieval via `searc
 
 **VS Code Copilot** — High coverage. Same as Gemini CLI — PostToolUse, PreCompact, and SessionStart all fire. User decisions aren't captured but all tool-level events are.
 
+**Cursor** — Medium coverage. Native `preToolUse`, `postToolUse`, and `sessionStart` hooks are supported. Session restore works from the persisted event database, but `preCompact` is intentionally disabled in v1 until real Cursor fixtures prove compatible semantics.
+
 **OpenCode** — Partial. The TypeScript plugin captures PostToolUse events via `tool.execute.after`, but SessionStart is not yet available ([#14808](https://github.com/sst/opencode/issues/14808)). Events are stored but not automatically restored after compaction. The `AGENTS.md` routing instructions file compensates by re-teaching tool preferences at each session start.
 
 **Codex CLI** — No session support. No hooks means no event capture. Each compaction or new session starts fresh. The `AGENTS.md` routing instructions file is the only continuity mechanism.
@@ -369,17 +434,18 @@ Detailed event data is also indexed into FTS5 for on-demand retrieval via `searc
 
 ## Platform Compatibility
 
-| Feature | Claude Code | Gemini CLI <sup>(Beta)</sup> | VS Code Copilot <sup>(Beta)</sup> | OpenCode <sup>(Beta)</sup> | Codex CLI <sup>(Beta)</sup> |
-|---|:---:|:---:|:---:|:---:|:---:|
-| MCP Server | Yes | Yes | Yes | Yes | Yes |
-| PreToolUse Hook | Yes | Yes | Yes | Plugin | -- |
-| PostToolUse Hook | Yes | Yes | Yes | Plugin | -- |
-| SessionStart Hook | Yes | Yes | Yes | -- | -- |
-| Can Modify Args | Yes | Yes | Yes | Plugin | -- |
-| Can Block Tools | Yes | Yes | Yes | Plugin | -- |
-| Utility Commands (ctx) | Yes | Yes | Yes | Yes | Yes |
-| Slash Commands | Yes | -- | -- | -- | -- |
-| Plugin Marketplace | Yes | -- | -- | -- | -- |
+| Feature | Claude Code | Gemini CLI <sup>(Beta)</sup> | VS Code Copilot <sup>(Beta)</sup> | Cursor <sup>(Beta)</sup> | OpenCode <sup>(Beta)</sup> | Codex CLI <sup>(Beta)</sup> |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| MCP Server | Yes | Yes | Yes | Yes | Yes | Yes |
+| PreToolUse Hook | Yes | Yes | Yes | Yes | Plugin | -- |
+| PostToolUse Hook | Yes | Yes | Yes | Yes | Plugin | -- |
+| SessionStart Hook | Yes | Yes | Yes | Yes | -- | -- |
+| PreCompact Hook | Yes | Yes | Yes | -- | Plugin | -- |
+| Can Modify Args | Yes | Yes | Yes | Yes | Plugin | -- |
+| Can Block Tools | Yes | Yes | Yes | Yes | Plugin | -- |
+| Utility Commands (ctx) | Yes | Yes | Yes | Yes | Yes | Yes |
+| Slash Commands | Yes | -- | -- | -- | -- | -- |
+| Plugin Marketplace | Yes | -- | -- | -- | -- | -- |
 
 > **OpenCode** uses a TypeScript plugin paradigm — hooks run as in-process functions via `tool.execute.before`, `tool.execute.after`, and `experimental.session.compacting`, providing the same routing enforcement and session continuity as shell-based hooks. SessionStart is not yet available ([#14808](https://github.com/sst/opencode/issues/14808)), but compaction recovery works via the plugin's compacting hook.
 >
@@ -394,6 +460,7 @@ Hooks intercept tool calls programmatically — they can block dangerous command
 | Claude Code | Yes (auto) | [`CLAUDE.md`](configs/claude-code/CLAUDE.md) | **~98% saved** | ~60% saved |
 | Gemini CLI | Yes | [`GEMINI.md`](configs/gemini-cli/GEMINI.md) | **~98% saved** | ~60% saved |
 | VS Code Copilot | Yes | [`copilot-instructions.md`](configs/vscode-copilot/copilot-instructions.md) | **~98% saved** | ~60% saved |
+| Cursor | Yes | -- | **~98% saved** | Manual tool choice |
 | OpenCode | Plugin | [`AGENTS.md`](configs/opencode/AGENTS.md) | **~98% saved** | ~60% saved |
 | Codex CLI | -- | [`AGENTS.md`](configs/codex/AGENTS.md) | -- | ~60% saved |
 

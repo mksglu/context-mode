@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { detectPlatform, getAdapter } from "../../src/adapters/detect.js";
 import { ClaudeCodeAdapter } from "../../src/adapters/claude-code/index.js";
 import { GeminiCLIAdapter } from "../../src/adapters/gemini-cli/index.js";
 import { OpenCodeAdapter } from "../../src/adapters/opencode/index.js";
 import { CodexAdapter } from "../../src/adapters/codex/index.js";
 import { VSCodeCopilotAdapter } from "../../src/adapters/vscode-copilot/index.js";
+import { CursorAdapter } from "../../src/adapters/cursor/index.js";
 
 // ─────────────────────────────────────────────────────────
 // detectPlatform — env var detection
@@ -24,8 +25,12 @@ describe("detectPlatform", () => {
     delete process.env.OPENCODE_PID;
     delete process.env.CODEX_CI;
     delete process.env.CODEX_THREAD_ID;
+    delete process.env.CURSOR_CWD;
+    delete process.env.CURSOR_SESSION_ID;
+    delete process.env.CURSOR_TRACE_ID;
     delete process.env.VSCODE_PID;
     delete process.env.VSCODE_CWD;
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
@@ -96,6 +101,30 @@ describe("detectPlatform", () => {
     expect(signal.confidence).toBe("high");
   });
 
+  // ── Cursor ─────────────────────────────────────────────
+
+  it("returns cursor when CURSOR_CWD is set", () => {
+    process.env.CURSOR_CWD = "/some/dir";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("cursor");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("returns cursor when CURSOR_SESSION_ID is set", () => {
+    process.env.CURSOR_SESSION_ID = "cursor-sess-123";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("cursor");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("prefers cursor over vscode-copilot when both Cursor and VS Code env vars are set", () => {
+    process.env.CURSOR_CWD = "/cursor/project";
+    process.env.VSCODE_PID = "12345";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("cursor");
+    expect(signal.confidence).toBe("high");
+  });
+
   // ── VS Code Copilot ────────────────────────────────────
 
   it("returns vscode-copilot when VSCODE_PID is set", () => {
@@ -117,7 +146,7 @@ describe("detectPlatform", () => {
   it("returns a valid platform as default when no env vars are set", () => {
     // No env vars set — result depends on which config dirs exist on this machine.
     const signal = detectPlatform();
-    expect(["claude-code", "gemini-cli", "codex", "opencode"]).toContain(signal.platform);
+    expect(["claude-code", "gemini-cli", "codex", "cursor", "opencode"]).toContain(signal.platform);
   });
 });
 
@@ -149,6 +178,11 @@ describe("getAdapter", () => {
   it("returns VSCodeCopilotAdapter for vscode-copilot", async () => {
     const adapter = await getAdapter("vscode-copilot");
     expect(adapter).toBeInstanceOf(VSCodeCopilotAdapter);
+  });
+
+  it("returns CursorAdapter for cursor", async () => {
+    const adapter = await getAdapter("cursor");
+    expect(adapter).toBeInstanceOf(CursorAdapter);
   });
 
   it("returns ClaudeCodeAdapter for unknown platform", async () => {

@@ -55,6 +55,11 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     precompact: "hooks/vscode-copilot/precompact.mjs",
     sessionstart: "hooks/vscode-copilot/sessionstart.mjs",
   },
+  "cursor": {
+    pretooluse: "hooks/cursor/pretooluse.mjs",
+    posttooluse: "hooks/cursor/posttooluse.mjs",
+    sessionstart: "hooks/cursor/sessionstart.mjs",
+  },
 };
 
 async function hookDispatch(platform: string, event: string): Promise<void> {

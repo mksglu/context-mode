@@ -33,6 +33,13 @@ export const VSCODE_OPTS = {
   sessionIdEnv: undefined,
 };
 
+/** Cursor platform options. */
+export const CURSOR_OPTS = {
+  configDir: ".cursor",
+  projectDirEnv: "CURSOR_CWD",
+  sessionIdEnv: "CURSOR_SESSION_ID",
+};
+
 /**
  * Read all of stdin as a string (event-based, cross-platform safe).
  */
@@ -56,6 +63,20 @@ export function getProjectDir(opts = CLAUDE_OPTS) {
 }
 
 /**
+ * Get the project directory from hook input when available.
+ * Falls back to the platform env var and finally process.cwd().
+ */
+export function getInputProjectDir(input, opts = CLAUDE_OPTS) {
+  if (typeof input?.cwd === "string" && input.cwd.length > 0) {
+    return input.cwd;
+  }
+  if (Array.isArray(input?.workspace_roots) && input.workspace_roots.length > 0) {
+    return String(input.workspace_roots[0]);
+  }
+  return getProjectDir(opts);
+}
+
+/**
  * Derive session ID from hook input.
  * Priority: transcript_path UUID > sessionId (camelCase) > session_id > env var > ppid fallback.
  */
@@ -64,6 +85,7 @@ export function getSessionId(input, opts = CLAUDE_OPTS) {
     const match = input.transcript_path.match(/([a-f0-9-]{36})\.jsonl$/);
     if (match) return match[1];
   }
+  if (input.conversation_id) return input.conversation_id;
   if (input.sessionId) return input.sessionId;
   if (input.session_id) return input.session_id;
   if (opts.sessionIdEnv && process.env[opts.sessionIdEnv]) {

@@ -298,6 +298,7 @@ export type PlatformId =
   | "opencode"
   | "codex"
   | "vscode-copilot"
+  | "cursor"
   | "unknown";
 
 /** Detection signal used to identify which platform is running. */

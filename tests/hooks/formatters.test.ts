@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 let claudeCodeFormat: (decision: unknown) => unknown;
 let geminiCliFormat: (decision: unknown) => unknown;
 let vscodeCopilotFormat: (decision: unknown) => unknown;
+let cursorFormat: (decision: unknown) => unknown;
 
 beforeAll(async () => {
   const ccMod = await import("../../hooks/formatters/claude-code.mjs");
@@ -14,6 +15,9 @@ beforeAll(async () => {
 
   const vscMod = await import("../../hooks/formatters/vscode-copilot.mjs");
   vscodeCopilotFormat = vscMod.formatDecision;
+
+  const cursorMod = await import("../../hooks/formatters/cursor.mjs");
+  cursorFormat = cursorMod.formatDecision;
 });
 
 // ─── Shared test decisions ───────────────────────────────
@@ -164,6 +168,29 @@ describe("formatDecision", () => {
       expect(result.hookEventName).toBe("PreToolUse");
       const output = result.hookSpecificOutput as Record<string, unknown>;
       expect(output.additionalContext).toBe(contextDecision.additionalContext);
+    });
+  });
+
+  describe("cursor formatter", () => {
+    it("formats deny with permission and user_message", () => {
+      const result = cursorFormat(denyDecision) as Record<string, unknown>;
+      expect(result.permission).toBe("deny");
+      expect(result.user_message).toBe(denyDecision.reason);
+    });
+
+    it("formats ask with permission:'ask'", () => {
+      const result = cursorFormat(askDecision) as Record<string, unknown>;
+      expect(result.permission).toBe("ask");
+    });
+
+    it("formats modify with updated_input", () => {
+      const result = cursorFormat(modifyDecision) as Record<string, unknown>;
+      expect(result.updated_input).toEqual(modifyDecision.updatedInput);
+    });
+
+    it("formats context with agent_message", () => {
+      const result = cursorFormat(contextDecision) as Record<string, unknown>;
+      expect(result.agent_message).toBe(contextDecision.additionalContext);
     });
   });
 });

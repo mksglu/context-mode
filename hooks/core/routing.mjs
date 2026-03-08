@@ -73,6 +73,10 @@ const TOOL_ALIASES = {
   "container.exec": "Bash",
   "local_shell": "Bash",
   "grep_files": "Grep",
+  // Cursor
+  "mcp_web_fetch": "WebFetch",
+  "mcp_fetch_tool": "WebFetch",
+  "Shell": "Bash",
 };
 
 /**
@@ -170,7 +174,7 @@ export function routePreToolUse(toolName, toolInput, projectDir) {
     const url = toolInput.url ?? "";
     return {
       action: "deny",
-      reason: `context-mode: WebFetch blocked. Use mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: "${url}", source: "...") to fetch this URL in sandbox. Then use mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query results. Do NOT use curl/wget — they are also blocked.`,
+      reason: `context-mode: WebFetch blocked. Use mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: "${url}", source: "...") to fetch this URL in sandbox. Then use mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query results. Do NOT use curl, wget, mcp_web_fetch, or mcp_fetch_tool.`,
     };
   }
 
@@ -189,7 +193,11 @@ export function routePreToolUse(toolName, toolInput, projectDir) {
 
   // ─── MCP execute: security check for shell commands ───
   // Match both __execute and __ctx_execute (prefixed tool names)
-  if (toolName.includes("context-mode") && /__(ctx_)?execute$/.test(toolName)) {
+  // Cursor can also surface the tool as MCP:ctx_execute_file.
+  if (
+    (toolName.includes("context-mode") && /__(ctx_)?execute$/.test(toolName)) ||
+    /^MCP:(ctx_)?execute$/.test(toolName)
+  ) {
     if (security && toolInput.language === "shell") {
       const code = toolInput.code ?? "";
       const policies = security.readBashPolicies(projectDir);
@@ -207,7 +215,11 @@ export function routePreToolUse(toolName, toolInput, projectDir) {
   }
 
   // ─── MCP execute_file: check file path + code against deny patterns ───
-  if (toolName.includes("context-mode") && /__(ctx_)?execute_file$/.test(toolName)) {
+  // Cursor can also surface the tool as MCP:ctx_execute_file.
+  if (
+    (toolName.includes("context-mode") && /__(ctx_)?execute_file$/.test(toolName)) ||
+    /^MCP:(ctx_)?execute_file$/.test(toolName)
+  ) {
     if (security) {
       // Check file path against Read deny patterns
       const filePath = toolInput.path ?? "";

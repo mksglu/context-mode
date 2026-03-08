@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "command": "context-mode hook cursor pretooluse",
+        "matcher": "Shell|Read|Grep|WebFetch|mcp_web_fetch|mcp_fetch_tool|Task|MCP:ctx_execute|MCP:ctx_execute_file|MCP:ctx_batch_execute",
+        "loop_limit": null,
+        "failClosed": false
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "command": "context-mode hook cursor posttooluse",
+        "loop_limit": null,
+        "failClosed": false
+      }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "context-mode hook cursor sessionstart",
+        "loop_limit": null,
+        "failClosed": false
+      }
+    ]
+  }
+}
