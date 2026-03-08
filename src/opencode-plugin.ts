@@ -25,6 +25,7 @@ import { extractEvents } from "./session/extract.js";
 import type { HookInput } from "./session/extract.js";
 import { buildResumeSnapshot } from "./session/snapshot.js";
 import type { SessionEvent } from "./types.js";
+import { OpenCodeAdapter } from "./adapters/opencode/index.js";
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -84,6 +85,13 @@ export const ContextModePlugin = async (ctx: PluginContext) => {
   const db = new SessionDB({ dbPath: getDBPath(projectDir) });
   const sessionId = randomUUID();
   db.ensureSession(sessionId, projectDir);
+
+  // Auto-write AGENTS.md on startup for OpenCode projects
+  try {
+    new OpenCodeAdapter().writeRoutingInstructions(projectDir, resolve(buildDir, ".."));
+  } catch {
+    // best effort — never break plugin init
+  }
 
   // Clean up old sessions on startup (replaces SessionStart hook)
   db.cleanupOldSessions(0);

@@ -85,6 +85,13 @@ try {
     const sessionId = getSessionId(input, OPTS);
     const projectDir = getProjectDir(OPTS);
     db.ensureSession(sessionId, projectDir);
+
+    // Auto-write GEMINI.md on startup if missing or not merged yet
+    try {
+      const { GeminiCLIAdapter } = await import(pathToFileURL(join(HOOK_DIR, "..", "..", "build", "adapters", "gemini-cli", "index.js")).href);
+      new GeminiCLIAdapter().writeRoutingInstructions(projectDir, join(HOOK_DIR, "..", ".."));
+    } catch { /* best effort — don't block session start */ }
+
     const ruleFilePaths = [
       join(homedir(), ".gemini", "GEMINI.md"),
       join(projectDir, "GEMINI.md"),

@@ -9,7 +9,7 @@ import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, rmSync, existsSync, unlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, unlinkSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir, homedir } from "node:os";
 
@@ -131,6 +131,10 @@ describe("Gemini CLI hooks", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("SessionStart");
       expect(result.stdout).toContain("context-mode");
+
+      const geminiMdPath = join(tempDir, "GEMINI.md");
+      expect(existsSync(geminiMdPath)).toBe(true);
+      expect(readFileSync(geminiMdPath, "utf-8")).toContain("context-mode");
     });
 
     test("compact: outputs routing block", () => {
