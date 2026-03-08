@@ -73,6 +73,8 @@ const TOOL_ALIASES = {
   "container.exec": "Bash",
   "local_shell": "Bash",
   "grep_files": "Grep",
+  // VS Code Copilot
+  "run_in_terminal": "Bash",
 };
 
 /**

@@ -57,6 +57,44 @@ describe("VS Code Copilot hooks", () => {
 
   const vscodeEnv = () => ({ VSCODE_CWD: tempDir });
 
+  // ── PreToolUse ───────────────────────────────────────────
+
+  describe("pretooluse.mjs", () => {
+    test("run_in_terminal: injects BASH_GUIDANCE additionalContext", () => {
+      const result = runHook("pretooluse.mjs", {
+        tool_name: "run_in_terminal",
+        tool_input: { command: "npm test" },
+      }, vscodeEnv());
+
+      expect(result.exitCode).toBe(0);
+      const out = JSON.parse(result.stdout);
+      expect(out.hookSpecificOutput.additionalContext).toContain("ctx_batch_execute");
+    });
+
+    test("run_in_terminal: curl is redirected to echo", () => {
+      const result = runHook("pretooluse.mjs", {
+        tool_name: "run_in_terminal",
+        tool_input: { command: "curl https://example.com" },
+      }, vscodeEnv());
+
+      expect(result.exitCode).toBe(0);
+      const out = JSON.parse(result.stdout);
+      expect(out.hookSpecificOutput.updatedInput.command).toContain("context-mode");
+      expect(out.hookSpecificOutput.updatedInput.command).toContain("ctx_fetch_and_index");
+    });
+
+    test("run_in_terminal: safe short command passes through with guidance", () => {
+      const result = runHook("pretooluse.mjs", {
+        tool_name: "run_in_terminal",
+        tool_input: { command: "git status" },
+      }, vscodeEnv());
+
+      expect(result.exitCode).toBe(0);
+      const out = JSON.parse(result.stdout);
+      expect(out.hookSpecificOutput.additionalContext).toContain("ctx_batch_execute");
+    });
+  });
+
   // ── PostToolUse ──────────────────────────────────────────
 
   describe("posttooluse.mjs", () => {
