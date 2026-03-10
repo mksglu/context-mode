@@ -934,6 +934,57 @@ puts "has_emoji: #{FILE_CONTENT.include?('🔒')}"
     assert.ok(r.stdout.includes("这是中文内容"), "Shell should read Chinese: " + r.stdout);
   });
 
+  // --- execute_file: path alias ---
+
+  test.runIf(runtimes.python)("execute_file: Python exposes 'path' as alias for FILE_CONTENT_PATH", async () => {
+    const r = await executor.executeFile({
+      path: testFile,
+      language: "python",
+      code: `
+import json
+with open(path) as f:
+    data = json.load(f)
+print(f"Users via path: {len(data['users'])}")
+      `,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("Users via path: 3"), `Got: ${r.stdout}`);
+  });
+
+  test("execute_file: JS exposes 'path' as alias for FILE_CONTENT_PATH", async () => {
+    const r = await executor.executeFile({
+      path: testFile,
+      language: "javascript",
+      code: `console.log("path alias: " + path);`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes(testFile), `Got: ${r.stdout}`);
+  });
+
+  test("execute_file: Shell exposes 'path' as alias for FILE_CONTENT_PATH", async () => {
+    const r = await executor.executeFile({
+      path: testFile,
+      language: "shell",
+      code: 'echo "path alias: $path"',
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes(testFile), `Got: ${r.stdout}`);
+  });
+
+  test.runIf(runtimes.ruby)("execute_file: Ruby exposes 'path' as alias for FILE_CONTENT_PATH", async () => {
+    const r = await executor.executeFile({
+      path: testFile,
+      language: "ruby",
+      code: `
+require 'json'
+data = JSON.parse(File.read(path))
+puts "Users via path: #{data['users'].length}"
+      `,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("Users via path: 3"), `Got: ${r.stdout}`);
+  });
+
   afterAll(() => {
     rmSync(testDir, { recursive: true, force: true });
   });

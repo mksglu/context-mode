@@ -463,28 +463,28 @@ export class PolyglotExecutor {
     switch (language) {
       case "javascript":
       case "typescript":
-        return `const FILE_CONTENT_PATH = ${escaped};\nconst FILE_CONTENT = require("fs").readFileSync(FILE_CONTENT_PATH, "utf-8");\n${code}`;
+        return `const FILE_CONTENT_PATH = ${escaped};\nconst path = FILE_CONTENT_PATH;\nconst FILE_CONTENT = require("fs").readFileSync(FILE_CONTENT_PATH, "utf-8");\n${code}`;
       case "python":
-        return `FILE_CONTENT_PATH = ${escaped}\nwith open(FILE_CONTENT_PATH, "r", encoding="utf-8") as _f:\n    FILE_CONTENT = _f.read()\n${code}`;
+        return `FILE_CONTENT_PATH = ${escaped}\npath = FILE_CONTENT_PATH\nwith open(FILE_CONTENT_PATH, "r", encoding="utf-8") as _f:\n    FILE_CONTENT = _f.read()\n${code}`;
       case "shell": {
         // Single-quote the path to prevent $, backtick, and ! expansion
         const sq = "'" + absolutePath.replace(/'/g, "'\\''") + "'";
-        return `FILE_CONTENT_PATH=${sq}\nFILE_CONTENT=$(cat ${sq})\n${code}`;
+        return `FILE_CONTENT_PATH=${sq}\npath=${sq}\nFILE_CONTENT=$(cat ${sq})\n${code}`;
       }
       case "ruby":
-        return `FILE_CONTENT_PATH = ${escaped}\nFILE_CONTENT = File.read(FILE_CONTENT_PATH, encoding: "utf-8")\n${code}`;
+        return `FILE_CONTENT_PATH = ${escaped}\npath = FILE_CONTENT_PATH\nFILE_CONTENT = File.read(FILE_CONTENT_PATH, encoding: "utf-8")\n${code}`;
       case "go":
-        return `package main\n\nimport (\n\t"fmt"\n\t"os"\n)\n\nvar FILE_CONTENT_PATH = ${escaped}\n\nfunc main() {\n\tb, _ := os.ReadFile(FILE_CONTENT_PATH)\n\tFILE_CONTENT := string(b)\n\t_ = FILE_CONTENT\n\t_ = fmt.Sprint()\n${code}\n}\n`;
+        return `package main\n\nimport (\n\t"fmt"\n\t"os"\n)\n\nvar FILE_CONTENT_PATH = ${escaped}\nvar path = FILE_CONTENT_PATH\n\nfunc main() {\n\tb, _ := os.ReadFile(FILE_CONTENT_PATH)\n\tFILE_CONTENT := string(b)\n\t_ = FILE_CONTENT\n\t_ = fmt.Sprint()\n${code}\n}\n`;
       case "rust":
-        return `use std::fs;\n\nfn main() {\n    let file_content_path = ${escaped};\n    let file_content = fs::read_to_string(file_content_path).unwrap();\n${code}\n}\n`;
+        return `use std::fs;\n\nfn main() {\n    let file_content_path = ${escaped};\n    let path = file_content_path;\n    let file_content = fs::read_to_string(file_content_path).unwrap();\n${code}\n}\n`;
       case "php":
-        return `<?php\n$FILE_CONTENT_PATH = ${escaped};\n$FILE_CONTENT = file_get_contents($FILE_CONTENT_PATH);\n${code}`;
+        return `<?php\n$FILE_CONTENT_PATH = ${escaped};\n$path = $FILE_CONTENT_PATH;\n$FILE_CONTENT = file_get_contents($FILE_CONTENT_PATH);\n${code}`;
       case "perl":
-        return `my $FILE_CONTENT_PATH = ${escaped};\nopen(my $fh, '<:encoding(UTF-8)', $FILE_CONTENT_PATH) or die "Cannot open: $!";\nmy $FILE_CONTENT = do { local $/; <$fh> };\nclose($fh);\n${code}`;
+        return `my $FILE_CONTENT_PATH = ${escaped};\nmy $path = $FILE_CONTENT_PATH;\nopen(my $fh, '<:encoding(UTF-8)', $FILE_CONTENT_PATH) or die "Cannot open: $!";\nmy $FILE_CONTENT = do { local $/; <$fh> };\nclose($fh);\n${code}`;
       case "r":
-        return `FILE_CONTENT_PATH <- ${escaped}\nFILE_CONTENT <- readLines(FILE_CONTENT_PATH, warn=FALSE, encoding="UTF-8")\nFILE_CONTENT <- paste(FILE_CONTENT, collapse="\\n")\n${code}`;
+        return `FILE_CONTENT_PATH <- ${escaped}\npath <- FILE_CONTENT_PATH\nFILE_CONTENT <- readLines(FILE_CONTENT_PATH, warn=FALSE, encoding="UTF-8")\nFILE_CONTENT <- paste(FILE_CONTENT, collapse="\\n")\n${code}`;
       case "elixir":
-        return `file_content_path = ${escaped}\nfile_content = File.read!(file_content_path)\n${code}`;
+        return `file_content_path = ${escaped}\npath = file_content_path\nfile_content = File.read!(file_content_path)\n${code}`;
     }
   }
 }
