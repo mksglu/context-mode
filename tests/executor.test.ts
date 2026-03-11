@@ -1060,6 +1060,139 @@ puts "Users via file_path: #{data['users'].length}"
   });
 });
 
+describe("execute_file (multi-path and dir)", () => {
+  const testDir = join(tmpdir(), "ctx-mode-multi-" + Date.now());
+  const subDir = join(testDir, "data");
+  mkdirSync(subDir, { recursive: true });
+
+  const fileA = join(testDir, "a.json");
+  const fileB = join(testDir, "b.json");
+  const fileTxt = join(subDir, "notes.txt");
+  const fileBin = join(testDir, "binary.bin");
+
+  writeFileSync(fileA, JSON.stringify({ name: "Alice", role: "admin" }), "utf-8");
+  writeFileSync(fileB, JSON.stringify({ name: "Bob", role: "user" }), "utf-8");
+  writeFileSync(fileTxt, "hello from notes", "utf-8");
+  writeFileSync(fileBin, Buffer.from([0x00, 0x01, 0x02, 0x03])); // binary
+
+  // ── paths mode ───────────────────────────────────────────────────────────
+
+  test.runIf(runtimes.python)("paths: Python accesses both files via 'files' map", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "python",
+      code: `
+import json
+for path, content in files.items():
+    data = json.loads(content)
+    print(data["name"])
+      `,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("Alice"), `Got: ${r.stdout}`);
+    assert.ok(r.stdout.includes("Bob"), `Got: ${r.stdout}`);
+  });
+
+  test("paths: Shell accesses both files via FILE_0/FILE_1 indexed vars", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"; echo "$FILE_0_CONTENT" | grep -o '"name":"[^"]*"' | head -1; echo "$FILE_1_CONTENT" | grep -o '"name":"[^"]*"' | head -1`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("count=2"), `Got: ${r.stdout}`);
+    assert.ok(r.stdout.includes("Alice") || r.stdout.includes("Bob"), `Got: ${r.stdout}`);
+  });
+
+  test.runIf(runtimes.ruby)("paths: Ruby accesses both files via 'files' map", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "ruby",
+      code: `
+require 'json'
+files.each { |_path, content| puts JSON.parse(content)["name"] }
+      `,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("Alice"), `Got: ${r.stdout}`);
+    assert.ok(r.stdout.includes("Bob"), `Got: ${r.stdout}`);
+  });
+
+  test("paths: returns resolvedPaths with absolute paths", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "shell",
+      code: "echo ok",
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(Array.isArray(r.resolvedPaths), "resolvedPaths should be an array");
+    assert.equal(r.resolvedPaths!.length, 2);
+    assert.ok(r.resolvedPaths!.every((p) => p.startsWith("/")), "Should be absolute paths");
+  });
+
+  test("paths: binary files are skipped", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileBin],
+      language: "shell",
+      code: "echo \"count=$FILE_COUNT\"",
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("count=1"), `Binary file should be excluded, got: ${r.stdout}`);
+  });
+
+  // ── dir mode ─────────────────────────────────────────────────────────────
+
+  test.runIf(runtimes.python)("dir: Python sees all non-binary files via 'files' map", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      language: "python",
+      code: `print("file_count=" + str(len(files)))`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    // a.json, b.json, data/notes.txt — binary.bin excluded
+    assert.ok(r.stdout.includes("file_count=3"), `Got: ${r.stdout}`);
+  });
+
+  test.runIf(runtimes.python)("dir: glob filter limits to matching files only", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      glob: "*.json",
+      language: "python",
+      code: `print("json_count=" + str(len(files)))`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("json_count=2"), `Got: ${r.stdout}`);
+  });
+
+  test("dir: returns resolvedPaths for all matched files", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      glob: "*.json",
+      language: "shell",
+      code: "echo ok",
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(Array.isArray(r.resolvedPaths), "resolvedPaths should be an array");
+    assert.equal(r.resolvedPaths!.length, 2, `Expected 2 json files, got: ${JSON.stringify(r.resolvedPaths)}`);
+  });
+
+  test("dir: empty result when glob matches nothing", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      glob: "*.nonexistent",
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("count=0"), `Got: ${r.stdout}`);
+    assert.equal(r.resolvedPaths!.length, 0);
+  });
+
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+});
+
 describe("Environment Passthrough", () => {
   test("SSH_AUTH_SOCK is passed through to subprocess when set", async () => {
     const original = process.env.SSH_AUTH_SOCK;

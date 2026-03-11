@@ -1,5 +1,5 @@
 import { spawn, execSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync, statSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -13,6 +13,34 @@ export type { ExecResult } from "./types.js";
 import type { ExecResult } from "./types.js";
 
 const isWin = process.platform === "win32";
+
+/** Convert a glob pattern (e.g. "**\/*.ts") to a RegExp for path filtering. */
+function globToRegex(glob: string): RegExp {
+  let pattern = "";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*" && glob[i + 1] === "*") {
+      if (glob[i + 2] === "/") { pattern += "(?:.+/)?"; i += 2; }
+      else { pattern += ".*"; i++; }
+    } else if (c === "*") {
+      pattern += "[^/]*";
+    } else if (c === "?") {
+      pattern += "[^/]";
+    } else if (/[.+^${}()|[\]\\]/.test(c)) {
+      pattern += "\\" + c;
+    } else {
+      pattern += c;
+    }
+  }
+  return new RegExp("^" + pattern + "$");
+}
+
+/** Returns true if the buffer contains a null byte in the first 8 KB (binary heuristic). */
+function isBinary(buf: Buffer): boolean {
+  const check = Math.min(buf.length, 8192);
+  for (let i = 0; i < check; i++) { if (buf[i] === 0) return true; }
+  return false;
+}
 
 /** Kill process tree — on Windows, proc.kill() only kills the shell, not children. */
 function killTree(proc: ReturnType<typeof spawn>): void {
@@ -34,7 +62,14 @@ interface ExecuteOptions {
 }
 
 interface ExecuteFileOptions extends ExecuteOptions {
-  path: string;
+  /** Single file — injects FILE_CONTENT_PATH, FILE_CONTENT, file_path (existing behaviour). */
+  path?: string;
+  /** Multiple explicit files — injects a `files` map keyed by the given paths. */
+  paths?: string[];
+  /** Directory — globs all matching files, injects a `files` map, returns resolvedPaths for FTS5 indexing. */
+  dir?: string;
+  /** Glob filter for dir mode (e.g. "**\/*.ts"). Default: all non-binary files ≤ 100 KB. */
+  glob?: string;
 }
 
 export class PolyglotExecutor {
@@ -107,15 +142,147 @@ export class PolyglotExecutor {
     }
   }
 
-  async executeFile(opts: ExecuteFileOptions): Promise<ExecResult> {
-    const { path: filePath, language, code, timeout = 30_000 } = opts;
-    const absolutePath = resolve(this.#projectRoot, filePath);
-    const wrappedCode = this.#wrapWithFileContent(
-      absolutePath,
-      language,
-      code,
-    );
-    return this.execute({ language, code: wrappedCode, timeout });
+  async executeFile(
+    opts: ExecuteFileOptions,
+  ): Promise<ExecResult & { resolvedPaths?: string[] }> {
+    const { language, code, timeout = 30_000 } = opts;
+
+    // ── Single-file mode (existing behaviour) ──────────────────────────────
+    if (opts.path) {
+      const absolutePath = resolve(this.#projectRoot, opts.path);
+      const wrappedCode = this.#wrapWithFileContent(absolutePath, language, code);
+      return this.execute({ language, code: wrappedCode, timeout });
+    }
+
+    // ── Multi-file / directory mode ────────────────────────────────────────
+    const { fileMap, resolvedPaths } = this.#resolveFiles(opts);
+    const wrappedCode = this.#wrapWithMultipleFiles(fileMap, language, code);
+    const result = await this.execute({ language, code: wrappedCode, timeout });
+    return { ...result, resolvedPaths };
+  }
+
+  /** Resolve files from `paths` or `dir` opts into a content map + absolute path list. */
+  #resolveFiles(opts: {
+    paths?: string[];
+    dir?: string;
+    glob?: string;
+  }): { fileMap: Map<string, string>; resolvedPaths: string[] } {
+    const MAX_FILE_BYTES = 100 * 1024;      // 100 KB per file
+    const MAX_INJECT_BYTES = 1024 * 1024;   // 1 MB total injection budget
+    const fileMap = new Map<string, string>();
+    const resolvedPaths: string[] = [];
+
+    if (opts.paths) {
+      let totalBytes = 0;
+      for (const p of opts.paths) {
+        const abs = resolve(this.#projectRoot, p);
+        let buf: Buffer;
+        try { buf = readFileSync(abs); } catch { continue; }
+        if (isBinary(buf)) continue;
+        const content = buf.toString("utf-8");
+        const bytes = Buffer.byteLength(content);
+        if (bytes > MAX_FILE_BYTES || totalBytes + bytes > MAX_INJECT_BYTES) continue;
+        totalBytes += bytes;
+        fileMap.set(p, content);
+        resolvedPaths.push(abs);
+      }
+    } else if (opts.dir) {
+      const absDir = resolve(this.#projectRoot, opts.dir);
+      const regex = opts.glob ? globToRegex(opts.glob) : null;
+      let entries: string[];
+      try {
+        entries = (readdirSync(absDir, { recursive: true }) as string[]).map(String);
+      } catch { return { fileMap, resolvedPaths }; }
+
+      let totalBytes = 0;
+      for (const rel of entries.sort()) {
+        const abs = join(absDir, rel);
+        let stat;
+        try { stat = statSync(abs); } catch { continue; }
+        if (!stat.isFile()) continue;
+        const relNorm = rel.replace(/\\/g, "/");
+        if (regex && !regex.test(relNorm)) continue;
+        if (stat.size > MAX_FILE_BYTES) continue;
+        let buf: Buffer;
+        try { buf = readFileSync(abs); } catch { continue; }
+        if (isBinary(buf)) continue;
+        resolvedPaths.push(abs); // always tracked for server-side FTS5 indexing
+        const content = buf.toString("utf-8");
+        const bytes = Buffer.byteLength(content);
+        if (totalBytes + bytes > MAX_INJECT_BYTES) continue; // skip injection, but still indexed
+        totalBytes += bytes;
+        fileMap.set(relNorm, content);
+      }
+    }
+
+    return { fileMap, resolvedPaths };
+  }
+
+  /**
+   * Build multi-file boilerplate for all 11 languages.
+   *
+   * Injects a `files` map (or indexed shell vars) populated with the given
+   * fileMap entries, then appends user code.
+   */
+  #wrapWithMultipleFiles(
+    fileMap: Map<string, string>,
+    language: Language,
+    code: string,
+  ): string {
+    const entries = [...fileMap.entries()];
+
+    switch (language) {
+      case "javascript":
+      case "typescript": {
+        const pairs = entries.map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n");
+        return `const files = {\n${pairs}\n};\n${code}`;
+      }
+      case "python": {
+        const pairs = entries.map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n");
+        return `files = {\n${pairs}\n}\n${code}`;
+      }
+      case "shell": {
+        const sq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";
+        let boilerplate = `FILE_COUNT=${entries.length}\n`;
+        entries.forEach(([k, v], i) => {
+          boilerplate += `FILE_${i}_PATH=${sq(k)}\nFILE_${i}_CONTENT=${sq(v)}\n`;
+        });
+        return `${boilerplate}${code}`;
+      }
+      case "ruby": {
+        const pairs = entries.map(([k, v]) => `  ${JSON.stringify(k)} => ${JSON.stringify(v)}`).join(",\n");
+        return `files = {\n${pairs}\n}\n${code}`;
+      }
+      case "go": {
+        const inner = entries.map(([k, v]) => `\t${JSON.stringify(k)}: ${JSON.stringify(v)},`).join("\n");
+        const mapLit = entries.length > 0
+          ? `map[string]string{\n${inner}\n}`
+          : `map[string]string{}`;
+        return `package main\n\nimport "fmt"\n\nvar files = ${mapLit}\n\nfunc main() {\n\t_ = fmt.Sprint()\n${code}\n}\n`;
+      }
+      case "rust": {
+        const inserts = entries.map(([k, v]) =>
+          `    files.insert(${JSON.stringify(k)}.to_string(), ${JSON.stringify(v)}.to_string());`
+        ).join("\n");
+        return `use std::collections::HashMap;\n\nfn main() {\n    let mut files: HashMap<String, String> = HashMap::new();\n${inserts}\n${code}\n}\n`;
+      }
+      case "php": {
+        const pairs = entries.map(([k, v]) => `    ${JSON.stringify(k)} => ${JSON.stringify(v)}`).join(",\n");
+        return `<?php\n$files = [\n${pairs}\n];\n${code}`;
+      }
+      case "perl": {
+        const pairs = entries.map(([k, v]) => `    ${JSON.stringify(k)}, ${JSON.stringify(v)}`).join(",\n");
+        return `my %files = (\n${pairs}\n);\n${code}`;
+      }
+      case "r": {
+        const assigns = entries.map(([k, v]) => `files[[${JSON.stringify(k)}]] <- ${JSON.stringify(v)}`).join("\n");
+        return `files <- list()\n${assigns}\n${code}`;
+      }
+      case "elixir": {
+        const pairs = entries.map(([k, v]) => `  ${JSON.stringify(k)} => ${JSON.stringify(v)}`).join(",\n");
+        return `files = %{\n${pairs}\n}\n${code}`;
+      }
+    }
   }
 
   #writeScript(tmpDir: string, code: string, language: Language): string {
