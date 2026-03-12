@@ -626,11 +626,29 @@ server.registerTool(
   {
     title: "Execute File Processing",
     description:
-      "Read a file and process it without loading contents into context. The file is read into a FILE_CONTENT variable inside the sandbox. Only your printed summary enters context.\n\nPREFER THIS OVER Read/cat for: log files, data files (CSV, JSON, XML), large source files for analysis, and any file where you need to extract specific information rather than read the entire content.",
+      "Read a file (or multiple files / directory) and process it without loading contents into context. Only your printed summary enters context.\n\n" +
+      "**Modes:**\n" +
+      "- `path` (single file) — injects `FILE_CONTENT_PATH`, `FILE_CONTENT`, `file_path`\n" +
+      "- `paths` (array) — injects a `files` map keyed by each path; shell gets `FILE_0_PATH`/`FILE_0_CONTENT`, ..., `FILE_COUNT`\n" +
+      "- `dir` (directory) — globs all non-binary files ≤ 100 KB, injects `files` map, auto-indexes into FTS5 for follow-up `ctx_search`\n\n" +
+      "PREFER THIS OVER Read/cat for: log files, data files (CSV, JSON, XML), large source files for analysis, and any file where you need to extract specific information rather than read the entire content.",
     inputSchema: z.object({
       path: z
         .string()
-        .describe("Absolute file path or relative to project root"),
+        .optional()
+        .describe("Single file — absolute or relative to project root"),
+      paths: z
+        .array(z.string())
+        .optional()
+        .describe("Multiple files — injects `files` map keyed by path"),
+      dir: z
+        .string()
+        .optional()
+        .describe("Directory — globs files, injects `files` map, auto-indexes into FTS5"),
+      glob: z
+        .string()
+        .optional()
+        .describe("Glob filter for dir mode (e.g. '**/*.ts'). Default: all non-binary files ≤ 100 KB"),
       language: z
         .enum([
           "javascript",
@@ -649,7 +667,7 @@ server.registerTool(
       code: z
         .string()
         .describe(
-          "Code to process FILE_CONTENT (file_content in Elixir). Print summary via console.log/print/echo/IO.puts.",
+          "Code to run in sandbox. Single-file: use FILE_CONTENT / file_path. Multi-file: use `files` map (shell: FILE_0_PATH/FILE_0_CONTENT/FILE_COUNT). Print summary via console.log/print/echo/IO.puts.",
         ),
       timeout: z
         .number()
@@ -665,10 +683,31 @@ server.registerTool(
         ),
     }),
   },
-  async ({ path, language, code, timeout, intent }) => {
-    // Security: check file path against Read deny patterns
-    const pathDenied = checkFilePathDenyPolicy(path, "execute_file");
-    if (pathDenied) return pathDenied;
+  async ({ path, paths, dir, glob, language, code, timeout, intent }) => {
+    // Validate: exactly one mode must be specified
+    const modeCount = [path, paths, dir].filter(Boolean).length;
+    if (modeCount === 0) {
+      return trackResponse("ctx_execute_file", {
+        content: [{ type: "text" as const, text: "One of path, paths, or dir is required." }],
+        isError: true,
+      });
+    }
+
+    // Security: check file path(s) against Read deny patterns
+    if (path) {
+      const denied = checkFilePathDenyPolicy(path, "execute_file");
+      if (denied) return denied;
+    }
+    if (paths) {
+      for (const p of paths) {
+        const denied = checkFilePathDenyPolicy(p, "execute_file");
+        if (denied) return denied;
+      }
+    }
+    if (dir) {
+      const denied = checkFilePathDenyPolicy(dir, "execute_file");
+      if (denied) return denied;
+    }
 
     // Security: check code parameter against Bash deny patterns
     if (language === "shell") {
@@ -682,17 +721,30 @@ server.registerTool(
     try {
       const result = await executor.executeFile({
         path,
+        paths,
+        dir,
+        glob,
         language,
         code,
         timeout,
       });
+
+      // dir mode: auto-index all resolved files into FTS5 for ctx_search
+      if (dir && result.resolvedPaths && result.resolvedPaths.length > 0) {
+        const store = getStore();
+        for (const absPath of result.resolvedPaths) {
+          try { store.index({ path: absPath, source: absPath }); } catch { /* skip unindexable */ }
+        }
+      }
+
+      const inputLabel = path ?? (dir ? `dir:${dir}` : `paths:${(paths ?? []).length} files`);
 
       if (result.timedOut) {
         return trackResponse("ctx_execute_file", {
           content: [
             {
               type: "text" as const,
-              text: `Timed out processing ${path} after ${timeout}ms`,
+              text: `Timed out processing ${inputLabel} after ${timeout}ms`,
             },
           ],
           isError: true,
@@ -707,7 +759,7 @@ server.registerTool(
           trackIndexed(Buffer.byteLength(output));
           return trackResponse("ctx_execute_file", {
             content: [
-              { type: "text" as const, text: intentSearch(output, intent, isError ? `file:${path}:error` : `file:${path}`) },
+              { type: "text" as const, text: intentSearch(output, intent, isError ? `${inputLabel}:error` : inputLabel) },
             ],
             isError,
           });
@@ -720,13 +772,18 @@ server.registerTool(
         });
       }
 
-      const stdout = result.stdout || "(no output)";
+      let stdout = result.stdout || "(no output)";
+
+      // dir mode: append indexing note so callers know ctx_search is ready
+      if (dir && result.resolvedPaths && result.resolvedPaths.length > 0) {
+        stdout += `\n\n[${result.resolvedPaths.length} file(s) from '${dir}' indexed into FTS5 — use ctx_search to query them]`;
+      }
 
       if (intent && intent.trim().length > 0 && Buffer.byteLength(stdout) > INTENT_SEARCH_THRESHOLD) {
         trackIndexed(Buffer.byteLength(stdout));
         return trackResponse("ctx_execute_file", {
           content: [
-            { type: "text" as const, text: intentSearch(stdout, intent, `file:${path}`) },
+            { type: "text" as const, text: intentSearch(stdout, intent, inputLabel) },
           ],
         });
       }
@@ -1201,25 +1258,61 @@ server.registerTool(
       "Provide all commands to run and all queries to search — everything happens in one round trip.",
     inputSchema: z.object({
       commands: z
-        .array(
-          z.object({
-            label: z
-              .string()
-              .describe(
-                "Section header for this command's output (e.g., 'README', 'Package.json', 'Source Tree')",
-              ),
-            command: z
-              .string()
-              .describe("Shell command to execute"),
-          }),
+        .preprocess(
+          (val) => {
+            // Coerce JSON string → array
+            let arr = val;
+            if (typeof val === "string") {
+              try {
+                arr = JSON.parse(val);
+              } catch {
+                return val;
+              }
+            }
+            // Coerce array of plain strings → array of {label, command} objects
+            if (Array.isArray(arr)) {
+              return arr.map((item, i) =>
+                typeof item === "string"
+                  ? { label: `cmd ${i + 1}`, command: item }
+                  : item,
+              );
+            }
+            return arr;
+          },
+          z
+            .array(
+              z.object({
+                label: z
+                  .string()
+                  .describe(
+                    "Section header for this command's output (e.g., 'README', 'Package.json', 'Source Tree')",
+                  ),
+                command: z
+                  .string()
+                  .describe("Shell command to execute"),
+              }),
+            )
+            .min(1),
         )
-        .min(1)
         .describe(
           "Commands to execute as a batch. Each runs sequentially, output is labeled with the section header.",
         ),
       queries: z
-        .array(z.string())
-        .min(1)
+        .preprocess(
+          (val) => {
+            // Coerce JSON string → array, bare string → single-element array
+            if (typeof val === "string") {
+              try {
+                const parsed = JSON.parse(val);
+                return Array.isArray(parsed) ? parsed : [val];
+              } catch {
+                return [val];
+              }
+            }
+            return val;
+          },
+          z.array(z.string()).min(1),
+        )
         .describe(
           "Search queries to extract information from indexed output. Use 5-8 comprehensive queries. " +
           "Each returns top 5 matching sections with full content. " +
