@@ -37,12 +37,11 @@ Grep results can flood context. Use `ctx_execute(language: "shell", code: "grep 
 
 ## Tool selection hierarchy
 
-1. **DELEGATE**: `ctx_delegate(tasks)` — **PREFER THIS** when task involves analyzing, reviewing, or understanding multiple files (>5). Spawns parallel sub-agents with pre-read files. Domain-agnostic: analysis, review, migration, refactoring, documentation, etc. Results auto-indexed for `ctx_search`.
-2. **GATHER**: `ctx_batch_execute(commands, queries)` — Run commands, auto-index, search. For shell commands and CLI output, not file analysis.
-3. **FOLLOW-UP**: `ctx_search(queries: ["q1", "q2", ...])` — Query indexed content. Pass ALL questions as array in ONE call.
-4. **PROCESSING**: `ctx_execute(language, code)` | `ctx_execute_file(path, language, code)` — Sandbox execution. Only stdout enters context.
-5. **WEB**: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` — Fetch, chunk, index, query. Raw HTML never enters context.
-6. **INDEX**: `ctx_index(content, source)` — Store content in FTS5 knowledge base for later search.
+1. **GATHER**: `ctx_batch_execute(commands, queries)` — Primary tool. Runs all commands, auto-indexes output, returns search results. ONE call replaces 30+ individual calls.
+2. **FOLLOW-UP**: `ctx_search(queries: ["q1", "q2", ...])` — Query indexed content. Pass ALL questions as array in ONE call.
+3. **PROCESSING**: `ctx_execute(language, code)` | `ctx_execute_file(path, language, code)` — Sandbox execution. Only stdout enters context.
+4. **WEB**: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` — Fetch, chunk, index, query. Raw HTML never enters context.
+5. **INDEX**: `ctx_index(content, source)` — Store content in FTS5 knowledge base for later search.
 
 ## Subagent routing
 
