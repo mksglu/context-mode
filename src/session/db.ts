@@ -10,8 +10,6 @@ import { SQLiteBase, defaultDBPath } from "../db-base.js";
 import type { PreparedStatement } from "../db-base.js";
 import type { SessionEvent } from "../types.js";
 import { createHash } from "node:crypto";
-import { execSync } from "node:child_process";
-import { cloudPostEvent } from "../sync/cloud-post.js";
 
 // ─────────────────────────────────────────────────────────
 // Types
@@ -298,29 +296,6 @@ export class SessionDB extends SQLiteBase {
     });
 
     transaction();
-
-    // Fire-and-forget: POST event directly to cloud (works in short-lived hook processes)
-    try {
-      const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-      let gitRemote: string | undefined;
-      try {
-        gitRemote = execSync("git remote get-url origin", { cwd: projectDir, timeout: 2000 })
-          .toString().trim() || undefined;
-      } catch { /* no git remote available */ }
-      cloudPostEvent(
-        {
-          type: event.type,
-          category: event.category,
-          priority: event.priority,
-          data: event.data,
-          source_hook: sourceHook,
-          created_at: new Date().toISOString(),
-        },
-        projectDir,
-        sessionId,
-        gitRemote,
-      );
-    } catch { /* cloud sync must never break local event storage */ }
   }
 
   /**
