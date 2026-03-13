@@ -1,7 +1,7 @@
 import { describe, test, expect, afterAll } from "vitest";
 import { strict as assert } from "node:assert";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
 import { PolyglotExecutor } from "../src/executor.js";
 import {
@@ -1053,6 +1053,242 @@ puts "Users via file_path: #{data['users'].length}"
     });
     assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
     assert.ok(r.stdout.includes(testFile), `Got: ${r.stdout}`);
+  });
+
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+});
+
+describe("execute_file (multi-path and dir)", () => {
+  const testDir = join(tmpdir(), "ctx-mode-multi-" + Date.now());
+  const subDir = join(testDir, "data");
+  mkdirSync(subDir, { recursive: true });
+
+  const fileA = join(testDir, "a.json");
+  const fileB = join(testDir, "b.json");
+  const fileTxt = join(subDir, "notes.txt");
+  const fileBin = join(testDir, "binary.bin");
+
+  writeFileSync(fileA, JSON.stringify({ name: "Alice", role: "admin" }), "utf-8");
+  writeFileSync(fileB, JSON.stringify({ name: "Bob", role: "user" }), "utf-8");
+  writeFileSync(fileTxt, "hello from notes", "utf-8");
+  writeFileSync(fileBin, Buffer.from([0x00, 0x01, 0x02, 0x03])); // binary
+
+  // ── paths mode ───────────────────────────────────────────────────────────
+
+  test.runIf(runtimes.python)("paths: Python accesses both files via 'files' map", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "python",
+      code: `
+import json
+for path, content in files.items():
+    data = json.loads(content)
+    print(data["name"])
+      `,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("Alice"), `Got: ${r.stdout}`);
+    assert.ok(r.stdout.includes("Bob"), `Got: ${r.stdout}`);
+  });
+
+  test("paths: Shell accesses both files via FILE_0/FILE_1 indexed vars", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"; echo "$FILE_0_CONTENT" | grep -o '"name":"[^"]*"' | head -1; echo "$FILE_1_CONTENT" | grep -o '"name":"[^"]*"' | head -1`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("count=2"), `Got: ${r.stdout}`);
+    assert.ok(r.stdout.includes("Alice") || r.stdout.includes("Bob"), `Got: ${r.stdout}`);
+  });
+
+  test.runIf(runtimes.ruby)("paths: Ruby accesses both files via 'files' map", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "ruby",
+      code: `
+require 'json'
+files.each { |_path, content| puts JSON.parse(content)["name"] }
+      `,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("Alice"), `Got: ${r.stdout}`);
+    assert.ok(r.stdout.includes("Bob"), `Got: ${r.stdout}`);
+  });
+
+  test("paths: returns resolvedPaths with absolute paths", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileB],
+      language: "shell",
+      code: "echo ok",
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(Array.isArray(r.resolvedPaths), "resolvedPaths should be an array");
+    assert.equal(r.resolvedPaths!.length, 2);
+    assert.ok(r.resolvedPaths!.every((p) => isAbsolute(p)), "Should be absolute paths");
+  });
+
+  test("paths: binary files are skipped", async () => {
+    const r = await executor.executeFile({
+      paths: [fileA, fileBin],
+      language: "shell",
+      code: "echo \"count=$FILE_COUNT\"",
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("count=1"), `Binary file should be excluded, got: ${r.stdout}`);
+  });
+
+  // ── dir mode ─────────────────────────────────────────────────────────────
+
+  test.runIf(runtimes.python)("dir: Python sees all non-binary files via 'files' map", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      language: "python",
+      code: `print("file_count=" + str(len(files)))`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    // a.json, b.json, data/notes.txt — binary.bin excluded
+    assert.ok(r.stdout.includes("file_count=3"), `Got: ${r.stdout}`);
+  });
+
+  test.runIf(runtimes.python)("dir: glob filter limits to matching files only", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      glob: "*.json",
+      language: "python",
+      code: `print("json_count=" + str(len(files)))`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("json_count=2"), `Got: ${r.stdout}`);
+  });
+
+  test("dir: returns resolvedPaths for all matched files", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      glob: "*.json",
+      language: "shell",
+      code: "echo ok",
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(Array.isArray(r.resolvedPaths), "resolvedPaths should be an array");
+    assert.equal(r.resolvedPaths!.length, 2, `Expected 2 json files, got: ${JSON.stringify(r.resolvedPaths)}`);
+  });
+
+  test("dir: empty result when glob matches nothing", async () => {
+    const r = await executor.executeFile({
+      dir: testDir,
+      glob: "*.nonexistent",
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"`,
+    });
+    assert.equal(r.exitCode, 0, `stderr: ${r.stderr}`);
+    assert.ok(r.stdout.includes("count=0"), `Got: ${r.stdout}`);
+    assert.equal(r.resolvedPaths!.length, 0);
+  });
+
+  // ── B1: Path traversal ───────────────────────────────────────────────────
+
+  test("B1: path traversal via '../' in single-file path throws", async () => {
+    const sandboxRoot = join(testDir, "sandbox");
+    mkdirSync(sandboxRoot, { recursive: true });
+    const sandboxExecutor = new PolyglotExecutor({ runtimes, projectRoot: sandboxRoot });
+    await assert.rejects(
+      () => sandboxExecutor.executeFile({ path: "../../etc/passwd", language: "shell", code: "echo ok" }),
+      /escapes project root/,
+    );
+  });
+
+  test("B1: path traversal via '../' in paths array is silently skipped", async () => {
+    const sandboxRoot = join(testDir, "sandbox");
+    mkdirSync(sandboxRoot, { recursive: true });
+    const sandboxExecutor = new PolyglotExecutor({ runtimes, projectRoot: sandboxRoot });
+    const r = await sandboxExecutor.executeFile({
+      paths: ["../../etc/passwd"],
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"`,
+    });
+    assert.ok(r.stdout.includes("count=0"), `Traversal path should be excluded, got: ${r.stdout}`);
+  });
+
+  test("B1: path traversal via '../' in dir is silently skipped", async () => {
+    const sandboxRoot = join(testDir, "sandbox");
+    mkdirSync(sandboxRoot, { recursive: true });
+    const sandboxExecutor = new PolyglotExecutor({ runtimes, projectRoot: sandboxRoot });
+    const r = await sandboxExecutor.executeFile({
+      dir: "../../etc",
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"`,
+    });
+    assert.equal(r.resolvedPaths!.length, 0, "Traversal dir should yield no resolved paths");
+  });
+
+  // ── B2: Symlink traversal ────────────────────────────────────────────────
+
+  test("B2: symlinks in dir mode are skipped", async () => {
+    const { symlinkSync } = await import("node:fs");
+    const symlinkDir = join(testDir, "symlink-test");
+    mkdirSync(symlinkDir, { recursive: true });
+    writeFileSync(join(symlinkDir, "real.txt"), "real content", "utf-8");
+    try {
+      symlinkSync("/etc", join(symlinkDir, "evil-link"));
+    } catch {
+      // Skip on platforms that don't support symlinks
+      return;
+    }
+    const symlinkExecutor = new PolyglotExecutor({ runtimes, projectRoot: symlinkDir });
+    const r = await symlinkExecutor.executeFile({
+      dir: ".",
+      language: "shell",
+      code: `echo "count=$FILE_COUNT"`,
+    });
+    assert.ok(r.stdout.includes("count=1"), `Symlink should be skipped, got: ${r.stdout}`);
+  });
+
+  // ── B3: File count cap ───────────────────────────────────────────────────
+
+  test("B3: dir mode throws when file count exceeds 500", async () => {
+    const bigDir = join(testDir, "big-dir");
+    mkdirSync(bigDir, { recursive: true });
+    for (let i = 0; i < 501; i++) {
+      writeFileSync(join(bigDir, `file-${i}.txt`), `content ${i}`, "utf-8");
+    }
+    const bigExecutor = new PolyglotExecutor({ runtimes, projectRoot: bigDir });
+    await assert.rejects(
+      () => bigExecutor.executeFile({ dir: ".", language: "shell", code: "echo ok" }),
+      /exceeds the limit of 500/,
+    );
+  });
+
+  // ── B4: Mutual exclusivity ───────────────────────────────────────────────
+
+  test("B4: providing both path and paths throws", async () => {
+    await assert.rejects(
+      () => executor.executeFile({ path: fileA, paths: [fileB], language: "shell", code: "echo ok" }),
+      /Only one of/,
+    );
+  });
+
+  test("B4: providing both path and dir throws", async () => {
+    await assert.rejects(
+      () => executor.executeFile({ path: fileA, dir: testDir, language: "shell", code: "echo ok" }),
+      /Only one of/,
+    );
+  });
+
+  test("B4: providing both paths and dir throws", async () => {
+    await assert.rejects(
+      () => executor.executeFile({ paths: [fileA], dir: testDir, language: "shell", code: "echo ok" }),
+      /Only one of/,
+    );
+  });
+
+  test("B4: empty paths array throws", async () => {
+    await assert.rejects(
+      () => executor.executeFile({ paths: [], language: "shell", code: "echo ok" }),
+      /must contain at least one/,
+    );
   });
 
   afterAll(() => {
