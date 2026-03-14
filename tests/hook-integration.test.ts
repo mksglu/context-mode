@@ -16,8 +16,11 @@ import { tmpdir } from "node:os";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HOOK_PATH = join(__dirname, "..", "hooks", "pretooluse.mjs");
 
-// Clean guidance throttle markers before each test so guidance fires fresh
-const _guidanceDir = resolve(tmpdir(), `context-mode-guidance-${process.pid}`);
+// Clean guidance throttle markers before each test so guidance fires fresh.
+// Subprocess hooks use process.ppid (= this test's pid) + VITEST_WORKER_ID.
+const _wid = process.env.VITEST_WORKER_ID;
+const _guidanceSuffix = _wid ? `${process.pid}-w${_wid}` : String(process.pid);
+const _guidanceDir = resolve(tmpdir(), `context-mode-guidance-${_guidanceSuffix}`);
 beforeEach(() => {
   try { rmSync(_guidanceDir, { recursive: true, force: true }); } catch {}
 });

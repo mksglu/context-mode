@@ -5,9 +5,9 @@
  * simulated JSON stdin and asserting correct output/behavior.
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, existsSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -53,6 +53,16 @@ describe("VS Code Copilot hooks", () => {
     try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* best effort */ }
     try { if (existsSync(dbPath)) unlinkSync(dbPath); } catch { /* best effort */ }
     try { if (existsSync(eventsPath)) unlinkSync(eventsPath); } catch { /* best effort */ }
+  });
+
+  // Clean file-based guidance throttle markers between tests.
+  // Subprocess hooks use process.ppid (= this test's pid) for marker dir.
+  // VITEST_WORKER_ID is inherited by subprocesses, matching routing.mjs logic.
+  beforeEach(() => {
+    const wid = process.env.VITEST_WORKER_ID;
+    const suffix = wid ? `${process.pid}-w${wid}` : String(process.pid);
+    const guidanceDir = resolve(tmpdir(), `context-mode-guidance-${suffix}`);
+    try { rmSync(guidanceDir, { recursive: true, force: true }); } catch { /* best effort */ }
   });
 
   const vscodeEnv = () => ({ VSCODE_CWD: tempDir });

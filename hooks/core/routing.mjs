@@ -22,7 +22,10 @@ import { resolve } from "node:path";
 //     (Claude Code, Gemini, Cursor, VS Code Copilot)
 // Session scoped via process.ppid (= host PID, constant for session lifetime).
 const _guidanceShown = new Set();
-const _guidanceDir = resolve(tmpdir(), `context-mode-guidance-${process.ppid}`);
+const _guidanceId = process.env.VITEST_WORKER_ID
+  ? `${process.ppid}-w${process.env.VITEST_WORKER_ID}`
+  : String(process.ppid);
+const _guidanceDir = resolve(tmpdir(), `context-mode-guidance-${_guidanceId}`);
 
 function guidanceOnce(type, content) {
   // Fast path: in-memory (same process)

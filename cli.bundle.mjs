@@ -110,7 +110,8 @@ func main() {
 	_ = fmt.Sprint()
 ${n}
 }
-`;case"rust":return`use std::fs;
+`;case"rust":return`#[allow(unused_variables)]
+use std::fs;
 
 fn main() {
     let file_content_path = ${o};

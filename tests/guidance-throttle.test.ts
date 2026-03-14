@@ -90,7 +90,9 @@ describe("guidance throttle", () => {
     const fs = require("node:fs");
     const os = require("node:os");
     const path = require("node:path");
-    const dir = path.resolve(os.tmpdir(), `context-mode-guidance-${process.ppid}`);
+    const wid = process.env.VITEST_WORKER_ID;
+    const suffix = wid ? `${process.ppid}-w${wid}` : String(process.ppid);
+    const dir = path.resolve(os.tmpdir(), `context-mode-guidance-${suffix}`);
     try { fs.mkdirSync(dir, { recursive: true }); } catch {}
     try { fs.writeFileSync(path.resolve(dir, "read"), "", "utf-8"); } catch {}
 

@@ -122,7 +122,12 @@ describe("Lifecycle Guard", () => {
   });
 });
 
-describe("Lifecycle Guard — Integration (real process)", () => {
+// Integration tests spawn real child processes with stdin pipes and SIGTERM.
+// Windows lacks POSIX signal semantics — SIGTERM kills without handler invocation,
+// and stdin pipe close detection behaves differently. Skip on Windows.
+const isWindows = process.platform === "win32";
+
+describe.skipIf(isWindows)("Lifecycle Guard — Integration (real process)", () => {
   test("child exits when stdin is closed", async () => {
     const { child, ready } = spawnGuardChild(42);
 

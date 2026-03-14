@@ -11,3 +11,4 @@ gh-cli-cache/
 tasks/
 .playwright-mcp/
 AGENTS.md
+context-mode-guidance-*/
