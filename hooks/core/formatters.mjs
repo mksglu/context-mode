@@ -9,7 +9,7 @@ export const formatters = {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        reason,
+        permissionDecisionReason: reason,
       },
     }),
     ask: () => ({
@@ -21,6 +21,8 @@ export const formatters = {
     modify: (updatedInput) => ({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        permissionDecisionReason: "Routed to context-mode sandbox",
         updatedInput,
       },
     }),
@@ -46,7 +48,7 @@ export const formatters = {
   "vscode-copilot": {
     deny: (reason) => ({
       permissionDecision: "deny",
-      reason,
+      permissionDecisionReason: reason,
     }),
     ask: () => ({
       permissionDecision: "ask",
@@ -54,6 +56,8 @@ export const formatters = {
     modify: (updatedInput) => ({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        permissionDecisionReason: "Routed to context-mode sandbox",
         updatedInput,
       },
     }),

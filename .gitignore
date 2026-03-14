@@ -10,3 +10,4 @@ cli.bundle.mjs
 gh-cli-cache/
 tasks/
 .playwright-mcp/
+context-mode-guidance-*/

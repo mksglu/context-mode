@@ -92,6 +92,10 @@ export function deleteDBFiles(dbPath: string): void {
  */
 export function closeDB(db: DatabaseInstance): void {
   try {
+    // Checkpoint WAL before close to prevent contention on restart (#103)
+    db.pragma("wal_checkpoint(TRUNCATE)");
+  } catch { /* WAL may not be active */ }
+  try {
     db.close();
   } catch {
     // ignore

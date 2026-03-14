@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
 // Dynamic import for .mjs module
 let routePreToolUse: (
@@ -12,6 +12,7 @@ let routePreToolUse: (
   additionalContext?: string;
 } | null;
 
+let resetGuidanceThrottle: () => void;
 let ROUTING_BLOCK: string;
 let READ_GUIDANCE: string;
 let GREP_GUIDANCE: string;
@@ -19,11 +20,16 @@ let GREP_GUIDANCE: string;
 beforeAll(async () => {
   const mod = await import("../../hooks/core/routing.mjs");
   routePreToolUse = mod.routePreToolUse;
+  resetGuidanceThrottle = mod.resetGuidanceThrottle;
 
   const constants = await import("../../hooks/routing-block.mjs");
   ROUTING_BLOCK = constants.ROUTING_BLOCK;
   READ_GUIDANCE = constants.READ_GUIDANCE;
   GREP_GUIDANCE = constants.GREP_GUIDANCE;
+});
+
+beforeEach(() => {
+  if (typeof resetGuidanceThrottle === "function") resetGuidanceThrottle();
 });
 
 describe("routePreToolUse", () => {

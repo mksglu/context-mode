@@ -24,8 +24,8 @@ import {
   hasBunRuntime,
 } from "./runtime.js";
 import { classifyNonZeroExit } from "./exit-classify.js";
-import { delegate, type DelegateTask } from "./delegate.js";
-const VERSION = "1.0.18";
+import { startLifecycleGuard } from "./lifecycle.js";
+const VERSION = "1.0.21";
 
 // Prevent silent server death from unhandled async errors
 process.on("unhandledRejection", (err) => {
@@ -1926,6 +1926,9 @@ async function main() {
   process.on("exit", shutdown);
   process.on("SIGINT", () => { gracefulShutdown(); });
   process.on("SIGTERM", () => { gracefulShutdown(); });
+
+  // Lifecycle guard: detect parent death + stdin close to prevent orphaned processes (#103)
+  startLifecycleGuard({ onShutdown: () => gracefulShutdown() });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
