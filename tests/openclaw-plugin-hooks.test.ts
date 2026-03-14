@@ -472,14 +472,14 @@ describe("verbose logging", () => {
     assert.ok(infoLines.length > 0, "session_start must emit at least one info log");
   });
 
-  test("tool_call:after emits debug log for captured events when logger provided", async () => {
+  test("after_tool_call emits debug log for captured events when logger provided", async () => {
     const { default: plugin } = await import("../src/openclaw-plugin.js");
-    const { api, hooks, logLines } = createMockApi(true);
+    const { api, typedHooks, logLines } = createMockApi(true);
 
     plugin.register(api as unknown as Parameters<typeof plugin.register>[0]);
 
-    const afterHook = hooks.find(h => h.hookName === "tool_call:after");
-    assert.ok(afterHook);
+    const afterHook = typedHooks.find(h => h.hookName === "after_tool_call");
+    assert.ok(afterHook, "after_tool_call must be registered via api.on()");
 
     await afterHook.handler({
       toolName: "read",
@@ -488,7 +488,7 @@ describe("verbose logging", () => {
     });
 
     const debugLines = logLines.filter(l => l.level === "debug");
-    assert.ok(debugLines.length > 0, "tool_call:after must emit debug log when events captured");
+    assert.ok(debugLines.length > 0, "after_tool_call must emit debug log when events captured");
   });
 
   test("before_prompt_build emits debug log when resume is injected", async () => {

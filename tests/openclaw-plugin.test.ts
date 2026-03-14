@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 // ── Mock OpenClaw API ────────────────────────────────────
 
@@ -138,16 +139,16 @@ describe("OpenClawPlugin", () => {
   // ── Registration ──────────────────────────────────────
 
   describe("registration", () => {
-    it("registers tool_call:before hook", async () => {
+    it("registers before_tool_call hook via api.on()", async () => {
       const mock = await createTestPlugin(join(tempDir, "reg-before"));
-      const hookNames = mock.hooks.map((h) => h.event);
-      expect(hookNames).toContain("tool_call:before");
+      const lifecycleNames = mock.lifecycle.map((h) => h.event);
+      expect(lifecycleNames).toContain("before_tool_call");
     });
 
-    it("registers tool_call:after hook", async () => {
+    it("registers after_tool_call hook via api.on()", async () => {
       const mock = await createTestPlugin(join(tempDir, "reg-after"));
-      const hookNames = mock.hooks.map((h) => h.event);
-      expect(hookNames).toContain("tool_call:after");
+      const lifecycleNames = mock.lifecycle.map((h) => h.event);
+      expect(lifecycleNames).toContain("after_tool_call");
     });
 
     it("registers command:new hook", async () => {
@@ -227,12 +228,12 @@ describe("OpenClawPlugin", () => {
     });
   });
 
-  // ── tool_call:before ──────────────────────────────────
+  // ── before_tool_call ──────────────────────────────────
 
-  describe("tool_call:before", () => {
+  describe("before_tool_call", () => {
     it("modifies curl commands to block them", async () => {
       const mock = await createTestPlugin(join(tempDir, "before-curl"));
-      const beforeHook = mock.hooks.find((h) => h.event === "tool_call:before");
+      const beforeHook = mock.lifecycle.find((h) => h.event === "before_tool_call");
       expect(beforeHook).toBeDefined();
 
       const params = { command: "curl https://example.com/data" };
@@ -247,7 +248,7 @@ describe("OpenClawPlugin", () => {
 
     it("modifies wget commands to block them", async () => {
       const mock = await createTestPlugin(join(tempDir, "before-wget"));
-      const beforeHook = mock.hooks.find((h) => h.event === "tool_call:before");
+      const beforeHook = mock.lifecycle.find((h) => h.event === "before_tool_call");
 
       const params = { command: "wget https://example.com/file" };
       const event = { toolName: "Bash", params };
@@ -260,7 +261,7 @@ describe("OpenClawPlugin", () => {
 
     it("passes through normal tool calls", async () => {
       const mock = await createTestPlugin(join(tempDir, "before-pass"));
-      const beforeHook = mock.hooks.find((h) => h.event === "tool_call:before");
+      const beforeHook = mock.lifecycle.find((h) => h.event === "before_tool_call");
 
       const result = await beforeHook!.handler({
         toolName: "TaskCreate",
@@ -272,19 +273,19 @@ describe("OpenClawPlugin", () => {
 
     it("handles empty input gracefully", async () => {
       const mock = await createTestPlugin(join(tempDir, "before-empty"));
-      const beforeHook = mock.hooks.find((h) => h.event === "tool_call:before");
+      const beforeHook = mock.lifecycle.find((h) => h.event === "before_tool_call");
 
       const result = await beforeHook!.handler({});
       expect(result).toBeUndefined();
     });
   });
 
-  // ── tool_call:after ───────────────────────────────────
+  // ── after_tool_call ───────────────────────────────────
 
-  describe("tool_call:after", () => {
+  describe("after_tool_call", () => {
     it("captures file read events without throwing", async () => {
       const mock = await createTestPlugin(join(tempDir, "after-read"));
-      const afterHook = mock.hooks.find((h) => h.event === "tool_call:after");
+      const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
 
       await expect(
         afterHook!.handler({
@@ -297,7 +298,7 @@ describe("OpenClawPlugin", () => {
 
     it("captures file write events", async () => {
       const mock = await createTestPlugin(join(tempDir, "after-write"));
-      const afterHook = mock.hooks.find((h) => h.event === "tool_call:after");
+      const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
 
       await expect(
         afterHook!.handler({
@@ -309,7 +310,7 @@ describe("OpenClawPlugin", () => {
 
     it("captures git events from Bash", async () => {
       const mock = await createTestPlugin(join(tempDir, "after-git"));
-      const afterHook = mock.hooks.find((h) => h.event === "tool_call:after");
+      const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
 
       await expect(
         afterHook!.handler({
@@ -322,7 +323,7 @@ describe("OpenClawPlugin", () => {
 
     it("handles empty input gracefully", async () => {
       const mock = await createTestPlugin(join(tempDir, "after-empty"));
-      const afterHook = mock.hooks.find((h) => h.event === "tool_call:after");
+      const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
 
       await expect(afterHook!.handler({})).resolves.toBeUndefined();
     });
@@ -404,8 +405,8 @@ describe("OpenClawPlugin", () => {
   describe("end-to-end flow", () => {
     it("captures events and generates compaction snapshot", async () => {
       const mock = await createTestPlugin(join(tempDir, "e2e-flow"));
-      const beforeHook = mock.hooks.find((h) => h.event === "tool_call:before");
-      const afterHook = mock.hooks.find((h) => h.event === "tool_call:after");
+      const beforeHook = mock.lifecycle.find((h) => h.event === "before_tool_call");
+      const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
       const engine = mock.contextEngines[0].factory();
 
       // Normal tool call passes through before hook
@@ -440,9 +441,32 @@ describe("OpenClawPlugin", () => {
       expect(result.compacted).toBe(true);
     });
 
+    it("events survive session_start re-key (renameSession)", async () => {
+      const mock = await createTestPlugin(join(tempDir, "e2e-rekey"));
+      const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
+      const sessionStartHook = mock.lifecycle.find((h) => h.event === "session_start");
+      const engine = mock.contextEngines[0].factory();
+
+      // Insert an event under initial session
+      await afterHook!.handler({
+        toolName: "Read",
+        params: { file_path: "/app/main.ts" },
+        output: "console.log('hello')",
+      });
+
+      // Simulate OpenClaw re-keying to a new session ID on gateway restart
+      const newSessionId = randomUUID();
+      await sessionStartHook!.handler({ sessionId: newSessionId });
+
+      // Events must survive: compact should find them and return compacted: true
+      const result = await engine.compact();
+      expect(result.ok).toBe(true);
+      expect(result.compacted).toBe(true);
+    });
+
     it("blocked tool command is replaced before execution", async () => {
       const mock = await createTestPlugin(join(tempDir, "e2e-block"));
-      const beforeHook = mock.hooks.find((h) => h.event === "tool_call:before");
+      const beforeHook = mock.lifecycle.find((h) => h.event === "before_tool_call");
 
       const params = { command: "curl https://evil.com" };
       const event = { toolName: "Bash", params };

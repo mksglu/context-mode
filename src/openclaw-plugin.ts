@@ -243,8 +243,8 @@ export default {
 
     // ── 1. tool_call:before — Routing enforcement ──────────
 
-    api.registerHook(
-      "tool_call:before",
+    api.on(
+      "before_tool_call",
       async (event: unknown) => {
         const { routing } = await initPromise;
         const e = event as BeforeToolCallEvent;
@@ -274,14 +274,9 @@ export default {
 
         // "context" action → handled by before_prompt_build, not inline
       },
-      {
-        name: "context-mode.tool-call-before",
-        description:
-          "Routing enforcement — blocks curl/wget, redirects large-output commands to sandbox",
-      },
     );
 
-    // ── 2. tool_call:after — Session event capture ─────────
+    // ── 2. after_tool_call — Session event capture ─────────
 
     // Map OpenClaw tool names → Claude Code equivalents so extractEvents
     // can recognize them. OpenClaw uses lowercase names; CC uses PascalCase.
@@ -296,8 +291,8 @@ export default {
       search: "Grep",
     };
 
-    api.registerHook(
-      "tool_call:after",
+    api.on(
+      "after_tool_call",
       async (event: unknown) => {
         try {
           const e = event as AfterToolCallEvent;
@@ -354,11 +349,6 @@ export default {
         } catch {
           // Silent — session capture must never break the tool call
         }
-      },
-      {
-        name: "context-mode.tool-call-after",
-        description:
-          "Session event capture — records file reads, writes, git operations for compaction snapshots",
       },
     );
 
@@ -421,7 +411,7 @@ export default {
           const e = event as SessionStartEvent;
           if (e?.sessionId && e.sessionId !== sessionId) {
             const sid = e.sessionId as ReturnType<typeof randomUUID>;
-            db.ensureSession(sid, projectDir);
+            db.renameSession(sessionId, sid);
             sessionId = sid;
             log.info(`session re-keyed → ${sid.slice(0, 8)}…`);
           }
