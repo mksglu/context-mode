@@ -89,6 +89,16 @@ const sessionStats = {
   bytesIndexed: 0,
   bytesSandboxed: 0, // network I/O consumed inside sandbox (never enters context)
   sessionStart: Date.now(),
+  // Delegate-specific metrics
+  delegate: {
+    totalCalls: 0,
+    totalSubAgents: 0,
+    totalWallTimeMs: 0,
+    totalSequentialTimeMs: 0,
+    totalPromptTokens: 0,
+    totalSummaryTokens: 0,
+    totalFilesRead: 0,
+  },
 };
 
 type ToolResult = {
@@ -853,7 +863,9 @@ server.registerTool(
     title: "Search Indexed Content",
     description:
       "Search indexed content. Pass ALL search questions as queries array in ONE call.\n\n" +
-      "TIPS: 2-4 specific terms per query. Use 'source' to scope results.",
+      "TIPS: 2-4 specific terms per query. Use 'source' to scope results.\n\n" +
+      "DELEGATE RESULTS: After ctx_delegate, each sub-agent's output is indexed with source 'delegate:<task-name>'. " +
+      "Use source: 'delegate:<name>' to search a specific agent's findings, or source: 'delegate' to search all.",
     inputSchema: z.object({
       queries: z
         .array(z.string())
@@ -1400,6 +1412,158 @@ server.registerTool(
 );
 
 // ─────────────────────────────────────────────────────────
+// Tool: delegate — distributed analysis via sub-agents
+// ─────────────────────────────────────────────────────────
+
+server.registerTool(
+  "ctx_delegate",
+  {
+    title: "Delegate to Sub-Agents",
+    description:
+      "Spawn parallel Claude sub-agents for distributed analysis. Each sub-agent receives " +
+      "pre-read file contents, performs single-turn analysis, and returns a compressed summary. " +
+      "Results are indexed into the knowledge base for follow-up search.\n\n" +
+      "USE WHEN: Task requires reading many files (>5), deep analysis across modules, " +
+      "or any work that would flood your context window.\n\n" +
+      "IMPORTANT: Use directory paths (e.g., 'src/') to auto-discover files. " +
+      "Do NOT guess individual file names — pass the directory and let the tool find files recursively. " +
+      "If a file path is wrong, that task fails instantly (no sub-agent spawned).\n\n" +
+      "Concurrency is automatic (CPU-based). " +
+      "Uses `claude --print` (zero dependencies, Claude Code only).",
+    inputSchema: z.object({
+      tasks: z
+        .array(
+          z.object({
+            name: z.string().describe("Label for this sub-agent (e.g., 'security-audit', 'api-review')"),
+            prompt: z
+              .string()
+              .describe(
+                "Analysis instructions for the sub-agent. Be specific: what to look for, " +
+                "what format to use, max word count. The sub-agent sees ONLY this prompt + embedded files.",
+              ),
+            files: z
+              .array(z.string())
+              .optional()
+              .describe(
+                "File/directory paths to pre-read and embed in the prompt. " +
+                "Directories are read recursively (code files only). " +
+                "Paths relative to project root. Example: ['src/server.ts', 'src/adapters/']",
+              ),
+          }),
+        )
+        .min(1)
+        .max(20)
+        .describe("Array of tasks — each becomes one parallel sub-agent"),
+      model: z
+        .string()
+        .optional()
+        .default("claude-sonnet-4-6")
+        .describe("Model for sub-agents (default: claude-sonnet-4-6)"),
+      timeout: z
+        .number()
+        .optional()
+        .default(90000)
+        .describe("Per-task timeout in ms (default: 90s, max: 300s)"),
+      concurrency: z
+        .number()
+        .optional()
+        .describe("Max concurrent sub-agents (default: CPU count, max: 10)"),
+    }),
+  },
+  async ({ tasks, model, timeout, concurrency }) => {
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+
+    try {
+      const result = await delegate(
+        { tasks: tasks as DelegateTask[], model, timeout, concurrency },
+        projectRoot,
+      );
+
+      // Check for depth limit
+      if (result.results.length === 1 && result.results[0].error === "DEPTH_LIMIT") {
+        return trackResponse("ctx_delegate", {
+          content: [{
+            type: "text" as const,
+            text: result.results[0].summary,
+          }],
+          isError: true,
+        });
+      }
+
+      // Index each sub-agent result separately into FTS5 for targeted search.
+      // source: "delegate:<task-name>" allows scoped queries like:
+      //   ctx_search(queries: [...], source: "delegate:executor-security")
+      try {
+        const store = getStore();
+        for (const r of result.results) {
+          if (!r.summary || r.error) continue;
+          const content = `## ${r.name}\n\n${r.summary}`;
+          store.index({ content, source: `delegate:${r.name}` });
+          trackIndexed(Buffer.byteLength(content));
+        }
+      } catch { /* best-effort — FTS5/sqlite may not be available */ }
+
+      // Track delegate metrics for ctx_stats
+      sessionStats.delegate.totalCalls++;
+      sessionStats.delegate.totalSubAgents += result.results.length;
+      sessionStats.delegate.totalWallTimeMs += result.wallTimeMs;
+      sessionStats.delegate.totalSequentialTimeMs += result.sequentialTimeMs;
+      sessionStats.delegate.totalPromptTokens += result.totalPromptTokens;
+      sessionStats.delegate.totalSummaryTokens += result.totalSummaryTokens;
+      sessionStats.delegate.totalFilesRead += result.results.reduce((s, r) => s + r.fileCount, 0);
+
+      // Build response — metrics + summaries
+      const lines: string[] = [];
+
+      // Metrics header
+      lines.push("## ctx_delegate — Results\n");
+      lines.push(`| Metric | Value |`);
+      lines.push(`|--------|-------|`);
+      lines.push(`| Sub-agents | ${result.results.length} |`);
+      lines.push(`| Wall time | ${(result.wallTimeMs / 1000).toFixed(1)}s |`);
+      lines.push(`| Sequential would be | ${(result.sequentialTimeMs / 1000).toFixed(1)}s |`);
+      lines.push(`| Speedup | ${result.speedup.toFixed(1)}x |`);
+      lines.push(`| Prompt tokens (raw) | ~${result.totalPromptTokens.toLocaleString()} |`);
+      lines.push(`| Summary tokens | ~${result.totalSummaryTokens.toLocaleString()} |`);
+      lines.push(`| Compression | ${result.compressionPct.toFixed(1)}% |`);
+      lines.push("");
+
+      // Per-agent summaries
+      for (const r of result.results) {
+        const status = r.error ? "FAIL" : "OK";
+        const duration = (r.durationMs / 1000).toFixed(1);
+        lines.push(`### [${status}] ${r.name} (${duration}s, ${r.fileCount} files)\n`);
+        if (r.missingPaths && r.missingPaths.length > 0) {
+          lines.push(`**Missing paths:** ${r.missingPaths.join(", ")}\n`);
+        }
+        lines.push(r.summary);
+        lines.push("");
+      }
+
+      // Follow-up hint with per-agent source labels
+      const sourceLabels = result.results
+        .filter((r) => !r.error)
+        .map((r) => `"delegate:${r.name}"`)
+        .join(", ");
+      lines.push("---");
+      lines.push(`_Each result indexed separately. Use \`search(queries: [...], source: "delegate:<name>")\` for targeted lookups._`);
+      lines.push(`_Available sources: ${sourceLabels}_`);
+
+      const text = lines.join("\n");
+      return trackResponse("ctx_delegate", {
+        content: [{ type: "text" as const, text }],
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return trackResponse("ctx_delegate", {
+        content: [{ type: "text" as const, text: `Delegate error: ${message}` }],
+        isError: true,
+      });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────
 // Tool: stats
 // ─────────────────────────────────────────────────────────
 
@@ -1487,6 +1651,36 @@ server.registerTool(
       if (keptOut > 0) {
         lines.push("", `Without context-mode, **${kb(totalProcessed)}** of raw output would flood your context window. Instead, **${reductionPct}%** stayed in sandbox.`);
       }
+    }
+
+    // ── Delegate Analytics ──
+    if (sessionStats.delegate.totalCalls > 0) {
+      const d = sessionStats.delegate;
+      const avgSpeedup = d.totalSequentialTimeMs / Math.max(d.totalWallTimeMs, 1);
+      const compressionPct = d.totalPromptTokens > 0
+        ? ((1 - d.totalSummaryTokens / d.totalPromptTokens) * 100).toFixed(1)
+        : "0";
+      const rawTokensAvoided = d.totalPromptTokens - d.totalSummaryTokens;
+
+      lines.push(
+        "",
+        "### Delegate Analytics",
+        "",
+        "| Metric | Value |",
+        "|--------|------:|",
+        `| Delegate calls | ${d.totalCalls} |`,
+        `| Sub-agents spawned | ${d.totalSubAgents} |`,
+        `| Files analyzed | ${d.totalFilesRead} |`,
+        `| Wall time (total) | ${(d.totalWallTimeMs / 1000).toFixed(1)}s |`,
+        `| Sequential would be | ${(d.totalSequentialTimeMs / 1000).toFixed(1)}s |`,
+        `| Average speedup | ${avgSpeedup.toFixed(1)}x |`,
+        `| Raw tokens (pre-read files) | ~${d.totalPromptTokens.toLocaleString()} |`,
+        `| Summary tokens (returned) | ~${d.totalSummaryTokens.toLocaleString()} |`,
+        `| **Compression** | **${compressionPct}%** |`,
+        `| **Tokens kept out of context** | **~${rawTokensAvoided.toLocaleString()}** |`,
+        "",
+        `Without delegate, ~${d.totalPromptTokens.toLocaleString()} tokens of raw file content would enter your context window. Instead, sub-agents compressed it to ~${d.totalSummaryTokens.toLocaleString()} tokens — **${compressionPct}% reduction**.`,
+      );
     }
 
     // ── Session Continuity ──

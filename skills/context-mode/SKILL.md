@@ -12,7 +12,10 @@ description: |
   "fetch docs", "API reference", "index documentation",
   "call API", "check response", "query results",
   "find TODOs", "count lines", "codebase statistics", "security audit",
-  "outdated packages", "dependency tree", "cloud resources", "CI/CD output".
+  "outdated packages", "dependency tree", "cloud resources", "CI/CD output",
+  "delegate analysis", "parallel review", "analyze all files",
+  "review entire codebase", "analyze all modules", "refactor all",
+  "document all", "migrate all", "review all adapters".
   Also triggers on ANY MCP tool output that may exceed 20 lines.
   Subagent routing is handled automatically via PreToolUse hook.
 ---

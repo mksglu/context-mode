@@ -4,10 +4,11 @@ Raw tool output floods your context window. Use context-mode MCP tools to keep r
 
 ## Tool Selection
 
-1. **GATHER**: `batch_execute(commands, queries)` — Primary tool for research. Runs all commands, auto-indexes, and searches. ONE call replaces many individual steps.
-2. **FOLLOW-UP**: `search(queries: ["q1", "q2", ...])` — Use for all follow-up questions. ONE call, many queries.
-3. **PROCESSING**: `execute(language, code)` or `execute_file(path, language, code)` — Use for API calls, log analysis, and data processing.
-4. **WEB**: `fetch_and_index(url)` then `search(queries)` — Fetch, index, then query. Never dump raw HTML.
+1. **DELEGATE**: `delegate(tasks)` — **PREFER THIS** when task involves analyzing, reviewing, or understanding multiple files (>5). Spawns parallel sub-agents with pre-read files. Results auto-indexed.
+2. **GATHER**: `batch_execute(commands, queries)` — Run commands, auto-index, search. For shell commands and CLI output, not file analysis.
+3. **FOLLOW-UP**: `search(queries: ["q1", "q2", ...])` — Use for all follow-up questions. ONE call, many queries.
+4. **PROCESSING**: `execute(language, code)` or `execute_file(path, language, code)` — Use for API calls, log analysis, and data processing.
+5. **WEB**: `fetch_and_index(url)` then `search(queries)` — Fetch, index, then query. Never dump raw HTML.
 
 ## Rules
 

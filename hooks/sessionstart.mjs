@@ -27,7 +27,16 @@ import { homedir } from "node:os";
 const HOOK_DIR = dirname(fileURLToPath(import.meta.url));
 const { loadSessionDB } = createSessionLoaders(HOOK_DIR);
 
-let additionalContext = ROUTING_BLOCK;
+// Inject ctx_delegate into the tool hierarchy for Claude Code (uses claude --print)
+let additionalContext = ROUTING_BLOCK.replace(
+  `</tool_selection_hierarchy>`,
+  `    4. DELEGATE: mcp__plugin_context-mode_context-mode__ctx_delegate(tasks)
+       - Spawn parallel sub-agents when task requires reading >5 files or would flood context with raw content.
+       - Domain-agnostic: analysis, review, migration, refactoring, documentation, etc.
+       - Each task gets its own sub-agent with pre-read files. Results auto-indexed for ctx_search.
+       - ALWAYS prefer delegate over batch_execute when the user asks to analyze, review, or understand multiple files.
+  </tool_selection_hierarchy>`,
+);
 
 try {
   const raw = await readStdin();
