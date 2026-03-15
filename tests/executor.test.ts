@@ -1168,6 +1168,181 @@ describe("Environment Passthrough", () => {
       if (original !== undefined) process.env.SSH_AUTH_SOCK = original;
     }
   });
+
+  test("custom env var is NOT passed through by default", async () => {
+    process.env.MY_CUSTOM_SECRET = "secret123";
+    try {
+      const r = await executor.execute({
+        language: "shell",
+        code: 'echo "val=${MY_CUSTOM_SECRET:-empty}"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(
+        r.stdout.includes("val=empty"),
+        `Expected MY_CUSTOM_SECRET to be absent, got: ${r.stdout}`,
+      );
+    } finally {
+      delete process.env.MY_CUSTOM_SECRET;
+    }
+  });
+});
+
+describe("Custom envPassthrough", () => {
+  test("envPassthrough with exact var name passes it through", async () => {
+    process.env.MY_API_TOKEN = "tok_abc123";
+    try {
+      const ex = new PolyglotExecutor({
+        runtimes,
+        envPassthrough: ["MY_API_TOKEN"],
+      });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "token=$MY_API_TOKEN"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(
+        r.stdout.includes("token=tok_abc123"),
+        `Expected MY_API_TOKEN to be passed through, got: ${r.stdout}`,
+      );
+    } finally {
+      delete process.env.MY_API_TOKEN;
+    }
+  });
+
+  test("envPassthrough with glob pattern passes matching vars", async () => {
+    process.env.SLACK_TOKEN_WORKSPACE1 = "xoxc-111";
+    process.env.SLACK_COOKIE_WORKSPACE1 = "xoxd-222";
+    process.env.UNRELATED_VAR = "nope";
+    try {
+      const ex = new PolyglotExecutor({
+        runtimes,
+        envPassthrough: ["SLACK_*"],
+      });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "tok=$SLACK_TOKEN_WORKSPACE1 cook=$SLACK_COOKIE_WORKSPACE1 other=${UNRELATED_VAR:-empty}"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(r.stdout.includes("tok=xoxc-111"), `Missing SLACK_TOKEN, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("cook=xoxd-222"), `Missing SLACK_COOKIE, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("other=empty"), `UNRELATED_VAR should not pass through, got: ${r.stdout}`);
+    } finally {
+      delete process.env.SLACK_TOKEN_WORKSPACE1;
+      delete process.env.SLACK_COOKIE_WORKSPACE1;
+      delete process.env.UNRELATED_VAR;
+    }
+  });
+
+  test("envPassthrough with multiple patterns", async () => {
+    process.env.SLACK_TOKEN_X = "slack-val";
+    process.env.LINEAR_API_KEY_Y = "linear-val";
+    process.env.OTHER_SECRET = "other-val";
+    try {
+      const ex = new PolyglotExecutor({
+        runtimes,
+        envPassthrough: ["SLACK_*", "LINEAR_*"],
+      });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "s=$SLACK_TOKEN_X l=$LINEAR_API_KEY_Y o=${OTHER_SECRET:-empty}"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(r.stdout.includes("s=slack-val"), `Missing SLACK, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("l=linear-val"), `Missing LINEAR, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("o=empty"), `OTHER_SECRET should not pass, got: ${r.stdout}`);
+    } finally {
+      delete process.env.SLACK_TOKEN_X;
+      delete process.env.LINEAR_API_KEY_Y;
+      delete process.env.OTHER_SECRET;
+    }
+  });
+
+  test("envPassthrough: true passes all env vars", async () => {
+    process.env.CUSTOM_VAR_ALPHA = "alpha";
+    process.env.CUSTOM_VAR_BETA = "beta";
+    try {
+      const ex = new PolyglotExecutor({
+        runtimes,
+        envPassthrough: true,
+      });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "a=$CUSTOM_VAR_ALPHA b=$CUSTOM_VAR_BETA"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(r.stdout.includes("a=alpha"), `Missing ALPHA, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("b=beta"), `Missing BETA, got: ${r.stdout}`);
+    } finally {
+      delete process.env.CUSTOM_VAR_ALPHA;
+      delete process.env.CUSTOM_VAR_BETA;
+    }
+  });
+
+  test("CONTEXT_MODE_ENV_PASSTHROUGH env var with '*' enables pass-all", async () => {
+    process.env.CONTEXT_MODE_ENV_PASSTHROUGH = "*";
+    process.env.ENVVAR_TEST_XYZ = "xyz-value";
+    try {
+      const ex = new PolyglotExecutor({ runtimes });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "v=$ENVVAR_TEST_XYZ"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(
+        r.stdout.includes("v=xyz-value"),
+        `Expected ENVVAR_TEST_XYZ via env config, got: ${r.stdout}`,
+      );
+    } finally {
+      delete process.env.CONTEXT_MODE_ENV_PASSTHROUGH;
+      delete process.env.ENVVAR_TEST_XYZ;
+    }
+  });
+
+  test("CONTEXT_MODE_ENV_PASSTHROUGH env var with comma-separated patterns", async () => {
+    process.env.CONTEXT_MODE_ENV_PASSTHROUGH = "MY_TOK_*,MY_COOK";
+    process.env.MY_TOK_ABC = "tok-val";
+    process.env.MY_COOK = "cook-val";
+    process.env.MY_OTHER = "other-val";
+    try {
+      const ex = new PolyglotExecutor({ runtimes });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "t=$MY_TOK_ABC c=$MY_COOK o=${MY_OTHER:-empty}"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(r.stdout.includes("t=tok-val"), `Missing MY_TOK_ABC, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("c=cook-val"), `Missing MY_COOK, got: ${r.stdout}`);
+      assert.ok(r.stdout.includes("o=empty"), `MY_OTHER should not pass, got: ${r.stdout}`);
+    } finally {
+      delete process.env.CONTEXT_MODE_ENV_PASSTHROUGH;
+      delete process.env.MY_TOK_ABC;
+      delete process.env.MY_COOK;
+      delete process.env.MY_OTHER;
+    }
+  });
+
+  test("constructor envPassthrough takes precedence over env var", async () => {
+    process.env.CONTEXT_MODE_ENV_PASSTHROUGH = "*";
+    process.env.SHOULD_BE_BLOCKED = "blocked";
+    try {
+      const ex = new PolyglotExecutor({
+        runtimes,
+        envPassthrough: ["ALLOWED_ONLY"],
+      });
+      const r = await ex.execute({
+        language: "shell",
+        code: 'echo "v=${SHOULD_BE_BLOCKED:-empty}"',
+      });
+      assert.equal(r.exitCode, 0);
+      assert.ok(
+        r.stdout.includes("v=empty"),
+        `Constructor option should override env var, got: ${r.stdout}`,
+      );
+    } finally {
+      delete process.env.CONTEXT_MODE_ENV_PASSTHROUGH;
+      delete process.env.SHOULD_BE_BLOCKED;
+    }
+  });
 });
 
 describe("Concurrent Execution", () => {

@@ -45,6 +45,7 @@ const server = new McpServer({
 const executor = new PolyglotExecutor({
   runtimes,
   projectRoot: process.env.CLAUDE_PROJECT_DIR,
+  // CONTEXT_MODE_ENV_PASSTHROUGH is read automatically by the constructor
 });
 
 // Lazy singleton — no DB overhead unless index/search is used
