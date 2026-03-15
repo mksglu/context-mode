@@ -177,6 +177,14 @@ function getDBPath(projectDir: string): string {
   return join(getSessionDir(), `${hash}.db`);
 }
 
+// ── Module-level state for command handlers ───────────────
+// Commands are registered once (first register() call) but need access to the
+// latest session's db/sessionId. These refs are updated by each register() call.
+let _commandsRegistered = false;
+let _latestDb: SessionDB | null = null;
+let _latestSessionId = "";
+let _latestPluginRoot = "";
+
 // ── Plugin Definition (object export) ─────────────────────
 
 /**
@@ -445,6 +453,7 @@ export default {
           }
 
           sessionId = sid as ReturnType<typeof randomUUID>;
+          _latestSessionId = sessionId;
           if (key) {
             workspaceRouter.registerSession(key, sessionId);
           }
@@ -588,13 +597,20 @@ export default {
     }));
 
     // ── 10. Auto-reply commands — ctx slash commands ──────
+    // Update module-level refs so command handlers (registered once) always
+    // read the latest session's db/sessionId/pluginRoot.
+    _latestDb = db;
+    _latestSessionId = sessionId;
+    _latestPluginRoot = pluginRoot;
 
-    if (api.registerCommand) {
+    if (api.registerCommand && !_commandsRegistered) {
+      _commandsRegistered = true;
+
       api.registerCommand({
         name: "ctx-stats",
         description: "Show context-mode session statistics",
         handler: () => {
-          const text = buildStatsText(db, sessionId);
+          const text = buildStatsText(_latestDb!, _latestSessionId);
           return { text };
         },
       });
@@ -603,7 +619,7 @@ export default {
         name: "ctx-doctor",
         description: "Run context-mode diagnostics",
         handler: () => {
-          const cmd = `node "${pluginRoot}/build/cli.js" doctor`;
+          const cmd = `node "${_latestPluginRoot}/build/cli.js" doctor`;
           return {
             text: [
               "## ctx-doctor",
@@ -622,7 +638,7 @@ export default {
         name: "ctx-upgrade",
         description: "Upgrade context-mode to the latest version",
         handler: () => {
-          const cmd = `node "${pluginRoot}/build/cli.js" upgrade`;
+          const cmd = `node "${_latestPluginRoot}/build/cli.js" upgrade`;
           return {
             text: [
               "## ctx-upgrade",
