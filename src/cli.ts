@@ -1402,20 +1402,20 @@ async function upgrade(opts?: { platform?: string }) {
               color.dim("\n  Try (fallback): /context-mode:ctx-doctor"),
           );
         }
-      }
-
-      // Update global npm
-      s.start("Updating npm global package");
-      try {
-        npmExecFile(["install", "-g", pluginRoot, "--no-audit", "--no-fund"], {
-          stdio: "pipe",
-          timeout: 30000,
-        });
-        s.stop(color.green("npm global updated"));
-        changes.push("Updated npm global package");
-      } catch {
-        s.stop(color.yellow("npm global update skipped"));
-        p.log.info(color.dim("  Could not update global npm — may need sudo or standalone install"));
+        
+        // Update global npm
+        s.start("Updating npm global package");
+        try {
+          npmExecFile(["install", "-g", pluginRoot, "--no-audit", "--no-fund"], {
+            stdio: "pipe",
+            timeout: 30000,
+          });
+          s.stop(color.green("npm global updated"));
+          changes.push("Updated npm global package");
+        } catch {
+          s.stop(color.yellow("npm global update skipped"));
+          p.log.info(color.dim("  Could not update global npm — may need sudo or standalone install"));
+        }
       }
 
       // Cleanup
