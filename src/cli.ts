@@ -7,6 +7,7 @@
  *   context-mode doctor                       → Diagnose runtime issues, hooks, FTS5, version
  *   context-mode upgrade                      → Fix hooks, permissions, and settings
  *   context-mode hook <platform> <event>      → Dispatch a hook script (used by platform hook configs)
+ *   CONTEXT_MODE_DIR=/abs/path context-mode   → Override sessions/content storage root
  *
  * Platform auto-detection: CLI detects which platform is running
  * (Claude Code, Gemini CLI, OpenCode, etc.) and uses the appropriate adapter.
@@ -153,7 +154,23 @@ const isInProcessPluginPlatform = (p: string | undefined) =>
   p ? IN_PROCESS_PLUGIN_PLATFORMS.has(p) : false;
 const args = process.argv.slice(2);
 
-if (args[0] === "doctor") {
+function printHelp(): void {
+  console.log([
+    "Usage:",
+    "  context-mode                         Start MCP server (stdio)",
+    "  context-mode doctor                  Diagnose runtime issues, hooks, FTS5, version",
+    "  context-mode upgrade                 Fix hooks, permissions, and settings",
+    "  context-mode hook <platform> <event> Dispatch a configured hook script",
+    "  context-mode statusline              Print Claude Code status line",
+    "",
+    "Environment:",
+    "  CONTEXT_MODE_DIR=/absolute/path      Override sessions/content storage root",
+  ].join("\n"));
+}
+
+if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
+  printHelp();
+} else if (args[0] === "doctor") {
   doctor().then((code) => process.exit(code));
 } else if (args[0] === "upgrade") {
   // Issue #542 — accept --platform <id> from the ctx_upgrade MCP handler,

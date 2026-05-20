@@ -18,7 +18,7 @@
  * artifacts instead of pre-built bundles.
  */
 
-import { join, dirname, resolve } from "node:path";
+import { join, dirname } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -41,7 +41,17 @@ async function loadSessionDbModule() {
   return await import(pathToFileURL(buildPath).href);
 }
 
+async function loadStoragePathsModule() {
+  const bundlePath = join(__dirname, "storage-paths.bundle.mjs");
+  if (existsSync(bundlePath)) {
+    return await import(pathToFileURL(bundlePath).href);
+  }
+  const buildPath = join(__dirname, "..", "build", "storage-paths.js");
+  return await import(pathToFileURL(buildPath).href);
+}
+
 const _sessionDb = await loadSessionDbModule();
+const _storagePaths = await loadStoragePathsModule();
 const {
   hashProjectDirCanonical,
   hashProjectDirLegacy,
@@ -266,13 +276,9 @@ export function getSessionId(input, opts = CLAUDE_OPTS) {
 // ─────────────────────────────────────────────────────────
 
 function resolveSessionDir(opts) {
-  if (process.env.CONTEXT_MODE_SESSION_DIR) {
-    return resolve(process.env.CONTEXT_MODE_SESSION_DIR);
-  }
-  if (process.env.CONTEXT_MODE_DIR) {
-    return resolve(process.env.CONTEXT_MODE_DIR, "sessions");
-  }
-  return join(resolveConfigDir(opts), "context-mode", "sessions");
+  return _storagePaths.ensureWritableStorageDir(
+    _storagePaths.resolveSessionStorageDir(() => join(resolveConfigDir(opts), "context-mode", "sessions")),
+  );
 }
 
 function _resolveProjectFile(opts, projectDirOverride, ext) {

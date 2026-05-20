@@ -1,13 +1,12 @@
 import { accessSync, constants, mkdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+
+const BASE_ENV = "CONTEXT_MODE_DIR" as const;
+const SUBDIR_SESSIONS = "sessions";
+const SUBDIR_CONTENT = "content";
 
 export type StorageDirectoryKind = "session" | "content" | "stats";
-
-export type StorageOverrideEnvVar =
-  | "CONTEXT_MODE_DIR"
-  | "CONTEXT_MODE_SESSION_DIR"
-  | "CONTEXT_MODE_CONTENT_DIR"
-  | "CONTEXT_MODE_STATS_DIR";
+export type StorageOverrideEnvVar = typeof BASE_ENV;
 
 export interface ResolvedStorageDir {
   kind: StorageDirectoryKind;
@@ -16,83 +15,90 @@ export interface ResolvedStorageDir {
   source: "default" | "override";
 }
 
-const BASE_ENV = "CONTEXT_MODE_DIR" as const;
-const SPLIT_ENV = {
-  session: "CONTEXT_MODE_SESSION_DIR",
-  content: "CONTEXT_MODE_CONTENT_DIR",
-  stats: "CONTEXT_MODE_STATS_DIR",
-} as const satisfies Record<StorageDirectoryKind, Exclude<StorageOverrideEnvVar, typeof BASE_ENV>>;
-
 export class StorageDirectoryError extends Error {
   readonly kind: StorageDirectoryKind;
   readonly path: string;
-  readonly overrideEnvVar: Exclude<StorageOverrideEnvVar, typeof BASE_ENV>;
+  readonly overrideEnvVar: StorageOverrideEnvVar;
 
   constructor(
     kind: StorageDirectoryKind,
     path: string,
-    overrideEnvVar: Exclude<StorageOverrideEnvVar, typeof BASE_ENV>,
+    overrideEnvVar: StorageOverrideEnvVar = BASE_ENV,
     cause?: unknown,
+    message = errorMessage(kind, path),
   ) {
-    super(errorMessage(kind, path, overrideEnvVar));
+    super(message, { cause });
     this.name = "StorageDirectoryError";
     this.kind = kind;
     this.path = path;
     this.overrideEnvVar = overrideEnvVar;
-    (this as Error & { cause?: unknown }).cause = cause;
   }
 }
 
-function envDir(name: StorageOverrideEnvVar): string | null {
-  const raw = process.env[name]?.trim();
-  return raw ? resolve(raw) : null;
+function invalidOverride(kind: StorageDirectoryKind, path: string, detail: string): StorageDirectoryError {
+  return new StorageDirectoryError(
+    kind,
+    path,
+    BASE_ENV,
+    undefined,
+    [`Invalid ${BASE_ENV} for context-mode ${kind} directory: ${detail}`, storageHint()].join("\n"),
+  );
 }
 
-function overrideDir(kind: StorageDirectoryKind, baseSubdir: "sessions" | "content"): ResolvedStorageDir | null {
-  const split = envDir(SPLIT_ENV[kind]);
-  if (split) return { kind, path: split, envVar: SPLIT_ENV[kind], source: "override" };
+function overrideRoot(kind: StorageDirectoryKind): string | null {
+  const raw = process.env[BASE_ENV];
+  if (raw === undefined) return null;
 
-  const base = envDir(BASE_ENV);
-  if (!base) return null;
-  return { kind, path: join(base, baseSubdir), envVar: BASE_ENV, source: "override" };
+  const trimmed = raw.trim();
+  if (!trimmed) throw invalidOverride(kind, "<empty>", `${BASE_ENV} must not be empty.`);
+  if (!isAbsolute(trimmed)) throw invalidOverride(kind, trimmed, `${BASE_ENV} must be an absolute path.`);
+
+  return resolve(trimmed);
 }
 
-function defaultDir(kind: StorageDirectoryKind, getPath: () => string): ResolvedStorageDir {
-  try {
-    return { kind, path: resolve(getPath()), envVar: null, source: "default" };
-  } catch (err) {
-    throw new StorageDirectoryError(kind, pathFromError(err) ?? `${kind} storage directory`, SPLIT_ENV[kind], err);
-  }
+function overrideDir(kind: StorageDirectoryKind, subdir: string): ResolvedStorageDir | null {
+  const root = overrideRoot(kind);
+  if (!root) return null;
+
+  return {
+    kind,
+    path: join(root, subdir),
+    envVar: BASE_ENV,
+    source: "override",
+  };
 }
 
-function pathFromError(err: unknown): string | null {
-  return err && typeof err === "object" && typeof (err as { path?: unknown }).path === "string"
-    ? (err as { path: string }).path
-    : null;
+function defaultDir(kind: StorageDirectoryKind, getDefaultDir: () => string): ResolvedStorageDir {
+  return {
+    kind,
+    path: getDefaultDir(),
+    envVar: null,
+    source: "default",
+  };
 }
 
 export function resolveSessionStorageDir(getDefaultDir: () => string): ResolvedStorageDir {
-  return overrideDir("session", "sessions") ?? defaultDir("session", getDefaultDir);
+  return overrideDir("session", SUBDIR_SESSIONS) ?? defaultDir("session", getDefaultDir);
 }
 
 export function resolveContentStorageDir(getSessionDir: () => string): ResolvedStorageDir {
-  const override = overrideDir("content", "content");
+  const override = overrideDir("content", SUBDIR_CONTENT);
   if (override) return override;
 
   const session = resolveSessionStorageDir(getSessionDir);
   return {
     kind: "content",
-    path: join(dirname(session.path), "content"),
+    path: join(dirname(session.path), SUBDIR_CONTENT),
     envVar: session.envVar,
     source: session.source,
   };
 }
 
-export function resolveStatsStorageDir(getSessionDir: () => string): ResolvedStorageDir {
-  const override = overrideDir("stats", "sessions");
+export function resolveStatsStorageDir(getDefaultSessionDir: () => string): ResolvedStorageDir {
+  const override = overrideDir("stats", SUBDIR_SESSIONS);
   if (override) return override;
 
-  const session = resolveSessionStorageDir(getSessionDir);
+  const session = resolveSessionStorageDir(getDefaultSessionDir);
   return {
     kind: "stats",
     path: session.path,
@@ -107,21 +113,24 @@ export function ensureWritableStorageDir(dir: ResolvedStorageDir): string {
     accessSync(dir.path, constants.W_OK);
     return dir.path;
   } catch (err) {
-    throw new StorageDirectoryError(dir.kind, pathFromError(err) ?? dir.path, SPLIT_ENV[dir.kind], err);
+    throw new StorageDirectoryError(dir.kind, pathFromError(err) ?? dir.path, BASE_ENV, err);
   }
 }
 
 export function formatStorageDirectoryError(err: StorageDirectoryError): string {
-  return errorMessage(err.kind, err.path, err.overrideEnvVar);
+  return err.message;
 }
 
-function errorMessage(
-  kind: StorageDirectoryKind,
-  path: string,
-  overrideEnvVar: Exclude<StorageOverrideEnvVar, typeof BASE_ENV>,
-): string {
-  return [
-    `context-mode ${kind} directory is not writable: ${path}`,
-    `Set ${BASE_ENV} or ${overrideEnvVar} to a writable path.`,
-  ].join("\n");
+function errorMessage(kind: StorageDirectoryKind, path: string): string {
+  return [`context-mode ${kind} directory is not writable: ${path}`, storageHint()].join("\n");
+}
+
+function storageHint(): string {
+  return `Set ${BASE_ENV} to a writable path.`;
+}
+
+function pathFromError(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const path = (err as { path?: unknown }).path;
+  return typeof path === "string" && path.length > 0 ? path : null;
 }

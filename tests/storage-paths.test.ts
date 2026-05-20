@@ -10,22 +10,12 @@ import {
   StorageDirectoryError,
 } from "../src/storage-paths.js";
 
-const ENV_KEYS = [
-  "CONTEXT_MODE_DIR",
-  "CONTEXT_MODE_SESSION_DIR",
-  "CONTEXT_MODE_CONTENT_DIR",
-  "CONTEXT_MODE_STATS_DIR",
-] as const;
-
-const savedEnv = new Map<string, string | undefined>();
-for (const key of ENV_KEYS) savedEnv.set(key, process.env[key]);
+const ENV_KEY = "CONTEXT_MODE_DIR";
+const savedValue = process.env[ENV_KEY];
 
 function resetEnv(): void {
-  for (const key of ENV_KEYS) {
-    const value = savedEnv.get(key);
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  if (savedValue === undefined) delete process.env[ENV_KEY];
+  else process.env[ENV_KEY] = savedValue;
 }
 
 describe("storage path overrides", () => {
@@ -34,67 +24,78 @@ describe("storage path overrides", () => {
   });
 
   it("uses adapter defaults when no storage override is set", () => {
-    for (const key of ENV_KEYS) delete process.env[key];
+    delete process.env[ENV_KEY];
 
     const session = resolveSessionStorageDir(() => "/home/me/.codex/context-mode/sessions");
-    const content = resolveContentStorageDir(() => session.path);
-    const stats = resolveStatsStorageDir(() => session.path);
+    const content = resolveContentStorageDir(() => "/home/me/.codex/context-mode/sessions");
+    const stats = resolveStatsStorageDir(() => "/home/me/.codex/context-mode/sessions");
 
-    expect(session).toMatchObject({
-      path: resolve("/home/me/.codex/context-mode/sessions"),
+    expect(session).toEqual({
+      kind: "session",
+      path: "/home/me/.codex/context-mode/sessions",
       envVar: null,
       source: "default",
     });
-    expect(content).toMatchObject({
-      path: resolve("/home/me/.codex/context-mode/content"),
+    expect(content).toEqual({
+      kind: "content",
+      path: "/home/me/.codex/context-mode/content",
       envVar: null,
       source: "default",
     });
-    expect(stats).toMatchObject({
-      path: resolve("/home/me/.codex/context-mode/sessions"),
+    expect(stats).toEqual({
+      kind: "stats",
+      path: "/home/me/.codex/context-mode/sessions",
       envVar: null,
       source: "default",
     });
   });
 
-  it("uses CONTEXT_MODE_DIR as base for sessions, content, and stats", () => {
-    process.env.CONTEXT_MODE_DIR = "tmp/context-mode";
-    delete process.env.CONTEXT_MODE_SESSION_DIR;
-    delete process.env.CONTEXT_MODE_CONTENT_DIR;
-    delete process.env.CONTEXT_MODE_STATS_DIR;
+  it("uses CONTEXT_MODE_DIR as the single root for sessions, content, and stats", () => {
+    process.env[ENV_KEY] = "/tmp/context-mode";
 
-    const session = resolveSessionStorageDir(() => "/ignored/sessions");
-    const content = resolveContentStorageDir(() => session.path);
-    const stats = resolveStatsStorageDir(() => session.path);
-
-    expect(session.path).toBe(resolve("tmp/context-mode", "sessions"));
-    expect(content.path).toBe(resolve("tmp/context-mode", "content"));
-    expect(stats.path).toBe(resolve("tmp/context-mode", "sessions"));
+    expect(resolveSessionStorageDir(() => "/ignored")).toEqual({
+      kind: "session",
+      path: resolve("/tmp/context-mode/sessions"),
+      envVar: ENV_KEY,
+      source: "override",
+    });
+    expect(resolveContentStorageDir(() => "/ignored")).toEqual({
+      kind: "content",
+      path: resolve("/tmp/context-mode/content"),
+      envVar: ENV_KEY,
+      source: "override",
+    });
+    expect(resolveStatsStorageDir(() => "/ignored")).toEqual({
+      kind: "stats",
+      path: resolve("/tmp/context-mode/sessions"),
+      envVar: ENV_KEY,
+      source: "override",
+    });
   });
 
-  it("lets split overrides beat CONTEXT_MODE_DIR", () => {
-    process.env.CONTEXT_MODE_DIR = "/base/context-mode";
-    process.env.CONTEXT_MODE_SESSION_DIR = "/split/sessions";
-    process.env.CONTEXT_MODE_CONTENT_DIR = "/split/content";
-    process.env.CONTEXT_MODE_STATS_DIR = "/split/stats";
+  it("rejects a blank CONTEXT_MODE_DIR", () => {
+    process.env[ENV_KEY] = "   ";
 
-    const session = resolveSessionStorageDir(() => "/ignored/sessions");
-    const content = resolveContentStorageDir(() => session.path);
-    const stats = resolveStatsStorageDir(() => session.path);
-
-    expect(session.path).toBe(resolve("/split/sessions"));
-    expect(session.envVar).toBe("CONTEXT_MODE_SESSION_DIR");
-    expect(content.path).toBe(resolve("/split/content"));
-    expect(content.envVar).toBe("CONTEXT_MODE_CONTENT_DIR");
-    expect(stats.path).toBe(resolve("/split/stats"));
-    expect(stats.envVar).toBe("CONTEXT_MODE_STATS_DIR");
+    expect(() => resolveSessionStorageDir(() => "/ignored")).toThrow(StorageDirectoryError);
+    expect(() => resolveSessionStorageDir(() => "/ignored")).toThrow(
+      "CONTEXT_MODE_DIR must not be empty.",
+    );
   });
 
-  it("formats storage permission errors with path and relevant override vars", () => {
+  it("rejects a relative CONTEXT_MODE_DIR", () => {
+    process.env[ENV_KEY] = "tmp/context-mode";
+
+    expect(() => resolveSessionStorageDir(() => "/ignored")).toThrow(StorageDirectoryError);
+    expect(() => resolveSessionStorageDir(() => "/ignored")).toThrow(
+      "CONTEXT_MODE_DIR must be an absolute path.",
+    );
+  });
+
+  it("formats storage permission errors with the root override hint", () => {
     const err = new StorageDirectoryError(
       "content",
       "/Users/me/.codex/context-mode/content",
-      "CONTEXT_MODE_CONTENT_DIR",
+      ENV_KEY,
       Object.assign(new Error("EPERM"), { code: "EPERM" }),
     );
 
@@ -102,7 +103,7 @@ describe("storage path overrides", () => {
       "context-mode content directory is not writable: /Users/me/.codex/context-mode/content",
     );
     expect(formatStorageDirectoryError(err)).toContain(
-      "Set CONTEXT_MODE_DIR or CONTEXT_MODE_CONTENT_DIR to a writable path.",
+      "Set CONTEXT_MODE_DIR to a writable path.",
     );
   });
 });

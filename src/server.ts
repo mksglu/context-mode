@@ -900,7 +900,7 @@ let _lifetimeCache: { tokens: number; computedAt: number } | undefined;
  */
 function getStatsFilePath(): string {
   const sessionId = process.env.CLAUDE_SESSION_ID || `pid-${process.ppid}`;
-  const statsDir = ensureWritableStorageDir(resolveStatsStorageDir(getSessionDir));
+  const statsDir = ensureWritableStorageDir(resolveStatsStorageDir(getDefaultSessionDir));
   return join(statsDir, `stats-${sessionId}.json`);
 }
 

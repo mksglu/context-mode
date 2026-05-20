@@ -13,7 +13,15 @@
 
 import { strict as assert } from "node:assert";
 import { spawn, spawnSync, execSync, type ChildProcess } from "node:child_process";
-import { writeFileSync, mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync } from "node:fs";
+import {
+  chmodSync,
+  writeFileSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+} from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -1224,13 +1232,17 @@ describe("ctx_index: Read deny-policy enforcement (#442)", () => {
     return dir;
   }
 
-  function spawnServerInProject(projectDir: string): ChildProcess {
+  function spawnServerInProject(
+    projectDir: string,
+    extraEnv: Record<string, string> = {},
+  ): ChildProcess {
     return spawn("node", [mcpEntry], {
       stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...process.env,
         CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
         CLAUDE_PROJECT_DIR: projectDir,
+        ...extraEnv,
       },
     });
   }
@@ -1474,6 +1486,44 @@ describe("ctx_index: Read deny-policy enforcement (#442)", () => {
       rmSync(projectDir, { recursive: true, force: true });
     }
   }, 30_000);
+
+  test("ctx_index returns an actionable storage error when CONTEXT_MODE_DIR is unwritable", async () => {
+    if (process.platform === "win32") return;
+
+    const projectDir = setupProject([], {
+      "public-doc.md": "storage failure contract",
+    });
+    const storageRoot = mkdtempSync(join(tmpdir(), "ctx-storage-deny-"));
+    chmodSync(storageRoot, 0o500);
+    const proc = spawnServerInProject(projectDir, {
+      CONTEXT_MODE_DIR: storageRoot,
+    });
+
+    try {
+      await initServer(proc, "ctx-index-storage-error");
+
+      const indexResp = await awaitRpc(proc, {
+        jsonrpc: "2.0",
+        id: 103,
+        method: "tools/call",
+        params: { name: "ctx_index", arguments: { path: "public-doc.md" } },
+      });
+
+      expect(indexResp.error).toBeUndefined();
+      expect(indexResp.result?.isError).toBe(true);
+      expect(indexResp.result?.content?.[0]?.text).toContain(
+        "context-mode content directory is not writable:",
+      );
+      expect(indexResp.result?.content?.[0]?.text).toContain(
+        "Set CONTEXT_MODE_DIR to a writable path.",
+      );
+    } finally {
+      killProc(proc);
+      chmodSync(storageRoot, 0o700);
+      rmSync(storageRoot, { recursive: true, force: true });
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

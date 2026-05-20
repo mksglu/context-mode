@@ -30,6 +30,10 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
+import {
+  ensureWritableStorageDir,
+  resolveSessionStorageDir,
+} from "../hooks/storage-paths.bundle.mjs";
 
 // ── Analytics import — resolved relative to this script ─────────────────
 // statusline.mjs ships in `bin/`; the compiled analytics module lives in
@@ -98,13 +102,9 @@ function readStdinJson() {
 }
 
 function resolveSessionDir() {
-  if (process.env.CONTEXT_MODE_SESSION_DIR) {
-    return process.env.CONTEXT_MODE_SESSION_DIR;
-  }
-  if (process.env.CONTEXT_MODE_DIR) {
-    return join(process.env.CONTEXT_MODE_DIR, "sessions");
-  }
-  return join(homedir(), ".claude", "context-mode", "sessions");
+  return ensureWritableStorageDir(
+    resolveSessionStorageDir(() => join(homedir(), ".claude", "context-mode", "sessions")),
+  );
 }
 
 /**
