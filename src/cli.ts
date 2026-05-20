@@ -30,6 +30,15 @@ import {
 } from "./runtime.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
+import {
+  ensureWritableStorageDir,
+  formatStorageDirectoryError,
+  resolveContentStorageDir,
+  resolveSessionStorageDir,
+  resolveStatsStorageDir,
+  StorageDirectoryError,
+  type ResolvedStorageDir,
+} from "./session/db.js";
 // v1.0.128 — Issue #559 sibling MCP kill helpers (see PR-559-560-FIX-DESIGN.md).
 import { discoverSiblingMcpPids, killSiblingMcpServers } from "./util/sibling-mcp.js";
 // v1.0.119 — Issue #523 Layer 5 heal: post-bump assertion on .claude-plugin/plugin.json
@@ -57,15 +66,6 @@ function browserOpenArgv(
 
 // ── Adapter imports ──────────────────────────────────────
 import { detectPlatform, getAdapter } from "./adapters/detect.js";
-import {
-  ensureWritableStorageDir,
-  formatStorageDirectoryError,
-  resolveContentStorageDir,
-  resolveSessionStorageDir,
-  resolveStatsStorageDir,
-  StorageDirectoryError,
-  type ResolvedStorageDir,
-} from "./storage-paths.js";
 
 /* -------------------------------------------------------
  * Hook dispatcher — `context-mode hook <platform> <event>`

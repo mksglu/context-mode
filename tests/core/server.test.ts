@@ -41,7 +41,7 @@ import {
   resolveSessionStorageDir,
   resolveStatsStorageDir,
   StorageDirectoryError,
-} from "../../src/storage-paths.js";
+} from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────

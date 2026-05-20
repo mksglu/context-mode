@@ -41,21 +41,13 @@ async function loadSessionDbModule() {
   return await import(pathToFileURL(buildPath).href);
 }
 
-async function loadStoragePathsModule() {
-  const bundlePath = join(__dirname, "storage-paths.bundle.mjs");
-  if (existsSync(bundlePath)) {
-    return await import(pathToFileURL(bundlePath).href);
-  }
-  const buildPath = join(__dirname, "..", "build", "storage-paths.js");
-  return await import(pathToFileURL(buildPath).href);
-}
-
 const _sessionDb = await loadSessionDbModule();
-const _storagePaths = await loadStoragePathsModule();
 const {
+  ensureWritableStorageDir,
   hashProjectDirCanonical,
   hashProjectDirLegacy,
   normalizeWorktreePath,
+  resolveSessionStorageDir,
   resolveSessionPath: _resolveSessionPath,
   getWorktreeSuffix: _getWorktreeSuffixBundle,
 } = _sessionDb;
@@ -276,8 +268,8 @@ export function getSessionId(input, opts = CLAUDE_OPTS) {
 // ─────────────────────────────────────────────────────────
 
 function resolveSessionDir(opts) {
-  return _storagePaths.ensureWritableStorageDir(
-    _storagePaths.resolveSessionStorageDir(() => join(resolveConfigDir(opts), "context-mode", "sessions")),
+  return ensureWritableStorageDir(
+    resolveSessionStorageDir(() => join(resolveConfigDir(opts), "context-mode", "sessions")),
   );
 }
 

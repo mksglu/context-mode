@@ -33,7 +33,7 @@ import { execFileSync } from "node:child_process";
 import {
   ensureWritableStorageDir,
   resolveSessionStorageDir,
-} from "../hooks/storage-paths.bundle.mjs";
+} from "../hooks/session-db.bundle.mjs";
 
 // ── Analytics import — resolved relative to this script ─────────────────
 // statusline.mjs ships in `bin/`; the compiled analytics module lives in

@@ -29,17 +29,21 @@ import {
 } from "./runtime.js";
 import { classifyNonZeroExit } from "./exit-classify.js";
 import { startLifecycleGuard } from "./lifecycle.js";
-import { hashProjectDirCanonical, hashProjectDirLegacy, resolveContentStorePath, resolveSessionDbPath, SessionDB } from "./session/db.js";
-import { purgeSession } from "./session/purge.js";
 import {
   describeStorageDirectorySource,
   ensureWritableStorageDir,
   formatStorageDirectoryError,
+  hashProjectDirCanonical,
+  hashProjectDirLegacy,
+  resolveContentStorePath,
   resolveContentStorageDir,
+  resolveSessionDbPath,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
+  SessionDB,
   StorageDirectoryError,
-} from "./storage-paths.js";
+} from "./session/db.js";
+import { purgeSession } from "./session/purge.js";
 import {
   emitCacheHitEvent,
   emitIndexWriteEvent,
