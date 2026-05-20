@@ -13,11 +13,17 @@ import type { ProjectAttribution } from "./project-attribution.js";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync, mkdirSync, realpathSync, renameSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 // ─────────────────────────────────────────────────────────
 // Storage root resolution
 // ─────────────────────────────────────────────────────────
+//
+// This lives beside the session DB path helpers because packaged hooks and the
+// statusline already consume `hooks/session-db.bundle.mjs` as their no-build
+// runtime bridge. Keeping the storage resolver here avoids adding a second
+// generated hook bundle just to share CONTEXT_MODE_DIR behavior.
 
 const STORAGE_ROOT_ENV = "CONTEXT_MODE_DIR" as const;
 const STORAGE_SESSIONS_SUBDIR = "sessions";
@@ -68,6 +74,44 @@ type OverrideRoot =
   | { kind: "override"; root: string };
 
 const writableStorageCache = new Map<string, string | StorageDirectoryError>();
+
+export interface DefaultSessionDirOptions {
+  configDir: string;
+  configDirEnv?: string;
+  legacySessionDirEnv?: string;
+  onLegacySessionDir?: (envVar: string, dir: string) => void;
+  env?: NodeJS.ProcessEnv;
+}
+
+export function resolveDefaultSessionDir(opts: DefaultSessionDirOptions): string {
+  const env = opts.env ?? process.env;
+  const legacyEnvVar = opts.legacySessionDirEnv;
+  const legacy = legacyEnvVar ? env[legacyEnvVar]?.trim() : undefined;
+  if (legacy && legacyEnvVar) {
+    opts.onLegacySessionDir?.(legacyEnvVar, legacy);
+    return legacy;
+  }
+
+  return join(resolveConfigDirForDefaultSession(opts.configDir, opts.configDirEnv, env), "context-mode", "sessions");
+}
+
+function resolveConfigDirForDefaultSession(
+  configDir: string,
+  configDirEnv: string | undefined,
+  env: NodeJS.ProcessEnv,
+): string {
+  const envValue = configDirEnv ? env[configDirEnv] : undefined;
+  if (envValue && envValue.trim() !== "") {
+    return resolveConfigDirValue(envValue.trim());
+  }
+  return resolveConfigDirValue(configDir, homedir());
+}
+
+function resolveConfigDirValue(value: string, baseDir?: string): string {
+  if (value.startsWith("~")) return resolve(homedir(), value.replace(/^~[/\\]?/, ""));
+  if (isAbsolute(value)) return resolve(value);
+  return baseDir ? resolve(baseDir, value) : resolve(value);
+}
 
 function invalidStorageOverride(kind: StorageDirectoryKind, path: string, detail: string): StorageDirectoryError {
   return new StorageDirectoryError(

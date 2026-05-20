@@ -47,6 +47,7 @@ const {
   hashProjectDirCanonical,
   hashProjectDirLegacy,
   normalizeWorktreePath,
+  resolveDefaultSessionDir,
   resolveSessionStorageDir,
   resolveSessionPath: _resolveSessionPath,
   getWorktreeSuffix: _getWorktreeSuffixBundle,
@@ -269,7 +270,10 @@ export function getSessionId(input, opts = CLAUDE_OPTS) {
 
 function resolveSessionDir(opts) {
   return ensureWritableStorageDir(
-    resolveSessionStorageDir(() => join(resolveConfigDir(opts), "context-mode", "sessions")),
+    resolveSessionStorageDir(() => resolveDefaultSessionDir({
+      configDir: opts.configDir,
+      configDirEnv: opts.configDirEnv,
+    })),
   );
 }
 

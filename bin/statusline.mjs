@@ -26,12 +26,12 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
 import {
   ensureWritableStorageDir,
+  resolveDefaultSessionDir,
   resolveSessionStorageDir,
 } from "../hooks/session-db.bundle.mjs";
 
@@ -103,17 +103,17 @@ function readStdinJson() {
 
 function resolveSessionDir() {
   return ensureWritableStorageDir(
-    resolveSessionStorageDir(() => {
-      const legacy = process.env.CONTEXT_MODE_SESSION_DIR?.trim();
-      if (legacy) {
+    resolveSessionStorageDir(() => resolveDefaultSessionDir({
+      configDir: ".claude",
+      configDirEnv: "CLAUDE_CONFIG_DIR",
+      legacySessionDirEnv: "CONTEXT_MODE_SESSION_DIR",
+      onLegacySessionDir: () => {
         warnOnce(
           "legacy-session-dir",
           "CONTEXT_MODE_SESSION_DIR is deprecated; set CONTEXT_MODE_DIR to the parent context-mode root.",
         );
-        return legacy;
-      }
-      return join(homedir(), ".claude", "context-mode", "sessions");
-    }),
+      },
+    })),
   );
 }
 

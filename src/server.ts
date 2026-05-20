@@ -37,6 +37,7 @@ import {
   hashProjectDirLegacy,
   resolveContentStorePath,
   resolveContentStorageDir,
+  resolveDefaultSessionDir,
   resolveSessionDbPath,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
@@ -53,7 +54,6 @@ import { persistToolCallCounter, restoreSessionStats } from "./session/persist-t
 import { searchAllSources } from "./search/unified.js";
 import { buildNodeCommand, type HookAdapter, type PlatformId } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
-import { resolveCodexConfigDir } from "./adapters/codex/paths.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
@@ -476,10 +476,6 @@ let _insightChild: ChildProcess | null = null;
  * Issue #460 round-3: delegates to the canonical util so empty/whitespace
  * env values fall back instead of poisoning downstream `join()` calls.
  */
-function resolveClaudeConfigRoot(): string {
-  return resolveClaudeConfigDir();
-}
-
 async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
   if (_detectedAdapter) return _detectedAdapter;
   try {
@@ -507,20 +503,19 @@ function getDefaultSessionDir(): string {
     const signal = detectPlatform();
     const segments = getSessionDirSegments(signal.platform);
     if (segments) {
-      let root = join(homedir(), ...segments);
-      if (segments.length === 1 && segments[0] === ".claude") {
-        root = resolveClaudeConfigRoot();
-      } else if (segments.length === 1 && segments[0] === ".codex") {
-        root = resolveCodexConfigDir();
-      }
-      const dir = join(root, "context-mode", "sessions");
-      mkdirSync(dir, { recursive: true });
-      return dir;
+      return resolveDefaultSessionDir({
+        configDir: join(...segments),
+        configDirEnv: configDirEnvForSessionSegments(segments),
+      });
     }
   } catch { /* fall through to claude fallback */ }
-  const dir = join(resolveClaudeConfigRoot(), "context-mode", "sessions");
-  mkdirSync(dir, { recursive: true });
-  return dir;
+  return resolveDefaultSessionDir({ configDir: ".claude", configDirEnv: "CLAUDE_CONFIG_DIR" });
+}
+
+function configDirEnvForSessionSegments(segments: string[]): string | undefined {
+  if (segments.length === 1 && segments[0] === ".claude") return "CLAUDE_CONFIG_DIR";
+  if (segments.length === 1 && segments[0] === ".codex") return "CODEX_HOME";
+  return undefined;
 }
 
 function getSessionDir(): string {
@@ -2191,7 +2186,7 @@ server.registerTool(
         } catch { /* SessionDB unavailable — search ContentStore + auto-memory only */ }
       }
 
-      const configDir = _detectedAdapter?.getConfigDir() ?? resolveClaudeConfigRoot();
+      const configDir = _detectedAdapter?.getConfigDir() ?? resolveClaudeConfigDir();
 
       try {
       for (const q of queryList) {

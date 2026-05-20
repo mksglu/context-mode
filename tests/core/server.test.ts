@@ -38,6 +38,7 @@ import {
   ensureWritableStorageDir,
   formatStorageDirectoryError,
   resolveContentStorageDir,
+  resolveDefaultSessionDir,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
   StorageDirectoryError,
@@ -84,6 +85,45 @@ describe("storage path resolution", () => {
       envVar: null,
       source: "default",
     });
+  });
+
+  test("shared default session dir helper derives context-mode sessions root", () => {
+    const configRoot = join(tmpdir(), "context-mode-config-root");
+
+    expect(resolveDefaultSessionDir({ configDir: configRoot })).toBe(
+      join(configRoot, "context-mode", "sessions"),
+    );
+  });
+
+  test("shared default session dir helper honors config env override", () => {
+    const configRoot = join(tmpdir(), "context-mode-env-config-root");
+
+    expect(
+      resolveDefaultSessionDir({
+        configDir: ".ignored",
+        configDirEnv: "CONTEXT_MODE_TEST_CONFIG_DIR",
+        env: { CONTEXT_MODE_TEST_CONFIG_DIR: configRoot },
+      }),
+    ).toBe(join(configRoot, "context-mode", "sessions"));
+  });
+
+  test("legacy session dir wins only inside blank or unset storage override default callback", () => {
+    const legacyDir = join(tmpdir(), "context-mode-legacy-sessions");
+    const root = resolve(tmpdir(), "context-mode-storage-root");
+    const defaultDir = () => resolveDefaultSessionDir({
+      configDir: ".ignored",
+      legacySessionDirEnv: "CONTEXT_MODE_TEST_SESSION_DIR",
+      env: { CONTEXT_MODE_TEST_SESSION_DIR: legacyDir },
+    });
+
+    delete process.env[STORAGE_ENV_KEY];
+    expect(resolveSessionStorageDir(defaultDir).path).toBe(legacyDir);
+
+    process.env[STORAGE_ENV_KEY] = " \t ";
+    expect(resolveSessionStorageDir(defaultDir).path).toBe(legacyDir);
+
+    process.env[STORAGE_ENV_KEY] = root;
+    expect(resolveSessionStorageDir(defaultDir).path).toBe(join(root, "sessions"));
   });
 
   test("uses CONTEXT_MODE_DIR as the single root for sessions, content, and stats", () => {
