@@ -568,6 +568,12 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
 `[mcp_servers.context-mode]` block or `$CODEX_HOME/hooks.json` is needed when
 `plugin_hooks` is enabled and the plugin hooks are trusted.
 
+Marketplace plugin mode is self-contained: Codex starts
+`node ./.codex-plugin/plugin-start.mjs` from the installed plugin directory and should
+see `ctx_*` tools without a separate global npm or mise `context-mode` install.
+A global install is only a direct MCP fallback for Codex builds or local
+environments where marketplace plugins cannot be used.
+
 > **Node/PATH note:** context-mode still needs `node` visible to the Codex process.
 > The plugin removes manual Codex config, but it does not vendor Node or inherit
 > login-shell PATH fixes automatically.

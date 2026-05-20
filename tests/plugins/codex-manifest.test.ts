@@ -22,7 +22,7 @@
  * - Codex DOES auto-resolve a relative `cwd` against the plugin root in
  *   `normalize_plugin_mcp_server_value` (codex-rs/core-plugins/src/loader.rs:1067-1071).
  *   So `cwd: "."` becomes `<plugin_root>` at spawn time, and a relative
- *   `args: ["./start.mjs"]` then resolves correctly when Node loads it.
+ *   `args: ["./.codex-plugin/plugin-start.mjs"]` then resolves correctly when Node loads it.
  */
 
 import { describe, it, expect } from "vitest";
@@ -50,16 +50,16 @@ describe(".codex-plugin/mcp.json", () => {
     expect(servers).toHaveProperty("context-mode");
   });
 
-  it("launches via `node` with relative `./start.mjs`", () => {
+  it("launches via `node` with the Codex-only entrypoint", () => {
     const servers = mcp.mcpServers as Record<string, { command: string; args: string[] }>;
     const entry = servers["context-mode"];
     expect(entry.command).toBe("node");
-    expect(entry.args).toEqual(["./start.mjs"]);
+    expect(entry.args).toEqual(["./.codex-plugin/plugin-start.mjs"]);
   });
 
   it("sets `cwd: \".\"` so Codex resolves it to the plugin root at spawn", () => {
     // Codex normalizes relative cwd → plugin_root.join(cwd). With cwd="."
-    // the spawned `node ./start.mjs` resolves correctly inside the
+    // the spawned `node ./.codex-plugin/plugin-start.mjs` resolves correctly inside the
     // installed plugin directory.
     const servers = mcp.mcpServers as Record<string, { cwd?: string }>;
     const entry = servers["context-mode"];

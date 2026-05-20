@@ -29,6 +29,7 @@ import {
   getAvailableLanguages,
 } from "./runtime.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
+import { probeCodexPluginMcp } from "./util/codex-plugin-mcp-probe.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import {
   ensureWritableStorageDir,
@@ -864,6 +865,29 @@ async function doctor(): Promise<number> {
       color.yellow("Plugin enabled: WARN") +
         ` — ${pluginCheck.message}`,
     );
+  }
+
+  if (detection.platform === "codex") {
+    p.log.step("Checking Codex plugin MCP...");
+    const probe = await probeCodexPluginMcp(pluginRoot);
+    if (probe.ok) {
+      p.log.success(
+        color.green("Codex plugin MCP: PASS") +
+          color.dim(` — ${probe.message} (${probe.command}, cwd ${probe.cwd})`),
+      );
+    } else {
+      criticalFails++;
+      p.log.error(
+        color.red("Codex plugin MCP: FAIL") +
+          ` — ${probe.message}` +
+          color.dim(
+            `\n  Command: ${probe.command || "unavailable"}` +
+              `\n  Cwd: ${probe.cwd}` +
+              (probe.stderr ? `\n  Stderr: ${probe.stderr}` : "") +
+              "\n  Fix: reinstall or update the Codex marketplace plugin; global npm/mise context-mode is only a direct MCP fallback.",
+          ),
+      );
+    }
   }
 
   // ── Issue #613 — proactive Tier C absolute-path detection ───────────
