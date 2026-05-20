@@ -2605,10 +2605,23 @@ async function ssrfGuard(rawUrl: string): Promise<FetchOneResult | null> {
       }
     }
   } catch (err) {
+    // libuv DNS error codes that typically indicate the resolver itself can't
+    // reach a nameserver — common when the MCP host process is running under
+    // a sandbox that blocks outbound network. Surface a sandbox hint so the
+    // user knows the failure isn't a bad URL; the MCP server inherits its
+    // sandbox state at spawn time and can't be re-permissioned at runtime by
+    // toggling the host's sandbox (e.g. Claude Code's /sandbox).
+    const errCode = (err as NodeJS.ErrnoException | undefined)?.code ?? "";
+    const looksLikeSandbox = errCode === "ETIMEOUT" || errCode === "ETIMEDOUT" ||
+      errCode === "EAI_AGAIN" || errCode === "ENETUNREACH" || errCode === "EPERM";
+    const baseMsg = err instanceof Error ? err.message : String(err);
+    const hint = looksLikeSandbox
+      ? " — looks like the MCP host process can't reach a DNS resolver. If your editor/CLI runs MCP servers under a network sandbox, the server inherits that state at spawn and a runtime sandbox toggle won't reach it. Restart the MCP host with network access enabled."
+      : "";
     return {
       kind: "fetch_error",
       url: rawUrl,
-      error: `DNS lookup failed for "${parsed.hostname}": ${err instanceof Error ? err.message : String(err)}`,
+      error: `DNS lookup failed for "${parsed.hostname}": ${baseMsg}${hint}`,
       reason: "exit",
     };
   }
