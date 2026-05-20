@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -26,25 +26,27 @@ describe("storage path overrides", () => {
   it("uses adapter defaults when no storage override is set", () => {
     delete process.env[ENV_KEY];
 
-    const session = resolveSessionStorageDir(() => "/home/me/.codex/context-mode/sessions");
-    const content = resolveContentStorageDir(() => "/home/me/.codex/context-mode/sessions");
-    const stats = resolveStatsStorageDir(() => "/home/me/.codex/context-mode/sessions");
+    const defaultSessionsDir = join("/", "home", "me", ".codex", "context-mode", "sessions");
+    const defaultRoot = dirname(defaultSessionsDir);
+    const session = resolveSessionStorageDir(() => defaultSessionsDir);
+    const content = resolveContentStorageDir(() => defaultSessionsDir);
+    const stats = resolveStatsStorageDir(() => defaultSessionsDir);
 
     expect(session).toEqual({
       kind: "session",
-      path: "/home/me/.codex/context-mode/sessions",
+      path: defaultSessionsDir,
       envVar: null,
       source: "default",
     });
     expect(content).toEqual({
       kind: "content",
-      path: "/home/me/.codex/context-mode/content",
+      path: join(defaultRoot, "content"),
       envVar: null,
       source: "default",
     });
     expect(stats).toEqual({
       kind: "stats",
-      path: "/home/me/.codex/context-mode/sessions",
+      path: defaultSessionsDir,
       envVar: null,
       source: "default",
     });

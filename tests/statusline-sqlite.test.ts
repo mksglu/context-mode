@@ -325,7 +325,6 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
       HOME: home,
       USERPROFILE: home,
       // active adapter dir is the claude one (matches getSessionDir() default)
-      CONTEXT_MODE_DIR: claudeRoot,
       CLAUDE_SESSION_ID: "any-session-id",
     });
 
@@ -344,7 +343,6 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
     const { stdout } = runStatusline({
       HOME: home,
       USERPROFILE: home,
-      CONTEXT_MODE_DIR: claudeRoot,
       CLAUDE_SESSION_ID: "any-session-id",
     });
 
