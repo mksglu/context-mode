@@ -4262,9 +4262,11 @@ describe("getDefaultSessionDir uses pre-detection when adapter not yet detected"
     const fn = serverSrc.match(/function getDefaultSessionDir\(\)[\s\S]*?^}/m);
     expect(fn).not.toBeNull();
     const body = fn![0];
-    expect(serverSrc).toContain('import { resolveCodexConfigDir } from "./adapters/codex/paths.js";');
-    expect(body).toContain('segments[0] === ".codex"');
-    expect(body).toContain("resolveCodexConfigDir()");
+    expect(body).toContain("getSessionDirSegments(signal.platform)");
+    expect(body).toContain("configDirEnvForSessionSegments(segments)");
+    expect(serverSrc).toContain(
+      'if (segments.length === 1 && segments[0] === ".codex") return "CODEX_HOME";',
+    );
   });
 });
 
