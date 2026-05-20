@@ -72,10 +72,10 @@ function platform() {
 
 // Single-shot stderr warning latch — keep noise out of Claude Code's
 // statusline output even when our parent runs us repeatedly per session.
-let __winWarned = false;
+const __warnedKeys = new Set();
 function warnOnce(key, msg) {
-  if (key === "win" && __winWarned) return;
-  if (key === "win") __winWarned = true;
+  if (__warnedKeys.has(key)) return;
+  __warnedKeys.add(key);
   try { process.stderr.write(`context-mode statusline: ${msg}\n`); } catch { /* ignore */ }
 }
 
@@ -103,7 +103,17 @@ function readStdinJson() {
 
 function resolveSessionDir() {
   return ensureWritableStorageDir(
-    resolveSessionStorageDir(() => join(homedir(), ".claude", "context-mode", "sessions")),
+    resolveSessionStorageDir(() => {
+      const legacy = process.env.CONTEXT_MODE_SESSION_DIR?.trim();
+      if (legacy) {
+        warnOnce(
+          "legacy-session-dir",
+          "CONTEXT_MODE_SESSION_DIR is deprecated; set CONTEXT_MODE_DIR to the parent context-mode root.",
+        );
+        return legacy;
+      }
+      return join(homedir(), ".claude", "context-mode", "sessions");
+    }),
   );
 }
 

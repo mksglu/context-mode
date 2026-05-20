@@ -359,4 +359,16 @@ describe("statusline.mjs — CONTEXT_MODE_DIR override", () => {
     assert.match(out, /context-mode/);
     assert.match(out, /this chat/, "render reflects override-dir SessionDB");
   });
+
+  test("legacy CONTEXT_MODE_SESSION_DIR still routes the SessionDB read", () => {
+    seedDb({ dir, sessionId: "legacy-id", bytesAvoided: 2_097_152 }); // 2MB
+    const { stdout, stderr } = runStatuslineFull({
+      CONTEXT_MODE_SESSION_DIR: dir,
+      CLAUDE_SESSION_ID: "legacy-id",
+    });
+
+    assert.match(stdout, /context-mode/);
+    assert.match(stdout, /this chat/, "render reflects legacy session-dir SessionDB");
+    assert.match(stderr, /CONTEXT_MODE_SESSION_DIR is deprecated/);
+  });
 });

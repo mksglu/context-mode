@@ -32,6 +32,7 @@ import { startLifecycleGuard } from "./lifecycle.js";
 import { hashProjectDirCanonical, hashProjectDirLegacy, resolveContentStorePath, resolveSessionDbPath, SessionDB } from "./session/db.js";
 import { purgeSession } from "./session/purge.js";
 import {
+  describeStorageDirectorySource,
   ensureWritableStorageDir,
   formatStorageDirectoryError,
   resolveContentStorageDir,
@@ -283,9 +284,33 @@ const originalRegisterTool = server.registerTool.bind(server);
     emitSuppressionDiagnostic();
     return undefined;
   }
-  REGISTERED_CTX_TOOLS.push({ name, config, handler });
+  const wrappedHandler = wrapToolHandler(name, handler);
+  REGISTERED_CTX_TOOLS.push({ name, config, handler: wrappedHandler });
+  args[2] = wrappedHandler;
   return (originalRegisterTool as unknown as (...callArgs: unknown[]) => unknown)(...args);
 };
+
+function wrapToolHandler(
+  name: string,
+  handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
+): (toolArgs: Record<string, unknown>) => Promise<unknown> {
+  return async (toolArgs: Record<string, unknown>) => {
+    try {
+      return await handler(toolArgs);
+    } catch (err) {
+      const result = storageErrorResult(err);
+      if (result) {
+        try {
+          return trackResponse(name, result);
+        } catch (trackErr) {
+          if (trackErr instanceof StorageDirectoryError) return result;
+          throw trackErr;
+        }
+      }
+      throw err;
+    }
+  };
+}
 
 // Issue #637 — when suppression is active, install the empty tools/list handler
 // once at module-init time so the suppressed MCP child responds with
@@ -672,27 +697,6 @@ function storageErrorResult(err: unknown): ToolResult | null {
     isError: true,
   };
 }
-
-const registerTool = server.registerTool.bind(server) as any;
-(server as any).registerTool = (name: string, config: unknown, handler: (...args: any[]) => unknown) => {
-  return registerTool(name, config, async (...args: any[]) => {
-    try {
-      return await handler(...args);
-    } catch (err) {
-      const result = storageErrorResult(err);
-      if (result) {
-        try {
-          return trackResponse(name, result);
-        } catch (trackErr) {
-          if (trackErr instanceof StorageDirectoryError) return result;
-          throw trackErr;
-        }
-      }
-      throw err;
-    }
-  });
-};
-
 // ── Version outdated warning ──────────────────────────────────────────────
 // Non-blocking npm check at startup. trackResponse prepends warning
 // using a burst cadence: 3 warnings → 1h silent → 3 warnings → repeat.
@@ -3388,6 +3392,13 @@ server.registerTool(
     } else {
       lines.push("[WARN] Performance: NORMAL — install Bun for 3-5x speed boost");
     }
+
+    const sessionStorage = resolveSessionStorageDir(getDefaultSessionDir);
+    const contentStorage = resolveContentStorageDir(getDefaultSessionDir);
+    const statsStorage = resolveStatsStorageDir(getDefaultSessionDir);
+    lines.push(`[OK] Storage sessions: ${sessionStorage.path} (${describeStorageDirectorySource(sessionStorage)})`);
+    lines.push(`[OK] Storage content: ${contentStorage.path} (${describeStorageDirectorySource(contentStorage)})`);
+    lines.push(`[OK] Storage stats: ${statsStorage.path} (${describeStorageDirectorySource(statsStorage)})`);
 
     // Server test — cleanup executor to prevent resource leaks (#247)
     {

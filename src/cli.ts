@@ -8,6 +8,7 @@
  *   context-mode upgrade                      → Fix hooks, permissions, and settings
  *   context-mode hook <platform> <event>      → Dispatch a hook script (used by platform hook configs)
  *   CONTEXT_MODE_DIR=/abs/path context-mode   → Override sessions/content storage root
+ *     Empty/whitespace is ignored; non-empty values must be absolute.
  *
  * Platform auto-detection: CLI detects which platform is running
  * (Claude Code, Gemini CLI, OpenCode, etc.) and uses the appropriate adapter.
@@ -164,7 +165,7 @@ function printHelp(): void {
     "  context-mode statusline              Print Claude Code status line",
     "",
     "Environment:",
-    "  CONTEXT_MODE_DIR=/absolute/path      Override sessions/content storage root",
+    "  CONTEXT_MODE_DIR=/absolute/path      Override sessions/content storage root; empty is ignored, non-empty must be absolute",
   ].join("\n"));
 }
 
