@@ -60,7 +60,7 @@ describe("storage path resolution", () => {
   test("uses adapter defaults when no storage override is set", () => {
     delete process.env[STORAGE_ENV_KEY];
 
-    const defaultSessionsDir = join("/", "home", "me", ".codex", "context-mode", "sessions");
+    const defaultSessionsDir = join(tmpdir(), "context-mode-default", "sessions");
     const defaultRoot = dirname(defaultSessionsDir);
     const session = resolveSessionStorageDir(() => defaultSessionsDir);
     const content = resolveContentStorageDir(() => defaultSessionsDir);
@@ -112,7 +112,7 @@ describe("storage path resolution", () => {
 
   test("treats blank CONTEXT_MODE_DIR as default and reports ignored metadata", () => {
     process.env[STORAGE_ENV_KEY] = " \t ";
-    const defaultSessionsDir = join("/", "home", "me", ".codex", "context-mode", "sessions");
+    const defaultSessionsDir = join(tmpdir(), "context-mode-default", "sessions");
 
     const session = resolveSessionStorageDir(() => defaultSessionsDir);
     const content = resolveContentStorageDir(() => defaultSessionsDir);
