@@ -1269,6 +1269,14 @@ function formatCommandOutput(label: string, raw: string, onFsBytes?: (bytes: num
   return `# ${label}\n\n${output}\n`;
 }
 
+function combineExecOutput(result: { stdout?: string; stderr?: string }): string {
+  const stdout = result.stdout || "";
+  const stderr = result.stderr || "";
+  if (!stderr) return stdout;
+  if (!stdout) return stderr;
+  return `${stdout}${stdout.endsWith("\n") ? "" : "\n"}${stderr}`;
+}
+
 /**
  * Execute batch commands. concurrency=1 preserves the legacy serial path
  * (shared timeout budget + cascading skip-on-timeout). concurrency>1 runs
@@ -1305,10 +1313,10 @@ export async function runBatchCommands(
       }
       const result = await executor.execute({
         language: "shell",
-        code: `${nodeOptsPrefix}${cmd.command} 2>&1`,
+        code: `${nodeOptsPrefix}${cmd.command}`,
         timeout: perCmdTimeout,
       });
-      outputs.push(formatCommandOutput(cmd.label, result.stdout, onFsBytes));
+      outputs.push(formatCommandOutput(cmd.label, combineExecOutput(result), onFsBytes));
       if (result.timedOut) {
         timedOut = true;
         for (let j = i + 1; j < commands.length; j++) {
@@ -1327,12 +1335,12 @@ export async function runBatchCommands(
     run: async () => {
       const result = await executor.execute({
         language: "shell",
-        code: `${nodeOptsPrefix}${cmd.command} 2>&1`,
+        code: `${nodeOptsPrefix}${cmd.command}`,
         timeout,
       });
-      // Always route partial stdout through formatCommandOutput so __CM_FS__
+      // Always route partial output through formatCommandOutput so __CM_FS__
       // markers are stripped + counted, even when the command timed out.
-      const formatted = formatCommandOutput(cmd.label, result.stdout, onFsBytes);
+      const formatted = formatCommandOutput(cmd.label, combineExecOutput(result), onFsBytes);
       const output = result.timedOut
         ? formatted.replace(/\n$/, "") + `\n(timed out after ${timeout ?? "?"}ms)\n`
         : formatted;
