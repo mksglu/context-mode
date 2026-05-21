@@ -44,6 +44,34 @@ function byteSafePrefix(str: string, maxBytes: number): string {
 }
 
 // ─────────────────────────────────────────────────────────
+// Char-count prefix (UTF-16 surrogate-safe)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Return a prefix of `str` no longer than `maxChars` UTF-16 code units, with
+ * the cut backed off by one unit if it would split a surrogate pair. Mirrors
+ * the surrogate-safety semantics of the internal `byteSafePrefix`, but uses
+ * a character budget rather than a byte budget.
+ *
+ * Use this instead of bare `str.slice(0, n)` whenever the result is later
+ * JSON-encoded for an RFC 8259-strict consumer (e.g. tool_result payloads
+ * sent back to the host LLM API). `JSON.stringify` will emit a lone high
+ * surrogate as a literal `\uD8xx` escape, which is invalid JSON.
+ *
+ * @param str      - Input string.
+ * @param maxChars - Hard cap in UTF-16 code units.
+ */
+export function charSafePrefix(str: string, maxChars: number): string {
+  if (maxChars <= 0) return "";
+  if (str.length <= maxChars) return str;
+
+  let end = maxChars;
+  const code = str.charCodeAt(end - 1);
+  if (code >= 0xd800 && code <= 0xdbff) end -= 1;
+  return str.slice(0, end);
+}
+
+// ─────────────────────────────────────────────────────────
 // JSON truncation
 // ─────────────────────────────────────────────────────────
 

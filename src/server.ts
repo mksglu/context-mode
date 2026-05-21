@@ -29,6 +29,7 @@ import {
 } from "./runtime.js";
 import { classifyNonZeroExit } from "./exit-classify.js";
 import { startLifecycleGuard } from "./lifecycle.js";
+import { charSafePrefix } from "./truncate.js";
 import { hashProjectDirCanonical, hashProjectDirLegacy, resolveContentStorePath, resolveSessionDbPath, SessionDB } from "./session/db.js";
 import { purgeSession } from "./session/purge.js";
 import {
@@ -2760,7 +2761,7 @@ function indexFetched(f: { url: string; source?: string; markdown: string; heade
   // Track AFTER the FTS5 write succeeds — failed indexes shouldn't inflate the counter.
   trackIndexed(Buffer.byteLength(f.markdown));
   const preview = f.markdown.length > FETCH_PREVIEW_LIMIT
-    ? f.markdown.slice(0, FETCH_PREVIEW_LIMIT) + "\n\n…[truncated — use ctx_search() for full content]"
+    ? charSafePrefix(f.markdown, FETCH_PREVIEW_LIMIT) + "\n\n…[truncated — use ctx_search() for full content]"
     : f.markdown;
   return {
     label: indexed.label,

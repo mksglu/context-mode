@@ -9,7 +9,7 @@
 
 import { describe, test } from "vitest";
 import { strict as assert } from "node:assert";
-import { truncateJSON, capBytes, escapeXML } from "../src/truncate.js";
+import { truncateJSON, capBytes, escapeXML, charSafePrefix } from "../src/truncate.js";
 
 // ─────────────────────────────────────────────────────────
 // truncateJSON
@@ -264,5 +264,93 @@ describe("truncateJSON — exact-size boundaries", () => {
       Buffer.byteLength(out) <= cap,
       `expected <= ${cap} bytes, got ${Buffer.byteLength(out)}`,
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// charSafePrefix
+// ─────────────────────────────────────────────────────────
+
+describe("charSafePrefix", () => {
+  test("returns input unchanged when length <= maxChars", () => {
+    assert.equal(charSafePrefix("hello", 10), "hello");
+    assert.equal(charSafePrefix("hello", 5), "hello");
+  });
+
+  test("maxChars <= 0 returns empty string", () => {
+    assert.equal(charSafePrefix("hello", 0), "");
+    assert.equal(charSafePrefix("hello", -1), "");
+  });
+
+  test("ASCII input is sliced exactly at maxChars", () => {
+    const out = charSafePrefix("a".repeat(100), 10);
+    assert.equal(out.length, 10);
+    assert.equal(out, "a".repeat(10));
+  });
+
+  test("backs off one code unit when cut splits a surrogate pair", () => {
+    // "🟡" = U+1F7E1 = high surrogate \uD83D + low surrogate \uDFE1
+    const filler = "a".repeat(99);
+    const input = filler + "🟡extra";
+    // maxChars=100 would land between the two halves of 🟡.
+    const out = charSafePrefix(input, 100);
+    // Result should drop the orphan high surrogate, ending at the filler.
+    assert.equal(out.length, 99);
+    assert.equal(out, filler);
+    // No lone high surrogate at the boundary.
+    const last = out.charCodeAt(out.length - 1);
+    assert.ok(
+      last < 0xd800 || last > 0xdbff,
+      `last code unit ${last.toString(16)} is a lone high surrogate`,
+    );
+  });
+
+  test("cut after a complete surrogate pair leaves the pair intact", () => {
+    // maxChars lands AFTER both halves of 🟡 — should keep the emoji.
+    const filler = "a".repeat(98);
+    const input = filler + "🟡extra";
+    const out = charSafePrefix(input, 100);
+    assert.equal(out.length, 100);
+    assert.equal(out, filler + "🟡");
+  });
+
+  test("survives JSON.stringify round-trip with emoji at boundary", () => {
+    // Regression for #659: bare .slice(0, n) at a surrogate-pair boundary
+    // produces a lone high surrogate that JSON.stringify emits as a literal
+    // \uD8xx escape, breaking RFC 8259-strict consumers.
+    const filler = "a".repeat(99);
+    const input = filler + "🟡status indicator";
+    const sliced = charSafePrefix(input, 100);
+    const body = JSON.stringify({ content: sliced });
+    // No orphan \uD8xx high surrogate followed by anything except a \uDxxx low surrogate.
+    const orphan = /\\uD[89AB][0-9A-Fa-f]{2}(?!\\uD[CDEF])/i.test(body);
+    assert.equal(orphan, false, `JSON body contains orphan high surrogate: ${body}`);
+    // And the body round-trips through a strict parser.
+    assert.doesNotThrow(() => JSON.parse(body));
+  });
+
+  test("survives JSON round-trip when used in preview-construction pattern", () => {
+    // Mirrors src/server.ts fetch-preview construction:
+    //   charSafePrefix(markdown, LIMIT) + "\n\n…[truncated — use ctx_search() for full content]"
+    // Build markdown that puts an emoji exactly at the LIMIT boundary.
+    const LIMIT = 3072;
+    const markdown = "a".repeat(LIMIT - 1) + "🟡 status indicator more text here";
+    const preview = markdown.length > LIMIT
+      ? charSafePrefix(markdown, LIMIT) + "\n\n…[truncated — use ctx_search() for full content]"
+      : markdown;
+    const body = JSON.stringify({ preview });
+    const orphan = /\\uD[89AB][0-9A-Fa-f]{2}(?!\\uD[CDEF])/i.test(body);
+    assert.equal(orphan, false, "preview-construction pattern must not emit orphan surrogate");
+    assert.doesNotThrow(() => JSON.parse(body));
+  });
+
+  test("handles multiple surrogate pairs adjacent to the cut", () => {
+    // Two emoji in a row; cut between them should keep first, drop second's lone high half.
+    const filler = "a".repeat(98);
+    const input = filler + "🟡🔴trailing";
+    // maxChars=101 lands inside the second emoji (after 🟡's pair, mid-🔴).
+    const out = charSafePrefix(input, 101);
+    assert.equal(out.length, 100); // backed off from 101 to 100
+    assert.equal(out, filler + "🟡");
   });
 });
