@@ -410,13 +410,7 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
 **Install:**
 
-1. Install context-mode globally:
-
-   ```bash
-   npm install -g context-mode
-   ```
-
-2. Add to `opencode.json` in your project root (or `~/.config/opencode/opencode.json` for global):
+1. Add to `opencode.json` in your project root (or `~/.config/opencode/opencode.json` for global):
 
    ```json
    {
@@ -427,7 +421,7 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
    The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — OpenCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
 
-3. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness:
+2. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness:
 
    ```bash
    cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
@@ -435,7 +429,7 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
    This tells the model which tools to use and which commands are blocked. Without it, hooks still enforce routing — but the model won't know *why* a command was denied.
 
-4. Restart OpenCode.
+3. Restart OpenCode.
 
 **Verify:** In the OpenCode session, type `ctx stats`. Context-mode tools should appear and respond.
 
@@ -456,13 +450,7 @@ Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json)
 
 **Install:**
 
-1. Install context-mode globally:
-
-   ```bash
-   npm install -g context-mode
-   ```
-
-2. Add to `kilo.json` in your project root (or `~/.config/kilo/kilo.json` for global):
+1. Add to `kilo.json` in your project root (or `~/.config/kilo/kilo.json` for global):
 
    ```json
    {
@@ -473,13 +461,13 @@ Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json)
 
    The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — KiloCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
 
-3. *(Optional)* Copy the routing rules file. KiloCode shares the OpenCode plugin architecture, so the model needs an `AGENTS.md` file for routing awareness:
+2. *(Optional)* Copy the routing rules file. KiloCode shares the OpenCode plugin architecture, so the model needs an `AGENTS.md` file for routing awareness:
 
    ```bash
    cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
    ```
 
-4. Restart KiloCode.
+3. Restart KiloCode.
 
 **Verify:** In the KiloCode session, type `ctx stats`. Context-mode tools should appear and respond.
 

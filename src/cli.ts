@@ -139,6 +139,9 @@ async function hookDispatch(platform: string, event: string): Promise<void> {
  * Entry point
  * ------------------------------------------------------- */
 
+const IN_PROCESS_PLUGIN_PLATFORMS = new Set(["opencode", "kilo"]);
+const isInProcessPluginPlatform = (p: string | undefined) =>
+  p ? IN_PROCESS_PLUGIN_PLATFORMS.has(p) : false;
 const args = process.argv.slice(2);
 
 if (args[0] === "doctor") {
@@ -278,7 +281,7 @@ function cachePluginRoot(platform: string): string {
 
 function getPluginRoot(): string {
   const platform = detectPlatform().platform;
-  if (platform === 'opencode' || platform === 'kilo') {
+  if (isInProcessPluginPlatform(platform)) {
     return cachePluginRoot(platform);
   }
   return defaultPluginRoot();
@@ -1320,7 +1323,7 @@ async function upgrade(opts?: { platform?: string }) {
       });
       s.stop("Dependencies ready");
 
-      if (detection.platform !== 'opencode' && detection.platform !== 'kilo') {
+      if (!isInProcessPluginPlatform(detection.platform)) {
         // Verify native addons through the same bootstrap start.mjs imports.
         // On modern Node, the ABI-specific cache file is the compatibility marker;
         // the active binding alone may be stale from a previous Node ABI.
@@ -1402,20 +1405,20 @@ async function upgrade(opts?: { platform?: string }) {
               color.dim("\n  Try (fallback): /context-mode:ctx-doctor"),
           );
         }
-      }
-
-      // Update global npm
-      s.start("Updating npm global package");
-      try {
-        npmExecFile(["install", "-g", pluginRoot, "--no-audit", "--no-fund"], {
-          stdio: "pipe",
-          timeout: 30000,
-        });
-        s.stop(color.green("npm global updated"));
-        changes.push("Updated npm global package");
-      } catch {
-        s.stop(color.yellow("npm global update skipped"));
-        p.log.info(color.dim("  Could not update global npm — may need sudo or standalone install"));
+        
+        // Update global npm
+        s.start("Updating npm global package");
+        try {
+          npmExecFile(["install", "-g", pluginRoot, "--no-audit", "--no-fund"], {
+            stdio: "pipe",
+            timeout: 30000,
+          });
+          s.stop(color.green("npm global updated"));
+          changes.push("Updated npm global package");
+        } catch {
+          s.stop(color.yellow("npm global update skipped"));
+          p.log.info(color.dim("  Could not update global npm — may need sudo or standalone install"));
+        }
       }
 
       // Cleanup
