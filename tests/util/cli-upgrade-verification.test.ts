@@ -117,6 +117,26 @@ describe("cli.ts upgrade() pre-bump verification (v1.0.114 hotfix)", () => {
     expect(stopIdx).toBeLessThan(throwIdx);
     expect(throwIdx).toBeLessThan(updateIdx);
   });
+
+  test("upgrade() gates 'npm install -g' behind the opencode/kilo exclusion (PR #650)", () => {
+    const upgradeIdx = cliSrc.indexOf("async function upgrade");
+    const upgradeBody = cliSrc.slice(upgradeIdx, upgradeIdx + 30000);
+
+    const gateIdx = upgradeBody.indexOf("!isInProcessPluginPlatform(detection.platform)");
+    const npmGIdx = upgradeBody.indexOf('"install", "-g"');
+
+    // Gate must exist, and the '-g' call must sit AFTER it (i.e. inside the block).
+    expect(gateIdx).toBeGreaterThan(0);
+    expect(npmGIdx).toBeGreaterThan(gateIdx);
+
+    // The closing brace of the gate must come AFTER the '-g' call,
+    // not between the ABI verifier and the global install (the pre-PR shape).
+    const closeBefore = upgradeBody.lastIndexOf(
+      "      }",
+      upgradeBody.indexOf("// Cleanup"),
+    );
+    expect(closeBefore).toBeGreaterThan(npmGIdx);
+  });
 });
 
 describe("cli.ts upgrade() post-write registry consistency check (v1.0.114 hotfix)", () => {

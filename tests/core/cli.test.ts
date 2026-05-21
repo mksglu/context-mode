@@ -1713,17 +1713,10 @@ describe("Plugin root detection (#PR refactor/opencode-improvements)", () => {
     expect(cacheRootBody).toContain("homedir");
   });
 
-  test("getPluginRoot uses cache path for opencode platform", () => {
+  test("getPluginRoot uses cache path for opencode/kilo platform", () => {
     const getPluginRootStart = CLI_SOURCE.indexOf("function getPluginRoot");
     const getPluginRootBody = CLI_SOURCE.slice(getPluginRootStart, getPluginRootStart + 300);
-    expect(getPluginRootBody).toContain("'opencode'");
-    expect(getPluginRootBody).toContain("cachePluginRoot");
-  });
-
-  test("getPluginRoot uses cache path for kilo platform", () => {
-    const getPluginRootStart = CLI_SOURCE.indexOf("function getPluginRoot");
-    const getPluginRootBody = CLI_SOURCE.slice(getPluginRootStart, getPluginRootStart + 300);
-    expect(getPluginRootBody).toContain("'kilo'");
+    expect(getPluginRootBody).toContain("isInProcessPluginPlatform(platform)");
     expect(getPluginRootBody).toContain("cachePluginRoot");
   });
 });
