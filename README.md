@@ -61,6 +61,8 @@ Context Mode is an MCP server that solves all four sides of this problem:
 
 Platforms are grouped by install complexity. Hook-capable platforms get automatic routing enforcement. Non-hook platforms need a one-time routing file copy.
 
+Want the agent to do the install for you? Use the copy-paste prompts in [`docs/coding-agent-setup-prompts.md`](docs/coding-agent-setup-prompts.md).
+
 <details open>
 <summary><strong>Claude Code</strong> — plugin marketplace, fully automatic</summary>
 
