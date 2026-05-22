@@ -39,6 +39,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..", "..");
 
 const PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}/start.mjs";
+const SKILLS_PATH = "./skills/";
+const REQUIRED_PLUGIN_RUNTIME_FILES = [
+  "start.mjs",
+  "server.bundle.mjs",
+  "cli.bundle.mjs",
+];
 
 interface McpJson {
   mcpServers?: Record<string, { args?: unknown[] }>;
@@ -83,6 +89,52 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
     expect(exampleArgs).not.toBeNull();
     expect(pluginArgs).not.toBeNull();
     expect(exampleArgs).toBe(pluginArgs);
+  });
+
+  test(".claude-plugin/plugin.json points skills at the shipped top-level skills directory (#658)", () => {
+    const pluginJson = JSON.parse(
+      readFileSync(resolve(ROOT, ".claude-plugin", "plugin.json"), "utf-8"),
+    ) as { skills?: string };
+    expect(pluginJson.skills).toBe(SKILLS_PATH);
+    expect(existsSync(resolve(ROOT, "skills"))).toBe(true);
+  });
+
+  test("source checkout contains runtime files required by the Claude plugin manifest (#658)", () => {
+    for (const rel of REQUIRED_PLUGIN_RUNTIME_FILES) {
+      expect(existsSync(resolve(ROOT, rel)), `${rel} must exist in the plugin root`).toBe(
+        true,
+      );
+    }
+  });
+
+  test("package manifest ships plugin runtime entrypoints and top-level skills (#658)", () => {
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf-8")) as {
+      files?: string[];
+    };
+    expect(pkg.files).toEqual(
+      expect.arrayContaining([
+        ".claude-plugin",
+        "skills",
+        ...REQUIRED_PLUGIN_RUNTIME_FILES,
+      ]),
+    );
+  });
+
+  test("npm pack dry-run contains the Claude manifest, runtime bundles, start.mjs, and skills (#658)", () => {
+    const r = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+      cwd: ROOT,
+      encoding: "utf-8",
+      timeout: 30_000,
+    });
+    expect(r.status, `npm pack failed: stderr=${r.stderr} stdout=${r.stdout}`).toBe(0);
+    const pack = JSON.parse(r.stdout) as Array<{ files: Array<{ path: string }> }>;
+    const files = new Set(pack[0]?.files?.map((f) => f.path) ?? []);
+    expect(files).toContain(".claude-plugin/plugin.json");
+    for (const rel of REQUIRED_PLUGIN_RUNTIME_FILES) {
+      expect(files).toContain(rel);
+    }
+    expect([...files].some((p) => p.startsWith("skills/"))).toBe(true);
+    expect([...files].some((p) => p.startsWith(".claude/skills/"))).toBe(false);
   });
 
   test("build-chain asserter script exists at scripts/assert-asymmetric-drift.mjs", () => {
@@ -138,6 +190,46 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
       );
       expect(r.status, `asserter should fail on drift; stdout=${r.stdout}`).not.toBe(0);
       expect(r.stderr + r.stdout).toMatch(/drift|mismatch|differ/i);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("build-chain asserter script exits non-zero when runtime files are missing (#658)", () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("node:fs") as typeof import("node:fs");
+    const { tmpdir } = require("node:os") as typeof import("node:os");
+    const { join } = require("node:path") as typeof import("node:path");
+
+    const scratch = mkdtempSync(join(tmpdir(), "plugin-runtime-missing-"));
+    try {
+      mkdirSync(join(scratch, ".claude-plugin"), { recursive: true });
+      mkdirSync(join(scratch, "skills", "context-mode"), { recursive: true });
+      writeFileSync(
+        join(scratch, ".mcp.json.example"),
+        JSON.stringify({
+          mcpServers: { "context-mode": { command: "node", args: [PLACEHOLDER] } },
+        }),
+      );
+      writeFileSync(
+        join(scratch, ".claude-plugin", "plugin.json"),
+        JSON.stringify({
+          name: "context-mode",
+          skills: SKILLS_PATH,
+          mcpServers: { "context-mode": { command: "node", args: [PLACEHOLDER] } },
+        }),
+      );
+      writeFileSync(join(scratch, "cli.bundle.mjs"), "");
+
+      const r = spawnSync(
+        process.execPath,
+        [resolve(ROOT, "scripts", "assert-asymmetric-drift.mjs"), "--root", scratch],
+        { encoding: "utf-8", timeout: 10_000 },
+      );
+      expect(r.status, `asserter should fail on missing runtime files`).not.toBe(0);
+      expect(r.stderr + r.stdout).toMatch(/missing plugin runtime file/);
+      expect(r.stderr + r.stdout).toMatch(/start\.mjs|server\.bundle\.mjs/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

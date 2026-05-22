@@ -43,6 +43,12 @@ import { fileURLToPath } from "node:url";
 
 const PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}/start.mjs";
 const PLUGIN_KEY = "context-mode";
+const SKILLS_PATH = "./skills/";
+const REQUIRED_PLUGIN_RUNTIME_FILES = [
+  "start.mjs",
+  "server.bundle.mjs",
+  "cli.bundle.mjs",
+];
 
 function parseArgs(argv) {
   const out = { root: null };
@@ -78,6 +84,15 @@ function readArgs0(filePath) {
   return { ok: true, value: a0 };
 }
 
+function readJson(filePath) {
+  if (!existsSync(filePath)) return { ok: false, error: `missing: ${filePath}` };
+  try {
+    return { ok: true, value: JSON.parse(readFileSync(filePath, "utf-8")) };
+  } catch (err) {
+    return { ok: false, error: `parse-failed (${filePath}): ${err && err.message}` };
+  }
+}
+
 function main() {
   const { root: explicitRoot } = parseArgs(process.argv.slice(2));
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,6 +109,7 @@ function main() {
 
   const example = readArgs0(exampleJsonPath);
   const plg = readArgs0(pluginJsonPath);
+  const pluginJson = readJson(pluginJsonPath);
 
   if (!example.ok) violations.push(example.error);
   if (!plg.ok) violations.push(plg.error);
@@ -113,6 +129,29 @@ function main() {
     violations.push(
       `asymmetric drift: .mcp.json.example args[0]="${example.value}" vs .claude-plugin/plugin.json args[0]="${plg.value}". The two source-tracked manifests MUST agree so contributors copying the template and end-users via marketplace install resolve the same start.mjs.`,
     );
+  }
+
+  if (pluginJson.ok) {
+    const skills = pluginJson.value && pluginJson.value.skills;
+    if (skills !== SKILLS_PATH) {
+      violations.push(
+        `.claude-plugin/plugin.json skills is "${skills}" but must equal "${SKILLS_PATH}". The npm package ships top-level skills/, not .claude/skills/.`,
+      );
+    }
+    if (!existsSync(resolve(root, "skills"))) {
+      violations.push(`missing skills directory at ${resolve(root, "skills")}`);
+    }
+  } else {
+    violations.push(pluginJson.error);
+  }
+
+  for (const rel of REQUIRED_PLUGIN_RUNTIME_FILES) {
+    if (!existsSync(resolve(root, rel))) {
+      violations.push(
+        `missing plugin runtime file at ${resolve(root, rel)}. ` +
+          `.claude-plugin/plugin.json can load but the MCP server will expose zero tools if ${rel} is absent.`,
+      );
+    }
   }
 
   // Contributor's local .mcp.json (if present) — must match the template.
@@ -136,7 +175,7 @@ function main() {
   }
 
   process.stdout.write(
-    `asymmetric-drift: OK (.mcp.json.example + .claude-plugin/plugin.json both pin args[0] to ${PLACEHOLDER})\n`,
+    `asymmetric-drift: OK (.mcp.json.example + .claude-plugin/plugin.json both pin args[0] to ${PLACEHOLDER}; plugin skills path is ${SKILLS_PATH}; runtime files present)\n`,
   );
 }
 
