@@ -3363,6 +3363,28 @@ describe("ctx_fetch_and_index batch refactor", () => {
     expect(block).toContain(".default(1)");
   });
 
+  test("handler exposes per-call ttl override for fetch cache freshness (#648)", () => {
+    const fetchBlockMatch = fetchHandlerSrc.match(/registerTool\(\s*"ctx_fetch_and_index"[\s\S]+?registerTool\(\s*"ctx_batch_execute"/);
+    expect(fetchBlockMatch).not.toBeNull();
+    const block = fetchBlockMatch![0];
+    expect(block).toContain("ttl: z");
+    expect(block).toContain("Override the cache freshness window");
+    expect(block).toContain("`ttl: 0` bypasses the cache like `force: true`");
+    expect(block).toContain("async ({ url, source, requests, concurrency, force, ttl })");
+    expect(block).toContain("fetchOneUrl(req.url, req.source, force, ttl)");
+  });
+
+  test("fetchOneUrl applies ttl override and treats ttl=0 as cache bypass (#648)", () => {
+    const fetchOneSrc = fetchHandlerSrc.match(/async function fetchOneUrl\([\s\S]+?const outputPath =/m);
+    expect(fetchOneSrc).not.toBeNull();
+    const block = fetchOneSrc![0];
+    expect(block).toContain("ttl: number | undefined");
+    expect(block).toContain("if (!force && ttl !== 0)");
+    expect(block).toContain("const cacheTtlMs = ttl ?? FETCH_TTL_MS");
+    expect(block).toContain("ageMs < cacheTtlMs");
+    expect(block).toContain("ttlStr: formatFetchTtl(cacheTtlMs)");
+  });
+
   test("PARALLELIZE I/O guidance + locked requests:[] schema in description", () => {
     expect(fetchHandlerSrc).toContain("PARALLELIZE I/O");
     expect(fetchHandlerSrc).toContain("requests: [{url, source}");

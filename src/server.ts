@@ -2525,8 +2525,19 @@ main();
 const FETCH_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_PREVIEW_LIMIT = 3072;
 
+function formatFetchTtl(ttlMs: number): string {
+  if (ttlMs === 0) return "0ms";
+  const day = 24 * 60 * 60 * 1000;
+  const hour = 60 * 60 * 1000;
+  const minute = 60 * 1000;
+  if (ttlMs % day === 0) return `${ttlMs / day}d`;
+  if (ttlMs % hour === 0) return `${ttlMs / hour}h`;
+  if (ttlMs % minute === 0) return `${ttlMs / minute}m`;
+  return `${ttlMs}ms`;
+}
+
 type FetchOneResult =
-  | { kind: "cached"; label: string; chunkCount: number; estimatedBytes: number; ageStr: string }
+  | { kind: "cached"; label: string; chunkCount: number; estimatedBytes: number; ageStr: string; ttlStr: string }
   | { kind: "fetched"; url: string; source?: string; markdown: string; header: string }
   | { kind: "fetch_error"; url: string; error: string; reason: "exit" | "read" | "empty" | "throw" };
 
@@ -2668,14 +2679,14 @@ export function classifyIp(rawIp: string): "block" | "private" | "public" {
   return "public";
 }
 
-async function fetchOneUrl(url: string, source: string | undefined, force: boolean | undefined): Promise<FetchOneResult> {
+async function fetchOneUrl(url: string, source: string | undefined, force: boolean | undefined, ttl: number | undefined): Promise<FetchOneResult> {
   // SSRF guard — reject file://, javascript:, loopback, RFC1918, IMDS, link-local
   // BEFORE any cache lookup or subprocess spawn. Even cached entries shouldn't
   // serve a previously-poisoned source label.
   const ssrfBlock = await ssrfGuard(url);
   if (ssrfBlock) return ssrfBlock;
 
-  if (!force) {
+  if (!force && ttl !== 0) {
     const store = getStore();
     // Cache key composes (source, url) so two distinct URLs sharing the same
     // `source` label do not collide — they each get their own cache slot
@@ -2685,12 +2696,13 @@ async function fetchOneUrl(url: string, source: string | undefined, force: boole
     if (meta) {
       const indexedAt = new Date(meta.indexedAt + "Z"); // SQLite datetime is UTC without Z
       const ageMs = Date.now() - indexedAt.getTime();
-      if (ageMs < FETCH_TTL_MS) {
+      const cacheTtlMs = ttl ?? FETCH_TTL_MS;
+      if (ageMs < cacheTtlMs) {
         const ageHours = Math.floor(ageMs / (60 * 60 * 1000));
         const ageMin = Math.floor(ageMs / (60 * 1000));
         const ageStr = ageHours > 0 ? `${ageHours}h ago` : ageMin > 0 ? `${ageMin}m ago` : "just now";
         const estimatedBytes = meta.chunkCount * 1600; // ~1.6KB/chunk avg
-        return { kind: "cached", label: meta.label, chunkCount: meta.chunkCount, estimatedBytes, ageStr };
+        return { kind: "cached", label: meta.label, chunkCount: meta.chunkCount, estimatedBytes, ageStr, ttlStr: formatFetchTtl(cacheTtlMs) };
       }
       // Stale — fall through to re-fetch silently
     }
@@ -2822,9 +2834,18 @@ server.registerTool(
         .boolean()
         .optional()
         .describe("Skip cache and re-fetch even if content was recently indexed"),
+      ttl: z
+        .coerce.number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          "Override the cache freshness window for this call, in milliseconds. " +
+          "`ttl: 0` bypasses the cache like `force: true`; omit to use the default 24h TTL.",
+        ),
     }),
   },
-  async ({ url, source, requests, concurrency, force }) => {
+  async ({ url, source, requests, concurrency, force, ttl }) => {
     // Normalize input: legacy {url} or new {requests: [...]}.
     // requests wins when both are provided (explicit batch intent).
     const batch: { url: string; source?: string }[] = requests
@@ -2849,7 +2870,7 @@ server.registerTool(
     // Parallel fetch via shared runPool primitive. capByCpuCount only for batch
     // — single-URL doesn't need the cap (only one job, executor is one subprocess).
     const jobs: PoolJob<FetchOneResult>[] = batch.map((req) => ({
-      run: () => fetchOneUrl(req.url, req.source, force),
+      run: () => fetchOneUrl(req.url, req.source, force, ttl),
     }));
     const { settled, effectiveConcurrency, capped } = await runPool(jobs, {
       concurrency: requestedConcurrency,
@@ -2858,7 +2879,7 @@ server.registerTool(
 
     // Serial index drain — workers race on fetch, but store.index* runs one at a time.
     type Finalized =
-      | { kind: "cached"; label: string; chunkCount: number; ageStr: string }
+      | { kind: "cached"; label: string; chunkCount: number; ageStr: string; ttlStr: string }
       | { kind: "fetched"; indexed: IndexedFetchResult }
       | { kind: "fetch_error"; url: string; error: string; reason: "exit" | "read" | "empty" | "throw" }
       | { kind: "job_error"; url: string; error: string };
@@ -2887,7 +2908,7 @@ server.registerTool(
             bytesAvoided: cachedBytes,
           })
         );
-        finalized.push({ kind: "cached", label: v.label, chunkCount: v.chunkCount, ageStr: v.ageStr });
+        finalized.push({ kind: "cached", label: v.label, chunkCount: v.chunkCount, ageStr: v.ageStr, ttlStr: v.ttlStr });
       } else if (v.kind === "fetch_error") {
         finalized.push({ kind: "fetch_error", url: v.url, error: v.error, reason: v.reason });
       } else {
@@ -2903,7 +2924,7 @@ server.registerTool(
         return trackResponse("ctx_fetch_and_index", {
           content: [{
             type: "text" as const,
-            text: `Cached: **${r.label}** — ${r.chunkCount} sections, indexed ${r.ageStr} (fresh, TTL: 24h).\nTo refresh: call ctx_fetch_and_index again with \`force: true\`.\n\nYou MUST call ctx_search() to answer questions about this content — this cached response contains no content.\nUse: ctx_search(queries: [...], source: "${r.label}")`,
+            text: `Cached: **${r.label}** — ${r.chunkCount} sections, indexed ${r.ageStr} (fresh, TTL: ${r.ttlStr}).\nTo refresh: call ctx_fetch_and_index again with \`force: true\`.\n\nYou MUST call ctx_search() to answer questions about this content — this cached response contains no content.\nUse: ctx_search(queries: [...], source: "${r.label}")`,
           }],
         });
       }
@@ -2954,7 +2975,7 @@ server.registerTool(
     for (const r of finalized) {
       if (r.kind === "cached") {
         cachedCount++;
-        lines.push(`- [cache] ${r.label} — ${r.chunkCount} sections (${r.ageStr})`);
+        lines.push(`- [cache] ${r.label} — ${r.chunkCount} sections (${r.ageStr}, TTL: ${r.ttlStr})`);
       } else if (r.kind === "fetched") {
         fetchedCount++;
         totalSections += r.indexed.totalChunks;
