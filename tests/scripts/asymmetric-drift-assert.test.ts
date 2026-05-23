@@ -59,6 +59,21 @@ function readArgs0(path: string, key: string): string | null {
   return typeof a0 === "string" ? a0 : null;
 }
 
+function npmPackDryRunJson() {
+  const options = {
+    cwd: ROOT,
+    encoding: "utf-8" as BufferEncoding,
+    timeout: 30_000,
+  };
+
+  if (process.platform === "win32") {
+    // npm is commonly a .cmd shim on Windows, which spawnSync("npm") does not resolve.
+    return spawnSync("cmd.exe", ["/d", "/s", "/c", "npm pack --dry-run --json"], options);
+  }
+
+  return spawnSync("npm", ["pack", "--dry-run", "--json"], options);
+}
+
 describe("Issue #531 — asymmetric-drift invariant", () => {
   test(".mcp.json.example args[0] is the ${CLAUDE_PLUGIN_ROOT}/start.mjs placeholder", () => {
     // After the #531 architectural untrack (commit 9261377), .mcp.json is no
@@ -121,11 +136,7 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
   });
 
   test("npm pack dry-run contains the Claude manifest, runtime bundles, start.mjs, and skills (#658)", () => {
-    const r = spawnSync("npm", ["pack", "--dry-run", "--json"], {
-      cwd: ROOT,
-      encoding: "utf-8",
-      timeout: 30_000,
-    });
+    const r = npmPackDryRunJson();
     expect(r.status, `npm pack failed: stderr=${r.stderr} stdout=${r.stdout}`).toBe(0);
     const pack = JSON.parse(r.stdout) as Array<{ files: Array<{ path: string }> }>;
     const files = new Set(pack[0]?.files?.map((f) => f.path) ?? []);
