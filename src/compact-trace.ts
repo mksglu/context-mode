@@ -49,7 +49,8 @@ export interface DecodedCompactBatchTrace {
   }>;
 }
 
-const kTraceHeader = "CM1";
+const kTraceHeader = "CM2";
+const kLegacyTraceHeader = "CM1";
 
 function toBase36(value: number): string {
   return Math.max(0, Math.floor(value)).toString(36);
@@ -79,6 +80,16 @@ function parseFields(line: string): Record<string, string> {
     if (eq > 0) fields[part.slice(0, eq)] = part.slice(eq + 1);
   }
   return fields;
+}
+
+function packRefs(refs: string[]): string {
+  if (refs.length === 0) return "_";
+  return refs.every((ref) => ref.length === 1) ? refs.join("") : `~${refs.join(".")}`;
+}
+
+function unpackRefs(value: string): string[] {
+  if (value === "_") return [];
+  return value.startsWith("~") ? value.slice(1).split(".").filter(Boolean) : Array.from(value);
 }
 
 function isLetter(code: number): boolean {
@@ -176,25 +187,30 @@ export class CompactTraceCodec {
       sectionGroups.set(section.title, existing);
     }
 
-    const sections = Array.from(sectionGroups.entries()).map(([title, group]) => {
-      const titleRef = ref(title);
-      return `${titleRef}:${toBase36(group.count)}:${toBase36(group.bytes)}:${hashText(group.hashes.join(""))}`;
-    });
+    const sectionTitles: string[] = [];
+    const sectionCounts: string[] = [];
+    const sectionHashes: string[] = [];
+    for (const [title, group] of sectionGroups.entries()) {
+      sectionTitles.push(ref(title));
+      sectionCounts.push(toBase36(group.count));
+      sectionHashes.push(hashText(group.hashes.join(""), 4));
+    }
 
     const queries = input.queries.map((query) => {
       const queryRef = ref(query.query);
       const hits = query.hits.map((hit) => ref(hit.title));
-      const hitHash = hashText(query.hits.map((hit) => hashText(hit.content)).join(""));
-      return `${queryRef}:${hitHash}>${hits.join(".")}`;
+      return packRefs([queryRef, ...hits]);
     });
 
     const baseLines = [
       kTraceHeader,
       additions.length > 0 ? `D ${additions.join(",")}` : "",
-      `B src=${sourceRef} n=${toBase36(input.commandLabels.length)} l=${toBase36(input.totalLines)} b=${toBase36(input.totalBytes)} i=${toBase36(input.indexedSections.length)} q=${toBase36(input.queries.length)}`,
-      commandRefs.length > 0 ? `C ${commandRefs.join(".")}` : "C",
-      sections.length > 0 ? `S ${sections.join(",")}` : "S",
-      queries.length > 0 ? `Q ${queries.join(",")}` : "Q",
+      `B ${sourceRef} ${toBase36(input.commandLabels.length)} ${toBase36(input.totalLines)} ${toBase36(input.totalBytes)} ${toBase36(input.indexedSections.length)} ${toBase36(input.queries.length)}`,
+      commandRefs.length > 0 ? `C ${packRefs(commandRefs)}` : "C",
+      sectionTitles.length > 0
+        ? `S ${packRefs(sectionTitles)} ${packRefs(sectionCounts)} ${sectionHashes.join("")}`
+        : "S",
+      queries.length > 0 ? `Q ${queries.join(" ")}` : "Q",
     ].filter(Boolean);
 
     const plainTokens = estimateCompactTraceTokens(input.plainText);
@@ -206,7 +222,7 @@ export class CompactTraceCodec {
       const savedRatio = plainTokens === 0 ? 0 : savedTokens / plainTokens;
       finalText = [
         ...baseLines,
-        `M p=${toBase36(plainTokens)} c=${toBase36(compactTokens)} s=${Math.round(savedRatio * 1000).toString(36)}`,
+        `M ${toBase36(plainTokens)} ${toBase36(compactTokens)} ${Math.round(savedRatio * 1000).toString(36)}`,
       ].join("\n");
       const nextTokens = estimateCompactTraceTokens(finalText);
       if (nextTokens === compactTokens) break;
@@ -228,9 +244,10 @@ export class CompactTraceCodec {
 
   decodeBatch(text: string): DecodedCompactBatchTrace {
     const lines = text.split(/\n/).map((line) => line.trim()).filter(Boolean);
-    if (lines[0] !== kTraceHeader) {
+    if (lines[0] !== kTraceHeader && lines[0] !== kLegacyTraceHeader) {
       throw new Error(`Unsupported compact trace header: ${lines[0] ?? "(empty)"}`);
     }
+    const legacy = lines[0] === kLegacyTraceHeader;
 
     const dictionary = [...this.values];
     const dLine = lines.find((line) => line.startsWith("D "));
@@ -247,24 +264,36 @@ export class CompactTraceCodec {
     }
 
     const resolve = (id: string): string => dictionary[fromBase36(id)] ?? "";
-    const b = parseFields(lines.find((line) => line.startsWith("B ")) ?? "B");
-    const m = parseFields(lines.find((line) => line.startsWith("M ")) ?? "M");
+    const bLine = lines.find((line) => line.startsWith("B ")) ?? "B";
+    const mLine = lines.find((line) => line.startsWith("M ")) ?? "M";
+    const b = legacy ? parseFields(bLine) : {};
+    const m = legacy ? parseFields(mLine) : {};
 
     const commandLine = lines.find((line) => line === "C" || line.startsWith("C "));
     const commandLabels = commandLine && commandLine.length > 1
-      ? commandLine.slice(2).split(".").filter(Boolean).map(resolve)
+      ? (legacy ? commandLine.slice(2).split(".").filter(Boolean) : unpackRefs(commandLine.slice(2))).map(resolve)
       : [];
 
     const sectionLine = lines.find((line) => line === "S" || line.startsWith("S "));
-    const indexedSections = sectionLine && sectionLine.length > 1
+    const indexedSections = legacy && sectionLine && sectionLine.length > 1
       ? sectionLine.slice(2).split(",").filter(Boolean).map((entry) => {
         const [titleRef = "", count = "0", bytes = "0", hash = ""] = entry.split(":");
         return { title: resolve(titleRef), count: fromBase36(count), bytes: fromBase36(bytes), hash };
       })
+      : sectionLine && sectionLine.length > 1
+        ? (() => {
+          const [titleRefs = "", countRefs = "", hashes = ""] = sectionLine.slice(2).split(" ");
+          return unpackRefs(titleRefs).map((titleRef, index) => ({
+            title: resolve(titleRef),
+            count: fromBase36(unpackRefs(countRefs)[index] ?? "0"),
+            bytes: 0,
+            hash: hashes.slice(index * 4, index * 4 + 4),
+          }));
+        })()
       : [];
 
     const queryLine = lines.find((line) => line === "Q" || line.startsWith("Q "));
-    const queries = queryLine && queryLine.length > 1
+    const queries = legacy && queryLine && queryLine.length > 1
       ? queryLine.slice(2).split(",").filter(Boolean).map((entry) => {
         const [queryPart = "", hitPart = ""] = entry.split(">");
         const [queryRef = "", hitHash = ""] = queryPart.split(":");
@@ -273,16 +302,45 @@ export class CompactTraceCodec {
         });
         return { query: resolve(queryRef), hits };
       })
+      : queryLine && queryLine.length > 1
+        ? queryLine.slice(2).split(" ").filter(Boolean).map((entry) => {
+          const [queryRef = "", ...hitRefs] = unpackRefs(entry);
+          const hits = hitRefs.map((hit) => ({ title: resolve(hit), bytes: 0, hash: "" }));
+          return { query: resolve(queryRef), hits };
+        })
       : [];
 
+    const compactMetrics = legacy
+      ? {
+        plainTokens: fromBase36(m.p ?? "0"),
+        compactTokens: fromBase36(m.c ?? "0"),
+        savedRatio: fromBase36(m.s ?? "0") / 1000,
+      }
+      : (() => {
+        const [plainTokens = "0", compactTokens = "0", savedRatio = "0"] = mLine.slice(2).split(" ");
+        return {
+          plainTokens: fromBase36(plainTokens),
+          compactTokens: fromBase36(compactTokens),
+          savedRatio: fromBase36(savedRatio) / 1000,
+        };
+      })();
+
+    const batchMetrics = legacy
+      ? {
+        source: resolve(b.src ?? "0"),
+        totalLines: fromBase36(b.l ?? "0"),
+        totalBytes: fromBase36(b.b ?? "0"),
+      }
+      : {
+        source: resolve((bLine.slice(2).split(" ")[0] ?? "0")),
+        totalLines: fromBase36(bLine.slice(2).split(" ")[2] ?? "0"),
+        totalBytes: fromBase36(bLine.slice(2).split(" ")[3] ?? "0"),
+      };
+
     return {
-      plainTokens: fromBase36(m.p ?? "0"),
-      compactTokens: fromBase36(m.c ?? "0"),
-      savedRatio: fromBase36(m.s ?? "0") / 1000,
+      ...compactMetrics,
       commandLabels,
-      source: resolve(b.src ?? "0"),
-      totalLines: fromBase36(b.l ?? "0"),
-      totalBytes: fromBase36(b.b ?? "0"),
+      ...batchMetrics,
       indexedSections,
       queries,
     };
