@@ -139,6 +139,15 @@ export function compactTraceEnabled(value = process.env.CONTEXT_MODE_COMPACT_TRA
   return ["1", "true", "yes", "compact"].includes(value.toLowerCase());
 }
 
+export function shouldReturnCompactTrace(
+  trace: Pick<CompactBatchTraceResult, "plainTokens" | "savedRatio">,
+  opts: { minPlainTokens?: number; minSavedRatio?: number } = {},
+): boolean {
+  const minPlainTokens = opts.minPlainTokens ?? 1_000;
+  const minSavedRatio = opts.minSavedRatio ?? 0.25;
+  return trace.plainTokens >= minPlainTokens && trace.savedRatio >= minSavedRatio;
+}
+
 export class CompactTraceCodec {
   private readonly ids = new Map<string, number>();
   private readonly values: string[] = [];

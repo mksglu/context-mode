@@ -44,7 +44,7 @@ import { resolveCodexConfigDir } from "./adapters/codex/paths.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
-import { compactTraceEnabled, globalCompactTraceCodec } from "./compact-trace.js";
+import { compactTraceEnabled, globalCompactTraceCodec, shouldReturnCompactTrace } from "./compact-trace.js";
 import { loadDatabase } from "./db-base.js";
 import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, OPUS_INPUT_PRICE_PER_TOKEN } from "./session/analytics.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
@@ -3068,10 +3068,10 @@ server.registerTool(
       compact: z
         .boolean()
         .optional()
-        .default(false)
         .describe(
-          "Return a compact dictionary trace instead of inline query snippets. " +
-          "Full output is still indexed; use ctx_search with the returned source to retrieve details.",
+          "Optional override for compact dictionary trace responses. " +
+          "Omit for automatic savings-based selection, pass false to force normal snippets, or true to force compact. " +
+          "Full output is always indexed; use ctx_search with the returned source to retrieve details.",
         ),
     }),
   },
@@ -3159,7 +3159,7 @@ server.registerTool(
           : "",
       ].join("\n");
 
-      if (compact === true || compactTraceEnabled()) {
+      if (compact !== false) {
         const compactQueries = queries.map((query) => ({
           query,
           hits: store.searchWithFallback(query, 3, source, undefined, "exact").map((hit) => ({
@@ -3179,15 +3179,17 @@ server.registerTool(
           queries: compactQueries,
           plainText: output,
         });
-        const compactOutput = [
-          compactTrace.text,
-          `R source=${source}`,
-          `R saved=${(compactTrace.savedRatio * 100).toFixed(1)}% tokens=${compactTrace.plainTokens}->${compactTrace.compactTokens}`,
-        ].join("\n");
+        if (compact === true || compactTraceEnabled() || shouldReturnCompactTrace(compactTrace)) {
+          const compactOutput = [
+            compactTrace.text,
+            `R source=${source}`,
+            `R saved=${(compactTrace.savedRatio * 100).toFixed(1)}% tokens=${compactTrace.plainTokens}->${compactTrace.compactTokens}`,
+          ].join("\n");
 
-        return trackResponse("ctx_batch_execute", {
-          content: [{ type: "text" as const, text: compactOutput }],
-        });
+          return trackResponse("ctx_batch_execute", {
+            content: [{ type: "text" as const, text: compactOutput }],
+          });
+        }
       }
 
       return trackResponse("ctx_batch_execute", {

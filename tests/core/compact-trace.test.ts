@@ -4,6 +4,7 @@ import {
   CompactTraceCodec,
   compactTraceEnabled,
   estimateCompactTraceTokens,
+  shouldReturnCompactTrace,
   type CompactBatchTraceInput,
 } from "../../src/compact-trace.js";
 
@@ -107,5 +108,14 @@ describe("compact trace codec", () => {
     expect(compactTraceEnabled("compact")).toBe(true);
     expect(compactTraceEnabled("0")).toBe(false);
     expect(compactTraceEnabled(undefined)).toBe(false);
+  });
+
+  test("auto-selects compact only after savings clear the threshold", () => {
+    const codec = new CompactTraceCodec();
+    const large = codec.encodeBatch(buildBatch(0, 20));
+
+    expect(shouldReturnCompactTrace(large)).toBe(true);
+    expect(shouldReturnCompactTrace({ plainTokens: 999, savedRatio: 0.95 })).toBe(false);
+    expect(shouldReturnCompactTrace({ plainTokens: 2_000, savedRatio: 0.24 })).toBe(false);
   });
 });
