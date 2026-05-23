@@ -44,6 +44,7 @@ import { resolveCodexConfigDir } from "./adapters/codex/paths.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
+import { compactTraceEnabled, globalCompactTraceCodec } from "./compact-trace.js";
 import { loadDatabase } from "./db-base.js";
 import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, OPUS_INPUT_PRICE_PER_TOKEN } from "./session/analytics.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
@@ -3064,9 +3065,17 @@ server.registerTool(
           ">1 switches to per-command timeouts (no shared budget) and " +
           "individual `(timed out)` blocks instead of cascading skip.",
         ),
+      compact: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Return a compact dictionary trace instead of inline query snippets. " +
+          "Full output is still indexed; use ctx_search with the returned source to retrieve details.",
+        ),
     }),
   },
-  async ({ commands, queries, timeout, concurrency }) => {
+  async ({ commands, queries, timeout, concurrency, compact }) => {
     // Security: check each command against deny patterns
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
@@ -3149,6 +3158,37 @@ server.registerTool(
           ? `\nSearchable terms for follow-up: ${distinctiveTerms.join(", ")}`
           : "",
       ].join("\n");
+
+      if (compact === true || compactTraceEnabled()) {
+        const compactQueries = queries.map((query) => ({
+          query,
+          hits: store.searchWithFallback(query, 3, source, undefined, "exact").map((hit) => ({
+            title: hit.title,
+            content: hit.content,
+          })),
+        }));
+        const compactTrace = globalCompactTraceCodec.encodeBatch({
+          commandLabels: commands.map((command) => command.label),
+          source,
+          totalLines,
+          totalBytes,
+          indexedSections: allSections.map((section) => ({
+            title: section.title,
+            content: section.content,
+          })),
+          queries: compactQueries,
+          plainText: output,
+        });
+        const compactOutput = [
+          compactTrace.text,
+          `R source=${source}`,
+          `R saved=${(compactTrace.savedRatio * 100).toFixed(1)}% tokens=${compactTrace.plainTokens}->${compactTrace.compactTokens}`,
+        ].join("\n");
+
+        return trackResponse("ctx_batch_execute", {
+          content: [{ type: "text" as const, text: compactOutput }],
+        });
+      }
 
       return trackResponse("ctx_batch_execute", {
         content: [{ type: "text" as const, text: output }],
