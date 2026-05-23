@@ -7,6 +7,8 @@
  *   context-mode doctor                       → Diagnose runtime issues, hooks, FTS5, version
  *   context-mode upgrade                      → Fix hooks, permissions, and settings
  *   context-mode hook <platform> <event>      → Dispatch a hook script (used by platform hook configs)
+ *   CONTEXT_MODE_DIR=/abs/path context-mode   → Override sessions/content storage root
+ *     Empty/whitespace is ignored; non-empty values must be absolute.
  *
  * Platform auto-detection: CLI detects which platform is running
  * (Claude Code, Gemini CLI, OpenCode, etc.) and uses the appropriate adapter.
@@ -28,6 +30,15 @@ import {
 } from "./runtime.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
+import {
+  ensureWritableStorageDir,
+  formatStorageDirectoryError,
+  resolveContentStorageDir,
+  resolveSessionStorageDir,
+  resolveStatsStorageDir,
+  StorageDirectoryError,
+  type ResolvedStorageDir,
+} from "./session/db.js";
 // v1.0.128 — Issue #559 sibling MCP kill helpers (see PR-559-560-FIX-DESIGN.md).
 import { discoverSiblingMcpPids, killSiblingMcpServers } from "./util/sibling-mcp.js";
 // v1.0.119 — Issue #523 Layer 5 heal: post-bump assertion on .claude-plugin/plugin.json
@@ -144,7 +155,23 @@ const isInProcessPluginPlatform = (p: string | undefined) =>
   p ? IN_PROCESS_PLUGIN_PLATFORMS.has(p) : false;
 const args = process.argv.slice(2);
 
-if (args[0] === "doctor") {
+function printHelp(): void {
+  console.log([
+    "Usage:",
+    "  context-mode                         Start MCP server (stdio)",
+    "  context-mode doctor                  Diagnose runtime issues, hooks, FTS5, version",
+    "  context-mode upgrade                 Fix hooks, permissions, and settings",
+    "  context-mode hook <platform> <event> Dispatch a configured hook script",
+    "  context-mode statusline              Print Claude Code status line",
+    "",
+    "Environment:",
+    "  CONTEXT_MODE_DIR=/absolute/path      Override sessions/content storage root; empty is ignored, non-empty must be absolute",
+  ].join("\n"));
+}
+
+if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
+  printHelp();
+} else if (args[0] === "doctor") {
   doctor().then((code) => process.exit(code));
 } else if (args[0] === "upgrade") {
   // Issue #542 — accept --platform <id> from the ctx_upgrade MCP handler,
@@ -327,6 +354,30 @@ async function fetchLatestVersion(): Promise<string> {
  * Doctor — adapter-aware diagnostics
  * ------------------------------------------------------- */
 
+function describeStorageSource(dir: ResolvedStorageDir): string {
+  return dir.envVar ? dir.envVar : "adapter default";
+}
+
+function logStorageDir(dir: ResolvedStorageDir): number {
+  try {
+    ensureWritableStorageDir(dir);
+    p.log.success(
+      color.green(`Storage ${dir.kind}: PASS`) +
+        color.dim(` — ${dir.path} (${describeStorageSource(dir)})`),
+    );
+    return 0;
+  } catch (err) {
+    if (err instanceof StorageDirectoryError) {
+      p.log.error(
+        color.red(`Storage ${dir.kind}: FAIL`) +
+          color.dim(` — ${formatStorageDirectoryError(err)}`),
+      );
+      return 1;
+    }
+    throw err;
+  }
+}
+
 async function doctor(): Promise<number> {
   if (process.stdout.isTTY) console.clear();
 
@@ -341,6 +392,34 @@ async function doctor(): Promise<number> {
   );
 
   let criticalFails = 0;
+
+  try {
+    const sessionDir = resolveSessionStorageDir(() => adapter.getSessionDir());
+    const contentDir = resolveContentStorageDir(() => sessionDir.path);
+    const statsDir = resolveStatsStorageDir(() => sessionDir.path);
+
+    p.note(
+      [
+        `sessions: ${sessionDir.path} (${describeStorageSource(sessionDir)})`,
+        `content:  ${contentDir.path} (${describeStorageSource(contentDir)})`,
+        `stats:    ${statsDir.path} (${describeStorageSource(statsDir)})`,
+      ].join("\n"),
+      "Storage paths",
+    );
+    criticalFails += logStorageDir(sessionDir);
+    criticalFails += logStorageDir(contentDir);
+    criticalFails += logStorageDir(statsDir);
+  } catch (err) {
+    if (err instanceof StorageDirectoryError) {
+      criticalFails++;
+      p.log.error(
+        color.red(`Storage ${err.kind}: FAIL`) +
+          color.dim(` — ${formatStorageDirectoryError(err)}`),
+      );
+    } else {
+      throw err;
+    }
+  }
 
   const s = p.spinner();
   s.start("Running diagnostics");
@@ -867,8 +946,8 @@ async function insight(port: number) {
   // Detect platform + adapter for correct session/content paths
   const detection = detectPlatform();
   const adapter = await getAdapter(detection.platform);
-  const sessDir = adapter.getSessionDir();
-  const contentDir = join(dirname(sessDir), "content");
+  const sessDir = ensureWritableStorageDir(resolveSessionStorageDir(() => adapter.getSessionDir()));
+  const contentDir = ensureWritableStorageDir(resolveContentStorageDir(() => sessDir));
   const cacheDir = join(dirname(sessDir), "insight-cache");
 
   if (!existsSync(join(insightSource, "server.mjs"))) {

@@ -544,6 +544,14 @@ Full documentation: [`docs/adapters/openclaw.md`](docs/adapters/openclaw.md)
    > remains accepted as a legacy alias in current Codex builds. Bundled plugin hooks
    > additionally require `plugin_hooks` until Codex enables plugin hooks by default.
 
+   **Custom storage location:** if Codex cannot write the adapter default storage directory, set
+   `CONTEXT_MODE_DIR` to an absolute writable root in the environment that launches Codex. Sessions
+   and stats use `<root>/sessions`; indexed content uses `<root>/content`.
+
+   ```bash
+   CONTEXT_MODE_DIR="$HOME/.codex-context-mode" codex
+   ```
+
 3. Restart Codex CLI and verify MCP with `ctx stats`.
 
    `ctx stats` proves the plugin MCP server is installed and reachable; it does
@@ -1376,6 +1384,12 @@ export CTX_FETCH_STRICT=1
 That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. Useful when context-mode runs as a shared service, not on a developer's own machine.
 
 `tool_input` for any `mcp__*` tool call is also redacted before persistence — the regex matcher in `hooks/posttooluse.mjs` masks `authorization`, `auth_token`, `access_token`, `refresh_token`, `bearer`, `token`, `secret`, `password`, `passwd`, `pwd`, `api_key` / `apikey` / `x_api_key`, `cookie` / `set-cookie`, `signature`, `private_key`, and `client_secret` (case-insensitive, hyphen/underscore-insensitive) to `[REDACTED]` so credentials in MCP arguments don't end up in the session DB.
+
+### Storage environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTEXT_MODE_DIR` | Adapter default, for example `~/.codex/context-mode` or `~/.claude/context-mode` | Since v1.0.147. Absolute writable root for context-mode storage. Sessions and stats use `<root>/sessions`; indexed content uses `<root>/content`. Empty or whitespace-only values are treated as unset and shown by `ctx_doctor`; non-empty values must be absolute. `~` is not expanded. |
 
 ### Routing-guidance environment variables
 

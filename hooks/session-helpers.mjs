@@ -43,9 +43,12 @@ async function loadSessionDbModule() {
 
 const _sessionDb = await loadSessionDbModule();
 const {
+  ensureWritableStorageDir,
   hashProjectDirCanonical,
   hashProjectDirLegacy,
   normalizeWorktreePath,
+  resolveDefaultSessionDir,
+  resolveSessionStorageDir,
   resolveSessionPath: _resolveSessionPath,
   getWorktreeSuffix: _getWorktreeSuffixBundle,
 } = _sessionDb;
@@ -265,9 +268,18 @@ export function getSessionId(input, opts = CLAUDE_OPTS) {
 // Per-project file paths — thin wrappers around resolveSessionPath.
 // ─────────────────────────────────────────────────────────
 
+function resolveSessionDir(opts) {
+  return ensureWritableStorageDir(
+    resolveSessionStorageDir(() => resolveDefaultSessionDir({
+      configDir: opts.configDir,
+      configDirEnv: opts.configDirEnv,
+    })),
+  );
+}
+
 function _resolveProjectFile(opts, projectDirOverride, ext) {
   const projectDir = normalizeWorktreePath(projectDirOverride ?? getProjectDir(opts));
-  const sessionsDir = join(resolveConfigDir(opts), "context-mode", "sessions");
+  const sessionsDir = resolveSessionDir(opts);
   mkdirSync(sessionsDir, { recursive: true });
   return _resolveSessionPath({
     projectDir,
@@ -303,4 +315,3 @@ export function getSessionEventsPath(opts = CLAUDE_OPTS, projectDirOverride) {
 export function getCleanupFlagPath(opts = CLAUDE_OPTS, projectDirOverride) {
   return _resolveProjectFile(opts, projectDirOverride, ".cleanup");
 }
-

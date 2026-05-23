@@ -61,8 +61,9 @@ const HOMEDRIVE_HOMEPATH_KEYS = ["HOMEDRIVE", "HOMEPATH"] as const;
  * leak across the test boundary even with HOME redirected.
  */
 const DELETE_KEYS = [
-  "CLAUDE_PLUGIN_ROOT",
+  "CONTEXT_MODE_DIR",
   "CONTEXT_MODE_SESSION_DIR",
+  "CLAUDE_PLUGIN_ROOT",
   "CONTEXT_MODE_SESSION_SUFFIX",
   "CONTEXT_MODE_SESSION_DB",
 ] as const;

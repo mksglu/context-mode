@@ -144,21 +144,24 @@ function runStatuslineFull(env: Record<string, string>) {
 }
 
 describe("statusline.mjs — render fallbacks", () => {
+  let root: string;
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ctx-statusline-"));
+    root = mkdtempSync(join(tmpdir(), "ctx-statusline-"));
+    dir = join(root, "sessions");
+    mkdirSync(dir, { recursive: true });
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   });
 
   // BRAND-NEW state: no SessionDB. Falls back to substantiated README
   // headline ("~98% of context window") — no fabricated $/dev/month copy.
   test("brand-new state: no SessionDB shows substantiated headline", () => {
     const out = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CLAUDE_SESSION_ID: "pid-doesnotexist",
     });
     assert.match(out, /context-mode/);
@@ -170,7 +173,7 @@ describe("statusline.mjs — render fallbacks", () => {
   test("empty sessions dir shows substantiated headline", () => {
     // dir is freshly mkdtemp'd — empty, no .db files.
     const out = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CLAUDE_SESSION_ID: "pid-empty",
     });
     assert.match(out, /context-mode/);
@@ -184,7 +187,7 @@ describe("statusline.mjs — render fallbacks", () => {
   test("corrupt .db file degrades to headline", () => {
     writeFileSync(join(dir, "deadbeefdeadbeef.db"), "not a sqlite file");
     const out = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CLAUDE_SESSION_ID: "pid-bad",
     });
     assert.match(out, /context-mode/);
@@ -205,16 +208,19 @@ describe("statusline.mjs — render fallbacks", () => {
 // session-id → render path — assertion is "did the right pid-* event get
 // loaded", which proves the walk produced the expected PID.
 describe("statusline.mjs — cross-OS session resolver", () => {
+  let root: string;
   let dir: string;
   let scratch: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ctx-statusline-resolver-"));
+    root = mkdtempSync(join(tmpdir(), "ctx-statusline-resolver-"));
+    dir = join(root, "sessions");
+    mkdirSync(dir, { recursive: true });
     scratch = mkdtempSync(join(tmpdir(), "ctx-statusline-scratch-"));
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
     rmSync(scratch, { recursive: true, force: true });
   });
 
@@ -254,7 +260,7 @@ esac
     seedDb({ dir, sessionId: "pid-90001", bytesAvoided: 1_048_576 });
 
     const out = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CTX_TEST_PLATFORM: "darwin",
       // Ensure our shim wins:
       PATH: `${scratch}${delimiter}${process.env.PATH ?? ""}`,
@@ -296,7 +302,7 @@ esac
     seedDb({ dir, sessionId: "pid-70001", bytesAvoided: 524_288 });
 
     const out = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CTX_TEST_PLATFORM: "linux",
       CTX_TEST_PROC_DIR: fakeProc,
       CLAUDE_SESSION_ID: "",
@@ -313,7 +319,7 @@ esac
     seedDb({ dir, sessionId: `pid-${statuslineParentPid}`, bytesAvoided: 524_288 });
 
     const { stdout, stderr } = runStatuslineFull({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CTX_TEST_PLATFORM: "win32",
       CLAUDE_SESSION_ID: "",
     });
@@ -327,27 +333,42 @@ esac
   });
 });
 
-// ── CONTEXT_MODE_SESSION_DIR override (backward-compat) ───────────────────
+// ── CONTEXT_MODE_DIR override (backward-compat) ───────────────────
 // Power users / tests rely on this env var to redirect the data source
 // without patching getSessionDir(). Must keep working post-refactor.
-describe("statusline.mjs — CONTEXT_MODE_SESSION_DIR override", () => {
+describe("statusline.mjs — CONTEXT_MODE_DIR override", () => {
+  let root: string;
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ctx-statusline-override-"));
+    root = mkdtempSync(join(tmpdir(), "ctx-statusline-override-"));
+    dir = join(root, "sessions");
+    mkdirSync(dir, { recursive: true });
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   });
 
-  test("CONTEXT_MODE_SESSION_DIR routes the SessionDB read to the override path", () => {
+  test("CONTEXT_MODE_DIR routes the SessionDB read to the override path", () => {
     seedDb({ dir, sessionId: "any-id", bytesAvoided: 2_097_152 }); // 2MB
     const out = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CLAUDE_SESSION_ID: "any-id",
     });
     assert.match(out, /context-mode/);
     assert.match(out, /this chat/, "render reflects override-dir SessionDB");
+  });
+
+  test("legacy CONTEXT_MODE_SESSION_DIR still routes the SessionDB read", () => {
+    seedDb({ dir, sessionId: "legacy-id", bytesAvoided: 2_097_152 }); // 2MB
+    const { stdout, stderr } = runStatuslineFull({
+      CONTEXT_MODE_SESSION_DIR: dir,
+      CLAUDE_SESSION_ID: "legacy-id",
+    });
+
+    assert.match(stdout, /context-mode/);
+    assert.match(stdout, /this chat/, "render reflects legacy session-dir SessionDB");
+    assert.match(stderr, /CONTEXT_MODE_SESSION_DIR is deprecated/);
   });
 });

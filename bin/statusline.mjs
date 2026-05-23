@@ -26,10 +26,14 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
+import {
+  ensureWritableStorageDir,
+  resolveDefaultSessionDir,
+  resolveSessionStorageDir,
+} from "../hooks/session-db.bundle.mjs";
 
 // ── Analytics import — resolved relative to this script ─────────────────
 // statusline.mjs ships in `bin/`; the compiled analytics module lives in
@@ -68,10 +72,10 @@ function platform() {
 
 // Single-shot stderr warning latch — keep noise out of Claude Code's
 // statusline output even when our parent runs us repeatedly per session.
-let __winWarned = false;
+const __warnedKeys = new Set();
 function warnOnce(key, msg) {
-  if (key === "win" && __winWarned) return;
-  if (key === "win") __winWarned = true;
+  if (__warnedKeys.has(key)) return;
+  __warnedKeys.add(key);
   try { process.stderr.write(`context-mode statusline: ${msg}\n`); } catch { /* ignore */ }
 }
 
@@ -98,10 +102,19 @@ function readStdinJson() {
 }
 
 function resolveSessionDir() {
-  if (process.env.CONTEXT_MODE_SESSION_DIR) {
-    return process.env.CONTEXT_MODE_SESSION_DIR;
-  }
-  return join(homedir(), ".claude", "context-mode", "sessions");
+  return ensureWritableStorageDir(
+    resolveSessionStorageDir(() => resolveDefaultSessionDir({
+      configDir: ".claude",
+      configDirEnv: "CLAUDE_CONFIG_DIR",
+      legacySessionDirEnv: "CONTEXT_MODE_SESSION_DIR",
+      onLegacySessionDir: () => {
+        warnOnce(
+          "legacy-session-dir",
+          "CONTEXT_MODE_SESSION_DIR is deprecated; set CONTEXT_MODE_DIR to the parent context-mode root.",
+        );
+      },
+    })),
+  );
 }
 
 /**

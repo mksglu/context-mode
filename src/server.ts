@@ -30,7 +30,21 @@ import {
 import { classifyNonZeroExit } from "./exit-classify.js";
 import { startLifecycleGuard } from "./lifecycle.js";
 import { charSafePrefix } from "./truncate.js";
-import { hashProjectDirCanonical, hashProjectDirLegacy, resolveContentStorePath, resolveSessionDbPath, SessionDB } from "./session/db.js";
+import {
+  describeStorageDirectorySource,
+  ensureWritableStorageDir,
+  formatStorageDirectoryError,
+  hashProjectDirCanonical,
+  hashProjectDirLegacy,
+  resolveContentStorePath,
+  resolveContentStorageDir,
+  resolveDefaultSessionDir,
+  resolveSessionDbPath,
+  resolveSessionStorageDir,
+  resolveStatsStorageDir,
+  SessionDB,
+  StorageDirectoryError,
+} from "./session/db.js";
 import { purgeSession } from "./session/purge.js";
 import {
   emitCacheHitEvent,
@@ -41,7 +55,6 @@ import { persistToolCallCounter, restoreSessionStats } from "./session/persist-t
 import { searchAllSources } from "./search/unified.js";
 import { buildNodeCommand, type HookAdapter, type PlatformId } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
-import { resolveCodexConfigDir } from "./adapters/codex/paths.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
@@ -276,9 +289,33 @@ const originalRegisterTool = server.registerTool.bind(server);
     emitSuppressionDiagnostic();
     return undefined;
   }
-  REGISTERED_CTX_TOOLS.push({ name, config, handler });
+  const wrappedHandler = wrapToolHandler(name, handler);
+  REGISTERED_CTX_TOOLS.push({ name, config, handler: wrappedHandler });
+  args[2] = wrappedHandler;
   return (originalRegisterTool as unknown as (...callArgs: unknown[]) => unknown)(...args);
 };
+
+function wrapToolHandler(
+  name: string,
+  handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
+): (toolArgs: Record<string, unknown>) => Promise<unknown> {
+  return async (toolArgs: Record<string, unknown>) => {
+    try {
+      return await handler(toolArgs);
+    } catch (err) {
+      const result = storageErrorResult(err);
+      if (result) {
+        try {
+          return trackResponse(name, result);
+        } catch (trackErr) {
+          if (trackErr instanceof StorageDirectoryError) return result;
+          throw trackErr;
+        }
+      }
+      throw err;
+    }
+  };
+}
 
 // Issue #637 — when suppression is active, install the empty tools/list handler
 // once at module-init time so the suppressed MCP child responds with
@@ -440,10 +477,6 @@ let _insightChild: ChildProcess | null = null;
  * Issue #460 round-3: delegates to the canonical util so empty/whitespace
  * env values fall back instead of poisoning downstream `join()` calls.
  */
-function resolveClaudeConfigRoot(): string {
-  return resolveClaudeConfigDir();
-}
-
 async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
   if (_detectedAdapter) return _detectedAdapter;
   try {
@@ -459,7 +492,7 @@ async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
  * Get the platform-specific sessions directory from the detected adapter.
  * Falls back to the detected platform config root before adapter detection.
  */
-function getSessionDir(): string {
+function getDefaultSessionDir(): string {
   if (_detectedAdapter) return _detectedAdapter.getSessionDir();
   // Pre-detection path (race window before MCP `initialize` completes):
   // call detectPlatform() (sync, env-var-based) and look up segments via
@@ -471,20 +504,23 @@ function getSessionDir(): string {
     const signal = detectPlatform();
     const segments = getSessionDirSegments(signal.platform);
     if (segments) {
-      let root = join(homedir(), ...segments);
-      if (segments.length === 1 && segments[0] === ".claude") {
-        root = resolveClaudeConfigRoot();
-      } else if (segments.length === 1 && segments[0] === ".codex") {
-        root = resolveCodexConfigDir();
-      }
-      const dir = join(root, "context-mode", "sessions");
-      mkdirSync(dir, { recursive: true });
-      return dir;
+      return resolveDefaultSessionDir({
+        configDir: join(...segments),
+        configDirEnv: configDirEnvForSessionSegments(segments),
+      });
     }
   } catch { /* fall through to claude fallback */ }
-  const dir = join(resolveClaudeConfigRoot(), "context-mode", "sessions");
-  mkdirSync(dir, { recursive: true });
-  return dir;
+  return resolveDefaultSessionDir({ configDir: ".claude", configDirEnv: "CLAUDE_CONFIG_DIR" });
+}
+
+function configDirEnvForSessionSegments(segments: string[]): string | undefined {
+  if (segments.length === 1 && segments[0] === ".claude") return "CLAUDE_CONFIG_DIR";
+  if (segments.length === 1 && segments[0] === ".codex") return "CODEX_HOME";
+  return undefined;
+}
+
+function getSessionDir(): string {
+  return ensureWritableStorageDir(resolveSessionStorageDir(getDefaultSessionDir));
 }
 
 /**
@@ -583,9 +619,7 @@ function getSessionDbPath(): string {
  *         ~/.cursor/context-mode/content/87c28c41ddb64d38.db
  */
 function getStorePath(): string {
-  // Derive content dir from session dir: .../sessions/ → .../content/
-  const dir = join(dirname(getSessionDir()), "content");
-  mkdirSync(dir, { recursive: true });
+  const dir = ensureWritableStorageDir(resolveContentStorageDir(getDefaultSessionDir));
   // Delegate to resolveContentStorePath: same case-fold + one-shot legacy
   // rename behavior as resolveSessionDbPath. On macOS / Windows, an
   // existing legacy raw-casing FTS5 db (with -wal/-shm sidecars) is
@@ -656,6 +690,13 @@ type ToolResult = {
   isError?: boolean;
 };
 
+function storageErrorResult(err: unknown): ToolResult | null {
+  if (!(err instanceof StorageDirectoryError)) return null;
+  return {
+    content: [{ type: "text", text: formatStorageDirectoryError(err) }],
+    isError: true,
+  };
+}
 // ── Version outdated warning ──────────────────────────────────────────────
 // Non-blocking npm check at startup. trackResponse prepends warning
 // using a burst cadence: 3 warnings → 1h silent → 3 warnings → repeat.
@@ -863,7 +904,8 @@ let _lifetimeCache: { tokens: number; computedAt: number } | undefined;
  */
 function getStatsFilePath(): string {
   const sessionId = process.env.CLAUDE_SESSION_ID || `pid-${process.ppid}`;
-  return join(getSessionDir(), `stats-${sessionId}.json`);
+  const statsDir = ensureWritableStorageDir(resolveStatsStorageDir(getDefaultSessionDir));
+  return join(statsDir, `stats-${sessionId}.json`);
 }
 
 function persistStats(): void {
@@ -2153,7 +2195,7 @@ server.registerTool(
         } catch { /* SessionDB unavailable — search ContentStore + auto-memory only */ }
       }
 
-      const configDir = _detectedAdapter?.getConfigDir() ?? resolveClaudeConfigRoot();
+      const configDir = _detectedAdapter?.getConfigDir() ?? resolveClaudeConfigDir();
 
       try {
       for (const q of queryList) {
@@ -3381,6 +3423,13 @@ server.registerTool(
     } else {
       lines.push("[WARN] Performance: NORMAL — install Bun for 3-5x speed boost");
     }
+
+    const sessionStorage = resolveSessionStorageDir(getDefaultSessionDir);
+    const contentStorage = resolveContentStorageDir(getDefaultSessionDir);
+    const statsStorage = resolveStatsStorageDir(getDefaultSessionDir);
+    lines.push(`[OK] Storage sessions: ${sessionStorage.path} (${describeStorageDirectorySource(sessionStorage)})`);
+    lines.push(`[OK] Storage content: ${contentStorage.path} (${describeStorageDirectorySource(contentStorage)})`);
+    lines.push(`[OK] Storage stats: ${statsStorage.path} (${describeStorageDirectorySource(statsStorage)})`);
 
     // Server test — cleanup executor to prevent resource leaks (#247)
     {

@@ -166,14 +166,17 @@ function seedSessionDb(opts: {
 }
 
 describe("statusline.mjs — SessionDB-backed reads", () => {
+  let root: string;
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ctx-statusline-sqlite-"));
+    root = mkdtempSync(join(tmpdir(), "ctx-statusline-sqlite-"));
+    dir = join(root, "sessions");
+    mkdirSync(dir, { recursive: true });
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   });
 
   // SLICE 1: lifetime $ comes from SessionDB, not from sidecar JSON.
@@ -191,7 +194,7 @@ describe("statusline.mjs — SessionDB-backed reads", () => {
     seedSessionDb({ dir, events });
 
     const { stdout } = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CLAUDE_SESSION_ID: "any-session-id",
     });
 
@@ -216,7 +219,7 @@ describe("statusline.mjs — SessionDB-backed reads", () => {
   test("empty sessionsDir falls back to substantiated headline", () => {
     // dir exists but has no .db files
     const { stdout } = runStatusline({
-      CONTEXT_MODE_SESSION_DIR: dir,
+      CONTEXT_MODE_DIR: root,
       CLAUDE_SESSION_ID: "any-session-id",
     });
     assert.match(stdout, /context-mode/);
@@ -236,13 +239,15 @@ describe("statusline.mjs — SessionDB-backed reads", () => {
 // avg bytes >= 50 — see DEFAULT_REAL_USAGE_FILTER at analytics.ts:1162).
 describe("statusline.mjs — multi-adapter aggregation", () => {
   let home: string;
+  let claudeRoot: string;
   let claudeSessionsDir: string;
 
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), "ctx-statusline-multi-"));
     // Mirror real adapter layout: ~/.claude/context-mode/sessions for
     // claude-code, ~/.gemini/context-mode/sessions for gemini-cli, etc.
-    claudeSessionsDir = join(home, ".claude", "context-mode", "sessions");
+    claudeRoot = join(home, ".claude", "context-mode");
+    claudeSessionsDir = join(claudeRoot, "sessions");
     mkdirSync(claudeSessionsDir, { recursive: true });
     mkdirSync(join(home, ".gemini", "context-mode", "sessions"), {
       recursive: true,
@@ -320,7 +325,6 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
       HOME: home,
       USERPROFILE: home,
       // active adapter dir is the claude one (matches getSessionDir() default)
-      CONTEXT_MODE_SESSION_DIR: claudeSessionsDir,
       CLAUDE_SESSION_ID: "any-session-id",
     });
 
@@ -339,7 +343,6 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
     const { stdout } = runStatusline({
       HOME: home,
       USERPROFILE: home,
-      CONTEXT_MODE_SESSION_DIR: claudeSessionsDir,
       CLAUDE_SESSION_ID: "any-session-id",
     });
 
