@@ -3347,8 +3347,10 @@ describe("ctx_fetch_and_index batch refactor", () => {
   test("schema accepts both legacy {url} and batch {requests}", () => {
     expect(fetchHandlerSrc).toContain('url: z.string().optional()');
     expect(fetchHandlerSrc).toContain('requests: z');
-    // Zod array of {url, source?}
-    expect(fetchHandlerSrc).toContain("z.object({\n            url: z.string()");
+    // Zod array of {url, source?} wrapped with preprocess for native plugin coercion
+    expect(fetchHandlerSrc).toContain('z.preprocess(');
+    expect(fetchHandlerSrc).toContain('coerceJsonArray');
+    expect(fetchHandlerSrc).toContain('url: z.string()');
     expect(fetchHandlerSrc).toContain('source: z.string().optional()');
   });
 
@@ -3453,6 +3455,20 @@ describe("ctx_fetch_and_index batch refactor", () => {
     expect(block).toContain("store.indexJSON");
     expect(block).toContain("store.indexPlainText");
     expect(block).toContain("store.index");
+  });
+
+  test("force and requests parameters coerce string types from in-process native plugins", () => {
+    // OpenCode/Kilo in-process plugin bridge stringifies primitive types
+    // (boolean → "false", array → "[]"). z.preprocess(coerceBoolean/coerceJsonArray)
+    // defends against this in the Zod parse step. This test verifies those
+    // preprocess wrappers are present (issue #627 follow-up).
+    const fetchBlockMatch = fetchHandlerSrc.match(/registerTool\(\s*"ctx_fetch_and_index"[\s\S]+?registerTool\(\s*"ctx_batch_execute"/);
+    expect(fetchBlockMatch).not.toBeNull();
+    const block = fetchBlockMatch![0];
+    // force must coerce "false"/"true" strings → boolean
+    expect(block).toMatch(/force:\s*z\s*\n?\s*\.preprocess\(\s*coerceBoolean\s*,\s*z\.boolean\(\)\)/);
+    // requests must coerce JSON-stringified arrays
+    expect(block).toMatch(/requests:\s*z\s*\n?\s*\.preprocess\(\s*coerceJsonArray\s*,/);
   });
 });
 

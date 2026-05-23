@@ -2793,13 +2793,15 @@ server.registerTool(
           "Label for the indexed content when using single `url` (e.g., 'React useEffect docs', 'Supabase Auth API'). For batch, put source in each requests entry.",
         ),
       requests: z
-        .array(
-          z.object({
-            url: z.string().describe("URL to fetch"),
-            source: z.string().optional().describe("Label for this URL's indexed content"),
-          }),
+        .preprocess(
+          coerceJsonArray,
+          z.array(
+            z.object({
+              url: z.string().describe("URL to fetch"),
+              source: z.string().optional().describe("Label for this URL's indexed content"),
+            }),
+          ).min(1),
         )
-        .min(1)
         .optional()
         .describe(
           "Batch shape: array of {url, source?} entries. Use with concurrency>1 for parallel fetch. " +
@@ -2819,7 +2821,7 @@ server.registerTool(
           "Indexing is always serial regardless — only fetches race.",
         ),
       force: z
-        .boolean()
+        .preprocess(coerceBoolean, z.boolean())
         .optional()
         .describe("Skip cache and re-fetch even if content was recently indexed"),
     }),
