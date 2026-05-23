@@ -121,12 +121,20 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
   });
 
   test("npm pack dry-run contains the Claude manifest, runtime bundles, start.mjs, and skills (#658)", () => {
-    const r = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+    const isWin = process.platform === "win32";
+    const r = spawnSync(isWin ? "npm.cmd" : "npm", ["pack", "--dry-run", "--json"], {
       cwd: ROOT,
       encoding: "utf-8",
       timeout: 30_000,
+      ...(isWin ? { shell: true } : {}),
     });
-    expect(r.status, `npm pack failed: stderr=${r.stderr} stdout=${r.stdout}`).toBe(0);
+    const spawnErr = r.error
+      ? `${r.error.name}: ${r.error.message}`
+      : "(none)";
+    expect(
+      r.status,
+      `npm pack failed: status=${String(r.status)} signal=${String(r.signal)} error=${spawnErr} stderr=${String(r.stderr)} stdout=${String(r.stdout)}`,
+    ).toBe(0);
     const pack = JSON.parse(r.stdout) as Array<{ files: Array<{ path: string }> }>;
     const files = new Set(pack[0]?.files?.map((f) => f.path) ?? []);
     expect(files).toContain(".claude-plugin/plugin.json");
