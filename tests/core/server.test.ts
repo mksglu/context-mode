@@ -2902,7 +2902,7 @@ import {
   type BatchCommand,
 } from "../../src/server.js";
 
-interface MockResult { stdout: string; timedOut?: boolean; }
+interface MockResult { stdout: string; stderr?: string; timedOut?: boolean; }
 
 function mkMockExecutor(
   handler: (code: string, timeout: number | undefined) => Promise<MockResult> | MockResult,
@@ -2929,6 +2929,26 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     expect(outputs[0]).toContain("a");
     expect(outputs[1]).toContain("# B");
     expect(outputs[2]).toContain("# C");
+  });
+
+  test("preserves heredoc commands and combines captured stderr", async () => {
+    const heredoc = "node - <<'NODE'\nconsole.log('stdout')\nconsole.error('stderr')\nNODE";
+    let seenCode = "";
+    const exec = mkMockExecutor((code) => {
+      seenCode = code;
+      return { stdout: "stdout\n", stderr: "stderr\n" };
+    });
+    const { outputs, timedOut } = await runBatchCommands(
+      [{ label: "heredoc", command: heredoc }],
+      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      exec,
+    );
+
+    expect(timedOut).toBe(false);
+    expect(seenCode).toBe(heredoc);
+    expect(seenCode).not.toContain("NODE 2>&1");
+    expect(outputs[0]).toContain("stdout");
+    expect(outputs[0]).toContain("stderr");
   });
 
   test("cascading skip: timeout in first cmd skips the rest", async () => {
@@ -3028,6 +3048,27 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
     expect(timedOut).toBe(false);
     expect(outputs).toHaveLength(3);
     expect(elapsed).toBeLessThan(250); // 3x parallel ~100ms, with overhead room
+  });
+
+  test("parallel path preserves heredoc commands and combines captured stderr", async () => {
+    const seenCodes: string[] = [];
+    const exec = mkMockExecutor((code) => {
+      seenCodes.push(code);
+      return { stdout: `${code.includes("one") ? "one" : "two"} stdout\n`, stderr: `${code.includes("one") ? "one" : "two"} stderr\n` };
+    });
+    const cmds: BatchCommand[] = [
+      { label: "ONE", command: "node - <<'NODE'\nconsole.log('one')\nNODE" },
+      { label: "TWO", command: "python3 - <<'PY'\nprint('two')\nPY" },
+    ];
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX }, exec);
+
+    expect(timedOut).toBe(false);
+    expect(seenCodes).toEqual(cmds.map((cmd) => cmd.command));
+    expect(seenCodes.join("\n")).not.toContain("2>&1");
+    expect(outputs[0]).toContain("one stdout");
+    expect(outputs[0]).toContain("one stderr");
+    expect(outputs[1]).toContain("two stdout");
+    expect(outputs[1]).toContain("two stderr");
   });
 
   test("order preservation: outputs match input order, not completion order", async () => {
@@ -3137,7 +3178,7 @@ describe("runBatchCommands edge cases", () => {
     });
     const cmds: BatchCommand[] = [{ label: "A", command: "echo hi" }];
     await runBatchCommands(cmds, { timeout: 1000, concurrency: 1, nodeOptsPrefix: 'NODE_OPTIONS="--require /tmp/x" ' }, exec);
-    expect(seen[0]).toBe('NODE_OPTIONS="--require /tmp/x" echo hi 2>&1');
+    expect(seen[0]).toBe('NODE_OPTIONS="--require /tmp/x" echo hi');
   });
 
   test("buildBatchNodeOptionsPrefix formats POSIX shell assignment", () => {
