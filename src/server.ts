@@ -32,6 +32,7 @@ import { startLifecycleGuard } from "./lifecycle.js";
 import { hashProjectDirCanonical, hashProjectDirLegacy, resolveContentStorePath, resolveSessionDbPath, SessionDB } from "./session/db.js";
 import { purgeSession } from "./session/purge.js";
 import {
+  emitBitbusEvent,
   emitCacheHitEvent,
   emitIndexWriteEvent,
   emitSandboxExecuteEvent,
@@ -45,6 +46,7 @@ import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
 import { compactTraceEnabled, globalCompactTraceCodec, shouldReturnCompactTrace } from "./compact-trace.js";
+import { formatBitbusRecord, normalizeBitbusRecord } from "./bitbus.js";
 import { loadDatabase } from "./db-base.js";
 import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, OPUS_INPUT_PRICE_PER_TOKEN } from "./session/analytics.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
@@ -1836,6 +1838,56 @@ server.registerTool(
         isError: true,
       });
     }
+  },
+);
+
+// ─────────────────────────────────────────────────────────
+// Tool: bitbus_record
+// ─────────────────────────────────────────────────────────
+
+server.registerTool(
+  "ctx_bitbus_record",
+  {
+    title: "Record Bitbus Event",
+    description:
+      "Record a structured bitbus-style event into context-mode. " +
+      "Events are indexed under source \"bitbus-events\" and persisted into the session timeline. " +
+      "Use this for cross-agent failures, patterns, coordination signals, and durable trace refs.",
+    inputSchema: z.object({
+      type: z
+        .string()
+        .optional()
+        .default("pattern_failed")
+        .describe("Event type, e.g. pattern_failed, claim, handoff, trace_ref."),
+      actor: z.string().optional().describe("Agent/tool/person that observed the event."),
+      file: z.string().optional().describe("Relevant file path, if any."),
+      pattern: z.string().optional().describe("Pattern, invariant, or rule involved."),
+      reason: z.string().optional().describe("Short reason or finding to preserve."),
+      data: z.record(z.unknown()).optional().describe("Additional structured metadata."),
+      priority: z.coerce.number().int().min(0).max(9).optional().default(2),
+    }),
+  },
+  async ({ type, actor, file, pattern, reason, data, priority }) => {
+    const record = normalizeBitbusRecord({ type, actor, file, pattern, reason, data });
+    const text = formatBitbusRecord(record);
+    const source = "bitbus-events";
+
+    const store = getStore();
+    const indexed = store.index({ content: text, source, attribution: currentAttribution() });
+    trackIndexed(Buffer.byteLength(text), source);
+    setImmediate(() => emitBitbusEvent({
+      sessionDbPath: getSessionDbPath(),
+      type: record.type,
+      data: text,
+      priority,
+    }));
+
+    return trackResponse("ctx_bitbus_record", {
+      content: [{
+        type: "text" as const,
+        text: `Recorded bitbus:${record.type} into ${source} (${indexed.totalChunks} indexed section).`,
+      }],
+    });
   },
 );
 

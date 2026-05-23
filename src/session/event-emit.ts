@@ -130,3 +130,26 @@ export function emitCacheHitEvent(opts: {
     );
   });
 }
+
+export function emitBitbusEvent(opts: {
+  sessionDbPath: string;
+  type: string;
+  data: string;
+  priority?: number;
+}): void {
+  withLatestSession(opts.sessionDbPath, (sdb, sid) => {
+    sdb.insertEvent(
+      sid,
+      {
+        type: `bitbus:${opts.type}`,
+        category: "bitbus",
+        priority: opts.priority ?? 2,
+        data: opts.data,
+        project_dir: "",
+        attribution_source: "bitbus",
+        attribution_confidence: 1,
+      },
+      "ctx-bitbus",
+    );
+  });
+}
