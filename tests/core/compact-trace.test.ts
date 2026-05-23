@@ -59,11 +59,11 @@ describe("compact trace codec", () => {
     const encoded = codec.encodeBatch(buildBatch(0, 6));
     const decoded = new CompactTraceCodec().decodeBatch(encoded.text);
 
-    expect(encoded.text.startsWith("CM2\n")).toBe(true);
+    expect(encoded.text.startsWith("CM3\n")).toBe(true);
     expect(decoded.source).toBe("batch:git,tests,docs");
     expect(decoded.commandLabels).toEqual(["git", "tests", "docs"]);
     expect(decoded.indexedSections).toHaveLength(6);
-    expect(decoded.indexedSections[0].hash).toMatch(/^[a-f0-9]{4}$/);
+    expect(decoded.indexedSections[0].hash).toBe("");
     expect(decoded.queries).toHaveLength(5);
     expect(decoded.queries[0].hits).toHaveLength(3);
   });

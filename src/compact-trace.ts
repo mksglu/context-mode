@@ -49,8 +49,9 @@ export interface DecodedCompactBatchTrace {
   }>;
 }
 
-const kTraceHeader = "CM2";
+const kTraceHeader = "CM3";
 const kLegacyTraceHeader = "CM1";
+const kLegacyTraceHeaderV2 = "CM2";
 
 function toBase36(value: number): string {
   return Math.max(0, Math.floor(value)).toString(36);
@@ -162,10 +163,12 @@ export function shouldReturnCompactTrace(
 export class CompactTraceCodec {
   private readonly ids = new Map<string, number>();
   private readonly values: string[] = [];
+  private lastBatchLine = "";
 
   reset(): void {
     this.ids.clear();
     this.values.length = 0;
+    this.lastBatchLine = "";
   }
 
   symbolCount(): number {
@@ -188,12 +191,9 @@ export class CompactTraceCodec {
     }
 
     const sectionTitles: string[] = [];
-    const sectionCounts: string[] = [];
-    const sectionHashes: string[] = [];
     for (const [title, group] of sectionGroups.entries()) {
+      void group;
       sectionTitles.push(ref(title));
-      sectionCounts.push(toBase36(group.count));
-      sectionHashes.push(hashText(group.hashes.join(""), 4));
     }
 
     const queries = input.queries.map((query) => {
@@ -202,14 +202,15 @@ export class CompactTraceCodec {
       return packRefs([queryRef, ...hits]);
     });
 
+    const batchLine = `B ${sourceRef} ${packRefs(commandRefs)} ${toBase36(input.totalLines)} ${toBase36(input.totalBytes)} ${toBase36(input.indexedSections.length)} ${toBase36(input.queries.length)}`;
+    const emitBatchLine = batchLine !== this.lastBatchLine;
+    this.lastBatchLine = batchLine;
+
     const baseLines = [
       kTraceHeader,
       additions.length > 0 ? `D ${additions.join(",")}` : "",
-      `B ${sourceRef} ${toBase36(input.commandLabels.length)} ${toBase36(input.totalLines)} ${toBase36(input.totalBytes)} ${toBase36(input.indexedSections.length)} ${toBase36(input.queries.length)}`,
-      commandRefs.length > 0 ? `C ${packRefs(commandRefs)}` : "C",
-      sectionTitles.length > 0
-        ? `S ${packRefs(sectionTitles)} ${packRefs(sectionCounts)} ${sectionHashes.join("")}`
-        : "S",
+      emitBatchLine ? batchLine : "",
+      sectionTitles.length > 0 ? `S ${packRefs(sectionTitles)}` : "S",
       queries.length > 0 ? `Q ${queries.join(" ")}` : "Q",
     ].filter(Boolean);
 
@@ -220,10 +221,7 @@ export class CompactTraceCodec {
     for (let i = 0; i < 3; i++) {
       const savedTokens = Math.max(0, plainTokens - compactTokens);
       const savedRatio = plainTokens === 0 ? 0 : savedTokens / plainTokens;
-      finalText = [
-        ...baseLines,
-        `M ${toBase36(plainTokens)} ${toBase36(compactTokens)} ${Math.round(savedRatio * 1000).toString(36)}`,
-      ].join("\n");
+      finalText = baseLines.join("\n");
       const nextTokens = estimateCompactTraceTokens(finalText);
       if (nextTokens === compactTokens) break;
       compactTokens = nextTokens;
@@ -244,10 +242,11 @@ export class CompactTraceCodec {
 
   decodeBatch(text: string): DecodedCompactBatchTrace {
     const lines = text.split(/\n/).map((line) => line.trim()).filter(Boolean);
-    if (lines[0] !== kTraceHeader && lines[0] !== kLegacyTraceHeader) {
+    if (lines[0] !== kTraceHeader && lines[0] !== kLegacyTraceHeader && lines[0] !== kLegacyTraceHeaderV2) {
       throw new Error(`Unsupported compact trace header: ${lines[0] ?? "(empty)"}`);
     }
     const legacy = lines[0] === kLegacyTraceHeader;
+    const v2 = lines[0] === kLegacyTraceHeaderV2;
 
     const dictionary = [...this.values];
     const dLine = lines.find((line) => line.startsWith("D "));
@@ -264,15 +263,19 @@ export class CompactTraceCodec {
     }
 
     const resolve = (id: string): string => dictionary[fromBase36(id)] ?? "";
-    const bLine = lines.find((line) => line.startsWith("B ")) ?? "B";
+    const bLine = lines.find((line) => line.startsWith("B ")) ?? this.lastBatchLine;
+    if (bLine.startsWith("B ")) this.lastBatchLine = bLine;
     const mLine = lines.find((line) => line.startsWith("M ")) ?? "M";
     const b = legacy ? parseFields(bLine) : {};
     const m = legacy ? parseFields(mLine) : {};
 
+    const bParts = legacy ? [] : bLine.slice(2).split(" ");
     const commandLine = lines.find((line) => line === "C" || line.startsWith("C "));
-    const commandLabels = commandLine && commandLine.length > 1
-      ? (legacy ? commandLine.slice(2).split(".").filter(Boolean) : unpackRefs(commandLine.slice(2))).map(resolve)
-      : [];
+    const commandLabels = legacy || v2
+      ? commandLine && commandLine.length > 1
+        ? (legacy ? commandLine.slice(2).split(".").filter(Boolean) : unpackRefs(commandLine.slice(2))).map(resolve)
+        : []
+      : unpackRefs(bParts[1] ?? "_").map(resolve);
 
     const sectionLine = lines.find((line) => line === "S" || line.startsWith("S "));
     const indexedSections = legacy && sectionLine && sectionLine.length > 1
@@ -280,7 +283,7 @@ export class CompactTraceCodec {
         const [titleRef = "", count = "0", bytes = "0", hash = ""] = entry.split(":");
         return { title: resolve(titleRef), count: fromBase36(count), bytes: fromBase36(bytes), hash };
       })
-      : sectionLine && sectionLine.length > 1
+      : v2 && sectionLine && sectionLine.length > 1
         ? (() => {
           const [titleRefs = "", countRefs = "", hashes = ""] = sectionLine.slice(2).split(" ");
           return unpackRefs(titleRefs).map((titleRef, index) => ({
@@ -290,6 +293,13 @@ export class CompactTraceCodec {
             hash: hashes.slice(index * 4, index * 4 + 4),
           }));
         })()
+        : sectionLine && sectionLine.length > 1
+          ? unpackRefs(sectionLine.slice(2)).map((titleRef) => ({
+            title: resolve(titleRef),
+            count: 0,
+            bytes: 0,
+            hash: "",
+          }))
       : [];
 
     const queryLine = lines.find((line) => line === "Q" || line.startsWith("Q "));
@@ -316,14 +326,16 @@ export class CompactTraceCodec {
         compactTokens: fromBase36(m.c ?? "0"),
         savedRatio: fromBase36(m.s ?? "0") / 1000,
       }
-      : (() => {
+      : mLine.startsWith("M ")
+        ? (() => {
         const [plainTokens = "0", compactTokens = "0", savedRatio = "0"] = mLine.slice(2).split(" ");
         return {
           plainTokens: fromBase36(plainTokens),
           compactTokens: fromBase36(compactTokens),
           savedRatio: fromBase36(savedRatio) / 1000,
         };
-      })();
+      })()
+        : { plainTokens: 0, compactTokens: 0, savedRatio: 0 };
 
     const batchMetrics = legacy
       ? {
@@ -331,10 +343,16 @@ export class CompactTraceCodec {
         totalLines: fromBase36(b.l ?? "0"),
         totalBytes: fromBase36(b.b ?? "0"),
       }
-      : {
-        source: resolve((bLine.slice(2).split(" ")[0] ?? "0")),
-        totalLines: fromBase36(bLine.slice(2).split(" ")[2] ?? "0"),
-        totalBytes: fromBase36(bLine.slice(2).split(" ")[3] ?? "0"),
+      : v2
+        ? {
+          source: resolve(bParts[0] ?? "0"),
+          totalLines: fromBase36(bParts[2] ?? "0"),
+          totalBytes: fromBase36(bParts[3] ?? "0"),
+        }
+        : {
+        source: resolve(bParts[0] ?? "0"),
+        totalLines: fromBase36(bParts[2] ?? "0"),
+        totalBytes: fromBase36(bParts[3] ?? "0"),
       };
 
     return {
