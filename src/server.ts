@@ -2107,15 +2107,17 @@ WHEN:
   - You already indexed content via ctx_batch_execute, ctx_index, or ctx_fetch_and_index
   - You have multiple related questions about that content - batch them in one call
   - You want to scope to one labelled source (pass \`source\`)
+  - You want to query auto-captured session memory: decisions, errors, blockers, plans, user prompts, rejected approaches, post-compact session guides
 
 WHEN NOT:
-  - Nothing has been indexed yet - run ctx_batch_execute, ctx_index, or ctx_fetch_and_index first
+  - Nothing has been indexed yet AND no session memory has accumulated - run ctx_batch_execute, ctx_index, or ctx_fetch_and_index first
   - You only have a single one-off question on un-indexed data - ctx_execute is simpler
 
 RETURNS:
-  Top matches per query with section headers and content previews. Use 2-4 specific terms per query and pass every question in the queries array.
+  Top matches per query with section headers and content previews. Use 2-4 specific terms per query and pass every question in the queries array. Common session-memory sources: \`decision\`, \`error\`, \`error-resolution\`, \`blocker\`, \`plan\`, \`user-prompt\`, \`rejected-approach\`, \`compaction\`. Pass \`sort: "timeline"\` for chronological retrieval; see ctx_stats for live category counts.
 
-EXAMPLE: ctx_search(queries: ["root cause", "proposed fix", "test coverage"], source: "issue-#683")`,
+EXAMPLE: ctx_search(queries: ["root cause", "proposed fix", "test coverage"], source: "issue-#683")
+EXAMPLE: ctx_search(queries: ["what did we decide"], source: "decision", sort: "timeline")`,
     inputSchema: z.object({
       queries: z.preprocess(coerceJsonArray, z
         .array(z.string())
@@ -3744,8 +3746,8 @@ WHEN NOT:
   - User wants to free memory or improve performance -> recommend ctx_stats first, do not purge
 
 SCOPES (pass exactly one):
-  - Per-session: ctx_purge(confirm: true, sessionId: "<uuid>") deletes that session's events and per-session FTS5 chunks; sibling sessions and stats file are preserved.
-  - Per-project: ctx_purge(confirm: true, scope: "project") wipes FTS5 knowledge base, every session DB row, events markdown, and resets the stats file.
+  - Per-session: ctx_purge(confirm: true, sessionId: "<uuid>") deletes that session's events (auto-captured decisions, errors, plans, user prompts, rejected approaches, etc.) and per-session FTS5 chunks; sibling sessions and stats file are preserved.
+  - Per-project: ctx_purge(confirm: true, scope: "project") wipes FTS5 knowledge base, every session DB row, events markdown, and resets the stats file. Use ctx_stats first to preview category counts before purging.
 
 CONTRACT:
   - confirm:true is required; confirm:false returns 'purge cancelled'.
