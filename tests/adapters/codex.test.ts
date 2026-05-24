@@ -574,7 +574,15 @@ describe("CodexAdapter", () => {
     it("passes when all required Codex hooks are configured", () => {
       adapter.configureAllHooks("/ignored/plugin/root");
       const results = adapter.validateHooks("/ignored/plugin/root");
-      expect(results.every((result) => result.status === "pass")).toBe(true);
+      // The "Codex CLI binary" check is a runtime environment probe added
+      // by PR #686 — it shells out to `codex --version` and reports `warn`
+      // when the binary is absent (e.g. CI runners without Codex installed).
+      // That probe is orthogonal to the hook-config validation this test is
+      // pinning, so exclude it from the all-pass assertion. Probe-specific
+      // behaviour (pass/warn shape) is covered separately by the unit tests
+      // around probeCodexCliVersion() at L295-299.
+      const configChecks = results.filter((r) => r.check !== "Codex CLI binary");
+      expect(configChecks.every((result) => result.status === "pass")).toBe(true);
       expect(results.map((result) => result.check)).toContain("PreCompact hook");
       expect(results.map((result) => result.check)).toContain("UserPromptSubmit hook");
       expect(results.map((result) => result.check)).toContain("Stop hook");
