@@ -3107,11 +3107,12 @@ describe("batch_execute FS read tracking", () => {
   });
 
   test("tool description documents the concurrency field with positive guidance", () => {
-    // Hardened guidance per PRD-concurrency-architectural.md Section 4
-    expect(serverSrc).toContain("concurrency: 4-8");
-    expect(serverSrc).toContain("3-5x");
-    expect(serverSrc).toContain("✅");
-    expect(serverSrc).toContain("❌");
+    // PR #683 / ADR-0002: emoji bullets replaced with prose. The guidance
+    // still names the I/O-bound vs CPU-bound split and the speedup window,
+    // but uses positive WHEN: structure instead of ✅/❌ rows.
+    expect(serverSrc).toContain("4-8 for I/O-bound");
+    expect(serverSrc).toContain("1 for CPU-bound");
+    expect(serverSrc).toContain("CONCURRENCY");
   });
 });
 
@@ -3652,11 +3653,14 @@ describe("ctx_fetch_and_index batch refactor", () => {
   });
 
   test("PARALLELIZE I/O guidance + locked requests:[] schema in description", () => {
-    expect(fetchHandlerSrc).toContain("PARALLELIZE I/O");
-    expect(fetchHandlerSrc).toContain("requests: [{url, source}");
-    expect(fetchHandlerSrc).toContain("3-5x");
-    expect(fetchHandlerSrc).toContain("✅");
-    expect(fetchHandlerSrc).toContain("❌");
+    // PR #683 / ADR-0002: emoji bullets replaced with prose, "PARALLELIZE
+    // I/O" banner replaced with a positive CONCURRENCY: section. The
+    // requests:[{url, source}] schema callout stays (it's a contract cue),
+    // and the I/O-bound vs single-URL split is still named — just in prose.
+    expect(fetchHandlerSrc).toContain("CONCURRENCY");
+    expect(fetchHandlerSrc).toContain("requests: [{url");
+    expect(fetchHandlerSrc).toContain("concurrency 4-8 for I/O-bound");
+    expect(fetchHandlerSrc).toContain("concurrency 1");
   });
 
   test("serial-write contract: index drain is a for-loop calling indexFetched serially", () => {
@@ -5215,3 +5219,211 @@ test("registerEmptyToolsListHandler responds with {tools:[]} so operators don't 
     })(),
   ]);
 }, 15_000);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool description style contract (#683 ADR-0002)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Static contract test that scans every server.registerTool() block in
+// src/server.ts and asserts the tool description meets the style policy
+// codified in docs/adr/0002-tool-description-style.md.
+//
+// Motivation: PR #654 surfaced that a single hortatory word ("blocked") in a
+// routing deny reason was misread by Opus 4.6 as a network restriction,
+// causing capitulation to training data instead of routing. The same drift
+// has accumulated organically in tool descriptions (MANDATORY:, PREFER X
+// OVER Y, NEVER, Do NOT, ✅/❌). This test is the regression guard.
+//
+// Per CONTRIBUTING.md "Test file organization", we fold the contract into
+// tests/core/server.test.ts rather than creating tests/server/*.test.ts.
+//
+// Exemptions: ctx_stats, ctx_doctor, ctx_insight have minimal one-line
+// descriptions by design — they are GUI/diagnostic affordances, not routing
+// targets, so the WHEN: structural requirement does not apply.
+describe("tool description style contract (#683 ADR-0002)", () => {
+  const serverTsPath = resolve(__dirname, "../../src/server.ts");
+  const serverTs = readFileSync(serverTsPath, "utf-8");
+
+  // Extract every registered tool with its description string.
+  // Description is a template literal or "+"-concatenated string literal
+  // sitting on the `description:` key inside the registerTool config object.
+  function extractToolDescriptions(): Array<{ name: string; description: string; lineNo: number }> {
+    const out: Array<{ name: string; description: string; lineNo: number }> = [];
+    const lines = serverTs.split("\n");
+    const RE_REGISTER = /server\.registerTool\(\s*$/;
+    const RE_NAME = /^\s*"(ctx_[a-z_]+)"\s*,\s*$/;
+    for (let i = 0; i < lines.length; i++) {
+      if (!RE_REGISTER.test(lines[i])) continue;
+      const nameMatch = lines[i + 1]?.match(RE_NAME);
+      if (!nameMatch) continue;
+      const name = nameMatch[1];
+      // Description block starts at first `description:` after the name.
+      // Capture until the next `inputSchema:` line at the same indentation.
+      let descStart = -1;
+      let descEnd = -1;
+      for (let j = i + 2; j < Math.min(i + 80, lines.length); j++) {
+        if (descStart < 0 && /^\s*description:/.test(lines[j])) {
+          descStart = j;
+        } else if (descStart >= 0 && /^\s*(inputSchema|outputSchema|annotations):/.test(lines[j])) {
+          descEnd = j;
+          break;
+        }
+      }
+      if (descStart < 0 || descEnd < 0) continue;
+      const block = lines.slice(descStart, descEnd).join("\n");
+      // Strip the leading `description: ` and trailing comma.
+      // The literal text the LLM sees is just the string content — for the
+      // contract we work on the source-form block (template-literal/concat
+      // syntax), which is sufficient to detect forbidden tokens like
+      // `MANDATORY:` or `PREFER`. We do NOT execute the template here.
+      out.push({ name, description: block, lineNo: descStart + 1 });
+    }
+    return out;
+  }
+
+  const tools = extractToolDescriptions();
+
+  // Tools exempt from the WHEN: structural requirement, with documented
+  // rationale per the audit (see TOOL-DESCRIPTIONS-AUDIT.md §3 table).
+  //
+  // - ctx_stats / ctx_doctor / ctx_insight: minimal one-line descriptions by
+  //   design — diagnostic/GUI affordances, not routing targets. Audit row:
+  //   "NIT — Clean, minimal, no change."
+  // - ctx_upgrade: MUST is appropriate here (post-call obligation on the
+  //   agent to run the returned shell command). Audit row: "LOW — MUST is
+  //   appropriate here (post-call obligation), good use case. No change."
+  const EXEMPT_FROM_WHEN = new Set([
+    "ctx_stats",
+    "ctx_doctor",
+    "ctx_insight",
+    "ctx_upgrade",
+    "ctx_purge", // deferred entirely (see EXEMPT_FROM_FORBIDDEN_TOKENS below)
+  ]);
+
+  // ctx_purge is exempt from the forbidden-word scan because its rewrite is
+  // deferred to a separate PR per Probe 4 empirical evidence in
+  // TOOL-DESCRIPTIONS-AUDIT.md §6.1: heavy negative framing OUTPERFORMS the
+  // softer rewrite (5/5 vs 3/5 on parameter fidelity on Haiku). A naive
+  // wording fix here would REGRESS the tool. The follow-up PR must run a
+  // tri-LLM probe (Haiku / Sonnet / Opus) and gate merge on that probe.
+  // Documented in PR #683 body and ADR-0002.
+  const EXEMPT_FROM_FORBIDDEN_TOKENS = new Set(["ctx_purge"]);
+
+  test("at least 11 ctx_* tools are registered", () => {
+    // Sanity check that the extractor found the corpus.
+    expect(tools.length).toBeGreaterThanOrEqual(11);
+  });
+
+  // Forbidden tokens per ADR-0002. Each pattern is documented inline so
+  // a future contributor reading a failure understands the rationale, not
+  // just the regex.
+  type ForbiddenRule = { name: string; pattern: RegExp; rationale: string };
+  const FORBIDDEN: ForbiddenRule[] = [
+    {
+      name: "SESSION STATE clause",
+      // Rubric #3 + GRILL-Q1-VERDICT: tool descriptions are selection cues,
+      // not in-context prompts. Skill/role/decision persistence belongs in
+      // routing-block.mjs (which already covers it more thoroughly).
+      pattern: /\bSESSION STATE\b/,
+      rationale: "Move SESSION STATE guidance to routing-block.mjs (it already lives there).",
+    },
+    {
+      name: "BLOCKED",
+      // ADR-0003: 'blocked' is reserved for CASE B (real policy restriction)
+      // in routing.mjs deny reasons. It MUST NOT appear in any ctx_* tool
+      // description, where there is no security restriction to express.
+      pattern: /\bBLOCKED\b/,
+      rationale: "Reserve 'blocked' for routing CASE B (security policy denial) per ADR-0003.",
+    },
+    {
+      name: "MANDATORY: opener",
+      // Rubric #7: MANDATORY in a tool description reads as a developer
+      // policy note rather than a tool-selection cue. Replace with WHEN:.
+      pattern: /\bMANDATORY:/,
+      rationale: "Replace 'MANDATORY:' opener with role definition + WHEN: section.",
+    },
+    {
+      name: "PREFER X OVER Y",
+      // Rubric #7: 'PREFER' is the wrong strength and frames the choice as
+      // a tradeoff. WHEN:/WHEN NOT: sections give the agent positive cues.
+      pattern: /\bPREFER\s+THIS\s+OVER\b/,
+      rationale: "Replace 'PREFER THIS OVER X' with positive WHEN: clauses.",
+    },
+    {
+      name: "Do NOT (descriptive)",
+      // Rubric #2 + #7: affirmative beats negative. 'Do NOT' inside the
+      // description is voice-of-trainer; routing-block.mjs is the right
+      // layer for prohibitions.
+      pattern: /\bDo NOT\s+(?:read|use|pull|call)\b/,
+      rationale: "Rewrite 'Do NOT read/use/pull' as positive WHEN: / WHEN NOT: clauses.",
+    },
+    {
+      name: "Never use (capitalised imperative)",
+      // Rubric #7: 'Never' as a soft imperative inside a description is
+      // a forbidding voice; sibling-tool selection should be expressed
+      // through WHEN NOT: structure instead.
+      pattern: /\bNever\s+use\b/,
+      rationale: "Rewrite 'Never use' as positive WHEN NOT: clause.",
+    },
+    {
+      name: "checkmark emoji ✅",
+      // Rubric #4 + Probe 3 evidence: emoji tokenize inconsistently across
+      // LLM families (Llama, Gemini) and ❌ bullets are precisely the
+      // negative-example leakage pattern.
+      pattern: /✅/,
+      rationale: "Replace ✅ bullets with prose 'USE concurrency 4-8 for ...' (ADR-0002).",
+    },
+    {
+      name: "cross emoji ❌",
+      pattern: /❌/,
+      rationale: "Replace ❌ bullets with prose 'KEEP concurrency 1 for ...' (ADR-0002).",
+    },
+  ];
+
+  for (const tool of tools) {
+    // Tools exempt from BOTH groups (only ctx_purge today) have no assertions
+    // to make — emit a placeholder test so vitest doesn't error on empty
+    // describe blocks. The placeholder documents the deferral inline.
+    const isFullyExempt =
+      EXEMPT_FROM_FORBIDDEN_TOKENS.has(tool.name) && EXEMPT_FROM_WHEN.has(tool.name);
+    describe(tool.name, () => {
+      if (isFullyExempt) {
+        test("deferred to follow-up PR (see EXEMPT_FROM_FORBIDDEN_TOKENS rationale)", () => {
+          expect(EXEMPT_FROM_FORBIDDEN_TOKENS.has(tool.name)).toBe(true);
+        });
+        return;
+      }
+      if (!EXEMPT_FROM_FORBIDDEN_TOKENS.has(tool.name)) {
+        for (const rule of FORBIDDEN) {
+          test(`MUST NOT contain '${rule.name}'`, () => {
+            const match = tool.description.match(rule.pattern);
+            if (match) {
+              throw new Error(
+                `${tool.name} description (src/server.ts:${tool.lineNo}) contains forbidden token '${match[0]}' ` +
+                `(rule: ${rule.name}). ${rule.rationale}`,
+              );
+            }
+          });
+        }
+      }
+
+      if (!EXEMPT_FROM_WHEN.has(tool.name)) {
+        test("MUST contain a WHEN: section (or WHEN TO USE: legacy)", () => {
+          // Per ADR-0002: every routing-target ctx_* tool MUST have a
+          // positive selection cue. The legacy alias `WHEN TO USE:` is
+          // accepted because ctx_index already uses it and rewriting that
+          // header is out of scope for this PR (audit MEDIUM, separate work).
+          //
+          // We can't use `\bWHEN` because in source-form descriptions the
+          // preceding token is often the literal two-char sequence `\n`
+          // (from the JS escape) — `n` is a word character so `\b` fails.
+          // Likewise, for `+ "WHEN:..."` concat style the preceding char is
+          // `"`. Match any of those legitimate prefixes explicitly so both
+          // template-literal and string-concat description shapes pass.
+          const hasWhen = /(?:\\n|^|\s|")WHEN(?:\s+TO\s+USE)?:/.test(tool.description);
+          expect(hasWhen, `${tool.name} description (src/server.ts:${tool.lineNo}) must contain a WHEN: section`).toBe(true);
+        });
+      }
+    });
+  }
+});

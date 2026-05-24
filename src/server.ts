@@ -1416,7 +1416,7 @@ server.registerTool(
   "ctx_execute",
   {
     title: "Execute Code",
-    description: `MANDATORY: Use for any command where output exceeds 20 lines. Execute code in a sandboxed subprocess. Only stdout enters context — raw data stays in the subprocess.${bunNote} Available: ${langList}.\n\nPREFER THIS OVER BASH for: API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff), data processing, and ANY CLI command that may produce large output. Bash should only be used for file mutations, git writes, and navigation.\n\nTHINK IN CODE: When you need to analyze, count, filter, compare, or process data — write code that does the work and console.log() only the answer. Do NOT read raw data into context to process mentally. Program the analysis, don't compute it in your reasoning. Write robust, pure JavaScript (no npm dependencies). Use only Node.js built-ins (fs, path, child_process). Always wrap in try/catch. Handle null/undefined. Works on both Node.js and Bun.`,
+    description: `Run code in a sandboxed subprocess. Only what you console.log() enters the agent's context; the raw stdout stays in the sandbox.${bunNote} Languages: ${langList}.\n\nWHEN:\n  - Command output is large (>= 20 lines) or unbounded\n  - You want to filter, count, summarize, or aggregate before printing\n  - API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff)\n\nWHEN NOT:\n  - File mutations, simple navigation, single short commands -> use Bash\n\nRETURNS: only your printed output. Wrap risky calls in try/catch.\n\nEXAMPLE: ctx_execute(language: "shell", code: "npm test 2>&1 | tail -40")\nEXAMPLE: ctx_execute(language: "javascript", code: "const r = await fetch('...'); console.log(r.status)")`,
     inputSchema: z.object({
       language: z
         .enum([
@@ -1752,7 +1752,19 @@ server.registerTool(
   {
     title: "Execute File Processing",
     description:
-      "Read a file and process it without loading contents into context. The file is read into a FILE_CONTENT variable inside the sandbox. Only your printed summary enters context.\n\nPREFER THIS OVER Read/cat for: log files, data files (CSV, JSON, XML), large source files for analysis, and any file where you need to extract specific information rather than read the entire content.\n\nTHINK IN CODE: Write code that processes FILE_CONTENT and console.log() only the answer. Don't read files into context to analyze mentally. Write robust, pure JavaScript — no npm deps, try/catch, null-safe. Node.js + Bun compatible.",
+      "Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what you console.log() enters the agent's context.\n\n" +
+      "WHEN:\n" +
+      "  - Large logs, CSVs, JSON dumps, or source files you want to analyze, filter, or summarize\n" +
+      "  - The raw contents would flood context\n\n" +
+      "WHEN NOT:\n" +
+      "  - You want to edit the file -> use Read so Edit can match the exact text\n" +
+      "  - You only need one specific line -> Read with offset/limit is simpler\n\n" +
+      "RETURNS: only your printed summary.\n\n" +
+      "EXAMPLE: ctx_execute_file(\n" +
+      "  path: \"huge.log\",\n" +
+      "  language: \"javascript\",\n" +
+      "  code: \"console.log(FILE_CONTENT.split('\\\\n').filter(l => l.includes('ERROR')).slice(0, 20).join('\\\\n'))\"\n" +
+      ")",
     inputSchema: z.object({
       path: z
         .string()
@@ -1899,18 +1911,19 @@ server.registerTool(
     title: "Index Content",
     description:
       "Index documentation or knowledge content into a searchable BM25 knowledge base. " +
-      "Chunks markdown by headings (keeping code blocks intact) and stores in ephemeral FTS5 database. " +
-      "The full content does NOT stay in context — only a brief summary is returned.\n\n" +
-      "WHEN TO USE:\n" +
-      "- Documentation from Context7, Skills, or MCP tools (API docs, framework guides, code examples)\n" +
-      "- API references (endpoint details, parameter specs, response schemas)\n" +
-      "- MCP tools/list output (exact tool signatures and descriptions)\n" +
-      "- Skill prompts and instructions that are too large for context\n" +
-      "- README files, migration guides, changelog entries\n" +
-      "- Any content with code examples you may need to reference precisely\n\n" +
-      "After indexing, use 'ctx_search' to retrieve specific sections on-demand.\n" +
-      "When `path` is provided, a content hash is stored for automatic stale detection in search results.\n" +
-      "Do NOT use for: log files, test output, CSV, build output — use 'ctx_execute_file' for those.",
+      "Chunks markdown by headings (keeping code blocks intact) and stores in an FTS5 database. " +
+      "Only a brief summary is returned — the full content stays in the store.\n\n" +
+      "WHEN:\n" +
+      "  - Documentation from Context7, Skills, or MCP tools (API docs, framework guides, code examples)\n" +
+      "  - API references (endpoint details, parameter specs, response schemas)\n" +
+      "  - MCP tools/list output (exact tool signatures and descriptions)\n" +
+      "  - Skill prompts and instructions that are too large for context\n" +
+      "  - README files, migration guides, changelog entries\n" +
+      "  - Any content with code examples you may need to reference precisely\n\n" +
+      "WHEN NOT:\n" +
+      "  - Log files, test output, CSV, or build output -> use ctx_execute_file (it processes in-sandbox)\n\n" +
+      "RETURNS: a brief indexing summary. Retrieve sections on-demand via ctx_search.\n\n" +
+      "When `path` is provided, a content hash is stored for automatic stale detection in search results.",
     inputSchema: z.object({
       content: z
         .string()
@@ -2069,11 +2082,14 @@ server.registerTool(
   {
     title: "Search Indexed Content",
     description:
-      "Search indexed content. Requires prior indexing via ctx_batch_execute, ctx_index, or ctx_fetch_and_index. " +
-      "Pass ALL search questions as queries array in ONE call. " +
-      "File-backed sources are auto-refreshed when the source file changes.\n\n" +
-      "TIPS: 2-4 specific terms per query. Use 'source' to scope results.\n\n" +
-      "SESSION STATE: If skills, roles, or decisions were set earlier in this conversation, they are still active. Do not discard or contradict them.",
+      "Search indexed content (BM25 over an FTS5 store). File-backed sources auto-refresh when the source file changes.\n\n" +
+      "WHEN:\n" +
+      "  - You already indexed content via ctx_batch_execute, ctx_index, or ctx_fetch_and_index\n" +
+      "  - You have multiple related questions about that content — batch them in one call\n" +
+      "  - You want to scope to one labelled source (pass `source`)\n\n" +
+      "RETURNS: top matches per query with section headers and content previews.\n\n" +
+      "TIPS: 2-4 specific terms per query. Pass ALL questions in the queries array — one call, many queries.\n\n" +
+      "EXAMPLE: ctx_search(queries: [\"root cause\", \"proposed fix\", \"test coverage\"], source: \"issue-#683\")",
     inputSchema: z.object({
       queries: z.preprocess(coerceJsonArray, z
         .array(z.string())
@@ -2862,15 +2878,22 @@ server.registerTool(
   {
     title: "Fetch & Index URL(s)",
     description:
-      "Fetches URL content, converts HTML to markdown, indexes into searchable knowledge base, " +
-      "and returns a ~3KB preview. Full content stays in sandbox — use ctx_search() for deeper lookups.\n\n" +
-      "Better than WebFetch: preview is immediate, full content is searchable, raw HTML never enters context.\n\n" +
+      "Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base, " +
+      "and returns a ~3KB preview. Full content stays in the store — use ctx_search() for deeper lookups.\n\n" +
+      "WHEN:\n" +
+      "  - You need web content (docs, changelogs, API references) without raw HTML entering context\n" +
+      "  - Multi-URL research: library evaluation, migration scans, doc comparisons\n" +
+      "  - The preview is enough to plan follow-up ctx_search calls\n\n" +
       "Content-type aware: HTML is converted to markdown, JSON is chunked by key paths, plain text is indexed directly.\n\n" +
-      "PARALLELIZE I/O: For multi-URL research (library evaluation, migration scans, doc comparisons), pass `requests: [{url, source}, ...]` with `concurrency: 4-8` — speeds up by 3-5x on real workloads.\n" +
-      "  ✅ Use concurrency: 4-8 for: library docs sweep, multi-changelog scan, competitive pricing pages, multi-region docs, GitHub raw file pulls.\n" +
-      "  ❌ Single URL → use the legacy {url, source} shape (concurrency irrelevant).\n" +
-      "  Example: requests: [{url: 'https://react.dev/...', source: 'react'}, {url: 'https://vuejs.org/...', source: 'vue'}], concurrency: 5.\n" +
-      "  Fetches parallelize up to your concurrency setting; FTS5 indexing serializes the writes after (SQLite single-writer rule).",
+      "CONCURRENCY:\n" +
+      "  - Use concurrency 4-8 for I/O-bound batches: library docs sweep, multi-changelog scan, competitive pricing pages, multi-region docs, GitHub raw file pulls.\n" +
+      "  - Keep concurrency 1 (default) for a single URL — pass `url` + `source` directly.\n" +
+      "  - Fetches parallelize up to your concurrency setting; FTS5 indexing serializes the writes after (SQLite single-writer rule).\n\n" +
+      "RETURNS: a ~3KB preview per fetched source + an indexing summary. Call ctx_search(source: \"<label>\") to retrieve specific sections.\n\n" +
+      "EXAMPLE: ctx_fetch_and_index(\n" +
+      "  requests: [{url: \"https://react.dev/...\", source: \"react\"}, {url: \"https://vuejs.org/...\", source: \"vue\"}],\n" +
+      "  concurrency: 5\n" +
+      ")",
     inputSchema: z.object({
       url: z.string().optional().describe("Single URL to fetch and index (legacy single-shape)"),
       source: z
@@ -3106,17 +3129,22 @@ server.registerTool(
   {
     title: "Batch Execute & Search",
     description:
-      "Execute multiple commands in ONE call, auto-index all output, and search with multiple queries. " +
-      "Returns search results directly — no follow-up calls needed.\n\n" +
-      "THIS IS THE PRIMARY TOOL. Use this instead of multiple ctx_execute() calls.\n\n" +
-      "One ctx_batch_execute call replaces 30+ ctx_execute calls + 10+ ctx_search calls.\n" +
-      "Provide all commands to run and all queries to search — everything happens in one round trip.\n\n" +
-      "PARALLELIZE I/O: For I/O-bound batches (network calls, slow API queries, multi-URL fetches), ALWAYS pass concurrency: 4-8 — speeds up by 3-5x on real workloads.\n" +
-      "  ✅ Use concurrency: 4-8 for: gh API calls, curl/web fetches, multi-region cloud queries, multi-repo git reads, dig/DNS, docker inspect.\n" +
-      "  ❌ Keep concurrency: 1 for: npm test, build, lint, image processing (CPU-bound), or commands sharing state (ports, lock files, same-repo writes).\n" +
-      "  Example: [gh issue view 1, gh issue view 2, gh issue view 3] → concurrency: 3.\n" +
-      "  Speedup depends on workload — applies to I/O wait, not CPU work.\n\n" +
-      "THINK IN CODE — NON-NEGOTIABLE: When commands produce data you need to analyze, count, filter, compare, or transform — add a processing command that runs JavaScript and console.log() ONLY the answer. NEVER pull raw output into context to reason over. Concurrency parallelizes the FETCH; THINK IN CODE owns the PROCESSING. One programmed analysis replaces ten read-and-reason rounds. Pure JavaScript, Node.js built-ins (fs, path, child_process), try/catch, null-safe.",
+      "Run multiple commands in ONE call. Output is auto-indexed. Optional queries return matching sections — no follow-up ctx_search needed.\n\n" +
+      "WHEN:\n" +
+      "  - You have 3+ related commands (gh issue view x N, git log + git diff, multi-file reads)\n" +
+      "  - You want to gather + search in one round trip\n" +
+      "  - You want to parallelize I/O-bound calls\n\n" +
+      "WHEN NOT:\n" +
+      "  - One command, no follow-up search -> ctx_execute is simpler\n\n" +
+      "CONCURRENCY:\n" +
+      "  - 4-8 for I/O-bound: gh, curl, multi-region cloud queries, multi-repo git reads.\n" +
+      "  - 1 for CPU-bound or stateful: npm test, build, lint, ports, lock files.\n\n" +
+      "RETURNS: section list + top matches per query. Add a processing command that console.log()s only the answer when you need to filter or aggregate.\n\n" +
+      "EXAMPLE: ctx_batch_execute(\n" +
+      "  commands: [{label:\"issue 1\", command:\"gh issue view 1\"}, {label:\"issue 2\", command:\"gh issue view 2\"}],\n" +
+      "  queries: [\"root cause\", \"proposed fix\"],\n" +
+      "  concurrency: 4\n" +
+      ")",
     inputSchema: z.object({
       commands: z.preprocess(coerceCommandsArray, z
         .array(
