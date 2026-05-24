@@ -1230,10 +1230,17 @@ async function upgrade(opts?: { platform?: string }) {
         if (!(to + sep).startsWith(pluginRootWithSep)) continue;
         if (!(from + sep).startsWith(srcDirWithSep)) continue;
         if (!refuseSymlinks(from)) continue;
+        // Existence-check the source BEFORE the rm so a `files[]` entry that
+        // doesn't exist in srcDir can never delete-without-replace at
+        // pluginRoot. The catch-all below swallows cpSync failures too, and
+        // a swallowed cp after a successful rm is exactly how a partial
+        // install lands silently. Mirrors the safe pattern in
+        // server.ts's inline-fallback upgrade path (PR #699).
+        if (!existsSync(from)) continue;
         try {
           rmSync(to, { recursive: true, force: true });
           cpSync(from, to, { recursive: true, filter: refuseSymlinks });
-        } catch { /* some files may not exist in source */ }
+        } catch { /* best effort, next /ctx-upgrade retries */ }
       }
 
       // Issue #609 — DO NOT write `.mcp.json` into the plugin cache dir.

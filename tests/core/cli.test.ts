@@ -2875,6 +2875,30 @@ describe("Shell-free upgrade (#185)", () => {
     expect(configureIdx).toBeGreaterThan(alreadyLatestIdx);
   });
 
+  test("cli.ts swap loop guards rm/cp with existsSync(from)", () => {
+    // Regression test for the partial-install vector: the rm/cp loop's
+    // catch-all was swallowing cpSync failures, so a `files[]` entry
+    // that didn't exist in the cloned source dropped the corresponding
+    // pluginRoot path without replacement. Mirrors the safe pattern in
+    // server.ts:3820 inline-fallback (`if (existsSync(from))` before any
+    // rm or cp). Same architectural-lock as the rest of #609.
+    const upgradeStart = CLI_SOURCE.indexOf("async function upgrade");
+    expect(upgradeStart).toBeGreaterThan(-1);
+    const upgradeBody = CLI_SOURCE.slice(upgradeStart);
+    const loopIdx = upgradeBody.indexOf("for (const item of items) {");
+    expect(loopIdx, "swap loop missing in upgrade()").toBeGreaterThan(-1);
+    const loopBody = upgradeBody.slice(loopIdx, loopIdx + 1200);
+    // Source must exist before any rm/cp fires.
+    expect(loopBody).toMatch(/if\s*\(!existsSync\(from\)\)\s*continue/);
+    // The existsSync probe must come BEFORE rmSync inside the loop, not
+    // after; otherwise it's a no-op guard against the actual vector.
+    const guardIdx = loopBody.indexOf("if (!existsSync(from)) continue");
+    const rmIdx = loopBody.indexOf("rmSync");
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(rmIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeLessThan(rmIdx);
+  });
+
   test("server.ts inline fallback uses execFileSync, not execSync", () => {
     // The inline script template must use execFileSync
     const inlineStart = SERVER_SOURCE.indexOf("Inline fallback");
