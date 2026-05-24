@@ -240,9 +240,18 @@ describe("WebFetch", () => {
       parsed.hookSpecificOutput.permissionDecisionReason.includes("https://docs.example.com/api"),
       "Expected original URL in reason",
     );
+    // PR #683 follow-up (ADR-0003 amendment): the deny reason was reframed
+    // affirmatively. The negative "Do NOT retry with curl" hint was replaced
+    // by a positive imperative retry hint scoped to transient DNS errors and
+    // by the ctx_fetch_and_index call instruction. Assert on the affirmative
+    // wording instead of the dropped negation.
     assert.ok(
-      /Do NOT retry with .*curl/.test(parsed.hookSpecificOutput.permissionDecisionReason),
-      "Expected curl warning in reason",
+      /Retry the same call on a transient DNS error/.test(parsed.hookSpecificOutput.permissionDecisionReason),
+      "Expected positive transient-DNS retry hint in reason",
+    );
+    assert.ok(
+      /Call .*ctx_fetch_and_index/.test(parsed.hookSpecificOutput.permissionDecisionReason),
+      "Expected explicit ctx_fetch_and_index call instruction in reason",
     );
   });
 });

@@ -330,7 +330,11 @@ describe("routePreToolUse with platform parameter", () => {
     expect(result).not.toBeNull();
     const cmd = (result!.updatedInput as Record<string, string>).command;
     expect(cmd).toContain("ctx_execute");
-    expect(cmd).toContain("Think in Code");
+    // PR #683 follow-up (ADR-0003 amendment): "Think in Code" voice-of-trainer
+    // marker was folded into the imperative call instruction. The deny reason
+    // now opens with the affirmative redirect frame; assert on the explicit
+    // ctx_execute call instruction that survived the rewrite.
+    expect(cmd).toContain("Call ctx_execute");
     expect(cmd).not.toContain("mcp__");
   });
 
