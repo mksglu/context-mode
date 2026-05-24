@@ -93,10 +93,10 @@ npm run typecheck
 <release_title_convention enforcement="MANDATORY">
 The GitHub release title MUST be the bare version tag — nothing else.
 
-  CORRECT:    `v1.0.151`
-  WRONG:      `v1.0.151 — VS Code Copilot cwd cascade + fan-out gate`
-  WRONG:      `v1.0.151: stats accuracy hotfix`
-  WRONG:      `v1.0.151 (hotfix)`
+  CORRECT:    `v1.0.152`
+  WRONG:      `v1.0.152 — VS Code Copilot cwd cascade + fan-out gate`
+  WRONG:      `v1.0.152: stats accuracy hotfix`
+  WRONG:      `v1.0.152 (hotfix)`
 
 Rationale: title length matters for npm/registry feed rendering, RSS,
 release-list pages, and the GitHub UI sidebar — all of which truncate.
