@@ -40,11 +40,14 @@ Routing deny reasons MUST distinguish two cases:
 The action is supported, via a different tool, for context-window or
 efficiency reasons.
 
-- **Opening verb**: "redirected to <ctx_tool> for context-window
-  efficiency" — affirmative routing intent, no negation.
-- **MUST affirm capability**: "<ctx_tool> has full network access"
+- **Opening verb**: `"redirected to <ctx_tool>"` — affirmative routing
+  intent, no negation, no org-rationale (the agent's job is to act on the
+  redirect, not to audit policy).
+- **MUST affirm capability**: `"<ctx_tool> has full network access"`
   (positive frame of the same signal the old `NOT a network restriction`
-  parenthetical tried to deliver).
+  parenthetical tried to deliver — and the same signal the
+  `for context-window efficiency` rationale prescription also tried to
+  deliver before the 2026-05-24 second amendment).
 - **MUST specify**: the alternative tool to use, by name, as an
   imperative call (e.g. `Call ctx_fetch_and_index(url, source) now`).
 - **MUST end with**: a positive imperative retry hint —
@@ -53,6 +56,10 @@ efficiency reasons.
 - **MUST NOT contain**: bare-NOT negations (`NOT a network restriction`,
   `Do NOT retry with curl`, etc.). See §Amendment below for the
   empirical rationale.
+- **MUST NOT contain**: org-rationale prefaces (`for context-window
+  efficiency`, `for performance`, etc.). The redirect verb + the
+  capability affirmation already carry the full action signal; rationale
+  is metadata, not action input. See §Second amendment below.
 
 The word `BLOCKED` MUST NOT appear bare in CASE A. It is reserved for
 true policy denial (CASE B) where the agent's correct response IS to
@@ -82,22 +89,43 @@ sibling negation in the very next clause. PR #683 follow-up
 (this amendment) eradicates the negation construct entirely:
 
 - Replace `"(context-window optimization, NOT a network restriction)"`
-  with affirmative `"to <ctx_tool> for context-window efficiency"` +
-  separate affirmative sentence `"<ctx_tool> has full network
-  access."`.
+  with the affirmative sentence `"<ctx_tool> has full network access."`
+  (originally also prescribed a `"for context-window efficiency"` opening
+  preface — see §Second amendment below for why that prescription was
+  dropped).
 - Replace `"Do NOT retry with curl/wget"` with positive
   `"Retry the same call on a transient DNS error (...)"` — the
   affirmative retry hint IS the next-action signal; the prohibition was
   redundant once the routing is correct.
 
+## Second amendment (PR #683 mid-review, 2026-05-24)
+
+Mert flagged on review of the first amendment: the prescribed opening
+`"redirected to <ctx_tool> for context-window efficiency"` itself
+carries org-rationale that the agent does not need to act. The agent's
+job is to (a) understand a redirect happened, (b) make the correct next
+call, (c) know it has the capability to do so, (d) know when to retry.
+"For X reason" is post-hoc justification — pure prompt overhead.
+
+Compare to HTTP 301 `Moved Permanently` — the response carries `Location:
+<new-url>` and the client uses it. The server never appends
+`"for SEO efficiency"` or `"for caching strategy"`. The redirect verb
++ the new target are the entire action signal.
+
+The capability affirmation (`"<ctx_tool> has full network access"`)
+already delivers the substantive content the rationale was trying to
+carry — that this is a routing optimization, not a capability denial.
+The rationale preface was double-encoding that signal.
+
 The four CASE A sites in `hooks/core/routing.mjs` (L707 curl/wget,
 L738 inline HTTP, L751 build tool, L804 WebFetch) all conform to the
-amended rubric after this PR. A contract test in
+second-amended rubric after this PR. A contract test in
 `tests/core/server.test.ts` (`ADR-0003 CASE A: routing.mjs redirect
 deny reasons`) locks the rule: every CASE A string MUST open with
 "redirected", MUST NOT contain bare uppercase `BLOCKED`, MUST name at
 least one `ctx_*` alternative, MUST NOT contain `"NOT a network"`,
-MUST NOT contain `"Do NOT retry"`.
+MUST NOT contain `"Do NOT retry"`, MUST NOT contain
+`"for context-window efficiency"` (or sibling org-rationale prefaces).
 
 ## Consequences
 

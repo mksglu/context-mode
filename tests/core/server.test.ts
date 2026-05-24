@@ -5562,6 +5562,42 @@ describe("tool description style contract (#683 ADR-0002)", () => {
             `Use markdown '- ' bullets only (ADR-0002 §Canonical structure).`,
           ).toEqual([]);
         });
+
+        // ── PR #683 second amendment (Mert flag): RETURNS form uniformity ──
+        //
+        // ADR-0002 L56-57 specifies RETURNS as a header on its own line with
+        // the body on the next line indented (matching WHEN: / WHEN NOT:
+        // shape). Three tools (ctx_execute, ctx_execute_file, ctx_purge)
+        // historically used inline form ("RETURNS: only your printed output.")
+        // while four tools (ctx_index, ctx_search, ctx_fetch_and_index,
+        // ctx_batch_execute) used the canonical header+body form. Mert flagged
+        // the visual inconsistency on review. This guard locks the canonical
+        // form so the regression can't slip back.
+        //
+        // EXAMPLE: stays inline per ADR-0002 L59 ("EXAMPLE: <one canonical
+        // call>"). The asymmetry is intentional — RETURNS prose is multi-line
+        // capable, EXAMPLE values are one-call-per-line.
+        test("RETURNS: header MUST be on its own line, body indented below (ADR-0002 L56-57)", () => {
+          // Match RETURNS: followed by anything other than \n on the same
+          // line (treating \\n source escape as the same boundary as a real
+          // newline). Inline form like "RETURNS: only your printed output."
+          // fails; header+body form like "RETURNS:\n  Only your printed
+          // output." passes.
+          //
+          // Source descriptions live either as template literals with real
+          // newlines OR as `+ "...\n"` concat strings with escape sequences.
+          // Match both shapes via a non-newline-non-backslash assertion.
+          const inlineRe = /RETURNS:[ \t]+[^\n\\]/;
+          const m = tool.description.match(inlineRe);
+          expect(
+            m,
+            m
+              ? `${tool.name} (src/server.ts:${tool.lineNo}) uses inline RETURNS form: '${m[0]}…'. ` +
+                `ADR-0002 L56-57 requires header on its own line with body indented below. ` +
+                `Rewrite as 'RETURNS:\\n  <body>'.`
+              : "RETURNS: header on own line.",
+          ).toBeNull();
+        });
       }
     });
   }
@@ -5779,6 +5815,24 @@ describe("hook routing prompt-surface contract (#683 ADR-0002 + ADR-0003)", () =
           // the disallowed action. Express as the positive next step — the
           // ctx_execute / ctx_fetch_and_index call IS the next step.
           expect(cs.payload).not.toMatch(/\bDo\s+NOT\s+retry\b/i);
+        });
+
+        // ── PR #683 second amendment (Mert flag): no org-rationale preface ──
+        //
+        // The first amendment replaced the bare-NOT parenthetical
+        // "(context-window optimization, NOT a network restriction)" with the
+        // affirmative-voice opening "redirected to <ctx_tool> for context-window
+        // efficiency". Mert's second-pass flag: the "for X reason" preface is
+        // org-rationale, not action input. The agent's job is to (a) make the
+        // correct next call, (b) know it has the capability, (c) know when to
+        // retry — not to audit policy. The capability affirmation
+        // "<ctx_tool> has full network access" already carries the substantive
+        // signal the rationale was double-encoding. ADR-0003 §Second amendment.
+        //
+        // Compare HTTP 301: the response carries "Location: <new-url>" and the
+        // client uses it. The server never appends "for SEO efficiency".
+        test("MUST NOT contain 'for context-window efficiency' org-rationale (PR #683 second amendment)", () => {
+          expect(cs.payload).not.toMatch(/\bfor\s+context-window\s+(efficiency|optimization)\b/i);
         });
       });
     }

@@ -1426,7 +1426,8 @@ WHEN:
 WHEN NOT:
   - File mutations, simple navigation, single short commands -> use Bash
 
-RETURNS: only your printed output. Wrap risky calls in try/catch.
+RETURNS:
+  Only your printed output. Wrap risky calls in try/catch.
 
 EXAMPLE: ctx_execute(language: "shell", code: "npm test 2>&1 | tail -40")
 EXAMPLE: ctx_execute(language: "javascript", code: "const r = await fetch('...'); console.log(r.status)")`,
@@ -1774,7 +1775,8 @@ WHEN NOT:
   - You want to edit the file -> use Read so Edit can match the exact text
   - You only need one specific line -> Read with offset/limit is simpler
 
-RETURNS: only your printed summary.
+RETURNS:
+  Only your printed summary.
 
 EXAMPLE: ctx_execute_file(
   path: "huge.log",
@@ -3751,7 +3753,8 @@ CONTRACT:
   - scope:'session' without sessionId throws (sessionId required).
   - Bare {confirm:true} is deprecated: maps to scope:'project' with a stderr warning; will hard-error in a future major.
 
-RETURNS: a summary of removed rows + the resolved scope.
+RETURNS:
+  A summary of removed rows + the resolved scope.
 
 EXAMPLE: ctx_purge(confirm: true, sessionId: "7c8a-1234-5678-9abc-def012345678")
 EXAMPLE: ctx_purge(confirm: true, scope: "project")`,
