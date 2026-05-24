@@ -1910,9 +1910,7 @@ server.registerTool(
   {
     title: "Index Content",
     description:
-      "Index documentation or knowledge content into a searchable BM25 knowledge base. " +
-      "Chunks markdown by headings (keeping code blocks intact) and stores in an FTS5 database. " +
-      "Only a brief summary is returned — the full content stays in the store.\n\n" +
+      "Index documentation or knowledge content into a searchable BM25 knowledge base. Chunks markdown by headings (keeping code blocks intact) and stores in an FTS5 database. Only a brief summary is returned - the full content stays in the store.\n\n" +
       "WHEN:\n" +
       "  - Documentation from Context7, Skills, or MCP tools (API docs, framework guides, code examples)\n" +
       "  - API references (endpoint details, parameter specs, response schemas)\n" +
@@ -1922,8 +1920,9 @@ server.registerTool(
       "  - Any content with code examples you may need to reference precisely\n\n" +
       "WHEN NOT:\n" +
       "  - Log files, test output, CSV, or build output -> use ctx_execute_file (it processes in-sandbox)\n\n" +
-      "RETURNS: a brief indexing summary. Retrieve sections on-demand via ctx_search.\n\n" +
-      "When `path` is provided, a content hash is stored for automatic stale detection in search results.",
+      "RETURNS:\n" +
+      "  A brief indexing summary. Retrieve sections on-demand via ctx_search. When `path` is provided, a content hash is stored for automatic stale detection in search results.\n\n" +
+      "EXAMPLE: ctx_index(content: \"# React useEffect\\n\\nThe Effect Hook lets you ...\", source: \"react-useeffect-docs\")",
     inputSchema: z.object({
       content: z
         .string()
@@ -2085,10 +2084,13 @@ server.registerTool(
       "Search indexed content (BM25 over an FTS5 store). File-backed sources auto-refresh when the source file changes.\n\n" +
       "WHEN:\n" +
       "  - You already indexed content via ctx_batch_execute, ctx_index, or ctx_fetch_and_index\n" +
-      "  - You have multiple related questions about that content — batch them in one call\n" +
+      "  - You have multiple related questions about that content - batch them in one call\n" +
       "  - You want to scope to one labelled source (pass `source`)\n\n" +
-      "RETURNS: top matches per query with section headers and content previews.\n\n" +
-      "TIPS: 2-4 specific terms per query. Pass ALL questions in the queries array — one call, many queries.\n\n" +
+      "WHEN NOT:\n" +
+      "  - Nothing has been indexed yet - run ctx_batch_execute, ctx_index, or ctx_fetch_and_index first\n" +
+      "  - You only have a single one-off question on un-indexed data - ctx_execute is simpler\n\n" +
+      "RETURNS:\n" +
+      "  Top matches per query with section headers and content previews. Use 2-4 specific terms per query and pass every question in the queries array.\n\n" +
       "EXAMPLE: ctx_search(queries: [\"root cause\", \"proposed fix\", \"test coverage\"], source: \"issue-#683\")",
     inputSchema: z.object({
       queries: z.preprocess(coerceJsonArray, z
@@ -2878,18 +2880,16 @@ server.registerTool(
   {
     title: "Fetch & Index URL(s)",
     description:
-      "Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base, " +
-      "and returns a ~3KB preview. Full content stays in the store — use ctx_search() for deeper lookups.\n\n" +
+      "Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base, and returns a ~3KB preview. Full content stays in the store - use ctx_search() for deeper lookups. Content-type aware: HTML becomes markdown, JSON is chunked by key paths, plain text is indexed directly.\n\n" +
       "WHEN:\n" +
       "  - You need web content (docs, changelogs, API references) without raw HTML entering context\n" +
-      "  - Multi-URL research: library evaluation, migration scans, doc comparisons\n" +
+      "  - Multi-URL research: library evaluation, migration scans, doc comparisons (pass `requests` with concurrency 4-8)\n" +
       "  - The preview is enough to plan follow-up ctx_search calls\n\n" +
-      "Content-type aware: HTML is converted to markdown, JSON is chunked by key paths, plain text is indexed directly.\n\n" +
-      "CONCURRENCY:\n" +
-      "  - Use concurrency 4-8 for I/O-bound batches: library docs sweep, multi-changelog scan, competitive pricing pages, multi-region docs, GitHub raw file pulls.\n" +
-      "  - Keep concurrency 1 (default) for a single URL — pass `url` + `source` directly.\n" +
-      "  - Fetches parallelize up to your concurrency setting; FTS5 indexing serializes the writes after (SQLite single-writer rule).\n\n" +
-      "RETURNS: a ~3KB preview per fetched source + an indexing summary. Call ctx_search(source: \"<label>\") to retrieve specific sections.\n\n" +
+      "WHEN NOT:\n" +
+      "  - You already have the content locally - ctx_index handles raw text or files\n" +
+      "  - You need to execute JavaScript in the page (SPA-rendered content) - this is a plain fetch, no headless browser\n\n" +
+      "RETURNS:\n" +
+      "  A ~3KB preview per fetched source plus an indexing summary. Retrieve sections on demand via ctx_search(source: \"<label>\"). Fetches parallelize up to `concurrency`; FTS5 indexing then serializes writes (SQLite single-writer rule).\n\n" +
       "EXAMPLE: ctx_fetch_and_index(\n" +
       "  requests: [{url: \"https://react.dev/...\", source: \"react\"}, {url: \"https://vuejs.org/...\", source: \"vue\"}],\n" +
       "  concurrency: 5\n" +
@@ -3129,17 +3129,16 @@ server.registerTool(
   {
     title: "Batch Execute & Search",
     description:
-      "Run multiple commands in ONE call. Output is auto-indexed. Optional queries return matching sections — no follow-up ctx_search needed.\n\n" +
+      "Run multiple commands in ONE call. Output is auto-indexed. Optional queries return matching sections - no follow-up ctx_search needed.\n\n" +
       "WHEN:\n" +
       "  - You have 3+ related commands (gh issue view x N, git log + git diff, multi-file reads)\n" +
       "  - You want to gather + search in one round trip\n" +
-      "  - You want to parallelize I/O-bound calls\n\n" +
+      "  - You want to parallelize I/O-bound calls (pass concurrency 4-8 for gh, curl, multi-region cloud queries, multi-repo git reads)\n\n" +
       "WHEN NOT:\n" +
-      "  - One command, no follow-up search -> ctx_execute is simpler\n\n" +
-      "CONCURRENCY:\n" +
-      "  - 4-8 for I/O-bound: gh, curl, multi-region cloud queries, multi-repo git reads.\n" +
-      "  - 1 for CPU-bound or stateful: npm test, build, lint, ports, lock files.\n\n" +
-      "RETURNS: section list + top matches per query. Add a processing command that console.log()s only the answer when you need to filter or aggregate.\n\n" +
+      "  - One command, no follow-up search -> ctx_execute is simpler\n" +
+      "  - CPU-bound or stateful commands -> keep concurrency at 1 (npm test, build, lint, ports, lock files)\n\n" +
+      "RETURNS:\n" +
+      "  Section list plus top matches per query. Add a processing command that console.log()s only the answer when you need to filter or aggregate.\n\n" +
       "EXAMPLE: ctx_batch_execute(\n" +
       "  commands: [{label:\"issue 1\", command:\"gh issue view 1\"}, {label:\"issue 2\", command:\"gh issue view 2\"}],\n" +
       "  queries: [\"root cause\", \"proposed fix\"],\n" +
@@ -3705,24 +3704,24 @@ server.registerTool(
   {
     title: "Purge Knowledge Base",
     description:
-      "DESTRUCTIVE — permanently delete indexed content. CANNOT be undone.\n\n" +
-      "You MUST specify exactly ONE scope:\n\n" +
-      "  • { confirm: true, sessionId: \"<uuid>\" }\n" +
-      "      Deletes ONLY that session's events + per-session FTS5 chunks.\n" +
-      "      Preserves stats file and ALL other sessions.\n\n" +
-      "  • { confirm: true, scope: \"project\" }\n" +
-      "      Wipes the ENTIRE project: FTS5 knowledge base, every session DB row,\n" +
-      "      events markdown, AND resets the stats file.\n\n" +
-      "REFUSAL RULES (tool returns an error):\n" +
-      "  • confirm: false                              → 'purge cancelled'\n" +
-      "  • Both sessionId AND scope:'project' provided → 'ambiguous — pick one'\n" +
-      "  • scope:'session' without sessionId           → throws (sessionId required)\n" +
-      "  • Neither sessionId NOR scope provided        → DEPRECATED: maps to\n" +
-      "    scope:'project' with a deprecation warning to stderr. Will be a hard\n" +
-      "    error in a future major.\n\n" +
-      "Use sessionId when the user asks to clear a specific conversation's data.\n" +
-      "Use scope:'project' ONLY when the user explicitly asks to reset everything.\n" +
-      "NEVER call with bare {confirm:true} — always specify the scope.",
+      "DESTRUCTIVE: permanently delete indexed content. Cannot be undone. Requires confirm:true and exactly one scope.\n\n" +
+      "WHEN:\n" +
+      "  - User explicitly asks to clear a specific session ('purge this session', 'wipe this conversation')\n" +
+      "  - User explicitly asks to reset the whole project ('reset everything', 'wipe the knowledge base')\n\n" +
+      "WHEN NOT:\n" +
+      "  - User says 'reset', 'clear', or 'wipe' without naming a scope -> ask which scope before calling\n" +
+      "  - User wants to free memory or improve performance -> recommend ctx_stats first, do not purge\n\n" +
+      "SCOPES (pass exactly one):\n" +
+      "  - Per-session: ctx_purge(confirm: true, sessionId: \"<uuid>\") deletes that session's events and per-session FTS5 chunks; sibling sessions and stats file are preserved.\n" +
+      "  - Per-project: ctx_purge(confirm: true, scope: \"project\") wipes FTS5 knowledge base, every session DB row, events markdown, and resets the stats file.\n\n" +
+      "CONTRACT:\n" +
+      "  - confirm:true is required; confirm:false returns 'purge cancelled'.\n" +
+      "  - sessionId and scope:'project' together return 'ambiguous - pick one'.\n" +
+      "  - scope:'session' without sessionId throws (sessionId required).\n" +
+      "  - Bare {confirm:true} is deprecated: maps to scope:'project' with a stderr warning; will hard-error in a future major.\n\n" +
+      "RETURNS: a summary of removed rows + the resolved scope.\n\n" +
+      "EXAMPLE: ctx_purge(confirm: true, sessionId: \"7c8a-1234-5678-9abc-def012345678\")\n" +
+      "EXAMPLE: ctx_purge(confirm: true, scope: \"project\")",
     // NOTE: schema MUST be a plain z.object — no .refine()/.transform()/
     // .superRefine() wrapper. See block comment above & issue #563. The
     // cross-field ambiguity check lives in the handler body below.
