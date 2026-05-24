@@ -1416,21 +1416,36 @@ server.registerTool(
   "ctx_execute",
   {
     title: "Execute Code",
-    description: `Run code in a sandboxed subprocess. Only what you console.log() enters the agent's context; the raw stdout stays in the sandbox.${bunNote} Languages: ${langList}.
+    description: `Run code in a sandboxed subprocess.${bunNote} Languages: ${langList}.
+
+Think-in-Code — the core philosophy: the bytes your code processes never enter your conversation memory; only what you console.log() does. Reading a 700 KB log directly means 700 KB of your remaining reasoning capacity gets spent on raw bytes. Running code over that same log in this sandbox and printing a 3 KB summary leaves you with 697 KB of capacity for the actual work.
+
+Concrete shape — analyze 47 source files without reading any of them:
+  ctx_execute(language: "javascript", code: \`
+    const fs = require('fs');
+    const files = fs.readdirSync('src').filter(f => f.endsWith('.ts'));
+    files.forEach(f => {
+      const lines = fs.readFileSync('src/'+f,'utf8').split('\\\\n').length;
+      console.log(f + ': ' + lines + ' lines');
+    });
+  \`)
+  // 47 files analyzed, 15,314 LoC summarized — output ~3.6 KB instead of 47 Read() calls = ~700 KB.
 
 WHEN:
-  - Command output is large (>= 20 lines) or unbounded
-  - You want to filter, count, summarize, or aggregate before printing
-  - API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff)
+  - You intend to derive an answer FROM data (filter, count, aggregate, parse, compare, transform) — do the derivation in code and print only the answer
+  - Output shape or size cannot be predicted before execution (recursive finds, repo-wide greps, list endpoints, query results, log scans)
+  - You would otherwise read raw output and then mentally compute — that compute belongs here, in code, where its inputs stay out of your conversation
 
 WHEN NOT:
-  - File mutations, simple navigation, single short commands -> use Bash
+  - Single observational command whose entire short output you intend to consume verbatim (whoami, pwd, git status on a clean tree) — Bash is simpler
+  - File mutations (Edit/Write) or navigation (cd/ls) — Bash is the right surface
+  - You already know the output is one short fixed line and you want to read it as-is
 
 RETURNS:
-  Only your printed output. Wrap risky calls in try/catch.
+  Only what your code prints. Wrap risky calls in try/catch — uncaught errors go to stderr and may leak more than intended.
 
-EXAMPLE: ctx_execute(language: "shell", code: "npm test 2>&1 | tail -40")
-EXAMPLE: ctx_execute(language: "javascript", code: "const r = await fetch('...'); console.log(r.status)")`,
+EXAMPLE: ctx_execute(language: "shell", code: "npm test 2>&1 | grep -E '(FAIL|✗|×|Error:|Tests +.*(failed|passed))' | head -60")
+EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_process').execSync('gh issue list --json number,title --limit 100', {encoding:'utf8'}); const hooks = JSON.parse(out).filter(i => /hook|routing/i.test(i.title)); console.log(\`\${hooks.length} hook-related issues\`)")`,
     inputSchema: z.object({
       language: z
         .enum([
@@ -1765,24 +1780,25 @@ server.registerTool(
   "ctx_execute_file",
   {
     title: "Execute File Processing",
-    description: `Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what you console.log() enters the agent's context.
+    description: `Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what you console.log() enters your conversation — the file bytes stay in the sandbox.
+
+Think-in-Code applied to file-level analysis: Reading the whole file means every byte enters your conversation memory and costs reasoning capacity for the rest of the session. Running code over it here lets you keep the raw bytes out and only the derived answer in. Same principle as ctx_execute, scoped to one named file via the FILE_CONTENT variable.
 
 WHEN:
-  - Large logs, CSVs, JSON dumps, or source files you want to analyze, filter, or summarize
-  - The raw contents would flood context
+  - You want to KNOW SOMETHING ABOUT a file (line count, matches of a pattern, parsed structure, statistical aggregate) without needing to SEE all of it
+  - The file is structured (CSV, JSON, log, code) and a code-level derivation is cheaper than reading verbatim
+  - The file is large enough that reading the full content would burn meaningful conversation memory you need for the actual work
 
 WHEN NOT:
-  - You want to edit the file -> use Read so Edit can match the exact text
-  - You only need one specific line -> Read with offset/limit is simpler
+  - You intend to EDIT the file — use Read so the subsequent Edit can match the exact text
+  - You only need one specific line and you know its offset — Read with offset/limit is the simplest path
+  - The file is small AND you will consume all of it for understanding/editing — Read directly
 
 RETURNS:
-  Only your printed summary.
+  Only what your code prints. The FILE_CONTENT variable holds the raw bytes inside the sandbox; nothing else leaves.
 
-EXAMPLE: ctx_execute_file(
-  path: "huge.log",
-  language: "javascript",
-  code: "console.log(FILE_CONTENT.split('\\\\n').filter(l => l.includes('ERROR')).slice(0, 20).join('\\\\n'))"
-)`,
+EXAMPLE: ctx_execute_file(path: "huge.log", language: "javascript", code: "const errs = FILE_CONTENT.split('\\\\n').filter(l => /ERROR|FATAL/.test(l)); console.log(\`\${errs.length} error lines\`); console.log(errs.slice(-5).join('\\\\n'))")
+EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const rows = FILE_CONTENT.split('\\\\n'); console.log(\`rows: \${rows.length - 1}, header: \${rows[0]}\`)")`,
     inputSchema: z.object({
       path: z
         .string()
@@ -1927,23 +1943,25 @@ server.registerTool(
   "ctx_index",
   {
     title: "Index Content",
-    description: `Index documentation or knowledge content into a searchable BM25 knowledge base. Chunks markdown by headings (keeping code blocks intact) and stores in an FTS5 database. Only a brief summary is returned - the full content stays in the store.
+    description: `Store content in a searchable knowledge base (BM25 over FTS5). Splits markdown by headings, keeps code blocks intact, and persists the raw chunks. The full content stays in storage — retrieve any section on-demand via ctx_search; nothing is summarized or truncated.
 
 WHEN:
   - Documentation from Context7, Skills, or MCP tools (API docs, framework guides, code examples)
   - API references (endpoint details, parameter specs, response schemas)
   - MCP tools/list output (exact tool signatures and descriptions)
-  - Skill prompts and instructions that are too large for context
+  - Skill prompts and instructions that are too large to keep verbatim in conversation
   - README files, migration guides, changelog entries
-  - Any content with code examples you may need to reference precisely
+  - Any content with code examples you may need to reference precisely later
 
 WHEN NOT:
-  - Log files, test output, CSV, or build output -> use ctx_execute_file (it processes in-sandbox)
+  - Log files, test output, CSV, or build output — use ctx_execute_file, which processes in-sandbox without persisting bytes
+  - Single-use ephemeral content you will not query later — keep it inline if it fits, or ctx_execute_file it
 
 RETURNS:
-  A brief indexing summary. Retrieve sections on-demand via ctx_search. When \`path\` is provided, a content hash is stored for automatic stale detection in search results.
+  Indexing metadata: chunk counts (total, code-bearing), source label, and the exact ctx_search call shape to query the indexed content. Raw content is NOT echoed back — it lives in storage, retrievable via ctx_search(source: "<label>"). When \`path\` is provided, a content hash is stored so ctx_search results auto-flag staleness on future calls.
 
-EXAMPLE: ctx_index(content: "# React useEffect\\n\\nThe Effect Hook lets you ...", source: "react-useeffect-docs")`,
+EXAMPLE: ctx_index(content: "# React useEffect\\n\\nThe Effect Hook lets you ...", source: "react-useeffect-docs")
+EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
     inputSchema: z.object({
       content: z
         .string()
@@ -2905,19 +2923,19 @@ server.registerTool(
   "ctx_fetch_and_index",
   {
     title: "Fetch & Index URL(s)",
-    description: `Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base, and returns a ~3KB preview. Full content stays in the store - use ctx_search() for deeper lookups. Content-type aware: HTML becomes markdown, JSON is chunked by key paths, plain text is indexed directly.
+    description: `Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base (BM25 over FTS5), and returns a ~3KB preview per source. Raw HTML never enters your conversation — the full content stays in storage, retrievable on-demand via ctx_search. Content-type aware: HTML becomes markdown, JSON is chunked by key paths, plain text is indexed directly.
 
 WHEN:
-  - You need web content (docs, changelogs, API references) without raw HTML entering context
-  - Multi-URL research: library evaluation, migration scans, doc comparisons (pass \`requests\` with concurrency 4-8)
+  - You need web content (docs, changelogs, API references) and the raw page bytes should NOT enter your conversation memory
+  - Multi-URL research: library evaluation, migration scans, doc comparisons — pass \`requests\` array with concurrency 4-8 for parallel I/O
   - The preview is enough to plan follow-up ctx_search calls
 
 WHEN NOT:
-  - You already have the content locally - ctx_index handles raw text or files
-  - You need to execute JavaScript in the page (SPA-rendered content) - this is a plain fetch, no headless browser
+  - You already have the content locally — ctx_index handles raw text or files
+  - The page is SPA-rendered (JavaScript-required) — this is a plain HTTP fetch, no headless browser
 
 RETURNS:
-  A ~3KB preview per fetched source plus an indexing summary. Retrieve sections on demand via ctx_search(source: "<label>"). Fetches parallelize up to \`concurrency\`; FTS5 indexing then serializes writes (SQLite single-writer rule).
+  A ~3KB preview per fetched source plus indexing metadata (chunk counts, source labels). Raw content is NOT echoed back — retrieve any section on-demand via ctx_search(source: "<label>"). Fetches parallelize up to \`concurrency\`; FTS5 indexing then serializes writes (SQLite single-writer rule).
 
 EXAMPLE: ctx_fetch_and_index(
   requests: [{url: "https://react.dev/...", source: "react"}, {url: "https://vuejs.org/...", source: "vue"}],
