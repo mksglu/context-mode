@@ -51,6 +51,18 @@ await runHook(async () => {
   const HOOK_DIR = dirname(fileURLToPath(import.meta.url));
   const { loadSessionDB } = createSessionLoaders(HOOK_DIR);
 
+  // Self-heal a partial plugin cache install before anything else
+  // touches the cache dir. The Algo-D4 boot gate and the #604
+  // normalize-hooks ratchet both fire from start.mjs, which is one of
+  // the files that may be missing in the failure mode; sessionstart.mjs
+  // fires from CC's hooks.json wiring regardless of MCP boot status, so
+  // it is the reliably-available entry point. See
+  // hooks/heal-partial-install.mjs for the full failure-mode description.
+  try {
+    const { healPartialInstallFromMarketplace } = await import("./heal-partial-install.mjs");
+    healPartialInstallFromMarketplace();
+  } catch { /* best effort, never block session start */ }
+
   let additionalContext = ROUTING_BLOCK;
 
   // ─── #558: surface security init failure as agent-facing context ───

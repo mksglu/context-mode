@@ -8,8 +8,8 @@
  */
 import { describe, it, test, expect, beforeEach, afterEach } from "vitest";
 import { strict as assert } from "node:assert";
-import { readFileSync, existsSync, accessSync, constants, mkdirSync, writeFileSync, rmSync, readdirSync } from "node:fs";
-import { resolve, join, dirname } from "node:path";
+import { readFileSync, existsSync, accessSync, constants, mkdirSync, writeFileSync, rmSync, readdirSync, cpSync, symlinkSync, lstatSync } from "node:fs";
+import { resolve, join, dirname, sep } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
@@ -1386,6 +1386,1083 @@ describe("start.mjs CLI self-heal", () => {
         `legacy required sibling missing from algorithmic set: ${entry}`,
       ).toBe(true);
     }
+  });
+
+  // ── hooks/heal-partial-install.mjs (partial-install auto-recovery) ──
+  //
+  // Claude Code's native plugin manager occasionally produces a partial
+  // install when it creates a new cache version directory: hooks/ and
+  // .claude-plugin/ make it across, but cli.bundle.mjs, server.bundle.mjs,
+  // start.mjs, package.json, src/, bin/, scripts/, and skills/ don't. The
+  // .claude-plugin/plugin.json carries forward from the previous version
+  // with a stale absolute mcpServers.args[0]; once the old version dir is
+  // age-gate-cleaned, every MCP spawn ENOENTs.
+  //
+  // The existing #550 boot gate and the #604 stale-cache-version ratchet
+  // both fire from start.mjs, the very file that's missing. The heal
+  // module lives in hooks/ since that's the directory that reliably
+  // survives the partial copy, and runs from hooks/sessionstart.mjs (the
+  // primary trigger) and start.mjs (belt-and-braces, before the Algo-D4
+  // gate so a fixable install is repaired rather than just reported).
+  describe("hooks/heal-partial-install.mjs (partial-install auto-recovery)", () => {
+    const heallessCleanups: string[] = [];
+
+    afterEach(() => {
+      while (heallessCleanups.length) {
+        const dir = heallessCleanups.pop();
+        if (dir) {
+          try {
+            rmSync(dir, { recursive: true, force: true });
+          } catch {
+            /* best effort */
+          }
+        }
+      }
+    });
+
+    function makeTmp(prefix = "ctx-heal-partial-"): string {
+      const dir = mkdtempSync(join(tmpdir(), prefix));
+      heallessCleanups.push(dir);
+      return dir;
+    }
+
+    // Build a fake CC plugin layout under a fresh tmp dir:
+    //   <root>/.claude/plugins/cache/context-mode/context-mode/<version>/
+    //   <root>/.claude/plugins/marketplaces/context-mode/
+    // The marketplace clone gets a realistic package.json files[] pointing
+    // at a few canned dirs + files so the heal has concrete sources to
+    // copy. The cache dir starts empty so each test can populate the exact
+    // subset it wants to simulate.
+    function buildFakeLayout(version = "1.0.150"): {
+      pluginRoot: string;
+      marketplaceClonePath: string;
+    } {
+      const root = makeTmp();
+      const pluginsDir = resolve(root, ".claude", "plugins");
+      const pluginRoot = resolve(
+        pluginsDir,
+        "cache",
+        "context-mode",
+        "context-mode",
+        version,
+      );
+      const marketplaceClonePath = resolve(
+        pluginsDir,
+        "marketplaces",
+        "context-mode",
+      );
+      mkdirSync(marketplaceClonePath, { recursive: true });
+      writeFileSync(
+        resolve(marketplaceClonePath, "package.json"),
+        JSON.stringify(
+          {
+            name: "context-mode",
+            version,
+            files: [
+              "hooks",
+              ".claude-plugin",
+              "scripts/postinstall.mjs",
+              "scripts/plugin-cache-integrity.mjs",
+              "cli.bundle.mjs",
+              "server.bundle.mjs",
+              "start.mjs",
+              "bin",
+            ],
+          },
+          null,
+          2,
+        ),
+      );
+      writeFileSync(resolve(marketplaceClonePath, "start.mjs"), "// start\n");
+      writeFileSync(
+        resolve(marketplaceClonePath, "cli.bundle.mjs"),
+        "// cli bundle\n",
+      );
+      writeFileSync(
+        resolve(marketplaceClonePath, "server.bundle.mjs"),
+        "// server bundle\n",
+      );
+      mkdirSync(resolve(marketplaceClonePath, "hooks"), { recursive: true });
+      writeFileSync(
+        resolve(marketplaceClonePath, "hooks", "sessionstart.mjs"),
+        "// hook\n",
+      );
+      mkdirSync(resolve(marketplaceClonePath, ".claude-plugin"), {
+        recursive: true,
+      });
+      writeFileSync(
+        resolve(marketplaceClonePath, ".claude-plugin", "plugin.json"),
+        JSON.stringify(
+          {
+            name: "context-mode",
+            version,
+            mcpServers: {
+              "context-mode": {
+                command: "node",
+                args: ["${CLAUDE_PLUGIN_ROOT}/start.mjs"],
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      mkdirSync(resolve(marketplaceClonePath, "scripts"), { recursive: true });
+      writeFileSync(
+        resolve(marketplaceClonePath, "scripts", "postinstall.mjs"),
+        "// postinstall\n",
+      );
+      writeFileSync(
+        resolve(marketplaceClonePath, "scripts", "plugin-cache-integrity.mjs"),
+        "// integrity\n",
+      );
+      mkdirSync(resolve(marketplaceClonePath, "bin"), { recursive: true });
+      writeFileSync(
+        resolve(marketplaceClonePath, "bin", "statusline.mjs"),
+        "// statusline\n",
+      );
+      mkdirSync(pluginRoot, { recursive: true });
+      return { pluginRoot, marketplaceClonePath };
+    }
+
+    function readJson(path: string): unknown {
+      return JSON.parse(readFileSync(path, "utf-8"));
+    }
+
+    // ── isPartialInstall cheap probe ──
+
+    it("isPartialInstall returns false for a healthy install", async () => {
+      const { isPartialInstall } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      cpSync(marketplaceClonePath, pluginRoot, { recursive: true, force: true });
+      expect(isPartialInstall(pluginRoot)).toBe(false);
+    });
+
+    it("isPartialInstall returns true when start.mjs is missing", async () => {
+      const { isPartialInstall } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      cpSync(marketplaceClonePath, pluginRoot, { recursive: true, force: true });
+      rmSync(join(pluginRoot, "start.mjs"));
+      expect(isPartialInstall(pluginRoot)).toBe(true);
+    });
+
+    it("isPartialInstall returns true when package.json is missing", async () => {
+      const { isPartialInstall } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      cpSync(marketplaceClonePath, pluginRoot, { recursive: true, force: true });
+      rmSync(join(pluginRoot, "package.json"));
+      expect(isPartialInstall(pluginRoot)).toBe(true);
+    });
+
+    it("isPartialInstall returns true when both cli.bundle.mjs and build/cli.js are missing", async () => {
+      const { isPartialInstall } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      cpSync(marketplaceClonePath, pluginRoot, { recursive: true, force: true });
+      rmSync(join(pluginRoot, "cli.bundle.mjs"));
+      expect(isPartialInstall(pluginRoot)).toBe(true);
+    });
+
+    it("isPartialInstall accepts build/cli.js as the cli fallback", async () => {
+      const { isPartialInstall } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      cpSync(marketplaceClonePath, pluginRoot, { recursive: true, force: true });
+      rmSync(join(pluginRoot, "cli.bundle.mjs"));
+      rmSync(join(pluginRoot, "server.bundle.mjs"));
+      mkdirSync(join(pluginRoot, "build"), { recursive: true });
+      writeFileSync(join(pluginRoot, "build", "cli.js"), "// tsc output\n");
+      writeFileSync(join(pluginRoot, "build", "server.js"), "// tsc output\n");
+      expect(isPartialInstall(pluginRoot)).toBe(false);
+    });
+
+    it("isPartialInstall returns false on falsy pluginRoot", async () => {
+      const { isPartialInstall } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      expect(isPartialInstall(undefined)).toBe(false);
+      expect(isPartialInstall(null)).toBe(false);
+      expect(isPartialInstall("")).toBe(false);
+    });
+
+    // ── deriveMarketplaceClonePath layout helper ──
+
+    it("deriveMarketplaceClonePath derives the marketplace path from a CC cache layout", async () => {
+      const { deriveMarketplaceClonePath } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const cache = "/home/u/.claude/plugins/cache/context-mode/context-mode/1.0.150";
+      expect(deriveMarketplaceClonePath(cache)).toBe(
+        resolve("/home/u/.claude/plugins/marketplaces/context-mode"),
+      );
+    });
+
+    it("deriveMarketplaceClonePath tolerates a trailing slash", async () => {
+      const { deriveMarketplaceClonePath } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const cache = "/home/u/.claude/plugins/cache/context-mode/context-mode/1.0.150/";
+      expect(deriveMarketplaceClonePath(cache)).toBe(
+        resolve("/home/u/.claude/plugins/marketplaces/context-mode"),
+      );
+    });
+
+    it("deriveMarketplaceClonePath handles Windows-style backslashes", async () => {
+      const { deriveMarketplaceClonePath } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const cache = "C:\\Users\\u\\.claude\\plugins\\cache\\context-mode\\context-mode\\1.0.150";
+      const got = deriveMarketplaceClonePath(cache);
+      // resolve() leaves the leading drive letter intact as a relative
+      // segment on POSIX; the important assertion is the suffix.
+      expect(String(got).replace(/\\/g, "/")).toMatch(
+        /plugins\/marketplaces\/context-mode$/,
+      );
+    });
+
+    it("deriveMarketplaceClonePath returns null for non-CC layouts", async () => {
+      const { deriveMarketplaceClonePath } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      expect(
+        deriveMarketplaceClonePath("/usr/local/lib/node_modules/context-mode"),
+      ).toBeNull();
+      expect(
+        deriveMarketplaceClonePath("/home/u/sultan-projects/context-mode"),
+      ).toBeNull();
+      expect(deriveMarketplaceClonePath(undefined)).toBeNull();
+      expect(deriveMarketplaceClonePath(null)).toBeNull();
+      expect(deriveMarketplaceClonePath("")).toBeNull();
+    });
+
+    // ── healPartialInstallFromMarketplace full heal ──
+
+    it("healPartialInstallFromMarketplace early-returns on a healthy install", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      cpSync(marketplaceClonePath, pluginRoot, { recursive: true, force: true });
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.skipped).toBe("not-partial");
+      expect(result.healed).toEqual([]);
+    });
+
+    it("healPartialInstallFromMarketplace skips when the marketplace clone is missing", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot } = buildFakeLayout();
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath: resolve(pluginRoot, "..", "..", "..", "no-such-mp"),
+        log: false,
+      });
+      expect(result.skipped).toBe("no-marketplace");
+    });
+
+    it("healPartialInstallFromMarketplace refuses to heal when pluginRoot equals marketplaceClonePath", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { marketplaceClonePath } = buildFakeLayout();
+      // Force the probe to trip by stripping start.mjs from the
+      // marketplace itself, then point pluginRoot at it.
+      rmSync(join(marketplaceClonePath, "start.mjs"));
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot: marketplaceClonePath,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.skipped).toBe("same-as-marketplace");
+    });
+
+    it("healPartialInstallFromMarketplace copies missing files from the marketplace clone", async () => {
+      const { healPartialInstallFromMarketplace, isPartialInstall } =
+        await import("../../hooks/heal-partial-install.mjs");
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      // Replicate the user-observed partial install: hooks/ and
+      // .claude-plugin/ made it across, the rest didn't.
+      cpSync(
+        join(marketplaceClonePath, "hooks"),
+        join(pluginRoot, "hooks"),
+        { recursive: true, force: true },
+      );
+      cpSync(
+        join(marketplaceClonePath, ".claude-plugin"),
+        join(pluginRoot, ".claude-plugin"),
+        { recursive: true, force: true },
+      );
+      expect(isPartialInstall(pluginRoot)).toBe(true);
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.skipped).toBeUndefined();
+      expect(result.stillMissing).toEqual([]);
+      expect(result.healed).toContain("start.mjs");
+      expect(result.healed).toContain("cli.bundle.mjs");
+      expect(result.healed).toContain("server.bundle.mjs");
+      expect(result.healed).toContain("package.json");
+      expect(isPartialInstall(pluginRoot)).toBe(false);
+    });
+
+    it("healPartialInstallFromMarketplace falls back to the marketplace's package.json when pluginRoot's is missing", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      // Empty pluginRoot, no package.json.
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.skipped).toBeUndefined();
+      expect(result.pkgSource).toBe("marketplace");
+      expect(result.healed).toContain("package.json");
+    });
+
+    it("healPartialInstallFromMarketplace rewrites carry-forward stale args[0] in plugin.json", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout("1.0.150");
+
+      // Seed pluginRoot with the user-observed carry-forward state:
+      // plugin.json copied from 1.0.146 with bun + an absolute args[0].
+      cpSync(
+        join(marketplaceClonePath, "hooks"),
+        join(pluginRoot, "hooks"),
+        { recursive: true, force: true },
+      );
+      mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+      writeFileSync(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+        JSON.stringify(
+          {
+            name: "context-mode",
+            version: "1.0.150",
+            mcpServers: {
+              "context-mode": {
+                command: "/usr/bin/bun",
+                args: [
+                  "/home/u/.claude/plugins/cache/context-mode/context-mode/1.0.146/start.mjs",
+                ],
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.argsRewritten).toBe(true);
+      const fixed = readJson(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+      ) as {
+        mcpServers: { "context-mode": { args: string[] } };
+      };
+      expect(fixed.mcpServers["context-mode"].args[0]).toContain("1.0.150");
+      expect(fixed.mcpServers["context-mode"].args[0]).not.toContain("1.0.146");
+    });
+
+    it.skipIf(process.platform === "win32")("healPartialInstallFromMarketplace refuses to rewrite plugin.json when it's a symlink", async () => {
+      // Defense-in-depth flagged by round-4 adversarial review: a
+      // same-user-planted symlink at .claude-plugin/plugin.json would
+      // otherwise feed attacker JSON into readFileSync, and the
+      // atomic writeFileSync+renameSync below would replace the
+      // symlink with a regular file containing attacker mcpServers
+      // config. POSIX 0700 on ~/.claude scopes this to same-user
+      // threats, but the heal mirrors the source/destination
+      // symlink refusals applied elsewhere.
+      //
+      // Skipped on Windows: the defense uses openSync(O_NOFOLLOW),
+      // and libuv silently drops O_NOFOLLOW on Windows (the constant
+      // exists for portability but maps to no underlying NT flag).
+      // Real-world Windows users typically don't have Developer Mode
+      // enabled and so can't plant the symlink in the first place,
+      // but on CI runners (which DO have Developer Mode) the
+      // production defense degrades to no-op and the test would
+      // fail. Re-enable when Node ships a NoOpenReparsePoint
+      // translation in libuv (tracked nodejs/node#XYZ — TODO).
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout("1.0.150");
+
+      // Stage attacker-controlled mcpServers JSON outside the cache
+      // tree. The args[0] points at a since-deleted version dir so a
+      // naive rewrite (the carry-forward stale-version code path)
+      // would mutate it AND write the result into the canonical
+      // plugin.json location, materializing the attacker config.
+      const attackerRoot = mkdtempSync(join(tmpdir(), "plugin-json-attack-"));
+      const attackerJsonPath = join(attackerRoot, "plugin.json");
+      writeFileSync(
+        attackerJsonPath,
+        JSON.stringify({
+          name: "context-mode",
+          version: "1.0.150",
+          mcpServers: {
+            "context-mode": {
+              command: "/attacker/payload.sh",
+              args: [
+                "/home/u/.claude/plugins/cache/context-mode/context-mode/1.0.146/start.mjs",
+              ],
+            },
+          },
+        }),
+      );
+
+      // Plant the symlink at the canonical location. readFileSync
+      // would follow this; the lstatSync guard must refuse.
+      mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+      symlinkSync(
+        attackerJsonPath,
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // The rewrite was refused.
+      expect(result.argsRewritten).toBe(false);
+      // plugin.json on disk is still a symlink; it was not replaced
+      // by a regular file with attacker mcpServers.
+      const stPj = lstatSync(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+      );
+      expect(stPj.isSymbolicLink()).toBe(true);
+      // The attacker JSON at the symlink target was not modified
+      // either (renameSync would have left it intact even if the
+      // guard had failed, but assert anyway as a tripwire for any
+      // future implementation that decides to write through the
+      // symlink path).
+      const attackerStillThere = JSON.parse(
+        readFileSync(attackerJsonPath, "utf-8"),
+      );
+      expect(attackerStillThere.mcpServers["context-mode"].command).toBe(
+        "/attacker/payload.sh",
+      );
+    });
+
+    it("healPartialInstallFromMarketplace resolves the ${CLAUDE_PLUGIN_ROOT} placeholder", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout("1.0.150");
+      mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+      writeFileSync(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+        JSON.stringify(
+          {
+            name: "context-mode",
+            version: "1.0.150",
+            mcpServers: {
+              "context-mode": {
+                command: "node",
+                args: ["${CLAUDE_PLUGIN_ROOT}/start.mjs"],
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.argsRewritten).toBe(true);
+      const fixed = readJson(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+      ) as {
+        mcpServers: { "context-mode": { args: string[] } };
+      };
+      expect(fixed.mcpServers["context-mode"].args[0]).not.toContain(
+        "${CLAUDE_PLUGIN_ROOT}",
+      );
+      expect(fixed.mcpServers["context-mode"].args[0]).toContain("start.mjs");
+    });
+
+    it("healPartialInstallFromMarketplace leaves a healthy plugin.json alone", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout("1.0.150");
+      // Seed a healthy plugin.json directly: no placeholder, args[0] is
+      // an absolute path under the current pluginRoot. The rewrite path
+      // should all branches decline to mutate.
+      mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+      const healthyArgs0 = join(pluginRoot, "start.mjs").replace(/\\/g, "/");
+      writeFileSync(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+        JSON.stringify(
+          {
+            name: "context-mode",
+            version: "1.0.150",
+            mcpServers: {
+              "context-mode": {
+                command: "node",
+                args: [healthyArgs0],
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(result.healed).toContain("start.mjs");
+      expect(result.argsRewritten).toBe(false);
+    });
+
+    it("healPartialInstallFromMarketplace is idempotent across re-runs", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      const first = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(first.healed.length).toBeGreaterThan(0);
+      const second = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(second.skipped).toBe("not-partial");
+      expect(second.healed).toEqual([]);
+    });
+
+    it("healPartialInstallFromMarketplace short-circuits with not-claude-code for non-CC pluginRoots", async () => {
+      // The heal is scoped to Claude Code's per-version cache layout
+      // (~/.claude/plugins/cache/<owner>/<plugin>/<version>/). Other
+      // clients (Codex, Cursor, OpenCode, Kiro, gemini-cli, ...) ship
+      // their own SessionStart wrappers under hooks/<client>/ and
+      // never call this module. The module also guards its scope at
+      // runtime: any pluginRoot that doesn't match the CC cache layout
+      // bails with skipped="not-claude-code" before any filesystem
+      // work runs.
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+
+      // npm-global-style layout: no /plugins/cache/ segment.
+      const npmGlobalRoot = makeTmp();
+      const npmGlobalPlugin = resolve(
+        npmGlobalRoot,
+        "lib",
+        "node_modules",
+        "context-mode",
+      );
+      mkdirSync(npmGlobalPlugin, { recursive: true });
+      const r1 = healPartialInstallFromMarketplace({
+        pluginRoot: npmGlobalPlugin,
+        log: false,
+      });
+      expect(r1.skipped).toBe("not-claude-code");
+      expect(r1.healed).toEqual([]);
+      expect(r1.stillMissing).toEqual([]);
+
+      // Codex-style layout: under ~/.codex, no /plugins/cache/.
+      const codexRoot = makeTmp();
+      const codexPlugin = resolve(
+        codexRoot,
+        ".codex",
+        "plugins",
+        "context-mode",
+      );
+      mkdirSync(codexPlugin, { recursive: true });
+      const r2 = healPartialInstallFromMarketplace({
+        pluginRoot: codexPlugin,
+        log: false,
+      });
+      expect(r2.skipped).toBe("not-claude-code");
+    });
+
+    it("healPartialInstallFromMarketplace doesn't overwrite files that already exist", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      // Seed pluginRoot with hooks/sessionstart.mjs holding a custom
+      // override. The heal only restores missing paths, so the override
+      // should survive.
+      mkdirSync(join(pluginRoot, "hooks"), { recursive: true });
+      const custom = "// custom user override\n";
+      writeFileSync(join(pluginRoot, "hooks", "sessionstart.mjs"), custom);
+      healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+      expect(
+        readFileSync(join(pluginRoot, "hooks", "sessionstart.mjs"), "utf-8"),
+      ).toBe(custom);
+    });
+
+    it("healPartialInstallFromMarketplace rejects files[] entries that escape rootDir via ..", async () => {
+      // Regression guard for PR #699 review: a corrupted marketplace
+      // package.json with `files: ["../outside.txt", ...]` must not
+      // turn the self-heal into an out-of-root write. Seed an
+      // `outside.txt` in the marketplace's parent dir, point a files[]
+      // entry at it via ..-escape, and assert nothing lands outside
+      // pluginRoot.
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      // Write a sentinel file in the marketplace's parent dir — the
+      // ..-escape target. If the guard fails, the heal would copy this
+      // into pluginRoot's parent.
+      const marketplaceParent = dirname(marketplaceClonePath);
+      const escapeTargetPath = join(marketplaceParent, "OUTSIDE-MARKER.txt");
+      writeFileSync(escapeTargetPath, "should-not-be-copied\n");
+
+      // Repoint marketplace package.json's files[] to include an
+      // escape entry alongside legitimate entries.
+      writeFileSync(
+        join(marketplaceClonePath, "package.json"),
+        JSON.stringify({
+          name: "context-mode",
+          version: "1.0.150",
+          files: ["../OUTSIDE-MARKER.txt", "hooks", "start.mjs", "cli.bundle.mjs", "server.bundle.mjs", ".claude-plugin"],
+        }),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // The escape entry must not appear anywhere the heal acted on.
+      expect(result.healed).not.toContain("../OUTSIDE-MARKER.txt");
+      expect(result.healed).not.toContain("OUTSIDE-MARKER.txt");
+      expect(result.stillMissing).not.toContain("../OUTSIDE-MARKER.txt");
+      // Nothing got written to pluginRoot's parent.
+      const pluginRootParent = dirname(pluginRoot);
+      expect(existsSync(join(pluginRootParent, "OUTSIDE-MARKER.txt"))).toBe(false);
+      // The legitimate entries still healed.
+      expect(result.healed).toContain("start.mjs");
+      expect(result.healed).toContain("cli.bundle.mjs");
+    });
+
+    it("healPartialInstallFromMarketplace rejects nested ..-escape entries (e.g. 'a/../../outside')", async () => {
+      // Mixed-segment escape: even when the entry starts with a
+      // legitimate-looking segment, path normalization collapses the
+      // ..'s and resolves outside rootDir. Guard must catch it.
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      const marketplaceParent = dirname(marketplaceClonePath);
+      const escapeTargetPath = join(marketplaceParent, "NESTED-OUTSIDE.txt");
+      writeFileSync(escapeTargetPath, "should-not-be-copied\n");
+
+      writeFileSync(
+        join(marketplaceClonePath, "package.json"),
+        JSON.stringify({
+          name: "context-mode",
+          version: "1.0.150",
+          files: ["hooks/../../NESTED-OUTSIDE.txt", "start.mjs"],
+        }),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      expect(result.healed.some((p: string) => p.includes("NESTED-OUTSIDE"))).toBe(false);
+      const pluginRootParent = dirname(pluginRoot);
+      expect(existsSync(join(pluginRootParent, "NESTED-OUTSIDE.txt"))).toBe(false);
+      expect(result.healed).toContain("start.mjs");
+    });
+
+    it("healPartialInstallFromMarketplace replaces a planted leaf symlink at the destination instead of writing through it", async () => {
+      // Arbitrary-file-write primitive surfaced by the second
+      // adversarial review: a stale heal leftover or a local attacker
+      // plants `pluginRoot/server.bundle.mjs` as a symlink to an
+      // out-of-tree target that doesn't exist yet. existsSync follows
+      // the dangling link and returns false, so the probe trips and
+      // the file lands in missingBefore. Without the lstat+unlink
+      // guard at the copy site, cpSync follows the symlink and writes
+      // marketplace bytes (arbitrary JS) to the target outside
+      // pluginRoot. The guard must replace the symlink with a fresh
+      // regular file before cpSync runs.
+      const { healPartialInstallFromMarketplace, isPartialInstall } =
+        await import("../../hooks/heal-partial-install.mjs");
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      // Dangling target outside pluginRoot, must stay un-created.
+      const pluginRootParent = dirname(pluginRoot);
+      const escapeTargetPath = join(
+        pluginRootParent,
+        "OUT-OF-ROOT-MUST-NOT-EXIST.txt",
+      );
+      expect(existsSync(escapeTargetPath)).toBe(false);
+
+      // Plant the symlink at the launch-critical leaf so the probe
+      // trips on it (existsSync on a dangling link returns false).
+      symlinkSync(escapeTargetPath, join(pluginRoot, "server.bundle.mjs"));
+      expect(
+        lstatSync(join(pluginRoot, "server.bundle.mjs")).isSymbolicLink(),
+      ).toBe(true);
+      expect(isPartialInstall(pluginRoot)).toBe(true);
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // The symlink target must not have been materialized: no
+      // arbitrary write happened outside pluginRoot.
+      expect(existsSync(escapeTargetPath)).toBe(false);
+      // The leaf is now a regular file with marketplace bytes, not a
+      // dangling symlink.
+      const stTo = lstatSync(join(pluginRoot, "server.bundle.mjs"));
+      expect(stTo.isSymbolicLink()).toBe(false);
+      expect(stTo.isFile()).toBe(true);
+      expect(
+        readFileSync(join(pluginRoot, "server.bundle.mjs"), "utf-8"),
+      ).toBe("// server bundle\n");
+      // The heal records the file as healed, and the probe agrees
+      // we're healthy.
+      expect(result.healed).toContain("server.bundle.mjs");
+      expect(isPartialInstall(pluginRoot)).toBe(false);
+    });
+
+    it("healPartialInstallFromMarketplace rejects deep files[] entries reached through a symlinked ancestor in the marketplace tree", async () => {
+      // Ancestor-symlink bypass surfaced by the third adversarial
+      // review: lstat(from) on a deep leaf returns isSymbolicLink=false
+      // when the symlink is in a PARENT segment, not the leaf itself.
+      // The lexical resolve+startsWith guard also doesn't catch it,
+      // since the symlink's own lexical path stays inside the
+      // marketplace tree. Only realpath(from) collapses the ancestor
+      // symlink and exposes the escape. Without this guard, cpSync
+      // would read attacker-staged content through the ancestor link
+      // and copy it into pluginRoot, where the next session start
+      // would execute the planted bytes (e.g. scripts/postinstall.mjs).
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      // Stage attacker-controlled bytes outside the marketplace tree.
+      const attackerRoot = mkdtempSync(join(tmpdir(), "ancestor-attack-"));
+      writeFileSync(
+        join(attackerRoot, "postinstall.mjs"),
+        "// ATTACKER PAYLOAD\n",
+      );
+
+      // Replace marketplace/scripts/ (a real dir set up by
+      // buildFakeLayout) with a symlink to the attacker-staged dir.
+      // The lexical resolve check on `from` passes because the
+      // symlink's path stays inside marketplaceClonePath; only
+      // realpath collapses through it.
+      rmSync(join(marketplaceClonePath, "scripts"), {
+        recursive: true,
+        force: true,
+      });
+      symlinkSync(attackerRoot, join(marketplaceClonePath, "scripts"));
+
+      // package.json references the deep leaf through the
+      // now-symlinked ancestor. lstat(from).isSymbolicLink() === false
+      // because the leaf is a real file at the symlink target.
+      writeFileSync(
+        join(marketplaceClonePath, "package.json"),
+        JSON.stringify({
+          name: "context-mode",
+          version: "1.0.150",
+          files: [
+            "scripts/postinstall.mjs",
+            "hooks",
+            ".claude-plugin",
+            "start.mjs",
+            "cli.bundle.mjs",
+            "server.bundle.mjs",
+          ],
+        }),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // The ancestor-symlinked entry must not appear in healed, and
+      // pluginRoot must not contain the attacker payload at the
+      // resolved-through-ancestor path.
+      expect(result.healed).not.toContain("scripts/postinstall.mjs");
+      const planted = join(pluginRoot, "scripts", "postinstall.mjs");
+      if (existsSync(planted)) {
+        expect(readFileSync(planted, "utf-8")).not.toBe(
+          "// ATTACKER PAYLOAD\n",
+        );
+      }
+      // Legitimate non-symlinked entries still healed (sanity).
+      expect(result.healed).toContain("start.mjs");
+      expect(result.healed).toContain("cli.bundle.mjs");
+    });
+
+    it("healPartialInstallFromMarketplace rejects symlink entries that escape rootDir", async () => {
+      // Symlink-based bypass for the ..-escape resolve+startsWith
+      // guard: the symlink itself sits inside marketplaceClonePath, so
+      // its lexical resolve stays inside rootDir, but the symlink
+      // target points outside. Reading through the link would expose
+      // arbitrary host filesystem content to the heal. expandFilesArray
+      // and listFilesRecursive must drop symlinks via lstatSync.
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      // Sentinel outside the marketplace tree.
+      const marketplaceParent = dirname(marketplaceClonePath);
+      const sentinelPath = join(marketplaceParent, "SYMLINK-TARGET.txt");
+      writeFileSync(sentinelPath, "should-not-leak\n");
+
+      // Top-level symlink-to-outside file at marketplace root.
+      const topLink = join(marketplaceClonePath, "evil-link.txt");
+      symlinkSync(sentinelPath, topLink);
+
+      // Symlink-to-outside hidden inside a legitimate-looking dir,
+      // so listFilesRecursive's walk has to drop it too.
+      const nestedDir = join(marketplaceClonePath, "scripts");
+      const nestedLink = join(nestedDir, "evil-nested.txt");
+      symlinkSync(sentinelPath, nestedLink);
+
+      writeFileSync(
+        join(marketplaceClonePath, "package.json"),
+        JSON.stringify({
+          name: "context-mode",
+          version: "1.0.150",
+          // "scripts" is a directory walk; "evil-link.txt" is a
+          // top-level symlink entry. Both should be filtered.
+          files: [
+            "evil-link.txt",
+            "scripts",
+            "hooks",
+            "start.mjs",
+            "cli.bundle.mjs",
+            "server.bundle.mjs",
+            ".claude-plugin",
+          ],
+        }),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // Neither the top-level nor the nested symlink can appear in
+      // healed; nothing got materialized at pluginRoot for them either.
+      expect(result.healed).not.toContain("evil-link.txt");
+      expect(result.healed.some((p: string) => p.includes("evil-nested"))).toBe(false);
+      expect(existsSync(join(pluginRoot, "evil-link.txt"))).toBe(false);
+      expect(existsSync(join(pluginRoot, "scripts", "evil-nested.txt"))).toBe(false);
+
+      // Legitimate scripts entries still healed (the symlink dropped
+      // out, but the regular files in scripts/ stayed). Use join() so
+      // Windows backslash and POSIX forward-slash both match the
+      // OS-native paths listFilesRecursive emits.
+      expect(result.healed).toContain(join("scripts", "postinstall.mjs"));
+      expect(result.healed).toContain(join("scripts", "plugin-cache-integrity.mjs"));
+      // Sentinel content was never copied anywhere in pluginRoot.
+      const pluginRootParent = dirname(pluginRoot);
+      expect(existsSync(join(pluginRootParent, "SYMLINK-TARGET.txt"))).toBe(false);
+    });
+
+    it("healPartialInstallFromMarketplace keeps valid entries when escape entries are mixed in", async () => {
+      // The escape guard must drop only the bad entries, leaving valid
+      // ones in the manifest. Otherwise a single corrupt entry would
+      // poison the whole heal.
+      const { healPartialInstallFromMarketplace, isPartialInstall } =
+        await import("../../hooks/heal-partial-install.mjs");
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+
+      const marketplaceParent = dirname(marketplaceClonePath);
+      writeFileSync(join(marketplaceParent, "POISON.txt"), "x");
+
+      writeFileSync(
+        join(marketplaceClonePath, "package.json"),
+        JSON.stringify({
+          name: "context-mode",
+          version: "1.0.150",
+          files: [
+            "../POISON.txt",
+            "hooks",
+            ".claude-plugin",
+            "start.mjs",
+            "cli.bundle.mjs",
+            "server.bundle.mjs",
+            "scripts/postinstall.mjs",
+            "scripts/plugin-cache-integrity.mjs",
+            "bin",
+          ],
+        }),
+      );
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // Every valid entry healed.
+      expect(result.healed).toContain("start.mjs");
+      expect(result.healed).toContain("cli.bundle.mjs");
+      expect(result.healed).toContain("server.bundle.mjs");
+      // No escape side effect.
+      const pluginRootParent = dirname(pluginRoot);
+      expect(existsSync(join(pluginRootParent, "POISON.txt"))).toBe(false);
+      // The probe agrees we're healthy after the heal (the legitimate
+      // launch-critical files all landed).
+      expect(isPartialInstall(pluginRoot)).toBe(false);
+    });
+
+    it("healPartialInstallFromMarketplace reproduces and heals the v1.0.150 partial install", async () => {
+      const { healPartialInstallFromMarketplace, isPartialInstall } =
+        await import("../../hooks/heal-partial-install.mjs");
+      // Mirrors the exact failure shape captured in the wild:
+      //   - hooks/ and .claude-plugin/ survived
+      //   - plus a few non-files[] extras (web/, CONTRIBUTING.md) from an
+      //     earlier install moment
+      //   - .claude-plugin/plugin.json carry-forwarded from 1.0.146 with
+      //     command "/usr/bin/bun" and args[0] pointing at the stale
+      //     1.0.146/start.mjs absolute path
+      //   - everything else missing
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout("1.0.150");
+      cpSync(
+        join(marketplaceClonePath, "hooks"),
+        join(pluginRoot, "hooks"),
+        { recursive: true, force: true },
+      );
+      mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+      writeFileSync(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+        JSON.stringify(
+          {
+            name: "context-mode",
+            version: "1.0.150",
+            mcpServers: {
+              "context-mode": {
+                command: "/usr/bin/bun",
+                args: [
+                  pluginRoot.replace("1.0.150", "1.0.146") + sep + "start.mjs",
+                ],
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      writeFileSync(join(pluginRoot, "CONTRIBUTING.md"), "# Contributing\n");
+      mkdirSync(join(pluginRoot, "web"), { recursive: true });
+      writeFileSync(join(pluginRoot, "web", "index.html"), "<!doctype html>");
+
+      const result = healPartialInstallFromMarketplace({
+        pluginRoot,
+        marketplaceClonePath,
+        log: false,
+      });
+
+      // Full recovery: every files[] entry restored, args[0] re-pointed
+      // at 1.0.150, and the cheap probe agrees we're healthy.
+      expect(result.stillMissing).toEqual([]);
+      expect(result.argsRewritten).toBe(true);
+      expect(isPartialInstall(pluginRoot)).toBe(false);
+
+      const plugin = readJson(
+        join(pluginRoot, ".claude-plugin", "plugin.json"),
+      ) as {
+        mcpServers: { "context-mode": { args: string[] } };
+      };
+      expect(plugin.mcpServers["context-mode"].args[0]).toContain("1.0.150");
+      expect(plugin.mcpServers["context-mode"].args[0]).not.toContain("1.0.146");
+
+      // Non-files[] extras left alone.
+      expect(
+        readFileSync(join(pluginRoot, "CONTRIBUTING.md"), "utf-8"),
+      ).toBe("# Contributing\n");
+    });
+
+    // ── Wiring assertions ──
+
+    it("start.mjs invokes the heal before the Algo-D4 integrity check", () => {
+      const src = readFileSync(resolve(ROOT, "start.mjs"), "utf-8");
+      // Anchor on the literal import + call shape, not the bare filename
+      // substring. A DELETED- prefix or comment mention would otherwise
+      // pass the test even when the wiring is gone.
+      const importIdx = src.indexOf('"./hooks/heal-partial-install.mjs"');
+      const callIdx = src.indexOf("healPartialInstallFromMarketplace({");
+      const integrityIdx = src.indexOf('"./scripts/plugin-cache-integrity.mjs"');
+      expect(importIdx, "heal-partial-install import missing in start.mjs").toBeGreaterThan(-1);
+      expect(callIdx, "healPartialInstallFromMarketplace call missing in start.mjs").toBeGreaterThan(-1);
+      expect(integrityIdx, "plugin-cache-integrity import missing in start.mjs").toBeGreaterThan(-1);
+      // Order: heal runs first so a fixable install is repaired, then
+      // the integrity gate decides whether boot proceeds.
+      expect(importIdx).toBeLessThan(integrityIdx);
+      expect(callIdx).toBeLessThan(integrityIdx);
+    });
+
+    it("hooks/sessionstart.mjs invokes the heal early in the runHook callback", () => {
+      const src = readFileSync(
+        resolve(ROOT, "hooks", "sessionstart.mjs"),
+        "utf-8",
+      );
+      const importIdx = src.indexOf('"./heal-partial-install.mjs"');
+      const callIdx = src.indexOf("healPartialInstallFromMarketplace()");
+      expect(importIdx, "heal-partial-install import missing in sessionstart.mjs").toBeGreaterThan(-1);
+      expect(callIdx, "healPartialInstallFromMarketplace call missing in sessionstart.mjs").toBeGreaterThan(-1);
+      // Heal must fire before the age-gated cleanup that wipes sibling
+      // cache version dirs, since the cleanup would otherwise erase a
+      // healthy previous version while the new one is still partial.
+      const cleanupIdx = src.indexOf("Age-gated lazy cleanup");
+      expect(cleanupIdx, "age-gated cleanup comment missing").toBeGreaterThan(-1);
+      expect(callIdx).toBeLessThan(cleanupIdx);
+    });
   });
 });
 

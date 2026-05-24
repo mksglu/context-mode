@@ -415,6 +415,21 @@ if (!existsSync(resolve(__dirname, "cli.bundle.mjs")) && existsSync(resolve(__di
   if (process.platform !== "win32") chmodSync(shimPath, 0o755);
 }
 
+// ── Self-heal partial install from marketplace clone ──
+// Runs BEFORE the Algo-D4 integrity check so a fixable partial install
+// gets repaired rather than just reported. Best-effort and idempotent;
+// the integrity check below remains the authoritative gate that decides
+// whether boot proceeds. See hooks/heal-partial-install.mjs for the
+// failure-mode description and module contract.
+if (!process.env.VITEST) {
+  try {
+    const { healPartialInstallFromMarketplace } = await import(
+      "./hooks/heal-partial-install.mjs"
+    );
+    healPartialInstallFromMarketplace({ pluginRoot: __dirname });
+  } catch { /* best effort, never block boot */ }
+}
+
 // ── Algo-D4: plugin cache integrity check ──
 // Verify boot-critical siblings exist BEFORE importing server.bundle.mjs.
 // Without this, a partial install (#550) gives an opaque downstream
@@ -423,11 +438,12 @@ if (!existsSync(resolve(__dirname, "cli.bundle.mjs")) && existsSync(resolve(__di
 // external monitoring grep + the user both see the actionable signal.
 //
 // Runs AFTER the heal layers above so missing files they can fix
-// (cli.bundle.mjs shim, dangling symlinks) get a chance first. Helper
-// is shared with `ctx doctor` (Algo-D5) — single source of truth so
-// boot + diagnostic agree byte-for-byte. Skipped under VITEST so the
-// repo's own test invocations against in-tree start.mjs don't fail
-// when running before `npm run build` produces the bundles.
+// (cli.bundle.mjs shim, dangling symlinks, partial-install copy from
+// the marketplace clone) get a chance first. Helper is shared with
+// `ctx doctor` (Algo-D5) — single source of truth so boot + diagnostic
+// agree byte-for-byte. Skipped under VITEST so the repo's own test
+// invocations against in-tree start.mjs don't fail when running before
+// `npm run build` produces the bundles.
 if (!process.env.VITEST) {
   try {
     const { assertPluginCacheIntegrity, formatPartialInstallReport } =
