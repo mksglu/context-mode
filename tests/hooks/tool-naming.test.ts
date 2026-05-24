@@ -414,7 +414,7 @@ describe("routePreToolUse with platform parameter", () => {
       expect(result).not.toBeNull();
       expect(result!.action).toBe("modify");
       expect((result!.updatedInput as Record<string, string>).command).toContain(
-        "curl/wget blocked",
+        "curl/wget redirected",
       );
     });
 
@@ -427,7 +427,7 @@ describe("routePreToolUse with platform parameter", () => {
       );
       expect(result).not.toBeNull();
       expect(result!.action).toBe("deny");
-      expect(result!.reason).toContain("WebFetch blocked");
+      expect(result!.reason).toContain("WebFetch redirected");
     });
 
     it("read_file routes as Read → context guidance", () => {

@@ -704,7 +704,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         return mcpRedirect({
           action: "modify",
           updatedInput: {
-            command: `echo "context-mode: curl/wget blocked. Think in Code — use ${t("ctx_execute")}(language, code) to write code that fetches, processes, and prints only the answer. Or use ${t("ctx_fetch_and_index")}(url, source) to fetch and index. Write pure JS with try/catch, no npm deps. Do NOT retry with curl/wget."`,
+            command: `echo "context-mode: curl/wget redirected (context-window optimization, NOT a network restriction). ${t("ctx_execute")} and ${t("ctx_fetch_and_index")} have full network access — retry if it fails with a transient DNS error. Think in Code — call ${t("ctx_execute")}(language, code) now to fetch, process, and print only the answer. Or ${t("ctx_fetch_and_index")}(url, source) to fetch and index. Write pure JS with try/catch, no npm deps. Do NOT retry with curl/wget."`,
           },
           // D2 PRD Phase 3.1: marker payload for PostToolUse byte accounting.
           redirectMeta: {
@@ -735,7 +735,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
       return mcpRedirect({
         action: "modify",
         updatedInput: {
-          command: `echo "context-mode: Inline HTTP blocked. Think in Code — use ${t("ctx_execute")}(language, code) to write code that fetches, processes, and console.log() only the result. Write robust pure JS with try/catch, no npm deps. Do NOT retry with Bash."`,
+          command: `echo "context-mode: Inline HTTP redirected (context-window optimization, NOT a network restriction). ${t("ctx_execute")} has full network access — retry if it fails with a transient DNS error. Think in Code — call ${t("ctx_execute")}(language, code) now to fetch, process, and console.log() only the result. Write robust pure JS with try/catch, no npm deps. Do NOT retry with Bash."`,
         },
       });
     }
@@ -801,7 +801,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     const url = toolInput.url ?? "";
     return mcpRedirect({
       action: "deny",
-      reason: `context-mode: WebFetch blocked. Think in Code — use ${t("ctx_fetch_and_index")}(url: "${url}", source: "...") to fetch and index, then ${t("ctx_search")}(queries: [...]) to query. Or use ${t("ctx_execute")}(language, code) to fetch, process, and console.log() only what you need. Write pure JS, no npm deps. Do NOT use curl, wget, or WebFetch.`,
+      reason: `context-mode: WebFetch redirected to ${t("ctx_fetch_and_index")} (context-window optimization, NOT a network restriction). ${t("ctx_fetch_and_index")} has full network access — retry if it fails with a transient DNS error. Call ${t("ctx_fetch_and_index")}(url: "${url}", source: "...") now, then ${t("ctx_search")}(queries: [...]) to query. Or ${t("ctx_execute")}(language, code) to fetch, process, and console.log() only what you need. Write pure JS, no npm deps. Do NOT retry with WebFetch, curl, or wget.`,
       // D2 PRD Phase 4.1: marker payload for PostToolUse byte accounting.
       redirectMeta: {
         tool: "WebFetch",

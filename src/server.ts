@@ -2667,10 +2667,23 @@ async function ssrfGuard(rawUrl: string): Promise<FetchOneResult | null> {
       }
     }
   } catch (err) {
+    // libuv DNS error codes that typically indicate the resolver itself can't
+    // reach a nameserver — common when the MCP host process is running under
+    // a sandbox that blocks outbound network, OR a transient upstream DNS
+    // hiccup. Append an imperative retry hint so the agent does not capitulate
+    // to training data on the FIRST transient failure (PR #654 substitute —
+    // sibling-tool consistency with hooks/core/routing.mjs WebFetch wording).
+    const errCode = (err as NodeJS.ErrnoException | undefined)?.code ?? "";
+    const isTransientDns = errCode === "ETIMEOUT" || errCode === "ETIMEDOUT" ||
+      errCode === "EAI_AGAIN" || errCode === "ENETUNREACH" || errCode === "EPERM";
+    const baseMsg = err instanceof Error ? err.message : String(err);
+    const hint = isTransientDns
+      ? " — transient DNS error; retry once before falling back. If it keeps failing, the MCP host may be running under a network sandbox; restart the host with network access enabled."
+      : "";
     return {
       kind: "fetch_error",
       url: rawUrl,
-      error: `DNS lookup failed for "${parsed.hostname}": ${err instanceof Error ? err.message : String(err)}`,
+      error: `DNS lookup failed for "${parsed.hostname}": ${baseMsg}${hint}`,
       reason: "exit",
     };
   }
@@ -2768,7 +2781,18 @@ async function fetchOneUrl(url: string, source: string | undefined, force: boole
       timeout: 30_000,
     });
     if (result.exitCode !== 0) {
-      return { kind: "fetch_error", url, error: result.stderr || result.stdout || "unknown error", reason: "exit" };
+      // Subprocess fetch failure — undici / fetch can surface EAI_AGAIN /
+      // ETIMEDOUT / ENETUNREACH in stderr when the resolver is overloaded
+      // or the network is briefly unavailable. Append the same retry hint
+      // ssrfGuard's pre-flight DNS path emits so the agent doesn't capitulate
+      // to training data on the first transient failure (PR #654 substitute —
+      // sibling-tool consistency with hooks/core/routing.mjs WebFetch wording).
+      const raw = result.stderr || result.stdout || "unknown error";
+      const isTransientDns = /\b(EAI_AGAIN|ETIMEDOUT|ETIMEOUT|ENETUNREACH|EPERM|getaddrinfo)\b/.test(raw);
+      const hint = isTransientDns
+        ? " — transient DNS error; retry once before falling back. If it keeps failing, the MCP host may be running under a network sandbox; restart the host with network access enabled."
+        : "";
+      return { kind: "fetch_error", url, error: `${raw}${hint}`, reason: "exit" };
     }
     const header = (result.stdout || "").trim();
     let markdown: string;

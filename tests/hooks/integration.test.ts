@@ -241,7 +241,7 @@ describe("WebFetch", () => {
       "Expected original URL in reason",
     );
     assert.ok(
-      parsed.hookSpecificOutput.permissionDecisionReason.includes("Do NOT use curl"),
+      /Do NOT retry with .*curl/.test(parsed.hookSpecificOutput.permissionDecisionReason),
       "Expected curl warning in reason",
     );
   });

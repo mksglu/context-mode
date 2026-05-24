@@ -88,9 +88,10 @@ describe("routePreToolUse", () => {
       expect(result).not.toBeNull();
       expect(result!.action).toBe("modify");
       expect(result!.updatedInput).toBeDefined();
-      expect((result!.updatedInput as Record<string, string>).command).toContain(
-        "curl/wget blocked",
-      );
+      const cmd = (result!.updatedInput as Record<string, string>).command;
+      expect(cmd).toContain("curl/wget redirected");
+      expect(cmd).not.toContain("curl/wget blocked");
+      expect(cmd).toMatch(/retry/i);
     });
 
     it("denies Codex exec_command cmd payloads like Bash command payloads", () => {
@@ -104,7 +105,7 @@ describe("routePreToolUse", () => {
       expect(result).not.toBeNull();
       expect(result!.action).toBe("modify");
       expect((result!.updatedInput as Record<string, string>).command).toContain(
-        "curl/wget blocked",
+        "curl/wget redirected",
       );
     });
 
@@ -115,7 +116,7 @@ describe("routePreToolUse", () => {
       expect(result).not.toBeNull();
       expect(result!.action).toBe("modify");
       expect((result!.updatedInput as Record<string, string>).command).toContain(
-        "curl/wget blocked",
+        "curl/wget redirected",
       );
     });
 
@@ -194,9 +195,10 @@ describe("routePreToolUse", () => {
       });
       expect(result).not.toBeNull();
       expect(result!.action).toBe("modify");
-      expect((result!.updatedInput as Record<string, string>).command).toContain(
-        "Inline HTTP blocked",
-      );
+      const cmd = (result!.updatedInput as Record<string, string>).command;
+      expect(cmd).toContain("Inline HTTP redirected");
+      expect(cmd).not.toContain("Inline HTTP blocked");
+      expect(cmd).toMatch(/retry/i);
     });
 
     it("denies requests.get() with modify action", () => {
@@ -206,7 +208,7 @@ describe("routePreToolUse", () => {
       expect(result).not.toBeNull();
       expect(result!.action).toBe("modify");
       expect((result!.updatedInput as Record<string, string>).command).toContain(
-        "Inline HTTP blocked",
+        "Inline HTTP redirected",
       );
     });
 
@@ -346,8 +348,13 @@ describe("routePreToolUse", () => {
       });
       expect(result).not.toBeNull();
       expect(result!.action).toBe("deny");
-      expect(result!.reason).toContain("WebFetch blocked");
+      // PR #654 substitute: imperative-positive framing, no "blocked" wording,
+      // explicit retry hint to keep Haiku-tier agents from capitulating to
+      // training data on transient DNS errors (audit Probe 3).
+      expect(result!.reason).toContain("WebFetch redirected");
+      expect(result!.reason).not.toContain("WebFetch blocked");
       expect(result!.reason).toContain("fetch_and_index");
+      expect(result!.reason).toMatch(/retry/i);
     });
 
     it("includes the URL in deny reason", () => {
@@ -362,7 +369,7 @@ describe("routePreToolUse", () => {
       const result = routePreToolUse("mcp_web_fetch", { url });
       expect(result).not.toBeNull();
       expect(result!.action).toBe("deny");
-      expect(result!.reason).toContain("WebFetch blocked");
+      expect(result!.reason).toContain("WebFetch redirected");
       expect(result!.reason).toContain("fetch_and_index");
       expect(result!.reason).toContain("ctx_search");
     });
@@ -372,7 +379,7 @@ describe("routePreToolUse", () => {
       const result = routePreToolUse("mcp_fetch_tool", { url });
       expect(result).not.toBeNull();
       expect(result!.action).toBe("deny");
-      expect(result!.reason).toContain("WebFetch blocked");
+      expect(result!.reason).toContain("WebFetch redirected");
       expect(result!.reason).toContain("fetch_and_index");
       expect(result!.reason).toContain("ctx_search");
     });
