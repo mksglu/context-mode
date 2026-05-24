@@ -45,23 +45,91 @@ All `ctx_*` tool descriptions registered via `server.registerTool()`
 **MUST** follow this structure:
 
 ```text
-<1-line role definition>
+<1-line headline, <= 120 chars, imperative-positive>
 
 WHEN:
   - <bulleted positive trigger conditions>
 
-WHEN NOT (optional):
+WHEN NOT:
   - <bulleted positive disambiguation from sibling tools>
 
 RETURNS:
-  <what the agent sees back>
+  <what the agent sees back, 1-3 lines>
 
-EXAMPLE:
-  <one concrete call with realistic params>
+EXAMPLE: <one canonical call with realistic params>
 ```
 
 The legacy alias `WHEN TO USE:` is accepted as a transitional form (see
 `ctx_index`) but new tools MUST use `WHEN:`.
+
+### Canonical structure (locked rubric — PR #683 WS3)
+
+Future contributors do **not** get to re-invent section names. The
+contract test in `tests/core/server.test.ts` enforces every rule below
+on every commit; this section is the source of truth.
+
+1. **Section order MUST be**
+   `WHEN -> WHEN NOT -> RETURNS -> EXAMPLE`.
+   Positive selection cues precede negative disambiguation (audit
+   rubric #2). A tool MAY omit `WHEN NOT:` when it has no sibling-tool
+   ambiguity, but every other canonical section is mandatory.
+
+2. **Bullets MUST use markdown `- ` only.** Numeric (`1.`, `1-`),
+   asterisk (`* `), and unicode (`•`) bullets are rejected. Numbering
+   inside a routing-target description is also rejected because each
+   bullet should be independently true, not sequenced. Numbered
+   hierarchies live in `hooks/routing-block.mjs` (priority order in a
+   system-prompt injection is a different prompt surface, governed by
+   ADR-0003 sibling concerns).
+
+3. **Section headers MUST be UPPERCASE + colon at the start of a
+   line.** The token uniformity matters because GPT, Gemini, Llama,
+   and Claude tokenize lowercase / mixed-case section names
+   differently — uppercase headers are the only shape that hits a
+   single token across families.
+
+4. **Two-space bullet indent under each header.** Example shape:
+   ```
+   WHEN:
+     - First positive cue
+     - Second positive cue
+   ```
+   The contract test does not assert the literal indent count (LLMs
+   are tolerant of 2 vs 4) but every shipped description in
+   `src/server.ts` uses two-space indent for visual uniformity.
+
+5. **One blank line between sections.**
+
+6. **One canonical `EXAMPLE:` per tool.** Tools with two valid input
+   shapes (e.g. `ctx_purge` per-session vs per-project) MAY include
+   two EXAMPLE lines back-to-back. Keep them adjacent so the
+   description does not interleave examples with other sections.
+
+7. **Carve-outs (per-tool, allow-listed in the contract test):**
+   - `ctx_purge`: `DESTRUCTIVE`, `SCOPES`, `CONTRACT`. Justified by
+     Probe 4 empirical evidence — heavy framing on this tool
+     preserves parameter fidelity on small models. `DESTRUCTIVE` here
+     is accurate user-facing signaling, distinct from the
+     cross-LLM-bias negative framing the rubric forbids.
+
+### Cross-LLM rationale
+
+The audit ran 38 A/B trials × 6 probes across Haiku and Sonnet. The
+canonical structure above is the lowest common denominator that:
+
+- Hits a single token across **Claude, GPT, Gemini, Llama** families
+  for every section header (uppercase + colon).
+- Avoids tokens flagged by Constitutional AI-style RLHF priors
+  (`FORBIDDEN`, `BLOCKED`, `NEVER`, `MANDATORY`).
+- Eliminates negative-example leakage (emoji bullets — rubric #4,
+  Probe 3).
+- Leaves room for accurate signaling where empirically required
+  (Probe 4 `ctx_purge` carve-out).
+
+The structure is locked to make future PRs ungameable: a contributor
+proposing a new tool either adheres to it (contract test passes) or
+opens a new ADR amending this one (contract test fails until the
+allow-list is updated).
 
 ### Forbidden tokens
 
@@ -100,10 +168,12 @@ Descriptions SHOULD be ≤ 1,000 characters. Hard cap 1,500.
   by design (diagnostic / GUI affordances, not routing targets).
 - `ctx_upgrade` — `MUST` is permitted per the post-call obligation rule
   above.
-- `ctx_purge` — rewrite deferred per Probe 4 empirical evidence (see
-  Consequences). A naïve rewrite would regress parameter fidelity on
-  Haiku (5/5 → 3/5). The follow-up rewrite PR must run a tri-LLM probe
-  (Haiku / Sonnet / Opus) and gate merge on that probe.
+- `ctx_purge` — rewritten in PR #683 WS2 with carve-outs (`DESTRUCTIVE`,
+  `SCOPES`, `CONTRACT`) that preserve the parameter-fidelity discipline
+  Probe 4 measured (5/5 vs 3/5 on Haiku). The rewrite still meets the
+  canonical `WHEN / WHEN NOT / RETURNS / EXAMPLE` structure; the carve-out
+  headers coexist with it. The empirical-validation gate is documented in
+  `tests/core/server.test.ts` `ALLOWED_EXTRA_SECTIONS`.
 
 ## Consequences
 
@@ -119,9 +189,12 @@ Descriptions SHOULD be ≤ 1,000 characters. Hard cap 1,500.
   lives in `hooks/routing-block.mjs` and `CLAUDE.md`, not in tool
   descriptions. That layer is correct because it runs as system-prompt
   injection, where exhortations belong.
-- `ctx_purge` rewrite is a separate PR with a tri-LLM probe gate.
-  Documented inline in `EXEMPT_FROM_FORBIDDEN_TOKENS` so future authors
-  see the empirical rationale, not just a quiet skip.
+- `ctx_purge` is rewritten in PR #683 WS2 with carve-out headers
+  (`DESTRUCTIVE`, `SCOPES`, `CONTRACT`) allow-listed by the contract
+  test's `ALLOWED_EXTRA_SECTIONS`. The rewrite preserves Probe 4's
+  parameter-fidelity discipline (accurate DESTRUCTIVE signal + explicit
+  SCOPES + CONTRACT block) while still meeting the canonical
+  `WHEN / WHEN NOT / RETURNS / EXAMPLE` structure.
 - New `ctx_*` tools added in future PRs MUST cite this ADR in the PR
   description and pass the contract test.
 

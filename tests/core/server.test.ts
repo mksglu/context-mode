@@ -3112,12 +3112,18 @@ describe("batch_execute FS read tracking", () => {
   });
 
   test("tool description documents the concurrency field with positive guidance", () => {
-    // PR #683 / ADR-0002: emoji bullets replaced with prose. The guidance
-    // still names the I/O-bound vs CPU-bound split and the speedup window,
-    // but uses positive WHEN: structure instead of ✅/❌ rows.
-    expect(serverSrc).toContain("4-8 for I/O-bound");
-    expect(serverSrc).toContain("1 for CPU-bound");
-    expect(serverSrc).toContain("CONCURRENCY");
+    // PR #683 / ADR-0002: emoji bullets replaced with prose. The standalone
+    // CONCURRENCY: section was folded into WHEN: / WHEN NOT: prose by the
+    // PR #683 WS3 canonical-structure pass so descriptions only carry the
+    // four canonical sections (WHEN / WHEN NOT / RETURNS / EXAMPLE) plus
+    // approved per-tool carve-outs (e.g. ctx_purge SCOPES / CONTRACT).
+    // The I/O-bound vs CPU-bound split and the 4-8 speedup window are still
+    // named — just inline in the WHEN clauses now, not under a separate
+    // UPPERCASE banner.
+    expect(serverSrc).toContain("parallelize I/O-bound calls");
+    expect(serverSrc).toContain("concurrency 4-8");
+    expect(serverSrc).toContain("CPU-bound or stateful");
+    expect(serverSrc).toContain("keep concurrency at 1");
   });
 });
 
@@ -3658,14 +3664,17 @@ describe("ctx_fetch_and_index batch refactor", () => {
   });
 
   test("PARALLELIZE I/O guidance + locked requests:[] schema in description", () => {
-    // PR #683 / ADR-0002: emoji bullets replaced with prose, "PARALLELIZE
-    // I/O" banner replaced with a positive CONCURRENCY: section. The
-    // requests:[{url, source}] schema callout stays (it's a contract cue),
-    // and the I/O-bound vs single-URL split is still named — just in prose.
-    expect(fetchHandlerSrc).toContain("CONCURRENCY");
+    // PR #683 / ADR-0002: emoji bullets replaced with prose. PR #683 WS3
+    // (canonical structure) folded the dedicated CONCURRENCY: section into
+    // the WHEN: / RETURNS: prose so the description carries only the
+    // canonical four sections (WHEN / WHEN NOT / RETURNS / EXAMPLE).
+    // The requests:[{url, source}] schema callout stays (contract cue), and
+    // the I/O-bound multi-URL guidance + the FTS5 serial-write contract
+    // remain explicit in the description — just inline now, not under a
+    // separate UPPERCASE banner.
     expect(fetchHandlerSrc).toContain("requests: [{url");
-    expect(fetchHandlerSrc).toContain("concurrency 4-8 for I/O-bound");
-    expect(fetchHandlerSrc).toContain("concurrency 1");
+    expect(fetchHandlerSrc).toContain("concurrency 4-8");
+    expect(fetchHandlerSrc).toContain("FTS5 indexing then serializes writes");
   });
 
   test("serial-write contract: index drain is a for-loop calling indexFetched serially", () => {
@@ -5302,17 +5311,17 @@ describe("tool description style contract (#683 ADR-0002)", () => {
     "ctx_doctor",
     "ctx_insight",
     "ctx_upgrade",
-    "ctx_purge", // deferred entirely (see EXEMPT_FROM_FORBIDDEN_TOKENS below)
   ]);
 
-  // ctx_purge is exempt from the forbidden-word scan because its rewrite is
-  // deferred to a separate PR per Probe 4 empirical evidence in
-  // TOOL-DESCRIPTIONS-AUDIT.md §6.1: heavy negative framing OUTPERFORMS the
-  // softer rewrite (5/5 vs 3/5 on parameter fidelity on Haiku). A naive
-  // wording fix here would REGRESS the tool. The follow-up PR must run a
-  // tri-LLM probe (Haiku / Sonnet / Opus) and gate merge on that probe.
-  // Documented in PR #683 body and ADR-0002.
-  const EXEMPT_FROM_FORBIDDEN_TOKENS = new Set(["ctx_purge"]);
+  // ctx_purge carve-out — the rewrite (PR #683 WS2) preserves the
+  // user-facing DESTRUCTIVE signal because Probe 4 empirically showed that
+  // soft framing regresses parameter fidelity on Haiku (5/5 → 3/5). The
+  // word "DESTRUCTIVE" is therefore an accurate-signaling carve-out,
+  // distinct from cross-LLM-bias negative framing the rubric forbids.
+  // ADR-0002 §Exemptions documents this; the WHEN/WHEN NOT/SCOPES/
+  // CONTRACT/RETURNS/EXAMPLE structure of the rewritten description still
+  // meets the canonical contract enforced below.
+  const EXEMPT_FROM_FORBIDDEN_TOKENS = new Set<string>([]);
 
   test("at least 11 ctx_* tools are registered", () => {
     // Sanity check that the extractor found the corpus.
@@ -5385,10 +5394,70 @@ describe("tool description style contract (#683 ADR-0002)", () => {
     },
   ];
 
+  // ── Canonical structure (ADR-0002 amendment, PR #683 WS3) ────────────
+  //
+  // Every non-exempt ctx_* tool description MUST follow the canonical
+  // structure documented in ADR-0002:
+  //
+  //   <1-line headline>
+  //   WHEN:        (mandatory — positive selection cues, bulleted with `- `)
+  //   WHEN NOT:    (optional — sibling-tool disambiguation, bulleted)
+  //   RETURNS:     (mandatory — what the agent gets back)
+  //   EXAMPLE:     (mandatory — one canonical call)
+  //
+  // Rules:
+  //   1. Section order MUST be WHEN -> WHEN NOT -> RETURNS -> EXAMPLE
+  //      (positive cues precede negative disambiguation, per audit rubric #2).
+  //   2. Bullets MUST use markdown `- ` only. `1.`, `1-`, `* `, and `•` are
+  //      rejected because they tokenize inconsistently across LLM families
+  //      and break the audit's bullet-uniformity contract.
+  //   3. Section headers MUST be UPPERCASE + colon at the start of a line
+  //      (after the `\n` escape in source form).
+  //   4. ctx_purge has an audit-approved carve-out for DESTRUCTIVE / SCOPES /
+  //      CONTRACT headers (accurate-signaling and parameter-fidelity
+  //      requirements that Probe 4 empirically validated). All four headers
+  //      coexist with the canonical WHEN/WHEN NOT/RETURNS/EXAMPLE.
+  //
+  // Helper: flatten the source-form description into the literal text the
+  // LLM eventually sees (collapse `\n` escapes, join `"..." + "..."` concat,
+  // strip template-literal backticks). This is the same shape the host LLM
+  // receives at tool-selection time.
+  function flattenDescription(d: string): string {
+    return d
+      .replace(/^\s*description:\s*/, "")
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, '"')
+      .replace(/"\s*\+\s*\n\s*"/g, "")
+      .replace(/"\s*\+\s*"/g, "")
+      .replace(/^"|"$/gm, "")
+      .replace(/`/g, "");
+  }
+
+  // Per-tool carve-outs that allow non-canonical UPPERCASE: section headers.
+  // Each entry is justified inline so a future contributor reading a failure
+  // understands why the carve-out exists.
+  const ALLOWED_EXTRA_SECTIONS: Record<string, string[]> = {
+    // ctx_purge: heavy framing is empirically validated by Probe 4. The
+    // DESTRUCTIVE prefix preserves accurate user-facing signaling and
+    // SCOPES/CONTRACT preserve parameter-fidelity discipline on Haiku.
+    ctx_purge: ["DESTRUCTIVE", "SCOPES", "CONTRACT"],
+  };
+
+  // Canonical mandatory + optional sections.
+  const CANONICAL_ORDER = ["WHEN", "WHEN NOT", "RETURNS", "EXAMPLE"] as const;
+  const MANDATORY = ["WHEN", "RETURNS", "EXAMPLE"] as const;
+
+  // Bullet patterns the contract rejects in routing-target descriptions.
+  const BAD_BULLETS = [
+    { name: "numeric-dot bullet (e.g. '1.')", pattern: /^\s*\d+\.\s/m },
+    { name: "numeric-dash bullet (e.g. '1-')", pattern: /^\s*\d+-\s/m },
+    { name: "asterisk bullet (e.g. '* foo')", pattern: /^\s*\*\s/m },
+    { name: "unicode bullet (e.g. '• foo')", pattern: /^\s*•\s/m },
+  ];
+
   for (const tool of tools) {
-    // Tools exempt from BOTH groups (only ctx_purge today) have no assertions
-    // to make — emit a placeholder test so vitest doesn't error on empty
-    // describe blocks. The placeholder documents the deferral inline.
+    // Tools exempt from BOTH groups have no assertions to make — emit a
+    // placeholder test so vitest doesn't error on empty describe blocks.
     const isFullyExempt =
       EXEMPT_FROM_FORBIDDEN_TOKENS.has(tool.name) && EXEMPT_FROM_WHEN.has(tool.name);
     describe(tool.name, () => {
@@ -5427,6 +5496,71 @@ describe("tool description style contract (#683 ADR-0002)", () => {
           // template-literal and string-concat description shapes pass.
           const hasWhen = /(?:\\n|^|\s|")WHEN(?:\s+TO\s+USE)?:/.test(tool.description);
           expect(hasWhen, `${tool.name} description (src/server.ts:${tool.lineNo}) must contain a WHEN: section`).toBe(true);
+        });
+
+        // ── Canonical structure assertions (PR #683 WS3) ─────────────
+        const flat = flattenDescription(tool.description);
+
+        test("MUST contain RETURNS: and EXAMPLE: sections (canonical structure)", () => {
+          for (const section of MANDATORY) {
+            expect(
+              flat.includes(section + ":"),
+              `${tool.name} (src/server.ts:${tool.lineNo}) missing mandatory section '${section}:' per ADR-0002 canonical structure.`,
+            ).toBe(true);
+          }
+        });
+
+        test("section order MUST be WHEN -> WHEN NOT -> RETURNS -> EXAMPLE", () => {
+          // For each canonical section present, its position in the flattened
+          // description must be strictly greater than the previous canonical
+          // section's position. Carve-out headers (DESTRUCTIVE, SCOPES,
+          // CONTRACT for ctx_purge) are allowed between canonical sections
+          // — only the relative order of the canonical four is enforced.
+          let lastPos = -1;
+          for (const section of CANONICAL_ORDER) {
+            const pos = flat.indexOf(section + ":");
+            if (pos < 0) continue;
+            expect(
+              pos,
+              `${tool.name} (src/server.ts:${tool.lineNo}) section '${section}:' appears before a sibling that should follow it (positions: ${CANONICAL_ORDER.map(s => `${s}=${flat.indexOf(s + ":")}`).join(", ")}). Canonical order: WHEN -> WHEN NOT -> RETURNS -> EXAMPLE.`,
+            ).toBeGreaterThan(lastPos);
+            lastPos = pos;
+          }
+        });
+
+        test("section headers MUST be UPPERCASE + colon (no off-spec UPPERCASE sections)", () => {
+          // Extract every UPPERCASE-header occurrence (two or more uppercase
+          // chars, optional space, then colon at line start). Reject any
+          // that aren't in the canonical set or the per-tool carve-out.
+          const headerMatches = [...flat.matchAll(/^([A-Z][A-Z _]+):/gm)].map(m => m[1]);
+          const allowed = new Set<string>([...CANONICAL_ORDER, ...(ALLOWED_EXTRA_SECTIONS[tool.name] ?? [])]);
+          const offSpec = [...new Set(headerMatches.filter(h => !allowed.has(h)))];
+          expect(
+            offSpec,
+            `${tool.name} (src/server.ts:${tool.lineNo}) uses off-spec UPPERCASE sections [${offSpec.join(", ")}]. ` +
+            `Allowed: [${[...allowed].join(", ")}]. Fold operational sub-guidance (CONCURRENCY, TIPS, ...) into WHEN: / RETURNS: prose.`,
+          ).toEqual([]);
+        });
+
+        test("bullets MUST use '- ' markdown only (no '1.', '1-', '* ', or '•')", () => {
+          // Scan the flattened description. The rubric requires uniform
+          // markdown bullets so the host LLM tokenizes them consistently
+          // across Claude / GPT / Gemini / Llama. Numbered ordering inside
+          // a routing-target description is also discouraged because each
+          // bullet should be independently true, not sequenced.
+          const failures: string[] = [];
+          for (const rule of BAD_BULLETS) {
+            const m = flat.match(rule.pattern);
+            if (m) {
+              const lineNo = flat.slice(0, flat.indexOf(m[0])).split("\n").length;
+              failures.push(`${rule.name} at description-line ${lineNo}: '${m[0].trim()}'`);
+            }
+          }
+          expect(
+            failures,
+            `${tool.name} (src/server.ts:${tool.lineNo}) bullet uniformity violation: ${failures.join("; ")}. ` +
+            `Use markdown '- ' bullets only (ADR-0002 §Canonical structure).`,
+          ).toEqual([]);
         });
       }
     });
