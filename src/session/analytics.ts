@@ -14,6 +14,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, sep } from "node:path";
 import { loadDatabase as loadDatabaseImpl } from "../db-base.js";
+import { ensureSessionEventsSchema } from "./db.js";
 import { resolveClaudeConfigDir } from "../util/claude-config.js";
 
 function semverNewer(a: string, b: string): boolean {
@@ -1190,6 +1191,19 @@ export function getRealBytesStats(opts: {
   // don't need to type-narrow per row.
   for (const file of dbFiles) {
     const dbPath = join(sessionsDir, file);
+    // v1.0.148 hotfix: historical DBs were created with pre-v1.0.130
+    // schema (no bytes_avoided / bytes_returned / project_dir columns).
+    // The SELECT below references those columns, so without an in-place
+    // migration the prepare() throws and the surrounding catch silently
+    // skips the WHOLE DB — losing even the LENGTH(data) signal. Run the
+    // shared migration helper before opening readonly. Idempotent: a
+    // PRAGMA check inside the helper short-circuits when the DB is
+    // already current, so post-first-read calls are cheap.
+    ensureSessionEventsSchema(dbPath, DatabaseCtor as unknown as new (path: string, opts?: { readonly?: boolean }) => {
+      pragma: (q: string) => Array<{ name: string }>;
+      exec: (sql: string) => void;
+      close: () => void;
+    });
     try {
       const sdb = new DatabaseCtor(dbPath, { readonly: true });
       try {

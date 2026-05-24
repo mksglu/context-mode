@@ -659,6 +659,98 @@ const S = {
 } as const;
 
 // ─────────────────────────────────────────────────────────
+// Schema migration helpers (shared with the analytics aggregator)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Columns that the current `session_events` schema requires but earlier
+ * versions of context-mode did not write. Older DBs on disk are missing
+ * these — the analytics aggregator opens every DB it finds across all
+ * adapters, so without an in-place migration the SUM queries below fail
+ * the entire DB (the catch at the top of the read loop swallows the
+ * "no such column" error and the DB contributes zero to every column,
+ * not just the new ones). v1.0.148 hotfix.
+ */
+const SESSION_EVENTS_REQUIRED_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+  ["project_dir", "TEXT NOT NULL DEFAULT ''"],
+  ["attribution_source", "TEXT NOT NULL DEFAULT 'unknown'"],
+  ["attribution_confidence", "REAL NOT NULL DEFAULT 0"],
+  ["bytes_avoided", "INTEGER NOT NULL DEFAULT 0"],
+  ["bytes_returned", "INTEGER NOT NULL DEFAULT 0"],
+];
+
+/**
+ * Apply any missing post-v1.0.130 `session_events` columns to an already-
+ * open writable database handle. Idempotent — each ALTER is guarded by a
+ * PRAGMA table_xinfo check, and the project_dir index is created only
+ * when a migration actually ran. Returns true if any column was added.
+ *
+ * Used by both the SessionDB constructor (for the active DB) and the
+ * analytics aggregator (for the 100+ historical DBs that never get
+ * opened through SessionDB). ADR-0001 compatible: no EXCLUSIVE pragma,
+ * no acquireDbLock — relies on the SQLite busy_timeout + WAL semantics
+ * already provided by SQLiteBase.
+ */
+export function applyMissingSessionEventsColumns(db: {
+  pragma: (q: string) => Array<{ name: string }>;
+  exec: (sql: string) => void;
+}): boolean {
+  const colInfo = db.pragma("table_xinfo(session_events)") as Array<{ name: string }>;
+  const cols = new Set(colInfo.map((c) => c.name));
+  let changed = false;
+  for (const [name, spec] of SESSION_EVENTS_REQUIRED_COLUMNS) {
+    if (!cols.has(name)) {
+      db.exec(`ALTER TABLE session_events ADD COLUMN ${name} ${spec}`);
+      changed = true;
+    }
+  }
+  if (changed) {
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_session_events_project ON session_events(session_id, project_dir)",
+    );
+  }
+  return changed;
+}
+
+/**
+ * Open a session DB file briefly, run any missing schema migrations,
+ * and close. Best-effort: missing tables, file-locks, corrupt files,
+ * and any DatabaseCtor error are swallowed silently — the caller
+ * (analytics aggregator) handles the readonly query that follows and
+ * will skip the DB if it remains unreadable.
+ *
+ * Lazy migration entry point for the analytics aggregator, which would
+ * otherwise read 100+ historical DBs with the old (pre-v1.0.130) schema
+ * and lose every signal (not just bytes_avoided) because the SELECT
+ * statement references columns that don't exist on legacy schemas.
+ *
+ * Two open/close cycles in the worst case (one readonly probe to detect
+ * legacy schema, one writable to migrate). For already-migrated DBs
+ * (the common case after first read), this opens writable once and
+ * exits without writing — cheaper than always-writable.
+ */
+export function ensureSessionEventsSchema(
+  dbPath: string,
+  DatabaseCtor: new (path: string, opts?: { readonly?: boolean }) => {
+    pragma: (q: string) => Array<{ name: string }>;
+    exec: (sql: string) => void;
+    close: () => void;
+  },
+): void {
+  let db: { pragma: (q: string) => Array<{ name: string }>; exec: (sql: string) => void; close: () => void } | null = null;
+  try {
+    db = new DatabaseCtor(dbPath);
+    applyMissingSessionEventsColumns(db);
+  } catch {
+    // best-effort — missing table, file lock, corrupt DB, or DatabaseCtor
+    // load failure. The aggregator's existing skip-on-error handles the
+    // downstream readonly query.
+  } finally {
+    try { db?.close(); } catch { /* ignore */ }
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // SessionDB
 // ─────────────────────────────────────────────────────────
 
@@ -752,25 +844,14 @@ export class SessionDB extends SQLiteBase {
     `);
 
     // Migration: add per-event attribution columns for existing DBs.
+    // Shared helper — the analytics aggregator (analytics.ts) runs the
+    // SAME migration against every historical DB it scans, so the column
+    // list lives in one place at the top of this module.
     try {
-      const colInfo = this.db.pragma("table_xinfo(session_events)") as Array<{ name: string }>;
-      const cols = new Set(colInfo.map((c) => c.name));
-      if (!cols.has("project_dir")) {
-        this.db.exec("ALTER TABLE session_events ADD COLUMN project_dir TEXT NOT NULL DEFAULT ''");
-      }
-      if (!cols.has("attribution_source")) {
-        this.db.exec("ALTER TABLE session_events ADD COLUMN attribution_source TEXT NOT NULL DEFAULT 'unknown'");
-      }
-      if (!cols.has("attribution_confidence")) {
-        this.db.exec("ALTER TABLE session_events ADD COLUMN attribution_confidence REAL NOT NULL DEFAULT 0");
-      }
-      if (!cols.has("bytes_avoided")) {
-        this.db.exec("ALTER TABLE session_events ADD COLUMN bytes_avoided INTEGER NOT NULL DEFAULT 0");
-      }
-      if (!cols.has("bytes_returned")) {
-        this.db.exec("ALTER TABLE session_events ADD COLUMN bytes_returned INTEGER NOT NULL DEFAULT 0");
-      }
-      this.db.exec("CREATE INDEX IF NOT EXISTS idx_session_events_project ON session_events(session_id, project_dir)");
+      applyMissingSessionEventsColumns(this.db as unknown as {
+        pragma: (q: string) => Array<{ name: string }>;
+        exec: (sql: string) => void;
+      });
     } catch {
       // best-effort migration only
     }
