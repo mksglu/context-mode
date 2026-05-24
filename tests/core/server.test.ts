@@ -3118,10 +3118,13 @@ describe("batch_execute FS read tracking", () => {
     // four canonical sections (WHEN / WHEN NOT / RETURNS / EXAMPLE) plus
     // approved per-tool carve-outs (e.g. ctx_purge SCOPES / CONTRACT).
     // The I/O-bound vs CPU-bound split and the 4-8 speedup window are still
-    // named — just inline in the WHEN clauses now, not under a separate
-    // UPPERCASE banner.
-    expect(serverSrc).toContain("parallelize I/O-bound calls");
-    expect(serverSrc).toContain("concurrency 4-8");
+    // named — the PR #683 second amendment then deepened the concurrency
+    // guidance (CPU-bound stays at 1, GitHub API caps at 4 to respect rate
+    // limits, I/O-bound uses 4-8). This test pins the load-bearing concepts
+    // (I/O-bound parallelism, the 4-8 window, the keep-at-1 rule) not the
+    // exact prose so future copy-edits don't break it.
+    expect(serverSrc).toMatch(/parallelize I\/O-bound (work|calls|batches)/);
+    expect(serverSrc).toMatch(/4-8\s+(for I\/O-bound|I\/O-bound batches)/);
     expect(serverSrc).toContain("CPU-bound or stateful");
     expect(serverSrc).toContain("keep concurrency at 1");
   });
@@ -3668,13 +3671,16 @@ describe("ctx_fetch_and_index batch refactor", () => {
     // (canonical structure) folded the dedicated CONCURRENCY: section into
     // the WHEN: / RETURNS: prose so the description carries only the
     // canonical four sections (WHEN / WHEN NOT / RETURNS / EXAMPLE).
-    // The requests:[{url, source}] schema callout stays (contract cue), and
-    // the I/O-bound multi-URL guidance + the FTS5 serial-write contract
-    // remain explicit in the description — just inline now, not under a
-    // separate UPPERCASE banner.
-    expect(fetchHandlerSrc).toContain("requests: [{url");
-    expect(fetchHandlerSrc).toContain("concurrency 4-8");
-    expect(fetchHandlerSrc).toContain("FTS5 indexing then serializes writes");
+    // PR #683 second amendment then deepened the concurrency guidance
+    // (gh API cap 4, single-writer mechanism explanation) and reframed the
+    // FTS5 serialization in more technical terms ("write phase always runs
+    // serially because SQLite is a single-writer store").
+    // This test pins the load-bearing concepts (requests:[] batch shape,
+    // 4-8 I/O window, FTS5 serial-write contract) using semantic regexes
+    // so future copy-edits don't break it.
+    expect(fetchHandlerSrc).toMatch(/requests(:\s*\[|`\s*array)/);
+    expect(fetchHandlerSrc).toMatch(/4-8\s+(for|stable)/);
+    expect(fetchHandlerSrc).toMatch(/FTS5[^.]*(serializes? writes?|write phase[^.]*serial|single-writer)/);
   });
 
   test("serial-write contract: index drain is a for-loop calling indexFetched serially", () => {
