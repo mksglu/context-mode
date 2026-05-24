@@ -14,6 +14,7 @@
  * Track: https://github.com/openai/codex/issues/18491
  */
 
+import { execFileSync } from "node:child_process";
 import {
   readFileSync,
   writeFileSync,
@@ -113,6 +114,36 @@ const LEGACY_HOOK_PATH_SUFFIXES: Record<keyof typeof CODEX_HOOK_COMMANDS, string
   UserPromptSubmit: ["hooks/userpromptsubmit.mjs", "hooks/codex/userpromptsubmit.mjs"],
   Stop: ["hooks/stop.mjs", "hooks/codex/stop.mjs"],
 };
+
+type CodexVersionRunner = (
+  file: string,
+  args: string[],
+  options: {
+    encoding: BufferEncoding;
+    stdio: ["ignore", "pipe", "ignore"];
+    timeout: number;
+  },
+) => string | Buffer;
+
+export function probeCodexCliVersion(runCommand: CodexVersionRunner = execFileSync): string | null {
+  try {
+    const output = process.platform === "win32"
+      ? runCommand("cmd.exe", ["/d", "/s", "/c", "codex --version"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 5000,
+      })
+      : runCommand("codex", ["--version"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 1500,
+      });
+    const version = String(output).trim();
+    return version.length > 0 ? version : "available (version output empty)";
+  } catch {
+    return null;
+  }
+}
 
 function getTomlSection(raw: string, sectionName: string): string | null {
   const lines = raw.split(/\r?\n/);
@@ -459,6 +490,16 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
 
   validateHooks(_pluginRoot: string): DiagnosticResult[] {
     const results: DiagnosticResult[] = [];
+    const codexCliVersion = probeCodexCliVersion();
+
+    results.push({
+      check: "Codex CLI binary",
+      status: codexCliVersion ? "pass" : "warn",
+      message: codexCliVersion
+        ? `codex --version resolved to ${codexCliVersion}`
+        : "Could not run codex --version; hooks need the Codex CLI available on PATH",
+      ...(codexCliVersion ? {} : { fix: "Install Codex CLI or make codex available on PATH" }),
+    });
 
     try {
       const raw = readFileSync(this.getSettingsPath(), "utf-8");
@@ -607,8 +648,9 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
   }
 
   getInstalledVersion(): string {
-    // Codex CLI has no marketplace or plugin system
-    return "not installed";
+    // Codex uses standalone MCP registration; there is no platform-owned
+    // plugin version to compare against the context-mode npm package.
+    return "standalone";
   }
 
   // ── Upgrade ────────────────────────────────────────────

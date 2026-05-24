@@ -894,7 +894,12 @@ async function doctor(): Promise<number> {
     );
   }
 
-  if (installedVersion === "not installed") {
+  if (installedVersion === "standalone") {
+    p.log.info(
+      color.dim(`${adapter.name}: standalone MCP mode`) +
+        " — no platform plugin version to compare",
+    );
+  } else if (installedVersion === "not installed") {
     p.log.info(
       color.dim(`${adapter.name}: not installed`) +
         " — using standalone MCP mode",

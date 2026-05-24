@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { CodexAdapter } from "../../src/adapters/codex/index.js";
+import { CodexAdapter, probeCodexCliVersion } from "../../src/adapters/codex/index.js";
 import { resolveSessionDbPath, SessionDB } from "../../src/session/db.js";
 
 describe("CodexAdapter", () => {
@@ -281,6 +281,29 @@ describe("CodexAdapter", () => {
         else process.env.CODEX_HOME = savedCodexHome;
         rmSync(codexHome, { recursive: true, force: true });
       }
+    });
+  });
+
+  // ── Version diagnostics ───────────────────────────────
+
+  describe("version diagnostics", () => {
+    it("reports standalone MCP mode instead of a missing platform plugin", () => {
+      expect(adapter.getInstalledVersion()).toBe("standalone");
+    });
+
+    it("trims Codex CLI version probe output", () => {
+      expect(probeCodexCliVersion(() => "codex-cli 0.132.0\n")).toBe("codex-cli 0.132.0");
+    });
+
+    it("returns null when the Codex CLI version probe fails", () => {
+      expect(probeCodexCliVersion(() => {
+        throw new Error("ENOENT");
+      })).toBeNull();
+    });
+
+    it("surfaces Codex CLI binary availability in diagnostics", () => {
+      const checks = adapter.validateHooks("");
+      expect(checks.some((result) => result.check === "Codex CLI binary")).toBe(true);
     });
   });
 

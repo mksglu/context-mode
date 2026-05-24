@@ -296,7 +296,10 @@ export interface HookAdapter {
   /** Check if the plugin is registered/enabled on this platform. */
   checkPluginRegistration(): DiagnosticResult;
 
-  /** Get the installed version from this platform's registry/marketplace. */
+  /**
+   * Get the installed version from this platform's registry/marketplace, or
+   * "standalone" when no platform-owned plugin version exists.
+   */
   getInstalledVersion(): string;
 
   // ── Upgrade ────────────────────────────────────────────
