@@ -127,13 +127,6 @@ await runHook(async () => {
                   // Extract the script filename (e.g., sessionstart.mjs, pretooluse.mjs)
                   const scriptMatch = h.command.match(/([a-z]+\.mjs)\s*"?\s*$/);
                   if (scriptMatch) {
-                    // Issue #636: quote the script path so spaces in targetDir
-                    // (e.g. Dropbox/iCloud display names like "Lucas Werneck",
-                    // or CLAUDE_CONFIG_DIR pointed at a synced spaced folder)
-                    // don't break /bin/sh's word-splitting at hook-spawn time.
-                    // JSON.stringify is sufficient on Unix and safe on Windows
-                    // (backslashes get escaped — Claude Code's hook layer
-                    //  normalizes to POSIX on Windows anyway via toHookPath).
                     const scriptPath = resolve(targetDir, "hooks", scriptMatch[1]);
                     h.command = `node ${JSON.stringify(scriptPath)}`;
                     changed = true;
@@ -146,9 +139,6 @@ await runHook(async () => {
 
         if (changed) writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
       } catch { /* skip settings update */ }
-
-      // Old version dirs are cleaned lazily by sessionstart.mjs (age-gated >1h)
-      // to avoid breaking active sessions that still reference them (#181).
 
       writeFileSync(marker, Date.now().toString(), "utf-8");
     }
@@ -169,8 +159,6 @@ await runHook(async () => {
   const response = formatDecision("claude-code", decision);
 
   // ─── Write latency marker for cross-hook timing (Category 27) ───
-  // Marker writes MUST happen before stdout write — stdout is the last action
-  // so the process can exit immediately after, avoiding CI test timeouts.
   try {
     const sessionId = getSessionId(input);
     if (tool) {
@@ -182,7 +170,12 @@ await runHook(async () => {
   // ─── Write rejected-approach marker for PostToolUse to pick up ───
   // PreToolUse cannot safely load SessionDB (native module loading breaks hook stdout).
   // Write a marker file instead; PostToolUse reads it and writes the event.
-  if (decision && (decision.action === "deny" || decision.action === "modify")) {
+  //
+  // Skip the marker for Agent routing-block injection — that modification is
+  // transparent to the model (it enriches subagent prompts, the model never
+  // sees a denial). Pre-this-fix, every subagent spawn logged a spurious
+  // "Redirected to context-mode sandbox" event, inflating the rejected counter.
+  if (decision && (decision.action === "deny" || decision.action === "modify") && tool !== "Agent") {
     try {
       const sessionId = getSessionId(input);
       const reason = decision.action === "deny"
@@ -194,20 +187,12 @@ await runHook(async () => {
   }
 
   // ─── D2 PRD Phase 3/4: redirect marker for byte-accounting events ───
-  // routing.mjs attaches `redirectMeta` to decisions for tools whose output we
-  // kept out of the model's context window (curl/wget, WebFetch, large Read).
-  // PostToolUse reads this marker to emit a `category=redirect` event with the
-  // estimated `bytes_avoided`. PreToolUse cannot load SessionDB safely (native
-  // module load breaks hook stdout), hence the marker indirection.
   if (decision && decision.redirectMeta) {
     try {
       const sessionId = getSessionId(input);
       const meta = decision.redirectMeta;
       const summary = String(meta.commandSummary ?? "").slice(0, 200);
       const markerPath = resolve(tmpdir(), `context-mode-redirect-${sessionId}.txt`);
-      // Format: tool:type:bytesAvoided:commandSummary (matches Override C).
-      // commandSummary may legitimately contain `:` (URLs) — don't quote it,
-      // PostToolUse parses only the first 3 colons and treats the rest as data.
       writeFileSync(
         markerPath,
         `${meta.tool}:${meta.type}:${meta.bytesAvoided}:${summary}`,
