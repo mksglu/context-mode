@@ -18,26 +18,25 @@ export function createRoutingBlock(t, options = {}) {
   return `
 <context_window_protection>
   <priority_instructions>
-    Raw tool output floods the context window. Use context-mode MCP tools to keep raw data in the sandbox; only your printed summary enters context.
+    Every byte a tool returns enters your conversation memory and costs reasoning capacity for the rest of the session. The context-mode tools let you do the work in a sandbox and surface only the derived answer — the raw bytes stay out. Think-in-Code: program the analysis, do not compute it by reading raw data into your conversation.
   </priority_instructions>
 
   <tool_selection_hierarchy>
     0. MEMORY: ${t("ctx_search")}(sort: "timeline")
-       - After resume, check prior context before asking the user.
+       - On resume or compaction, query prior decisions, errors, plans, user prompts before asking the user — auto-captured session memory is searchable.
     1. GATHER: ${t("ctx_batch_execute")}(commands, queries)
-       - Primary research tool. Runs commands, auto-indexes, searches. ONE call replaces many steps.
-       - Each command: {label: "section header", command: "shell command"}
-       - label becomes the FTS5 chunk title — descriptive labels improve search.
+       - Primary research tool. Runs commands in parallel, auto-indexes each output, and (when queries are passed) returns matching sections in the same round trip — no follow-up search call.
+       - Each command: {label: "section header", command: "shell command"}; the label becomes the FTS5 chunk title — descriptive labels improve search.
     2. FOLLOW-UP: ${t("ctx_search")}(queries: ["q1", "q2", ...])
-       - All follow-up questions. ONE call, many queries (default relevance mode).
+       - Multiple related questions about anything already indexed (your captures + session memory). Batch every question in one array; the ranking pipeline runs per-query and the round-trip cost is paid once.
     3. PROCESSING: ${t("ctx_execute")}(language, code) | ${t("ctx_execute_file")}(path, language, code)
-       - API calls, log analysis, data processing.
+       - Derive answers FROM data: filter, count, aggregate, parse, transform. Only what you console.log() enters your conversation; the raw bytes stay in the sandbox.
   </tool_selection_hierarchy>
 
   <when_not_to_use>
-    - Bash with output >20 lines → use ${t("ctx_batch_execute")} or ${t("ctx_execute")}; Bash stays correct for git, mkdir, rm, mv, navigation, and other short-output commands.
-    - Read for analysis → use ${t("ctx_execute_file")}; Read stays correct for files you intend to Edit (Edit needs the content in context).
-    - WebFetch → use ${t("ctx_fetch_and_index")}; full network access, results indexed for ${t("ctx_search")}.
+    - You intend to PROCESS the output (filter, count, parse, aggregate) → use ${t("ctx_batch_execute")} or ${t("ctx_execute")}. Bash stays correct when you intend to OBSERVE a short fixed output (git status on a clean tree, whoami, pwd) or when you are mutating state (git, mkdir, rm, mv, navigation).
+    - You want to analyze, summarize, or extract from a file → use ${t("ctx_execute_file")}. Read stays correct when you intend to Edit the file (Edit needs the exact bytes in your conversation to match against).
+    - WebFetch → use ${t("ctx_fetch_and_index")}; full network access, results indexed for ${t("ctx_search")}, raw page bytes never enter your conversation.
     - ${t("ctx_execute")} and ${t("ctx_execute_file")} for file writes → these run code in a subprocess and discard the sandbox FS; they are for analysis, processing, and computation only.
   </when_not_to_use>
 
@@ -76,19 +75,19 @@ ${includeCommands ? `
 }
 
 export function createReadGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    Reading to Edit? Read is correct — Edit needs content in context.\n    Reading to analyze/explore? Use ' + t("ctx_execute_file") + '(path, language, code) — only printed summary enters context.\n  </tip>\n</context_guidance>';
+  return '<context_guidance>\n  <tip>\n    Reading to Edit the file? Read is correct — Edit needs the exact bytes in your conversation to match against.\n    Reading to analyze, summarize, or extract from the file? Use ' + t("ctx_execute_file") + '(path, language, code) — the bytes stay in the sandbox and only what your code prints enters your conversation.\n  </tip>\n</context_guidance>';
 }
 
 export function createGrepGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    May flood context. Use ' + t("ctx_execute") + '(language: "shell", code: "...") to run searches in sandbox. Only printed summary enters context.\n  </tip>\n</context_guidance>';
+  return '<context_guidance>\n  <tip>\n    Grep results may be larger than you expect. When you intend to count, filter, or aggregate matches (not just spot-check one), run the search through ' + t("ctx_execute") + '(language: "shell", code: "...") — the raw match list stays in the sandbox and only your derived answer enters your conversation.\n  </tip>\n</context_guidance>';
 }
 
 export function createBashGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    May produce large output. Use ' + t("ctx_batch_execute") + '(commands, queries) for multiple commands, ' + t("ctx_execute") + '(language: "shell", code: "...") for single. Only printed summary enters context. Bash only for: git, mkdir, rm, mv, navigation.\n  </tip>\n</context_guidance>';
+  return '<context_guidance>\n  <tip>\n    When you intend to PROCESS the output (filter, count, parse, aggregate), use ' + t("ctx_batch_execute") + '(commands, queries) for multiple commands or ' + t("ctx_execute") + '(language: "shell", code: "...") for one — the raw output stays in the sandbox and only what you print enters your conversation. Bash stays the right surface when you intend to OBSERVE a short fixed output or when you are mutating state (git, mkdir, rm, mv, navigation).\n  </tip>\n</context_guidance>';
 }
 
 export function createExternalMcpGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    External MCP tools may return large payloads (channel history, file content, search results) that flood context. After this call, if the result is large or you need to filter/aggregate it, pipe the data through ' + t("ctx_execute") + '(language, code) — only your printed summary enters context. For docs-style fetches, prefer ' + t("ctx_fetch_and_index") + '(url, source) then ' + t("ctx_search") + '(queries).\n  </tip>\n</context_guidance>';
+  return '<context_guidance>\n  <tip>\n    External MCP tools commonly return large payloads (channel history, file content, search results) that enter your conversation in full. When you intend to filter, count, or aggregate that data, pipe it through ' + t("ctx_execute") + '(language, code) — the raw payload stays in the sandbox and only the derived answer enters your conversation. For docs-style fetches you will want to query later, prefer ' + t("ctx_fetch_and_index") + '(url, source) then ' + t("ctx_search") + '(queries).\n  </tip>\n</context_guidance>';
 }
 
 // ── Backward compat: static exports defaulting to claude-code ──
