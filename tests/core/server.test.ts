@@ -1032,6 +1032,59 @@ describe("ctx_index: projectRoot path resolution (#365)", () => {
     }
   }, 30_000);
 
+  test("directory path indexes project files and skips ignored folders", async () => {
+    const directoryProjectDir = mkdtempSync(join(tmpdir(), "ctx-index-dir-"));
+    const docMarker = `ctx-index-dir-doc-${process.pid}-${Date.now()}`;
+    const codeMarker = `ctx-index-dir-code-${process.pid}-${Date.now()}`;
+    const ignoredMarker = `ctx-index-dir-ignored-${process.pid}-${Date.now()}`;
+    mkdirSync(join(directoryProjectDir, "docs"), { recursive: true });
+    mkdirSync(join(directoryProjectDir, "src"), { recursive: true });
+    mkdirSync(join(directoryProjectDir, "node_modules", "pkg"), { recursive: true });
+    writeFileSync(join(directoryProjectDir, "docs", "guide.md"), `# Guide\n\n${docMarker}\n`, "utf-8");
+    writeFileSync(join(directoryProjectDir, "src", "example.ts"), `export const marker = "${codeMarker}";\n`, "utf-8");
+    writeFileSync(join(directoryProjectDir, "node_modules", "pkg", "ignored.md"), `# Ignored\n\n${ignoredMarker}\n`, "utf-8");
+    writeFileSync(join(directoryProjectDir, "image.png"), "not indexable", "utf-8");
+
+    const proc = spawnServerWithProjectDir(directoryProjectDir);
+    try {
+      await awaitRpc(proc, 1, {
+        jsonrpc: "2.0", id: 1, method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ctx-index-dir", version: "1.0" } },
+      });
+      sendRpc(proc, { jsonrpc: "2.0", method: "notifications/initialized" });
+
+      const indexResp = await awaitRpc(proc, 100, {
+        jsonrpc: "2.0", id: 100, method: "tools/call",
+        params: { name: "ctx_index", arguments: { path: ".", source: "dir-fixture" } },
+      });
+
+      expect(indexResp?.error).toBeUndefined();
+      const indexText = indexResp?.result?.content?.[0]?.text ?? "";
+      expect(indexText).toContain(`Indexed directory ${directoryProjectDir}`);
+      expect(indexText).toMatch(/2 files, \d+ sections/);
+      expect(indexText).toContain("Skipped:");
+
+      const searchResp = await awaitRpc(proc, 101, {
+        jsonrpc: "2.0", id: 101, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [docMarker, codeMarker], source: "dir-fixture" } },
+      });
+      expect(searchResp?.error).toBeUndefined();
+      const searchText = searchResp?.result?.content?.[0]?.text ?? "";
+      expect(searchText).toContain(docMarker);
+      expect(searchText).toContain(codeMarker);
+
+      const ignoredSearchResp = await awaitRpc(proc, 102, {
+        jsonrpc: "2.0", id: 102, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [ignoredMarker], source: "dir-fixture" } },
+      });
+      expect(ignoredSearchResp?.error).toBeUndefined();
+      expect(ignoredSearchResp?.result?.content?.[0]?.text ?? "").toContain("No results found");
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+      rmSync(directoryProjectDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   test("absolute path bypasses project-dir resolution", async () => {
     const absFile = join(ctxProjectDir, ctxFileName);
     const proc = spawnServerWithProjectDir("/non-existent-dir-on-purpose");
@@ -1615,6 +1668,49 @@ describe("ctx_index: Read deny-policy enforcement (#442)", () => {
       });
       expect(searchResp.error).toBeUndefined();
       expect(searchResp.result?.content?.[0]?.text ?? "").toContain(allowedMarker);
+    } finally {
+      killProc(proc);
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("ctx_index({ path: <directory> }) skips files denied by Read policy", async () => {
+    const publicMarker = `dir-public-marker-${process.pid}-${Date.now()}`;
+    const secretMarker = `dir-secret-marker-${process.pid}-${Date.now()}`;
+    const projectDir = setupProject(
+      ["Read(**/secret.txt)"],
+      {
+        "public-doc.md": `# Public doc\n\n${publicMarker}\n`,
+        "nested/secret.txt": `SECRET_TOKEN=${secretMarker}\n`,
+      },
+    );
+    const proc = spawnServerInProject(projectDir);
+    try {
+      await initServer(proc, "ctx-index-dir-deny-442");
+
+      const indexResp = await awaitRpc(proc, {
+        jsonrpc: "2.0", id: 100, method: "tools/call",
+        params: { name: "ctx_index", arguments: { path: ".", source: "deny-dir" } },
+      });
+      expect(indexResp.error).toBeUndefined();
+      expect(indexResp.result?.isError).toBeFalsy();
+      const indexText = indexResp.result?.content?.[0]?.text ?? "";
+      expect(indexText).toMatch(/1 files?, \d+ sections/);
+      expect(indexText).toContain("1 denied by Read policy");
+
+      const publicSearchResp = await awaitRpc(proc, {
+        jsonrpc: "2.0", id: 101, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [publicMarker], source: "deny-dir" } },
+      });
+      expect(publicSearchResp.error).toBeUndefined();
+      expect(publicSearchResp.result?.content?.[0]?.text ?? "").toContain(publicMarker);
+
+      const secretSearchResp = await awaitRpc(proc, {
+        jsonrpc: "2.0", id: 102, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [secretMarker], source: "deny-dir" } },
+      });
+      expect(secretSearchResp.error).toBeUndefined();
+      expect(secretSearchResp.result?.content?.[0]?.text ?? "").toContain("No results found");
     } finally {
       killProc(proc);
       rmSync(projectDir, { recursive: true, force: true });

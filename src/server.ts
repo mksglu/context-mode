@@ -2,9 +2,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createRequire } from "node:module";
-import { existsSync, unlinkSync, readdirSync, readFileSync, writeFileSync, renameSync, rmSync, mkdirSync, cpSync, statSync, symlinkSync, lstatSync } from "node:fs";
+import { existsSync, unlinkSync, readdirSync, readFileSync, writeFileSync, renameSync, rmSync, mkdirSync, cpSync, statSync, symlinkSync, lstatSync, type Dirent } from "node:fs";
 import { execSync, spawnSync, type ChildProcess, type SpawnSyncOptions, type SpawnSyncReturns } from "node:child_process";
-import { join, dirname, resolve, sep, isAbsolute } from "node:path";
+import { basename, extname, join, dirname, relative, resolve, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir, tmpdir, cpus } from "node:os";
 import { request as httpsRequest } from "node:https";
@@ -1061,8 +1061,22 @@ function checkFilePathDenyPolicy(
   filePath: string,
   toolName: string,
 ): ToolResult | null {
+  const projectDir = getProjectDir();
+  const matchedPattern = getReadDenyPattern(filePath, projectDir);
+  if (matchedPattern) {
+    return trackResponse(toolName, {
+      content: [{
+        type: "text" as const,
+        text: `File access blocked by security policy: path matches Read deny pattern ${matchedPattern}`,
+      }],
+      isError: true,
+    });
+  }
+  return null;
+}
+
+function getReadDenyPattern(filePath: string, projectDir = getProjectDir()): string | null {
   try {
-    const projectDir = getProjectDir();
     const denyGlobs = readToolDenyPatterns("Read", projectDir);
     const result = evaluateFilePath(
       filePath,
@@ -1070,19 +1084,11 @@ function checkFilePathDenyPolicy(
       process.platform === "win32",
       projectDir,
     );
-    if (result.denied) {
-      return trackResponse(toolName, {
-        content: [{
-          type: "text" as const,
-          text: `File access blocked by security policy: path matches Read deny pattern ${result.matchedPattern}`,
-        }],
-        isError: true,
-      });
-    }
+    return result.denied ? result.matchedPattern ?? "(unknown)" : null;
   } catch {
     // Fail-open
+    return null;
   }
-  return null;
 }
 
 // Build description dynamically based on detected runtimes
@@ -1942,6 +1948,247 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
 // Tool: index
 // ─────────────────────────────────────────────────────────
 
+const CTX_INDEX_DIRECTORY_MAX_DEPTH = 8;
+const CTX_INDEX_DIRECTORY_MAX_FILES = 500;
+
+const CTX_INDEX_DIRECTORY_IGNORED_DIRS = new Set([
+  ".cache",
+  ".claude",
+  ".codex",
+  ".context-mode",
+  ".cursor",
+  ".gemini",
+  ".git",
+  ".next",
+  ".turbo",
+  ".vite",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "out",
+  "target",
+  "vendor",
+]);
+
+const CTX_INDEX_DIRECTORY_IGNORED_FILES = new Set([
+  "bun.lock",
+  "bun.lockb",
+  "cargo.lock",
+  "composer.lock",
+  "go.sum",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "poetry.lock",
+  "yarn.lock",
+]);
+
+const CTX_INDEX_DIRECTORY_EXTENSIONS = new Set([
+  ".c",
+  ".cc",
+  ".cpp",
+  ".cs",
+  ".css",
+  ".go",
+  ".h",
+  ".hpp",
+  ".java",
+  ".js",
+  ".json",
+  ".jsx",
+  ".kt",
+  ".md",
+  ".mdx",
+  ".mjs",
+  ".php",
+  ".py",
+  ".rb",
+  ".rs",
+  ".sh",
+  ".swift",
+  ".toml",
+  ".ts",
+  ".tsx",
+  ".txt",
+  ".yaml",
+  ".yml",
+]);
+
+const CTX_INDEX_DIRECTORY_SPECIAL_FILENAMES = new Set([
+  "dockerfile",
+  "gemfile",
+  "justfile",
+  "makefile",
+  "procfile",
+  "rakefile",
+]);
+
+type DirectoryIndexPlan = {
+  files: string[];
+  skippedIgnored: number;
+  skippedExtensions: number;
+  skippedDenied: number;
+  errors: string[];
+  truncated: boolean;
+};
+
+type DirectoryIndexSummary = {
+  filesIndexed: number;
+  totalChunks: number;
+  codeChunks: number;
+  skippedIgnored: number;
+  skippedExtensions: number;
+  skippedDenied: number;
+  errors: string[];
+  truncated: boolean;
+};
+
+function normalizeDirectoryRelativePath(root: string, filePath: string): string {
+  return relative(root, filePath).split(sep).join("/");
+}
+
+function isDirectoryIndexableFile(name: string): boolean {
+  const lowered = name.toLowerCase();
+  if (CTX_INDEX_DIRECTORY_IGNORED_FILES.has(lowered)) return false;
+  if (CTX_INDEX_DIRECTORY_SPECIAL_FILENAMES.has(lowered)) return true;
+  return CTX_INDEX_DIRECTORY_EXTENSIONS.has(extname(lowered));
+}
+
+function collectDirectoryIndexFiles(root: string): DirectoryIndexPlan {
+  const files: string[] = [];
+  const errors: string[] = [];
+  let skippedIgnored = 0;
+  let skippedExtensions = 0;
+  let skippedDenied = 0;
+  let truncated = false;
+
+  const walk = (dir: string, depth: number): void => {
+    if (files.length >= CTX_INDEX_DIRECTORY_MAX_FILES) {
+      truncated = true;
+      return;
+    }
+
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${dir}: ${message}`);
+      return;
+    }
+
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      if (files.length >= CTX_INDEX_DIRECTORY_MAX_FILES) {
+        truncated = true;
+        return;
+      }
+
+      const entryPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (depth >= CTX_INDEX_DIRECTORY_MAX_DEPTH || CTX_INDEX_DIRECTORY_IGNORED_DIRS.has(entry.name)) {
+          skippedIgnored++;
+          continue;
+        }
+        walk(entryPath, depth + 1);
+        continue;
+      }
+
+      if (!entry.isFile() || entry.isSymbolicLink()) {
+        skippedIgnored++;
+        continue;
+      }
+
+      if (!isDirectoryIndexableFile(basename(entryPath))) {
+        skippedExtensions++;
+        continue;
+      }
+
+      if (getReadDenyPattern(entryPath)) {
+        skippedDenied++;
+        continue;
+      }
+
+      files.push(entryPath);
+    }
+  };
+
+  walk(root, 0);
+
+  return {
+    files,
+    skippedIgnored,
+    skippedExtensions,
+    skippedDenied,
+    errors,
+    truncated,
+  };
+}
+
+function formatDirectoryIndexSummary(directoryPath: string, summary: DirectoryIndexSummary, source?: string): string {
+  const skipped = summary.skippedIgnored + summary.skippedExtensions + summary.skippedDenied + summary.errors.length;
+  const parts = [
+    `Indexed directory ${directoryPath}: ${summary.filesIndexed} files, ${summary.totalChunks} sections (${summary.codeChunks} with code).`,
+  ];
+
+  if (skipped > 0 || summary.truncated) {
+    const reasons = [
+      summary.skippedIgnored > 0 ? `${summary.skippedIgnored} ignored` : null,
+      summary.skippedExtensions > 0 ? `${summary.skippedExtensions} unsupported extension` : null,
+      summary.skippedDenied > 0 ? `${summary.skippedDenied} denied by Read policy` : null,
+      summary.errors.length > 0 ? `${summary.errors.length} read error` : null,
+      summary.truncated ? `stopped at ${CTX_INDEX_DIRECTORY_MAX_FILES} files` : null,
+    ].filter(Boolean);
+    parts.push(`Skipped: ${reasons.join(", ")}.`);
+  }
+
+  if (summary.errors.length > 0) {
+    parts.push(`First error: ${summary.errors[0]}`);
+  }
+
+  if (source) {
+    parts.push(`Use ctx_search(queries: ["..."], source: "${source}") to search this directory label prefix.`);
+  } else {
+    parts.push(`Use ctx_search(queries: ["..."], source: "${directoryPath}") to scope results to this directory.`);
+  }
+
+  return parts.join("\n");
+}
+
+function indexDirectoryPath(store: ContentStore, directoryPath: string, source?: string): DirectoryIndexSummary {
+  const plan = collectDirectoryIndexFiles(directoryPath);
+  const summary: DirectoryIndexSummary = {
+    filesIndexed: 0,
+    totalChunks: 0,
+    codeChunks: 0,
+    skippedIgnored: plan.skippedIgnored,
+    skippedExtensions: plan.skippedExtensions,
+    skippedDenied: plan.skippedDenied,
+    errors: [...plan.errors],
+    truncated: plan.truncated,
+  };
+  const attribution = currentAttribution();
+
+  for (const filePath of plan.files) {
+    try {
+      const relPath = normalizeDirectoryRelativePath(directoryPath, filePath);
+      const label = source ? `${source}:${relPath}` : filePath;
+      const result = store.index({ path: filePath, source: label, attribution });
+      summary.filesIndexed++;
+      summary.totalChunks += result.totalChunks;
+      summary.codeChunks += result.codeChunks;
+      try {
+        trackIndexed(statSync(filePath).size, label);
+      } catch { /* best-effort stats only */ }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      summary.errors.push(`${filePath}: ${message}`);
+    }
+  }
+
+  return summary;
+}
+
 server.registerTool(
   "ctx_index",
   {
@@ -1964,7 +2211,8 @@ RETURNS:
   Indexing metadata: chunk counts (total, code-bearing), source label, and the exact ctx_search call shape to query the indexed content. Raw content is NOT echoed back — it lives in storage, retrievable via ctx_search(source: "<label>"). When \`path\` is provided, a content hash is stored so ctx_search results auto-flag staleness on future calls.
 
 EXAMPLE: ctx_index(content: "# React useEffect\\n\\nThe Effect Hook lets you ...", source: "react-useeffect-docs")
-EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
+EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")
+EXAMPLE: ctx_index(path: "/path/to/project", source: "project-docs")`,
     inputSchema: z.object({
       content: z
         .string()
@@ -1976,7 +2224,7 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
         .string()
         .optional()
         .describe(
-          "File path to read and index (content never enters context). Provide this OR content.",
+          "File or directory path to read and index (content never enters context). Provide this OR content.",
         ),
       source: z
         .string()
@@ -2010,6 +2258,22 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
 
     try {
       const resolvedPath = path ? resolveProjectPath(path) : undefined;
+      if (resolvedPath && !content) {
+        const resolvedStat = statSync(resolvedPath);
+        if (resolvedStat.isDirectory()) {
+          const store = getStore();
+          const result = indexDirectoryPath(store, resolvedPath, source);
+          return trackResponse("ctx_index", {
+            content: [
+              {
+                type: "text" as const,
+                text: formatDirectoryIndexSummary(resolvedPath, result, source),
+              },
+            ],
+          });
+        }
+      }
+
       // Track the raw bytes being indexed (content or file)
       if (content) trackIndexed(Buffer.byteLength(content));
       else if (resolvedPath) {
