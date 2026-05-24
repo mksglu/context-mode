@@ -18,41 +18,37 @@ export function createRoutingBlock(t, options = {}) {
   return `
 <context_window_protection>
   <priority_instructions>
-    Raw tool output floods context window. MUST use context-mode MCP tools. Keep raw data in sandbox.
+    Raw tool output floods the context window. Use context-mode MCP tools to keep raw data in the sandbox; only your printed summary enters context.
   </priority_instructions>
 
   <tool_selection_hierarchy>
     0. MEMORY: ${t("ctx_search")}(sort: "timeline")
-       - After resume, check prior context before asking user.
+       - After resume, check prior context before asking the user.
     1. GATHER: ${t("ctx_batch_execute")}(commands, queries)
        - Primary research tool. Runs commands, auto-indexes, searches. ONE call replaces many steps.
        - Each command: {label: "section header", command: "shell command"}
-       - label becomes FTS5 chunk title — descriptive labels improve search.
+       - label becomes the FTS5 chunk title — descriptive labels improve search.
     2. FOLLOW-UP: ${t("ctx_search")}(queries: ["q1", "q2", ...])
        - All follow-up questions. ONE call, many queries (default relevance mode).
     3. PROCESSING: ${t("ctx_execute")}(language, code) | ${t("ctx_execute_file")}(path, language, code)
        - API calls, log analysis, data processing.
   </tool_selection_hierarchy>
 
-  <forbidden_actions>
-    - NO Bash for commands producing >20 lines output.
-    - NO Read for analysis — use ${t("ctx_execute_file")}. Read IS correct for files you intend to Edit.
-    - NO WebFetch — use ${t("ctx_fetch_and_index")}.
-    - Bash ONLY for git/mkdir/rm/mv/navigation.
-    - NO ${t("ctx_execute")} or ${t("ctx_execute_file")} for file creation/modification.
-      ${t("ctx_execute")} is for analysis, processing, computation only.
-  </forbidden_actions>
+  <when_not_to_use>
+    - Bash with output >20 lines → use ${t("ctx_batch_execute")} or ${t("ctx_execute")}; Bash stays correct for git, mkdir, rm, mv, navigation, and other short-output commands.
+    - Read for analysis → use ${t("ctx_execute_file")}; Read stays correct for files you intend to Edit (Edit needs the content in context).
+    - WebFetch → use ${t("ctx_fetch_and_index")}; full network access, results indexed for ${t("ctx_search")}.
+    - ${t("ctx_execute")} and ${t("ctx_execute_file")} for file writes → these run code in a subprocess and discard the sandbox FS; they are for analysis, processing, and computation only.
+  </when_not_to_use>
 
   <file_writing_policy>
-    ALWAYS use native Write/Edit tools for file creation/modification.
-    NEVER use ${t("ctx_execute")}, ${t("ctx_execute_file")}, or Bash to write files.
+    File writes use the native Write or Edit tool — ${t("ctx_execute")}, ${t("ctx_execute_file")}, and Bash subprocesses do not persist edits to the host filesystem.
     Applies to all file types: code, configs, plans, specs, YAML, JSON, markdown.
   </file_writing_policy>
 
   <output_constraints>
     <artifact_policy>
-      Write artifacts (code, configs, PRDs) to FILES. NEVER inline.
-      Return only: file path + 1-line description.
+      Write artifacts (code, configs, PRDs) to files. Return only: file path + 1-line description.
     </artifact_policy>
   </output_constraints>
   <session_continuity>
