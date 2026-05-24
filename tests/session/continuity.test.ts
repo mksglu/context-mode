@@ -76,8 +76,8 @@ describe("SessionStart Hook", () => {
       "Expected <tool_selection_hierarchy> tag",
     );
     assert.ok(
-      ctx.includes("<forbidden_actions>"),
-      "Expected <forbidden_actions> tag",
+      ctx.includes("<when_not_to_use>"),
+      "Expected <when_not_to_use> tag (renamed from <forbidden_actions> in ADR-0002 — affirmative framing, same semantic intent)",
     );
     assert.ok(
       ctx.includes("<output_constraints>"),
