@@ -374,3 +374,167 @@ describe("getRealBytesStats (Phase 8 renderer source-of-truth)", () => {
     expect(r.contentBytes).toBeLessThan(22_000);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// v1.0.148 hotfix — lazy schema migration in the aggregator.
+//
+// Bug A + C cascade: pre-v1.0.130 session DBs on disk have no
+// `bytes_avoided`, `bytes_returned`, or `project_dir` columns. The
+// aggregator's combined SUM query references those columns, so SQLite
+// throws "no such column" at prepare() time and the surrounding catch
+// in getRealBytesStats silently skips the WHOLE DB — even the
+// LENGTH(data) signal is lost, not just the missing columns. On the
+// reporter's machine 131 of 197 historical DBs were affected.
+//
+// Fix: aggregator now calls ensureSessionEventsSchema(dbPath, ctor)
+// before opening each DB readonly. Idempotent, ADR-0001 compatible
+// (no EXCLUSIVE pragma). Self-healing — every stats call migrates
+// any legacy DBs it scans.
+//
+// These tests pin the behavioural guarantee through the public
+// getRealBytesStats API (no implementation coupling): a legacy-schema
+// DB on disk must still contribute LENGTH(data) signal, and the
+// migration must be observable as columns added in place.
+// ──────────────────────────────────────────────────────────────────────
+describe("aggregator schema-migration recovery (#683 follow-up, v1.0.148)", () => {
+  /**
+   * Build a pre-v1.0.130 session DB on disk — no `bytes_avoided`,
+   * `bytes_returned`, `project_dir`, or attribution columns. Mirrors
+   * the schema actually observed on real upgraded installs. Uses raw
+   * SQL via better-sqlite3 to bypass the SessionDB ctor's
+   * auto-migration.
+   */
+  async function createLegacySessionDb(
+    dbPath: string,
+    sessionId: string,
+    events: Array<{ data: string }>,
+  ): Promise<void> {
+    const Database = (await import("better-sqlite3")).default;
+    const db = new Database(dbPath);
+    try {
+      db.exec(`
+        CREATE TABLE session_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          category TEXT NOT NULL,
+          priority INTEGER NOT NULL DEFAULT 2,
+          data TEXT NOT NULL,
+          source_hook TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          data_hash TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE session_meta (
+          session_id TEXT PRIMARY KEY,
+          project_dir TEXT NOT NULL,
+          started_at TEXT NOT NULL DEFAULT (datetime('now')),
+          last_event_at TEXT,
+          event_count INTEGER NOT NULL DEFAULT 0,
+          compact_count INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE session_resume (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL UNIQUE,
+          snapshot TEXT NOT NULL,
+          event_count INTEGER NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          consumed INTEGER NOT NULL DEFAULT 0
+        );
+      `);
+      const ins = db.prepare(
+        `INSERT INTO session_events (session_id, type, category, data, source_hook) VALUES (?, ?, ?, ?, ?)`,
+      );
+      let i = 0;
+      for (const e of events) {
+        ins.run(sessionId, "tool_use", "file", `${e.data}#${i++}`, "test");
+      }
+    } finally {
+      db.close();
+    }
+  }
+
+  /** Read the column set from a session DB. Used to assert pre/post migration state. */
+  async function readSessionEventsColumns(dbPath: string): Promise<Set<string>> {
+    const Database = (await import("better-sqlite3")).default;
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const colInfo = db.pragma("table_xinfo(session_events)") as Array<{ name: string }>;
+      return new Set(colInfo.map((c) => c.name));
+    } finally {
+      db.close();
+    }
+  }
+
+  test("recovers LENGTH(data) signal from a legacy-schema DB (the regression v1.0.148 fixes)", async () => {
+    const dir = mkSessionsDir();
+    const sid = `sess-${randomUUID()}`;
+    const dbPath = dbPathFor(dir, "legacy0123456789");
+
+    await createLegacySessionDb(dbPath, sid, [
+      { data: "src/app.ts captured by hook" },
+      { data: "src/another.ts more bytes for the sum" },
+    ]);
+
+    // Confirm the seed DB has the pre-v1.0.130 legacy schema.
+    const colsBefore = await readSessionEventsColumns(dbPath);
+    expect(colsBefore.has("bytes_avoided")).toBe(false);
+    expect(colsBefore.has("bytes_returned")).toBe(false);
+    expect(colsBefore.has("project_dir")).toBe(false);
+
+    // ACT — the aggregator call that triggered the original regression
+    // (pre-fix: prepare() throws on missing column, catch skips the DB,
+    // result.eventDataBytes returns 0 even though LENGTH(data) > 0).
+    const r = getRealBytesStats({ sessionId: sid, sessionsDir: dir });
+
+    // ASSERT — LENGTH(data) signal recovered. Two events, each ~27-38 chars
+    // plus the `#N` dedup suffix; the assertion guards against the
+    // identity-collapse failure mode (eventDataBytes == 0) without
+    // pinning fragile exact byte counts.
+    expect(r.eventDataBytes).toBeGreaterThan(40);
+    expect(r.eventDataBytes).toBeLessThan(500);
+    // Legacy events never recorded these — 0 by absence, not by bug.
+    expect(r.bytesAvoided).toBe(0);
+    expect(r.bytesReturned).toBe(0);
+  });
+
+  test("migrates the DB schema in-place on first read (columns now exist on disk)", async () => {
+    const dir = mkSessionsDir();
+    const sid = `sess-${randomUUID()}`;
+    const dbPath = dbPathFor(dir, "legacymigrate56a");
+
+    await createLegacySessionDb(dbPath, sid, [{ data: "one event" }]);
+
+    const colsBefore = await readSessionEventsColumns(dbPath);
+    expect(colsBefore.has("bytes_avoided")).toBe(false);
+    expect(colsBefore.has("project_dir")).toBe(false);
+
+    // ACT — aggregator call triggers ensureSessionEventsSchema.
+    getRealBytesStats({ sessionsDir: dir });
+
+    // ASSERT — the disk DB now carries all five post-v1.0.130 columns.
+    const colsAfter = await readSessionEventsColumns(dbPath);
+    expect(colsAfter.has("project_dir")).toBe(true);
+    expect(colsAfter.has("attribution_source")).toBe(true);
+    expect(colsAfter.has("attribution_confidence")).toBe(true);
+    expect(colsAfter.has("bytes_avoided")).toBe(true);
+    expect(colsAfter.has("bytes_returned")).toBe(true);
+  });
+
+  test("migration is idempotent — second aggregator call adds no columns, no error", async () => {
+    const dir = mkSessionsDir();
+    const sid = `sess-${randomUUID()}`;
+    const dbPath = dbPathFor(dir, "legacyidempotent");
+
+    await createLegacySessionDb(dbPath, sid, [{ data: "event" }]);
+
+    // First call migrates.
+    getRealBytesStats({ sessionsDir: dir });
+    const colsAfterFirst = await readSessionEventsColumns(dbPath);
+    expect(colsAfterFirst.has("bytes_avoided")).toBe(true);
+
+    // Second call must not throw and must not add new columns.
+    expect(() => getRealBytesStats({ sessionsDir: dir })).not.toThrow();
+    const colsAfterSecond = await readSessionEventsColumns(dbPath);
+    expect(colsAfterSecond.size).toBe(colsAfterFirst.size);
+  });
+});
