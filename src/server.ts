@@ -1416,7 +1416,20 @@ server.registerTool(
   "ctx_execute",
   {
     title: "Execute Code",
-    description: `Run code in a sandboxed subprocess. Only what you console.log() enters the agent's context; the raw stdout stays in the sandbox.${bunNote} Languages: ${langList}.\n\nWHEN:\n  - Command output is large (>= 20 lines) or unbounded\n  - You want to filter, count, summarize, or aggregate before printing\n  - API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff)\n\nWHEN NOT:\n  - File mutations, simple navigation, single short commands -> use Bash\n\nRETURNS: only your printed output. Wrap risky calls in try/catch.\n\nEXAMPLE: ctx_execute(language: "shell", code: "npm test 2>&1 | tail -40")\nEXAMPLE: ctx_execute(language: "javascript", code: "const r = await fetch('...'); console.log(r.status)")`,
+    description: `Run code in a sandboxed subprocess. Only what you console.log() enters the agent's context; the raw stdout stays in the sandbox.${bunNote} Languages: ${langList}.
+
+WHEN:
+  - Command output is large (>= 20 lines) or unbounded
+  - You want to filter, count, summarize, or aggregate before printing
+  - API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff)
+
+WHEN NOT:
+  - File mutations, simple navigation, single short commands -> use Bash
+
+RETURNS: only your printed output. Wrap risky calls in try/catch.
+
+EXAMPLE: ctx_execute(language: "shell", code: "npm test 2>&1 | tail -40")
+EXAMPLE: ctx_execute(language: "javascript", code: "const r = await fetch('...'); console.log(r.status)")`,
     inputSchema: z.object({
       language: z
         .enum([
@@ -1751,20 +1764,23 @@ server.registerTool(
   "ctx_execute_file",
   {
     title: "Execute File Processing",
-    description:
-      "Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what you console.log() enters the agent's context.\n\n" +
-      "WHEN:\n" +
-      "  - Large logs, CSVs, JSON dumps, or source files you want to analyze, filter, or summarize\n" +
-      "  - The raw contents would flood context\n\n" +
-      "WHEN NOT:\n" +
-      "  - You want to edit the file -> use Read so Edit can match the exact text\n" +
-      "  - You only need one specific line -> Read with offset/limit is simpler\n\n" +
-      "RETURNS: only your printed summary.\n\n" +
-      "EXAMPLE: ctx_execute_file(\n" +
-      "  path: \"huge.log\",\n" +
-      "  language: \"javascript\",\n" +
-      "  code: \"console.log(FILE_CONTENT.split('\\\\n').filter(l => l.includes('ERROR')).slice(0, 20).join('\\\\n'))\"\n" +
-      ")",
+    description: `Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what you console.log() enters the agent's context.
+
+WHEN:
+  - Large logs, CSVs, JSON dumps, or source files you want to analyze, filter, or summarize
+  - The raw contents would flood context
+
+WHEN NOT:
+  - You want to edit the file -> use Read so Edit can match the exact text
+  - You only need one specific line -> Read with offset/limit is simpler
+
+RETURNS: only your printed summary.
+
+EXAMPLE: ctx_execute_file(
+  path: "huge.log",
+  language: "javascript",
+  code: "console.log(FILE_CONTENT.split('\\\\n').filter(l => l.includes('ERROR')).slice(0, 20).join('\\\\n'))"
+)`,
     inputSchema: z.object({
       path: z
         .string()
@@ -1909,20 +1925,23 @@ server.registerTool(
   "ctx_index",
   {
     title: "Index Content",
-    description:
-      "Index documentation or knowledge content into a searchable BM25 knowledge base. Chunks markdown by headings (keeping code blocks intact) and stores in an FTS5 database. Only a brief summary is returned - the full content stays in the store.\n\n" +
-      "WHEN:\n" +
-      "  - Documentation from Context7, Skills, or MCP tools (API docs, framework guides, code examples)\n" +
-      "  - API references (endpoint details, parameter specs, response schemas)\n" +
-      "  - MCP tools/list output (exact tool signatures and descriptions)\n" +
-      "  - Skill prompts and instructions that are too large for context\n" +
-      "  - README files, migration guides, changelog entries\n" +
-      "  - Any content with code examples you may need to reference precisely\n\n" +
-      "WHEN NOT:\n" +
-      "  - Log files, test output, CSV, or build output -> use ctx_execute_file (it processes in-sandbox)\n\n" +
-      "RETURNS:\n" +
-      "  A brief indexing summary. Retrieve sections on-demand via ctx_search. When `path` is provided, a content hash is stored for automatic stale detection in search results.\n\n" +
-      "EXAMPLE: ctx_index(content: \"# React useEffect\\n\\nThe Effect Hook lets you ...\", source: \"react-useeffect-docs\")",
+    description: `Index documentation or knowledge content into a searchable BM25 knowledge base. Chunks markdown by headings (keeping code blocks intact) and stores in an FTS5 database. Only a brief summary is returned - the full content stays in the store.
+
+WHEN:
+  - Documentation from Context7, Skills, or MCP tools (API docs, framework guides, code examples)
+  - API references (endpoint details, parameter specs, response schemas)
+  - MCP tools/list output (exact tool signatures and descriptions)
+  - Skill prompts and instructions that are too large for context
+  - README files, migration guides, changelog entries
+  - Any content with code examples you may need to reference precisely
+
+WHEN NOT:
+  - Log files, test output, CSV, or build output -> use ctx_execute_file (it processes in-sandbox)
+
+RETURNS:
+  A brief indexing summary. Retrieve sections on-demand via ctx_search. When \`path\` is provided, a content hash is stored for automatic stale detection in search results.
+
+EXAMPLE: ctx_index(content: "# React useEffect\\n\\nThe Effect Hook lets you ...", source: "react-useeffect-docs")`,
     inputSchema: z.object({
       content: z
         .string()
@@ -2080,18 +2099,21 @@ server.registerTool(
   "ctx_search",
   {
     title: "Search Indexed Content",
-    description:
-      "Search indexed content (BM25 over an FTS5 store). File-backed sources auto-refresh when the source file changes.\n\n" +
-      "WHEN:\n" +
-      "  - You already indexed content via ctx_batch_execute, ctx_index, or ctx_fetch_and_index\n" +
-      "  - You have multiple related questions about that content - batch them in one call\n" +
-      "  - You want to scope to one labelled source (pass `source`)\n\n" +
-      "WHEN NOT:\n" +
-      "  - Nothing has been indexed yet - run ctx_batch_execute, ctx_index, or ctx_fetch_and_index first\n" +
-      "  - You only have a single one-off question on un-indexed data - ctx_execute is simpler\n\n" +
-      "RETURNS:\n" +
-      "  Top matches per query with section headers and content previews. Use 2-4 specific terms per query and pass every question in the queries array.\n\n" +
-      "EXAMPLE: ctx_search(queries: [\"root cause\", \"proposed fix\", \"test coverage\"], source: \"issue-#683\")",
+    description: `Search indexed content (BM25 over an FTS5 store). File-backed sources auto-refresh when the source file changes.
+
+WHEN:
+  - You already indexed content via ctx_batch_execute, ctx_index, or ctx_fetch_and_index
+  - You have multiple related questions about that content - batch them in one call
+  - You want to scope to one labelled source (pass \`source\`)
+
+WHEN NOT:
+  - Nothing has been indexed yet - run ctx_batch_execute, ctx_index, or ctx_fetch_and_index first
+  - You only have a single one-off question on un-indexed data - ctx_execute is simpler
+
+RETURNS:
+  Top matches per query with section headers and content previews. Use 2-4 specific terms per query and pass every question in the queries array.
+
+EXAMPLE: ctx_search(queries: ["root cause", "proposed fix", "test coverage"], source: "issue-#683")`,
     inputSchema: z.object({
       queries: z.preprocess(coerceJsonArray, z
         .array(z.string())
@@ -2879,21 +2901,24 @@ server.registerTool(
   "ctx_fetch_and_index",
   {
     title: "Fetch & Index URL(s)",
-    description:
-      "Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base, and returns a ~3KB preview. Full content stays in the store - use ctx_search() for deeper lookups. Content-type aware: HTML becomes markdown, JSON is chunked by key paths, plain text is indexed directly.\n\n" +
-      "WHEN:\n" +
-      "  - You need web content (docs, changelogs, API references) without raw HTML entering context\n" +
-      "  - Multi-URL research: library evaluation, migration scans, doc comparisons (pass `requests` with concurrency 4-8)\n" +
-      "  - The preview is enough to plan follow-up ctx_search calls\n\n" +
-      "WHEN NOT:\n" +
-      "  - You already have the content locally - ctx_index handles raw text or files\n" +
-      "  - You need to execute JavaScript in the page (SPA-rendered content) - this is a plain fetch, no headless browser\n\n" +
-      "RETURNS:\n" +
-      "  A ~3KB preview per fetched source plus an indexing summary. Retrieve sections on demand via ctx_search(source: \"<label>\"). Fetches parallelize up to `concurrency`; FTS5 indexing then serializes writes (SQLite single-writer rule).\n\n" +
-      "EXAMPLE: ctx_fetch_and_index(\n" +
-      "  requests: [{url: \"https://react.dev/...\", source: \"react\"}, {url: \"https://vuejs.org/...\", source: \"vue\"}],\n" +
-      "  concurrency: 5\n" +
-      ")",
+    description: `Fetches URL content, converts HTML to markdown, indexes into a searchable knowledge base, and returns a ~3KB preview. Full content stays in the store - use ctx_search() for deeper lookups. Content-type aware: HTML becomes markdown, JSON is chunked by key paths, plain text is indexed directly.
+
+WHEN:
+  - You need web content (docs, changelogs, API references) without raw HTML entering context
+  - Multi-URL research: library evaluation, migration scans, doc comparisons (pass \`requests\` with concurrency 4-8)
+  - The preview is enough to plan follow-up ctx_search calls
+
+WHEN NOT:
+  - You already have the content locally - ctx_index handles raw text or files
+  - You need to execute JavaScript in the page (SPA-rendered content) - this is a plain fetch, no headless browser
+
+RETURNS:
+  A ~3KB preview per fetched source plus an indexing summary. Retrieve sections on demand via ctx_search(source: "<label>"). Fetches parallelize up to \`concurrency\`; FTS5 indexing then serializes writes (SQLite single-writer rule).
+
+EXAMPLE: ctx_fetch_and_index(
+  requests: [{url: "https://react.dev/...", source: "react"}, {url: "https://vuejs.org/...", source: "vue"}],
+  concurrency: 5
+)`,
     inputSchema: z.object({
       url: z.string().optional().describe("Single URL to fetch and index (legacy single-shape)"),
       source: z
@@ -3128,22 +3153,25 @@ server.registerTool(
   "ctx_batch_execute",
   {
     title: "Batch Execute & Search",
-    description:
-      "Run multiple commands in ONE call. Output is auto-indexed. Optional queries return matching sections - no follow-up ctx_search needed.\n\n" +
-      "WHEN:\n" +
-      "  - You have 3+ related commands (gh issue view x N, git log + git diff, multi-file reads)\n" +
-      "  - You want to gather + search in one round trip\n" +
-      "  - You want to parallelize I/O-bound calls (pass concurrency 4-8 for gh, curl, multi-region cloud queries, multi-repo git reads)\n\n" +
-      "WHEN NOT:\n" +
-      "  - One command, no follow-up search -> ctx_execute is simpler\n" +
-      "  - CPU-bound or stateful commands -> keep concurrency at 1 (npm test, build, lint, ports, lock files)\n\n" +
-      "RETURNS:\n" +
-      "  Section list plus top matches per query. Add a processing command that console.log()s only the answer when you need to filter or aggregate.\n\n" +
-      "EXAMPLE: ctx_batch_execute(\n" +
-      "  commands: [{label:\"issue 1\", command:\"gh issue view 1\"}, {label:\"issue 2\", command:\"gh issue view 2\"}],\n" +
-      "  queries: [\"root cause\", \"proposed fix\"],\n" +
-      "  concurrency: 4\n" +
-      ")",
+    description: `Run multiple commands in ONE call. Output is auto-indexed. Optional queries return matching sections - no follow-up ctx_search needed.
+
+WHEN:
+  - You have 3+ related commands (gh issue view x N, git log + git diff, multi-file reads)
+  - You want to gather + search in one round trip
+  - You want to parallelize I/O-bound calls (pass concurrency 4-8 for gh, curl, multi-region cloud queries, multi-repo git reads)
+
+WHEN NOT:
+  - One command, no follow-up search -> ctx_execute is simpler
+  - CPU-bound or stateful commands -> keep concurrency at 1 (npm test, build, lint, ports, lock files)
+
+RETURNS:
+  Section list plus top matches per query. Add a processing command that console.log()s only the answer when you need to filter or aggregate.
+
+EXAMPLE: ctx_batch_execute(
+  commands: [{label:"issue 1", command:"gh issue view 1"}, {label:"issue 2", command:"gh issue view 2"}],
+  queries: ["root cause", "proposed fix"],
+  concurrency: 4
+)`,
     inputSchema: z.object({
       commands: z.preprocess(coerceCommandsArray, z
         .array(
@@ -3703,25 +3731,30 @@ server.registerTool(
   "ctx_purge",
   {
     title: "Purge Knowledge Base",
-    description:
-      "DESTRUCTIVE: permanently delete indexed content. Cannot be undone. Requires confirm:true and exactly one scope.\n\n" +
-      "WHEN:\n" +
-      "  - User explicitly asks to clear a specific session ('purge this session', 'wipe this conversation')\n" +
-      "  - User explicitly asks to reset the whole project ('reset everything', 'wipe the knowledge base')\n\n" +
-      "WHEN NOT:\n" +
-      "  - User says 'reset', 'clear', or 'wipe' without naming a scope -> ask which scope before calling\n" +
-      "  - User wants to free memory or improve performance -> recommend ctx_stats first, do not purge\n\n" +
-      "SCOPES (pass exactly one):\n" +
-      "  - Per-session: ctx_purge(confirm: true, sessionId: \"<uuid>\") deletes that session's events and per-session FTS5 chunks; sibling sessions and stats file are preserved.\n" +
-      "  - Per-project: ctx_purge(confirm: true, scope: \"project\") wipes FTS5 knowledge base, every session DB row, events markdown, and resets the stats file.\n\n" +
-      "CONTRACT:\n" +
-      "  - confirm:true is required; confirm:false returns 'purge cancelled'.\n" +
-      "  - sessionId and scope:'project' together return 'ambiguous - pick one'.\n" +
-      "  - scope:'session' without sessionId throws (sessionId required).\n" +
-      "  - Bare {confirm:true} is deprecated: maps to scope:'project' with a stderr warning; will hard-error in a future major.\n\n" +
-      "RETURNS: a summary of removed rows + the resolved scope.\n\n" +
-      "EXAMPLE: ctx_purge(confirm: true, sessionId: \"7c8a-1234-5678-9abc-def012345678\")\n" +
-      "EXAMPLE: ctx_purge(confirm: true, scope: \"project\")",
+    description: `DESTRUCTIVE: permanently delete indexed content. Cannot be undone. Requires confirm:true and exactly one scope.
+
+WHEN:
+  - User explicitly asks to clear a specific session ('purge this session', 'wipe this conversation')
+  - User explicitly asks to reset the whole project ('reset everything', 'wipe the knowledge base')
+
+WHEN NOT:
+  - User says 'reset', 'clear', or 'wipe' without naming a scope -> ask which scope before calling
+  - User wants to free memory or improve performance -> recommend ctx_stats first, do not purge
+
+SCOPES (pass exactly one):
+  - Per-session: ctx_purge(confirm: true, sessionId: "<uuid>") deletes that session's events and per-session FTS5 chunks; sibling sessions and stats file are preserved.
+  - Per-project: ctx_purge(confirm: true, scope: "project") wipes FTS5 knowledge base, every session DB row, events markdown, and resets the stats file.
+
+CONTRACT:
+  - confirm:true is required; confirm:false returns 'purge cancelled'.
+  - sessionId and scope:'project' together return 'ambiguous - pick one'.
+  - scope:'session' without sessionId throws (sessionId required).
+  - Bare {confirm:true} is deprecated: maps to scope:'project' with a stderr warning; will hard-error in a future major.
+
+RETURNS: a summary of removed rows + the resolved scope.
+
+EXAMPLE: ctx_purge(confirm: true, sessionId: "7c8a-1234-5678-9abc-def012345678")
+EXAMPLE: ctx_purge(confirm: true, scope: "project")`,
     // NOTE: schema MUST be a plain z.object — no .refine()/.transform()/
     // .superRefine() wrapper. See block comment above & issue #563. The
     // cross-field ambiguity check lives in the handler body below.
