@@ -27,9 +27,15 @@ import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, test } from "vitest";
 import { SessionDB } from "../../src/session/db.js";
 import {
+  formatReport,
   getContentBytesForSession,
   getMultiAdapterRealBytesStats,
   getRealBytesStats,
+} from "../../src/session/analytics.js";
+import type {
+  ConversationStats,
+  FullReport,
+  RealBytesStats,
 } from "../../src/session/analytics.js";
 import { ContentStore } from "../../src/store.js";
 
@@ -633,5 +639,163 @@ describe("getRealBytesStats projectDir scope (Bug E+F, v1.0.148)", () => {
     // ASSERT — A (10k, event-level matches) + B (30k, event-level empty
     // but META matches) summed; C excluded.
     expect(r.bytesAvoided).toBe(40_000);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// v1.0.148 — Bug G — strict-compression formula
+//
+// Display formula change. Pre-fix (v1.0.134 SLICE B):
+//   Without = bytesAvoided + bytesReturned + eventDataBytes
+//   With    = max(1, bytesReturned + eventDataBytes)
+// SLICE B added eventDataBytes to both sides to dodge a degenerate
+// 100% bar when bytesReturned was 0. But eventDataBytes is the raw
+// payload captured by the hook (tool args / prompt text) — it is
+// analytics infrastructure that NEVER enters the model context
+// window. Including it inflates the With side and crushes the
+// percentage from ~95% (truth) down to ~56% (display).
+//
+// Post-fix (strict-compression):
+//   if (bytesAvoided + bytesReturned == 0) → skip section, emit hint
+//   else:
+//     Without = bytesAvoided + bytesReturned       (truly diverted)
+//     With    = max(1, bytesReturned)              (truly re-served)
+// eventDataBytes is rendered in Section 2 (captures count), not in
+// the Section 1 Without/With ratio.
+//
+// Empirical baseline (Mert's machine, real DB):
+//   Without ≈ 3.0 MB · With ≈ 140 KB · 95.4% kept out
+// Pre-fix the same DB rendered:
+//   Without ≈ 5.2 MB · With ≈ 2.3 MB · 56% kept out
+// ─────────────────────────────────────────────────────────
+
+const STRICT_OPTS = {
+  cwd:    "/home/u/cm",
+  now:    Date.UTC(2026, 4, 24, 12, 0, 0),
+  locale: "en-TR" as const,
+  tz:     "Europe/Istanbul" as const,
+};
+
+function strictReport(): FullReport {
+  return {
+    savings: {
+      processed_kb: 0, entered_kb: 0, saved_kb: 0, pct: 0, savings_ratio: 0,
+      by_tool: [],
+      total_calls: 5,
+      total_bytes_returned: 1000,
+      kept_out: 5000,
+      total_processed: 0,
+    },
+    session: { id: "strict-test", uptime_min: "3.0" },
+    continuity: { total_events: 0, by_category: [], compact_count: 0, resume_ready: false },
+    projectMemory: { total_events: 0, session_count: 0, by_category: [] },
+  };
+}
+
+function strictConversation(): ConversationStats {
+  return {
+    sessionId: "strict-conv",
+    events: 12,
+    dbCount: 1,
+    daysAlive: 1.5,
+    snapshotBytes: 0,
+    snapshotsConsumed: 0,
+    byCategory: [{ category: "file", count: 1, label: "Files tracked" }],
+    firstEventMs: Date.parse("2026-05-23T08:00:00Z"),
+    lastEventMs:  Date.parse("2026-05-24T11:00:00Z"),
+  };
+}
+
+describe("v1.0.148 Bug G — strict-compression formula (Section 1 Without/With)", () => {
+  test("eventDataBytes is excluded from Without/With; ratio reflects true compression (~95%)", () => {
+    // Mert's empirical conversation row:
+    //   bytesAvoided   = 2,898,000  (tool-call outputs we diverted)
+    //   bytesReturned  =   140,000  (what we actually re-served)
+    //   eventDataBytes = 2,139,000  (raw hook payload — NOT context cost)
+    //
+    // Strict formula:
+    //   Without = 2898000 + 140000  = 3,038,000 ≈ 3.0 MB
+    //   With    = max(1, 140000)    =   140,000 ≈ 140 KB
+    //   % kept  = 1 - 140000/3038000 ≈ 95.4%
+    const realBytes: RealBytesStats = {
+      eventDataBytes: 2_139_000,
+      bytesAvoided:   2_898_000,
+      bytesReturned:    140_000,
+      snapshotBytes:        0,
+      totalSavedTokens: Math.floor((2_898_000 + 140_000) / 4),
+    };
+
+    const text = formatReport(strictReport(), "1.0.148", null, {
+      conversation: strictConversation(),
+      realBytes: { conversation: realBytes },
+      ...STRICT_OPTS,
+    });
+
+    const lines = text.split("\n");
+
+    // Locate the "kept out of context" ratio line.
+    const ratioLine = lines.find((l) => /kept out of context/.test(l));
+    expect(ratioLine, `ratio line missing:\n${text}`).toBeDefined();
+    const m = ratioLine!.match(/(\d+)%\s+kept out of context/);
+    expect(m, `cannot parse ratio: ${ratioLine}`).not.toBeNull();
+    const pct = Number(m![1]);
+
+    // Strict formula → ~95%. SLICE B formula → ~56%. Pre-Bug-E-F → ~6%.
+    // Hard assertion: pct is in the strict-compression band.
+    expect(pct).toBeGreaterThanOrEqual(94);
+    expect(pct).toBeLessThanOrEqual(96);
+
+    // Without / With bars: bytes labels are formatted via kb().
+    const withoutLine = lines.find((l) => /Without context-mode/.test(l));
+    const withLine    = lines.find((l) => /With context-mode/.test(l));
+    expect(withoutLine, `Without line missing:\n${text}`).toBeDefined();
+    expect(withLine,    `With line missing:\n${text}`).toBeDefined();
+
+    // Without ≈ 3 MB. 3,038,000 bytes / 1024^2 = 2.897 MB → kb() prints
+    // "2.9 MB". Pre-fix (SLICE B): 2898+140+2139 = 5177 KB → "5.1 MB".
+    expect(withoutLine!).toMatch(/(2\.9 MB|3\.0 MB|2,8\d\d KB|3,038 KB)/);
+    expect(withoutLine).not.toMatch(/5\.\d MB/);
+
+    // With ≈ 140 KB. 140,000 / 1024 = 136.7 KB → kb() prints "137 KB".
+    // Pre-fix (SLICE B): 140 + 2139 = 2279 KB → "2.2 MB".
+    expect(withLine!).toMatch(/13[67] KB|140 KB/);
+    expect(withLine).not.toMatch(/2\.\d MB/);
+  });
+});
+
+describe("v1.0.148 Bug G — empty-state branch (no degenerate bar)", () => {
+  test("bytesAvoided=0 AND bytesReturned=0 → skip Section 1 bars, emit honest hint", () => {
+    // Only event metadata captured — no redirects yet. SLICE B formula
+    // would render Without=50000, With=50000, ratio=0% — a degenerate
+    // flat bar. Strict formula skips the bar and emits a one-line hint.
+    const realBytes: RealBytesStats = {
+      eventDataBytes: 50_000,
+      bytesAvoided:        0,
+      bytesReturned:       0,
+      snapshotBytes:       0,
+      totalSavedTokens:    0,
+    };
+
+    const text = formatReport(strictReport(), "1.0.148", null, {
+      conversation: strictConversation(),
+      realBytes: { conversation: realBytes },
+      ...STRICT_OPTS,
+    });
+
+    const lines = text.split("\n");
+
+    // No Without/With bars in this empty state.
+    expect(lines.find((l) => /Without context-mode/.test(l)),
+      `Without bar should NOT render in empty state:\n${text}`).toBeUndefined();
+    expect(lines.find((l) => /With context-mode/.test(l)),
+      `With bar should NOT render in empty state:\n${text}`).toBeUndefined();
+
+    // And no "0% kept out" or "100% kept out" degenerate ratio line.
+    const ratioLine = lines.find((l) => /kept out of context/.test(l));
+    expect(ratioLine,
+      `degenerate ratio line should NOT render in empty state:\n${text}`).toBeUndefined();
+
+    // Honest hint must appear in Section 1.
+    expect(text).toMatch(/no measurable redirect activity/i);
   });
 });

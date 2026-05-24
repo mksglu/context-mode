@@ -2028,35 +2028,44 @@ function renderNarrative5Section(args: {
   }
   out.push("");
 
-  // Without/With bars — measured from real per-event bytes_returned / bytes_avoided.
+  // Without/With bars — strict compression (v1.0.148, Bug G / ADR-0004).
   //
-  // Honest definitions (v1.0.134 SLICE B — eventDataBytes floor):
-  //   Without = bytes the model WOULD have re-seen with no filtering
-  //           = bytes_avoided + bytes_returned + eventDataBytes
+  // Honest definitions:
+  //   Without = bytes the model WOULD have re-seen if context-mode
+  //             had not diverted them
+  //           = bytesAvoided + bytesReturned
   //   With    = bytes the model ACTUALLY re-saw after context-mode
-  //           = bytes_returned + eventDataBytes
+  //           = max(1, bytesReturned)
   //
-  // Why eventDataBytes belongs on BOTH sides:
-  //   `eventDataBytes` is the raw payload captured by the hook (tool args,
-  //   prompt body, etc). Those bytes were "kept out" — never inflated back
-  //   into context — but they still represent real measured signal. Pre-fix
-  //   the formula was `with = max(1, bytesReturned)`, which collapsed to 1
-  //   whenever the conversation hadn't accumulated any re-served bytes yet
-  //   (early in a session, or for tool-heavy work that never re-hits index).
-  //   That produced a degenerate ~100% kept-out bar even when the only
-  //   honest signal we had was a few KB of event payloads.
+  // Why eventDataBytes is excluded from this ratio:
+  //   `eventDataBytes` is the raw hook payload (tool args, prompt
+  //   body) we captured for the knowledge base. Those bytes are
+  //   analytics infrastructure — they NEVER enter the model context
+  //   window. Including them on either side (as v1.0.134 SLICE B did
+  //   to dodge a degenerate 100% bar) misrepresents context cost.
+  //   SLICE B was an incidental fix that crushed the displayed
+  //   percentage from ~95% (the true compression ratio) to ~56% on
+  //   live conversations. eventDataBytes is rendered in Section 2
+  //   (captures count), not in this Section 1 Without/With bar.
   //
-  // No fallback to heuristic. If the schema has zero signal for this
-  // conversation (no hook ever populated any of the three columns),
-  // the section is skipped entirely. Honesty over decoration.
+  // Empty-state branch:
+  //   If neither bytesAvoided nor bytesReturned has been measured yet
+  //   (early in a session, schema-migration recovery in progress, or
+  //   tool-heavy work that hasn't re-hit the index), we do NOT draw
+  //   a degenerate 0% / 100% bar. We emit one honest hint line and
+  //   skip the bar — honesty over decoration.
   const realConv = realBytes?.conversation;
   const measuredAvoided  = realConv?.bytesAvoided   ?? 0;
   const measuredReturned = realConv?.bytesReturned  ?? 0;
-  const measuredEvent    = realConv?.eventDataBytes ?? 0;
 
-  if (measuredAvoided + measuredReturned + measuredEvent > 0) {
-    const convBytesWithout  = measuredAvoided + measuredReturned + measuredEvent;
-    const convBytesWith     = Math.max(1, measuredReturned + measuredEvent);
+  if (measuredAvoided + measuredReturned === 0) {
+    // No measurable redirect activity yet — captures may exist, but
+    // nothing has been diverted from the model context window.
+    out.push("  No measurable redirect activity captured yet — bars will appear once context-mode diverts its first payload.");
+    out.push("");
+  } else {
+    const convBytesWithout  = measuredAvoided + measuredReturned;
+    const convBytesWith     = Math.max(1, measuredReturned);
     const convTokensWithout = Math.max(1, Math.floor(convBytesWithout / 4));
     const convTokensWith    = Math.max(1, Math.floor(convBytesWith    / 4));
     const withoutBar = dataBar(convTokensWithout, convTokensWithout, 32);

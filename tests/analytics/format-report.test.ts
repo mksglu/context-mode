@@ -676,30 +676,34 @@ describe("formatReport", () => {
 });
 
 // ─────────────────────────────────────────────────────────
-// v1.0.134 SLICE B — narrative bar uses eventDataBytes as floor
-// When `bytes_returned == 0` (a fresh session that hasn't measured any
-// re-served bytes yet) the previous formula degenerated to:
-//   convBytesWith    = max(1, 0)           = 1     ← tiny denominator
-//   convBytesWithout = 0 + measuredAvoided = N     ← real numerator
-// → ratio = ~100% kept-out, even when the only signal we have is the
-// captured event payload itself. The fix: include `eventDataBytes` (raw
-// captured payload bytes — also bytes we kept the model from re-seeing)
-// in BOTH sides of the ratio so the With bar reflects something honest.
+// v1.0.148 Bug G — Section 1 bar uses strict-compression formula.
+//
+// SUPERSEDES the v1.0.134 SLICE B fix. SLICE B folded `eventDataBytes`
+// into BOTH sides of the Without/With ratio to dodge a degenerate-100%
+// bar when `bytes_returned == 0`. That tactical fix crushed the
+// per-conversation display from the literal compression ratio (~95%
+// on real conversations) down to ~56% by treating analytics
+// infrastructure bytes as if they were context bytes.
+//
+// The v1.0.148 strict-compression formula treats `eventDataBytes` as
+// what it actually is: hook-captured payload bytes that NEVER enter
+// the model context window. They live in SessionDB for the knowledge
+// base, not in conversation memory. Section 2 (captures count) is the
+// right surface for that signal.
+//
+// New definitions:
+//   Without = bytesAvoided + bytesReturned
+//   With    = max(1, bytesReturned)
+//   kept-out = 1 - With / Without
+//
+// SLICE B's degenerate-100% problem is now handled by an explicit
+// empty-state branch: when BOTH measurements are zero, no bar is
+// drawn and an honest hint line is emitted instead.
 // ─────────────────────────────────────────────────────────
-describe("v1.0.134 SLICE B — narrative bar uses eventDataBytes when bytes_returned=0", () => {
-  it("bar ratio uses eventDataBytes when bytes_returned=0 (no degenerate 100%)", () => {
-    const report = makeReport({
-      savings: {
-        ...makeReport().savings,
-        total_calls: 5,
-        total_bytes_returned: 1000,
-        kept_out: 5000,
-      },
-    });
-
-    // Triggers the narrative-5-section path (conversation.events > 0).
+describe("v1.0.148 Bug G — Section 1 bar uses strict-compression formula", () => {
+  function makeNarrativeContext() {
     const conversation = {
-      sessionId: "slice-b-test",
+      sessionId: "bug-g-test",
       events: 12,
       dbCount: 1,
       daysAlive: 1.5,
@@ -708,42 +712,97 @@ describe("v1.0.134 SLICE B — narrative bar uses eventDataBytes when bytes_retu
       byCategory: [],
       firstEventMs: Date.now() - 86_400_000,
       lastEventMs: Date.now(),
-    } as const;
+    };
+    const report = makeReport({
+      savings: {
+        ...makeReport().savings,
+        total_calls: 5,
+        total_bytes_returned: 1000,
+        kept_out: 5000,
+      },
+    });
+    return { conversation, report };
+  }
 
+  it("empty-state: emits honest 'no measurable activity' hint when bytesAvoided + bytesReturned == 0", () => {
+    const { conversation, report } = makeNarrativeContext();
     const conversationRealBytes = {
-      // The signal that USED to be ignored by the bar formula.
+      eventDataBytes: 50_000,       // captures exist…
+      bytesAvoided: 0,              // …but nothing has been diverted
+      bytesReturned: 0,             // …and nothing has been re-served
+      snapshotBytes: 0,
+      contentBytes: 0,
+      totalSavedTokens: 0,
+    };
+
+    const output = formatReport(report, "1.0.148", null, {
+      conversation: conversation as any,
+      realBytes: { conversation: conversationRealBytes as any },
+    });
+
+    // No Without/With bar should render — instead an honest hint line.
+    expect(output).toMatch(/No measurable redirect activity captured yet/i);
+    expect(output).not.toMatch(/Without context-mode\s+\d+/);
+    expect(output).not.toMatch(/With context-mode\s+\d+/);
+  });
+
+  it("mixed case: 60% kept out when bytesAvoided=6KB, bytesReturned=4KB (eventDataBytes ignored)", () => {
+    const { conversation, report } = makeNarrativeContext();
+    const conversationRealBytes = {
+      eventDataBytes: 100_000,      // analytics infrastructure — MUST be excluded from ratio
+      bytesAvoided: 6_000,
+      bytesReturned: 4_000,
+      snapshotBytes: 0,
+      contentBytes: 0,
+      totalSavedTokens: Math.floor((100_000 + 6_000) / 4),
+    };
+
+    const output = formatReport(report, "1.0.148", null, {
+      conversation: conversation as any,
+      realBytes: { conversation: conversationRealBytes as any },
+    });
+
+    const ratioLine = output
+      .split("\n")
+      .find((l) => l.includes("kept out of context") && l.includes("%"));
+    expect(ratioLine, `bar summary line missing in:\n${output}`).toBeDefined();
+
+    // Strict-compression: kept-out = 1 - 4000 / (6000 + 4000) = 60%.
+    // If eventDataBytes were folded in (SLICE B regression), the displayed
+    // ratio would be 1 - 104000 / 110000 ≈ 5% — wildly off.
+    const m = ratioLine!.match(/(\d+)%\s+kept out of context/);
+    const pct = Number(m![1]);
+    expect(pct).toBeGreaterThanOrEqual(58);
+    expect(pct).toBeLessThanOrEqual(62);
+  });
+
+  it("only-avoided case: honest 99% kept out when bytesReturned=0 but bytesAvoided>0", () => {
+    const { conversation, report } = makeNarrativeContext();
+    const conversationRealBytes = {
       eventDataBytes: 50_000,
       bytesAvoided: 10_000,
-      bytesReturned: 0, // ← the degenerate-100% trigger before the fix
+      bytesReturned: 0,             // genuinely no re-served bytes yet
       snapshotBytes: 0,
       contentBytes: 0,
       totalSavedTokens: Math.floor((50_000 + 10_000) / 4),
     };
 
-    const output = formatReport(report, "1.0.134", null, {
+    const output = formatReport(report, "1.0.148", null, {
       conversation: conversation as any,
       realBytes: { conversation: conversationRealBytes as any },
     });
 
-    // The bar lines must render (signal > 0 from eventDataBytes).
-    const lines = output.split("\n");
-    const ratioLine = lines.find((l) =>
-      l.includes("kept out of context") && l.includes("%"),
-    );
-    expect(ratioLine, `bar summary line missing in output:\n${output}`)
-      .toBeDefined();
-
-    // Parse "  NN% kept out of context · ..." — must NOT be ~100%.
+    // With strict compression: With = max(1, 0) = 1, Without = 10_000, pct = 99.99%.
+    // This 100% is HONEST (every measured byte was kept out — nothing came
+    // back into context yet). The empty-state branch above handles the
+    // truly-no-signal case; here we let the honest 100% stand.
+    const ratioLine = output
+      .split("\n")
+      .find((l) => l.includes("kept out of context") && l.includes("%"));
+    expect(ratioLine, `bar summary line missing in:\n${output}`).toBeDefined();
     const m = ratioLine!.match(/(\d+)%\s+kept out of context/);
-    expect(m, `cannot parse ratio from line: ${ratioLine}`).not.toBeNull();
     const pct = Number(m![1]);
-    // Honest ratio after fix:
-    //   With    = bytesReturned + eventDataBytes = 0 + 50000 = 50000
-    //   Without = bytesAvoided + bytesReturned + eventDataBytes = 60000
-    //   kept-out ≈ 1 - 50000/60000 ≈ 16.67%
-    // Pre-fix this was ~100%. The hard assertion is: no longer degenerate.
-    expect(pct).toBeLessThan(95);
-    expect(pct).toBeGreaterThanOrEqual(0);
+    expect(pct).toBeGreaterThanOrEqual(99);
   });
 });
 
