@@ -1143,6 +1143,25 @@ export function getRealBytesStats(opts: {
   sessionsDir?: string;
   worktreeHash?: string;
   /**
+   * v1.0.148 follow-up (Bug E+F): when set, the function aggregates across
+   * EVERY session whose `session_meta.project_dir` matches this value, not
+   * just one session_id. Resolves the per-conversation under-attribution:
+   * one Claude Code conversation typically spans many session_ids (resume
+   * cycles, /compact rebirths, PID sub-process sessions spawned by
+   * ctx_execute), so a single-session_id filter loses the sandbox-burst
+   * bytes_avoided that all live under the conversation's cwd.
+   *
+   * Uses a META subquery (`session_id IN (SELECT session_id FROM
+   * session_meta WHERE project_dir = ?)`), then sums ALL events for
+   * matching sessions regardless of their event-level project_dir
+   * (sandbox-burst events write `project_dir = ''` even when the
+   * META row carries the parent cwd — see Bug F).
+   *
+   * Mutually exclusive with `sessionId`. When both are set, `sessionId`
+   * wins for back-compat.
+   */
+  projectDir?: string;
+  /**
    * v1.0.133 Slice 3: when set alongside `sessionId`, the function joins
    * the FTS5 content DB at this path and folds chunk bytes into
    * `bytesAvoided` + `totalSavedTokens` + `contentBytes`. Render-time
@@ -1226,6 +1245,39 @@ export function getRealBytesStats(opts: {
             const snap = sdb.prepare(
               "SELECT COALESCE(SUM(LENGTH(snapshot)), 0) AS bytes FROM session_resume WHERE session_id = ?",
             ).get(opts.sessionId) as { bytes: number } | undefined;
+            if (snap?.bytes) snapshotBytes += Number(snap.bytes);
+          } catch { /* old schema */ }
+        } else if (opts.projectDir) {
+          // Bug E+F: META-scoped aggregation. Take every session_id whose
+          // session_meta.project_dir matches, then sum ALL of those
+          // sessions' events regardless of the events' own project_dir
+          // (sandbox-burst PID sessions write empty event-level project_dir
+          // even when their META carries the parent cwd).
+          const row = sdb.prepare(
+            `SELECT
+               COALESCE(SUM(LENGTH(data)), 0)   AS data_bytes,
+               COALESCE(SUM(bytes_avoided), 0)  AS bytes_avoided,
+               COALESCE(SUM(bytes_returned), 0) AS bytes_returned
+             FROM session_events
+             WHERE session_id IN (
+               SELECT session_id FROM session_meta WHERE project_dir = ?
+             )`,
+          ).get(opts.projectDir) as
+            | { data_bytes: number; bytes_avoided: number; bytes_returned: number }
+            | undefined;
+          if (row) {
+            eventDataBytes += Number(row.data_bytes ?? 0);
+            bytesAvoided   += Number(row.bytes_avoided ?? 0);
+            bytesReturned  += Number(row.bytes_returned ?? 0);
+          }
+          try {
+            const snap = sdb.prepare(
+              `SELECT COALESCE(SUM(LENGTH(snapshot)), 0) AS bytes
+               FROM session_resume
+               WHERE session_id IN (
+                 SELECT session_id FROM session_meta WHERE project_dir = ?
+               )`,
+            ).get(opts.projectDir) as { bytes: number } | undefined;
             if (snap?.bytes) snapshotBytes += Number(snap.bytes);
           } catch { /* old schema */ }
         } else {

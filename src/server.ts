@@ -3451,7 +3451,47 @@ server.registerTool(
               // 49 MB of indexed content sitting in the content DB.
               // Render-time read-only — no DB mutation, no backfill.
               const contentDbPath = getStorePath();
-              const convReal = getRealBytesStats({ sessionId: sid, sessionsDir: getSessionDir(), worktreeHash: dbHash, contentDbPath });
+              // v1.0.148 Bug E+F: a conversation typically spans many
+              // session_ids (resume cycles, /compact rebirths, PID
+              // sub-process sessions launched by ctx_execute). Scoping
+              // per-session loses sandbox-burst bytes_avoided that the
+              // PID-sessions own. Look up THIS session's project_dir
+              // from META and aggregate via META subquery so all
+              // sibling sessions in the same cwd attribute together.
+              // Fallback to sessionId scope if the META lookup fails
+              // (best-effort — the original metric is still defensible).
+              let convReal;
+              try {
+                const Database = loadDatabase();
+                const dbFiles = (await import("node:fs"))
+                  .readdirSync(getSessionDir())
+                  .filter((f) => f.endsWith(".db") && (!dbHash || f.startsWith(dbHash)));
+                let projectDirForSid: string | undefined;
+                for (const file of dbFiles) {
+                  try {
+                    const sdb = new Database(
+                      (await import("node:path")).join(getSessionDir(), file),
+                      { readonly: true },
+                    );
+                    try {
+                      const r = sdb
+                        .prepare("SELECT project_dir FROM session_meta WHERE session_id = ?")
+                        .get(sid) as { project_dir: string } | undefined;
+                      if (r?.project_dir) {
+                        projectDirForSid = r.project_dir;
+                        break;
+                      }
+                    } finally {
+                      sdb.close();
+                    }
+                  } catch { /* skip unreadable DB */ }
+                }
+                convReal = projectDirForSid
+                  ? getRealBytesStats({ projectDir: projectDirForSid, sessionsDir: getSessionDir(), worktreeHash: dbHash, contentDbPath })
+                  : getRealBytesStats({ sessionId: sid, sessionsDir: getSessionDir(), worktreeHash: dbHash, contentDbPath });
+              } catch {
+                convReal = getRealBytesStats({ sessionId: sid, sessionsDir: getSessionDir(), worktreeHash: dbHash, contentDbPath });
+              }
               const lifeRealBase = getRealBytesStats({ sessionsDir: getSessionDir() });
               // v1.0.134 SLICE C: lifetime tier sums ALL chunks (no
               // session_id filter). Without this fold, lifetime "kept out"

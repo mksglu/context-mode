@@ -538,3 +538,100 @@ describe("aggregator schema-migration recovery (#683 follow-up, v1.0.148)", () =
     expect(colsAfterSecond.size).toBe(colsAfterFirst.size);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// Bug E+F (v1.0.148 follow-up) — per-conversation aggregator MUST scope
+// by project_dir on session_META, not by a single session_id.
+//
+// Empirical finding from the field: one Claude Code conversation
+// produces dozens of session_ids (resume cycles, /compact rebirths,
+// PID sub-process sessions launched by ctx_execute). The aggregator's
+// existing per-session filter caught only the top-level main session,
+// losing every sandbox burst's bytes_avoided. On the reporter's
+// machine: real conversation savings = 56% / 5 MB, displayed = 6% /
+// 168 KB. 49 percentage points of attribution loss.
+//
+// Worse — Bug F nested inside: sandbox-burst PID-session EVENTS write
+// project_dir = '' even though the session_META has the parent cwd.
+// So an event-level project_dir filter would still miss them. The fix
+// scopes via META subquery (`session_id IN (SELECT session_id FROM
+// session_meta WHERE project_dir = ?)`), then sums ALL events for
+// matching sessions regardless of their event-level project_dir.
+//
+// Public API change: getRealBytesStats accepts a new `projectDir`
+// option, mutually exclusive with `sessionId`. When passed, the
+// aggregator uses the META-based subquery.
+// ──────────────────────────────────────────────────────────────────────
+describe("getRealBytesStats projectDir scope (Bug E+F, v1.0.148)", () => {
+  /**
+   * Seed a session with its own DB at a deterministic path. The META
+   * row carries project_dir; events optionally carry their own
+   * project_dir (defaulting to empty string to mirror the
+   * sandbox-burst real-world shape).
+   */
+  function seedSessionWithProjectDir(
+    dir: string,
+    hash: string,
+    sessionId: string,
+    projectDir: string,
+    events: Array<{ data: string; bytesAvoided?: number; bytesReturned?: number; eventProjectDir?: string }>,
+  ): void {
+    const dbPath = dbPathFor(dir, hash);
+    const sdb = new SessionDB({ dbPath });
+    try {
+      sdb.ensureSession(sessionId, projectDir);
+      let i = 0;
+      for (const e of events) {
+        sdb.insertEvent(
+          sessionId,
+          {
+            type: "test",
+            category: "test",
+            priority: 1,
+            data: `${e.data}#${i++}`,
+            // Real bug: sandbox PID-burst events write empty project_dir
+            project_dir: e.eventProjectDir ?? "",
+            attribution_source: "test",
+            attribution_confidence: 1,
+          },
+          "test",
+          undefined,
+          { bytesAvoided: e.bytesAvoided, bytesReturned: e.bytesReturned },
+        );
+      }
+    } finally {
+      sdb.close();
+    }
+  }
+
+  test("sums bytes across every session_id whose META project_dir matches", () => {
+    const dir = mkSessionsDir();
+    const targetProj = "/proj/target";
+    const otherProj = "/proj/other";
+
+    // Session A — main session in target project, bytes_avoided=10_000
+    seedSessionWithProjectDir(dir, "aaa1111111111111", `sess-A-${randomUUID()}`, targetProj, [
+      { data: "main-event", bytesAvoided: 10_000, eventProjectDir: targetProj },
+    ]);
+
+    // Session B — PID sub-process in target project. META has targetProj,
+    // but EVENTS have empty project_dir (the real-world Bug F shape).
+    // bytes_avoided=30_000 — these are the bytes the existing event-level
+    // filter loses.
+    seedSessionWithProjectDir(dir, "bbb2222222222222", `pid-12345`, targetProj, [
+      { data: "sandbox-burst", bytesAvoided: 30_000, eventProjectDir: "" },
+    ]);
+
+    // Session C — different project, MUST be excluded.
+    seedSessionWithProjectDir(dir, "ccc3333333333333", `sess-C-${randomUUID()}`, otherProj, [
+      { data: "noise", bytesAvoided: 99_000, eventProjectDir: otherProj },
+    ]);
+
+    // ACT — new projectDir scope.
+    const r = getRealBytesStats({ projectDir: targetProj, sessionsDir: dir });
+
+    // ASSERT — A (10k, event-level matches) + B (30k, event-level empty
+    // but META matches) summed; C excluded.
+    expect(r.bytesAvoided).toBe(40_000);
+  });
+});
