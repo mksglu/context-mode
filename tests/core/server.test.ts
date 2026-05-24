@@ -5753,7 +5753,145 @@ describe("hook routing prompt-surface contract (#683 ADR-0002 + ADR-0003)", () =
           // is mentioned so the agent has a concrete next call.
           expect(cs.payload).toMatch(/ctx_(execute|fetch_and_index|search|batch_execute)/);
         });
+
+        // ── PR #683 follow-up (Mert flag): negation-pattern eradication ──
+        //
+        // The original PR #654 fix replaced the single word "blocked" with
+        // "redirected", which removed the Constitutional-AI safety trigger but
+        // kept a sibling rubric #2 violation in the very next clause:
+        //
+        //   "(context-window optimization, NOT a network restriction)"
+        //
+        // The audit (TOOL-DESCRIPTIONS-AUDIT.md §2 Probe 3) measured this
+        // parenthetical regressing Haiku capitulation from 0/6 → 2/6 — the
+        // bare-NOT construct primes the very frame it tries to deny (ironic
+        // process theory). Per ADR-0002 rubric #2 (affirmative beats negative),
+        // CASE A strings MUST avoid bare-NOT negations entirely. Reframe with
+        // affirmative "X has full network access" + imperative retry hint.
+        test("MUST NOT contain the 'NOT a network' negation (PR #683 follow-up)", () => {
+          // Matches "NOT a network restriction", "NOT a network/security
+          // restriction", "is NOT a network ...", etc. Affirmative-only voice.
+          expect(cs.payload).not.toMatch(/\bNOT\s+a\s+network\b/i);
+        });
+
+        test("MUST NOT contain 'Do NOT retry' negation (PR #683 follow-up)", () => {
+          // Same rubric: "Do NOT retry with curl/wget" anchors attention on
+          // the disallowed action. Express as the positive next step — the
+          // ctx_execute / ctx_fetch_and_index call IS the next step.
+          expect(cs.payload).not.toMatch(/\bDo\s+NOT\s+retry\b/i);
+        });
       });
     }
   });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// PR #683 follow-up (Mert flag, 2026-05-24): tool description source-form
+// uniformity — embedded `\n\n` escapes in template literals
+//
+// ctx_execute was the lone ctx_* tool whose description used a template
+// literal with embedded `\n\n` escape sequences inline (compact but
+// escape-heavy and harder to scan). Every other multi-section ctx_*
+// description used `"..." + "...\n\n"` concat-form. Both render identically
+// to the host LLM — the bytes are the same `\n\n` separators — but the
+// source form was inconsistent.
+//
+// Canonical decision (ADR-0002 follow-up): template literal with REAL
+// newlines. Source mirrors the rendered prompt. Zero escape sequences.
+// Markdown-friendly when read in an editor. The contract test below locks
+// the decision so a future contributor can't slip back to either of the
+// rejected forms (embedded `\n\n` escapes OR multi-line string concat).
+// ──────────────────────────────────────────────────────────────────────────
+describe("tool description source form contract (#683 PR follow-up)", () => {
+  const serverTsPath = resolve(__dirname, "../../src/server.ts");
+  const serverTs = readFileSync(serverTsPath, "utf-8");
+
+  // Locate every `description: ...,` block under a server.registerTool() call
+  // and capture its raw source text. Reuse the same anchor pattern as the
+  // ADR-0002 contract test for consistency.
+  function extractDescriptionBlocks(): Array<{ name: string; raw: string; lineNo: number }> {
+    const out: Array<{ name: string; raw: string; lineNo: number }> = [];
+    const lines = serverTs.split("\n");
+    const RE_REGISTER = /server\.registerTool\(\s*$/;
+    const RE_NAME = /^\s*"(ctx_[a-z_]+)"\s*,\s*$/;
+    for (let i = 0; i < lines.length; i++) {
+      if (!RE_REGISTER.test(lines[i])) continue;
+      const nameMatch = lines[i + 1]?.match(RE_NAME);
+      if (!nameMatch) continue;
+      const name = nameMatch[1];
+      let descStart = -1;
+      let descEnd = -1;
+      for (let j = i + 2; j < Math.min(i + 80, lines.length); j++) {
+        if (descStart < 0 && /^\s*description:/.test(lines[j])) {
+          descStart = j;
+        } else if (descStart >= 0 && /^\s*(inputSchema|outputSchema|annotations):/.test(lines[j])) {
+          descEnd = j;
+          break;
+        }
+      }
+      if (descStart < 0 || descEnd < 0) continue;
+      out.push({ name, raw: lines.slice(descStart, descEnd).join("\n"), lineNo: descStart + 1 });
+    }
+    return out;
+  }
+
+  const blocks = extractDescriptionBlocks();
+
+  // Tools whose descriptions are intentionally one-line concats with no
+  // section structure (diagnostic / GUI affordances per ADR-0002
+  // §Exemptions). They carry no `\n` separators in the source at all, so
+  // the embedded-escape rule is trivially satisfied and the concat-form
+  // exemption applies. Future contributors can promote these to template
+  // literals at will; they just aren't forced to.
+  const SHORT_DESCRIPTION_EXEMPT = new Set([
+    "ctx_stats",
+    "ctx_doctor",
+    "ctx_upgrade",
+    "ctx_insight",
+  ]);
+
+  test("at least 11 ctx_* tools surfaced for source-form contract", () => {
+    expect(blocks.length).toBeGreaterThanOrEqual(11);
+  });
+
+  for (const block of blocks) {
+    if (SHORT_DESCRIPTION_EXEMPT.has(block.name)) continue;
+
+    describe(block.name, () => {
+      test("source-form MUST NOT contain embedded '\\n\\n' escape (use real newlines in template literal)", () => {
+        // The forbidden pattern is the literal four-character source-text
+        // sequence: backslash, n, backslash, n. In source these appear inside
+        // template literals (`...\n\n...`) or quoted strings ("...\n\n").
+        // The canonical form is a template literal with REAL newlines so the
+        // source mirrors the rendered prompt byte-for-byte without escapes.
+        const hasEscapedDoubleNewline = /\\n\\n/.test(block.raw);
+        expect(
+          hasEscapedDoubleNewline,
+          `${block.name} description (src/server.ts:${block.lineNo}) contains embedded '\\n\\n' escapes. ` +
+            `Use a template literal with REAL newlines instead — source should mirror the rendered prompt. ` +
+            `Diff: replace \`...\\n\\n...\` source spans with multi-line template literals.`,
+        ).toBe(false);
+      });
+
+      test("source-form MUST NOT use multi-line string concat with '+' (use template literal)", () => {
+        // Concat-form was the legacy alternative — `"...\n\n" + "WHEN:\n"`.
+        // Once we ban `\n\n`, the only sensible multi-section shape is a
+        // template literal. This second assertion makes that explicit so a
+        // contributor doesn't switch one negative form for another (e.g.
+        // splitting on a newline inside a `+ "\n"` chain).
+        //
+        // Heuristic: a `"\n" +` or `"+ \n"` chain inside the description
+        // block. Single-line concats (e.g. `"a " + "b"`) are too loose to
+        // ban without false positives, so we anchor on the embedded newline
+        // form which is what multi-section descriptions actually used.
+        const hasConcatNewline = /"[^"]*"\s*\+\s*\n\s*"/.test(block.raw) ||
+          /\\n"\s*\+/.test(block.raw);
+        expect(
+          hasConcatNewline,
+          `${block.name} description (src/server.ts:${block.lineNo}) uses multi-line string concat with '+'. ` +
+            `Use a template literal with REAL newlines instead — single canonical source form for all multi-section descriptions.`,
+        ).toBe(false);
+      });
+    });
+  }
 });

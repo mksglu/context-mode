@@ -1,6 +1,7 @@
 # ADR-0003 — Routing deny reasons: redirect ≠ restriction
 
-- **Status**: Accepted
+- **Status**: Accepted — amended 2026-05-24 (PR #683 follow-up) to drop the
+  `"NOT a network restriction"` negation prescription; see §Amendment.
 - **Date**: 2026-05-24
 - **PR**: #683 (substitutes #654)
 - **Motivating bug**: kerneltoast / @noctivoro / Mert reproduced on Opus 4.6
@@ -39,11 +40,19 @@ Routing deny reasons MUST distinguish two cases:
 The action is supported, via a different tool, for context-window or
 efficiency reasons.
 
-- **Opening verb**: "redirected"
-- **MUST state**: "this is NOT a network / security restriction"
-- **MUST specify**: the alternative tool to use
-- **MUST end with**: an imperative next-action — e.g. "retry if it fails
-  with a transient error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH)"
+- **Opening verb**: "redirected to <ctx_tool> for context-window
+  efficiency" — affirmative routing intent, no negation.
+- **MUST affirm capability**: "<ctx_tool> has full network access"
+  (positive frame of the same signal the old `NOT a network restriction`
+  parenthetical tried to deliver).
+- **MUST specify**: the alternative tool to use, by name, as an
+  imperative call (e.g. `Call ctx_fetch_and_index(url, source) now`).
+- **MUST end with**: a positive imperative retry hint —
+  `"Retry the same call on a transient DNS error (EAI_AGAIN,
+  ETIMEDOUT, ENETUNREACH)"`.
+- **MUST NOT contain**: bare-NOT negations (`NOT a network restriction`,
+  `Do NOT retry with curl`, etc.). See §Amendment below for the
+  empirical rationale.
 
 The word `BLOCKED` MUST NOT appear bare in CASE A. It is reserved for
 true policy denial (CASE B) where the agent's correct response IS to
@@ -57,6 +66,38 @@ sandbox capability.
 - **Opening verb**: "denied" or "blocked by security policy"
 - **MUST cite**: the pattern or rule violated
 - **MAY suggest**: a safe alternative
+
+## Amendment (PR #683 follow-up, 2026-05-24)
+
+The original CASE A rubric required the parenthetical `"this is NOT a
+network / security restriction"`. Mert flagged on review that this
+prescription itself violates ADR-0002 rubric #2 (affirmative beats
+negation): the bare-NOT construct primes the very frame it tries to
+deny (ironic process theory). `TOOL-DESCRIPTIONS-AUDIT.md §2 Probe 3`
+already documented this — the NOT-parenthetical regressed Haiku
+capitulation rate from 0/6 → 2/6 vs the original "blocked" wording.
+
+PR #654 fixed the headline word (`blocked` → `redirected`) but kept the
+sibling negation in the very next clause. PR #683 follow-up
+(this amendment) eradicates the negation construct entirely:
+
+- Replace `"(context-window optimization, NOT a network restriction)"`
+  with affirmative `"to <ctx_tool> for context-window efficiency"` +
+  separate affirmative sentence `"<ctx_tool> has full network
+  access."`.
+- Replace `"Do NOT retry with curl/wget"` with positive
+  `"Retry the same call on a transient DNS error (...)"` — the
+  affirmative retry hint IS the next-action signal; the prohibition was
+  redundant once the routing is correct.
+
+The four CASE A sites in `hooks/core/routing.mjs` (L707 curl/wget,
+L738 inline HTTP, L751 build tool, L804 WebFetch) all conform to the
+amended rubric after this PR. A contract test in
+`tests/core/server.test.ts` (`ADR-0003 CASE A: routing.mjs redirect
+deny reasons`) locks the rule: every CASE A string MUST open with
+"redirected", MUST NOT contain bare uppercase `BLOCKED`, MUST name at
+least one `ctx_*` alternative, MUST NOT contain `"NOT a network"`,
+MUST NOT contain `"Do NOT retry"`.
 
 ## Consequences
 
