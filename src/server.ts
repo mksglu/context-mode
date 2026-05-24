@@ -2006,7 +2006,7 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
         "Directory-only: hard cap on files indexed (default: 200) — FTS5 blow-up guard.",
       ),
       extensions: z.array(z.string()).optional().describe(
-        "Directory-only: allowed file extensions (default: .md .mdx .txt .json .yaml .yml .ts .tsx .js .jsx .py .rs .go .sh).",
+        "Directory-only: allowed file extensions (default: .md .mdx .txt .json .yaml .yml .ts .tsx .js .jsx .astro .py .rs .go .sh).",
       ),
       respectGitignore: z.boolean().optional().describe(
         "Directory-only: apply nearest .gitignore (default: true).",

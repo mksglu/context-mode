@@ -1,0 +1,29 @@
+---
+import UserCard from "./UserCard.astro";
+---
+<main id="page-root">
+  <UserCard />
+  <NavBar />
+</main>
+
+<script lang="ts">
+interface CounterState {
+  value: number;
+}
+const state: CounterState = { value: 0 };
+function increment() {
+  state.value += 1;
+}
+</script>
+
+<script>
+function hydrate() {
+  return true;
+}
+</script>
+
+<script type="application/ld+json">
+function shouldSkip() {
+  return 0;
+}
+</script>

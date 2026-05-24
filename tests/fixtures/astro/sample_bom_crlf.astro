@@ -1,0 +1,12 @@
+---
+export interface Props {
+  title: string;
+}
+function frontmatterHelper(value: number): number {
+  return value + 1;
+}
+---
+<section id="hero-banner">
+  <h1>{Astro.props.title}</h1>
+</section>
+

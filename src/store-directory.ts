@@ -78,6 +78,7 @@ const DEFAULT_EXTENSIONS = [
   ".tsx",
   ".js",
   ".jsx",
+  ".astro",
   ".py",
   ".rs",
   ".go",

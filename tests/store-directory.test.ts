@@ -149,3 +149,26 @@ describe("walkDirectory — cross-OS path separators (#687)", () => {
     }
   });
 });
+
+describe("walkDirectory — default extensions include Astro", () => {
+  let rootDir: string;
+
+  beforeAll(() => {
+    rootDir = mkdtempSync(join(tmpdir(), "ctx-walk-astro-ext-"));
+    writeFileSync(join(rootDir, "component.astro"), "---\nconst x = 1;\n---\n<div />\n");
+    writeFileSync(join(rootDir, "notes.md"), "# notes\n");
+  });
+
+  afterAll(() => {
+    rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  test("indexes .astro files when extensions are omitted", () => {
+    const files = walkDirectory(rootDir, {
+      maxDepth: 1,
+      maxFiles: 10,
+    });
+    expect(files.some((f) => f.endsWith("component.astro"))).toBe(true);
+    expect(files.some((f) => f.endsWith("notes.md"))).toBe(true);
+  });
+});

@@ -15,6 +15,7 @@ import { readFileSync, readdirSync, unlinkSync, existsSync, statSync, openSync, 
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { formatAstroForIndex, getLanguageForPath } from "./astro.js";
 import { walkDirectoryDetailed, type WalkOptions } from "./store-directory.js";
 
 // ─────────────────────────────────────────────────────────
@@ -852,13 +853,17 @@ export class ContentStore {
       }
     }
     const label = source ?? path ?? "untitled";
-    const chunks = this.#chunkMarkdown(text);
+    const languageHint = path ?? source ?? label;
+    const indexText = getLanguageForPath(languageHint) === "astro"
+      ? formatAstroForIndex(text, languageHint)
+      : text;
+    const chunks = this.#chunkMarkdown(indexText);
 
     // Stale detection: store file_path + SHA-256 for file-backed sources
     const filePath = path ?? undefined;
     const contentHash = filePath ? createHash("sha256").update(text).digest("hex") : undefined;
 
-    return withRetry(() => this.#insertChunks(chunks, label, text, filePath, contentHash, attribution));
+    return withRetry(() => this.#insertChunks(chunks, label, indexText, filePath, contentHash, attribution));
   }
 
   // ── Index Directory (#687) ──
