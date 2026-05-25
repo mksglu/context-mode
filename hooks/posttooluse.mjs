@@ -129,7 +129,10 @@ await runHook(async () => {
     try {
       const toolName = input.tool_name ?? "";
       if (toolName) {
-        const markerPath = resolve(tmpdir(), `context-mode-latency-${sessionId}-${toolName}.txt`);
+        // Must match pretooluse's marker name; sanitize the same way so a
+        // crafted tool_name can't escape tmpdir (and the pair still aligns).
+        const safeToolName = /^[A-Za-z0-9._-]+$/.test(toolName) ? toolName : "tool";
+        const markerPath = resolve(tmpdir(), `context-mode-latency-${sessionId}-${safeToolName}.txt`);
         let startTime;
         try {
           startTime = parseInt(readFileSync(markerPath, "utf-8").trim(), 10);

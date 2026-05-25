@@ -336,22 +336,33 @@ export function getInputProjectDir(input, opts = CLAUDE_OPTS) {
   return getProjectDir(opts);
 }
 
+// Session ids land in filesystem paths (tmpdir marker files written by
+// pre/posttooluse, per-project storage dirs). A raw id containing "/" or ".."
+// would escape those dirs, so every non-derived source is constrained to the
+// same allowlist the MCP server uses for CLAUDE_SESSION_ID (src/server.ts
+// sanitizeSessionId). Normal ids (UUIDs, "pid-<n>") pass unchanged; anything
+// else falls back to the ppid marker. transcript_path is already constrained by
+// the UUID regex below.
+const SESSION_ID_RE = /^[A-Za-z0-9._-]+$/;
+function sanitizeSessionId(value) {
+  return (typeof value === "string" && SESSION_ID_RE.test(value)) ? value : null;
+}
+
 /**
  * Derive session ID from hook input.
  * Priority: transcript_path UUID > sessionId (camelCase) > session_id > env var > ppid fallback.
+ * All non-derived sources are sanitized (allowlist) before use in paths.
  */
 export function getSessionId(input, opts = CLAUDE_OPTS) {
   if (input.transcript_path) {
     const match = input.transcript_path.match(/([a-f0-9-]{36})\.jsonl$/);
     if (match) return match[1];
   }
-  if (input.conversation_id) return input.conversation_id;
-  if (input.sessionId) return input.sessionId;
-  if (input.session_id) return input.session_id;
-  if (opts.sessionIdEnv && process.env[opts.sessionIdEnv]) {
-    return process.env[opts.sessionIdEnv];
-  }
-  return `pid-${process.ppid}`;
+  return sanitizeSessionId(input.conversation_id)
+    ?? sanitizeSessionId(input.sessionId)
+    ?? sanitizeSessionId(input.session_id)
+    ?? sanitizeSessionId(opts.sessionIdEnv ? process.env[opts.sessionIdEnv] : undefined)
+    ?? `pid-${process.ppid}`;
 }
 
 // ─────────────────────────────────────────────────────────

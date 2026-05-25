@@ -174,7 +174,11 @@ await runHook(async () => {
   try {
     const sessionId = getSessionId(input);
     if (tool) {
-      const markerPath = resolve(tmpdir(), `context-mode-latency-${sessionId}-${tool}.txt`);
+      // tool_name is attacker-influenceable via tool dispatch and shares this
+      // tmpdir marker path with the (now-sanitized) session id, so apply the
+      // same allowlist or it escapes tmpdir on its own.
+      const safeTool = /^[A-Za-z0-9._-]+$/.test(tool) ? tool : "tool";
+      const markerPath = resolve(tmpdir(), `context-mode-latency-${sessionId}-${safeTool}.txt`);
       writeFileSync(markerPath, String(Date.now()), "utf-8");
     }
   } catch { /* latency tracking is best-effort — never block hook */ }

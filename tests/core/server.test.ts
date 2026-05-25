@@ -44,6 +44,7 @@ import {
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
+import { createServer } from "node:http";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
 const runtimes = detectRuntimes();
@@ -6478,6 +6479,120 @@ describe("ctx_fetch_and_index: response body size cap", () => {
     expect(fetchOneUrlSrc).toMatch(/statSync\(outputPath\)\.size/);
     expect(fetchOneUrlSrc).toMatch(/fileSize > MAX_FETCH_OUTPUT_BYTES/);
   });
+
+  // Behavioral coverage: drive the REAL handler against a mock that advertises
+  // an oversized Content-Length. safeText (in the fetch subprocess) rejects on
+  // the header before reading the body, so the response is never indexed; a
+  // normal small response from the same fixture indexes as a positive control.
+  function spawnMcpServer(): ChildProcess {
+    return spawn("node", [mcpEntry], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, CONTEXT_MODE_DISABLE_VERSION_CHECK: "1" },
+    });
+  }
+
+  async function rpc(
+    proc: ChildProcess,
+    id: number,
+    request: Record<string, unknown>,
+    timeoutMs = 15_000,
+  ): Promise<DoctorJsonRpcResponse | undefined> {
+    return new Promise((resolve) => {
+      let buffer = "";
+      const onData = (d: Buffer) => {
+        buffer += d.toString();
+        let idx: number;
+        while ((idx = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, idx).trim();
+          buffer = buffer.slice(idx + 1);
+          if (!line) continue;
+          try {
+            const parsed = JSON.parse(line) as DoctorJsonRpcResponse;
+            if (parsed.id === id) {
+              proc.stdout!.off("data", onData);
+              clearTimeout(timer);
+              resolve(parsed);
+              return;
+            }
+          } catch { /* ignore non-JSON-RPC lines */ }
+        }
+      };
+      const timer = setTimeout(() => {
+        proc.stdout!.off("data", onData);
+        resolve(undefined);
+      }, timeoutMs);
+      proc.stdout!.on("data", onData);
+      sendRpc(proc, request);
+    });
+  }
+
+  test("oversized Content-Length is rejected and never indexed (real handler)", async () => {
+    const okMarker = `fetchcap-ok-${process.pid}-${Date.now()}`;
+    const hugeMarker = `fetchcap-huge-${process.pid}-${Date.now()}`;
+    const server = createServer((req, res) => {
+      if (req.url === "/huge") {
+        // Advertise 60MB so safeText rejects on the header before reading body.
+        res.writeHead(200, { "content-type": "text/html", "content-length": "62914560" });
+        res.end(`<html><body>${hugeMarker}</body></html>`);
+        return;
+      }
+      const body = `<html><body>${okMarker}</body></html>`;
+      res.writeHead(200, { "content-type": "text/html", "content-length": String(Buffer.byteLength(body)) });
+      res.end(body);
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    const addr = server.address();
+    if (typeof addr === "string" || !addr) throw new Error("no server address");
+    const baseUrl = `http://127.0.0.1:${addr.port}`;
+
+    const proc = spawnMcpServer();
+    try {
+      const init = await rpc(proc, 1, {
+        jsonrpc: "2.0", id: 1, method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ctx-fetch-cap", version: "1.0" } },
+      });
+      expect(init?.result).toBeDefined();
+      sendRpc(proc, { jsonrpc: "2.0", method: "notifications/initialized" });
+
+      // Positive control: a normal response indexes and becomes searchable.
+      const okResp = await rpc(proc, 100, {
+        jsonrpc: "2.0", id: 100, method: "tools/call",
+        params: { name: "ctx_fetch_and_index", arguments: { url: `${baseUrl}/ok`, source: "fetchcap-ok" } },
+      });
+      expect(okResp?.result?.isError).toBeFalsy();
+      expect(okResp?.result?.content?.[0]?.text ?? "").toMatch(/Fetched and indexed/);
+
+      // Oversized Content-Length: the fetch fails, nothing is indexed.
+      const hugeResp = await rpc(proc, 101, {
+        jsonrpc: "2.0", id: 101, method: "tools/call",
+        params: { name: "ctx_fetch_and_index", arguments: { url: `${baseUrl}/huge`, source: "fetchcap-huge" } },
+      });
+      expect(hugeResp?.result?.isError).toBe(true);
+      const hugeText = hugeResp?.result?.content?.[0]?.text ?? "";
+      expect(hugeText).toMatch(/Failed to fetch/);
+      expect(hugeText).not.toMatch(/Fetched and indexed/);
+
+      // The control content reached FTS5; the oversized body did not.
+      const okSearch = await rpc(proc, 102, {
+        jsonrpc: "2.0", id: 102, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [okMarker] } },
+      });
+      expect(okSearch?.result?.content?.[0]?.text ?? "").toContain(okMarker);
+
+      const hugeSearch = await rpc(proc, 103, {
+        jsonrpc: "2.0", id: 103, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [hugeMarker] } },
+      });
+      const hugeSearchText = hugeSearch?.result?.content?.[0]?.text ?? "";
+      expect(
+        hugeSearchText.includes("No results found") ||
+        hugeSearchText.includes("After indexing"),
+      ).toBe(true);
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 30_000);
 });
 
 describe("getStatsFilePath: sanitize CLAUDE_SESSION_ID before path.join", () => {
