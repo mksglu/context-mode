@@ -19,6 +19,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { spawn, execFileSync } from "node:child_process";
 
 describe("db-base platform gate (#551)", () => {
   const dbBasePath = resolve(__dirname, "..", "..", "src", "db-base.ts");
@@ -386,4 +387,134 @@ describe("v1.0.130 — SQLiteBase lifecycle composition", () => {
       try { rmSync(testDir, { recursive: true, force: true }); } catch { /* best effort */ }
     }
   });
+});
+
+// ─────────────────────────────────────────────────────────
+// Issue #642 follow-up: cross-process multi-writer (subprocess regression).
+//
+// CONTRACT: SessionDB must be safe for two DIFFERENT processes opening
+// the same on-disk path concurrently. The v1.0.130 INVARIANT block
+// above proves the contract for two instances IN THE SAME process,
+// which exercises the WAL writer-lock geometry only partially. Same
+// process means same shared cache and same file descriptor table, so
+// a regression that breaks cross-process locking can pass that test
+// while still crashing the legitimate multi-window UX (two concurrent
+// Claude sessions writing to the same project-dir-hashed DB).
+//
+// HISTORY: #642 surfaced as exactly this geometry. NodeDatabaseFactory
+// dropped opts.timeout, so busy_timeout stayed at the SQLite default
+// of 0 and the first write contention between concurrent sessions
+// raised an immediate "database is locked". Fixed in 7afa0f4 / v1.0.142
+// by mirroring the Bun branch's adapter.pragma("busy_timeout = N").
+//
+// REGRESSION-PROOF: this test forks two child Node processes and has
+// each open the SAME SessionDB path, writes hundreds of events from
+// both in tight concurrent loops, then read-asserts that every event
+// from both writers landed in the DB. Catches:
+//   - busy_timeout = 0 regressions on the node:sqlite path (#642).
+//   - any re-introduction of EXCLUSIVE locking_mode or lockfile
+//     primitives in the SQLiteBase ctor (the v1.0.128 over-correction).
+//   - silent write drops if a future refactor wraps insertEvent in
+//     a swallow-on-error try/catch.
+//
+// See: docs/adr/0001-sessiondb-multi-writer.md and commit 7afa0f4.
+// ─────────────────────────────────────────────────────────
+describe("Issue #642 follow-up: cross-process multi-writer (subprocess regression)", () => {
+  const repoRoot = resolve(__dirname, "..", "..");
+  const childFixture = resolve(
+    __dirname,
+    "fixtures",
+    "db-base-multiwriter-child.mjs",
+  );
+  const builtSessionDb = resolve(repoRoot, "build", "session", "db.js");
+
+  // Ensure build/ is populated. `npm test` runs `pretest: npm run build`
+  // first, but running this file directly (`vitest run tests/util/db-base-
+  // platform-gate.test.ts`) skips that step. Mirrors the on-demand
+  // compile in tests/core/server.test.ts.
+  function ensureBuild(): void {
+    if (existsSync(builtSessionDb)) return;
+    execFileSync("npx", ["tsc"], { cwd: repoRoot, stdio: "pipe" });
+  }
+
+  function runChild(
+    dbPath: string,
+    sessionId: string,
+    iterations: number,
+  ): Promise<{ code: number | null; stdout: string; stderr: string }> {
+    return new Promise((resolveP) => {
+      const proc = spawn(
+        process.execPath,
+        [childFixture, dbPath, sessionId, String(iterations)],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let stdout = "";
+      let stderr = "";
+      proc.stdout.on("data", (d: Buffer) => { stdout += d.toString("utf8"); });
+      proc.stderr.on("data", (d: Buffer) => { stderr += d.toString("utf8"); });
+      proc.on("close", (code) => resolveP({ code, stdout, stderr }));
+    });
+  }
+
+  it(
+    "INVARIANT: two child node processes can both write to the same SessionDB path under contention (#642)",
+    async () => {
+      ensureBuild();
+
+      // Real on-disk path outside tmpdir. The v1.0.128/v1.0.129 skip-gate
+      // excused tmpdir paths from the EXCLUSIVE pragma, so a tmpdir path
+      // would not exercise the regression. Real-user dbPaths live under
+      // ~/.claude/, so the test must too.
+      const testDir = mkdtempSync(
+        join(process.env.HOME || "/tmp", ".ctx-mode-multiwriter-subproc-"),
+      );
+      const dbPath = join(testDir, "two-writer.db");
+
+      const iterations = 200;
+      try {
+        // Spawn both writers and wait for both to exit. They start at
+        // nearly the same wall-clock moment, so the writer-lock contention
+        // window opens immediately and persists across the full loop.
+        const [a, b] = await Promise.all([
+          runChild(dbPath, "writer-a", iterations),
+          runChild(dbPath, "writer-b", iterations),
+        ]);
+
+        // Each writer must finish cleanly. A throw from insertEvent
+        // (e.g. SQLITE_BUSY past withRetry's bounded loop) bubbles up
+        // to exit code 1 with "ERR <message>" on stderr.
+        expect(
+          a.code,
+          `writer-a exited ${a.code}\nstdout=${a.stdout}\nstderr=${a.stderr}`,
+        ).toBe(0);
+        expect(
+          b.code,
+          `writer-b exited ${b.code}\nstdout=${b.stdout}\nstderr=${b.stderr}`,
+        ).toBe(0);
+        expect(a.stdout.trim()).toBe(`OK ${iterations}`);
+        expect(b.stdout.trim()).toBe(`OK ${iterations}`);
+        // Stderr must be empty. An `ERR` line from the child means a
+        // thrown exception, even on the success-exit path.
+        expect(a.stderr).toBe("");
+        expect(b.stderr).toBe("");
+
+        // Read-back assertion. Both writers must have landed every event
+        // they reported writing. Guards against a future refactor that
+        // catches SQLITE_BUSY and silently drops the write.
+        const { SessionDB } = await import("../../src/session/db.js");
+        const verifier = new SessionDB({ dbPath });
+        try {
+          const eventsA = verifier.getEvents("writer-a", { limit: 10_000 });
+          const eventsB = verifier.getEvents("writer-b", { limit: 10_000 });
+          expect(eventsA.length).toBe(iterations);
+          expect(eventsB.length).toBe(iterations);
+        } finally {
+          verifier.close();
+        }
+      } finally {
+        try { rmSync(testDir, { recursive: true, force: true }); } catch { /* best effort */ }
+      }
+    },
+    60_000,
+  );
 });
