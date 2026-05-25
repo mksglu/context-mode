@@ -1623,6 +1623,99 @@ describe("ctx-upgrade syncs marketplace clone (#418)", () => {
   });
 });
 
+describe("ctx-upgrade swap loop supply-chain containment", () => {
+  const CLI_SOURCE = readFileSync(resolve(ROOT, "src/cli.ts"), "utf-8");
+  const SERVER_SOURCE = readFileSync(resolve(ROOT, "src/server.ts"), "utf-8");
+
+  // Both /ctx-upgrade swap loops iterate `pkg.files[]` read from a freshly
+  // cloned upstream package.json. Without containment, a compromised
+  // upstream tag shipping files: ["../../.ssh/authorized_keys"] (or, at
+  // the cli.ts site, an absolute path) would let rmSync+cpSync escape
+  // pluginRoot. Mirrors the lexical guard pattern that
+  // hooks/heal-partial-install.mjs already uses (PR #699).
+
+  test("cli.ts upgrade() rejects swap-loop items that escape pluginRoot or srcDir", () => {
+    // The block of interest is bounded by the comment about reading
+    // files from the cloned package.json and the next Issue #609 marker.
+    const loopBlock = CLI_SOURCE.match(
+      /Read files list from cloned repo's package\.json[\s\S]*?Issue #609/,
+    );
+    expect(loopBlock).not.toBeNull();
+    expect(loopBlock![0]).toContain("resolve(pluginRoot) + sep");
+    expect(loopBlock![0]).toContain("resolve(srcDir) + sep");
+    expect(loopBlock![0]).toMatch(/\(to \+ sep\)\.startsWith\(pluginRootWithSep\)/);
+    expect(loopBlock![0]).toMatch(/\(from \+ sep\)\.startsWith\(srcDirWithSep\)/);
+    // The pre-fix unguarded form must not return.
+    expect(loopBlock![0]).not.toMatch(
+      /rmSync\(resolve\(pluginRoot, item\),[^)]*\);\s*\n\s*cpSync\(resolve\(srcDir, item\)/,
+    );
+    // sep must be imported from node:path.
+    expect(CLI_SOURCE).toMatch(
+      /import\s*\{[^}]*\bsep\b[^}]*\}\s*from\s*"node:path"/,
+    );
+  });
+
+  test("server.ts inline-fallback upgrade script rejects swap-loop items that escape pluginRoot or srcDir", () => {
+    // The inline-script lines are literal-string template segments inside
+    // the ctx_upgrade handler's scriptLines array, so the guards land as
+    // quoted lines in src/server.ts.
+    expect(SERVER_SOURCE).toContain('import{join,resolve,sep}from"node:path"');
+    expect(SERVER_SOURCE).toContain("const PW=resolve(P)+sep;const TW=resolve(T)+sep;");
+    expect(SERVER_SOURCE).toContain("if(!(to+sep).startsWith(PW))continue;");
+    expect(SERVER_SOURCE).toContain("if(!(from+sep).startsWith(TW))continue;");
+    // The pre-fix unguarded join-only form must not return.
+    expect(SERVER_SOURCE).not.toMatch(
+      /for\(const item of items\)\{const from=join\(T,item\);const to=join\(P,item\);if\(existsSync\(from\)\)/,
+    );
+  });
+
+  test("algorithm: lexical containment guard rejects relative and absolute traversal items", async () => {
+    // Sandbox replay of the guard logic. Two trees: pluginRoot/ and
+    // srcDir/. Plant a victim file at base/OUTSIDE/victim.txt and an
+    // absolute-path probe at base/etc/passwd. Run the same guard the
+    // production swap loop uses; assert the malicious items are skipped
+    // and the legitimate item is the only one accepted.
+    const base = mkdtempSync(join(tmpdir(), "swap-loop-containment-"));
+    try {
+      const pluginRoot = join(base, "plugin", "root");
+      const srcDir = join(base, "src", "dir");
+      const outside = join(base, "OUTSIDE");
+      const etc = join(base, "etc");
+      mkdirSync(pluginRoot, { recursive: true });
+      mkdirSync(srcDir, { recursive: true });
+      mkdirSync(outside, { recursive: true });
+      mkdirSync(etc, { recursive: true });
+      writeFileSync(join(outside, "victim.txt"), "ATTACKER_WOULD_DELETE_ME");
+      writeFileSync(join(etc, "passwd"), "PRETEND_PASSWD");
+      mkdirSync(join(srcDir, "src"), { recursive: true });
+      writeFileSync(join(srcDir, "src", "index.ts"), "ok");
+
+      const { sep } = await import("node:path");
+      const pluginRootWithSep = resolve(pluginRoot) + sep;
+      const srcDirWithSep = resolve(srcDir) + sep;
+      const items = [
+        "../../OUTSIDE/victim.txt", // relative traversal
+        join(etc, "passwd"),         // absolute-path bypass
+        "src",                       // legitimate
+      ];
+      const accepted: string[] = [];
+      for (const item of items) {
+        const from = resolve(srcDir, item);
+        const to = resolve(pluginRoot, item);
+        if (!(to + sep).startsWith(pluginRootWithSep)) continue;
+        if (!(from + sep).startsWith(srcDirWithSep)) continue;
+        accepted.push(item);
+      }
+      expect(accepted).toEqual(["src"]);
+      // Victim files must remain untouched.
+      expect(existsSync(join(outside, "victim.txt"))).toBe(true);
+      expect(existsSync(join(etc, "passwd"))).toBe(true);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("Shell-free upgrade (#185)", () => {
   const CLI_SOURCE = readFileSync(resolve(ROOT, "src/cli.ts"), "utf-8");
   const SERVER_SOURCE = readFileSync(resolve(ROOT, "src/server.ts"), "utf-8");

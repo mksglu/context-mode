@@ -19,7 +19,7 @@ import color from "picocolors";
 import { execFileSync, execSync, execFile as nodeExecFile, type ExecSyncOptions } from "node:child_process";
 import { readFileSync, writeFileSync, cpSync, accessSync, existsSync, readdirSync, rmSync, closeSync, openSync, chmodSync, mkdirSync, constants } from "node:fs";
 import { request as httpsRequest } from "node:https";
-import { resolve, dirname, join } from "node:path";
+import { resolve, dirname, join, sep } from "node:path";
 import { tmpdir, devNull, homedir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -1202,10 +1202,24 @@ async function upgrade(opts?: { platform?: string }) {
         ...(clonedPkg.files || []),
         "src", "package.json",
       ];
+      // Supply-chain containment on items[]. A compromised upstream tag
+      // shipping files: ["../../.ssh/authorized_keys"] or an absolute
+      // path would, without a guard, hand rmSync+cpSync an arbitrary
+      // destination under the user's UID. resolve(P, "/abs") discards P,
+      // so the absolute-path variant escapes too. Reject items whose
+      // resolved path escapes either srcDir or pluginRoot. Mirrors the
+      // pattern hooks/heal-partial-install.mjs already uses for its own
+      // files[] expansion (PR #699).
+      const pluginRootWithSep = resolve(pluginRoot) + sep;
+      const srcDirWithSep = resolve(srcDir) + sep;
       for (const item of items) {
+        const from = resolve(srcDir, item);
+        const to = resolve(pluginRoot, item);
+        if (!(to + sep).startsWith(pluginRootWithSep)) continue;
+        if (!(from + sep).startsWith(srcDirWithSep)) continue;
         try {
-          rmSync(resolve(pluginRoot, item), { recursive: true, force: true });
-          cpSync(resolve(srcDir, item), resolve(pluginRoot, item), { recursive: true });
+          rmSync(to, { recursive: true, force: true });
+          cpSync(from, to, { recursive: true });
         } catch { /* some files may not exist in source */ }
       }
 

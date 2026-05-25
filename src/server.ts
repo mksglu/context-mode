@@ -3810,7 +3810,7 @@ server.registerTool(
       const scriptLines = [
         `import{execFileSync}from"node:child_process";`,
         `import{cpSync,rmSync,existsSync,mkdtempSync,readFileSync,writeFileSync}from"node:fs";`,
-        `import{join}from"node:path";`,
+        `import{join,resolve,sep}from"node:path";`,
         `import{tmpdir}from"node:os";`,
         `const P=${JSON.stringify(pluginRoot)};`,
         `const T=mkdtempSync(join(tmpdir(),"ctx-upgrade-"));`,
@@ -3823,7 +3823,13 @@ server.registerTool(
         `console.log("- [x] Built from source");`,
         `const pkg=JSON.parse(readFileSync(join(T,"package.json"),"utf8"));`,
         `const items=[...(Array.isArray(pkg.files)?pkg.files:[]),"src","package.json"];`,
-        `for(const item of items){const from=join(T,item);const to=join(P,item);if(existsSync(from)){rmSync(to,{recursive:true,force:true});cpSync(from,to,{recursive:true,force:true});}}`,
+        // Supply-chain containment on items[]. Mirror the cli.ts upgrade()
+        // guard: a compromised upstream package.json with files:["../etc"]
+        // would otherwise let path.join follow ".." out of pluginRoot.
+        // path.resolve normalizes "..", so the lexical startsWith catches
+        // both relative-".." traversal and absolute-path bypass.
+        `const PW=resolve(P)+sep;const TW=resolve(T)+sep;`,
+        `for(const item of items){const from=resolve(T,item);const to=resolve(P,item);if(!(to+sep).startsWith(PW))continue;if(!(from+sep).startsWith(TW))continue;if(existsSync(from)){rmSync(to,{recursive:true,force:true});cpSync(from,to,{recursive:true,force:true});}}`,
         // Issue #609: do NOT write .mcp.json into the cache dir. Claude Code reads
         // .claude-plugin/plugin.json.mcpServers as the canonical MCP source — the
         // per-version .mcp.json file is a stale-write vector. Same architectural
