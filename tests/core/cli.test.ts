@@ -1657,6 +1657,16 @@ describe("ctx-upgrade swap loop supply-chain containment", () => {
     expect(CLI_SOURCE).toMatch(
       /import\s*\{[^}]*\bsep\b[^}]*\}\s*from\s*"node:path"/,
     );
+    // F30 hardening: symlinks inside source items must be filtered, not
+    // copied as destination symlinks. A planted symlink would otherwise
+    // bypass the lexical containment at copy time.
+    expect(loopBlock![0]).toContain("refuseSymlinks");
+    expect(loopBlock![0]).toMatch(/lstatSync\(src\)\.isSymbolicLink\(\)/);
+    expect(loopBlock![0]).toMatch(/cpSync\(from, to, \{ recursive: true, filter: refuseSymlinks \}\)/);
+    // lstatSync must be imported from node:fs.
+    expect(CLI_SOURCE).toMatch(
+      /import\s*\{[^}]*\blstatSync\b[^}]*\}\s*from\s*"node:fs"/,
+    );
   });
 
   test("server.ts inline-fallback upgrade script rejects swap-loop items that escape pluginRoot or srcDir", () => {
@@ -1671,6 +1681,13 @@ describe("ctx-upgrade swap loop supply-chain containment", () => {
     expect(SERVER_SOURCE).not.toMatch(
       /for\(const item of items\)\{const from=join\(T,item\);const to=join\(P,item\);if\(existsSync\(from\)\)/,
     );
+    // F30 hardening for the inline script.
+    expect(SERVER_SOURCE).toMatch(
+      /import\{[^}]*\blstatSync\b[^}]*\}from"node:fs"/,
+    );
+    expect(SERVER_SOURCE).toContain('const noSymlink=(src)=>{try{return !lstatSync(src).isSymbolicLink()}catch{return false}};');
+    expect(SERVER_SOURCE).toContain("if(!noSymlink(from))continue;");
+    expect(SERVER_SOURCE).toContain("filter:noSymlink");
   });
 
   test("algorithm: lexical containment guard rejects relative and absolute traversal items", async () => {
@@ -2097,6 +2114,13 @@ describe("installed_plugins.json installPath containment", () => {
     expect(skillsBlock![0]).not.toMatch(
       /cpSync\(srcSkills, resolve\(installPath, "skills"\),/,
     );
+    // F30 hardening: realpathSync re-check defeats symlink-anchor bypasses
+    // where the cacheRoot-anchored installPath is itself a symlink to an
+    // attacker target.
+    expect(skillsBlock![0]).toMatch(/realpathSync\(cacheRoot\)/);
+    expect(skillsBlock![0]).toMatch(/realpathSync\(resolvedInstallPath\)/);
+    expect(skillsBlock![0]).toMatch(/\(realInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
+    expect(skillsBlock![0]).toMatch(/cpSync\(srcSkills, resolve\(realInstallPath, "skills"\)/);
   });
 
   test("statuslineForward() candidate selection gates installPath under <claudeRoot>/plugins/cache", () => {
@@ -2117,6 +2141,72 @@ describe("installed_plugins.json installPath containment", () => {
     expect(candidateBlock![0]).not.toMatch(
       /candidates\.push\(resolve\(installPath, "bin", "statusline\.mjs"\)\)/,
     );
+    // F30 hardening: realpathSync re-check on the candidate's installPath.
+    expect(candidateBlock![0]).toMatch(/realpathSync\(cacheRoot\)/);
+    expect(candidateBlock![0]).toMatch(/realpathSync\(resolvedInstallPath\)/);
+    expect(candidateBlock![0]).toMatch(/\(realInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
+    expect(candidateBlock![0]).toMatch(/candidates\.push\(resolve\(realInstallPath, "bin", "statusline\.mjs"\)\)/);
+    // realpathSync must be imported from node:fs.
+    expect(CLI_SOURCE).toMatch(
+      /import\s*\{[^}]*\brealpathSync\b[^}]*\}\s*from\s*"node:fs"/,
+    );
+  });
+
+  test("algorithm: realpath re-check rejects symlink-anchor planted at cacheRoot/<owner>/<plugin>/<version>", async () => {
+    // Sandbox: build <fakeClaudeRoot>/plugins/cache/owner/plugin/version
+    // as a SYMLINK targeting an attacker-controlled directory outside
+    // cacheRoot. The lexical resolve+startsWith check passes (the symlink
+    // path itself is under cacheRoot). realpathSync follows the link and
+    // returns the attacker target -- which then fails the post-realpath
+    // startsWith gate.
+    const fs = await import("node:fs");
+    // Canonicalize the base directory up front: on macOS, mkdtempSync(tmpdir())
+    // returns a path under /var/folders, which is itself a symlink to
+    // /private/var/folders. Without realpathSync here, the legit-installPath
+    // arm below trips the lexical startsWith gate (resolved input still
+    // /var/folders/..., cacheRootCanon is /private/var/folders/...). Same
+    // canonicalization production users get when ~/.claude lives on a real
+    // (non-symlinked) path.
+    const base = fs.realpathSync(
+      mkdtempSync(join(tmpdir(), "installpath-symlink-anchor-")),
+    );
+    try {
+      const cacheRoot = resolve(base, ".claude", "plugins", "cache");
+      const legitVersionDir = resolve(cacheRoot, "owner", "plugin", "1.0.0");
+      const attackerDir = resolve(base, "attacker-target");
+      mkdirSync(legitVersionDir, { recursive: true });
+      mkdirSync(attackerDir, { recursive: true });
+      writeFileSync(join(attackerDir, "marker.txt"), "PWNED");
+
+      // Planted symlink anchor: <cacheRoot>/owner/plugin/2.0.0 -> attackerDir.
+      // On Windows without symlink privilege / Developer Mode, symlinkSync
+      // with type "dir" fails with EPERM; "junction" works without privilege
+      // and still reports isSymbolicLink()===true under lstatSync.
+      const plantedAnchor = resolve(cacheRoot, "owner", "plugin", "2.0.0");
+      const symlinkType = process.platform === "win32" ? "junction" : "dir";
+      fs.symlinkSync(attackerDir, plantedAnchor, symlinkType);
+
+      const cacheRootCanon = fs.realpathSync(cacheRoot);
+      const cacheRootWithSep = cacheRootCanon + require("node:path").sep;
+
+      const isAccepted = (installPath: string): boolean => {
+        const resolvedInstallPath = resolve(installPath);
+        if (!(resolvedInstallPath + require("node:path").sep).startsWith(cacheRootWithSep)) return false;
+        let realInstallPath: string;
+        try { realInstallPath = fs.realpathSync(resolvedInstallPath); }
+        catch { return false; }
+        return (realInstallPath + require("node:path").sep).startsWith(cacheRootWithSep);
+      };
+
+      // Legit version dir: accepted.
+      expect(isAccepted(legitVersionDir)).toBe(true);
+      // Symlink anchor: lexical passes, realpath escapes -> rejected.
+      expect(isAccepted(plantedAnchor)).toBe(false);
+      // Direct attacker path: lexical rejects immediately.
+      expect(isAccepted(attackerDir)).toBe(false);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 
   test("algorithm: containment rejects installPath values outside the cache root", async () => {

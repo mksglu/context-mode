@@ -3879,7 +3879,7 @@ server.registerTool(
       // across cmd.exe, PowerShell, and bash (node -e '...' breaks on Windows).
       const scriptLines = [
         `import{execFileSync}from"node:child_process";`,
-        `import{cpSync,rmSync,existsSync,mkdtempSync,readFileSync,writeFileSync}from"node:fs";`,
+        `import{cpSync,rmSync,existsSync,mkdtempSync,readFileSync,writeFileSync,lstatSync}from"node:fs";`,
         `import{join,resolve,sep}from"node:path";`,
         `import{tmpdir}from"node:os";`,
         `const P=${JSON.stringify(pluginRoot)};`,
@@ -3897,9 +3897,14 @@ server.registerTool(
         // guard: a compromised upstream package.json with files:["../etc"]
         // would otherwise let path.join follow ".." out of pluginRoot.
         // path.resolve normalizes "..", so the lexical startsWith catches
-        // both relative-".." traversal and absolute-path bypass.
+        // both relative-".." traversal and absolute-path bypass. Plus a
+        // symlink filter so a committed symlink inside the clone can't
+        // plant itself in pluginRoot (cpSync default preserves source
+        // symlinks; a planted symlink in pluginRoot/src then redirects
+        // every subsequent load through to an attacker target).
         `const PW=resolve(P)+sep;const TW=resolve(T)+sep;`,
-        `for(const item of items){const from=resolve(T,item);const to=resolve(P,item);if(!(to+sep).startsWith(PW))continue;if(!(from+sep).startsWith(TW))continue;if(existsSync(from)){rmSync(to,{recursive:true,force:true});cpSync(from,to,{recursive:true,force:true});}}`,
+        `const noSymlink=(src)=>{try{return !lstatSync(src).isSymbolicLink()}catch{return false}};`,
+        `for(const item of items){const from=resolve(T,item);const to=resolve(P,item);if(!(to+sep).startsWith(PW))continue;if(!(from+sep).startsWith(TW))continue;if(!noSymlink(from))continue;if(existsSync(from)){rmSync(to,{recursive:true,force:true});cpSync(from,to,{recursive:true,force:true,filter:noSymlink});}}`,
         // Issue #609: do NOT write .mcp.json into the cache dir. Claude Code reads
         // .claude-plugin/plugin.json.mcpServers as the canonical MCP source — the
         // per-version .mcp.json file is a stale-write vector. Same architectural

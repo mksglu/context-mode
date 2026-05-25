@@ -2442,7 +2442,12 @@ describe("ctx_upgrade tool: inline fallback for missing CLI", () => {
     expect(serverSrc).toContain('readFileSync(join(T,"package.json"),"utf8")');
     expect(serverSrc).toContain("pkg.files");
     expect(serverSrc).toContain("Array.isArray(pkg.files)");
-    expect(serverSrc).toContain("cpSync(from,to,{recursive:true,force:true})");
+    // The inline cpSync passes `filter:noSymlink` to refuse copying symlinks
+    // back into the plugin tree. Anchor on this shape so future drift toward
+    // the unfiltered form is caught.
+    expect(serverSrc).toContain(
+      "cpSync(from,to,{recursive:true,force:true,filter:noSymlink})",
+    );
     expect(serverSrc).toMatch(/npm.*install/);
   });
 
