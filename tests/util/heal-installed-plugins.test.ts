@@ -954,4 +954,55 @@ describe("healClaudeJsonMcpArgs", () => {
     expect(result.healed).toEqual([]);
     expect(readFileSync(dotClaudeJsonPath, "utf-8")).toBe(original);
   });
+
+  it("rejects suffixes that escape newPluginRoot via .. traversal", () => {
+    // ~/.claude.json is locally user-writable, same trust boundary as
+    // installed_plugins.json. A crafted arg whose suffix slice contains
+    // literal ".." string characters (not path.join-normalized at write
+    // time) would otherwise let resolve(newPluginRoot, suffix) normalize
+    // the traversal to a path outside the cache hierarchy. The healer
+    // then writes that attacker-chosen .mjs path back into ~/.claude.json
+    // as the new MCP spawn target. The post-resolve startsWith guard
+    // rejects the mutation; the arg is left untouched.
+    const tmp = makeTmp("ctx-claude-json-traversal-");
+    const cacheParent = join(tmp, ".claude", "plugins", "cache", "context-mode", "context-mode");
+    const oldPluginRoot = join(cacheParent, "1.0.0");
+    const newPluginRoot = join(cacheParent, "1.0.1");
+    mkdirSync(oldPluginRoot, { recursive: true });
+    mkdirSync(newPluginRoot, { recursive: true });
+
+    // String concatenation preserves the literal ".." characters in the
+    // stored arg, which is what the threat model requires. join() would
+    // normalize at construction time and defuse the attack before it
+    // reaches the healer, so don't use join() here.
+    const traversalArg = oldPluginRoot + "/../../../evil/start.mjs";
+    const deeperTraversalArg = oldPluginRoot + "/subdir/../../../../../evil.mjs";
+    const legitimateOldArg = join(oldPluginRoot, "start.mjs");
+
+    const dotClaudeJsonPath = join(tmp, ".claude.json");
+    const original = JSON.stringify({
+      mcpServers: {
+        traversal_suffix: { args: [traversalArg] },
+        deeper_traversal: { args: [deeperTraversalArg] },
+        legitimate_old: { args: [legitimateOldArg] },
+      },
+    }, null, 2);
+    writeFileSync(dotClaudeJsonPath, original);
+
+    const result = healClaudeJsonMcpArgs({
+      dotClaudeJsonPath,
+      pluginCacheParent: cacheParent,
+      newPluginRoot,
+    });
+
+    expect(result.healed).toEqual(["claude-json-mcp-args"]);
+    const updated = JSON.parse(readFileSync(dotClaudeJsonPath, "utf-8"));
+    // The legitimate entry was rewritten in place.
+    expect(updated.mcpServers.legitimate_old.args[0]).toBe(join(newPluginRoot, "start.mjs"));
+    // The two traversal entries must NOT have been rewritten; the original
+    // attacker strings stay in place rather than getting normalized to a
+    // .mjs path outside newPluginRoot.
+    expect(updated.mcpServers.traversal_suffix.args[0]).toBe(traversalArg);
+    expect(updated.mcpServers.deeper_traversal.args[0]).toBe(deeperTraversalArg);
+  });
 });

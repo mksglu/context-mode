@@ -430,6 +430,18 @@ export function healClaudeJsonMcpArgs({ dotClaudeJsonPath, pluginCacheParent, ne
   }
 
   const cacheParentFwd = pluginCacheParent.replace(/\\/g, "/");
+  // Post-resolve containment on newArg. ~/.claude.json is locally user-
+  // writable (same trust boundary as installed_plugins.json), and the
+  // `suffix` slice is derived from arg strings inside the existing config.
+  // A crafted arg like
+  //   .../cache/<owner>/<plugin>/1.0.0/../../../evil/start.mjs
+  // slices to suffix="../../../evil/start.mjs", and resolve(newPluginRoot,
+  // suffix) normalizes to an attacker-chosen .mjs path outside the plugin
+  // cache. Writing that path back into ~/.claude.json mutates the mcpServers
+  // args so the next MCP boot spawns from the attacker path. Reject any
+  // suffix that escapes newPluginRoot.
+  const newPluginRootResolved = resolve(newPluginRoot);
+  const newPluginRootWithSep = newPluginRootResolved + sep;
 
   let mutated = false;
   for (const srv of Object.values(servers)) {
@@ -444,6 +456,12 @@ export function healClaudeJsonMcpArgs({ dotClaudeJsonPath, pluginCacheParent, ne
       if (slashIdx < 0) continue;
       const suffix = rel.slice(slashIdx + 1);
       const newArg = resolve(newPluginRoot, suffix);
+      if (
+        newArg !== newPluginRootResolved &&
+        !(newArg + sep).startsWith(newPluginRootWithSep)
+      ) {
+        continue;
+      }
       if (newArg !== arg) {
         srv.args[i] = newArg;
         mutated = true;
