@@ -6246,3 +6246,70 @@ describe("ctx_index: directory path support (#687)", () => {
     }
   }, 30_000);
 });
+
+describe("ctx_index: root-level symlink defense in directory dispatch", () => {
+  // The directory-dispatch branch used statSync to decide whether to walk
+  // a path as a directory. statSync follows symlinks, so a path like
+  // `/tmp/link -> /etc` reported as a directory and walkDirectoryDetailed
+  // then realpathSync'd internally and indexed /etc. The deny-glob check
+  // at the head of the handler had run against `/tmp/link`, not /etc, so a
+  // user whose deny globs include /etc but not /tmp would still see /etc
+  // contents land in the FTS5 store. Fix: detect root-level symlinks with
+  // lstatSync, realpath them once, and re-apply the deny check against
+  // the actual walk target before dispatching.
+
+  const SERVER_SOURCE = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("ctx_index handler lstats and re-deny-checks symlinks before directory dispatch", () => {
+    const dispatchBlock = SERVER_SOURCE.match(
+      /Root-level symlink defense[\s\S]*?if \(resolvedPath && existsSync\(resolvedPath\) && statSync\(resolvedPath\)\.isDirectory\(\)\)/,
+    );
+    expect(dispatchBlock).not.toBeNull();
+    const block = dispatchBlock![0];
+    expect(block).toMatch(/const lst = lstatSync\(resolvedPath\);/);
+    expect(block).toMatch(/lst\.isSymbolicLink\(\)/);
+    expect(block).toMatch(/realpathSync\(resolvedPath\)/);
+    expect(block).toMatch(
+      /const realDenied = checkFilePathDenyPolicy\(realTarget, "ctx_index"\);/,
+    );
+    expect(block).toMatch(/if \(realDenied\) return realDenied;/);
+    expect(SERVER_SOURCE).toMatch(
+      /import\s*\{[^}]*\brealpathSync\b[^}]*\}\s*from\s*"node:fs"/,
+    );
+  });
+
+  test("algorithm: lstatSync + realpath identifies a symlinked directory whose target differs", () => {
+    // The behavior the fix depends on: lstatSync on a symlink reports
+    // isSymbolicLink()=true and isDirectory()=false. realpathSync resolves
+    // to the target. statSync, by contrast, would report isDirectory()=true
+    // and silently follow -- the pre-fix dispatch relied on that.
+    const base = mkdtempSync(join(tmpdir(), "ctx-index-symlink-defense-"));
+    try {
+      const realDir = join(base, "real");
+      const linkPath = join(base, "link");
+      mkdirSync(realDir, { recursive: true });
+      writeFileSync(join(realDir, "marker.txt"), "real");
+
+      const fsLocal = require("node:fs") as typeof import("node:fs");
+      // "junction" on Windows so the test works without admin / Developer
+      // Mode; lstatSync still reports isSymbolicLink()===true for junctions,
+      // which is what the algorithm-under-test depends on.
+      const symlinkType = process.platform === "win32" ? "junction" : "dir";
+      fsLocal.symlinkSync(realDir, linkPath, symlinkType);
+
+      const lst = fsLocal.lstatSync(linkPath);
+      expect(lst.isSymbolicLink()).toBe(true);
+      expect(lst.isDirectory()).toBe(false);
+      expect(fsLocal.statSync(linkPath).isDirectory()).toBe(true);
+
+      const real = fsLocal.realpathSync(linkPath);
+      expect(real).not.toBe(linkPath);
+      expect(real).toBe(fsLocal.realpathSync(realDir));
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});

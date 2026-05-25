@@ -2,7 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createRequire } from "node:module";
-import { existsSync, unlinkSync, readdirSync, readFileSync, writeFileSync, renameSync, rmSync, mkdirSync, cpSync, statSync, symlinkSync, lstatSync } from "node:fs";
+import { existsSync, unlinkSync, readdirSync, readFileSync, writeFileSync, renameSync, rmSync, mkdirSync, cpSync, statSync, symlinkSync, lstatSync, realpathSync } from "node:fs";
 import { execSync, spawnSync, type ChildProcess, type SpawnSyncOptions, type SpawnSyncReturns } from "node:child_process";
 import { join, dirname, resolve, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -2045,6 +2045,33 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
       // resolved path is a directory, walk it bounded and re-enter `index()`
       // per-file so the security gate at store.ts:845 (TOCTOU defense from
       // #442 round-3) keeps running for every file.
+      //
+      // Root-level symlink defense: the deny-glob check above ran on the
+      // user-supplied `path`. If `path` is a symlink whose target lands in
+      // a sensitive directory (e.g. `/tmp/link -> /etc`), statSync would
+      // happily report directory and walkDirectoryDetailed would
+      // realpathSync internally, walking /etc with the user's deny globs
+      // bound to /tmp/link instead of the real target. Detect the symlink
+      // with lstatSync, follow it once, and re-apply the deny check
+      // against the realpath so the user's deny globs see the actual
+      // walk root.
+      if (resolvedPath && existsSync(resolvedPath)) {
+        const lst = lstatSync(resolvedPath);
+        if (lst.isSymbolicLink()) {
+          let realTarget: string;
+          try {
+            realTarget = realpathSync(resolvedPath);
+          } catch {
+            return trackResponse("ctx_index", {
+              content: [{ type: "text" as const, text: "Error: symlink target could not be resolved." }],
+            });
+          }
+          if (realTarget !== resolvedPath) {
+            const realDenied = checkFilePathDenyPolicy(realTarget, "ctx_index");
+            if (realDenied) return realDenied;
+          }
+        }
+      }
       if (resolvedPath && existsSync(resolvedPath) && statSync(resolvedPath).isDirectory()) {
         const store = getStore();
         const projectDir = getProjectDir();
