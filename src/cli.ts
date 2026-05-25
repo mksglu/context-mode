@@ -1869,6 +1869,12 @@ async function upgrade(opts?: { platform?: string }) {
           // FS-write time. Re-check via realpathSync so a planted symlink
           // anchor fails the gate.
           const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+          // Cheap pre-filter compares like-with-like (lexical installPath vs
+          // lexical cache root). The post-realpath gate below is the real
+          // security check and compares canonical-to-canonical. Comparing a
+          // lexical installPath against the canonical root would over-reject
+          // every install when ~/.claude (or any ancestor) is a symlink.
+          const cacheRootLexWithSep = cacheRoot + sep;
           let cacheRootCanon: string;
           try { cacheRootCanon = realpathSync(cacheRoot); }
           catch { cacheRootCanon = cacheRoot; }
@@ -1881,7 +1887,7 @@ async function upgrade(opts?: { platform?: string }) {
               if (typeof installPath !== "string" || !installPath) continue;
               if (installPath === pluginRoot) continue;
               const resolvedInstallPath = resolve(installPath);
-              if (!(resolvedInstallPath + sep).startsWith(cacheRootWithSep)) continue;
+              if (!(resolvedInstallPath + sep).startsWith(cacheRootLexWithSep)) continue;
               if (!existsSync(resolvedInstallPath)) continue;
               let realInstallPath: string;
               try { realInstallPath = realpathSync(resolvedInstallPath); }
@@ -2070,6 +2076,11 @@ function statuslineForward(): void {
       // realpathSync so the dynamic-import target's actual on-disk
       // location also stays under cacheRoot.
       const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+      // Cheap pre-filter compares like-with-like (lexical installPath vs
+      // lexical cache root); the post-realpath gate below is the real security
+      // check (canonical-to-canonical). A lexical-vs-canonical pre-filter would
+      // over-reject every install when ~/.claude (or any ancestor) is a symlink.
+      const cacheRootLexWithSep = cacheRoot + sep;
       let cacheRootCanon: string;
       try { cacheRootCanon = realpathSync(cacheRoot); }
       catch { cacheRootCanon = cacheRoot; }
@@ -2081,7 +2092,7 @@ function statuslineForward(): void {
           const installPath = entry?.installPath;
           if (typeof installPath !== "string" || !installPath) continue;
           const resolvedInstallPath = resolve(installPath);
-          if (!(resolvedInstallPath + sep).startsWith(cacheRootWithSep)) continue;
+          if (!(resolvedInstallPath + sep).startsWith(cacheRootLexWithSep)) continue;
           let realInstallPath: string;
           try { realInstallPath = realpathSync(resolvedInstallPath); }
           catch { continue; }

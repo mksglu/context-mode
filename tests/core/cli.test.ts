@@ -2833,6 +2833,72 @@ describe("ctx-upgrade swap loop supply-chain containment", () => {
       rmSync(base, { recursive: true, force: true });
     }
   });
+
+  test("guarded swap loop runs real rmSync/cpSync without escaping pluginRoot or copying a symlink", async () => {
+    // Stronger than the replay above, which only inspects which items pass the
+    // lexical gate. This runs the ACTUAL destructive operations cli.ts
+    // upgrade() performs (rmSync + cpSync with the verbatim refuseSymlinks
+    // filter) against a malicious items[] list, and proves no out-of-root file
+    // is deleted or written and no symlink is planted in pluginRoot. The
+    // literal upgrade() loop is embedded in the git-clone/npm flow; the
+    // source-grep test above pins that the production loop matches this guard.
+    const { sep } = await import("node:path");
+    const { lstatSync, cpSync, symlinkSync } = await import("node:fs");
+    const base = mkdtempSync(join(tmpdir(), "swap-loop-real-"));
+    try {
+      const pluginRoot = join(base, "plugin", "root");
+      const srcDir = join(base, "src", "dir");
+      const outside = join(base, "OUTSIDE");
+      const etc = join(base, "etc");
+      mkdirSync(pluginRoot, { recursive: true });
+      mkdirSync(srcDir, { recursive: true });
+      mkdirSync(outside, { recursive: true });
+      mkdirSync(etc, { recursive: true });
+      const victim = join(outside, "victim.txt");
+      const passwd = join(etc, "passwd");
+      writeFileSync(victim, "ATTACKER_WOULD_DELETE_ME");
+      writeFileSync(passwd, "PRETEND_PASSWD");
+      mkdirSync(join(srcDir, "src"), { recursive: true });
+      writeFileSync(join(srcDir, "src", "index.ts"), "ok-content");
+      // A symlink shipped inside the source tree, pointing outside it.
+      symlinkSync(passwd, join(srcDir, "evil-link"));
+
+      // Guard + ops copied verbatim from src/cli.ts upgrade().
+      const pluginRootWithSep = resolve(pluginRoot) + sep;
+      const srcDirWithSep = resolve(srcDir) + sep;
+      const refuseSymlinks = (src: string): boolean => {
+        try { return !lstatSync(src).isSymbolicLink(); } catch { return false; }
+      };
+      const items = [
+        "../../OUTSIDE/victim.txt", // relative traversal -> to escapes pluginRoot
+        passwd,                     // absolute path -> resolve discards pluginRoot
+        "evil-link",                // symlink -> refuseSymlinks rejects
+        "src",                      // legitimate
+      ];
+      for (const item of items) {
+        const from = resolve(srcDir, item);
+        const to = resolve(pluginRoot, item);
+        if (!(to + sep).startsWith(pluginRootWithSep)) continue;
+        if (!(from + sep).startsWith(srcDirWithSep)) continue;
+        if (!refuseSymlinks(from)) continue;
+        try {
+          rmSync(to, { recursive: true, force: true });
+          cpSync(from, to, { recursive: true, filter: refuseSymlinks });
+        } catch { /* some files may not exist in source */ }
+      }
+
+      // Out-of-root files survived the real rmSync calls (the guard skipped them).
+      expect(existsSync(victim)).toBe(true);
+      expect(readFileSync(victim, "utf-8")).toBe("ATTACKER_WOULD_DELETE_ME");
+      expect(existsSync(passwd)).toBe(true);
+      // The legitimate item was copied in.
+      expect(existsSync(join(pluginRoot, "src", "index.ts"))).toBe(true);
+      // The symlink was never planted in pluginRoot.
+      expect(existsSync(join(pluginRoot, "evil-link"))).toBe(false);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("Shell-free upgrade (#185)", () => {
@@ -3315,7 +3381,12 @@ describe("installed_plugins.json installPath containment", () => {
       .match(/Sync skills to the active install path[\s\S]*?best effort — registry may not exist or be malformed/);
     expect(skillsBlock).not.toBeNull();
     expect(skillsBlock![0]).toContain('resolve(claudeRoot, "plugins", "cache")');
-    expect(skillsBlock![0]).toMatch(/\(resolvedInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
+    // Regression fix: the cheap pre-filter compares the lexical installPath
+    // against the LEXICAL cache root (cacheRootLexWithSep). Comparing it against
+    // the canonical root over-rejected every install when ~/.claude was a
+    // symlink; only the post-realpath gate below is canonical.
+    expect(skillsBlock![0]).toMatch(/const cacheRootLexWithSep = cacheRoot \+ sep;/);
+    expect(skillsBlock![0]).toMatch(/\(resolvedInstallPath \+ sep\)\.startsWith\(cacheRootLexWithSep\)/);
     // The pre-fix shape passed installPath verbatim to cpSync without
     // normalizing or gating it.
     expect(skillsBlock![0]).not.toMatch(
@@ -3342,7 +3413,11 @@ describe("installed_plugins.json installPath containment", () => {
     );
     expect(candidateBlock).not.toBeNull();
     expect(candidateBlock![0]).toContain('resolve(claudeRoot, "plugins", "cache")');
-    expect(candidateBlock![0]).toMatch(/\(resolvedInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
+    // Regression fix: lexical pre-filter compares against the lexical cache
+    // root; only the post-realpath gate is canonical (avoids over-rejecting
+    // installs when ~/.claude is a symlink).
+    expect(candidateBlock![0]).toMatch(/const cacheRootLexWithSep = cacheRoot \+ sep;/);
+    expect(candidateBlock![0]).toMatch(/\(resolvedInstallPath \+ sep\)\.startsWith\(cacheRootLexWithSep\)/);
     // The pre-fix shape pushed any installPath string into candidates without
     // gating it.
     expect(candidateBlock![0]).not.toMatch(
@@ -3357,6 +3432,49 @@ describe("installed_plugins.json installPath containment", () => {
     expect(CLI_SOURCE).toMatch(
       /import\s*\{[^}]*\brealpathSync\b[^}]*\}\s*from\s*"node:fs"/,
     );
+  });
+
+  test("algorithm: legit install under a symlinked config root is accepted (regression)", async () => {
+    // Regression: the first gate must compare the lexical installPath
+    // against the LEXICAL cache root. When ~/.claude (or an ancestor) is a
+    // symlink, comparing the lexical installPath against the CANONICAL root
+    // false-rejects every legitimate install. Replay the new two-gate shape
+    // against a symlinked config root and assert acceptance.
+    const fs = await import("node:fs");
+    const realBase = fs.realpathSync(
+      mkdtempSync(join(tmpdir(), "installpath-symlinked-home-")),
+    );
+    try {
+      const realHome = resolve(realBase, "real-home");
+      mkdirSync(realHome, { recursive: true });
+      const linkedHome = resolve(realBase, "linked-home");
+      fs.symlinkSync(realHome, linkedHome); // linked-home -> real-home
+
+      // cacheRoot reached through the symlink (lexical path != realpath).
+      const cacheRoot = resolve(linkedHome, ".claude", "plugins", "cache");
+      const installPath = resolve(cacheRoot, "owner", "plugin", "1.0.0");
+      mkdirSync(installPath, { recursive: true }); // real dir lives under real-home
+
+      const sepLocal = (await import("node:path")).sep;
+      const cacheRootLexWithSep = cacheRoot + sepLocal;
+      let cacheRootCanon: string;
+      try { cacheRootCanon = fs.realpathSync(cacheRoot); }
+      catch { cacheRootCanon = cacheRoot; }
+      const cacheRootCanonWithSep = cacheRootCanon + sepLocal;
+
+      const resolvedInstallPath = resolve(installPath);
+      // Lexical pre-filter (the regression fix): like-with-like, so a symlinked
+      // home does NOT over-reject.
+      expect((resolvedInstallPath + sepLocal).startsWith(cacheRootLexWithSep)).toBe(true);
+      // The OLD shape compared the lexical installPath against the canonical
+      // root — exactly what false-rejected it.
+      expect((resolvedInstallPath + sepLocal).startsWith(cacheRootCanonWithSep)).toBe(false);
+      // Security gate (canonical-to-canonical) still accepts the legit install.
+      const realInstallPath = fs.realpathSync(resolvedInstallPath);
+      expect((realInstallPath + sepLocal).startsWith(cacheRootCanonWithSep)).toBe(true);
+    } finally {
+      rmSync(realBase, { recursive: true, force: true });
+    }
   });
 
   test("algorithm: realpath re-check rejects symlink-anchor planted at cacheRoot/<owner>/<plugin>/<version>", async () => {
