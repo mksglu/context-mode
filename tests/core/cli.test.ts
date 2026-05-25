@@ -190,7 +190,9 @@ describe(".mcp.json — MCP server config", () => {
       /sweepStaleMcpJson[^;]*from\s+["']\.\.\/scripts\/heal-installed-plugins\.mjs["']/,
     );
     const upgradeStart = src.indexOf("async function upgrade");
-    const upgradeSrc = src.slice(upgradeStart, upgradeStart + 16000);
+    // Slice the whole upgrade region rather than a fixed-width window so
+    // pattern lookups stay valid as the function grows under feature work.
+    const upgradeSrc = src.slice(upgradeStart);
     // Order constraint: sweep runs AFTER updatePluginRegistry so the
     // cleanup operates against the final on-disk shape.
     const updateIdx = upgradeSrc.indexOf("updatePluginRegistry");
@@ -1530,7 +1532,9 @@ describe("Cache dir safety (#181)", () => {
 describe("statuslineForward survives stale getPluginRoot() (post-upgrade)", () => {
   const CLI_SOURCE = readFileSync(resolve(ROOT, "src/cli.ts"), "utf-8");
   const fnStart = CLI_SOURCE.indexOf("function statuslineForward");
-  const fnBody = CLI_SOURCE.slice(fnStart, fnStart + 2000);
+  // Slice through end-of-file rather than a fixed-width window so pattern
+  // lookups stay valid as the function picks up defensive checks.
+  const fnBody = CLI_SOURCE.slice(fnStart);
 
   test("statuslineForward falls back to the marketplace clone path", () => {
     // After ctx-upgrade, the running CLI binary may live in a cache dir that
@@ -2039,8 +2043,13 @@ describe("Upgrade syncs skills to active install path (#228)", () => {
   });
 
   test("upgrade only syncs when installPath differs from pluginRoot", () => {
-    // Must check installPath !== pluginRoot before copying
-    expect(upgradeBody).toMatch(/installPath.*!==.*pluginRoot|installPath\s*&&\s*installPath\s*!==\s*pluginRoot/);
+    // Must short-circuit when installPath === pluginRoot before copying.
+    // Accept either the original `installPath !== pluginRoot` conjunction
+    // form OR the refactored early-continue form (`if (installPath ===
+    // pluginRoot) continue;`).
+    expect(upgradeBody).toMatch(
+      /installPath.*!==.*pluginRoot|installPath\s*===\s*pluginRoot/,
+    );
   });
 
   test("upgrade does NOT blindly copy to marketplace or cache directories", () => {

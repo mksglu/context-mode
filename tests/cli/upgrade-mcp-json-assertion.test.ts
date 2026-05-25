@@ -39,7 +39,11 @@ const ROOT = resolve(__dirname, "..", "..");
 
 const cliSrc = readFileSync(resolve(ROOT, "src", "cli.ts"), "utf-8");
 const upgradeIdx = cliSrc.indexOf("async function upgrade");
-const upgradeBody = cliSrc.slice(upgradeIdx, upgradeIdx + 16000);
+// The window must cover updatePluginRegistry + the post-bump sweep block.
+// Containment hardening can push sweepStaleMcpJson past a tighter slice;
+// 24000 bytes gives ~7.7 KB of headroom so future inserts inside upgrade()
+// do not silently shift the assertion off-window.
+const upgradeBody = cliSrc.slice(upgradeIdx, upgradeIdx + 24000);
 
 describe("cli.ts upgrade() — Issue #609 .mcp.json sweep assertion", () => {
   test("post-bump block invokes sweepStaleMcpJson from the shared module", () => {
