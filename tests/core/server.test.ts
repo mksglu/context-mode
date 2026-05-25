@@ -1870,6 +1870,84 @@ describe("ctx_insight: port schema rejects invalid values (#441)", () => {
   }, 20_000);
 });
 
+describe("ctx_insight: explicit sessionDir/contentDir containment", () => {
+  // The handler resolves sessionDir / contentDir overrides and passes them
+  // to the spawned insight server as INSIGHT_SESSION_DIR / INSIGHT_CONTENT_DIR.
+  // The server then enumerates every *.db file in those dirs (info disclosure)
+  // and, for hex-named files, can DELETE rows via /api/content. Without
+  // containment, a prompt-injected MCP caller passing sessionDir="/etc" or
+  // contentDir="~/.ssh" turns the dashboard into a confused-deputy
+  // enumerator over the user's filesystem. The fix gates explicit overrides
+  // against the adapter's config root: broad enough for the documented
+  // "multi-install setups or pointing at a sibling project's data" use case,
+  // narrow enough to block /etc, ~/.ssh, /tmp/<foreign-user>, etc.
+
+  const SERVER_SOURCE = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("ctx_insight handler rejects explicit overrides outside the containment root", () => {
+    // Slice to the ctx_insight handler body. Bounded by the registerTool
+    // call for "ctx_insight" and the next "// ── " section divider that
+    // closes the handler.
+    const handlerStart = SERVER_SOURCE.indexOf('server.registerTool(\n  "ctx_insight"');
+    expect(handlerStart).toBeGreaterThan(0);
+    const handlerSlice = SERVER_SOURCE.slice(handlerStart, handlerStart + 12000);
+    expect(handlerSlice).toContain("Confused-deputy guard on explicit overrides");
+    expect(handlerSlice).toMatch(
+      /if \(explicitSessionDir \|\| explicitContentDir\) \{/,
+    );
+    expect(handlerSlice).toMatch(/const containmentRoot = dirname\(dirname\(defaultSessDir\)\);/);
+    expect(handlerSlice).toMatch(/const containmentRootWithSep = resolve\(containmentRoot\) \+ sep;/);
+    expect(handlerSlice).toMatch(
+      /Error: sessionDir must resolve under \$\{containmentRoot\}/,
+    );
+    expect(handlerSlice).toMatch(
+      /Error: contentDir must resolve under \$\{containmentRoot\}/,
+    );
+  });
+
+  test("algorithm: containment accepts in-tree dirs and rejects /etc and traversal escapes", () => {
+    // Replay the guard logic against a sandbox tree whose default sessions
+    // dir is <root>/.claude/context-mode/sessions. The containment root
+    // derives as dirname(dirname(defaultSessDir)) = <root>/.claude.
+    const base = mkdtempSync(join(tmpdir(), "ctx-insight-containment-"));
+    try {
+      const fakeClaudeRoot = join(base, ".claude");
+      const defaultSessDir = join(fakeClaudeRoot, "context-mode", "sessions");
+      mkdirSync(defaultSessDir, { recursive: true });
+
+      const sepLocal = require("node:path").sep as string;
+      const dirnameLocal = (require("node:path") as typeof import("node:path")).dirname;
+      const containmentRoot = dirnameLocal(dirnameLocal(defaultSessDir));
+      const containmentRootWithSep = resolve(containmentRoot) + sepLocal;
+      const isContained = (dir: string): boolean =>
+        (resolve(dir) + sepLocal).startsWith(containmentRootWithSep);
+
+      // In-tree: legitimate.
+      expect(isContained(defaultSessDir)).toBe(true);
+      expect(isContained(join(fakeClaudeRoot, "context-mode", "content"))).toBe(true);
+      expect(isContained(join(fakeClaudeRoot, "other-install", "sessions"))).toBe(true);
+
+      // Outside the containment root: rejected.
+      expect(isContained("/etc")).toBe(false);
+      expect(isContained(join(base, ".ssh"))).toBe(false);
+      expect(isContained(join(base, "elsewhere"))).toBe(false);
+
+      // Relative-".." escape: resolves outside, rejected.
+      expect(isContained(join(defaultSessDir, "..", "..", "..", "elsewhere"))).toBe(false);
+
+      // Prefix collision: a sibling whose name starts with the same chars
+      // as containmentRoot must not slip through. The trailing sep on
+      // containmentRoot is the safeguard.
+      expect(isContained(fakeClaudeRoot + "-evil")).toBe(false);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ctx_execute_file: projectRoot env cascade parity with ctx_index
 // ═══════════════════════════════════════════════════════════════════════════

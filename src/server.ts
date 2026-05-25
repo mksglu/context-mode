@@ -4289,6 +4289,40 @@ server.registerTool(
     const insightContentDirResolved = explicitContentDir ? resolve(explicitContentDir) : join(dirname(sessDir), "content");
     const cacheDir = join(dirname(sessDir), "insight-cache");
 
+    // Confused-deputy guard on explicit overrides. The spawned insight
+    // server reads every .db file under sessDir and insightContentDir, and
+    // its /api/content DELETE endpoint can rewrite hex-named .db files in
+    // those trees. A prompt-injected caller passing sessionDir="~/.ssh"
+    // or contentDir="~/.gnupg" would otherwise let the dashboard
+    // enumerate (and, for hex-named SQLite files, mutate rows in) those
+    // directories. Contain explicit overrides to the adapter's config
+    // root: broad enough for the documented "multi-install setups or
+    // pointing at a sibling project's data" use case, narrow enough to
+    // block /etc, ~/.ssh, /tmp/<foreign-user>, etc.
+    if (explicitSessionDir || explicitContentDir) {
+      const defaultSessDir = getSessionDir();
+      const containmentRoot = dirname(dirname(defaultSessDir));
+      const containmentRootWithSep = resolve(containmentRoot) + sep;
+      const isContained = (dir: string): boolean =>
+        (resolve(dir) + sep).startsWith(containmentRootWithSep);
+      if (explicitSessionDir && !isContained(sessDir)) {
+        return trackResponse("ctx_insight", {
+          content: [{
+            type: "text" as const,
+            text: `Error: sessionDir must resolve under ${containmentRoot} (got ${sessDir}).`,
+          }],
+        });
+      }
+      if (explicitContentDir && !isContained(insightContentDirResolved)) {
+        return trackResponse("ctx_insight", {
+          content: [{
+            type: "text" as const,
+            text: `Error: contentDir must resolve under ${containmentRoot} (got ${insightContentDirResolved}).`,
+          }],
+        });
+      }
+    }
+
     // Verify source exists
     if (!existsSync(join(insightSource, "server.mjs"))) {
       return trackResponse("ctx_insight", {
