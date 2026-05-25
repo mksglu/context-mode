@@ -1946,6 +1946,124 @@ describe("ctx_insight: explicit sessionDir/contentDir containment", () => {
       rmSync(base, { recursive: true, force: true });
     }
   });
+
+  test("algorithm: realpath gate rejects a symlink planted inside the root pointing outside", () => {
+    // path.resolve does not dereference symlinks, so a symlink that lives under
+    // the containment root but points outside it passes the lexical gate; the
+    // spawned insight server's readdirSync/DELETE then follow it out. The
+    // realpath gate closes this while still accepting legitimate in-tree dirs.
+    const fs = require("node:fs") as typeof import("node:fs");
+    const path = require("node:path") as typeof import("node:path");
+    const sepLocal = path.sep;
+    const base = mkdtempSync(join(tmpdir(), "ctx-insight-realpath-"));
+    try {
+      const fakeClaudeRoot = join(base, ".claude");
+      const defaultSessDir = join(fakeClaudeRoot, "context-mode", "sessions");
+      mkdirSync(defaultSessDir, { recursive: true });
+      const outside = join(base, "outside-secret");
+      mkdirSync(outside, { recursive: true });
+      // Planted symlink: lives under the root, resolves outside it.
+      const planted = join(fakeClaudeRoot, "evil");
+      fs.symlinkSync(outside, planted);
+
+      const containmentRoot = path.dirname(path.dirname(defaultSessDir));
+      const containmentRootWithSep = resolve(containmentRoot) + sepLocal;
+      let containmentRootCanonWithSep: string;
+      try { containmentRootCanonWithSep = fs.realpathSync(containmentRoot) + sepLocal; }
+      catch { containmentRootCanonWithSep = containmentRootWithSep; }
+      const isContained = (dir: string): boolean => {
+        const resolved = resolve(dir);
+        if (!(resolved + sepLocal).startsWith(containmentRootWithSep)) return false;
+        try {
+          const real = fs.realpathSync(resolved);
+          if (!(real + sepLocal).startsWith(containmentRootCanonWithSep)) return false;
+        } catch { /* dir doesn't exist: lexical gate suffices */ }
+        return true;
+      };
+
+      // Legitimate in-tree dir still accepted (no regression).
+      expect(isContained(defaultSessDir)).toBe(true);
+      expect(isContained(join(fakeClaudeRoot, "context-mode", "content"))).toBe(true);
+      // The planted symlink passes the lexical gate but the realpath gate
+      // rejects it.
+      expect((resolve(planted) + sepLocal).startsWith(containmentRootWithSep)).toBe(true);
+      expect(isContained(planted)).toBe(false);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  // Runtime behavioral coverage: the tests above pin the source and replay the
+  // algorithm in isolation; this one drives the REAL ctx_insight handler over
+  // JSON-RPC with an out-of-tree sessionDir and asserts the handler itself
+  // returns the containment error before reaching the dashboard spawn path.
+  function spawnInsightServer(): ChildProcess {
+    return spawn("node", [mcpEntry], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, CONTEXT_MODE_DISABLE_VERSION_CHECK: "1" },
+    });
+  }
+
+  async function awaitRpc(
+    proc: ChildProcess,
+    id: number,
+    request: Record<string, unknown>,
+    timeoutMs = 10_000,
+  ): Promise<DoctorJsonRpcResponse | undefined> {
+    return new Promise((resolve) => {
+      let buffer = "";
+      const onData = (d: Buffer) => {
+        buffer += d.toString();
+        let idx: number;
+        while ((idx = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, idx).trim();
+          buffer = buffer.slice(idx + 1);
+          if (!line) continue;
+          try {
+            const parsed = JSON.parse(line) as DoctorJsonRpcResponse;
+            if (parsed.id === id) {
+              proc.stdout!.off("data", onData);
+              clearTimeout(timer);
+              resolve(parsed);
+              return;
+            }
+          } catch { /* ignore non-JSON-RPC lines */ }
+        }
+      };
+      const timer = setTimeout(() => {
+        proc.stdout!.off("data", onData);
+        resolve(undefined);
+      }, timeoutMs);
+      proc.stdout!.on("data", onData);
+      sendRpc(proc, request);
+    });
+  }
+
+  test("handler rejects an out-of-tree sessionDir at runtime, before spawning", async () => {
+    const proc = spawnInsightServer();
+    try {
+      const init = await awaitRpc(proc, 1, {
+        jsonrpc: "2.0", id: 1, method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ctx-insight-containment-rt", version: "1.0" } },
+      });
+      expect(init?.result).toBeDefined();
+      sendRpc(proc, { jsonrpc: "2.0", method: "notifications/initialized" });
+
+      const resp = await awaitRpc(proc, 100, {
+        jsonrpc: "2.0", id: 100, method: "tools/call",
+        params: { name: "ctx_insight", arguments: { sessionDir: "/etc" } },
+      });
+
+      // The real handler rejected the override with the containment error,
+      // naming the offending dir, and never reached the dashboard spawn path.
+      const text = resp?.result?.content?.[0]?.text ?? "";
+      expect(text).toContain("sessionDir must resolve under");
+      expect(text).toContain("(got /etc)");
+      expect(text).not.toMatch(/Dashboard running at/);
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+    }
+  }, 20_000);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

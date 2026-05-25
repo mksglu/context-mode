@@ -4564,9 +4564,27 @@ server.registerTool(
     if (explicitSessionDir || explicitContentDir) {
       const defaultSessDir = getSessionDir();
       const containmentRoot = dirname(dirname(defaultSessDir));
+      // Lexical gate compares like-with-like (resolved dir vs lexical root), so
+      // a legitimate override under a symlinked config root still passes.
       const containmentRootWithSep = resolve(containmentRoot) + sep;
-      const isContained = (dir: string): boolean =>
-        (resolve(dir) + sep).startsWith(containmentRootWithSep);
+      // Canonical gate closes the symlink escape: path.resolve does not
+      // dereference symlinks, so a symlink planted inside the config root and
+      // pointing outside it passes the lexical check, then the spawned insight
+      // server's readdirSync/DELETE follow it out. realpathSync the dir (when it
+      // exists) and re-check against the canonical root, mirroring the realpath
+      // hardening already applied to the cache-root containment sites.
+      let containmentRootCanonWithSep: string;
+      try { containmentRootCanonWithSep = realpathSync(containmentRoot) + sep; }
+      catch { containmentRootCanonWithSep = containmentRootWithSep; }
+      const isContained = (dir: string): boolean => {
+        const resolved = resolve(dir);
+        if (!(resolved + sep).startsWith(containmentRootWithSep)) return false;
+        try {
+          const real = realpathSync(resolved);
+          if (!(real + sep).startsWith(containmentRootCanonWithSep)) return false;
+        } catch { /* dir doesn't exist yet: nothing to enumerate, lexical gate suffices */ }
+        return true;
+      };
       if (explicitSessionDir && !isContained(sessDir)) {
         return trackResponse("ctx_insight", {
           content: [{
