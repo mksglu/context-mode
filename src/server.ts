@@ -6,7 +6,7 @@ import { existsSync, unlinkSync, readdirSync, readFileSync, writeFileSync, renam
 import { execSync, spawnSync, type ChildProcess, type SpawnSyncOptions, type SpawnSyncReturns } from "node:child_process";
 import { join, dirname, resolve, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir, tmpdir, cpus } from "node:os";
+import { homedir, tmpdir, cpus, platform } from "node:os";
 import { request as httpsRequest } from "node:https";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
@@ -53,7 +53,7 @@ import {
 } from "./session/event-emit.js";
 import { persistToolCallCounter, restoreSessionStats } from "./session/persist-tool-calls.js";
 import { searchAllSources } from "./search/unified.js";
-import { buildNodeCommand, type HookAdapter, type PlatformId } from "./adapters/types.js";
+import { buildNodeCommand, type HookAdapter, type PlatformId, isInProcessPluginPlatform } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
@@ -3782,19 +3782,25 @@ server.registerTool(
     // and cmd.exe — unlike env-var prefixes). If detection fails we
     // skip the flag and let upgrade()'s own detectPlatform() fall back.
     let platformFlag = "";
+    let nodeOpts: { platform: string; jsRuntime: string } | undefined =
+      undefined;
     try {
       const { detectPlatform } = await import("./adapters/detect.js");
       const clientInfo = server.server.getClientVersion();
       const signal = detectPlatform(clientInfo ?? undefined);
       platformFlag = ` --platform ${signal.platform}`;
+      nodeOpts = isInProcessPluginPlatform(signal.platform)
+        ? { platform: signal.platform, jsRuntime: runtimes.javascript }
+        : undefined;
     } catch { /* best effort — fall back to upgrade()'s own detect */ }
+
 
     let cmd: string;
 
     if (existsSync(bundlePath)) {
-      cmd = `${buildNodeCommand(bundlePath)} upgrade${platformFlag}`;
+      cmd = `${buildNodeCommand(bundlePath, nodeOpts)} upgrade${platformFlag}`;
     } else if (existsSync(fallbackPath)) {
-      cmd = `${buildNodeCommand(fallbackPath)} upgrade${platformFlag}`;
+      cmd = `${buildNodeCommand(fallbackPath, nodeOpts)} upgrade${platformFlag}`;
     } else {
       // Inline fallback: neither CLI file exists (e.g. marketplace installs).
       // Generate a self-contained node -e script that performs the upgrade.
@@ -3838,7 +3844,7 @@ server.registerTool(
       const tmpScript = resolve(pluginRoot, ".ctx-upgrade-inline.mjs");
       const { writeFileSync: writeTmp } = await import("node:fs");
       writeTmp(tmpScript, scriptLines);
-      cmd = buildNodeCommand(tmpScript);
+      cmd = buildNodeCommand(tmpScript, nodeOpts);
     }
 
     const text = [
