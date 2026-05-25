@@ -6313,3 +6313,99 @@ describe("ctx_index: root-level symlink defense in directory dispatch", () => {
     }
   });
 });
+
+describe("ctx_fetch_and_index: response body size cap", () => {
+  // ctx_fetch_and_index spawns a subprocess that fetches a URL, writes the
+  // response body to a tmpfile, exits, and the parent reads the file back
+  // into the long-running MCP server's heap via readFileSync. Without a
+  // cap, an unexpectedly large endpoint (or a slowloris that keeps
+  // appending chunks until the subprocess is killed) can either OOM the
+  // subprocess or, worse, propagate a multi-GB response into the parent
+  // heap and crash the MCP server. Cap to 50 MB on both ends.
+
+  const SERVER_SOURCE = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("subprocess buildFetchCode caps response via Content-Length and post-text length", () => {
+    expect(SERVER_SOURCE).toContain("const MAX_FETCH_BYTES = 50 * 1024 * 1024;");
+    expect(SERVER_SOURCE).toContain("async function safeText(resp)");
+    // The three response paths (JSON, HTML, default) all route through safeText
+    // instead of resp.text() directly.
+    const buildFetchSrc = SERVER_SOURCE.slice(
+      SERVER_SOURCE.indexOf("export function buildFetchCode"),
+      SERVER_SOURCE.indexOf("// fetch_and_index helpers"),
+    );
+    expect(buildFetchSrc.length).toBeGreaterThan(0);
+    expect(buildFetchSrc.match(/await safeText\(resp\)/g)?.length).toBeGreaterThanOrEqual(3);
+    // The pre-fix call sites (one per content-type branch) routed through
+    // `await resp.text()` directly. Now only one such call survives,
+    // inside safeText itself. Count exactly one.
+    const directCalls = buildFetchSrc.match(/await resp\.text\(\)/g) ?? [];
+    expect(directCalls.length).toBe(1);
+  });
+
+  test("parent-side fetchOneUrl stat-gates outputPath before readFileSync", () => {
+    const fetchOneUrlSrc = SERVER_SOURCE.slice(
+      SERVER_SOURCE.indexOf("async function fetchOneUrl"),
+      SERVER_SOURCE.indexOf("async function fetchOneUrl") + 6000,
+    );
+    expect(fetchOneUrlSrc).toContain("MAX_FETCH_OUTPUT_BYTES = 50 * 1024 * 1024");
+    expect(fetchOneUrlSrc).toMatch(/statSync\(outputPath\)\.size/);
+    expect(fetchOneUrlSrc).toMatch(/fileSize > MAX_FETCH_OUTPUT_BYTES/);
+  });
+});
+
+describe("getStatsFilePath: sanitize CLAUDE_SESSION_ID before path.join", () => {
+  // CLAUDE_SESSION_ID flows from the hosting process straight into a
+  // path.join, and path.join collapses ".." segments. CLAUDE_SESSION_ID=
+  // "../../evil" would write "stats-evil.json" two levels above statsDir.
+  // The env var is not under direct MCP-tool-caller control, but in CI /
+  // multi-tenant contexts where the host env is partly influenceable this
+  // is an arbitrary-write primitive. Reject any session id whose
+  // characters aren't [A-Za-z0-9._-] and fall back to pid-based id.
+
+  const SERVER_SOURCE = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("sanitizeSessionId exists and is called from getStatsFilePath", () => {
+    expect(SERVER_SOURCE).toMatch(/const SESSION_ID_RE = \/\^\[A-Za-z0-9\._-\]\+\$\//);
+    expect(SERVER_SOURCE).toContain("function sanitizeSessionId(raw: string): string {");
+    const getStatsSlice = SERVER_SOURCE.slice(
+      SERVER_SOURCE.indexOf("function getStatsFilePath"),
+      SERVER_SOURCE.indexOf("function getStatsFilePath") + 600,
+    );
+    expect(getStatsSlice).toMatch(/sanitizeSessionId\(raw\)/);
+    // The pre-fix direct splice of the env var into the join is gone.
+    expect(getStatsSlice).not.toMatch(
+      /join\(statsDir, `stats-\$\{process\.env\.CLAUDE_SESSION_ID/,
+    );
+  });
+
+  test("algorithm: sanitizer rejects traversal characters and falls back to pid", () => {
+    // Mirror the production sanitizer in isolation. The malicious shapes
+    // must all fall through to the pid-based id; the legitimate UUID-ish
+    // shape passes through unchanged.
+    const SESSION_ID_RE = /^[A-Za-z0-9._-]+$/;
+    const sanitize = (raw: string): string =>
+      SESSION_ID_RE.test(raw) ? raw : `pid-${process.ppid}`;
+
+    expect(sanitize("../../evil")).toMatch(/^pid-\d+$/);
+    expect(sanitize("/etc/passwd")).toMatch(/^pid-\d+$/);
+    expect(sanitize("a/b")).toMatch(/^pid-\d+$/);
+    expect(sanitize("a\\b")).toMatch(/^pid-\d+$/);
+    expect(sanitize("..\\..")).toMatch(/^pid-\d+$/);
+    expect(sanitize("")).toMatch(/^pid-\d+$/);
+
+    // Legitimate ids pass through.
+    expect(sanitize("session-abc123")).toBe("session-abc123");
+    expect(sanitize("pid-12345")).toBe("pid-12345");
+    expect(sanitize("550e8400-e29b-41d4-a716-446655440000")).toBe(
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(sanitize("MyHost_2024.01")).toBe("MyHost_2024.01");
+  });
+});

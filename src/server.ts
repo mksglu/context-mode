@@ -911,8 +911,22 @@ let _lifetimeCache: { tokens: number; computedAt: number } | undefined;
  * (`pid-<parent pid>`), so a status line script can derive
  * the same id from `$PPID` without coupling to MCP.
  */
+// CLAUDE_SESSION_ID flows from the hosting process (Claude Code, pi, etc.)
+// straight into a path.join, and path.join collapses ".." into the result,
+// so a host env CLAUDE_SESSION_ID=../../evil writes "stats-evil.json" two
+// levels above statsDir. The env var is not under direct MCP-tool-caller
+// control, but in CI / multi-tenant contexts where the host env is partly
+// influenceable this is an arbitrary-write primitive within the MCP server
+// process's filesystem permissions. Constrain to a UUID-shaped charset
+// before splicing into the stats filename.
+const SESSION_ID_RE = /^[A-Za-z0-9._-]+$/;
+function sanitizeSessionId(raw: string): string {
+  return SESSION_ID_RE.test(raw) ? raw : `pid-${process.ppid}`;
+}
+
 function getStatsFilePath(): string {
-  const sessionId = process.env.CLAUDE_SESSION_ID || `pid-${process.ppid}`;
+  const raw = process.env.CLAUDE_SESSION_ID || `pid-${process.ppid}`;
+  const sessionId = sanitizeSessionId(raw);
   const statsDir = ensureWritableStorageDir(resolveStatsStorageDir(getDefaultSessionDir));
   return join(statsDir, `stats-${sessionId}.json`);
 }
@@ -2710,6 +2724,25 @@ async function fetchWithManualRedirect(initialUrl) {
   throw new Error('SSRF blocked: redirect chain exceeded ' + MAX_REDIRECTS + ' hops');
 }
 
+// Subprocess response-body size cap. A malicious or unexpectedly large
+// endpoint reachable through ctx_fetch_and_index would otherwise stream
+// gigabytes into resp.text(), then into outputPath, then into the parent
+// MCP server's heap via readFileSync. 50 MB is far above typical web
+// page / API response sizes (~1-5 MB) but bounded enough to keep parent
+// heap survivable. Cap both early via Content-Length and after the read.
+const MAX_FETCH_BYTES = 50 * 1024 * 1024;
+async function safeText(resp) {
+  const cl = parseInt(resp.headers.get('content-length') || '0', 10);
+  if (cl > MAX_FETCH_BYTES) {
+    throw new Error('Response too large: Content-Length ' + cl + ' exceeds ' + MAX_FETCH_BYTES);
+  }
+  const text = await resp.text();
+  if (text.length > MAX_FETCH_BYTES) {
+    throw new Error('Response too large: ' + text.length + ' bytes exceeds ' + MAX_FETCH_BYTES);
+  }
+  return text;
+}
+
 async function main() {
   const resp = await fetchWithManualRedirect(url);
   if (!resp.ok) { console.error("HTTP " + resp.status); process.exit(1); }
@@ -2717,7 +2750,7 @@ async function main() {
 
   // --- JSON responses ---
   if (contentType.includes('application/json') || contentType.includes('+json')) {
-    const text = await resp.text();
+    const text = await safeText(resp);
     try {
       const pretty = JSON.stringify(JSON.parse(text), null, 2);
       emit('json', pretty);
@@ -2729,7 +2762,7 @@ async function main() {
 
   // --- HTML responses (default for text/html, application/xhtml+xml) ---
   if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
-    const html = await resp.text();
+    const html = await safeText(resp);
     const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
     td.use(gfm);
     td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
@@ -2738,7 +2771,7 @@ async function main() {
   }
 
   // --- Everything else: plain text, CSV, XML, etc. ---
-  const text = await resp.text();
+  const text = await safeText(resp);
   emit('text', text);
 }
 main();
@@ -2973,6 +3006,16 @@ async function fetchOneUrl(url: string, source: string | undefined, force: boole
     const header = (result.stdout || "").trim();
     let markdown: string;
     try {
+      // Parent-side defense-in-depth on the subprocess output size. The
+      // embedded safeText() in buildFetchCode already caps before writing,
+      // but a torn write (subprocess killed mid-write, fs cache desync,
+      // etc.) could still leave an oversized file. Bail before slurping
+      // multiple gigabytes into the long-running MCP server's heap.
+      const MAX_FETCH_OUTPUT_BYTES = 50 * 1024 * 1024;
+      const fileSize = statSync(outputPath).size;
+      if (fileSize > MAX_FETCH_OUTPUT_BYTES) {
+        return { kind: "fetch_error", url, error: `subprocess output ${fileSize} bytes exceeds cap ${MAX_FETCH_OUTPUT_BYTES}`, reason: "read" };
+      }
       markdown = readFileSync(outputPath, "utf-8").trim();
     } catch {
       return { kind: "fetch_error", url, error: "could not read subprocess output", reason: "read" };
