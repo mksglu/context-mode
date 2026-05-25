@@ -1525,19 +1525,33 @@ async function upgrade(opts?: { platform?: string }) {
       // Issue #460 round-3: honor $CLAUDE_CONFIG_DIR so the registry lookup
       // tracks relocated CC config trees.
       try {
-        const registryPath = resolve(resolveClaudeConfigDir(), "plugins", "installed_plugins.json");
+        const claudeRoot = resolveClaudeConfigDir();
+        const registryPath = resolve(claudeRoot, "plugins", "installed_plugins.json");
         if (existsSync(registryPath)) {
+          // The registry's installPath fields are written by Claude Code under
+          // <claudeRoot>/plugins/cache/<marketplace>/<plugin>/<version>. Any other
+          // shape means the registry has been tampered with by a co-resident
+          // plugin, a malicious postinstall script, or another local actor.
+          // Without containment, cpSync would happily recursive-write the in-repo
+          // skills/ tree to /etc/skills, ~/.ssh/skills, or wherever the attacker
+          // pointed. server.ts:790 (healCacheMidSession) already gates the same
+          // field this way; the symmetric guard belongs here too.
+          const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+          const cacheRootWithSep = cacheRoot + sep;
           const registry = JSON.parse(readFileSync(registryPath, "utf-8"));
           const entries = registry?.plugins?.["context-mode@context-mode"];
           if (Array.isArray(entries)) {
             for (const entry of entries) {
-              const installPath = entry.installPath;
-              if (installPath && installPath !== pluginRoot && existsSync(installPath)) {
-                const srcSkills = resolve(srcDir, "skills");
-                if (existsSync(srcSkills)) {
-                  cpSync(srcSkills, resolve(installPath, "skills"), { recursive: true });
-                  changes.push(`Synced skills to active install path`);
-                }
+              const installPath = entry?.installPath;
+              if (typeof installPath !== "string" || !installPath) continue;
+              if (installPath === pluginRoot) continue;
+              const resolvedInstallPath = resolve(installPath);
+              if (!(resolvedInstallPath + sep).startsWith(cacheRootWithSep)) continue;
+              if (!existsSync(resolvedInstallPath)) continue;
+              const srcSkills = resolve(srcDir, "skills");
+              if (existsSync(srcSkills)) {
+                cpSync(srcSkills, resolve(resolvedInstallPath, "skills"), { recursive: true });
+                changes.push(`Synced skills to active install path`);
               }
             }
           }
@@ -1703,14 +1717,24 @@ function statuslineForward(): void {
   try {
     const registryPath = resolve(claudeRoot, "plugins", "installed_plugins.json");
     if (existsSync(registryPath)) {
+      // Same trust boundary as the cpSync site in upgrade() and as
+      // server.ts:790's healCacheMidSession: only honor installPath values
+      // that resolve under <claudeRoot>/plugins/cache. A stray /etc or
+      // ~/.ssh entry written by another local actor must not become the
+      // script the statusline forwarder imports, since statusline re-fires
+      // several times per second and would hand the attacker durable RCE
+      // on the user's behalf.
+      const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+      const cacheRootWithSep = cacheRoot + sep;
       const registry = JSON.parse(readFileSync(registryPath, "utf-8"));
       const entries = registry?.plugins?.["context-mode@context-mode"];
       if (Array.isArray(entries)) {
         for (const entry of entries) {
           const installPath = entry?.installPath;
-          if (typeof installPath === "string" && installPath) {
-            candidates.push(resolve(installPath, "bin", "statusline.mjs"));
-          }
+          if (typeof installPath !== "string" || !installPath) continue;
+          const resolvedInstallPath = resolve(installPath);
+          if (!(resolvedInstallPath + sep).startsWith(cacheRootWithSep)) continue;
+          candidates.push(resolve(resolvedInstallPath, "bin", "statusline.mjs"));
         }
       }
     }

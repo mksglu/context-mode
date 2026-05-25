@@ -2060,6 +2060,92 @@ describe("Upgrade syncs skills to active install path (#228)", () => {
   });
 });
 
+describe("installed_plugins.json installPath containment", () => {
+  // installed_plugins.json is written by Claude Code itself with installPath
+  // values under <claudeRoot>/plugins/cache/<marketplace>/<plugin>/<version>.
+  // Any installPath that resolves elsewhere has been tampered with by a co-
+  // resident plugin, a malicious postinstall, or another local actor. cli.ts
+  // consumes the field in two hot places: the upgrade() skills sync (cpSync
+  // into installPath) and statuslineForward() (dynamic import from
+  // installPath/bin/statusline.mjs, ~3-5 Hz while CC is open). Both sites
+  // need the same lexical guard that server.ts:790 already uses on the
+  // same field.
+
+  const CLI_SOURCE = readFileSync(resolve(ROOT, "src/cli.ts"), "utf-8");
+
+  test("upgrade() skills cpSync gates installPath under <claudeRoot>/plugins/cache", () => {
+    // Bound the slice to the upgrade() skills-sync block.
+    const upgradeStart = CLI_SOURCE.indexOf("async function upgrade");
+    expect(upgradeStart).toBeGreaterThan(0);
+    const skillsBlock = CLI_SOURCE
+      .slice(upgradeStart)
+      .match(/Sync skills to the active install path[\s\S]*?best effort — registry may not exist or be malformed/);
+    expect(skillsBlock).not.toBeNull();
+    expect(skillsBlock![0]).toContain('resolve(claudeRoot, "plugins", "cache")');
+    expect(skillsBlock![0]).toMatch(/\(resolvedInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
+    // The pre-fix shape passed installPath verbatim to cpSync without
+    // normalizing or gating it.
+    expect(skillsBlock![0]).not.toMatch(
+      /cpSync\(srcSkills, resolve\(installPath, "skills"\),/,
+    );
+  });
+
+  test("statuslineForward() candidate selection gates installPath under <claudeRoot>/plugins/cache", () => {
+    // Slice to the statuslineForward() function body.
+    const statuslineStart = CLI_SOURCE.indexOf("statuslineForward");
+    expect(statuslineStart).toBeGreaterThan(0);
+    const tail = CLI_SOURCE.slice(statuslineStart);
+    // The candidate-building block runs between the candidates[] declaration
+    // and the candidates.find() that picks the script to import.
+    const candidateBlock = tail.match(
+      /candidates: string\[\] = \[[\s\S]*?candidates\.find\(/,
+    );
+    expect(candidateBlock).not.toBeNull();
+    expect(candidateBlock![0]).toContain('resolve(claudeRoot, "plugins", "cache")');
+    expect(candidateBlock![0]).toMatch(/\(resolvedInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
+    // The pre-fix shape pushed any installPath string into candidates without
+    // gating it.
+    expect(candidateBlock![0]).not.toMatch(
+      /candidates\.push\(resolve\(installPath, "bin", "statusline\.mjs"\)\)/,
+    );
+  });
+
+  test("algorithm: containment rejects installPath values outside the cache root", async () => {
+    // Sandbox a fake <claudeRoot> tree with a cache dir holding one
+    // legitimate plugin entry, plus a malicious entry pointing at an
+    // attacker-chosen directory outside the cache. Replay the production
+    // guard; assert only the legitimate entry survives.
+    const claudeRoot = mkdtempSync(join(tmpdir(), "installpath-containment-"));
+    try {
+      const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+      const legitCacheDir = resolve(cacheRoot, "context-mode", "context-mode", "1.0.0");
+      const attackerDir = resolve(claudeRoot, "outside-cache", "evil");
+      mkdirSync(legitCacheDir, { recursive: true });
+      mkdirSync(attackerDir, { recursive: true });
+
+      const { sep } = await import("node:path");
+      const cacheRootWithSep = cacheRoot + sep;
+      const inputs = [
+        { installPath: legitCacheDir, label: "legit" },
+        { installPath: attackerDir, label: "outside-cache" },
+        { installPath: "/etc", label: "absolute-system" },
+        // Relative-".." escape: legitimate prefix then ".." up and out.
+        { installPath: join(legitCacheDir, "..", "..", "..", "..", "outside-cache", "evil"), label: "traversal" },
+      ];
+      const accepted: string[] = [];
+      for (const { installPath, label } of inputs) {
+        if (typeof installPath !== "string" || !installPath) continue;
+        const resolvedInstallPath = resolve(installPath);
+        if (!(resolvedInstallPath + sep).startsWith(cacheRootWithSep)) continue;
+        accepted.push(label);
+      }
+      expect(accepted).toEqual(["legit"]);
+    } finally {
+      rmSync(claudeRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 // ── better-sqlite3 binding self-heal (#408) ───────────────────────────────
 //
 // On Windows, `npm rebuild better-sqlite3` falls through to node-gyp when
