@@ -159,7 +159,11 @@ function startInsight(runtime: "node" | "bun" = "node"): { port: number; child: 
   mkdirSync(join(tempInsightDir, "dist"), { recursive: true });
   cpSync(SOURCE_SERVER, join(tempInsightDir, "server.mjs"));
   writeFileSync(join(tempInsightDir, "dist", DIST_INDEX_NAME), "<!doctype html><html><body>stub</body></html>");
-  symlinkSync(resolve(ROOT, "node_modules"), join(tempRoot, "node_modules"), "dir");
+  symlinkSync(
+    resolve(ROOT, "node_modules"),
+    join(tempRoot, "node_modules"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
 
   const { sessionsDir, contentDir } = seedFixtureDBs(tempRoot);
   const port = 49152 + Math.floor(Math.random() * 16383);
