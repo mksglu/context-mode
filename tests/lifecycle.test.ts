@@ -7,13 +7,30 @@
 
 import { describe, test, assert } from "vitest";
 import { spawn, execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { startLifecycleGuard, makeDefaultIsParentAlive } from "../src/lifecycle.js";
 
-const TSX_PATH = execSync("which tsx", { encoding: "utf-8" }).trim();
+// Resolve the tsx binary. Prefer the local devDep so the test doesn't depend
+// on a global tsx install or on Git Bash's `which` being on PATH; the PATH
+// probe is a fallback for environments where node_modules/.bin isn't
+// populated. Windows ships tsx as tsx.cmd and uses `where`; everywhere else
+// it's `tsx` with `which`.
+function resolveTsxPath(): string {
+  const isWindows = process.platform === "win32";
+  const localBin = join(
+    process.cwd(),
+    "node_modules",
+    ".bin",
+    isWindows ? "tsx.cmd" : "tsx",
+  );
+  if (existsSync(localBin)) return localBin;
+  const probe = isWindows ? "where tsx" : "which tsx";
+  return execSync(probe, { encoding: "utf-8" }).trim().split(/\r?\n/)[0];
+}
+const TSX_PATH = resolveTsxPath();
 const PROJECT_ROOT = process.cwd();
 // file:// URL form so the spawned ESM module can import lifecycle.ts by
 // absolute path regardless of where the script itself lives.
