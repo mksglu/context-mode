@@ -3867,7 +3867,8 @@ server.registerTool(
       "  - [x] Hooks configured",
       "  - [x] Doctor: all checks PASS",
       "  ```",
-      "- Tell the user to restart their session to pick up the new version.",
+      "- If the output says a new version was installed, tell the user to restart their session to pick up the new version.",
+      "- If the output says \"Already on latest\", no restart is needed.",
     ].join("\n");
 
     return trackResponse("ctx_upgrade", {

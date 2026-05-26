@@ -1068,6 +1068,7 @@ async function upgrade(opts?: { platform?: string }) {
 
   let pluginRoot = getPluginRoot();
   const changes: string[] = [];
+  let didBumpVersion = false;
   const s = p.spinner();
 
   // Step 0: Sync the marketplace clone (#418).
@@ -1531,6 +1532,7 @@ async function upgrade(opts?: { platform?: string }) {
       } catch { /* best effort — registry may not exist or be malformed */ }
 
       changes.push(`Updated v${localVersion} → v${newVersion}`);
+      didBumpVersion = true;
       p.log.success(
         color.green("Plugin reinstalled from GitHub!") +
           color.dim(` — v${newVersion}`),
@@ -1635,13 +1637,15 @@ async function upgrade(opts?: { platform?: string }) {
   }
 
   // Restart notice — new MCP tools require MCP server restart
-  const restartHint = adapter.name === "Claude Code"
-    ? "/reload-plugins, new terminal, or restart session"
-    : "new terminal or restart session";
-  p.log.warn(
-    color.yellow("Restart for new MCP tools to take effect.") +
-      color.dim(` (${restartHint})`),
-  );
+  if (didBumpVersion) {
+    const restartHint = adapter.name === "Claude Code"
+      ? "/reload-plugins, new terminal, or restart session"
+      : "new terminal or restart session";
+    p.log.warn(
+      color.yellow("Restart for new MCP tools to take effect.") +
+        color.dim(` (${restartHint})`),
+    );
+  }
 
   // Step 7: Run doctor
   p.log.step("Running doctor to verify...");

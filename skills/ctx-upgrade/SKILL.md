@@ -24,7 +24,7 @@ Pull latest from GitHub and reinstall the plugin.
    - [x] Doctor: all checks PASS
    ```
    Use `[x]` for success, `[ ]` for failure. Show actual version numbers.
-4. Tell the user to **restart their session** to pick up the new version.
+4. If the output shows a new version was installed, tell the user to **restart their session** to pick up the new version. If it says "Already on latest", no restart is needed.
 5. **Fallback** (only if MCP tool call fails): Derive the **plugin root** from this skill's base directory (go up 2 levels — remove `/skills/ctx-upgrade`), then run with Bash:
    ```
    CLI="<PLUGIN_ROOT>/cli.bundle.mjs"; [ ! -f "$CLI" ] && CLI="<PLUGIN_ROOT>/build/cli.js"; node "$CLI" upgrade
