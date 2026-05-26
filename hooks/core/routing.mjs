@@ -822,7 +822,15 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     const fieldName = ["prompt", "request", "objective", "question", "query", "task"].find(f => f in toolInput) ?? "prompt";
     const prompt = toolInput[fieldName] ?? "";
 
-    const subagentBlock = createRoutingBlock(t, { includeCommands: false });
+    // Claude Code surfaces ctx_* as DEFERRED tools (schemas loaded via ToolSearch).
+    // Without a bootstrap step the subagent is told to use ctx_* tools it cannot yet
+    // invoke and stalls (see #724). Prepend the ToolSearch bootstrap for claude-code
+    // (the default when platform is unset). Other platforms don't defer, so skip it.
+    const isClaudeCode = !platform || platform === "claude-code";
+    const subagentBlock = createRoutingBlock(t, {
+      includeCommands: false,
+      toolSearchBootstrap: isClaudeCode,
+    });
 
     const updatedInput =
       subagentType === "Bash"
