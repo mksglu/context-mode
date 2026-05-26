@@ -66,6 +66,15 @@ describe(".codex-plugin/mcp.json", () => {
     expect(entry.cwd).toBe(".");
   });
 
+  it("sets CONTEXT_MODE_PLATFORM=codex for the MCP server process", () => {
+    // Codex hook wrappers already set this before loading shared hook code.
+    // The MCP server needs the same signal so storage and doctor output do
+    // not fall back to ~/.claude on machines that have both agents installed.
+    const servers = mcp.mcpServers as Record<string, { env?: Record<string, string> }>;
+    const entry = servers["context-mode"];
+    expect(entry.env?.CONTEXT_MODE_PLATFORM).toBe("codex");
+  });
+
   it("does NOT use `${CODEX_PLUGIN_ROOT}` placeholders (no var expansion happens)", () => {
     const raw = readFileSync(resolve(REPO_ROOT, ".codex-plugin/mcp.json"), "utf8");
     expect(raw).not.toMatch(/\$\{[^}]*PLUGIN_ROOT[^}]*\}/);

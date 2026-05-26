@@ -4,6 +4,9 @@
       "command": "node",
       "args": ["./start.mjs"],
       "cwd": ".",
+      "env": {
+        "CONTEXT_MODE_PLATFORM": "codex"
+      },
       "default_tools_approval_mode": "approve"
     }
   }
