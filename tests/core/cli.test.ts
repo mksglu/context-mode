@@ -84,6 +84,16 @@ describe("cli.bundle.mjs — marketplace install support", () => {
     expect(src).toMatch(/items\s*=\s*\[[\s\S]*?"cli\.bundle\.mjs"/);
   });
 
+  it("cli.ts exposes index/search commands for terminal knowledge-base access", () => {
+    const src = readFileSync(resolve(ROOT, "src", "cli.ts"), "utf-8");
+    expect(src).toContain("context-mode index <path>");
+    expect(src).toContain("context-mode search <query...>");
+    expect(src).toContain('args[0] === "index"');
+    expect(src).toContain('args[0] === "search"');
+    expect(src).toContain("resolveContentStorePath");
+    expect(src).toContain("searchWithFallback");
+  });
+
   it("cli.ts upgrade doctor call prefers cli.bundle.mjs with fallback", () => {
     const src = readFileSync(resolve(ROOT, "src", "cli.ts"), "utf-8");
     expect(src).toContain("cli.bundle.mjs");
@@ -134,6 +144,17 @@ describe("cli.bundle.mjs — marketplace install support", () => {
     expect(skill).toContain("cli.bundle.mjs");
     expect(skill).toContain("build/cli.js");
     expect(skill).toMatch(/CLI=.*cli\.bundle\.mjs.*\[ ! -f.*\].*build\/cli\.js/);
+  });
+
+  it("ctx-index and ctx-search skills expose slash-style triggers", () => {
+    const indexSkill = readFileSync(resolve(ROOT, "skills", "ctx-index", "SKILL.md"), "utf-8");
+    const searchSkill = readFileSync(resolve(ROOT, "skills", "ctx-search", "SKILL.md"), "utf-8");
+    expect(indexSkill).toContain("Trigger: /context-mode:ctx-index");
+    expect(indexSkill).toContain("user-invocable: true");
+    expect(indexSkill).toContain("context-mode index");
+    expect(searchSkill).toContain("Trigger: /context-mode:ctx-search");
+    expect(searchSkill).toContain("user-invocable: true");
+    expect(searchSkill).toContain("context-mode search");
   });
 
   // ── .gitignore ─────────────────────────────────────────────

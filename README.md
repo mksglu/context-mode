@@ -89,11 +89,13 @@ All checks should show `[x]`. The doctor validates runtimes, hooks, FTS5, and pl
 |---|---|
 | `/context-mode:ctx-stats` | Context savings — per-tool breakdown, tokens consumed, savings ratio. |
 | `/context-mode:ctx-doctor` | Diagnostics — runtimes, hooks, FTS5, plugin registration, versions. |
+| `/context-mode:ctx-index` | Index a local file or directory into the persistent FTS5 knowledge base. |
+| `/context-mode:ctx-search` | Search previously indexed content. |
 | `/context-mode:ctx-upgrade` | Pull latest, rebuild, migrate cache, fix hooks. |
 | `/context-mode:ctx-purge` | Permanently delete all indexed content from the knowledge base. |
 | `/context-mode:ctx-insight` | Personal analytics dashboard — 90 metrics, 37 insight patterns, 4 composite scores (productivity, quality, delegation, context health) across 23 event categories. Opens a local web UI. |
 
-> **Note:** Slash commands are a Claude Code plugin feature. On other platforms, type `ctx stats`, `ctx doctor`, `ctx upgrade`, or `ctx insight` in the chat — the model calls the MCP tool automatically. See [Utility Commands](#utility-commands).
+> **Note:** Slash commands are a Claude Code plugin feature. On other platforms, type `ctx stats`, `ctx doctor`, `ctx index`, `ctx search`, `ctx upgrade`, or `ctx insight` in the chat — the model calls the MCP tool automatically. See [Utility Commands](#utility-commands).
 
 **Status line (optional):** Claude Code's plugin manifest cannot declare a status line, so this is a one-time manual edit to `~/.claude/settings.json`:
 
@@ -1252,6 +1254,8 @@ See [`docs/platform-support.md`](docs/platform-support.md) for the full capabili
 ```
 ctx stats       → context savings, call counts, session report
 ctx doctor      → diagnose runtimes, hooks, FTS5, versions
+ctx index       → index a local file or directory for later search
+ctx search      → search previously indexed content
 ctx upgrade     → update from GitHub, rebuild, reconfigure hooks
 ctx purge       → permanently delete all indexed content from the knowledge base
 ctx insight     → personal analytics dashboard (opens local web UI)
@@ -1261,6 +1265,8 @@ ctx insight     → personal analytics dashboard (opens local web UI)
 
 ```bash
 context-mode doctor
+context-mode index . --source project:my-app
+context-mode search "authentication middleware" --source project:my-app
 context-mode upgrade
 context-mode insight          # opens analytics dashboard in browser
 bash scripts/ctx-debug.sh    # full diagnostic report for bug reports
@@ -1268,7 +1274,7 @@ bash scripts/ctx-debug.sh    # full diagnostic report for bug reports
 
 The debug script collects OS info, runtime versions, better-sqlite3 status, adapter detection, config files (redacted), hook validation, FTS5/SQLite test, executor test, process check, session databases, and environment variables into a single pasteable markdown report.
 
-Works on **all platforms**. On Claude Code, slash commands (`/ctx-stats`, `/ctx-doctor`, `/ctx-upgrade`, `/ctx-purge`, `/ctx-insight`) are also available.
+Works on **all platforms**. On Claude Code, slash commands (`/ctx-stats`, `/ctx-doctor`, `/ctx-index`, `/ctx-search`, `/ctx-upgrade`, `/ctx-purge`, `/ctx-insight`) are also available.
 
 ## Benchmarks
 
