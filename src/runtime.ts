@@ -1,5 +1,6 @@
 import { execFileSync, execSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 /**
  * Allowlist for SHELL env override. Only POSIX shells + Windows shells permit
@@ -88,19 +89,22 @@ function commandExists(cmd: string): boolean {
  * exit 0 before declaring the runtime available (#455).
  */
 function runnableExists(cmd: string): boolean {
-  if (isWindows) {
-    // Reject if every `where` hit lives under Microsoft\WindowsApps (Store stubs).
-    try {
-      const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe" });
-      const hits = out.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-      if (hits.length === 0) return false;
-      const realHits = hits.filter(p => !/\\Microsoft\\WindowsApps\\/i.test(p));
-      if (realHits.length === 0) return false;
-    } catch {
+  const isDirectFile = existsSync(cmd);
+  if (!isDirectFile) {
+    if (isWindows) {
+      // Reject if every `where` hit lives under Microsoft\WindowsApps (Store stubs).
+      try {
+        const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe" });
+        const hits = out.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
+        if (hits.length === 0) return false;
+        const realHits = hits.filter(p => !/\\Microsoft\\WindowsApps\\/i.test(p));
+        if (realHits.length === 0) return false;
+      } catch {
+        return false;
+      }
+    } else if (!commandExists(cmd)) {
       return false;
     }
-  } else if (!commandExists(cmd)) {
-    return false;
   }
   // Probe with --version. On Windows, allow 5s for cold-start (MS Store stub
   // fallthrough can be slow). On POSIX, 1500ms is plenty for a real binary
@@ -228,7 +232,25 @@ function getVersion(cmd: string, args: string[] = ["--version"]): string {
   }
 }
 
-export function detectRuntimes(): RuntimeMap {
+function detectVenvPython(projectRoot?: string): string | null {
+  const roots = [projectRoot, process.cwd()].filter((r): r is string => typeof r === "string" && r !== "");
+  const isWin = process.platform === "win32";
+  const subPaths = isWin
+    ? [join(".venv", "Scripts", "python.exe"), join("venv", "Scripts", "python.exe")]
+    : [join(".venv", "bin", "python"), join("venv", "bin", "python")];
+
+  for (const root of roots) {
+    for (const subPath of subPaths) {
+      const fullPath = resolve(root, subPath);
+      if (existsSync(fullPath) && runnableExists(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+  return null;
+}
+
+export function detectRuntimes(projectRoot?: string): RuntimeMap {
   const hasBun = bunExists();
   const bun = hasBun ? bunCommand() : null;
 
@@ -248,6 +270,7 @@ export function detectRuntimes(): RuntimeMap {
     !(isWin && isWindowsWslBash(userShell))
     ? userShell
     : null;
+  const venvPython = detectVenvPython(projectRoot);
 
   return {
     javascript: bun ?? process.execPath,
@@ -258,13 +281,13 @@ export function detectRuntimes(): RuntimeMap {
         : commandExists("ts-node")
           ? "ts-node"
           : null,
-    python: runnableExists("python3")
+    python: venvPython ?? (runnableExists("python3")
       ? "python3"
       : runnableExists("python")
         ? "python"
         : runnableExists("py")
           ? "py"
-          : null,
+          : null),
     shell: shellOverride ?? (isWin
       ? (resolveWindowsBash() ?? (commandExists("sh") ? "sh" : commandExists("powershell") ? "powershell" : "cmd.exe"))
       : commandExists("bash") ? "bash" : "sh"),

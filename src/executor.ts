@@ -157,7 +157,7 @@ export class PolyglotExecutor {
     } else {
       this.#projectRootResolver = () => process.cwd();
     }
-    this.#runtimes = opts?.runtimes ?? detectRuntimes();
+    this.#runtimes = opts?.runtimes ?? detectRuntimes(this.#projectRoot);
   }
 
   get #projectRoot(): string {
