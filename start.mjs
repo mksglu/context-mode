@@ -121,11 +121,33 @@ if (cacheMatch) {
       });
       const newest = dirs[dirs.length - 1];
       if (newest && newest !== myVersion) {
+        // Issue #727: normalize hooks.json + plugin.json in the newest version
+        // dir BEFORE updating the registry. CC's auto-update carries forward
+        // files from the old cache dir, including hooks.json and plugin.json
+        // with absolute paths baked to the old version. start.mjs's Self-heal
+        // Layer 5 would catch this, but plugin.json's stale mcpServers path
+        // prevents the new start.mjs from ever booting — chicken-and-egg.
+        // Fix: normalize from HERE (the old start.mjs that CC CAN still launch)
+        // so the new dir's files are correct before the next session reads them.
+        const newestDir = resolve(cacheParent, newest);
+        try {
+          // #713: use narrow helper — wide normalizeHooksOnStartup would
+          // write plugin.json on the NEW cache dir, the exact #711 poison
+          // vector. Only hooks.json needs the placeholder→absolute rewrite
+          // pre-bump to close the first-hook-fire window.
+          const { normalizeHooksJsonOnly } = await import("./hooks/normalize-hooks.mjs");
+          normalizeHooksJsonOnly({
+            pluginRoot: newestDir,
+            nodePath: process.execPath,
+            platform: process.platform,
+          });
+        } catch { /* best effort — never block startup */ }
+
         const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
         for (const [key, entries] of Object.entries(ip.plugins || {})) {
           if (key !== "context-mode@context-mode") continue;
           for (const entry of entries) {
-            entry.installPath = resolve(cacheParent, newest);
+            entry.installPath = newestDir;
             entry.version = newest;
             entry.lastUpdated = new Date().toISOString();
           }
@@ -253,11 +275,11 @@ try {
   if (existsSync(oldBashHook)) {
     try { unlinkSync(oldBashHook); } catch {}
   }
-  if (!existsSync(healHookPath)) {
-    if (!existsSync(globalHooksDir)) mkdirSync(globalHooksDir, { recursive: true });
-    const healScript = `#!/usr/bin/env node
+  if (!existsSync(globalHooksDir)) mkdirSync(globalHooksDir, { recursive: true });
+  const healScript = `#!/usr/bin/env node
 // context-mode plugin cache self-heal (auto-deployed)
 // Fixes anthropics/claude-code#46915: auto-update breaks CLAUDE_PLUGIN_ROOT
+// Issue #727: also normalizes stale version paths in existing installPaths
 // Honors CLAUDE_CONFIG_DIR (#577) — checked at this script's runtime so users
 // who set CLAUDE_CONFIG_DIR after install still get healed correctly.
 // Pure Node.js — no bash/shell dependency.
@@ -274,8 +296,25 @@ try{
     if(k!=="context-mode@context-mode")continue;
     for(const e of es){
       const p=e.installPath;
-      if(!p||existsSync(p))continue;
+      if(!p)continue;
       if(!resolve(p).startsWith(cacheRoot+sep))continue;
+      if(existsSync(p)){
+        // Issue #727: normalize stale version paths in existing installPaths.
+        // CC's auto-update can carry forward hooks.json/plugin.json with paths
+        // baked to a previous version dir. Import normalize-hooks from the
+        // installPath itself and let it detect + rewrite stale segments.
+        try{
+          // #713: narrow helper only — installPath belongs to a different
+          // version's cache dir; writing plugin.json there is the #711 vector.
+          const nhPath=join(p,"hooks","normalize-hooks.mjs");
+          if(existsSync(nhPath)){
+            const mod=await import(nhPath);
+            const fn=mod.normalizeHooksJsonOnly||mod.normalizeHooksOnStartup;
+            if(fn)fn({pluginRoot:p,nodePath:process.execPath,platform:process.platform});
+          }
+        }catch{}
+        continue;
+      }
       const parent=dirname(p);
       if(!existsSync(parent))continue;
       try{if(lstatSync(p).isSymbolicLink())unlinkSync(p)}catch{}
@@ -287,6 +326,13 @@ try{
   }
 }catch{}
 `;
+  // Deploy or update the heal hook when content changes (not just when missing).
+  // Allows new heal logic (e.g. #727 path normalization) to propagate on next boot.
+  let needsWrite = !existsSync(healHookPath);
+  if (!needsWrite) {
+    try { needsWrite = readFileSync(healHookPath, "utf-8") !== healScript; } catch { needsWrite = true; }
+  }
+  if (needsWrite) {
     writeFileSync(healHookPath, healScript, { mode: 0o755 });
   }
 
