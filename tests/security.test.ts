@@ -173,6 +173,52 @@ describe("Chained Command Splitting", () => {
     const parts = splitChainedCommands("git status");
     assert.deepEqual(parts, ["git status"]);
   });
+
+  // Separator-bypass regression. A denied command hidden after a
+  // separator the old splitter ignored (newline, lone &, subshell, $(),
+  // backtick, brace group) must still be isolated as its own segment.
+  test("splitChainedCommands: newline separator", () => {
+    assert.deepEqual(
+      splitChainedCommands("echo ok\nsudo rm -rf /"),
+      ["echo ok", "sudo rm -rf /"],
+    );
+  });
+
+  test("splitChainedCommands: lone & (background) separator", () => {
+    assert.deepEqual(
+      splitChainedCommands("echo ok & sudo rm -rf /"),
+      ["echo ok", "sudo rm -rf /"],
+    );
+  });
+
+  test("splitChainedCommands: subshell isolates the inner command", () => {
+    assert.deepEqual(splitChainedCommands("(sudo rm -rf /)"), ["sudo rm -rf /"]);
+  });
+
+  test("splitChainedCommands: $() substitution isolates the inner command", () => {
+    assert.deepEqual(
+      splitChainedCommands("echo $(sudo rm -rf /)"),
+      ["echo", "sudo rm -rf /"],
+    );
+  });
+
+  test("splitChainedCommands: backtick substitution isolates the inner command", () => {
+    assert.deepEqual(
+      splitChainedCommands("echo `sudo rm -rf /`"),
+      ["echo", "sudo rm -rf /"],
+    );
+  });
+
+  test("splitChainedCommands: brace group isolates the inner command", () => {
+    assert.deepEqual(splitChainedCommands("{ sudo rm -rf /; }"), ["sudo rm -rf /"]);
+  });
+
+  test("splitChainedCommands: does not over-split inside quotes", () => {
+    assert.deepEqual(
+      splitChainedCommands("echo 'a & b' && echo \"c | d\""),
+      ["echo 'a & b'", 'echo "c | d"'],
+    );
+  });
 });
 
 describe("Chained Command Evaluation", () => {
@@ -229,6 +275,38 @@ describe("Chained Command Evaluation", () => {
     const result = evaluateCommandDenyOnly("echo hello && git status", policies, false);
     assert.equal(result.decision, "allow");
   });
+
+  // The deny firewall must catch a denied command no matter which
+  // separator hides it behind an innocent prefix.
+  for (const payload of [
+    "echo ok\nsudo rm -rf /",
+    "echo ok & sudo rm -rf /",
+    "(sudo rm -rf /)",
+    "echo $(sudo rm -rf /)",
+    "echo `sudo rm -rf /`",
+    "{ sudo rm -rf /; }",
+  ]) {
+    test(`evaluateCommandDenyOnly: denies separator-bypass ${JSON.stringify(payload)}`, () => {
+      const policies = readBashPolicies(undefined, chainGlobalPath);
+      const result = evaluateCommandDenyOnly(payload, policies, false);
+      assert.equal(result.decision, "deny");
+    });
+  }
+
+  // Backslash-quote regression: a closing quote preceded by an EVEN
+  // run of backslashes is a real delimiter, so the chained denied command must
+  // still be split out. A one-char `prev === "\\"` lookback miscounted this.
+  for (const payload of [
+    'echo "a\\\\"; sudo rm -rf /',          // echo "a\\"; sudo ...
+    "echo 'a\\'; sudo rm -rf /",            // echo 'a\'; sudo ...
+    'echo "x\\\\" && sudo rm -rf /',        // echo "x\\" && sudo ...
+  ]) {
+    test(`evaluateCommandDenyOnly: denies backslash-quote bypass ${JSON.stringify(payload)}`, () => {
+      const policies = readBashPolicies(undefined, chainGlobalPath);
+      const result = evaluateCommandDenyOnly(payload, policies, false);
+      assert.equal(result.decision, "deny");
+    });
+  }
 });
 
 describe("Settings Reader", () => {

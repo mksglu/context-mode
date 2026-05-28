@@ -164,50 +164,102 @@ export function matchesAnyPattern(
  * This prevents bypassing deny patterns by prepending innocent commands.
  */
 export function splitChainedCommands(command: string): string[] {
+  // Split a compound command into its constituent simple commands so the deny
+  // policy can be checked against each one. Splitting is intentionally
+  // aggressive: deny is evaluated per-segment while allow/ask match the whole
+  // command (see evaluateCommand), so over-splitting can only ever cause MORE
+  // deny matches (fail-safe), never break a legitimate allow. The earlier
+  // version split only on ; && || | and treated backticks as opaque, so a
+  // denied command could hide after a newline, a lone &, a subshell, a brace
+  // group, or a $()/backtick substitution and never be matched against deny.
   const parts: string[] = [];
   let current = "";
   let inSingle = false;
   let inDouble = false;
-  let inBacktick = false;
+  const flush = () => {
+    const t = current.trim();
+    if (t) parts.push(t);
+    current = "";
+  };
+  // A quote or substitution char is escaped only when preceded by an ODD run of
+  // backslashes. A one-character `prev === "\\"` check miscounts `\\` (an even
+  // run is a literal backslash that leaves the next char unescaped), which let a
+  // real closing quote read as escaped so every later separator got swallowed
+  // into one segment and slipped past the per-segment deny check.
+  const escaped = (i: number): boolean => {
+    let n = 0;
+    for (let k = i - 1; k >= 0 && command[k] === "\\"; k--) n++;
+    return n % 2 === 1;
+  };
 
   for (let i = 0; i < command.length; i++) {
     const ch = command[i];
-    const prev = i > 0 ? command[i - 1] : "";
 
-    if (ch === "'" && !inDouble && !inBacktick && prev !== "\\") {
-      inSingle = !inSingle;
+    // Single quotes are fully literal in the shell: backslashes don't escape
+    // inside them, so a ' always closes once open; outside quotes a
+    // backslash-escaped ' is a literal, not an opener.
+    if (ch === "'" && !inDouble) {
+      if (inSingle) {
+        inSingle = false;
+        current += ch;
+        continue;
+      }
+      if (!escaped(i)) {
+        inSingle = true;
+        current += ch;
+        continue;
+      }
       current += ch;
-    } else if (ch === '"' && !inSingle && !inBacktick && prev !== "\\") {
+      continue;
+    }
+    if (inSingle) {
+      current += ch;
+      continue;
+    }
+    if (ch === '"' && !escaped(i)) {
       inDouble = !inDouble;
       current += ch;
-    } else if (ch === "`" && !inSingle && !inDouble && prev !== "\\") {
-      inBacktick = !inBacktick;
-      current += ch;
-    } else if (!inSingle && !inDouble && !inBacktick) {
-      if (ch === ";") {
-        parts.push(current.trim());
-        current = "";
-      } else if (ch === "|" && command[i + 1] === "|") {
-        parts.push(current.trim());
-        current = "";
-        i++; // skip second |
-      } else if (ch === "&" && command[i + 1] === "&") {
-        parts.push(current.trim());
-        current = "";
-        i++; // skip second &
-      } else if (ch === "|") {
-        // Single pipe — left side is a command too
-        parts.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    } else {
-      current += ch;
+      continue;
     }
+    // Command substitution runs even inside double quotes, so its body is its
+    // own command: treat `$(` and backtick as boundaries regardless of the
+    // double-quote state (single quotes, handled above, suppress them).
+    if (ch === "`" && !escaped(i)) {
+      flush();
+      continue;
+    }
+    if (ch === "$" && command[i + 1] === "(" && !escaped(i)) {
+      flush();
+      i++; // consume the "("
+      continue;
+    }
+    // Inside double quotes, ordinary operators are literal.
+    if (inDouble) {
+      current += ch;
+      continue;
+    }
+    // Unquoted operator / grouping separators.
+    if (
+      ch === ";" || ch === "\n" || ch === "\r" ||
+      ch === "(" || ch === ")" || ch === "{" || ch === "}"
+    ) {
+      flush();
+      continue;
+    }
+    if (ch === "|") {
+      flush();
+      if (command[i + 1] === "|") i++; // skip second |
+      continue;
+    }
+    if (ch === "&") {
+      flush();
+      if (command[i + 1] === "&") i++; // skip second &
+      continue;
+    }
+    current += ch;
   }
-  if (current.trim()) parts.push(current.trim());
-  return parts.filter((p) => p.length > 0);
+  flush();
+  return parts;
 }
 
 // ==============================================================================
@@ -384,11 +436,19 @@ interface CommandDecision {
  * Within each policy: deny > ask > allow (most restrictive wins).
  * First definitive match across policies wins.
  * Default (no match in any policy): "ask".
+ *
+ * Matching is case-insensitive on win32 and darwin, which default to
+ * case-insensitive filesystems: there `RM`/`Rm` resolve to the same binary as
+ * `rm`, so a deny like `Bash(rm:*)` must match regardless of case (otherwise an
+ * uppercased command slips past the gate and still executes). This is a
+ * platform heuristic, not a per-mount probe — a case-sensitive APFS volume or
+ * a case-insensitive Linux mount is not tracked.
  */
 export function evaluateCommand(
   command: string,
   policies: SecurityPolicy[],
-  caseInsensitive: boolean = process.platform === "win32",
+  caseInsensitive: boolean = process.platform === "win32" ||
+    process.platform === "darwin",
 ): CommandDecision {
   // Check each segment of chained commands against deny patterns
   const segments = splitChainedCommands(command);
@@ -426,7 +486,8 @@ export function evaluateCommand(
 export function evaluateCommandDenyOnly(
   command: string,
   policies: SecurityPolicy[],
-  caseInsensitive: boolean = process.platform === "win32",
+  caseInsensitive: boolean = process.platform === "win32" ||
+    process.platform === "darwin",
 ): { decision: "deny" | "allow"; matchedPattern?: string } {
   const segments = splitChainedCommands(command);
   for (const segment of segments) {
@@ -468,7 +529,8 @@ export function evaluateCommandDenyOnly(
 export function evaluateFilePath(
   filePath: string,
   denyGlobs: string[][],
-  caseInsensitive: boolean = process.platform === "win32",
+  caseInsensitive: boolean = process.platform === "win32" ||
+    process.platform === "darwin",
   projectRoot?: string,
 ): { denied: boolean; matchedPattern?: string } {
   const toForward = (path: string): string => path.replace(/\\/g, "/");
