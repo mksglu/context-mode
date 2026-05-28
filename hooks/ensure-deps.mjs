@@ -20,7 +20,7 @@
  */
 
 import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -239,7 +239,9 @@ export function ensureNativeCompat(pluginRoot) {
 export function codesignBinary(binaryPath) {
   if (process.platform === "darwin") {
     try {
-      execSync(`codesign --sign - --force "${binaryPath}"`, {
+      // argv form (no shell) so a binaryPath derived from HOME/LOCALAPPDATA
+      // containing a quote or shell metacharacter can't inject a command.
+      execFileSync("codesign", ["--sign", "-", "--force", binaryPath], {
         stdio: "pipe",
         timeout: 10000,
       });

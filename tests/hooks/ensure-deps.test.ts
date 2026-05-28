@@ -12,7 +12,7 @@
 
 import { describe, test, expect, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, chmodSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -416,6 +416,62 @@ describe("ensure-deps: codesignBinary macOS SIGKILL fix", () => {
     const out = runCodesignHarness("run", "/tmp/definitely-does-not-exist-12345.node");
     expect(out).toHaveProperty("success", true);
   });
+
+  // The argv form (execFileSync, no shell) is the actual injection defense:
+  // a binaryPath derived from HOME/LOCALAPPDATA could carry shell
+  // metacharacters. Force the darwin gate, shim a fake `codesign` on PATH
+  // that records its argv, and pass a path laced with `$(...)`. Under the
+  // argv form the metacharacters survive as one literal element and the
+  // injected command never runs; a regression to a shell string (execSync
+  // with template interpolation) would split and execute them.
+  test("Test D: codesignBinary passes binaryPath as a literal argv element (no shell)", () => {
+    const root = createTempRoot();
+    const recordFile = join(root, "argv.json");
+    const injectMarker = join(root, "INJECTED");
+    const binDir = join(root, "fakebin");
+    mkdirSync(binDir, { recursive: true });
+    const fakeCodesign = join(binDir, "codesign");
+    writeFileSync(
+      fakeCodesign,
+      `#!/usr/bin/env node\n` +
+        `require("node:fs").writeFileSync(process.env.CODESIGN_RECORD, JSON.stringify(process.argv.slice(2)));\n`,
+      "utf-8",
+    );
+    chmodSync(fakeCodesign, 0o755);
+
+    // A binaryPath a shell would treat as command substitution.
+    const evilPath = `${root}/pwn$(touch ${injectMarker}).node`;
+
+    const harness = `
+import { codesignBinary } from ${JSON.stringify("file://" + ensureDepsAbsPath.replace(/\\/g, "/"))};
+Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+codesignBinary(process.argv[2]);
+console.log("done");
+`;
+    const harnessPath = join(root, "_codesign-argv-harness.mjs");
+    writeFileSync(harnessPath, harness, "utf-8");
+
+    const result = spawnSync("node", [harnessPath, evilPath], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      cwd: join(fileURLToPath(import.meta.url), "..", ".."),
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+        CODESIGN_RECORD: recordFile,
+        CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
+      },
+    });
+    if (result.error) throw result.error;
+
+    // The fake codesign was invoked via argv, recording the metacharacter
+    // path as a SINGLE literal element.
+    expect(existsSync(recordFile)).toBe(true);
+    const argv = JSON.parse(readFileSync(recordFile, "utf-8"));
+    expect(argv).toEqual(["--sign", "-", "--force", evilPath]);
+    // No shell expanded `$(touch ...)`, so the injection marker was never created.
+    expect(existsSync(injectMarker)).toBe(false);
+  }, 30_000);
 });
 
 // ═══════════════════════════════════════════════════════════════════════
