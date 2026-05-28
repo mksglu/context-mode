@@ -59,11 +59,68 @@ function writeSession(
   return file;
 }
 
+function writeDesktopSession(
+  codexHome: string,
+  name: string,
+  cwd: string,
+  mtime?: Date,
+  extraPayload?: Record<string, unknown>,
+): string {
+  const sessionsDir = join(codexHome, "sessions", "2026", "05", "28");
+  mkdirSync(sessionsDir, { recursive: true });
+  const file = join(sessionsDir, `${name}.jsonl`);
+  const lines = [
+    JSON.stringify({ type: "session_meta", payload: { cwd, ...extraPayload } }),
+    JSON.stringify({ type: "turn_context", payload: { cwd } }),
+  ];
+  writeFileSync(file, lines.join("\n") + "\n");
+  if (mtime) utimesSync(file, mtime, mtime);
+  return file;
+}
+
 describe("resolveCodexSessionCwd", () => {
   it("returns meta.cwd from the most-recently-modified session.jsonl", () => {
     const codexHome = makeCodexHome();
     writeSession(codexHome, "old-uuid", "/project/old", new Date(Date.now() - 60_000));
     writeSession(codexHome, "new-uuid", "/project/new", new Date());
+
+    expect(resolveCodexSessionCwd({ codexHome })).toBe("/project/new");
+  });
+
+  it("returns payload.cwd from Codex Desktop's dated rollout session layout", () => {
+    const codexHome = makeCodexHome();
+    writeDesktopSession(
+      codexHome,
+      "rollout-2026-05-28T12-00-00-000Z",
+      "/Users/x/Work/Dev/ucw",
+      new Date(),
+    );
+
+    expect(resolveCodexSessionCwd({ codexHome })).toBe("/Users/x/Work/Dev/ucw");
+  });
+
+  it("handles Codex Desktop session_meta lines larger than the old 8KB head read", () => {
+    const codexHome = makeCodexHome();
+    writeDesktopSession(
+      codexHome,
+      "rollout-large-meta",
+      "/project/large-meta",
+      new Date(),
+      { dynamic_tools: "x".repeat(16_000) },
+    );
+
+    expect(resolveCodexSessionCwd({ codexHome })).toBe("/project/large-meta");
+  });
+
+  it("prefers the most-recently-modified Codex Desktop session recursively", () => {
+    const codexHome = makeCodexHome();
+    writeDesktopSession(
+      codexHome,
+      "rollout-old",
+      "/project/old",
+      new Date(Date.now() - 60_000),
+    );
+    writeDesktopSession(codexHome, "rollout-new", "/project/new", new Date());
 
     expect(resolveCodexSessionCwd({ codexHome })).toBe("/project/new");
   });
@@ -100,6 +157,26 @@ describe("resolveCodexSessionCwd", () => {
       codexHome,
       "poisoned",
       "/Users/x/.claude/plugins/cache/context-mode/context-mode/1.0.148",
+    );
+    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+  });
+
+  it("rejects when meta.cwd points to Codex plugin install path (isPluginInstallPath)", () => {
+    const codexHome = makeCodexHome();
+    writeSession(
+      codexHome,
+      "poisoned-codex",
+      "/Users/x/.codex/plugins/cache/context-mode/context-mode/1.0.151",
+    );
+    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+  });
+
+  it("rejects when Codex Desktop payload.cwd points to Codex plugin install path", () => {
+    const codexHome = makeCodexHome();
+    writeDesktopSession(
+      codexHome,
+      "rollout-poisoned",
+      "/Users/x/.codex/plugins/cache/context-mode/context-mode/1.0.151",
     );
     expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
   });
@@ -172,6 +249,20 @@ describe("resolveProjectDir({strictPlatform: 'codex'})", () => {
       codexHome,
     });
     expect(result).toBe("/project/from-session");
+  });
+
+  it("falls back to Codex Desktop session log before poisoned plugin cwd", () => {
+    const codexHome = makeCodexHome();
+    writeDesktopSession(codexHome, "rollout-active", "/project/from-desktop", new Date());
+
+    const result = resolveProjectDir({
+      env: {},
+      cwd: "/Users/x/.codex/plugins/cache/context-mode/context-mode/1.0.151",
+      pwd: undefined,
+      strictPlatform: "codex",
+      codexHome,
+    });
+    expect(result).toBe("/project/from-desktop");
   });
 
   it("falls through to PWD when no env and no session log", () => {

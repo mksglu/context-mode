@@ -53,17 +53,18 @@ const LEGACY_NON_STRICT_CANDIDATES: readonly string[] = [
  */
 
 /**
- * Detect whether a path lives inside the Claude Code plugin install tree —
- * specifically `<home>/.claude/plugins/cache/<plugin>/<plugin>/<version>/`
- * or the marketplace mirror `<home>/.claude/plugins/marketplaces/...`.
+ * Detect whether a path lives inside an agent plugin install tree —
+ * specifically `<home>/.claude/plugins/cache/<plugin>/<plugin>/<version>/`,
+ * `<home>/.codex/plugins/cache/<plugin>/<plugin>/<version>/`, or the
+ * marketplace mirror under `<home>/.{claude,codex}/plugins/marketplaces/...`.
  *
  * Cross-OS: matches both POSIX (`/`) and Windows (`\`) path separators.
- * Independent of `home` location — we only care about the `.claude/plugins/`
+ * Independent of `home` location — we only care about the agent plugin
  * suffix pattern.
  */
 export function isPluginInstallPath(p: string): boolean {
   if (!p) return false;
-  return /[/\\]\.claude[/\\]plugins[/\\](cache|marketplaces)[/\\]/.test(p);
+  return /[/\\]\.(claude|codex)[/\\]plugins[/\\](cache|marketplaces)[/\\]/.test(p);
 }
 
 /**
@@ -157,24 +158,26 @@ export function resolveProjectDirFromTranscript(opts: {
  * session log when the spawned MCP child inherits a non-project cwd
  * (e.g. $HOME when Codex was launched from anywhere outside the project).
  *
- * Codex writes its session transcripts to
- * `${CODEX_HOME ?? ~/.codex}/sessions/<uuid>.jsonl`. The first line is a
- * `SessionMeta` JSON struct whose `meta.cwd` field carries the literal
- * project directory the CLI was launched from (see refs/platforms/codex/
- * codex-rs SessionMeta). Codex publishes NO workspace env var to its child
- * MCP processes — so unlike Claude/Pi/Cursor, we have no env signal at all.
- * The session log is the strongest available signal.
+ * Codex writes its session transcripts to either
+ * `${CODEX_HOME ?? ~/.codex}/sessions/<uuid>.jsonl` (CLI) or a dated desktop
+ * layout such as
+ * `${CODEX_HOME ?? ~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl`.
+ * The cwd appears on `meta.cwd` for the CLI shape and on
+ * `payload.cwd` in `type: "session_meta"` records for Codex Desktop. Codex
+ * publishes NO workspace env var to its child MCP processes — so unlike
+ * Claude/Pi/Cursor, we have no env signal at all. The session log is the
+ * strongest available signal.
  *
  * Mirror of `resolveProjectDirFromTranscript` for Claude Code; differences:
- *   • Sessions live flat in `${codexHome}/sessions/*.jsonl` (no per-project
- *     encoded subdir like Claude's `~/.claude/projects/<encoded>/`).
- *   • The cwd is on `meta.cwd` (nested), not top-level `cwd`.
+ *   • Sessions may live flat or in a dated hierarchy (no per-project encoded
+ *     subdir like Claude's `~/.claude/projects/<encoded>/`).
+ *   • The cwd is nested on `meta.cwd` or `payload.cwd`, not top-level `cwd`.
  *
  * Returns `null` when:
  *   • `codexHome` or its `sessions/` subdir does not exist.
- *   • No `.jsonl` files exist or none has a parseable `meta.cwd` string.
+ *   • No `.jsonl` files exist or none has a parseable cwd string.
  *   • The newest log is older than `transcriptMaxAgeMs` (multi-window guard).
- *   • The resolved `meta.cwd` points at a plugin install path (poisoned).
+ *   • The resolved cwd points at a plugin install path (poisoned).
  */
 export function resolveCodexSessionCwd(opts?: {
   /** Defaults to `process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex")`. */
@@ -193,17 +196,33 @@ export function resolveCodexSessionCwd(opts?: {
   const sessionsDir = path.join(codexHome, "sessions");
   if (!fs.existsSync(sessionsDir)) return null;
 
+  const MAX_SCAN_DEPTH = 4; // sessions/YYYY/MM/DD/<file>.jsonl plus one spare.
+  const MAX_SCAN_ENTRIES = 10_000;
+  let visitedEntries = 0;
   let bestPath: string | undefined;
   let bestMtime = 0;
-  try {
-    for (const f of fs.readdirSync(sessionsDir)) {
-      if (!f.endsWith(".jsonl")) continue;
-      const fp = path.join(sessionsDir, f);
-      try {
-        const m = fs.statSync(fp).mtimeMs;
-        if (m > bestMtime) { bestMtime = m; bestPath = fp; }
-      } catch { /* skip */ }
+  const visit = (dir: string, depth: number) => {
+    if (visitedEntries >= MAX_SCAN_ENTRIES) return;
+    let entries: string[];
+    try { entries = fs.readdirSync(dir); } catch { return; }
+    entries.sort().reverse();
+    for (const entry of entries) {
+      if (visitedEntries >= MAX_SCAN_ENTRIES) return;
+      visitedEntries++;
+      const fp = path.join(dir, entry);
+      let stat;
+      try { stat = fs.statSync(fp); } catch { continue; }
+      if (stat.isDirectory()) {
+        if (depth < MAX_SCAN_DEPTH) visit(fp, depth + 1);
+        continue;
+      }
+      if (!stat.isFile() || !entry.endsWith(".jsonl")) continue;
+      const m = stat.mtimeMs;
+      if (m > bestMtime) { bestMtime = m; bestPath = fp; }
     }
+  };
+  try {
+    visit(sessionsDir, 0);
   } catch { return null; }
 
   if (!bestPath) return null;
@@ -212,27 +231,35 @@ export function resolveCodexSessionCwd(opts?: {
     if (nowMs - bestMtime > opts.transcriptMaxAgeMs) return null;
   }
 
-  // Read first ~8KB; the SessionMeta JSON is line 1 and small. Stream-cap
-  // mirrors `resolveProjectDirFromTranscript` for memory safety on long logs.
+  // Read a bounded head chunk. Codex Desktop's first session_meta line can be
+  // larger than Claude/Codex CLI metadata because it includes dynamic tool and
+  // instruction fields, but the full transcript can still be tens of MB.
   try {
     const fd = fs.openSync(bestPath, "r");
     try {
-      const buf = Buffer.alloc(8192);
+      const buf = Buffer.alloc(1024 * 1024);
       const bytes = fs.readSync(fd, buf, 0, buf.length, 0);
       const text = buf.subarray(0, bytes).toString("utf-8");
-      const firstLine = text.split("\n", 1)[0];
-      if (!firstLine || !firstLine.trim()) return null;
-      try {
-        const obj = JSON.parse(firstLine) as { meta?: { cwd?: unknown } };
-        const cwd = obj?.meta?.cwd;
-        if (typeof cwd !== "string" || cwd.length === 0) return null;
-        if (isPluginInstallPath(cwd)) return null;
-        return cwd;
-      } catch { return null; /* malformed first line */ }
+      for (const line of text.split("\n").slice(0, 10)) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line) as {
+            type?: unknown;
+            meta?: { cwd?: unknown };
+            payload?: { cwd?: unknown };
+          };
+          const cwd = obj?.meta?.cwd ??
+            (obj?.type === "session_meta" ? obj?.payload?.cwd : undefined);
+          if (typeof cwd !== "string" || cwd.length === 0) continue;
+          if (isPluginInstallPath(cwd)) return null;
+          return cwd;
+        } catch { return null; /* malformed session metadata line */ }
+      }
     } finally {
       fs.closeSync(fd);
     }
   } catch { return null; /* file vanished mid-read */ }
+  return null;
 }
 
 /**

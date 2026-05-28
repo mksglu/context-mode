@@ -18,7 +18,7 @@ function runStartMjsBootstrap(opts: {
 }): { CLAUDE_PROJECT_DIR: string | undefined; CONTEXT_MODE_PROJECT_DIR: string | undefined } {
   const code = `
     const isPluginInstallPath = (p) =>
-      /[/\\\\]\\.claude[/\\\\]plugins[/\\\\](cache|marketplaces)[/\\\\]/.test(p);
+      /[/\\\\]\\.(claude|codex)[/\\\\]plugins[/\\\\](cache|marketplaces)[/\\\\]/.test(p);
     const originalCwd = process.cwd();
     const safeOriginalCwd = isPluginInstallPath(originalCwd) ? null : originalCwd;
     if (!process.env.CLAUDE_PROJECT_DIR && safeOriginalCwd) {
@@ -51,6 +51,13 @@ describe("start.mjs env bootstrap — plugin path no-poison", () => {
     mkdirSync(pluginPath, { recursive: true });
     return pluginPath;
   };
+  const makeCodexPluginDir = () => {
+    const root = mkdtempSync(join(tmpdir(), "ctx-fake-plugin-"));
+    cleanup.push(root);
+    const pluginPath = join(root, ".codex", "plugins", "cache", "context-mode", "context-mode", "1.0.151");
+    mkdirSync(pluginPath, { recursive: true });
+    return pluginPath;
+  };
   const makeProjectDir = () => {
     const dir = mkdtempSync(join(tmpdir(), "ctx-fake-project-"));
     cleanup.push(dir);
@@ -68,6 +75,13 @@ describe("start.mjs env bootstrap — plugin path no-poison", () => {
 
   it("does NOT set CLAUDE_PROJECT_DIR or CONTEXT_MODE_PROJECT_DIR when cwd is plugin install path", () => {
     const pluginPath = makePluginDir();
+    const result = runStartMjsBootstrap({ cwd: pluginPath });
+    expect(result.CLAUDE_PROJECT_DIR).toBeUndefined();
+    expect(result.CONTEXT_MODE_PROJECT_DIR).toBeUndefined();
+  });
+
+  it("does NOT set CLAUDE_PROJECT_DIR or CONTEXT_MODE_PROJECT_DIR when cwd is Codex plugin install path", () => {
+    const pluginPath = makeCodexPluginDir();
     const result = runStartMjsBootstrap({ cwd: pluginPath });
     expect(result.CLAUDE_PROJECT_DIR).toBeUndefined();
     expect(result.CONTEXT_MODE_PROJECT_DIR).toBeUndefined();
@@ -91,4 +105,3 @@ describe("start.mjs env bootstrap — plugin path no-poison", () => {
     expect(result.CLAUDE_PROJECT_DIR).toBe("/Users/x/preset/proj");
   });
 });
-
