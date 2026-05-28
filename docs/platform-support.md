@@ -232,6 +232,25 @@ context-mode hook codex stop
 - Codex emits structured tool names such as `Bash` and `apply_patch`; context-mode only normalizes legacy shell aliases.
 - updatedInput and updatedMCPToolOutput are in the schema but NOT implemented
 - Default hook timeout: 600 seconds
+- Codex plugin marketplace installs on Windows can fail with `missing plugin.json` if
+  Git checks out `plugins/context-mode` as a regular file containing `..` instead of
+  a directory symlink. The Codex marketplace manifest points at
+  `./plugins/context-mode` because Codex currently rejects the repository root
+  (`"./"`) as an empty local plugin source path. If this happens, use a local
+  marketplace wrapper or Windows junction so `plugins/context-mode` resolves to
+  the repository root and contains `.codex-plugin/plugin.json`.
+
+  Example local workaround:
+
+  ```cmd
+  mkdir "%USERPROFILE%\.codex\local-marketplaces\context-mode\.agents\plugins"
+  mkdir "%USERPROFILE%\.codex\local-marketplaces\context-mode\plugins"
+  mklink /J "%USERPROFILE%\.codex\local-marketplaces\context-mode\plugins\context-mode" "%USERPROFILE%\.codex\.tmp\marketplaces\context-mode"
+  ```
+
+  Then point `[marketplaces.context-mode]` in `%USERPROFILE%\.codex\config.toml`
+  at `%USERPROFILE%\.codex\local-marketplaces\context-mode` with
+  `source_type = "local"` and retry the install.
 
 ---
 
