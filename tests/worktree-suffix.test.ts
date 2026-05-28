@@ -38,6 +38,21 @@ describe("getWorktreeSuffix", () => {
     expect(getWorktreeSuffix()).toBe("__my-worktree");
   });
 
+  it("ignores CONTEXT_MODE_SESSION_SUFFIX values that could escape the sessions dir", () => {
+    // The suffix lands in the DB filename via path.join, so a value with a path
+    // separator or other unsafe char would write the SQLite file outside
+    // sessionsDir. Such values are rejected (treated as no suffix).
+    for (const evil of ["../../../../tmp/evil", "a/b", "x\\y", "a b", "a;b", "a\nb"]) {
+      vi.stubEnv("CONTEXT_MODE_SESSION_SUFFIX", evil);
+      _resetWorktreeSuffixCacheForTests();
+      expect(getWorktreeSuffix("/some/project")).toBe("");
+    }
+    // A clean token still passes through.
+    vi.stubEnv("CONTEXT_MODE_SESSION_SUFFIX", "wt_abc-1.2");
+    _resetWorktreeSuffixCacheForTests();
+    expect(getWorktreeSuffix("/some/project")).toBe("__wt_abc-1.2");
+  });
+
   it("uses the git worktree root instead of the process cwd", () => {
     const repo = mkdtempSync(join(tmpdir(), "ctx-main-"));
     const worktreeParent = mkdtempSync(join(tmpdir(), "ctx-linked-parent-"));

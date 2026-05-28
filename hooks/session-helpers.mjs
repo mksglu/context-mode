@@ -89,7 +89,10 @@ function getWorktreeSuffix(projectDir = process.cwd()) {
 
   let suffix;
   if (envSuffix !== undefined) {
-    suffix = envSuffix ? `__${envSuffix}` : "";
+    // CONTEXT_MODE_SESSION_SUFFIX lands in the DB filename via path.join (see
+    // src/session/db.ts), so reject any value with a path separator or ".."
+    // (allowlist) to keep it from escaping sessionsDir; else treat as no suffix.
+    suffix = envSuffix && /^[A-Za-z0-9._-]+$/.test(envSuffix) ? `__${envSuffix}` : "";
   } else {
     // Try cross-process marker first.
     const markerPath = workTreeMarkerPath(projectDir);

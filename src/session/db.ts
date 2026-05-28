@@ -368,7 +368,11 @@ export function getWorktreeSuffix(projectDir = process.cwd()): string {
 
   let suffix = "";
   if (envSuffix !== undefined) {
-    suffix = envSuffix ? `__${envSuffix}` : "";
+    // CONTEXT_MODE_SESSION_SUFFIX lands in the DB filename via path.join, so an
+    // unsanitized "../../tmp/evil" would escape sessionsDir and write the SQLite
+    // file anywhere. Only accept the same charset sanitizeSessionId allows; a
+    // value with a path separator or ".." is treated as no suffix.
+    suffix = envSuffix && /^[A-Za-z0-9._-]+$/.test(envSuffix) ? `__${envSuffix}` : "";
   } else {
     try {
       const currentRoot = getCurrentWorktreeRoot(projectDir);
