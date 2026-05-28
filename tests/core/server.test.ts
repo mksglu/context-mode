@@ -6414,3 +6414,162 @@ describe("getStatsFilePath: sanitize CLAUDE_SESSION_ID before path.join", () => 
     expect(sanitize("MyHost_2024.01")).toBe("MyHost_2024.01");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Cross-platform audit follow-up — schema/observability fixes for #696 #697
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("ctx_insight schema description (issue #697)", () => {
+  const serverSrc = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("description states it is a dashboard launcher, not a Q&A engine", () => {
+    expect(serverSrc).toMatch(/ctx_insight[\s\S]{0,2000}dashboard launcher/);
+  });
+
+  test("description redirects natural-language queries to ctx_search", () => {
+    expect(serverSrc).toMatch(/ctx_insight[\s\S]{0,2000}use ctx_search/);
+  });
+
+  test("description preserves the original analytics framing", () => {
+    expect(serverSrc).toMatch(/Opens the context-mode Insight dashboard/);
+  });
+});
+
+describe("ctx_batch_execute query_scope (issue #696)", () => {
+  const serverSrc = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("schema declares query_scope enum with batch default", () => {
+    expect(serverSrc).toMatch(/query_scope:\s*z\s*\.enum\(\["batch",\s*"global"\]\)/);
+    expect(serverSrc).toContain('.default("batch")');
+  });
+
+  test("schema describes both scope semantics", () => {
+    expect(serverSrc).toMatch(/query_scope[\s\S]{0,2000}searches ONLY the chunks/i);
+    expect(serverSrc).toMatch(/query_scope[\s\S]{0,2000}searches the entire persistent index/i);
+  });
+
+  test("formatBatchQueryResults default scope keeps batch-local tip", async () => {
+    const { formatBatchQueryResults } = await import("../../src/server.js");
+    const store = new ContentStore(":memory:");
+    store.index({ content: "# Section A\n\nValidation of frontmatter is critical.\n", source: "batch:cmd1" });
+    const lines = formatBatchQueryResults(store, ["validation"], "batch:cmd1");
+    const text = lines.join("\n");
+    expect(text).toMatch(/Results are scoped to this batch only/);
+    expect(text).toMatch(/query_scope:\s*"global"/);
+  });
+
+  test("formatBatchQueryResults global scope drops batch tip and notes global scope", async () => {
+    const { formatBatchQueryResults } = await import("../../src/server.js");
+    const store = new ContentStore(":memory:");
+    store.index({ content: "# Section A\n\nValidation of frontmatter is critical.\n", source: "other:source" });
+    const lines = formatBatchQueryResults(store, ["validation"], "batch:cmd1", undefined, "global");
+    const text = lines.join("\n");
+    expect(text).toMatch(/query_scope:\s*"global"/);
+    expect(text).not.toMatch(/Results are scoped to this batch only/);
+  });
+});
+
+describe("ctx_search progressive throttle observability (issue #697)", () => {
+  const serverSrc = readFileSync(
+    resolve(__dirname, "../../src/server.ts"),
+    "utf-8",
+  );
+
+  test("env vars override throttle thresholds with positive-number validation", () => {
+    expect(serverSrc).toContain("CONTEXT_MODE_SEARCH_WINDOW_MS");
+    expect(serverSrc).toContain("CONTEXT_MODE_SEARCH_MAX_RESULTS_AFTER");
+    expect(serverSrc).toContain("CONTEXT_MODE_SEARCH_BLOCK_AFTER");
+    expect(serverSrc).toMatch(/readPositiveEnv\("CONTEXT_MODE_SEARCH_WINDOW_MS"/);
+  });
+
+  test("throttle counter line is surfaced on every response, not only after soft cap", () => {
+    // Branch before the soft cap — should still inform the agent.
+    expect(serverSrc).toMatch(/Throttle:\s*call\s+#\$\{searchCallCount\}/);
+    // Branch at/after soft cap keeps the historical warning shape.
+    expect(serverSrc).toMatch(/⚠ search call #\$\{searchCallCount\}/);
+  });
+
+  test("ctx_search description documents the throttle policy", () => {
+    expect(serverSrc).toMatch(/RETURNS:[\s\S]{0,2000}rolling time window/i);
+    expect(serverSrc).toMatch(/CONTEXT_MODE_SEARCH_WINDOW_MS/);
+  });
+});
+
+describe("ctx_stats cache observability + index_state (issue #697)", () => {
+  test("ContentStore.getIndexState aggregates totals correctly", async () => {
+    const store = new ContentStore(":memory:");
+    expect(store.getIndexState()).toEqual({ totalChunks: 0, totalSources: 0, lastIndexedAt: undefined });
+    store.index({ content: "# A\n\nalpha\n", source: "src-alpha" });
+    store.index({ content: "# B\n\nbeta\n\n# C\n\ngamma\n", source: "src-beta" });
+    const state = store.getIndexState();
+    expect(state.totalSources).toBe(2);
+    expect(state.totalChunks).toBeGreaterThanOrEqual(2);
+    expect(state.lastIndexedAt).toBeDefined();
+    expect(typeof state.lastIndexedAt).toBe("string");
+  });
+
+  test("AnalyticsEngine exposes cache_hit_rate computed from hits + misses", async () => {
+    const { AnalyticsEngine, formatReport } = await import("../../src/session/analytics.js");
+    const Database = (await import("better-sqlite3")).default;
+    const sdb = new Database(":memory:");
+    sdb.exec(`
+      CREATE TABLE session_meta (session_id TEXT PRIMARY KEY, started_at TEXT, compact_count INTEGER DEFAULT 0);
+      CREATE TABLE session_events (id INTEGER PRIMARY KEY, session_id TEXT, category TEXT, type TEXT, data TEXT, created_at TEXT);
+      CREATE TABLE session_resume (id INTEGER PRIMARY KEY, session_id TEXT, event_count INTEGER, consumed INTEGER, created_at TEXT);
+    `);
+    const engine = new AnalyticsEngine(sdb);
+    const report = engine.queryAll({
+      bytesReturned: {},
+      bytesIndexed: 0,
+      bytesSandboxed: 0,
+      calls: {},
+      sessionStart: Date.now() - 60_000,
+      cacheHits: 3,
+      cacheMisses: 1,
+      cacheBytesSaved: 1024,
+    });
+    expect(report.cache).toBeDefined();
+    expect(report.cache?.hits).toBe(3);
+    expect(report.cache?.misses).toBe(1);
+    expect(report.cache?.hit_rate).toBeCloseTo(0.75, 5);
+
+    const text = formatReport(report, "0.0.0-test", null, {
+      indexState: { totalChunks: 42, totalSources: 7, lastIndexedAt: "2026-05-24T12:00:00" },
+    });
+    expect(text).toContain("## Observability");
+    expect(text).toContain("cache.hit_rate: 75.0%");
+    expect(text).toContain("index.total_chunks: 42");
+    expect(text).toContain("index.total_sources: 7");
+    expect(text).toContain("index.last_indexed_at: 2026-05-24T12:00:00");
+  });
+
+  test("Observability section is omitted when no cache activity and no index_state", async () => {
+    const { AnalyticsEngine, formatReport } = await import("../../src/session/analytics.js");
+    const Database = (await import("better-sqlite3")).default;
+    const sdb = new Database(":memory:");
+    sdb.exec(`
+      CREATE TABLE session_meta (session_id TEXT PRIMARY KEY, started_at TEXT, compact_count INTEGER DEFAULT 0);
+      CREATE TABLE session_events (id INTEGER PRIMARY KEY, session_id TEXT, category TEXT, type TEXT, data TEXT, created_at TEXT);
+      CREATE TABLE session_resume (id INTEGER PRIMARY KEY, session_id TEXT, event_count INTEGER, consumed INTEGER, created_at TEXT);
+    `);
+    const engine = new AnalyticsEngine(sdb);
+    const report = engine.queryAll({
+      bytesReturned: {},
+      bytesIndexed: 0,
+      bytesSandboxed: 0,
+      calls: {},
+      sessionStart: Date.now() - 60_000,
+      cacheHits: 0,
+      cacheMisses: 0,
+      cacheBytesSaved: 0,
+    });
+    const text = formatReport(report, "0.0.0-test", null);
+    expect(text).not.toContain("## Observability");
+  });
+});

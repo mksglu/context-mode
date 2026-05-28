@@ -136,7 +136,19 @@ export interface RuntimeStats {
   calls: Record<string, number>;
   sessionStart: number;
   cacheHits: number;
+  cacheMisses?: number;
   cacheBytesSaved: number;
+}
+
+/**
+ * Index observability snapshot — point-in-time view of the persistent
+ * content store. Optional input to `formatReport` so callers that don't
+ * have store access (or don't want the extra DB hit) can omit it.
+ */
+export interface IndexState {
+  totalChunks: number;
+  totalSources: number;
+  lastIndexedAt?: string; // ISO-8601 when available
 }
 
 // ─────────────────────────────────────────────────────────
@@ -160,6 +172,8 @@ export interface FullReport {
   };
   cache?: {
     hits: number;
+    misses: number;
+    hit_rate: number; // hits / (hits + misses); 0 when both are zero
     bytes_saved: number;
     ttl_hours_left: number;
     total_with_cache: number;
@@ -450,12 +464,21 @@ export class AnalyticsEngine {
 
     // ── Cache ──
     let cache: FullReport["cache"];
-    if (runtimeStats.cacheHits > 0 || runtimeStats.cacheBytesSaved > 0) {
+    const cacheMisses = runtimeStats.cacheMisses ?? 0;
+    if (runtimeStats.cacheHits > 0 || runtimeStats.cacheBytesSaved > 0 || cacheMisses > 0) {
       const totalWithCache = totalProcessed + runtimeStats.cacheBytesSaved;
       const totalSavingsRatio = totalWithCache / Math.max(totalBytesReturned, 1);
       const ttlHoursLeft = Math.max(0, 24 - Math.floor((Date.now() - runtimeStats.sessionStart) / (60 * 60 * 1000)));
+      // hit_rate is the nominal cache effectiveness — the metric ctx_stats
+      // historically inferred-only by diffing tokens_saved snapshots. When
+      // there is no activity we report 0 instead of NaN/undefined so the
+      // renderer stays JSON-safe.
+      const totalLookups = runtimeStats.cacheHits + cacheMisses;
+      const hitRate = totalLookups > 0 ? runtimeStats.cacheHits / totalLookups : 0;
       cache = {
         hits: runtimeStats.cacheHits,
+        misses: cacheMisses,
+        hit_rate: hitRate,
         bytes_saved: runtimeStats.cacheBytesSaved,
         ttl_hours_left: ttlHoursLeft,
         total_with_cache: totalWithCache,
@@ -2742,6 +2765,12 @@ export function formatReport(
      */
     multiAdapter?: MultiAdapterLifetimeStats;
     /**
+     * Point-in-time snapshot of the persistent content store. Optional —
+     * callers that don't have store access can omit it and the renderer
+     * skips the observability section gracefully.
+     */
+    indexState?: IndexState;
+    /**
      * 5-section narrative renderer overrides. Defaults to ambient
      * `process.cwd()` + `Date.now()` + `detectLocaleAndTz()` for production
      * use; tests inject deterministic values so output is byte-stable.
@@ -2947,6 +2976,28 @@ export function formatReport(
 
   // ── Bottom line — business value framing (Bug #8) ──
   lines.push(...renderBottomLine(tokensSaved, lifetime));
+
+  // ── Observability — machine-readable cache + index state ──
+  // Surfaces the metrics that were previously inferable only by diffing
+  // snapshots between ctx_stats calls. Renders as a plain text block so
+  // downstream tooling can grep for the prefixes.
+  const obs: string[] = [];
+  if (report.cache) {
+    const hitRatePct = (report.cache.hit_rate * 100).toFixed(1);
+    obs.push(`cache.hit_rate: ${hitRatePct}% (${report.cache.hits} hits / ${report.cache.misses} misses)`);
+  }
+  if (opts?.indexState) {
+    obs.push(`index.total_chunks: ${opts.indexState.totalChunks}`);
+    obs.push(`index.total_sources: ${opts.indexState.totalSources}`);
+    if (opts.indexState.lastIndexedAt) {
+      obs.push(`index.last_indexed_at: ${opts.indexState.lastIndexedAt}`);
+    }
+  }
+  if (obs.length > 0) {
+    lines.push("");
+    lines.push("## Observability");
+    lines.push(...obs);
+  }
 
   // ── Footer ──
   lines.push("");

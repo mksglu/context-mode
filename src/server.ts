@@ -690,6 +690,7 @@ const sessionStats = {
   bytesIndexed: 0,
   bytesSandboxed: 0, // network I/O consumed inside sandbox (never enters context)
   cacheHits: 0,
+  cacheMisses: 0, // ctx_fetch_and_index calls that bypassed the TTL cache
   cacheBytesSaved: 0, // bytes avoided by TTL cache hits
   sessionStart: Date.now(),
 };
@@ -1235,14 +1236,23 @@ export function extractSnippet(
   return parts.join("\n\n");
 }
 
+export type BatchQueryScope = "batch" | "global";
+
 export function formatBatchQueryResults(
   store: ContentStore,
   queries: string[],
   source: string,
   maxOutput = 80 * 1024,
+  scope: BatchQueryScope = "batch",
 ): string[] {
   const sections: string[] = [];
   let outputSize = 0;
+
+  // When scope is "global", searchWithFallback receives `undefined` for the
+  // source filter, which makes it query the entire persistent index instead
+  // of only the chunks just produced by this batch's commands. Default
+  // remains "batch" to preserve the historical behavior.
+  const searchSource = scope === "global" ? undefined : source;
 
   for (const query of queries) {
     if (outputSize > maxOutput) {
@@ -1250,7 +1260,7 @@ export function formatBatchQueryResults(
       continue;
     }
 
-    const results = store.searchWithFallback(query, 3, source, undefined, "exact");
+    const results = store.searchWithFallback(query, 3, searchSource, undefined, "exact");
     sections.push(`## ${query}`);
     sections.push("");
     if (results.length > 0) {
@@ -1268,7 +1278,11 @@ export function formatBatchQueryResults(
     sections.push("");
   }
 
-  sections.push(`\n> **Tip:** Results are scoped to this batch only. To search across all indexed sources, use \`ctx_search(queries: [...])\`.`);
+  if (scope === "global") {
+    sections.push(`\n> **Scope:** Queries searched the entire persistent index (query_scope: "global").`);
+  } else {
+    sections.push(`\n> **Tip:** Results are scoped to this batch only. To search across all indexed sources, use \`ctx_search(queries: [...])\` or call ctx_batch_execute with \`query_scope: "global"\`.`);
+  }
 
   return sections;
 }
@@ -2166,12 +2180,24 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
 // Tool: search — progressive throttling
 // ─────────────────────────────────────────────────────────
 
-// Track search calls per 60-second window for progressive throttling
+// Track search calls per N-second window for progressive throttling.
+// Defaults preserve the historical behavior (60s window, soft-cap at 3
+// calls, hard-block at 8). All three thresholds are overridable via env
+// vars so users can loosen or tighten the policy without forking. Invalid
+// values (non-positive numbers, NaN) fall back to the default to avoid
+// silently disabling the protection.
+function readPositiveEnv(name: string, defaultValue: number): number {
+  const raw = process.env[name];
+  if (!raw) return defaultValue;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
 let searchCallCount = 0;
 let searchWindowStart = Date.now();
-const SEARCH_WINDOW_MS = 60_000;
-const SEARCH_MAX_RESULTS_AFTER = 3; // after 3 calls: 1 result per query
-const SEARCH_BLOCK_AFTER = 8; // after 8 calls: refuse, demand batching
+const SEARCH_WINDOW_MS = readPositiveEnv("CONTEXT_MODE_SEARCH_WINDOW_MS", 60_000);
+const SEARCH_MAX_RESULTS_AFTER = readPositiveEnv("CONTEXT_MODE_SEARCH_MAX_RESULTS_AFTER", 3); // after N calls: 1 result per query
+const SEARCH_BLOCK_AFTER = readPositiveEnv("CONTEXT_MODE_SEARCH_BLOCK_AFTER", 8); // after N calls: refuse, demand batching
 
 /**
  * Defensive coercion: parse stringified JSON arrays, AND lift a bare
@@ -2259,7 +2285,7 @@ WHEN NOT:
   - You have one ad-hoc question against data that is not in the knowledge base — answer it inline by running code in the sandbox tool; one round-trip instead of capture-then-query
 
 RETURNS:
-  Per-query ranked sections with window-extracted snippets. Use 2-4 specific technical terms per query. Common session-memory source labels: \`decision\` (user corrections / preferences), \`error\` and \`error-resolution\` (past failures + their fixes), \`blocker\`, \`plan\`, \`user-prompt\`, \`rejected-approach\`, \`compaction\` (post-compact session guide). See ctx_stats for live category counts.
+  Per-query ranked sections with window-extracted snippets. Use 2-4 specific technical terms per query. Common session-memory source labels: \`decision\` (user corrections / preferences), \`error\` and \`error-resolution\` (past failures + their fixes), \`blocker\`, \`plan\`, \`user-prompt\`, \`rejected-approach\`, \`compaction\` (post-compact session guide). See ctx_stats for live category counts. Each response carries a throttle counter (call #N/M in the rolling time window); results taper toward the soft cap and calls block after the hard cap. Tune via CONTEXT_MODE_SEARCH_WINDOW_MS, CONTEXT_MODE_SEARCH_MAX_RESULTS_AFTER, CONTEXT_MODE_SEARCH_BLOCK_AFTER.
 
 EXAMPLE: ctx_search(queries: ["root cause", "proposed fix", "test coverage"], source: "issue-#683")
 EXAMPLE: ctx_search(queries: ["what did we decide about caching"], source: "decision", sort: "timeline")
@@ -2443,11 +2469,20 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
         output = `> Auto-refreshed ${store.lastRefreshCount} stale source${store.lastRefreshCount > 1 ? "s" : ""} (file changed since indexing).\n\n` + output;
       }
 
-      // Add throttle warning after threshold
+      // Throttle counter — always surfaced so agents can pace themselves
+      // proactively instead of discovering the limit only after results are
+      // already truncated. Soft warning after SEARCH_MAX_RESULTS_AFTER calls;
+      // gentle informational line before that.
+      const throttleRemaining = Math.max(0, SEARCH_BLOCK_AFTER - searchCallCount);
+      const softCapRemaining = Math.max(0, SEARCH_MAX_RESULTS_AFTER - searchCallCount);
       if (searchCallCount >= SEARCH_MAX_RESULTS_AFTER) {
         output += `\n\n⚠ search call #${searchCallCount}/${SEARCH_BLOCK_AFTER} in this window. ` +
-          `Results limited to ${effectiveLimit}/query. ` +
+          `Results limited to ${effectiveLimit}/query. ${throttleRemaining} call(s) remaining before block. ` +
           `Batch queries: ctx_search(queries: ["q1","q2","q3"]) or use ctx_batch_execute.`;
+      } else {
+        output += `\n\n> Throttle: call #${searchCallCount}/${SEARCH_BLOCK_AFTER} in this window. ` +
+          `${softCapRemaining} call(s) before soft cap. ` +
+          `Prefer ctx_search(queries: [...]) array form for multi-query workloads — it counts as a single call.`;
       }
 
       if (output.trim().length === 0) {
@@ -3221,6 +3256,10 @@ EXAMPLE: ctx_fetch_and_index(
         finalized.push({ kind: "fetch_error", url: v.url, error: v.error, reason: v.reason });
       } else {
         // Serial FTS5 write here — no parallel store.index calls.
+        // Cache miss: the URL was not in the TTL window so we paid the
+        // network round-trip + re-indexed. Counted here so ctx_stats can
+        // report nominal cache_hit_rate alongside the existing hit metrics.
+        sessionStats.cacheMisses++;
         finalized.push({ kind: "fetched", indexed: indexFetched(v) });
       }
     }
@@ -3407,9 +3446,21 @@ EXAMPLE: ctx_batch_execute(
           ">1 switches to per-command timeouts (no shared budget) and " +
           "individual `(timed out)` blocks instead of cascading skip.",
         ),
+      query_scope: z
+        .enum(["batch", "global"])
+        .optional()
+        .default("batch")
+        .describe(
+          "Scope for `queries` (default: `batch`). " +
+          "`batch` searches ONLY the chunks produced by this batch's commands " +
+          "— useful when you want answers about the just-fetched output. " +
+          "`global` searches the entire persistent index (same scope as ctx_search) " +
+          "— useful when you want the batch commands to enrich context and " +
+          "the queries to also surface related prior knowledge in one round trip.",
+        ),
     }),
   },
-  async ({ commands, queries, timeout, concurrency }) => {
+  async ({ commands, queries, timeout, concurrency, query_scope }) => {
     // Security: check each command against deny patterns
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
@@ -3472,9 +3523,11 @@ EXAMPLE: ctx_batch_execute(
         sectionTitles.push(s.title);
       }
 
-      // Run all search queries — source scoped only.
-      // Cross-source search remains available via explicit ctx_search().
-      const queryResults = formatBatchQueryResults(store, queries, source);
+      // Run all search queries — default scope is batch-local (legacy behavior).
+      // When the caller passes query_scope: "global", searches reach the entire
+      // persistent index in the same round trip. Cross-source search remains
+      // available via explicit ctx_search() as well.
+      const queryResults = formatBatchQueryResults(store, queries, source, undefined, query_scope);
 
       // Get searchable terms for edge cases where follow-up is needed
       const distinctiveTerms = store.getDistinctiveTerms
@@ -3692,7 +3745,13 @@ server.registerTool(
           }
           // v1.0.117: pass projectDir as cwd so the narrative renderer's
           // "started in <path>" line matches the user's actual project.
-          text = formatReport(report, VERSION, _latestVersion, { lifetime, mcpUsage, multiAdapter, conversation, realBytes, cwd: projectDir });
+          // Snapshot the persistent store so the renderer can show
+          // total_chunks / last_indexed_at without callers having to query
+          // separately. Best-effort — getStore() is process-local and may
+          // be unavailable on cold paths; failures are absorbed.
+          let indexState;
+          try { indexState = getStore().getIndexState(); } catch { /* never block ctx_stats */ }
+          text = formatReport(report, VERSION, _latestVersion, { lifetime, mcpUsage, multiAdapter, conversation, realBytes, indexState, cwd: projectDir });
         } finally {
           sdb.close();
         }
@@ -3707,7 +3766,9 @@ server.registerTool(
         }
         let multiAdapter;
         try { multiAdapter = getMultiAdapterLifetimeStats(); } catch { /* never block ctx_stats */ }
-        text = formatReport(report, VERSION, _latestVersion, { lifetime, multiAdapter });
+        let indexState;
+        try { indexState = getStore().getIndexState(); } catch { /* never block ctx_stats */ }
+        text = formatReport(report, VERSION, _latestVersion, { lifetime, multiAdapter, indexState });
       }
     } catch {
       // Session DB not available or incompatible — build minimal report from runtime stats
@@ -4367,7 +4428,7 @@ server.registerTool(
   {
     title: "Open Insight Dashboard",
     description:
-      "Opens the context-mode Insight dashboard in the browser. " +
+      "Opens the context-mode Insight dashboard in the browser — a dashboard launcher for session analytics; for natural-language queries over indexed content, use ctx_search. " +
       "Shows personal analytics: session activity, tool usage, error rate, " +
       "parallel work patterns, project focus, and actionable insights. " +
       "First run installs dependencies (~30s). Subsequent runs open instantly. " +

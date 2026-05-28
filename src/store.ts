@@ -1414,6 +1414,27 @@ export class ContentStore {
   }
 
   /**
+   * Aggregate snapshot of the persistent content store. Returns total
+   * chunk count, source count, and the most recent indexed_at timestamp.
+   * Used by ctx_stats so callers can see observability state in the same
+   * round trip instead of inferring it from snapshot diffs.
+   */
+  getIndexState(): { totalChunks: number; totalSources: number; lastIndexedAt?: string } {
+    const row = (this.#db
+      .prepare("SELECT COALESCE(SUM(chunk_count), 0) AS total_chunks, COUNT(*) AS total_sources, MAX(indexed_at) AS last_indexed_at FROM sources")
+      .get() as {
+        total_chunks: number;
+        total_sources: number;
+        last_indexed_at: string | null;
+      });
+    return {
+      totalChunks: row.total_chunks ?? 0,
+      totalSources: row.total_sources ?? 0,
+      lastIndexedAt: row.last_indexed_at ?? undefined,
+    };
+  }
+
+  /**
    * Get all chunks for a given source by ID — bypasses FTS5 MATCH entirely.
    * Use this for inventory/listing where you need all sections, not search.
    */
