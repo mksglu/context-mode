@@ -126,6 +126,30 @@ describe("ContextModePlugin", () => {
       }
     });
 
+    // Mirror of the KiloCode test above, but for the default OpenCode platform.
+    // Recent OpenCode releases (≥ ~1.14.x) bundle Zod v4 in their bun-compiled
+    // binary. Before this fix, registering tool args as raw Zod v3 schemas
+    // caused OpenCode to crash on the first message with:
+    //   TypeError: undefined is not an object (evaluating 'n._zod.def')
+    // Reproduces the same invariant the KiloCode test enforces: every arg
+    // schema handed to the host must carry the `_zod` v4 marker.
+    it("converts tool args to Zod v4 when platform is opencode (#_zod.def fix)", async () => {
+      // No KILO_PID is set — getPlatform() falls back to "opencode" (default).
+      const plugin = await createTestPlugin(join(tempDir, "opencode-zod-v4-args"));
+      expect(plugin).toHaveProperty("tool");
+      expect(Object.keys(plugin.tool ?? {}).length).toBeGreaterThan(0);
+
+      for (const [toolName, toolDef] of Object.entries(plugin.tool ?? {})) {
+        const args = (toolDef as any).args as Record<string, unknown>;
+        for (const [argName, argSchema] of Object.entries(args)) {
+          expect(
+            (argSchema as any)._zod,
+            `tool ${toolName} arg ${argName} missing _zod (Zod v4 marker)`,
+          ).toBeDefined();
+        }
+      }
+    });
+
     it("ctx_stats native plugin tool executes without an MCP child (#574 smoke)", async () => {
       const projectDir = join(tempDir, "factory-native-tool-exec");
       const plugin = await createTestPlugin(projectDir);

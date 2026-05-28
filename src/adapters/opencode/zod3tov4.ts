@@ -1,13 +1,14 @@
 /**
- * Zod 3 → Zod 4 shape conversion (KiloCode only).
+ * Zod 3 → Zod 4 shape conversion for in-process plugin hosts that bundle Zod v4.
  *
- * KiloCode's runtime bundles Zod v4 internally. When it receives plugin tool
- * definitions whose `args` contain Zod v3 schemas (with `_def` but no `_zod`),
- * it crashes with `undefined is not an object (evaluating 'n._zod.def')`.
+ * KiloCode (since its inception) and recent OpenCode releases (≥ ~1.14.x)
+ * bundle Zod v4 internally. When they receive plugin tool definitions whose
+ * `args` contain Zod v3 schemas (with `_def` but no `_zod.def`), they crash
+ * with `TypeError: undefined is not an object (evaluating 'n._zod.def')`.
  *
- * This module converts Zod 3 schema shapes into Zod 4 equivalents so KiloCode
- * can process them natively. Only called when `platform === "kilo"`.
- * OpenCode uses Zod 3 natively and receives the original shapes unchanged.
+ * This module converts Zod 3 schema shapes into Zod 4 equivalents so both
+ * hosts can process them natively. Called when `platform === "kilo"` or
+ * `platform === "opencode"`.
  */
 import z from 'zod/v4';
 

@@ -407,7 +407,18 @@ async function createContextModePlugin(ctx: PluginContext) {
             ? (inputSchema._def.shape as () => unknown)()
             : {};
 
-      const argsForHost = platform === "kilo"
+      // Both KiloCode and recent OpenCode releases bundle Zod v4 in their
+      // host runtime. When they receive a tool definition whose `args`
+      // contain Zod v3 schemas (with `_def` but no `_zod.def`), they crash
+      // with `TypeError: undefined is not an object (evaluating 'n._zod.def')`
+      // during the first message handling. The KiloCode-only gate was
+      // introduced in v1.0.142 (#632) under the assumption that OpenCode
+      // would stay on Zod v3 — that assumption no longer holds for OpenCode
+      // ≥ ~1.14.x, which now bundles Zod v4 inside its bun-compiled binary.
+      // Converting v3 → v4 for both platforms is safe: the resulting v4
+      // schemas retain `_def` for legacy callers and add the `_zod.def`
+      // payload that v4 hosts require.
+      const argsForHost = platform === "kilo" || platform === "opencode"
         ? zod3ShapeToV4(shape as Record<string, unknown>)
         : shape as Record<string, unknown>;
 
