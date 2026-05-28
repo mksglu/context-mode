@@ -2728,6 +2728,37 @@ function renderMultiAdapter(multiAdapter: MultiAdapterLifetimeStats | undefined)
  * - Project memory: category bars showing persistent data across sessions
  * - No: Pct column, category tables, tips, jargon
  */
+/**
+ * Render the machine-readable Observability block (cache + index state).
+ *
+ * Returns an empty array when no observability data is available, so callers
+ * can `lines.push(...renderObservabilityBlock(...))` unconditionally and the
+ * section is omitted when the kit has nothing to report.
+ *
+ * Shared between the narrative path (early-returns when conversation.events > 0)
+ * and the legacy path so the block surfaces in both, matching the contract
+ * that the handler always passes `indexState` regardless of code path.
+ */
+function renderObservabilityBlock(
+  report: FullReport,
+  indexState?: IndexState,
+): string[] {
+  const obs: string[] = [];
+  if (report.cache) {
+    const hitRatePct = (report.cache.hit_rate * 100).toFixed(1);
+    obs.push(`cache.hit_rate: ${hitRatePct}% (${report.cache.hits} hits / ${report.cache.misses} misses)`);
+  }
+  if (indexState) {
+    obs.push(`index.total_chunks: ${indexState.totalChunks}`);
+    obs.push(`index.total_sources: ${indexState.totalSources}`);
+    if (indexState.lastIndexedAt) {
+      obs.push(`index.last_indexed_at: ${indexState.lastIndexedAt}`);
+    }
+  }
+  if (obs.length === 0) return [];
+  return ["", "## Observability", ...obs];
+}
+
 export function formatReport(
   report: FullReport,
   version?: string,
@@ -2847,6 +2878,9 @@ export function formatReport(
       conversation, lifetime, multiAdapter, realBytes,
       cwd, locale, tz, now, version, latestVersion,
     }));
+    // Append Observability so cache.hit_rate / index.* surface in the
+    // narrative path too (handler passes indexState regardless of path).
+    lines.push(...renderObservabilityBlock(report, opts?.indexState));
     return lines.join("\n");
   }
 
@@ -2978,26 +3012,9 @@ export function formatReport(
   lines.push(...renderBottomLine(tokensSaved, lifetime));
 
   // ── Observability — machine-readable cache + index state ──
-  // Surfaces the metrics that were previously inferable only by diffing
-  // snapshots between ctx_stats calls. Renders as a plain text block so
-  // downstream tooling can grep for the prefixes.
-  const obs: string[] = [];
-  if (report.cache) {
-    const hitRatePct = (report.cache.hit_rate * 100).toFixed(1);
-    obs.push(`cache.hit_rate: ${hitRatePct}% (${report.cache.hits} hits / ${report.cache.misses} misses)`);
-  }
-  if (opts?.indexState) {
-    obs.push(`index.total_chunks: ${opts.indexState.totalChunks}`);
-    obs.push(`index.total_sources: ${opts.indexState.totalSources}`);
-    if (opts.indexState.lastIndexedAt) {
-      obs.push(`index.last_indexed_at: ${opts.indexState.lastIndexedAt}`);
-    }
-  }
-  if (obs.length > 0) {
-    lines.push("");
-    lines.push("## Observability");
-    lines.push(...obs);
-  }
+  // Rendered via shared helper so the narrative path (above, early-return
+  // when conversation.events > 0) emits the same block.
+  lines.push(...renderObservabilityBlock(report, opts?.indexState));
 
   // ── Footer ──
   lines.push("");
