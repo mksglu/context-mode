@@ -252,6 +252,18 @@ context-mode hook codex stop
   at `%USERPROFILE%\.codex\local-marketplaces\context-mode` with
   `source_type = "local"` and retry the install.
 
+  After installation succeeds, verify that Codex hooks are enabled in
+  `%USERPROFILE%\.codex\config.toml`:
+
+  ```toml
+  [features]
+  hooks = true
+  ```
+
+  Some Codex builds may also require `plugin_hooks = true`. Without hook support,
+  the MCP tools can still work, but automatic session capture and persistent
+  memory may not record events.
+
 ---
 
 ### Qwen Code
