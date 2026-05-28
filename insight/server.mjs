@@ -1196,6 +1196,21 @@ if (!existsSync(join(DIST_DIR, "index.html"))) {
 
 // ── Server (dual runtime) ────────────────────────────────
 
+// DNS-rebinding guard. The dashboard binds 127.0.0.1, but without Host
+// validation a malicious web page whose hostname resolves to 127.0.0.1 can read
+// every analytics endpoint (and issue the DELETE) from the user's browser.
+// Accept only requests whose Host header is a loopback name/address.
+function isAllowedHost(host) {
+  if (!host) return false;
+  let h = String(host).toLowerCase();
+  if (h.startsWith("[")) {
+    h = h.replace(/\]:\d+$/, "]"); // [::1]:port -> [::1]
+  } else if ((h.match(/:/g) || []).length === 1) {
+    h = h.replace(/:\d+$/, ""); // host:port -> host (leave bare IPv6 ::1 intact)
+  }
+  return h === "127.0.0.1" || h === "localhost" || h === "[::1]" || h === "::1";
+}
+
 const indexHTML = readFileSync(join(DIST_DIR, "index.html"), "utf8");
 const API_JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -1205,6 +1220,9 @@ if (isBun) {
     port: PORT,
     hostname: "127.0.0.1",
     fetch(req) {
+      if (!isAllowedHost(req.headers.get("host"))) {
+        return new Response("Forbidden", { status: 403 });
+      }
       const url = new URL(req.url);
       const data = route(req.method, url.pathname, url.searchParams);
       if (data !== null) {
@@ -1224,6 +1242,7 @@ if (isBun) {
 } else {
   // Node: use http.createServer
   const server = createHttpServer((req, res) => {
+    if (!isAllowedHost(req.headers.host)) { res.writeHead(403); res.end("Forbidden"); return; }
     const url = new URL(req.url, `http://localhost:${PORT}`);
     if (req.method === "OPTIONS") { res.writeHead(405); res.end(); return; }
 

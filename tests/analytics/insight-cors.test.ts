@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, symlinkSync } fr
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
+import { request as httpRequest } from "node:http";
 import Database from "better-sqlite3";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -298,6 +299,30 @@ describe("Insight API — Node runtime", () => {
     expect(body.totals.totalPrompts).toBe(26);
     expect(body.tasks).toHaveLength(20);
     expect(body.totals.totalTasks).toBe(25);
+  });
+
+  test("rejects a spoofed/rebinding Host header with 403, allows loopback hosts (Node)", async () => {
+    // isAllowedHost defends against DNS-rebinding: a browser whose hostname
+    // rebinds to 127.0.0.1 still sends the attacker's hostname in the Host
+    // header, so the server must 403 it. undici (fetch) overrides Host, so
+    // drive raw http.request to control it. We connect to 127.0.0.1 either
+    // way; only the Host header varies.
+    const rawStatus = (hostHeader: string): Promise<number> =>
+      new Promise((resolveStatus, reject) => {
+        const req = httpRequest(
+          { host: "127.0.0.1", port, path: "/api/overview", method: "GET", headers: { Host: hostHeader } },
+          (res) => { res.resume(); resolveStatus(res.statusCode ?? 0); },
+        );
+        req.on("error", reject);
+        req.end();
+      });
+
+    // Spoofed / rebinding hostnames are rejected before routing.
+    expect(await rawStatus("evil.example.com")).toBe(403);
+    expect(await rawStatus("127.0.0.1.evil.com")).toBe(403);
+    // Legitimate loopback hosts route normally.
+    expect(await rawStatus(`127.0.0.1:${port}`)).toBe(200);
+    expect(await rawStatus("localhost")).toBe(200);
   });
 
 });
