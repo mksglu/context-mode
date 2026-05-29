@@ -20,13 +20,16 @@
 
 import {
   readFileSync,
-  writeFileSync,
-  mkdirSync,
   accessSync,
   chmodSync,
   constants,
 } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
+import {
+  writeProjectConfigSafely,
+  symlinkEscapesRoot,
+  SymlinkEscapeError,
+} from "../util/safe-project-write.js";
 
 import { BaseAdapter } from "./base.js";
 
@@ -344,11 +347,23 @@ export abstract class CopilotBaseAdapter extends BaseAdapter implements HookAdap
 
   writeSettings(settings: Record<string, unknown>): void {
     const configPath = this.getSettingsPath();
-    mkdirSync(resolve(".github", "hooks"), { recursive: true });
-    writeFileSync(
+    // The config sits two levels below the project root (.github/hooks/file).
+    // writeProjectConfigSafely guards the immediate dir (.github/hooks) and the
+    // target file, but a planted `.github` one level up would still redirect the
+    // write out of the project. Guard the grandparent here with the same rule: an
+    // in-root `.github` symlink is fine (a dotfile manager may point it there),
+    // but one whose real target escapes the project is refused. Throw the same
+    // recognizable error the util uses, so setup can warn-and-skip rather than
+    // abort outright.
+    const githubDir = dirname(dirname(configPath));
+    if (symlinkEscapesRoot(githubDir, process.cwd())) {
+      throw new SymlinkEscapeError(
+        `context-mode: refusing to write ${configPath}: .github is a symlink escaping the project`,
+      );
+    }
+    writeProjectConfigSafely(
       configPath,
       JSON.stringify(settings, null, 2) + "\n",
-      "utf-8",
     );
   }
 

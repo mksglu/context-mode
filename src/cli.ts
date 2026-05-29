@@ -30,6 +30,7 @@ import {
 } from "./runtime.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
+import { isSymlinkEscapeError } from "./util/safe-project-write.js";
 import {
   ensureWritableStorageDir,
   formatStorageDirectoryError,
@@ -1969,7 +1970,19 @@ async function upgrade(opts?: { platform?: string }) {
     p.log.success(color.green("Hooks configured") + color.dim(` — ${adapter.name}`));
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Hook configuration failed: ${message}`);
+    // A config path that's a symlink escaping the project is refused, not fatal.
+    // A user who manages config with a dotfile manager (stow/chezmoi) shouldn't
+    // have setup abort outright over it. Warn and skip just this adapter's hook
+    // config; the rest of setup still runs, and they can configure it manually or
+    // drop the symlink. Any other failure is a real problem, so keep it fatal.
+    if (isSymlinkEscapeError(err)) {
+      p.log.warn(
+        color.yellow(`Skipped ${adapter.name} hook config`) + color.dim(`: ${message}`),
+      );
+      changes.push(`Skipped ${adapter.name} hook config (config path is a symlink escaping the project)`);
+    } else {
+      throw new Error(`Hook configuration failed: ${message}`);
+    }
   }
 
   // Step 5: Set hook script permissions — adapter-aware

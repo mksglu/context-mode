@@ -2926,14 +2926,22 @@ describe("Shell-free upgrade (#185)", () => {
     expect(upgradeBody).toContain("chmodSync");
   });
 
-  test("cli.ts upgrade aborts when hook configuration fails instead of reporting success", () => {
+  test("cli.ts upgrade warn-skips a symlink-escape but stays fatal on other hook-config failures", () => {
+    // Wiring check: the recoverable-vs-fatal decision is routed through
+    // isSymlinkEscapeError; the actual behavior (an in-root symlink writes
+    // through, an escaping one is refused) is covered by the runtime tests in
+    // tests/util/safe-project-write.test.ts and
+    // tests/adapters/adapter-config-symlink.test.ts, so this asserts only that
+    // the wiring is present, not the exact catch-block text.
     const upgradeStart = CLI_SOURCE.indexOf("async function upgrade");
     expect(upgradeStart).toBeGreaterThan(-1);
     const upgradeBody = CLI_SOURCE.slice(upgradeStart);
 
-    expect(upgradeBody).toContain("Hook configuration failed");
     expect(upgradeBody).toMatch(/try\s*\{\s*const hookChanges = adapter\.configureAllHooks\(pluginRoot\)/s);
-    expect(upgradeBody).toMatch(/\}\s*catch\s*\(err: unknown\)\s*\{[\s\S]*throw new Error\(`Hook configuration failed: \$\{message\}`\);/s);
+    // A symlinked config path escaping the project is recoverable (warn + skip).
+    expect(upgradeBody).toMatch(/catch\s*\(err: unknown\)\s*\{[\s\S]*isSymlinkEscapeError\(err\)/s);
+    // Everything else stays fatal so a real failure can't masquerade as success.
+    expect(upgradeBody).toMatch(/throw new Error\(`Hook configuration failed: \$\{message\}`\)/s);
   });
 
   test("cli.ts entrypoint catches upgrade() rejection and exits non-zero", () => {

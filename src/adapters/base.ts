@@ -36,9 +36,15 @@
  */
 
 import { join, resolve } from "node:path";
-import { accessSync, copyFileSync, constants, mkdirSync } from "node:fs";
+import {
+  accessSync,
+  copyFileSync,
+  constants,
+  mkdirSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { hashProjectDirCanonical } from "../session/db.js";
+import { symlinkEscapesRoot } from "../util/safe-project-write.js";
 
 /**
  * Universal storage-root override. Returns the resolved absolute path when
@@ -128,6 +134,12 @@ export abstract class BaseAdapter {
   backupSettings(): string | null {
     const settingsPath = this.getSettingsPath();
     try {
+      // Mirror the write guard (writeProjectConfigSafely): skip a config symlink
+      // whose real target escapes the project, since copying through it would
+      // pull an arbitrary file (e.g. ~/.ssh/id_rsa) into a repo-local .bak. An
+      // in-root symlink (a dotfile manager's intra-repo link) stays in-tree, so
+      // back it up the way the write follows it.
+      if (symlinkEscapesRoot(settingsPath, process.cwd())) return null;
       accessSync(settingsPath, constants.R_OK);
       const backupPath = settingsPath + ".bak";
       copyFileSync(settingsPath, backupPath);

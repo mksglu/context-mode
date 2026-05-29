@@ -1,6 +1,6 @@
 import "../setup-home";
 import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, symlinkSync, lstatSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -222,6 +222,78 @@ describe("OpenCodeAdapter", () => {
       });
       expect(() => readFileSync(resolve(dir, "opencode.json"), "utf-8")).toThrow();
       expect(JSON.parse(readFileSync(file, "utf-8"))).toEqual({ plugin: ["context-mode"] });
+
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    it("configureAllHooks writes through a symlinked global config (dotfile manager)", () => {
+      // A stow/chezmoi user symlinks ~/.config/opencode/opencode.json into their
+      // dotfiles repo. That global config is solely user-owned and lives outside
+      // any project, so the project-local symlink-escape guard must not refuse it:
+      // configureAllHooks follows the symlink and updates the real file, the way a
+      // plain write did before the guard existed.
+      const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
+      const dir = join(root, "project");
+      const home = join(root, "home");
+      const conf = join(home, ".config", "opencode");
+      const link = join(conf, "opencode.json");
+      const real = join(home, "dotfiles", "opencode.json");
+      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+      mkdirSync(dir, { recursive: true });
+      mkdirSync(conf, { recursive: true });
+      mkdirSync(join(home, "dotfiles"), { recursive: true });
+      writeFileSync(real, JSON.stringify({ plugin: [] }, null, 2) + "\n");
+      symlinkSync(real, link); // ~/.config/opencode/opencode.json -> ~/dotfiles/opencode.json
+
+      const run = spawnSync(
+        process.execPath,
+        [
+          tsx,
+          "-e",
+          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.configureAllHooks('/tmp/plugin')))`,
+        ],
+        { cwd: dir, env: env(home), encoding: "utf-8" },
+      );
+
+      expect(run.status).toBe(0);
+      expect(JSON.parse(run.stdout)).toContain("Added context-mode to plugin array");
+      // The write followed the symlink to the real dotfiles file, and left the
+      // config path a symlink rather than clobbering it into a regular file.
+      expect(JSON.parse(readFileSync(real, "utf-8"))).toEqual({ plugin: ["context-mode"] });
+      expect(lstatSync(link).isSymbolicLink()).toBe(true);
+
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    it("still refuses a project-local config symlinked outside the project", () => {
+      // The clone-planted-symlink guard must stay for a cwd-relative config: a
+      // malicious repo shipping opencode.json -> ~/.bashrc cannot make a plain
+      // write clobber that file. This is the in-project case the guard defends,
+      // and the global carve-out above must not weaken it.
+      const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
+      const dir = join(root, "project");
+      const home = join(root, "home");
+      const victim = join(root, "victim");
+      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+      mkdirSync(dir, { recursive: true });
+      mkdirSync(home, { recursive: true });
+      writeFileSync(victim, "ORIGINAL");
+      symlinkSync(victim, join(dir, "opencode.json")); // cwd/opencode.json -> outside/victim
+
+      const run = spawnSync(
+        process.execPath,
+        [
+          tsx,
+          "-e",
+          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();a.configureAllHooks('/tmp/plugin')`,
+        ],
+        { cwd: dir, env: env(home), encoding: "utf-8" },
+      );
+
+      expect(run.status).not.toBe(0); // refused, did not write through the escaping symlink
+      expect(readFileSync(victim, "utf-8")).toBe("ORIGINAL"); // victim untouched
 
       rmSync(root, { recursive: true, force: true });
     });

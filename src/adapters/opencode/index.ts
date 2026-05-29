@@ -31,10 +31,11 @@ import {
   accessSync,
   constants,
 } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname, sep } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter, resolveContextModeDataRoot } from "../base.js";
+import { writeProjectConfigSafely } from "../../util/safe-project-write.js";
 
 import type {
   HookAdapter,
@@ -369,12 +370,24 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   }
 
   writeSettings(settings: Record<string, unknown>): void {
-    // Write to opencode.json(c)/kilo.json(c) in current directory
-    writeFileSync(
-      this.getSettingsPath(),
-      JSON.stringify(settings, null, 2) + "\n",
-      "utf-8",
-    );
+    const target = this.getSettingsPath();
+    const json = JSON.stringify(settings, null, 2) + "\n";
+    const abs = resolve(target);
+    const root = resolve(process.cwd());
+    // writeProjectConfigSafely refuses a symlink whose real target escapes the
+    // project root, the guard for a project-local (cwd-relative) config where a
+    // cloned repo could plant one. A global config (~/.config/<platform>/...)
+    // lives outside the project and is solely user-owned, so that clone-planted
+    // threat can't reach it; routing the global write through the cwd-rooted
+    // guard would just refuse a legit dotfile-manager symlink. Write a global
+    // target directly (following the user's own symlink) and keep the guard for
+    // an in-project target.
+    if (abs === root || abs.startsWith(root + sep)) {
+      writeProjectConfigSafely(target, json);
+    } else {
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, json, "utf-8");
+    }
   }
 
   // ── Diagnostics (doctor) ─────────────────────────────────

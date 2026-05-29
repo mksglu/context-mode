@@ -18,7 +18,6 @@
 
 import {
   readFileSync,
-  writeFileSync,
   copyFileSync,
   accessSync,
   constants,
@@ -27,6 +26,7 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter } from "../base.js";
+import { writeProjectConfigSafely } from "../../util/safe-project-write.js";
 
 import type {
   HookAdapter,
@@ -293,12 +293,11 @@ export class OpenClawAdapter extends BaseAdapter implements HookAdapter {
   }
 
   writeSettings(settings: Record<string, unknown>): void {
-    // Write to openclaw.json in current directory
-    const configPath = resolve("openclaw.json");
-    writeFileSync(
-      configPath,
+    // Refuse to follow a symlink that would escape the cwd-relative openclaw.json;
+    // writeProjectConfigSafely also creates the parent directory.
+    writeProjectConfigSafely(
+      resolve("openclaw.json"),
       JSON.stringify(settings, null, 2) + "\n",
-      "utf-8",
     );
   }
 

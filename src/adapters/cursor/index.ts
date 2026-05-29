@@ -7,8 +7,6 @@
 
 import {
   readFileSync,
-  writeFileSync,
-  mkdirSync,
   accessSync,
   chmodSync,
   constants,
@@ -21,6 +19,7 @@ import { homedir } from "node:os";
 
 import { BaseAdapter } from "../base.js";
 import { resolveClaudeConfigDir } from "../../util/claude-config.js";
+import { writeProjectConfigSafely } from "../../util/safe-project-write.js";
 
 import type {
   HookAdapter,
@@ -292,9 +291,12 @@ export class CursorAdapter extends BaseAdapter implements HookAdapter {
   }
 
   writeSettings(settings: Record<string, unknown>): void {
-    const configPath = this.getSettingsPath();
-    mkdirSync(resolve(".cursor"), { recursive: true });
-    writeFileSync(configPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+    // Refuse to follow a symlink that would escape the project's .cursor/ dir;
+    // writeProjectConfigSafely also creates the parent directory.
+    writeProjectConfigSafely(
+      this.getSettingsPath(),
+      JSON.stringify(settings, null, 2) + "\n",
+    );
   }
 
   validateHooks(_pluginRoot: string): DiagnosticResult[] {
