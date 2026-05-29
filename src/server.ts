@@ -658,7 +658,9 @@ function getStore(): ContentStore {
         const r = evaluateFilePath(
           filePath,
           denyGlobs,
-          process.platform === "win32",
+          // inherit the platform default (win32 || darwin); the file-path deny
+          // must be case-insensitive on macOS too, not just Windows
+          undefined,
           projectDir,
         );
         return r.denied;
@@ -1097,7 +1099,8 @@ function checkFilePathDenyPolicy(
     const result = evaluateFilePath(
       filePath,
       denyGlobs,
-      process.platform === "win32",
+      // inherit the platform default (win32 || darwin) so macOS denies match too
+      undefined,
       projectDir,
     );
     if (result.denied) {
@@ -2180,10 +2183,10 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
         const store = getStore();
         const projectDir = getProjectDir();
         const denyGlobs = readToolDenyPatterns("Read", projectDir);
-        const isWin32 = process.platform === "win32";
         const perFileDeny = (absPath: string): boolean => {
           try {
-            return evaluateFilePath(absPath, denyGlobs, isWin32, projectDir).denied;
+            // inherit the platform default (win32 || darwin) for macOS parity
+            return evaluateFilePath(absPath, denyGlobs, undefined, projectDir).denied;
           } catch {
             return false; // fail-open consistent with checkFilePathDenyPolicy
           }
@@ -2856,8 +2859,11 @@ async function safeText(resp) {
     throw new Error('Response too large: Content-Length ' + cl + ' exceeds ' + MAX_FETCH_BYTES);
   }
   const text = await resp.text();
-  if (text.length > MAX_FETCH_BYTES) {
-    throw new Error('Response too large: ' + text.length + ' bytes exceeds ' + MAX_FETCH_BYTES);
+  // text.length counts UTF-16 code units, not bytes; measure real bytes so the
+  // cap is accurate for multibyte responses (it was under-counting before).
+  const byteLen = Buffer.byteLength(text);
+  if (byteLen > MAX_FETCH_BYTES) {
+    throw new Error('Response too large: ' + byteLen + ' bytes exceeds ' + MAX_FETCH_BYTES);
   }
   return text;
 }
@@ -4593,7 +4599,11 @@ server.registerTool(
           }],
         });
       }
-      if (explicitContentDir && !isContained(insightContentDirResolved)) {
+      // Validate the content dir whenever EITHER override is set: when only
+      // sessionDir is passed, insightContentDirResolved is derived from it
+      // (join(dirname(sessDir), "content")), so sessionDir=<containmentRoot>
+      // would otherwise push it to <parentOfRoot>/content unchecked.
+      if ((explicitContentDir || explicitSessionDir) && !isContained(insightContentDirResolved)) {
         return trackResponse("ctx_insight", {
           content: [{
             type: "text" as const,
