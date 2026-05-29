@@ -1895,8 +1895,24 @@ async function upgrade(opts?: { platform?: string }) {
               catch { continue; }
               if (!(realInstallPath + sep).startsWith(cacheRootWithSep)) continue;
               const srcSkills = resolve(srcDir, "skills");
-              if (existsSync(srcSkills)) {
-                cpSync(srcSkills, resolve(realInstallPath, "skills"), { recursive: true });
+              // realInstallPath is canonical+contained, but `skills` is re-appended
+              // lexically — a planted <version>/skills symlink would let cpSync
+              // write through it outside the cache root. Skip a symlinked dest.
+              const skillsDest = resolve(realInstallPath, "skills");
+              let skillsDestIsSymlink = false;
+              try { skillsDestIsSymlink = lstatSync(skillsDest).isSymbolicLink(); }
+              catch { /* ENOENT: fresh dest, nothing to follow */ }
+              if (existsSync(srcSkills) && !skillsDestIsSymlink) {
+                // Strip symlinks from the copied tree like the items[] copy does.
+                // cpSync preserves source symlinks by default, so a symlink
+                // committed inside skills/ by a compromised upstream tag (the same
+                // source the items[] guard defends against) would otherwise be
+                // planted verbatim into the active install. refuseSymlinks is
+                // block-scoped to the items[] loop, so declare a local one here.
+                const refuseSymlinks = (src: string): boolean => {
+                  try { return !lstatSync(src).isSymbolicLink(); } catch { return false; }
+                };
+                cpSync(srcSkills, skillsDest, { recursive: true, filter: refuseSymlinks });
                 changes.push(`Synced skills to active install path`);
               }
             }
@@ -2110,7 +2126,15 @@ function statuslineForward(): void {
           try { realInstallPath = realpathSync(resolvedInstallPath); }
           catch { continue; }
           if (!(realInstallPath + sep).startsWith(cacheRootWithSep)) continue;
-          candidates.push(resolve(realInstallPath, "bin", "statusline.mjs"));
+          // bin/statusline.mjs is re-appended after the realpath gate and then
+          // imported (executed); a planted <version>/bin symlink would redirect it
+          // outside the cache. Canonicalize and re-contain before trusting it.
+          const statuslineCand = resolve(realInstallPath, "bin", "statusline.mjs");
+          try {
+            if ((realpathSync(statuslineCand) + sep).startsWith(cacheRootWithSep)) {
+              candidates.push(statuslineCand);
+            }
+          } catch { /* doesn't exist yet: skip */ }
         }
       }
     }

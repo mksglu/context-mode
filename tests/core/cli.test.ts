@@ -3406,7 +3406,15 @@ describe("installed_plugins.json installPath containment", () => {
     expect(skillsBlock![0]).toMatch(/realpathSync\(cacheRoot\)/);
     expect(skillsBlock![0]).toMatch(/realpathSync\(resolvedInstallPath\)/);
     expect(skillsBlock![0]).toMatch(/\(realInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
-    expect(skillsBlock![0]).toMatch(/cpSync\(srcSkills, resolve\(realInstallPath, "skills"\)/);
+    // Child-path hardening: `skills` is re-appended after the realpath gate, so a
+    // planted <version>/skills symlink is skipped before cpSync writes through it.
+    expect(skillsBlock![0]).toMatch(/lstatSync\(skillsDest\)\.isSymbolicLink\(\)/);
+    expect(skillsBlock![0]).toMatch(/cpSync\(srcSkills, skillsDest/);
+    // The skills cpSync must strip symlinks like its sibling items[] copy.
+    // cpSync preserves source symlinks by default, so a symlink committed inside
+    // skills/ by a malicious upstream tag (the same source the items[] guard
+    // defends against) would otherwise be planted verbatim into the active install.
+    expect(skillsBlock![0]).toMatch(/cpSync\(srcSkills, skillsDest, \{[^}]*filter:\s*refuseSymlinks/);
   });
 
   test("statuslineForward() candidate selection gates installPath under <claudeRoot>/plugins/cache", () => {
@@ -3435,7 +3443,11 @@ describe("installed_plugins.json installPath containment", () => {
     expect(candidateBlock![0]).toMatch(/realpathSync\(cacheRoot\)/);
     expect(candidateBlock![0]).toMatch(/realpathSync\(resolvedInstallPath\)/);
     expect(candidateBlock![0]).toMatch(/\(realInstallPath \+ sep\)\.startsWith\(cacheRootWithSep\)/);
-    expect(candidateBlock![0]).toMatch(/candidates\.push\(resolve\(realInstallPath, "bin", "statusline\.mjs"\)\)/);
+    // Child-path hardening: bin/statusline.mjs is re-appended after the realpath
+    // gate and then imported (executed), so the candidate is realpath-recontained
+    // before it's pushed — a planted <version>/bin symlink can't redirect it.
+    expect(candidateBlock![0]).toMatch(/realpathSync\(statuslineCand\)/);
+    expect(candidateBlock![0]).toMatch(/candidates\.push\(statuslineCand\)/);
     // realpathSync must be imported from node:fs.
     expect(CLI_SOURCE).toMatch(
       /import\s*\{[^}]*\brealpathSync\b[^}]*\}\s*from\s*"node:fs"/,
