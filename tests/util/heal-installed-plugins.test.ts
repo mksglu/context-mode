@@ -21,6 +21,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -546,6 +547,50 @@ describe("healPluginJsonMcpServers (Issue #523)", () => {
     expect(readFileSync(pluginJsonPath, "utf-8")).toBe(before);
   });
 
+  // A symlinked version dir resolves outside the cache root. The lexical
+  // resolve()+startsWith gate passes (the in-cache path string is unchanged),
+  // so only realpath catches the escape before the write follows the link.
+  it("traversal guard — refuses a symlinked version dir resolving outside the cache root", () => {
+    const cacheRoot = makeTmp("ctx-issue523-cache-");
+    const attackerDir = makeTmp("ctx-issue523-attacker-");
+    mkdirSync(resolve(attackerDir, ".claude-plugin"), { recursive: true });
+    const attackerJson = resolve(attackerDir, ".claude-plugin", "plugin.json");
+    writeFileSync(
+      attackerJson,
+      JSON.stringify(
+        {
+          mcpServers: {
+            "context-mode": {
+              command: "node",
+              args: [
+                "/var/folders/x/T/context-mode-upgrade-1747000000000/start.mjs",
+              ],
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    const before = readFileSync(attackerJson, "utf-8");
+
+    const versionParent = resolve(cacheRoot, "context-mode", "context-mode");
+    mkdirSync(versionParent, { recursive: true });
+    const symlinkedRoot = resolve(versionParent, "1.0.118");
+    symlinkSync(attackerDir, symlinkedRoot, "dir");
+
+    const result = healPluginJsonMcpServers({
+      pluginRoot: symlinkedRoot,
+      pluginCacheRoot: cacheRoot,
+      pluginKey: "context-mode@context-mode",
+    });
+
+    expect(result.healed).toEqual([]);
+    expect(result.skipped).toBe("outside-cache-root");
+    // The file beyond the cache root stays byte-identical.
+    expect(readFileSync(attackerJson, "utf-8")).toBe(before);
+  });
+
   // Slice 5 — preserves unrelated mcpServers entries.
   it("preserves unrelated mcpServers entries", () => {
     const cacheRoot = makeTmp("ctx-issue523-cache-");
@@ -850,6 +895,41 @@ describe("healMcpJsonArgs (Issue #531)", () => {
     expect(result.skipped).toBe("outside-cache-root");
     // File is untouched.
     expect(readFileSync(mcpJsonPath, "utf-8")).toBe(before);
+  });
+
+  // Same symlinked-version-dir escape as the plugin.json sibling, on .mcp.json.
+  it("traversal guard — refuses a symlinked version dir resolving outside the cache root", () => {
+    const cacheRoot = makeTmp("ctx-issue531-cache-");
+    const attackerDir = makeTmp("ctx-issue531-attacker-");
+    const attackerJson = resolve(attackerDir, ".mcp.json");
+    writeFileSync(
+      attackerJson,
+      JSON.stringify(
+        {
+          mcpServers: {
+            "context-mode": { command: "node", args: ["./start.mjs"] },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    const before = readFileSync(attackerJson, "utf-8");
+
+    const versionParent = resolve(cacheRoot, "context-mode", "context-mode");
+    mkdirSync(versionParent, { recursive: true });
+    const symlinkedRoot = resolve(versionParent, "1.0.118");
+    symlinkSync(attackerDir, symlinkedRoot, "dir");
+
+    const result = healMcpJsonArgs({
+      pluginRoot: symlinkedRoot,
+      pluginCacheRoot: cacheRoot,
+      pluginKey: "context-mode@context-mode",
+    });
+
+    expect(result.healed).toEqual([]);
+    expect(result.skipped).toBe("outside-cache-root");
+    expect(readFileSync(attackerJson, "utf-8")).toBe(before);
   });
 
   // Slice 6 — preserves unrelated mcpServers entries

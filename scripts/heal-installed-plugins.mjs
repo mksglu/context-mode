@@ -17,7 +17,7 @@
  * @see https://github.com/anthropics/claude-code/issues/46915
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync, lstatSync, realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
 /**
@@ -207,6 +207,31 @@ export function healSettingsEnabledPlugins({ settingsPath, pluginKey }) {
 
 const PLACEHOLDER_ARG = "${CLAUDE_PLUGIN_ROOT}/start.mjs";
 
+/*
+ * Canonicalize a plugin root and confirm it still lives under the cache root
+ * after symlink resolution. The lexical `resolve()` + `startsWith` gate only
+ * inspects the path string, so a planted symlink component (say a version dir
+ * pointing at an attacker directory) sails past it, and `writeFileSync` then
+ * follows the link at write time and escapes the cache root. We realpath both
+ * sides and re-check so the range check lands on the real on-disk target,
+ * mirroring the cli.ts install-path hardening. Returns the canonical root, or
+ * null when it escapes. A root that can't be resolved (nonexistent) falls back
+ * to the lexical path since there's nothing for a write to follow there yet.
+ */
+function canonicalContainedRoot(pluginRoot, pluginCacheRoot) {
+  const resolvedRoot = resolve(pluginRoot);
+  const cacheRootWithSep = resolve(pluginCacheRoot) + sep;
+  if (!resolvedRoot.startsWith(cacheRootWithSep)) return null;
+  let realRoot;
+  try { realRoot = realpathSync(resolvedRoot); }
+  catch { return resolvedRoot; }
+  let cacheRootCanon;
+  try { cacheRootCanon = realpathSync(resolve(pluginCacheRoot)); }
+  catch { cacheRootCanon = resolve(pluginCacheRoot); }
+  if (!(realRoot + sep).startsWith(cacheRootCanon + sep)) return null;
+  return realRoot;
+}
+
 /**
  * Heal `<pluginRoot>/.claude-plugin/plugin.json` mcpServers args.
  *
@@ -223,14 +248,15 @@ export function healPluginJsonMcpServers({ pluginRoot, pluginCacheRoot, pluginKe
   }
 
   // Path-traversal guard: refuse to touch a plugin root that escapes the
-  // declared cache root. Mirrors HEAL 3's guard.
-  const resolvedRoot = resolve(pluginRoot);
-  const cacheRootWithSep = resolve(pluginCacheRoot) + sep;
-  if (!resolvedRoot.startsWith(cacheRootWithSep)) {
+  // declared cache root, lexically AND after symlink resolution. A symlinked
+  // version dir would otherwise pass the lexical check, then redirect the write
+  // off-tree. Mirrors HEAL 3's guard.
+  const containedRoot = canonicalContainedRoot(pluginRoot, pluginCacheRoot);
+  if (!containedRoot) {
     return { healed: [], skipped: "outside-cache-root" };
   }
 
-  const pluginJsonPath = resolve(pluginRoot, ".claude-plugin", "plugin.json");
+  const pluginJsonPath = resolve(containedRoot, ".claude-plugin", "plugin.json");
   if (!existsSync(pluginJsonPath)) {
     return { healed: [], skipped: "no-plugin-json" };
   }
@@ -273,6 +299,10 @@ export function healPluginJsonMcpServers({ pluginRoot, pluginCacheRoot, pluginKe
   });
   const changed = after.some((v, i) => v !== before[i]);
   if (changed) {
+    // Don't write through a symlinked plugin.json: realpath canonicalizes the
+    // root dir but not the final file component, so a planted symlink here
+    // would still redirect the write off-tree.
+    try { if (lstatSync(pluginJsonPath).isSymbolicLink()) return { healed: [], skipped: "symlinked-target" }; } catch {}
     ours.args = after;
     healed.push("plugin-json-args");
     try {
@@ -332,15 +362,15 @@ export function healMcpJsonArgs({ pluginRoot, pluginCacheRoot, pluginKey }) {
   }
 
   // Path-traversal guard: refuse to touch a plugin root that escapes the
-  // declared cache root. Mirrors healPluginJsonMcpServers + HEAL 3.
-  const resolvedRoot = resolve(pluginRoot);
-  const cacheRootWithSep = resolve(pluginCacheRoot) + sep;
-  if (!resolvedRoot.startsWith(cacheRootWithSep)) {
+  // declared cache root, lexically AND after symlink resolution. Mirrors
+  // healPluginJsonMcpServers + HEAL 3.
+  const containedRoot = canonicalContainedRoot(pluginRoot, pluginCacheRoot);
+  if (!containedRoot) {
     return { healed: [], skipped: "outside-cache-root" };
   }
 
   // `.mcp.json` lives at pluginRoot/.mcp.json (flat), NOT under .claude-plugin/.
-  const mcpJsonPath = resolve(pluginRoot, ".mcp.json");
+  const mcpJsonPath = resolve(containedRoot, ".mcp.json");
   if (!existsSync(mcpJsonPath)) {
     return { healed: [], skipped: "no-mcp-json" };
   }
@@ -386,6 +416,9 @@ export function healMcpJsonArgs({ pluginRoot, pluginCacheRoot, pluginKey }) {
   });
   const changed = after.some((v, i) => v !== before[i]);
   if (changed) {
+    // Don't write through a symlinked .mcp.json (realpath canonicalizes the dir
+    // chain, not the final file component).
+    try { if (lstatSync(mcpJsonPath).isSymbolicLink()) return { healed: [], skipped: "symlinked-target" }; } catch {}
     ours.args = after;
     healed.push("mcp-json-args");
     try {
