@@ -4111,6 +4111,32 @@ describe("buildFetchCode — embedded SSRF guard contract", () => {
     expect(generated).toMatch(/delete process\.env\.all_proxy/);
   });
 
+  test("streams the response body with an incremental byte cap (decompression-bomb defense)", () => {
+    // safeText must read the body as a stream and bail the moment the running
+    // byte total crosses the cap, NOT buffer the whole decompressed body via
+    // resp.text(). A small gzip/br response advertising a tiny Content-Length
+    // otherwise inflates this subprocess heap toward gigabytes before any
+    // post-read check fires (the parent's statSync gate only bounds the file
+    // the subprocess writes, not its transient decompression heap).
+    expect(generated).toContain("resp.body.getReader()");
+    expect(generated).toMatch(/streamed.*bytes exceeds/);
+    expect(generated).not.toContain("await resp.text()");
+  });
+
+  test("decodes UTF-8 and strips a single leading BOM (parity with resp.text())", () => {
+    // The streaming reader decodes via Buffer.toString('utf-8'), which keeps a
+    // leading byte-order mark; resp.text() (the prior implementation) stripped
+    // it through the WHATWG decode. Without a matching strip a BOM-prefixed
+    // UTF-8 page (Windows/CMS-authored) gains a stray U+FEFF: the markdown gets
+    // a junk leading line and BOM-prefixed JSON stops parsing (the pretty-print
+    // branch falls through to raw text). One leading U+FEFF must be dropped on
+    // the decoded body the subprocess actually indexes.
+    expect(generated).toContain("const decoded = Buffer.concat(chunks).toString('utf-8');");
+    expect(generated).toContain("decoded.charCodeAt(0) === 0xFEFF ? decoded.slice(1) : decoded");
+    // The old un-stripped return must be gone (guards against a partial revert).
+    expect(generated).not.toContain("return Buffer.concat(chunks).toString('utf-8');");
+  });
+
   test("embedded SSRF classifier is callable as `classifyIp` even when bundler renames the export (#bug-v1.0.133)", () => {
     // REGRESSION: esbuild renames top-level `classifyIp` to a short name
     // (e.g. `_h`) in server.bundle.mjs. The previous implementation embedded
@@ -6452,7 +6478,7 @@ describe("ctx_fetch_and_index: response body size cap", () => {
     "utf-8",
   );
 
-  test("subprocess buildFetchCode caps response via Content-Length and post-text length", () => {
+  test("subprocess buildFetchCode caps response via Content-Length and a streaming byte cap", () => {
     expect(SERVER_SOURCE).toContain("const MAX_FETCH_BYTES = 50 * 1024 * 1024;");
     expect(SERVER_SOURCE).toContain("async function safeText(resp)");
     // The three response paths (JSON, HTML, default) all route through safeText
@@ -6463,11 +6489,14 @@ describe("ctx_fetch_and_index: response body size cap", () => {
     );
     expect(buildFetchSrc.length).toBeGreaterThan(0);
     expect(buildFetchSrc.match(/await safeText\(resp\)/g)?.length).toBeGreaterThanOrEqual(3);
-    // The pre-fix call sites (one per content-type branch) routed through
-    // `await resp.text()` directly. Now only one such call survives,
-    // inside safeText itself. Count exactly one.
+    // safeText streams the body with getReader() and aborts the moment the
+    // running byte count crosses the cap, so a compressed bomb can't fully
+    // decompress into the subprocess heap before the check fires. resp.text()
+    // (which buffered the whole decompressed body first) must be gone entirely.
+    expect(buildFetchSrc).toContain("resp.body.getReader()");
+    expect(buildFetchSrc).toMatch(/streamed.*bytes exceeds/);
     const directCalls = buildFetchSrc.match(/await resp\.text\(\)/g) ?? [];
-    expect(directCalls.length).toBe(1);
+    expect(directCalls.length).toBe(0);
   });
 
   test("parent-side fetchOneUrl stat-gates outputPath before readFileSync", () => {

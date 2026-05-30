@@ -2858,14 +2858,34 @@ async function safeText(resp) {
   if (cl > MAX_FETCH_BYTES) {
     throw new Error('Response too large: Content-Length ' + cl + ' exceeds ' + MAX_FETCH_BYTES);
   }
-  const text = await resp.text();
-  // text.length counts UTF-16 code units, not bytes; measure real bytes so the
-  // cap is accurate for multibyte responses (it was under-counting before).
-  const byteLen = Buffer.byteLength(text);
-  if (byteLen > MAX_FETCH_BYTES) {
-    throw new Error('Response too large: ' + byteLen + ' bytes exceeds ' + MAX_FETCH_BYTES);
+  // Stream the (decompressed) body and bail the moment the running byte count
+  // crosses the cap. resp.text() buffers the whole decompressed body first, so
+  // a small gzip/br response advertising a tiny Content-Length could still
+  // inflate this subprocess heap toward gigabytes before any post-read check
+  // fired; getReader() lets us cancel mid-stream and stop decompressing. Byte
+  // lengths are real bytes, so the cap stays accurate for multibyte responses.
+  if (!resp.body) return '';
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_FETCH_BYTES) {
+      try { await reader.cancel(); } catch {}
+      throw new Error('Response too large: streamed ' + total + ' bytes exceeds ' + MAX_FETCH_BYTES);
+    }
+    chunks.push(Buffer.from(value));
   }
-  return text;
+  // resp.text() (the prior implementation) ran a WHATWG UTF-8 decode that strips
+  // a leading byte-order mark; Buffer.toString keeps it. Drop one leading BOM so
+  // a BOM-prefixed page (Windows/CMS-authored UTF-8) indexes the same way it did
+  // before: no junk leading line in the turndown markdown, and BOM-prefixed JSON
+  // still parses into the pretty-printed branch instead of falling to raw text.
+  // (Compare the leading code unit rather than a regex to keep this source ASCII.)
+  const decoded = Buffer.concat(chunks).toString('utf-8');
+  return decoded.charCodeAt(0) === 0xFEFF ? decoded.slice(1) : decoded;
 }
 
 async function main() {
