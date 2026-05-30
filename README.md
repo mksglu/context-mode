@@ -586,6 +586,9 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
 
    [mcp_servers.context-mode]
    command = "context-mode"
+
+   [mcp_servers.context-mode.env]
+   CONTEXT_MODE_PLATFORM = "codex"
    ```
 
 3. Create `$CODEX_HOME/hooks.json` (or `~/.codex/hooks.json` when `CODEX_HOME` is unset):

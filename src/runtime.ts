@@ -25,6 +25,12 @@ export function isAllowlistedShell(shellPath: string): boolean {
   return ALLOWED_SHELL_BASENAMES.test(runtimeBasename(shellPath));
 }
 
+function isWindowsWslBash(shellPath: string): boolean {
+  const lower = shellPath.toLowerCase().replace(/\//g, "\\");
+  return /\\windows\\(?:system32|sysnative)\\bash\.exe$/.test(lower) ||
+    /\\microsoft\\windowsapps\\bash\.exe$/.test(lower);
+}
+
 export type Language =
   | "javascript"
   | "typescript"
@@ -227,18 +233,21 @@ export function detectRuntimes(): RuntimeMap {
   const bun = hasBun ? bunCommand() : null;
 
   // Honor SHELL env var when it points at a real binary AND the basename is
-  // an allowlisted shell. Lets users with non-standard setups (WSL, custom
-  // bash, msys2) pin context-mode to their preferred shell.
+  // an allowlisted shell. Lets users with non-standard setups (custom bash,
+  // msys2, pwsh) pin context-mode to their preferred shell.
   //
   // Allowlist (PR #401 ops review): basename must match
-  // /^(bash|sh|zsh|dash|pwsh|cmd)(\.exe)?$/. Without this guard, an attacker
+  // /^(bash|sh|zsh|dash|pwsh|powershell|cmd)(\.exe)?$/. Without this guard, an attacker
   // who controls SHELL (e.g., supply-chain compromise of a profile script)
   // could redirect the executor to /usr/bin/python or any arbitrary binary.
   const userShell = process.env.SHELL;
-  const shellOverride = userShell && existsSync(userShell) && isAllowlistedShell(userShell)
+  const isWin = process.platform === "win32";
+  const shellOverride = userShell &&
+    existsSync(userShell) &&
+    isAllowlistedShell(userShell) &&
+    !(isWin && isWindowsWslBash(userShell))
     ? userShell
     : null;
-  const isWin = process.platform === "win32";
 
   return {
     javascript: bun ?? process.execPath,
@@ -408,9 +417,16 @@ export function buildCommand(
           return [runtimes.shell, "-c", `source '${escaped}'`];
         }
         if (shellName.includes("powershell") || shellName.includes("pwsh")) {
-          return [runtimes.shell, "-File", filePath];
+          // Windows PowerShell defaults to Restricted when no execution policy
+          // is configured. Use process-scoped Bypass so generated temp scripts
+          // run without changing machine/user policy.
+          return [runtimes.shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", filePath];
         }
-        // cmd.exe and others: direct file (cmd reads .cmd association safely).
+        const shellBase = shellName.split(/[\\/]/).pop() ?? shellName;
+        if (shellBase === "cmd" || shellBase === "cmd.exe") {
+          return [runtimes.shell, "/d", "/s", "/c", filePath];
+        }
+        // Other Windows shells: direct file.
       }
       return [runtimes.shell, filePath];
     }

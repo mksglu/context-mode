@@ -180,6 +180,41 @@ describe("SHELL env var override", () => {
       expect(["bash", "sh"]).toContain(r.shell);
     }
   });
+
+  test("Windows ignores SHELL override pointing at WSL bash shim", async () => {
+    const originalPlatform = process.platform;
+    const wslBash = "C:\\Windows\\System32\\bash.exe";
+    const gitBash = "C:\\Program Files\\Git\\usr\\bin\\bash.exe";
+    process.env.SHELL = wslBash;
+
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return {
+        ...actual,
+        existsSync: vi.fn((p: string | URL) => [wslBash, gitBash].includes(String(p))),
+      };
+    });
+    vi.doMock("node:child_process", () => ({
+      execFileSync: vi.fn(() => ""),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd === "where bash") return `${wslBash}\r\n${gitBash}\r\n`;
+        throw new Error(`unmocked execSync: ${cmd}`);
+      }),
+    }));
+
+    try {
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      const { detectRuntimes } = await import("../src/runtime.js");
+      const r = detectRuntimes();
+      expect(r.shell).toBe(gitBash);
+      expect(r.shell).not.toBe(wslBash);
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
+      vi.doUnmock("node:fs");
+      vi.doUnmock("node:child_process");
+      vi.resetModules();
+    }
+  });
 });
 
 describe("runnableExists — Windows MS Store stub filter (#454)", () => {
@@ -615,7 +650,7 @@ describe("buildCommand shell variants", () => {
     }
   });
 
-  test("Windows powershell gets -File pattern", async () => {
+  test("Windows powershell gets process-scoped execution policy bypass", async () => {
     const original = process.platform;
     try {
       const { buildCommand } = await importWithPlatform("win32");
@@ -625,15 +660,44 @@ describe("buildCommand shell variants", () => {
         "C:\\tmp\\script.ps1",
       );
       expect(cmd[0]).toBe("powershell");
-      expect(cmd[1]).toBe("-File");
-      expect(cmd[2]).toBe("C:\\tmp\\script.ps1");
+      expect(cmd).toEqual([
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\tmp\\script.ps1",
+      ]);
     } finally {
       Object.defineProperty(process, "platform", { value: original, configurable: true });
       vi.resetModules();
     }
   });
 
-  test("Windows cmd gets direct file pattern", async () => {
+  test("Windows pwsh gets process-scoped execution policy bypass", async () => {
+    const original = process.platform;
+    try {
+      const { buildCommand } = await importWithPlatform("win32");
+      const cmd = buildCommand(
+        makeRuntimes("C:\\Program Files\\PowerShell\\7\\pwsh.exe"),
+        "shell",
+        "C:\\tmp\\script.ps1",
+      );
+      expect(cmd).toEqual([
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\tmp\\script.ps1",
+      ]);
+    } finally {
+      Object.defineProperty(process, "platform", { value: original, configurable: true });
+      vi.resetModules();
+    }
+  });
+
+  test("Windows cmd gets cmd /c pattern", async () => {
     const original = process.platform;
     try {
       const { buildCommand } = await importWithPlatform("win32");
@@ -642,9 +706,7 @@ describe("buildCommand shell variants", () => {
         "shell",
         "C:\\tmp\\script.cmd",
       );
-      expect(cmd[0]).toBe("cmd.exe");
-      expect(cmd[1]).toBe("C:\\tmp\\script.cmd");
-      expect(cmd.length).toBe(2);
+      expect(cmd).toEqual(["cmd.exe", "/d", "/s", "/c", "C:\\tmp\\script.cmd"]);
     } finally {
       Object.defineProperty(process, "platform", { value: original, configurable: true });
       vi.resetModules();

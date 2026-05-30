@@ -638,7 +638,10 @@ describe("Shell-Escape Scanner", () => {
 describe("CLAUDE_CONFIG_DIR honors security policy reader", () => {
   let cfgTmpBase: string;
   let customConfigDir: string;
+  let fakeHome: string;
   let savedEnv: string | undefined;
+  let savedHome: string | undefined;
+  let savedUserprofile: string | undefined;
 
   beforeAll(() => {
     cfgTmpBase = join(tmpdir(), `security-cfg-test-${Date.now()}`);
@@ -656,11 +659,15 @@ describe("CLAUDE_CONFIG_DIR honors security policy reader", () => {
       }),
     );
 
-    // Homedir fallback — distinct content so we can detect which file was read.
-    const homeClaudeDir = join(homedir(), ".claude");
-    mkdirSync(homeClaudeDir, { recursive: true });
+    // Homedir fallback — write to a sandboxed fake HOME under tmpdir() so
+    // running `npm test` from a contributor machine never clobbers the
+    // user's real ~/.claude/settings.json. Matches the env-override
+    // pattern used by the #451 round-3 block below.
+    fakeHome = join(cfgTmpBase, "fake-home");
+    const fakeClaudeDir = join(fakeHome, ".claude");
+    mkdirSync(fakeClaudeDir, { recursive: true });
     writeFileSync(
-      join(homeClaudeDir, "settings.json"),
+      join(fakeClaudeDir, "settings.json"),
       JSON.stringify({
         permissions: {
           allow: [],
@@ -670,11 +677,19 @@ describe("CLAUDE_CONFIG_DIR honors security policy reader", () => {
     );
 
     savedEnv = process.env.CLAUDE_CONFIG_DIR;
+    savedHome = process.env.HOME;
+    savedUserprofile = process.env.USERPROFILE;
+    process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
   });
 
   afterAll(() => {
     if (savedEnv === undefined) delete process.env.CLAUDE_CONFIG_DIR;
     else process.env.CLAUDE_CONFIG_DIR = savedEnv;
+    if (savedHome === undefined) delete process.env.HOME;
+    else process.env.HOME = savedHome;
+    if (savedUserprofile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = savedUserprofile;
     rmSync(cfgTmpBase, { recursive: true, force: true });
   });
 

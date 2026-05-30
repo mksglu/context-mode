@@ -61,7 +61,7 @@ function seedFixtureDBs(baseDir: string): { sessionsDir: string; contentDir: str
     "/secret/project",
     "2026-04-16T00:00:00Z",
     "2026-04-16T00:05:00Z",
-    1,
+    76,
     0,
   );
   sessionDb.prepare(
@@ -84,6 +84,45 @@ function seedFixtureDBs(baseDir: string): { sessionsDir: string; contentDir: str
     1,
     0,
   );
+  const insertEvent = sessionDb.prepare(
+    "INSERT INTO session_events (id, session_id, type, category, priority, data, source_hook, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  );
+  for (let i = 0; i < 25; i++) {
+    insertEvent.run(
+      i + 2,
+      "sess-1",
+      "error_tool",
+      "error",
+      "medium",
+      `Read failed ${i + 1}`,
+      "posttooluse",
+      `2026-04-16T00:${String(i + 2).padStart(2, "0")}:00Z`,
+    );
+  }
+  for (let i = 0; i < 25; i++) {
+    insertEvent.run(
+      i + 27,
+      "sess-1",
+      "user_prompt",
+      "user-prompt",
+      "high",
+      `prompt ${i + 1}`,
+      "userpromptsubmit",
+      `2026-04-16T00:31:${String(i).padStart(2, "0")}Z`,
+    );
+  }
+  for (let i = 0; i < 25; i++) {
+    insertEvent.run(
+      i + 52,
+      "sess-1",
+      "task",
+      "task",
+      "medium",
+      `task ${i + 1}`,
+      "posttooluse",
+      `2026-04-16T00:32:${String(i).padStart(2, "0")}Z`,
+    );
+  }
   sessionDb.close();
 
   const contentDb = new Database(join(contentDir, "feedface.db"));
@@ -159,7 +198,11 @@ function startInsight(runtime: "node" | "bun" = "node"): { port: number; child: 
   mkdirSync(join(tempInsightDir, "dist"), { recursive: true });
   cpSync(SOURCE_SERVER, join(tempInsightDir, "server.mjs"));
   writeFileSync(join(tempInsightDir, "dist", DIST_INDEX_NAME), "<!doctype html><html><body>stub</body></html>");
-  symlinkSync(resolve(ROOT, "node_modules"), join(tempRoot, "node_modules"), "dir");
+  symlinkSync(
+    resolve(ROOT, "node_modules"),
+    join(tempRoot, "node_modules"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
 
   const { sessionsDir, contentDir } = seedFixtureDBs(tempRoot);
   const port = 49152 + Math.floor(Math.random() * 16383);
@@ -177,7 +220,7 @@ function startInsight(runtime: "node" | "bun" = "node"): { port: number; child: 
   return { port, child };
 }
 
-describe("Insight API same-machine cross-origin policy", () => {
+describe("Insight API — Node runtime", () => {
   let port: number;
   let serverChild: ChildProcess;
   let serverTempDir: string | undefined;
@@ -242,6 +285,19 @@ describe("Insight API same-machine cross-origin policy", () => {
     expect(res.status).toBe(405);
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
     expect(res.headers.get("access-control-allow-methods")).toBeNull();
+  });
+
+  test("analytics totals count all matching rows even when detail lists are capped (Node)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/analytics`);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.errors).toHaveLength(20);
+    expect(body.totals.totalErrors).toBe(25);
+    expect(body.prompts).toHaveLength(20);
+    expect(body.totals.totalPrompts).toBe(26);
+    expect(body.tasks).toHaveLength(20);
+    expect(body.totals.totalTasks).toBe(25);
   });
 
 });

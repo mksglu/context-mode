@@ -3,7 +3,11 @@
     "context-mode": {
       "command": "node",
       "args": ["./start.mjs"],
-      "cwd": "."
+      "cwd": ".",
+      "env": {
+        "CONTEXT_MODE_PLATFORM": "codex"
+      },
+      "default_tools_approval_mode": "approve"
     }
   }
 }
