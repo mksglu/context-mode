@@ -24,12 +24,15 @@ export function createRoutingBlock(t, options = {}) {
   <tool_selection_hierarchy>
     0. MEMORY: ${t("ctx_search")}(sort: "timeline")
        - On resume or compaction, query prior decisions, errors, plans, user prompts before asking the user — auto-captured session memory is searchable.
-    1. GATHER: ${t("ctx_batch_execute")}(commands, queries)
-       - Primary research tool. Runs commands in parallel, auto-indexes each output, and (when queries are passed) returns matching sections in the same round trip — no follow-up search call.
+    1. SKILLS (check first): if the task matches an available skill's "Use when"/description, invoke it via the Skill tool BEFORE reaching for the gathering tools below.
+       - Skills encode how to do the task in this project; they shape what to gather and how. Check them first so external research is informed by internal conventions, not blind to them.
+       - Internal knowledge is NOT a blocker to external research: a matching skill does not replace gathering. Run the skill, then still use the tools below to fetch what the skill cannot supply (live data, code, docs).
+    2. GATHER: ${t("ctx_batch_execute")}(commands, queries)
+       - Primary tool for gathering external/raw data — used after skill routing (step 1), not instead of it. Runs commands in parallel, auto-indexes each output, and (when queries are passed) returns matching sections in the same round trip — no follow-up search call.
        - Each command: {label: "section header", command: "shell command"}; the label becomes the FTS5 chunk title — descriptive labels improve search.
-    2. FOLLOW-UP: ${t("ctx_search")}(queries: ["q1", "q2", ...])
+    3. FOLLOW-UP: ${t("ctx_search")}(queries: ["q1", "q2", ...])
        - Multiple related questions about anything already indexed (your captures + session memory). Batch every question in one array; the ranking pipeline runs per-query and the round-trip cost is paid once.
-    3. PROCESSING: ${t("ctx_execute")}(language, code) | ${t("ctx_execute_file")}(path, language, code)
+    4. PROCESSING: ${t("ctx_execute")}(language, code) | ${t("ctx_execute_file")}(path, language, code)
        - Derive answers FROM data: filter, count, aggregate, parse, transform. Only what you console.log() enters your conversation; the raw bytes stay in the sandbox.
   </tool_selection_hierarchy>
 
