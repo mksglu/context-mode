@@ -2106,11 +2106,11 @@ EXAMPLE: ctx_index(path: "/path/to/large-spec.md", source: "openapi-v2-spec")`,
       exclude: z.array(z.string()).optional().describe(
         "Directory-only: glob patterns to exclude. Merged with defaults (node_modules, .git, dist, build, .next, coverage, .venv, __pycache__, .DS_Store).",
       ),
-      maxDepth: z.number().int().min(0).optional().describe(
-        "Directory-only: max recursion depth from root (default: 5).",
+      maxDepth: z.number().int().min(0).max(64).optional().describe(
+        "Directory-only: max recursion depth from root (default: 5, max: 64).",
       ),
-      maxFiles: z.number().int().min(1).optional().describe(
-        "Directory-only: hard cap on files indexed (default: 200) — FTS5 blow-up guard.",
+      maxFiles: z.number().int().min(1).max(100_000).optional().describe(
+        "Directory-only: hard cap on files indexed (default: 200, max: 100000) — FTS5 blow-up guard.",
       ),
       extensions: z.array(z.string()).optional().describe(
         "Directory-only: allowed file extensions (default: .md .mdx .txt .json .yaml .yml .ts .tsx .js .jsx .py .rs .go .sh).",

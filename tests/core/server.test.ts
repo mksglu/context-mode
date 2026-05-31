@@ -6892,3 +6892,17 @@ describe("ctx_stats cache observability + index_state (issue #697)", () => {
     expect(text).toContain("index.last_indexed_at: 2026-05-24T12:00:00");
   });
 });
+
+describe("ctx_index schema bounds maxDepth and maxFiles", () => {
+  // Unbounded maxDepth/maxFiles let a hostile ctx_index call (path:"/",
+  // maxFiles huge) drive the walk into a resource-exhaustion sweep. The schema
+  // caps both so an over-cap request is rejected at the zod layer before the
+  // walk ever starts.
+  const SRC = readFileSync(resolve(__dirname, "../../src/server.ts"), "utf-8");
+  test("maxDepth carries a .max() cap", () => {
+    expect(SRC).toMatch(/maxDepth:\s*z\.number\(\)\.int\(\)\.min\(0\)\.max\(\d+\)/);
+  });
+  test("maxFiles carries a .max() cap", () => {
+    expect(SRC).toMatch(/maxFiles:\s*z\.number\(\)\.int\(\)\.min\(1\)\.max\([\d_]+\)/);
+  });
+});
