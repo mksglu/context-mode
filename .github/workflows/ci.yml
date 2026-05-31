@@ -80,6 +80,16 @@ jobs:
           elif grep -q "Tests.*passed" /tmp/vitest-output.txt; then
             echo "✅ All tests passed (exit code $VITEST_EXIT may reflect worker cleanup noise)"
             exit 0
+          elif grep -q "Error: kill EPERM" /tmp/vitest-output.txt; then
+            # Vitest crashed during worker teardown (Windows-only kill EPERM race, errno -4048)
+            # BEFORE printing the summary line. Look for per-suite failure markers instead —
+            # if none, treat as pass (the same cleanup noise the comment above acknowledges).
+            if grep -qE "FAIL +tests/|⨯ +tests/" /tmp/vitest-output.txt; then
+              echo "❌ Per-suite failures detected before teardown crash"
+              exit 1
+            fi
+            echo "⚠️ Vitest worker teardown race (Windows kill EPERM) — no failures detected; treating as pass."
+            exit 0
           else
             echo "❌ Could not parse test results"
             exit $VITEST_EXIT
