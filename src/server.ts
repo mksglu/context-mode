@@ -87,7 +87,12 @@ if (process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS !== "1") {
   });
 }
 
-const runtimes = detectRuntimes();
+// Pass the resolved project directory so detectVenvPython() can find
+// .venv/bin/python at boot. getProjectDir is hoisted from its function
+// declaration below (line ~537). Without projectRoot the venv check
+// falls back to process.cwd(), which for MCP servers spawned by editors
+// is rarely the user's actual project root.
+const runtimes = detectRuntimes(getProjectDir());
 const available = getAvailableLanguages(runtimes);
 export const server = new McpServer({
   name: "context-mode",

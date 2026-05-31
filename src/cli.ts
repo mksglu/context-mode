@@ -425,7 +425,11 @@ async function doctor(): Promise<number> {
   let runtimes: ReturnType<typeof detectRuntimes>;
   let available: string[];
   try {
-    runtimes = detectRuntimes();
+    // Pass cwd so detectVenvPython() picks up .venv/bin/python in the
+    // user's project. Without this, doctor's PolyglotExecutor (below)
+    // receives a runtime map with the global python rather than the
+    // activated/local one.
+    runtimes = detectRuntimes(process.cwd());
     available = getAvailableLanguages(runtimes);
   } catch {
     s.stop("Diagnostics partial");
