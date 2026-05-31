@@ -50,6 +50,49 @@ interface MockContextEngine {
   };
 }
 
+function createMockApiWithoutRegisterHook() {
+  const lifecycle: MockLifecycleEntry[] = [];
+  const tools: MockToolEntry[] = [];
+  const commands: MockCommandEntry[] = [];
+  const warnings: unknown[][] = [];
+
+  return {
+    lifecycle,
+    tools,
+    commands,
+    warnings,
+    api: {
+      on(
+        event: string,
+        handler: (...args: unknown[]) => unknown,
+        opts?: { priority?: number },
+      ) {
+        lifecycle.push({ event, handler, opts });
+      },
+      registerCommand(command: unknown) {
+        if (
+          !command ||
+          typeof command !== "object" ||
+          typeof (command as { name?: unknown }).name !== "string" ||
+          typeof (command as { handler?: unknown }).handler !== "function"
+        ) {
+          throw new TypeError("registerCommand(command) expected");
+        }
+        commands.push(command as MockCommandEntry);
+      },
+      registerTool(
+        tool: Omit<MockToolEntry, "optional">,
+        opts?: { optional?: boolean },
+      ) {
+        tools.push({ ...tool, optional: opts?.optional });
+      },
+      logger: {
+        warn: (...args: unknown[]) => warnings.push(args),
+      },
+    },
+  };
+}
+
 interface MockCommandEntry {
   name: string;
   description: string;
@@ -265,6 +308,22 @@ describe("OpenClawPlugin", () => {
         expect(hook.meta.description.length).toBeGreaterThan(0);
       }
     });
+
+    it("degrades gracefully when registerHook and registerContextEngine are unavailable", async () => {
+      const { default: plugin } = await import("../../src/adapters/openclaw/plugin.js");
+      const mock = createMockApiWithoutRegisterHook();
+
+      expect(() => plugin.register(mock.api as unknown as Parameters<typeof plugin.register>[0]))
+        .not.toThrow();
+      expect(mock.tools.length).toBeGreaterThan(0);
+      expect(mock.commands.map((c) => c.name)).toEqual(
+        expect.arrayContaining(["ctx-stats", "ctx-doctor", "ctx-upgrade"]),
+      );
+      const lifecycleNames = mock.lifecycle.map((h) => h.event);
+      expect(lifecycleNames).toContain("before_tool_call");
+      expect(lifecycleNames).toContain("command:new");
+      expect(mock.warnings.length).toBeGreaterThan(0);
+    });
   });
 
   // ── Auto-reply commands ───────────────────────────────
@@ -458,6 +517,17 @@ describe("OpenClawPlugin", () => {
       expect(result.appendSystemContext).toContain("context-mode");
     });
 
+    it("injects skill-like guidance derived from skills/context-mode/SKILL.md", async () => {
+      const mock = await createTestPlugin(join(tempDir, "prompt-skill-like"));
+      await flushInit(mock);
+      const promptHook = mock.lifecycle.find(
+        (l) => l.event === "before_prompt_build" && l.opts?.priority === 5,
+      );
+      const result = promptHook!.handler() as { appendSystemContext?: string };
+      expect(result?.appendSystemContext).toContain("<context_mode_skill_like_guidance");
+      expect(result?.appendSystemContext).toContain("Default to context-mode for ALL commands.");
+    });
+
     it("has priority 5", async () => {
       const mock = await createTestPlugin(join(tempDir, "prompt-priority"));
       const promptHook = mock.lifecycle.find(
@@ -604,6 +674,7 @@ describe("OpenClawPlugin", () => {
       expect(out?.inputOverride?.prompt).toBeDefined();
       expect(out!.inputOverride!.prompt!).toContain("Investigate the failing test.");
       expect(out!.inputOverride!.prompt!).toContain("<context_window_protection>");
+      expect(out!.inputOverride!.prompt!).toContain("<context_mode_skill_like_guidance");
     });
 
     it("falls back gracefully when input.prompt is missing", async () => {
@@ -614,6 +685,7 @@ describe("OpenClawPlugin", () => {
         | { inputOverride?: { prompt?: string } }
         | undefined;
       expect(out?.inputOverride?.prompt).toContain("<context_window_protection>");
+      expect(out?.inputOverride?.prompt).toContain("<context_mode_skill_like_guidance");
     });
   });
 
