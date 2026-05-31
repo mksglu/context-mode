@@ -744,3 +744,182 @@ describe("buildCommand shell variants", () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// PR #726 — project-local venv python detection
+//
+// detectVenvPython() resolves the Python interpreter in this order:
+//   1. $VIRTUAL_ENV/bin/python  (POSIX) | $VIRTUAL_ENV\Scripts\python.exe (Win)
+//   2. <projectRoot>/.venv/bin/python | venv/bin/python (POSIX equivalents on Win)
+//   3. <cwd>/.venv/bin/python | venv/bin/python
+//   4. PATH lookup for python3 → python → py
+//
+// Tests mock node:fs.existsSync and node:child_process.execFileSync/execSync
+// so they run identically across macOS / Linux / Windows CI without touching
+// the real disk. process.platform is stubbed to validate the path-separator
+// branch for each OS.
+// ─────────────────────────────────────────────────────────
+describe("detectVenvPython — project-local venv prioritization (#726)", () => {
+  const ORIG_VIRTUAL_ENV = process.env.VIRTUAL_ENV;
+  const ORIG_PLATFORM = process.platform;
+
+  beforeEach(() => {
+    delete process.env.VIRTUAL_ENV;
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("node:fs");
+    vi.doUnmock("node:child_process");
+    if (ORIG_VIRTUAL_ENV === undefined) {
+      delete process.env.VIRTUAL_ENV;
+    } else {
+      process.env.VIRTUAL_ENV = ORIG_VIRTUAL_ENV;
+    }
+    Object.defineProperty(process, "platform", { value: ORIG_PLATFORM, configurable: true });
+  });
+
+  /** Mock node:fs.existsSync to return true ONLY for the paths in `present`,
+   *  AND mock node:child_process so --version probes for those paths succeed.
+   *  This combination makes runnableExists() return true for our venv binary
+   *  without touching the real filesystem.
+   */
+  function mockFsAndProbes(present: string[]) {
+    const presentSet = new Set(present);
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return {
+        ...actual,
+        existsSync: (p: string) => presentSet.has(p),
+      };
+    });
+    const execFileSync = vi.fn((cmd: string, args: string[]) => {
+      if (args && args[0] === "--version" && presentSet.has(cmd)) {
+        return Buffer.from("Python 3.11.4\n");
+      }
+      throw new Error(`probe failed: ${cmd}`);
+    });
+    const execSync = vi.fn((cmd: string) => {
+      // POSIX `command -v <x>` lookups — fail everything so PATH-fallback
+      // can't accidentally satisfy the test.
+      if (/^command -v\s/.test(cmd)) throw new Error("not in PATH");
+      // Windows `where <x>` lookups — fail everything for the same reason.
+      if (/^where\s/.test(cmd)) throw new Error("not in PATH");
+      // Windows `"<cmd>" --version` probe.
+      const probe = cmd.match(/^"([^"]+)"\s+--version$/);
+      if (probe && presentSet.has(probe[1])) {
+        return Buffer.from("Python 3.11.4\n");
+      }
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    vi.doMock("node:child_process", () => ({ execFileSync, execSync }));
+  }
+
+  test("(a) POSIX: finds <projectRoot>/.venv/bin/python", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    const projectRoot = "/home/user/project";
+    const venvPy = `${projectRoot}/.venv/bin/python`;
+    mockFsAndProbes([venvPy]);
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes(projectRoot);
+
+    expect(r.python).toBe(venvPy);
+  });
+
+  test("(b) Windows: finds <projectRoot>\\.venv\\Scripts\\python.exe", async () => {
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    // Use a POSIX-shaped absolute root so node:path.resolve on the host
+    // test runner produces a stable string we can match. The branch under
+    // test is the Windows subPaths array (Scripts\\python.exe), which the
+    // process.platform stub selects regardless of host OS.
+    const projectRoot = "/fake/win-project";
+    const { join, resolve } = await import("node:path");
+    const venvPy = resolve(projectRoot, join(".venv", "Scripts", "python.exe"));
+    mockFsAndProbes([venvPy]);
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes(projectRoot);
+
+    expect(r.python).toBe(venvPy);
+    // Verify the Windows subPath was used (not the POSIX bin/python).
+    expect(venvPy).toContain("Scripts");
+    expect(venvPy).toContain("python.exe");
+  });
+
+  test("(c) $VIRTUAL_ENV precedence over disk scan (covers poetry/uv/pyenv-virtualenv)", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    const projectRoot = "/home/user/project";
+    const projectVenv = `${projectRoot}/.venv/bin/python`;
+    const activatedVenv = "/home/user/.cache/pypoetry/virtualenvs/myproj-py3.11/bin/python";
+    process.env.VIRTUAL_ENV = "/home/user/.cache/pypoetry/virtualenvs/myproj-py3.11";
+    // BOTH exist — activated venv must win.
+    mockFsAndProbes([projectVenv, activatedVenv]);
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes(projectRoot);
+
+    expect(r.python).toBe(activatedVenv);
+  });
+
+  test("(d) orphan-exe fallthrough — existsSync true but --version fails → fall through to PATH", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    const projectRoot = "/home/user/project";
+    const venvPy = `${projectRoot}/.venv/bin/python`;
+    // .venv/bin/python exists on disk but the binary is broken (e.g. recreated
+    // interpreter has wrong dynamic linker after a system upgrade). It must NOT
+    // be selected — detectRuntimes must fall through to PATH-based python3.
+    const presentSet = new Set([venvPy]);
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync: (p: string) => presentSet.has(p) };
+    });
+    const execFileSync = vi.fn((cmd: string, args: string[]) => {
+      if (args && args[0] === "--version") {
+        if (cmd === venvPy) throw new Error("orphan venv: bad interpreter");
+        if (cmd === "python3") return Buffer.from("Python 3.11.4\n");
+      }
+      throw new Error(`probe failed: ${cmd}`);
+    });
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd === "command -v python3") return Buffer.from("/usr/bin/python3\n");
+      if (/^command -v\s/.test(cmd)) throw new Error("not in PATH");
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    vi.doMock("node:child_process", () => ({ execFileSync, execSync }));
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes(projectRoot);
+
+    expect(r.python).toBe("python3");
+  });
+
+  test("(e) dead symlink fallthrough — existsSync false → skip venv, use PATH", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    const projectRoot = "/home/user/project";
+    // Dead symlink: existsSync follows symlinks → returns false for broken targets.
+    // No fs entries are "present" → venv check returns null → fall through to python3.
+    const presentSet = new Set<string>();
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync: (p: string) => presentSet.has(p) };
+    });
+    const execFileSync = vi.fn((cmd: string, args: string[]) => {
+      if (args && args[0] === "--version" && cmd === "python3") {
+        return Buffer.from("Python 3.11.4\n");
+      }
+      throw new Error(`probe failed: ${cmd}`);
+    });
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd === "command -v python3") return Buffer.from("/usr/bin/python3\n");
+      if (/^command -v\s/.test(cmd)) throw new Error("not in PATH");
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    vi.doMock("node:child_process", () => ({ execFileSync, execSync }));
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes(projectRoot);
+
+    expect(r.python).toBe("python3");
+  });
+});
