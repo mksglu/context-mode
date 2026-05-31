@@ -261,3 +261,94 @@ describe("Pi MCPStdioClient — foreign identification env scrub (issue #561)", 
     expect(spawned.PI_CONFIG_DIR).toBe("/Users/x/.pi/config");
   });
 });
+
+// PR #741 follow-up — cross-OS PI_CONFIG_DIR rescue.
+// Pi on Windows installs to %APPDATA%\.pi (XDG-on-Windows pattern),
+// NOT %USERPROFILE%\.pi. The HOME-rooted probe is false on every
+// Windows Pi install; without an APPDATA fallback the rescue never
+// fires and Pi sessions write into ~/.claude/ instead of ~/.pi/.
+describe("Pi MCPStdioClient — cross-OS PI_CONFIG_DIR rescue (PR #741 follow-up)", () => {
+  it("respects PI_CONFIG_DIR when the parent already exported it (no override)", () => {
+    // Pi's launcher may pin a non-default config dir (CI / corporate setup).
+    // The rescue must NEVER stomp on the parent's intent.
+    const home = process.env.HOME!;
+    if (!home) throw new Error("setup-home did not set HOME");
+    const piDir = join(home, ".pi");
+    mkdirSync(piDir);
+    try {
+      const env: NodeJS.ProcessEnv = {
+        HOME: home,
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        PI_CONFIG_DIR: "/opt/corporate/pi-config-pinned",
+      };
+      const client = new MCPStdioClient(fakeServer, env);
+      clients.push(client);
+      client.start();
+      const spawned = client._spawnEnv;
+      expect(spawned).not.toBeNull();
+      if (!spawned) throw new Error("unreachable");
+      // Parent-set PI_CONFIG_DIR is preserved verbatim even though
+      // ${HOME}/.pi exists on disk.
+      expect(spawned.PI_CONFIG_DIR).toBe("/opt/corporate/pi-config-pinned");
+    } finally {
+      try { rmSync(piDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  it("falls back to APPDATA/.pi on Windows when USERPROFILE/.pi does not exist", () => {
+    // Simulate Pi-on-Windows: APPDATA points to a real .pi/, USERPROFILE
+    // does NOT (so the original HOME-rooted probe would miss it). Bridge
+    // must rescue PI_CONFIG_DIR from APPDATA so detectPlatform() returns pi.
+    const scratchDir = mkdtempSync(join(tmpdir(), "ctx-pi-win-appdata-"));
+    const appDataPiDir = join(scratchDir, "appdata", ".pi");
+    mkdirSync(appDataPiDir, { recursive: true });
+    try {
+      const env: NodeJS.ProcessEnv = {
+        // No HOME set — emulates Windows where HOME may be absent and
+        // USERPROFILE points at a directory without .pi/ on it.
+        USERPROFILE: join(scratchDir, "userprofile"),
+        APPDATA: join(scratchDir, "appdata"),
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+      };
+      const client = new MCPStdioClient(fakeServer, env);
+      clients.push(client);
+      client.start();
+      const spawned = client._spawnEnv;
+      expect(spawned).not.toBeNull();
+      if (!spawned) throw new Error("unreachable");
+      // APPDATA-based path was picked up — Pi's Windows install layout.
+      expect(spawned.PI_CONFIG_DIR).toBe(appDataPiDir);
+    } finally {
+      try { rmSync(scratchDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  it("prefers HOME/.pi when both HOME/.pi and APPDATA/.pi exist", () => {
+    // POSIX-shaped path stays canonical. The home candidate is probed
+    // before APPDATA so Linux/macOS behavior is unchanged.
+    const home = process.env.HOME!;
+    if (!home) throw new Error("setup-home did not set HOME");
+    const homePiDir = join(home, ".pi");
+    const scratchDir = mkdtempSync(join(tmpdir(), "ctx-pi-prefer-home-"));
+    const appDataPiDir = join(scratchDir, "appdata", ".pi");
+    mkdirSync(homePiDir);
+    mkdirSync(appDataPiDir, { recursive: true });
+    try {
+      const env: NodeJS.ProcessEnv = {
+        HOME: home,
+        APPDATA: join(scratchDir, "appdata"),
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+      };
+      const client = new MCPStdioClient(fakeServer, env);
+      clients.push(client);
+      client.start();
+      const spawned = client._spawnEnv;
+      expect(spawned).not.toBeNull();
+      if (!spawned) throw new Error("unreachable");
+      expect(spawned.PI_CONFIG_DIR).toBe(homePiDir);
+    } finally {
+      try { rmSync(homePiDir, { recursive: true, force: true }); } catch {}
+      try { rmSync(scratchDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+});
