@@ -59,7 +59,7 @@ import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
 import { loadDatabase } from "./db-base.js";
-import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, PRICE_PER_TOKEN } from "./session/analytics.js";
+import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, pricePerToken } from "./session/analytics.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
 const VERSION: string = (() => {
   for (const rel of ["../package.json", "./package.json"]) {
@@ -894,7 +894,7 @@ const STATS_PERSIST_THROTTLE_MS = 500;
 // rendering missing fields (PR #401 architect review P1.3).
 // v2: added tokens_saved_lifetime + dollars_saved_lifetime.
 const STATS_SCHEMA_VERSION = 2;
-// PRICE_PER_TOKEN intentionally NOT defined here — single source in
+// pricePerToken() intentionally NOT defined here — single source in
 // src/session/analytics.ts re-exported above. (P1.1 — pricing constant dedup,
 // PR #401 architect + ops 2-vote convergence.)
 const LIFETIME_REFRESH_MS = 30_000;
@@ -975,11 +975,11 @@ function persistStats(): void {
       tokens_saved: tokensSaved,
       // statusline-facing $ values — pre-computed at the current per-token
       // rate (dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set by a
-      // Pi host; Opus $15/1M otherwise). Lets us evolve pricing in one place
-      // without touching consumers.
-      dollars_saved_session: +(tokensSaved * PRICE_PER_TOKEN).toFixed(2),
+      // Pi host; Opus $15/1M otherwise). Resolved on every persist via
+      // pricePerToken() so the env override picks up without an MCP restart.
+      dollars_saved_session: +(tokensSaved * pricePerToken()).toFixed(2),
       tokens_saved_lifetime: lifetimeTokens,
-      dollars_saved_lifetime: +(lifetimeTokens * PRICE_PER_TOKEN).toFixed(2),
+      dollars_saved_lifetime: +(lifetimeTokens * pricePerToken()).toFixed(2),
       by_tool: Object.fromEntries(
         Object.keys({ ...sessionStats.calls, ...sessionStats.bytesReturned }).map(
           (t) => [

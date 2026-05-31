@@ -464,11 +464,28 @@ export class MCPStdioClient {
     // child resolves to Pi correctly. (Use childEnv.HOME, not homedir(),
     // because homedir() reads getpwent() which ignores our HOME override
     // in test environments.)
-    const home = childEnv.HOME ?? childEnv.USERPROFILE ?? childEnv.HOMEPATH;
-    if (home) {
-      const piConfig = join(home, ".pi");
-      if (existsSync(piConfig)) {
-        childEnv.PI_CONFIG_DIR = piConfig;
+    //
+    // Cross-OS PI_CONFIG_DIR rescue (PR #741 follow-up):
+    //   1. If the parent already exported PI_CONFIG_DIR, trust it
+    //      verbatim — Pi's launcher owns that path and may pin it to
+    //      a non-default location (corporate setup, CI, etc.).
+    //   2. POSIX: ~/.pi (HOME-rooted).
+    //   3. Windows: probe both %USERPROFILE%\.pi (rare native install)
+    //      AND %APPDATA%\.pi (XDG-on-Windows, Pi's documented Windows
+    //      layout). Without the APPDATA fallback, every Pi-on-Windows
+    //      install silently drops back to the Claude Code default and
+    //      Pi's sessions write into the wrong directory.
+    if (!childEnv.PI_CONFIG_DIR) {
+      const home = childEnv.HOME ?? childEnv.USERPROFILE ?? childEnv.HOMEPATH;
+      const appData = childEnv.APPDATA; // Windows-only, undefined on POSIX
+      const candidates: string[] = [];
+      if (home) candidates.push(join(home, ".pi"));
+      if (appData) candidates.push(join(appData, ".pi"));
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+          childEnv.PI_CONFIG_DIR = candidate;
+          break;
+        }
       }
     }
     this._spawnEnv = childEnv;

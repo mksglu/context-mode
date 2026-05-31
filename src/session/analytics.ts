@@ -1854,7 +1854,7 @@ export function renderCostExample(
 ): string[] {
   if (!Number.isFinite(lifetimeTokens) || lifetimeTokens <= 0) return [];
 
-  const lifetimeUsd = lifetimeTokens * PRICE_PER_TOKEN;
+  const lifetimeUsd = lifetimeTokens * pricePerToken();
   const usdStr  = (n: number, dp: number = 2): string => n.toFixed(dp);
 
   // Comparison units — kept locally so they're easy to tune without touching
@@ -2360,14 +2360,25 @@ function fmtNum(n: number): string {
 // Pricing (Bug #6) — Anthropic Opus input rate
 // ─────────────────────────────────────────────────────────
 
-/** Opus 4 input price: $15 per 1M tokens. */
 // ── Pricing (Bug #6) — per-token USD rate ─────────────────
 // Reads PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN when set by a Pi host;
 // falls back to the Opus 4 input rate ($15/1M) for all other adapters.
-// Renamed from OPUS_INPUT_PRICE_PER_TOKEN to reflect the dynamic
-// resolution path (provider-pricing-bridge, 2026-05-30).
+//
+// IMPORTANT: this is a FUNCTION, not a const. Pi sets the env var
+// AFTER the MCP server has been imported (the bridge spawns the server
+// child, then the child reads its own env on every render). A
+// module-load-time const would freeze to the fallback because
+// process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is unset at
+// import time. Resolving on every call keeps the dynamic-pricing
+// contract honest — the env var works without an MCP restart.
+// (Reverted module-load const semantics, PR #741 follow-up.)
 
-function resolvePricePerToken(): number {
+/**
+ * Per-token USD rate — resolves on every call.
+ * Dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set, Opus 4 input
+ * ($15 per 1M tokens) otherwise.
+ */
+export function pricePerToken(): number {
   const env = process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN;
   if (env !== undefined && env !== "") {
     const parsed = Number(env);
@@ -2376,13 +2387,21 @@ function resolvePricePerToken(): number {
   return 15 / 1_000_000; // Opus 4 input fallback
 }
 
-/** Per-token USD rate — dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set, Opus 4 otherwise. */
-export const PRICE_PER_TOKEN = resolvePricePerToken();
+/**
+ * Back-compat alias for the original Opus-rate const (PR #401 architect
+ * P1.1 — single source of truth). Kept as a literal so any third-party
+ * consumer importing the named constant still resolves to the same
+ * fallback rate. New code should call pricePerToken() to pick up the
+ * dynamic Pi env override.
+ *
+ * @deprecated Use pricePerToken() to honor PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN.
+ */
+export const OPUS_INPUT_PRICE_PER_TOKEN = 15 / 1_000_000;
 
 /** Convert a token count to a USD string at the current per-token rate. */
 export function tokensToUsd(tokens: number): string {
   const safe = Number.isFinite(tokens) && tokens > 0 ? tokens : 0;
-  return `$${(safe * PRICE_PER_TOKEN).toFixed(2)}`;
+  return `$${(safe * pricePerToken()).toFixed(2)}`;
 }
 
 /**
