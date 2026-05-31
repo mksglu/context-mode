@@ -7,8 +7,7 @@
  * with `TypeError: undefined is not an object (evaluating 'n._zod.def')`.
  *
  * This module converts Zod 3 schema shapes into Zod 4 equivalents so both
- * hosts can process them natively. Called when `platform === "kilo"` or
- * `platform === "opencode"`.
+ * hosts can process them natively.
  */
 import z from 'zod/v4';
 
@@ -121,7 +120,7 @@ function zod3ToV4(v: unknown, depth = 0): z.ZodType {
       break;
 
     default:
-      // Never leak raw Zod 3 schemas back to KiloCode.
+      // Never leak raw Zod 3 schemas back to a v4 host.
       result = z.unknown();
       break;
   }
