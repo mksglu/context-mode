@@ -89,6 +89,14 @@ function commandExists(cmd: string): boolean {
  * exit 0 before declaring the runtime available (#455).
  */
 function runnableExists(cmd: string): boolean {
+  // Defense-in-depth (#455 fb4bc5ad): reject Windows MS Store App Execution
+  // Alias stubs even when the caller passes an absolute path. The stubs are
+  // 0-byte reparse points under %LOCALAPPDATA%\Microsoft\WindowsApps\ that
+  // existsSync() reports as true — without this guard an absolute-path probe
+  // would skip the stub filter and rely solely on the slow --version timeout.
+  if (isWindows && /\\Microsoft\\WindowsApps\\/i.test(cmd)) {
+    return false;
+  }
   const isDirectFile = existsSync(cmd);
   if (!isDirectFile) {
     if (isWindows) {
@@ -233,8 +241,26 @@ function getVersion(cmd: string, args: string[] = ["--version"]): string {
 }
 
 function detectVenvPython(projectRoot?: string): string | null {
-  const roots = [projectRoot, process.cwd()].filter((r): r is string => typeof r === "string" && r !== "");
   const isWin = process.platform === "win32";
+
+  // 1. $VIRTUAL_ENV — canonical activated-venv signal. Covers poetry, uv,
+  //    pyenv-virtualenv, conda, ~/.virtualenvs/* and any non-standard layout
+  //    the user has activated. Trust the env var over a disk scan because the
+  //    venv binary may live outside the project tree (e.g. ~/.cache/pypoetry).
+  //    Complements #22 (3e059bd5) which already passes VIRTUAL_ENV through to
+  //    child processes — here we also use it to pick the parent's interpreter.
+  const activeVenv = process.env.VIRTUAL_ENV;
+  if (activeVenv) {
+    const activatedPython = isWin
+      ? resolve(activeVenv, "Scripts", "python.exe")
+      : resolve(activeVenv, "bin", "python");
+    if (existsSync(activatedPython) && runnableExists(activatedPython)) {
+      return activatedPython;
+    }
+  }
+
+  // 2. Disk scan under projectRoot / cwd for the conventional .venv | venv layout.
+  const roots = [projectRoot, process.cwd()].filter((r): r is string => typeof r === "string" && r !== "");
   const subPaths = isWin
     ? [join(".venv", "Scripts", "python.exe"), join("venv", "Scripts", "python.exe")]
     : [join(".venv", "bin", "python"), join("venv", "bin", "python")];
