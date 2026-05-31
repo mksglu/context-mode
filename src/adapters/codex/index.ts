@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { BaseAdapter, resolveContextModeDataRoot } from "../base.js";
 import { hashProjectDirCanonical } from "../../session/db.js";
 import { resolveCodexConfigDir } from "./paths.js";
+import { symlinkEscapesRoot } from "../../util/safe-project-write.js";
 
 import {
   type HookAdapter,
@@ -712,6 +713,10 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
     let firstBackupPath: string | null = null;
     for (const settingsPath of [this.getHooksPath(), this.getSettingsPath()]) {
       try {
+        // Mirror the write guard: skip a config symlink whose real target
+        // escapes the project, since copying through it would back an arbitrary
+        // file into a repo-local .bak. An in-root symlink stays in-tree.
+        if (symlinkEscapesRoot(settingsPath, process.cwd())) continue;
         accessSync(settingsPath, constants.R_OK);
         const backupPath = this.backupFile(settingsPath);
         firstBackupPath ??= backupPath;

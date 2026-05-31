@@ -55,6 +55,16 @@ describe("adapter config writes refuse a symlink escape", () => {
     expect(readFileSync(victim, "utf-8")).toBe("ORIGINAL");
   });
 
+  it("OpenClaw skips backing up a symlinked openclaw.json (secret not copied locally)", () => {
+    const secret = join(outsideDir, "secret");
+    writeFileSync(secret, "SECRET");
+    symlinkSync(secret, resolve("openclaw.json")); // openclaw.json -> outside/secret
+    new OpenClawAdapter().backupSettings();
+    // The planted symlink must not be copied into a repo-local .bak.
+    expect(existsSync(resolve("openclaw.json.bak"))).toBe(false);
+    expect(readFileSync(secret, "utf-8")).toBe("SECRET");
+  });
+
   // Both Copilot leaves inherit writeSettings from CopilotBaseAdapter unchanged,
   // so the same symlinked-target test covers vscode-copilot AND jetbrains-copilot.
   for (const [name, make] of [
@@ -112,4 +122,44 @@ describe("adapter config writes refuse a symlink escape", () => {
       readFileSync(resolve("real-github", "hooks", "context-mode.json"), "utf-8"),
     ).toContain("enabled");
   });
+
+  // backupSettings must mirror the write guard: an in-root symlinked config (a
+  // dotfile manager's intra-repo link) still gets a .bak, while a config symlinked
+  // OUTSIDE the project is skipped so a secret can't land in a repo-local .bak.
+  it("OpenClaw backs up an in-root symlinked openclaw.json", () => {
+    writeFileSync(resolve("real-openclaw.json"), JSON.stringify({ enabled: true }));
+    symlinkSync(resolve("real-openclaw.json"), resolve("openclaw.json")); // -> in-root target
+    const bak = new OpenClawAdapter().backupSettings();
+    expect(bak).toBe(resolve("openclaw.json.bak"));
+    expect(readFileSync(resolve("openclaw.json.bak"), "utf-8")).toContain("enabled");
+  });
+
+  it("OpenClaw skips backup of an openclaw.json symlinked outside the project", () => {
+    const secret = join(outsideDir, "secret");
+    writeFileSync(secret, "SECRET");
+    symlinkSync(secret, resolve("openclaw.json")); // -> outside/secret
+    expect(new OpenClawAdapter().backupSettings()).toBeNull();
+    expect(existsSync(resolve("openclaw.json.bak"))).toBe(false);
+  });
+});
+
+describe("adapter backupSettings overrides guard a symlinked config path", () => {
+  // base.backupSettings skips a config symlink whose real target escapes the
+  // project (so a planted symlink can't copy an arbitrary file into a repo-local
+  // .bak) while backing up an in-root symlink in-tree. The three adapters that
+  // override backupSettings must carry the same symlinkEscapesRoot guard the
+  // write path uses, since the override bypasses the base method entirely.
+  const readSrc = (rel: string) =>
+    readFileSync(resolve(__dirname, "..", "..", "src", "adapters", rel), "utf-8");
+  for (const [name, rel] of [
+    ["OpenCode", "opencode/index.ts"],
+    ["OpenClaw", "openclaw/index.ts"],
+    ["Codex", "codex/index.ts"],
+  ] as const) {
+    it(`${name} backupSettings skips only a symlink escaping the project`, () => {
+      const body = readSrc(rel).slice(readSrc(rel).indexOf("backupSettings("));
+      expect(body).toMatch(/symlinkEscapesRoot\([^)]*process\.cwd\(\)\)/);
+      expect(body).not.toMatch(/lstatSync\([^)]*\)\.isSymbolicLink\(\)/);
+    });
+  }
 });

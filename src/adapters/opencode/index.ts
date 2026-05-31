@@ -35,7 +35,7 @@ import { resolve, join, dirname, sep } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter, resolveContextModeDataRoot } from "../base.js";
-import { writeProjectConfigSafely } from "../../util/safe-project-write.js";
+import { writeProjectConfigSafely, symlinkEscapesRoot } from "../../util/safe-project-write.js";
 
 import type {
   HookAdapter,
@@ -533,6 +533,10 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       return this.settingsPath;
     } else {
       try {
+        // Mirror the write guard: skip a config symlink whose real target
+        // escapes the project (copying through it could back e.g. ~/.ssh/id_rsa
+        // into a repo-local .bak); an in-root symlink stays in-tree, so keep it.
+        if (symlinkEscapesRoot(this.settingsPath, process.cwd())) return null;
         accessSync(this.settingsPath, constants.R_OK);
         const backupPath = this.settingsPath + ".bak";
         copyFileSync(this.settingsPath, backupPath);

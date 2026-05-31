@@ -26,7 +26,7 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter } from "../base.js";
-import { writeProjectConfigSafely } from "../../util/safe-project-write.js";
+import { writeProjectConfigSafely, symlinkEscapesRoot } from "../../util/safe-project-write.js";
 
 import type {
   HookAdapter,
@@ -496,6 +496,11 @@ export class OpenClawAdapter extends BaseAdapter implements HookAdapter {
     ];
     for (const configPath of paths) {
       try {
+        // Mirror the write guard: skip a config symlink whose real target
+        // escapes the project (a planted symlink could otherwise back e.g.
+        // ~/.ssh/id_rsa into a repo-local .bak); an in-root symlink stays
+        // in-tree, so keep it.
+        if (symlinkEscapesRoot(configPath, process.cwd())) continue;
         accessSync(configPath, constants.R_OK);
         const backupPath = configPath + ".bak";
         copyFileSync(configPath, backupPath);
