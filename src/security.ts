@@ -59,6 +59,18 @@ function convertGlobPart(glob: string): string {
     .replace(/\*/g, ".*");
 }
 
+// Same ReDoS guard as store-directory.ts's globToRegExp: a glob with many
+// wildcards compiles to a chain of `.*` groups that backtrack catastrophically
+// on a non-matching input, and these patterns reach us from project-local
+// `.claude/settings*.json` deny lists (readToolDenyPatterns), which a hostile
+// clone controls. So we cap the wildcard count and compile an over-cap glob to
+// a never-match regex rather than stalling the deny check in-process. Legit
+// deny globs (`**/.env`, `rm:*`) stay far under the cap.
+const MAX_GLOB_WILDCARDS = 12;
+function exceedsGlobWildcardCap(glob: string): boolean {
+  return (glob.match(/\*/g) ?? []).length > MAX_GLOB_WILDCARDS;
+}
+
 /**
  * Convert a Bash permission glob to a regex.
  *
@@ -70,6 +82,7 @@ export function globToRegex(
   glob: string,
   caseInsensitive: boolean = false,
 ): RegExp {
+  if (exceedsGlobWildcardCap(glob)) return new RegExp("(?!)", caseInsensitive ? "i" : "");
   let regexStr: string;
 
   const colonIdx = glob.indexOf(":");
@@ -102,6 +115,7 @@ export function fileGlobToRegex(
   glob: string,
   caseInsensitive: boolean = false,
 ): RegExp {
+  if (exceedsGlobWildcardCap(glob)) return new RegExp("(?!)", caseInsensitive ? "i" : "");
   let regexStr = "";
   let i = 0;
 

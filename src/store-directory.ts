@@ -87,13 +87,27 @@ const DEFAULT_EXTENSIONS = [
 const DEFAULT_MAX_DEPTH = 5;
 const DEFAULT_MAX_FILES = 200;
 
+// A glob with many wildcards is a ReDoS vector here: `**` compiles to `.*`
+// (which crosses `/`), so a pattern like `**/**/.../Z` becomes a chain of `.*`
+// groups whose `.test()` backtracks catastrophically against a `/`-segmented
+// walked path that doesn't match. matchesAny runs that `.test()` in the
+// long-lived server, not a child, so one hostile pattern stalls every tool.
+// ctx_index include/exclude reach here straight from the tool args (unvalidated
+// string arrays), so we cap the wildcard count and compile an over-cap pattern
+// to a never-match regex. Legit globs (`**/*.ts`, `node_modules/**`,
+// `**/secrets/**`) sit well under the cap.
+const MAX_GLOB_WILDCARDS = 12;
+
 /**
  * Convert a simple glob pattern (`*`, `**`, `?`) to a RegExp. Anchors at
  * boundaries so `node_modules` matches `node_modules` AND `node_modules/pkg`.
  * Patterns are matched against POSIX-style relative paths (forward slashes)
  * to give consistent behavior across macOS / Windows.
  */
-function globToRegExp(pattern: string): RegExp {
+export function globToRegExp(pattern: string): RegExp {
+  // Refuse to compile a pattern past the wildcard cap; a never-match regex
+  // can't backtrack (see MAX_GLOB_WILDCARDS).
+  if ((pattern.match(/\*/g) ?? []).length > MAX_GLOB_WILDCARDS) return /(?!)/;
   // Escape regex metachars except glob ones.
   let re = "";
   for (let i = 0; i < pattern.length; i++) {
