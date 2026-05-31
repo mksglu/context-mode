@@ -212,6 +212,22 @@ export function parseStdin(raw) {
 
 /**
  * Read all of stdin as a string (event-based, cross-platform safe).
+ *
+ * Idle-timeout semantics (override via env `CONTEXT_MODE_HOOK_STDIN_IDLE_MS`,
+ * default 1500 ms):
+ * - EOF before any data \u2192 resolve("")  \u2014 the original well-behaved path.
+ * - EOF after data       \u2192 resolve(buffer) with BOM strip (#139 \u2014 Cursor on
+ *                          Windows can emit a leading U+FEFF that crashes
+ *                          downstream JSON.parse).
+ * - Idle with 0 bytes    \u2192 resolve("")  \u2014 covers hosts that hold the pipe open
+ *                          without ever closing it (issue #639 \u2014 Bun re-exec
+ *                          EOF path) so the hook still terminates.
+ * - Idle with > 0 bytes  \u2192 reject(Error) \u2014 partial data after a stall MUST NOT
+ *                          be silently truncated, otherwise downstream
+ *                          JSON.parse corrupts on large `tool_response`
+ *                          payloads (issue #242 \u2014 Gemini AfterTool >1MB).
+ *                          Visible non-zero exit is correct here; the host
+ *                          surfaces the failure in its hook diagnostics.
  */
 export function readStdin() {
   return new Promise((resolve, reject) => {
@@ -228,22 +244,41 @@ export function readStdin() {
       try { process.stdin.pause(); } catch {}
       try { process.stdin.destroy?.(); } catch {}
     };
-    const finish = () => {
+    const resolveBuffer = () => {
       if (done) return;
       done = true;
       cleanup();
+      // Preserves #139 BOM strip \u2014 applies on both EOF and idle-empty paths.
       resolve(data.replace(/^\uFEFF/, ""));
+    };
+    const rejectIdle = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error(
+        `stdin idle for ${idleMs}ms with ${data.length} bytes buffered`,
+      ));
+    };
+    const onIdle = () => {
+      // Zero-buffer idle = host never wrote anything (issue #639). Resolve
+      // empty so the hook can no-op. Non-zero buffer = partial data, which
+      // must reject to avoid silent JSON.parse corruption (issue #242).
+      if (data.length === 0) {
+        resolveBuffer();
+      } else {
+        rejectIdle();
+      }
     };
     const arm = () => {
       clearTimeout(timer);
-      timer = setTimeout(finish, idleMs);
+      timer = setTimeout(onIdle, idleMs);
       timer.unref?.();
     };
     const onData = (chunk) => {
       data += chunk;
       arm();
     };
-    const onEnd = () => finish();
+    const onEnd = () => resolveBuffer();
     const onError = (error) => {
       if (done) return;
       done = true;
