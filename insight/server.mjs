@@ -448,6 +448,10 @@ function apiAnalytics() {
     safeAll(db, `SELECT data as detail, created_at, session_id FROM session_events
       WHERE type = 'error_tool' OR type = 'error' ORDER BY created_at DESC LIMIT 20`)
   );
+  const errorCounts = queryAllSessionDBs(db =>
+    safeAll(db, `SELECT COUNT(*) as count FROM session_events
+      WHERE type = 'error_tool' OR type = 'error'`)
+  );
   const fileActivity = queryAllSessionDBs(db =>
     safeAll(db, `SELECT data as file, type as op, COUNT(*) as count FROM session_events
       WHERE type IN ('file_read', 'file_write', 'file') AND data != ''
@@ -563,9 +567,15 @@ function apiAnalytics() {
     safeAll(db, `SELECT substr(data, 1, 100) as task, created_at FROM session_events
       WHERE type = 'task' ORDER BY created_at DESC LIMIT 20`)
   );
+  const taskCounts = queryAllSessionDBs(db =>
+    safeAll(db, `SELECT COUNT(*) as count FROM session_events WHERE type = 'task'`)
+  );
   const prompts = queryAllSessionDBs(db =>
     safeAll(db, `SELECT substr(data, 1, 100) as prompt, created_at, session_id FROM session_events
       WHERE type = 'user_prompt' ORDER BY created_at DESC LIMIT 20`)
+  );
+  const promptCounts = queryAllSessionDBs(db =>
+    safeAll(db, `SELECT COUNT(*) as count FROM session_events WHERE type = 'user_prompt'`)
   );
 
   const rw = readWriteRatio.reduce((a, b) => ({
@@ -573,7 +583,9 @@ function apiAnalytics() {
     total_file_ops: (a.total_file_ops || 0) + (b.total_file_ops || 0),
   }), { reads: 0, writes: 0, total_file_ops: 0 });
   const totalEvents = toolUsage.reduce((a, b) => a + b.count, 0);
-  const totalErrors = errors.length;
+  const totalErrors = errorCounts.reduce((a, b) => a + (b.count || 0), 0);
+  const totalTasks = taskCounts.reduce((a, b) => a + (b.count || 0), 0);
+  const totalPrompts = promptCounts.reduce((a, b) => a + (b.count || 0), 0);
   const totalCompacts = sessionDurations.reduce((a, b) => a + (b.compact_count || 0), 0);
   const sessionsWithCompact = sessionDurations.filter(s => s.compact_count > 0).length;
 
@@ -706,9 +718,9 @@ function apiAnalytics() {
       reads: rw.reads, writes: rw.writes,
       readWriteRatio: rw.writes > 0 ? Math.round(10 * rw.reads / rw.writes) / 10 : rw.reads,
       totalFileOps: rw.total_file_ops, totalSubagents: subagents.total,
-      totalTasks: tasks.length, totalPrompts: prompts.length,
+      totalTasks, totalPrompts,
       promptsPerSession: sessionDurations.length > 0
-        ? Math.round(10 * prompts.length / sessionDurations.length) / 10 : 0,
+        ? Math.round(10 * totalPrompts / sessionDurations.length) / 10 : 0,
       uniqueProjects: nonUnknownProjects.length,
       totalCommits: commitRate.reduce((a, b) => a + (b.commits || 0), 0),
       commitsPerSession: sessionDurations.length > 0

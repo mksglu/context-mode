@@ -299,7 +299,7 @@ function findMinSpan(positionLists: number[][]): number {
   if (positionLists.length === 0) return Infinity;
   if (positionLists.length === 1) return 0;
 
-  const sorted = positionLists.map((p) => [...p].sort((a, b) => a - b));
+  const sorted = positionLists;
   const ptrs = new Array(sorted.length).fill(0);
   let minSpan = Infinity;
 

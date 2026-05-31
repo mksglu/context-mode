@@ -38,6 +38,11 @@ describe("cli.bundle.mjs — marketplace install support", () => {
     expect(pkg.files).toContain(".codex-plugin");
   });
 
+  it("Codex plugin MCP manifest approves context-mode tools by default", () => {
+    const mcp = JSON.parse(readFileSync(resolve(ROOT, ".codex-plugin", "mcp.json"), "utf-8"));
+    expect(mcp.mcpServers["context-mode"].default_tools_approval_mode).toBe("approve");
+  });
+
   it("package.json bundle script builds cli.bundle.mjs", () => {
     const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf-8"));
     expect(pkg.scripts.bundle).toContain("cli.bundle.mjs");

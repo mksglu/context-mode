@@ -381,7 +381,8 @@ export class AnalyticsEngine {
       let median: number | null = null;
       let max: number | null = null;
       if (b.concurrencies.length > 0) {
-        const sorted = [...b.concurrencies].sort((a, c) => a - c);
+        b.concurrencies.sort((a, c) => a - c);
+        const sorted = b.concurrencies;
         const mid = Math.floor(sorted.length / 2);
         median = sorted.length % 2 === 0
           ? (sorted[mid - 1] + sorted[mid]) / 2
@@ -2590,8 +2591,9 @@ function renderConversation(c: ConversationStats, conversationUsd: string, contr
  */
 function renderMultiAdapter(multiAdapter: MultiAdapterLifetimeStats | undefined): string[] {
   if (!multiAdapter) return [];
-  const real     = multiAdapter.perAdapter.filter((a) => a.isReal);
-  const skipped  = multiAdapter.perAdapter.filter((a) => !a.isReal);
+  const real: typeof multiAdapter.perAdapter = [];
+  const skipped: typeof multiAdapter.perAdapter = [];
+  for (const a of multiAdapter.perAdapter) (a.isReal ? real : skipped).push(a);
   if (real.length === 0 && skipped.length === 0) return [];
 
   const out: string[] = [];

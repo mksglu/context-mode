@@ -372,8 +372,17 @@ export interface HealthCheck {
  *
  * Safe on macOS/Linux — quoting and forward slashes are no-ops there.
  */
-export function buildNodeCommand(scriptPath: string): string {
-  const nodePath = process.execPath.replace(/\\/g, "/");
+export function buildNodeCommand(
+  scriptPath: string,
+  opts?: { platform?: string; jsRuntime?: string },
+): string {
+  let nodePath = process.execPath.replace(/\\/g, "/");
+  if (isInProcessPluginPlatform(opts?.platform)) {
+    const base = nodePath.split("/").pop()!.replace(/\.exe$/i, "");
+    if (!JS_RUNTIMES.has(base)) {
+      nodePath = opts?.jsRuntime?.replace(/\\/g, "/") ?? "node";
+    }
+  }
   const safePath = scriptPath.replace(/\\/g, "/");
   return `"${nodePath}" "${safePath}"`;
 }
@@ -406,6 +415,16 @@ export function parseNodeCommand(
   const m = cmd.match(/^"([^"]+)"\s+"([^"]+)"\s*$/);
   if (!m) return null;
   return { nodePath: m[1], scriptPath: m[2] };
+}
+
+/** Known JS runtime binary names (base filename without extension). */
+export const JS_RUNTIMES: ReadonlySet<string> = new Set(["node", "bun", "deno"]);
+
+/** Platforms where context-mode runs as an in-process TS plugin (not MCP stdio). */
+export const IN_PROCESS_PLUGIN_PLATFORMS: ReadonlySet<string> = new Set(["opencode", "kilo"]);
+
+export function isInProcessPluginPlatform(p: string | undefined): boolean {
+  return !!p && IN_PROCESS_PLUGIN_PLATFORMS.has(p);
 }
 
 /** Supported platform identifiers. */
