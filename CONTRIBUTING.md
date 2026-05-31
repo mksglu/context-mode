@@ -362,6 +362,27 @@ The regression test at `tests/core/server.test.ts > prose-style policy (#482)` p
 
 If you genuinely need to nudge the model on style for a specific use case, do it in your own project's `CLAUDE.md` / `AGENTS.md`. Don't ship it inside the framework.
 
+## For Pi developers
+
+context-mode works on Pi now. The extension injects routing rules, registers
+ctx_* tools through the MCP bridge, and the lean `configs/pi/AGENTS.md` keeps
+context budget tight.
+
+**First-time setup:** If you open this project in Pi before running `npm install`
+and `npm run build`, you will see errors. That's normal — the extension needs
+the compiled server bundle. Run the build once and restart.
+
+- If you use Pi: remove `CLAUDE.md` from your project root. Pi.dev reads both
+  CLAUDE.md and AGENTS.md, burning double context on duplicated routing
+  instructions the extension already injects.
+- Use `ctx_search` to recall decisions, errors, and blockers from prior
+  sessions instead of re-reading raw files.
+- Use `ctx_insight` for personal analytics — session activity, tool usage,
+  error rate, project focus.
+
+For the full local dev workflow, build commands, and test instructions, see
+[the contributing guide above](#contributing-to-context-mode).
+
 ## Submitting a Bug Report
 
 When filing a bug, **always include your prompt**. The exact message you sent to the agent is critical for reproduction. Without it, we can't debug the issue.

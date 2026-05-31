@@ -155,25 +155,6 @@ let _mcpBridge: BridgeHandle | null = null;
  */
 export let _mcpBridgeReady: Promise<void> = Promise.resolve();
 
-// Cached routing-block string (built once per process from hooks/routing-block.mjs).
-let _routingBlock: string | null = null;
-async function getRoutingBlock(pluginRoot: string): Promise<string> {
-  if (_routingBlock !== null) return _routingBlock;
-  try {
-    const routingMod = await import(
-      pathToFileURL(join(pluginRoot, "hooks", "routing-block.mjs")).href
-    );
-    const namingMod = await import(
-      pathToFileURL(join(pluginRoot, "hooks", "core", "tool-naming.mjs")).href
-    );
-    const t = namingMod.createToolNamer("pi");
-    _routingBlock = String(routingMod.createRoutingBlock(t));
-  } catch {
-    _routingBlock = "";
-  }
-  return _routingBlock;
-}
-
 // Cached buildAutoInjection (500-token cap, prioritized).
 let _buildAutoInjection:
   | ((events: Array<{ category: string; data: string }>) => string)
@@ -616,14 +597,17 @@ export default function piExtension(pi: any): void {
       const parts: string[] = [];
       if (existingPrompt) parts.push(existingPrompt);
 
-      // Pi-1: Inject routing block every turn.
-      // Unlike Claude Code where the SessionStart hook injects once into a persistent
-      // context, Pi rebuilds the system prompt fresh on every before_agent_start call.
-      // The routing block must be re-injected each turn or it disappears after turn 1.
-      const routingBlock = await getRoutingBlock(pluginRoot);
-      if (routingBlock) {
-        parts.push(routingBlock);
-      }
+      // Pi-1: Lightweight routing anchor — 7KB routing block is too heavy
+      // for Pi's context budget. Tool descriptions from pi.registerTool()
+      // already tell the model what each tool does. This anchor gives the
+      // deliberate choice (which tool for which scenario) without the full
+      // block/redirect/memory/tool-selection hierarchy.
+      parts.push(
+        "context-mode active. Hierarchy: ctx_batch_execute > ctx_execute > ctx_execute_file > ctx_search. " +
+        "Read/edit files → ctx_execute_file. Multi-command research → ctx_batch_execute. " +
+        "Web pages → ctx_fetch_and_index then ctx_search. Index docs → ctx_index. " +
+        "Stats → ctx_stats. Doctor → ctx_doctor. Upgrade → ctx_upgrade. Purge → ctx_purge."
+      );
 
       // Pi-3 + Pi-4: Always build active_memory (not just post-compact),
       // capped at 500 tokens via buildAutoInjection. Falls back to inline

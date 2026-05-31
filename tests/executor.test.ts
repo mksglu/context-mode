@@ -1779,6 +1779,10 @@ describe("Windows Shell Support", () => {
       assert.equal(cmd.length, 3, `Expected [bash, -c, source ...], got: ${cmd}`);
       assert.equal(cmd[1], "-c");
       assert.ok(cmd[2].includes("/tmp/script.sh"), `Expected source clause to reference path, got: ${cmd[2]}`);
+    } else if (process.platform === "win32" && /powershell|pwsh/i.test(cmd[0])) {
+      assert.equal(cmd.length, 6, `Expected [powershell, -NoProfile, -ExecutionPolicy, Bypass, -File, path], got: ${cmd}`);
+      assert.deepEqual(cmd.slice(1, 5), ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]);
+      assert.equal(cmd[5], "/tmp/script.sh");
     } else {
       assert.equal(cmd.length, 2, `Expected [shell, path], got: ${cmd}`);
       assert.equal(cmd[1], "/tmp/script.sh");
@@ -1796,10 +1800,15 @@ describe("Windows Shell Support", () => {
     assert.equal(buildSpawnOptions("linux").windowsHide, false);
   });
 
-  test("buildScriptFilename: shell on Windows has NO extension (avoid .sh file association)", async () => {
+  test("buildScriptFilename: POSIX shell on Windows has NO extension (avoid .sh file association)", async () => {
     assert.equal(buildScriptFilename("shell", "win32"), "script");
     assert.equal(buildScriptFilename("shell", "win32", "C:\\Program Files\\Git\\usr\\bin\\bash.exe"), "script");
     assert.equal(buildScriptFilename("shell", "win32", "sh"), "script");
+  });
+
+  test("buildScriptFilename: cmd on Windows uses .cmd extension", async () => {
+    assert.equal(buildScriptFilename("shell", "win32", "cmd.exe"), "script.cmd");
+    assert.equal(buildScriptFilename("shell", "win32", "C:\\Windows\\System32\\cmd.exe"), "script.cmd");
   });
 
   test("buildScriptFilename: PowerShell on Windows uses .ps1 extension", async () => {

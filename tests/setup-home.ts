@@ -18,6 +18,10 @@ process.env.USERPROFILE = fakeHome;
 process.env.HOMEDRIVE = root.replace(/[\\/]+$/, "");
 process.env.HOMEPATH = fakeHome.slice(root.length) || root;
 
+// Prevent CONTEXT_MODE_BRIDGE_DEPTH from leaking in when Pi's MCP child
+// spawned with depth=1 and that env persisted into the test runner.
+delete process.env.CONTEXT_MODE_BRIDGE_DEPTH;
+
 // `node:os` mock: defer to `withIsolatedEnv()` when a scoped fake HOME is
 // active; otherwise return the suite-wide fakeHome. This lets tests opt into
 // stricter Windows-aware isolation without forking the mock setup.

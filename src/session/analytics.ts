@@ -381,7 +381,8 @@ export class AnalyticsEngine {
       let median: number | null = null;
       let max: number | null = null;
       if (b.concurrencies.length > 0) {
-        const sorted = [...b.concurrencies].sort((a, c) => a - c);
+        b.concurrencies.sort((a, c) => a - c);
+        const sorted = b.concurrencies;
         const mid = Math.floor(sorted.length / 2);
         median = sorted.length % 2 === 0
           ? (sorted[mid - 1] + sorted[mid]) / 2
@@ -1836,7 +1837,7 @@ function shortPath(abs: string): string {
  * the section disappears cleanly on a fresh install.
  *
  * Math constants:
- *   Opus 4   = $15.00 per 1M input tokens (matches OPUS_INPUT_PRICE_PER_TOKEN)
+ *   Opus 4   = $15.00 per 1M input tokens (fallback when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN not set)
  *   Sonnet 4 = $3.00  per 1M input tokens
  *   GPT-4o   = $2.50  per 1M input tokens
  *   Gemini 2 = $1.25  per 1M input tokens
@@ -1853,36 +1854,55 @@ export function renderCostExample(
 ): string[] {
   if (!Number.isFinite(lifetimeTokens) || lifetimeTokens <= 0) return [];
 
-  const opusUsd = (lifetimeTokens * 15) / 1_000_000;
+  const lifetimeUsd = lifetimeTokens * PRICE_PER_TOKEN;
   const usdStr  = (n: number, dp: number = 2): string => n.toFixed(dp);
 
   // Comparison units — kept locally so they're easy to tune without touching
   // the renderer logic. Cursor Pro & Claude Max are public list prices; the
   // weekend constant is an intentional approximation calibrated to make
   // $1399.73 → "19 weekends" line up with the demo target.
-  const cursorMonths     = Math.round(opusUsd / 20);
-  const claudeMaxMonths  = (opusUsd / 200).toFixed(1);
-  const weekendCount     = Math.round(opusUsd / 73.67);
-  const teamUsd          = Math.round(opusUsd * 10);
+  const cursorMonths     = Math.round(lifetimeUsd / 20);
+  const claudeMaxMonths  = (lifetimeUsd / 200).toFixed(1);
+  const weekendCount     = Math.round(lifetimeUsd / 73.67);
+  const teamUsd          = Math.round(lifetimeUsd * 10);
   const teamYearUsd      = lifetimeDays > 0
-    ? Math.round((opusUsd * 10) / lifetimeDays * 365)
+    ? Math.round((lifetimeUsd * 10) / lifetimeDays * 365)
     : 0;
 
   // Alternate-model scale row — same token count, different per-1M rates.
-  const sonnetUsd = ((lifetimeTokens * 3.0)  / 1_000_000).toFixed(2);
-  const gpt4oUsd  = ((lifetimeTokens * 2.5)  / 1_000_000).toFixed(2);
-  const geminiUsd = ((lifetimeTokens * 1.25) / 1_000_000).toFixed(2);
-  const haikuUsd  = ((lifetimeTokens * 0.8)  / 1_000_000).toFixed(2);
+  // (Kept for internal reference but unreachable per Mert directive.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _sonnetUsd = ((lifetimeTokens * 3.0)  / 1_000_000).toFixed(2);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _gpt4oUsd  = ((lifetimeTokens * 2.5)  / 1_000_000).toFixed(2);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _geminiUsd = ((lifetimeTokens * 1.25) / 1_000_000).toFixed(2);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _haikuUsd  = ((lifetimeTokens * 0.8)  / 1_000_000).toFixed(2);
+
+  const usingDynamicPrice =
+    process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN !== undefined;
+  const modelId = process.env.PI_CONTEXT_MODE_MODEL_ID;
 
   // Mert: "daha marketing ve business value e vermeli, math hesaplamalari ile
-  // kalabalik yapma" — collapse the old 4-block render (5 prose lines + 3
-  // comparison lines + 2 team lines + scaling table + disclaimer) into ONE
-  // headline number, ONE relatable comparison, ONE team-scale callout. Drop
-  // the alternate-model scaling row (engineer-curiosity, not value framing).
+  // kalabalik yapma" — collapse the old 4-block render into ONE headline
+  // number, ONE relatable comparison, ONE team-scale callout.
   const out: string[] = [];
-  out.push(
-    `  $${usdStr(opusUsd)} of Opus 4 tokens your team didn't burn.`,
-  );
+
+  if (usingDynamicPrice && modelId) {
+    out.push(
+      `  $${usdStr(lifetimeUsd)} of ${modelId} tokens your team didn't burn.`,
+    );
+  } else if (usingDynamicPrice) {
+    out.push(
+      `  $${usdStr(lifetimeUsd)} of tokens your team didn't burn.`,
+    );
+  } else {
+    out.push(
+      `  $${usdStr(lifetimeUsd)} of Opus 4 tokens your team didn't burn.`,
+    );
+  }
+
   out.push(
     `  context-mode kept ${kb(lifetimeBytes)} out of context — that's ${cursorMonths} months of Cursor Pro paid for itself.`,
   );
@@ -1892,10 +1912,13 @@ export function renderCostExample(
       `  Scale across a 10-dev team and that's ~$${teamYearUsd.toLocaleString("en-US")}/year saved.`,
     );
   }
-  out.push("");
-  out.push(
-    `  (Opus rates shown for context. On cheaper models the dollar number drops; the savings ratio holds.)`,
-  );
+
+  if (!usingDynamicPrice) {
+    out.push("");
+    out.push(
+      `  (Opus rates shown for context. On cheaper models the dollar number drops; the savings ratio holds.)`,
+    );
+  }
   return out;
 }
 
@@ -2338,12 +2361,28 @@ function fmtNum(n: number): string {
 // ─────────────────────────────────────────────────────────
 
 /** Opus 4 input price: $15 per 1M tokens. */
-export const OPUS_INPUT_PRICE_PER_TOKEN = 15 / 1_000_000;
+// ── Pricing (Bug #6) — per-token USD rate ─────────────────
+// Reads PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN when set by a Pi host;
+// falls back to the Opus 4 input rate ($15/1M) for all other adapters.
+// Renamed from OPUS_INPUT_PRICE_PER_TOKEN to reflect the dynamic
+// resolution path (provider-pricing-bridge, 2026-05-30).
 
-/** Convert a token count to a USD string at the Opus input rate. */
+function resolvePricePerToken(): number {
+  const env = process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN;
+  if (env !== undefined && env !== "") {
+    const parsed = Number(env);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 15 / 1_000_000; // Opus 4 input fallback
+}
+
+/** Per-token USD rate — dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set, Opus 4 otherwise. */
+export const PRICE_PER_TOKEN = resolvePricePerToken();
+
+/** Convert a token count to a USD string at the current per-token rate. */
 export function tokensToUsd(tokens: number): string {
   const safe = Number.isFinite(tokens) && tokens > 0 ? tokens : 0;
-  return `$${(safe * OPUS_INPUT_PRICE_PER_TOKEN).toFixed(2)}`;
+  return `$${(safe * PRICE_PER_TOKEN).toFixed(2)}`;
 }
 
 /**
@@ -2590,8 +2629,9 @@ function renderConversation(c: ConversationStats, conversationUsd: string, contr
  */
 function renderMultiAdapter(multiAdapter: MultiAdapterLifetimeStats | undefined): string[] {
   if (!multiAdapter) return [];
-  const real     = multiAdapter.perAdapter.filter((a) => a.isReal);
-  const skipped  = multiAdapter.perAdapter.filter((a) => !a.isReal);
+  const real: typeof multiAdapter.perAdapter = [];
+  const skipped: typeof multiAdapter.perAdapter = [];
+  for (const a of multiAdapter.perAdapter) (a.isReal ? real : skipped).push(a);
   if (real.length === 0 && skipped.length === 0) return [];
 
   const out: string[] = [];

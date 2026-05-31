@@ -21,6 +21,8 @@
  * No external dependencies — pure node:child_process + JSON line frames.
  */
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { detectRuntimes } from "../../runtime.js";
 import { foreignWorkspaceEnv, foreignIdentificationEnv } from "../detect.js";
@@ -452,6 +454,22 @@ export class MCPStdioClient {
     // detects pi correctly.
     for (const banned of foreignIdentificationEnv("pi")) {
       delete childEnv[banned];
+    }
+    // Issue #561 regression fix: Pi detection vars are empty after
+    // foreign env scrubbing (CLAUDE_CODE_ENTRYPOINT / CLAUDE_PLUGIN_ROOT
+    // are deleted by the ban above). Without PI_CONFIG_DIR,
+    // detectPlatform() finds zero Pi identification vars and falls
+    // through to Claude Code default — stats land in ~/.claude/ instead
+    // of ~/.pi/. Set PI_CONFIG_DIR from the child's HOME env var so the
+    // child resolves to Pi correctly. (Use childEnv.HOME, not homedir(),
+    // because homedir() reads getpwent() which ignores our HOME override
+    // in test environments.)
+    const home = childEnv.HOME ?? childEnv.USERPROFILE ?? childEnv.HOMEPATH;
+    if (home) {
+      const piConfig = join(home, ".pi");
+      if (existsSync(piConfig)) {
+        childEnv.PI_CONFIG_DIR = piConfig;
+      }
     }
     this._spawnEnv = childEnv;
     this.child = spawn(runtime, [this.serverScript], {

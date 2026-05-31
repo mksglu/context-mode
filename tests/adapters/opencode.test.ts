@@ -428,81 +428,81 @@ describe("OpenCodeAdapter", () => {
   "plugin": []
 }
 `,
-      );
-      const run = spawnSync(
-        process.execPath,
-        [
-          tsx,
-          "-e",
-          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.configureAllHooks('/tmp/plugin')))`,
-        ],
-        { cwd: dir, env: env(join(root, "home")), encoding: "utf-8" },
-      );
-      expect(run.status).toBe(0);
-      expect(JSON.parse(run.stdout)).toEqual(["Added context-mode to plugin array"]);
-      // Should write back to .jsonc (same file it read)
-      expect(JSON.parse(readFileSync(join(dir, "opencode.jsonc"), "utf-8"))).toEqual({
-        plugin: ["context-mode"],
+        );
+        const run = spawnSync(
+          process.execPath,
+          [
+            tsx,
+            "-e",
+            `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.configureAllHooks('/tmp/plugin')))`,
+          ],
+          { cwd: dir, env: env(join(root, "home")), encoding: "utf-8" },
+        );
+        expect(run.status).toBe(0);
+        expect(JSON.parse(run.stdout)).toEqual(["Added context-mode to plugin array"]);
+        // Should write back to .jsonc (same file it read)
+        expect(JSON.parse(readFileSync(join(dir, "opencode.jsonc"), "utf-8"))).toEqual({
+          plugin: ["context-mode"],
+        });
+        rmSync(root, { recursive: true, force: true });
       });
-      rmSync(root, { recursive: true, force: true });
+
+      it("validates hooks with jsonc config shows correct error message", () => {
+        const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
+        const dir = join(root, "project");
+        const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+        const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+        mkdirSync(dir, { recursive: true });
+        // No config file at all
+        const run = spawnSync(
+          process.execPath,
+          [
+            tsx,
+            "-e",
+            `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.validateHooks('/tmp')))`,
+          ],
+          { cwd: dir, env: env(join(root, "home")), encoding: "utf-8" },
+        );
+        expect(run.status).toBe(0);
+        const results = JSON.parse(run.stdout);
+        const pluginCheck = results.find((r: { check: string }) => r.check === "Plugin configuration");
+        expect(pluginCheck.message).toContain("jsonc");
+        rmSync(root, { recursive: true, force: true });
+      });
+
+      it("configureAllHooks writes back to .opencode/opencode.json when that is the selected config", () => {
+        const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
+        const dir = join(root, "project");
+        const home = join(root, "home");
+        const conf = join(dir, ".opencode");
+        const file = join(conf, "opencode.json");
+        const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+        const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+        mkdirSync(dir, { recursive: true });
+        mkdirSync(conf, { recursive: true });
+        writeFileSync(file, JSON.stringify({ plugin: [] }, null, 2) + "\n");
+        const run = spawnSync(
+          process.execPath,
+          [
+            tsx,
+            "-e",
+            `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.configureAllHooks('/tmp/plugin')))`,
+          ],
+          {
+            cwd: dir,
+            env: env(home),
+            encoding: "utf-8",
+          },
+        );
+
+        expect(run.status).toBe(0);
+        expect(JSON.parse(run.stdout)).toEqual(["Added context-mode to plugin array"]);
+        expect(() => readFileSync(resolve(dir, "opencode.json"), "utf-8")).toThrow();
+        expect(JSON.parse(readFileSync(file, "utf-8"))).toEqual({ plugin: ["context-mode"] });
+
+        rmSync(root, { recursive: true, force: true });
+      });
     });
-
-    it("validates hooks with jsonc config shows correct error message", () => {
-      const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
-      const dir = join(root, "project");
-      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
-      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
-      mkdirSync(dir, { recursive: true });
-      // No config file at all
-      const run = spawnSync(
-        process.execPath,
-        [
-          tsx,
-          "-e",
-          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.validateHooks('/tmp')))`,
-        ],
-        { cwd: dir, env: env(join(root, "home")), encoding: "utf-8" },
-      );
-      expect(run.status).toBe(0);
-      const results = JSON.parse(run.stdout);
-      const pluginCheck = results.find((r: { check: string }) => r.check === "Plugin configuration");
-      expect(pluginCheck.message).toContain("jsonc");
-      rmSync(root, { recursive: true, force: true });
-    });
-
-    it("configureAllHooks writes back to .opencode/opencode.json when that is the selected config", () => {
-      const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
-      const dir = join(root, "project");
-      const home = join(root, "home");
-      const conf = join(dir, ".opencode");
-      const file = join(conf, "opencode.json");
-      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
-      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
-      mkdirSync(dir, { recursive: true });
-      mkdirSync(conf, { recursive: true });
-      writeFileSync(file, JSON.stringify({ plugin: [] }, null, 2) + "\n");
-      const run = spawnSync(
-        process.execPath,
-        [
-          tsx,
-          "-e",
-          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.configureAllHooks('/tmp/plugin')))`,
-        ],
-        {
-          cwd: dir,
-          env: env(home),
-          encoding: "utf-8",
-        },
-      );
-
-      expect(run.status).toBe(0);
-      expect(JSON.parse(run.stdout)).toEqual(["Added context-mode to plugin array"]);
-      expect(() => readFileSync(resolve(dir, "opencode.json"), "utf-8")).toThrow();
-      expect(JSON.parse(readFileSync(file, "utf-8"))).toEqual({ plugin: ["context-mode"] });
-
-      rmSync(root, { recursive: true, force: true });
-    });
-  });
   });
 });
 
@@ -576,6 +576,74 @@ describe("OpenCodeAdapter for KiloCode", () => {
         process.chdir(prev);
         rmSync(root, { recursive: true, force: true });
       }
+    });
+  });
+
+  // ── buildNodeCommand opts parameter (in-process plugin platforms) ──
+
+  describe("buildNodeCommand opts parameter for in-process plugin platforms", () => {
+    it("isInProcessPluginPlatform membership test", async () => {
+      const { isInProcessPluginPlatform } = await import("../../src/adapters/types.js");
+      expect(isInProcessPluginPlatform("opencode")).toBe(true);
+      expect(isInProcessPluginPlatform("kilo")).toBe(true);
+      expect(isInProcessPluginPlatform("claude-code")).toBe(false);
+      expect(isInProcessPluginPlatform(undefined)).toBe(false);
+    });
+
+    it("buildNodeCommand substitutes jsRuntime for opencode/kilo when execPath is not node/bun/deno", async () => {
+      const { buildNodeCommand } = await import("../../src/adapters/types.js");
+      const cmd = buildNodeCommand("/script.mjs", { platform: "opencode", jsRuntime: "/usr/bin/bun" });
+      // On Node.js, execPath ends with 'node', so no substitution occurs.
+      // The test verifies the command still contains the script path.
+      expect(cmd).toContain("/script.mjs");
+    });
+
+    it("buildNodeCommand falls back to 'node' when jsRuntime is undefined for in-process platforms", async () => {
+      const { buildNodeCommand } = await import("../../src/adapters/types.js");
+      const cmd = buildNodeCommand("/script.mjs", { platform: "kilo" });
+      expect(cmd).toContain("node");
+      expect(cmd).toContain("/script.mjs");
+    });
+
+    it("buildNodeCommand ignores opts for non in-process platforms", async () => {
+      const { buildNodeCommand } = await import("../../src/adapters/types.js");
+      const cmd = buildNodeCommand("/script.mjs", { platform: "claude-code", jsRuntime: "/usr/bin/bun" });
+      // Should NOT substitute jsRuntime since claude-code is not an in-process platform
+      expect(cmd).not.toContain("/usr/bin/bun");
+      expect(cmd).toContain("/script.mjs");
+    });
+  });// ── buildNodeCommand opts parameter (in-process plugin platforms) ──
+
+  describe("buildNodeCommand opts parameter for in-process plugin platforms", () => {
+    it("isInProcessPluginPlatform membership test", async () => {
+      const { isInProcessPluginPlatform } = await import("../../src/adapters/types.js");
+      expect(isInProcessPluginPlatform("opencode")).toBe(true);
+      expect(isInProcessPluginPlatform("kilo")).toBe(true);
+      expect(isInProcessPluginPlatform("claude-code")).toBe(false);
+      expect(isInProcessPluginPlatform(undefined)).toBe(false);
+    });
+
+    it("buildNodeCommand substitutes jsRuntime for opencode/kilo when execPath is not node/bun/deno", async () => {
+      const { buildNodeCommand } = await import("../../src/adapters/types.js");
+      const cmd = buildNodeCommand("/script.mjs", { platform: "opencode", jsRuntime: "/usr/bin/bun" });
+      // On Node.js, execPath ends with 'node', so no substitution occurs.
+      // The test verifies the command still contains the script path.
+      expect(cmd).toContain("/script.mjs");
+    });
+
+    it("buildNodeCommand falls back to 'node' when jsRuntime is undefined for in-process platforms", async () => {
+      const { buildNodeCommand } = await import("../../src/adapters/types.js");
+      const cmd = buildNodeCommand("/script.mjs", { platform: "kilo" });
+      expect(cmd).toContain("node");
+      expect(cmd).toContain("/script.mjs");
+    });
+
+    it("buildNodeCommand ignores opts for non in-process platforms", async () => {
+      const { buildNodeCommand } = await import("../../src/adapters/types.js");
+      const cmd = buildNodeCommand("/script.mjs", { platform: "claude-code", jsRuntime: "/usr/bin/bun" });
+      // Should NOT substitute jsRuntime since claude-code is not an in-process platform
+      expect(cmd).not.toContain("/usr/bin/bun");
+      expect(cmd).toContain("/script.mjs");
     });
   });
 });

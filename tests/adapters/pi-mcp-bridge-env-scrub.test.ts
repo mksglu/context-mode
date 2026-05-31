@@ -16,7 +16,7 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MCPStdioClient } from "../../src/adapters/pi/mcp-bridge.js";
@@ -193,6 +193,39 @@ describe("Pi MCPStdioClient — foreign identification env scrub (issue #561)", 
 
     // Non-platform env — PRESERVED.
     expect(spawned.HOME).toBe("/Users/x");
+  });
+
+  it("auto-sets PI_CONFIG_DIR when parent env does not have it (#561 regression fix)", () => {
+    // Real Pi sessions: parent process does NOT set PI_CONFIG_DIR.
+    // The bridge must auto-resolve it via homedir() so the child detects Pi.
+    // setup-home roots process.env.HOME at a temp dir. Create .pi/ there.
+    const home = process.env.HOME!;
+    if (!home) throw new Error("setup-home did not set HOME");
+    const piDir = join(home, ".pi");
+    mkdirSync(piDir);
+    try {
+      const env: NodeJS.ProcessEnv = {
+        HOME: home,
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        PI_SESSION_FILE: `${home}/.pi/sessions/active.json`,
+        PI_COMPILED: "1",
+      };
+      const client = new MCPStdioClient(fakeServer, env);
+      clients.push(client);
+      client.start();
+      const spawned = client._spawnEnv;
+      expect(spawned).not.toBeNull();
+      if (!spawned) throw new Error("unreachable");
+
+      expect(spawned.PI_CONFIG_DIR).toBe(piDir);
+      expect(spawned.PI_SESSION_FILE).toBe(`${home}/.pi/sessions/active.json`);
+      expect(spawned.PI_COMPILED).toBe("1");
+      // No Claude contamination
+      expect(spawned.CLAUDE_CODE_ENTRYPOINT).toBeUndefined();
+      expect(spawned.CLAUDE_PLUGIN_ROOT).toBeUndefined();
+    } finally {
+      try { rmSync(piDir, { recursive: true, force: true }); } catch {}
+    }
   });
 
   it("workspace scrub from #545 still works alongside identification scrub from #561", () => {

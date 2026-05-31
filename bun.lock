@@ -8,6 +8,7 @@
         "@clack/prompts": "^1.0.1",
         "@mixmark-io/domino": "^2.2.0",
         "@modelcontextprotocol/sdk": "^1.26.0",
+        "better-sqlite3": "^12.6.2",
         "picocolors": "^1.1.1",
         "turndown": "^7.2.0",
         "turndown-plugin-gfm": "^1.0.2",
@@ -21,9 +22,6 @@
         "tsx": "^4.21.0",
         "typescript": "^5.7.0",
         "vitest": "^4.0.18",
-      },
-      "optionalDependencies": {
-        "better-sqlite3": "^12.6.2",
       },
     },
   },

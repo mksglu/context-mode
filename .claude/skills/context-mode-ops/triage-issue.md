@@ -48,6 +48,7 @@ ALWAYS spawn:
 ├── Context Mode Architect (reviews everything)
 ├── QA Engineer (runs all tests)
 ├── DX Engineer (checks user-facing quality)
+├── Git Archaeologist (bug/regression only — blame trail, read-only, gates the fix)
 
 IF adapter X is affected:
 ├── {X} Architect
@@ -121,6 +122,13 @@ with hard evidence. We shipped inheritEnvKeys because an LLM said Claude Code st
 ### 5. Investigation Phase (Parallel)
 
 All agents investigate simultaneously:
+
+**Git Archaeologist** runs the blame trail FIRST (read-only):
+- Find the commit that introduced the reported behavior (`git log -S`, `git blame`)
+- Read that commit's message + linked PR — what original problem did it solve?
+- Decide if a naive fix would re-break that original fix
+- Report: ARCHAEOLOGY_REPORT (INTRODUCED_BY, ORIGINAL_INTENT, REGRESSION_RISK, SAFE_FIX_CONSTRAINTS)
+- **Staff Engineers MUST read this report before writing any fix** — see [agent-teams.md](agent-teams.md)
 
 **Architects** research:
 - Read relevant source files

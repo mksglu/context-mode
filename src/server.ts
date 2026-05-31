@@ -6,7 +6,7 @@ import { existsSync, unlinkSync, readdirSync, readFileSync, writeFileSync, renam
 import { execSync, spawnSync, type ChildProcess, type SpawnSyncOptions, type SpawnSyncReturns } from "node:child_process";
 import { join, dirname, resolve, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir, tmpdir, cpus } from "node:os";
+import { homedir, tmpdir, cpus, platform } from "node:os";
 import { request as httpsRequest } from "node:https";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
@@ -53,13 +53,13 @@ import {
 } from "./session/event-emit.js";
 import { persistToolCallCounter, restoreSessionStats } from "./session/persist-tool-calls.js";
 import { searchAllSources } from "./search/unified.js";
-import { buildNodeCommand, type HookAdapter, type PlatformId } from "./adapters/types.js";
+import { buildNodeCommand, type HookAdapter, type PlatformId, isInProcessPluginPlatform } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
 import { loadDatabase } from "./db-base.js";
-import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, OPUS_INPUT_PRICE_PER_TOKEN } from "./session/analytics.js";
+import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, PRICE_PER_TOKEN } from "./session/analytics.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
 const VERSION: string = (() => {
   for (const rel of ["../package.json", "./package.json"]) {
@@ -894,7 +894,7 @@ const STATS_PERSIST_THROTTLE_MS = 500;
 // rendering missing fields (PR #401 architect review P1.3).
 // v2: added tokens_saved_lifetime + dollars_saved_lifetime.
 const STATS_SCHEMA_VERSION = 2;
-// OPUS_INPUT_PRICE_PER_TOKEN intentionally NOT defined here — single source in
+// PRICE_PER_TOKEN intentionally NOT defined here — single source in
 // src/session/analytics.ts re-exported above. (P1.1 — pricing constant dedup,
 // PR #401 architect + ops 2-vote convergence.)
 const LIFETIME_REFRESH_MS = 30_000;
@@ -973,12 +973,13 @@ function persistStats(): void {
       total_processed: totalProcessed,
       reduction_pct: reductionPct,
       tokens_saved: tokensSaved,
-      // statusline-facing $ values — pre-computed at Opus input rate so the
-      // statusline doesn't have to know pricing. Lets us evolve pricing in
-      // one place without touching consumers.
-      dollars_saved_session: +(tokensSaved * OPUS_INPUT_PRICE_PER_TOKEN).toFixed(2),
+      // statusline-facing $ values — pre-computed at the current per-token
+      // rate (dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set by a
+      // Pi host; Opus $15/1M otherwise). Lets us evolve pricing in one place
+      // without touching consumers.
+      dollars_saved_session: +(tokensSaved * PRICE_PER_TOKEN).toFixed(2),
       tokens_saved_lifetime: lifetimeTokens,
-      dollars_saved_lifetime: +(lifetimeTokens * OPUS_INPUT_PRICE_PER_TOKEN).toFixed(2),
+      dollars_saved_lifetime: +(lifetimeTokens * PRICE_PER_TOKEN).toFixed(2),
       by_tool: Object.fromEntries(
         Object.keys({ ...sessionStats.calls, ...sessionStats.bytesReturned }).map(
           (t) => [
@@ -3440,6 +3441,29 @@ EXAMPLE: ctx_batch_execute(
   },
 );
 
+/**
+ * Pi byte accounting: patch lifetime.totalEvents from bytes_sandboxed
+ * in stats-*.json files instead of the default events × 256 heuristic.
+ * Only active for Pi adapter — other platforms use getLifetimeStats() as-is.
+ */
+function patchPiLifetimeFromStatsFiles(lifetime: ReturnType<typeof getLifetimeStats>, sessionsDir: string): void {
+  if (!existsSync(sessionsDir)) return;
+  let sandboxedBytes = 0;
+  try {
+    for (const f of readdirSync(sessionsDir)) {
+      if (!f.startsWith("stats-") || !f.endsWith(".json")) continue;
+      try {
+        const raw = JSON.parse(readFileSync(join(sessionsDir, f), "utf-8"));
+        sandboxedBytes += (raw?.bytes_sandboxed ?? 0) + (raw?.bytes_indexed ?? 0);
+      } catch { /* corrupt file — skip */ }
+    }
+  } catch { /* never block ctx_stats on stats file I/O */ }
+  if (sandboxedBytes > 0) {
+    const rescueTokens = (lifetime.rescueBytes ?? 0) / 4;
+    lifetime.totalEvents = Math.round((sandboxedBytes / 4 + rescueTokens) / 256);
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // Tool: stats
 // ─────────────────────────────────────────────────────────
@@ -3591,11 +3615,13 @@ server.registerTool(
               realBytes = { conversation: convReal, lifetime: lifeReal };
             }
           } catch { /* never block ctx_stats */ }
+          // Pi byte accounting: patch lifetime from stats-*.json files
+          // (actual bytes_sandboxed, not events × 256 heuristic).
+          if (_detectedAdapter?.name === "Pi") {
+            patchPiLifetimeFromStatsFiles(lifetime, getSessionDir());
+          }
           // v1.0.117: pass projectDir as cwd so the narrative renderer's
-          // "started in <path>" line matches the user's actual project, not
-          // the MCP server's chdir'd plugin install dir. getProjectDir()
-          // includes v1.0.115's transcript heuristic which reads the literal
-          // cwd from Claude Code's session jsonl.
+          // "started in <path>" line matches the user's actual project.
           text = formatReport(report, VERSION, _latestVersion, { lifetime, mcpUsage, multiAdapter, conversation, realBytes, cwd: projectDir });
         } finally {
           sdb.close();
@@ -3606,6 +3632,9 @@ server.registerTool(
         const engine = new AnalyticsEngine(createMinimalDb());
         const report = engine.queryAll(sessionStats);
         const lifetime = getLifetimeStats({ sessionsDir: getSessionDir() });
+        if (_detectedAdapter?.name === "Pi") {
+          patchPiLifetimeFromStatsFiles(lifetime, getSessionDir());
+        }
         let multiAdapter;
         try { multiAdapter = getMultiAdapterLifetimeStats(); } catch { /* never block ctx_stats */ }
         text = formatReport(report, VERSION, _latestVersion, { lifetime, multiAdapter });
@@ -3616,6 +3645,9 @@ server.registerTool(
       const report = engine.queryAll(sessionStats);
       let lifetime;
       try { lifetime = getLifetimeStats({ sessionsDir: getSessionDir() }); } catch { /* never block ctx_stats */ }
+      if (_detectedAdapter?.name === "Pi" && lifetime) {
+        patchPiLifetimeFromStatsFiles(lifetime, getSessionDir());
+      }
       let multiAdapter;
       try { multiAdapter = getMultiAdapterLifetimeStats(); } catch { /* never block ctx_stats */ }
       text = formatReport(report, VERSION, _latestVersion, (lifetime || multiAdapter) ? { lifetime, multiAdapter } : undefined);
@@ -3782,19 +3814,25 @@ server.registerTool(
     // and cmd.exe — unlike env-var prefixes). If detection fails we
     // skip the flag and let upgrade()'s own detectPlatform() fall back.
     let platformFlag = "";
+    let nodeOpts: { platform: string; jsRuntime: string } | undefined =
+      undefined;
     try {
       const { detectPlatform } = await import("./adapters/detect.js");
       const clientInfo = server.server.getClientVersion();
       const signal = detectPlatform(clientInfo ?? undefined);
       platformFlag = ` --platform ${signal.platform}`;
+      nodeOpts = isInProcessPluginPlatform(signal.platform)
+        ? { platform: signal.platform, jsRuntime: runtimes.javascript }
+        : undefined;
     } catch { /* best effort — fall back to upgrade()'s own detect */ }
+
 
     let cmd: string;
 
     if (existsSync(bundlePath)) {
-      cmd = `${buildNodeCommand(bundlePath)} upgrade${platformFlag}`;
+      cmd = `${buildNodeCommand(bundlePath, nodeOpts)} upgrade${platformFlag}`;
     } else if (existsSync(fallbackPath)) {
-      cmd = `${buildNodeCommand(fallbackPath)} upgrade${platformFlag}`;
+      cmd = `${buildNodeCommand(fallbackPath, nodeOpts)} upgrade${platformFlag}`;
     } else {
       // Inline fallback: neither CLI file exists (e.g. marketplace installs).
       // Generate a self-contained node -e script that performs the upgrade.
@@ -3838,7 +3876,7 @@ server.registerTool(
       const tmpScript = resolve(pluginRoot, ".ctx-upgrade-inline.mjs");
       const { writeFileSync: writeTmp } = await import("node:fs");
       writeTmp(tmpScript, scriptLines);
-      cmd = buildNodeCommand(tmpScript);
+      cmd = buildNodeCommand(tmpScript, nodeOpts);
     }
 
     const text = [

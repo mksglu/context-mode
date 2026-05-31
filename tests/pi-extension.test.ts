@@ -837,11 +837,11 @@ describe("Pi Extension", () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // Slice 7: Routing block injection (Pi-1)
+  // Slice 7: Pi-1 lightweight routing anchor injection
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 7: Routing block injection", () => {
-    it("injects <context_window_protection> on first before_agent_start", async () => {
+    it("injects lightweight routing anchor on first before_agent_start", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
         sessionManager: { getSessionFile: () => `routing-1-${Date.now()}-${Math.random()}` },
@@ -852,10 +852,14 @@ describe("Pi Extension", () => {
       });
 
       expect(result?.systemPrompt).toBeDefined();
-      expect(result.systemPrompt).toContain("<context_window_protection>");
+      // Per-tool descriptions from pi.registerTool() tell the model what
+      // each tool does. The anchor adds the deliberate choice: which tool
+      // for which scenario. It does NOT emit the old 7KB routing block.
+      expect(result.systemPrompt).toContain("context-mode active");
+      expect(result.systemPrompt).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
     });
 
-    it("re-injects the routing block on every subsequent call (Pi rebuilds system prompt each turn)", async () => {
+    it("re-injects the anchor on every subsequent call (Pi rebuilds system prompt each turn)", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
         sessionManager: { getSessionFile: () => `routing-2-${Date.now()}-${Math.random()}` },
@@ -872,11 +876,12 @@ describe("Pi Extension", () => {
       });
 
       // Unlike Claude Code where the SessionStart hook persists context for the whole
-      // session, Pi rebuilds the system prompt fresh every turn. The routing block
+      // session, Pi rebuilds the system prompt fresh every turn. The anchor
       // must be present on every call or the LLM loses MCP tool awareness after turn 1.
-      expect(first?.systemPrompt).toContain("<context_window_protection>");
-      expect(second?.systemPrompt).toContain("<context_window_protection>");
-      expect(third?.systemPrompt).toContain("<context_window_protection>");
+      const ANCHOR = "context-mode active";
+      expect(first?.systemPrompt).toContain(ANCHOR);
+      expect(second?.systemPrompt).toContain(ANCHOR);
+      expect(third?.systemPrompt).toContain(ANCHOR);
     });
   });
 

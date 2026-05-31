@@ -66,6 +66,7 @@ function browserOpenArgv(
 
 // ── Adapter imports ──────────────────────────────────────
 import { detectPlatform, getAdapter } from "./adapters/detect.js";
+import { isInProcessPluginPlatform } from "./adapters/types.js";
 
 /* -------------------------------------------------------
  * Hook dispatcher — `context-mode hook <platform> <event>`
@@ -150,9 +151,6 @@ async function hookDispatch(platform: string, event: string): Promise<void> {
  * Entry point
  * ------------------------------------------------------- */
 
-const IN_PROCESS_PLUGIN_PLATFORMS = new Set(["opencode", "kilo"]);
-const isInProcessPluginPlatform = (p: string | undefined) =>
-  p ? IN_PROCESS_PLUGIN_PLATFORMS.has(p) : false;
 const args = process.argv.slice(2);
 
 function printHelp(): void {

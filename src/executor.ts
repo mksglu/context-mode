@@ -43,9 +43,10 @@ export function buildScriptFilename(
 ): string {
   if (platform === "win32" && language === "shell") {
     const shellName = shellPath?.toLowerCase() ?? "";
-    return shellName.includes("powershell") || shellName.includes("pwsh")
-      ? "script.ps1"
-      : "script";
+    if (shellName.includes("powershell") || shellName.includes("pwsh")) return "script.ps1";
+    const shellBase = shellName.split(/[\\/]/).pop() ?? shellName;
+    if (shellBase === "cmd" || shellBase === "cmd.exe") return "script.cmd";
+    return "script";
   }
   return `script.${SCRIPT_EXT[language]}`;
 }

@@ -57,12 +57,54 @@ const SYSTEM_REMINDER_PREFIXES = [
   "<context_guidance>",
   "<tool-result>",
 ] as const;
+const SKILL_FRONTMATTER_REGEX = /^---\s*\n[\s\S]*?\n---\s*\n?/;
+const OPENCLAW_SKILL_PROMPT_CHAR_LIMIT = 6000;
+const SKILL_SECTION_HEADINGS = [
+  "MANDATORY RULE",
+  "Decision Tree",
+  "When to Use Each Tool",
+  "Critical Rules",
+] as const;
 function isSystemReminderMessage(msg: string): boolean {
   const trimmed = msg.trimStart();
   for (const prefix of SYSTEM_REMINDER_PREFIXES) {
     if (trimmed.startsWith(prefix)) return true;
   }
   return false;
+}
+function stripMarkdownFrontmatter(markdown: string): string {
+  const normalized = markdown.replace(/\r\n/g, "\n");
+  return normalized.replace(SKILL_FRONTMATTER_REGEX, "").trim();
+}
+function extractMarkdownSection(markdown: string, heading: string): string | null {
+  const sectionHeader = `## ${heading}`;
+  const start = markdown.indexOf(sectionHeader);
+  if (start === -1) return null;
+  const afterHeader = markdown.slice(start + sectionHeader.length);
+  const nextHeadingOffset = afterHeader.search(/\n##\s+|\n#\s+/);
+  const body = (nextHeadingOffset === -1 ? afterHeader : afterHeader.slice(0, nextHeadingOffset)).trim();
+  if (!body) return null;
+  return `${sectionHeader}\n\n${body}`;
+}
+function buildOpenClawSkillLikeGuidance(skillMarkdown: string): string {
+  const skillBody = stripMarkdownFrontmatter(skillMarkdown);
+  const skillTitle = skillBody.match(/^#\s+.+$/m)?.[0]?.trim() ?? "# Context Mode Skill";
+  const selectedSections = SKILL_SECTION_HEADINGS
+    .map((heading) => extractMarkdownSection(skillBody, heading))
+    .filter((section): section is string => Boolean(section));
+  const rawContent = (
+    selectedSections.length > 0
+      ? [skillTitle, ...selectedSections].join("\n\n")
+      : skillBody
+  ).trim();
+  const boundedContent = rawContent.length > OPENCLAW_SKILL_PROMPT_CHAR_LIMIT
+    ? `${rawContent.slice(0, OPENCLAW_SKILL_PROMPT_CHAR_LIMIT).trimEnd()}\n\n[skill excerpt truncated for prompt budget]`
+    : rawContent;
+  return [
+    "<context_mode_skill_like_guidance source=\"skills/context-mode/SKILL.md\">",
+    boundedContent,
+    "</context_mode_skill_like_guidance>",
+  ].join("\n");
 }
 
 // ── OpenClaw Plugin API Types ─────────────────────────────
@@ -77,9 +119,17 @@ interface CommandContext {
   config?: Record<string, unknown>;
 }
 
+interface OpenClawCommandDefinition {
+  name: string;
+  description: string;
+  acceptsArgs?: boolean;
+  requireAuth?: boolean;
+  handler: (ctx: CommandContext) => { text: string } | Promise<{ text: string }>;
+}
+
 /** OpenClaw plugin API provided to the register function. */
 interface OpenClawPluginApi {
-  registerHook(
+  registerHook?(
     event: string,
     handler: (...args: unknown[]) => unknown,
     meta: { name: string; description: string },
@@ -94,14 +144,8 @@ interface OpenClawPluginApi {
     handler: (...args: unknown[]) => unknown,
     opts?: { priority?: number },
   ): void;
-  registerContextEngine(id: string, factory: () => ContextEngineInstance): void;
-  registerCommand?(cmd: {
-    name: string;
-    description: string;
-    acceptsArgs?: boolean;
-    requireAuth?: boolean;
-    handler: (ctx: CommandContext) => { text: string } | Promise<{ text: string }>;
-  }): void;
+  registerContextEngine?(id: string, factory: () => ContextEngineInstance): void;
+  registerCommand?: (cmd: OpenClawCommandDefinition) => void;
   registerCli?(
     factory: (ctx: { program: unknown }) => void,
     meta: { commands: string[] },
@@ -273,10 +317,40 @@ export default {
     // info/error always emit; debug only when api.logger.debug is present
     // (i.e. OpenClaw running with --log-level debug or lower).
     const log = {
-      info: (...args: unknown[]) => api.logger?.info("[context-mode]", ...args),
-      error: (...args: unknown[]) => api.logger?.error("[context-mode]", ...args),
+      info: (...args: unknown[]) => api.logger?.info?.("[context-mode]", ...args),
+      error: (...args: unknown[]) => api.logger?.error?.("[context-mode]", ...args),
       debug: (...args: unknown[]) => api.logger?.debug?.("[context-mode]", ...args),
       warn: (...args: unknown[]) => api.logger?.warn?.("[context-mode]", ...args),
+    };
+
+    const registerCommandHook = (
+      event: string,
+      handler: () => Promise<void> | void,
+      meta: { name: string; description: string },
+    ): void => {
+      if (api.registerHook) {
+        api.registerHook(event, handler, meta);
+        return;
+      }
+      try {
+        api.on(event, handler as (...args: unknown[]) => unknown);
+        log.debug("command hook registered via api.on fallback", { event });
+      } catch (err) {
+        log.warn?.("command hook registration skipped", { event }, err);
+      }
+    };
+
+    const registerAutoReplyCommand = (command: OpenClawCommandDefinition): void => {
+      if (!api.registerCommand) return;
+      try {
+        api.registerCommand(command);
+      } catch (err) {
+        log.warn?.(
+          "registerCommand failed; skipping auto-reply command",
+          { name: command.name },
+          err,
+        );
+      }
     };
 
     // Get shared DB singleton (lazy-init on first register() call)
@@ -302,6 +376,7 @@ export default {
     // with createRoutingBlock(createToolNamer("openclaw")) so OpenClaw-specific
     // MCP-prefix substitution stays in lockstep with hooks/routing-block.mjs.
     let routingInstructions = "";
+    let skillLikeInstructions = "";
     const initPromise = (async () => {
       const routingPath = resolve(buildDir, "..", "..", "..", "hooks", "core", "routing.mjs");
       const routing = await import(pathToFileURL(routingPath).href);
@@ -339,6 +414,17 @@ export default {
         } catch {
           // best effort
         }
+      }
+
+      try {
+        const skillPath = resolve(pluginRoot, "skills", "context-mode", "SKILL.md");
+        if (existsSync(skillPath)) {
+          skillLikeInstructions = buildOpenClawSkillLikeGuidance(readFileSync(skillPath, "utf-8"));
+        } else {
+          log.debug("context-mode skill file missing; skipping skill-like prompt injection", { skillPath });
+        }
+      } catch (err) {
+        log.warn?.("failed to build skill-like guidance from SKILL.md", err);
       }
 
       return { routing };
@@ -465,7 +551,7 @@ export default {
 
     // ── 3. command:new — Session initialization ────────────
 
-    api.registerHook(
+    registerCommandHook(
       "command:new",
       async () => {
         try {
@@ -484,7 +570,7 @@ export default {
 
     // ── 3b. command:reset / command:stop — Session cleanup ────
 
-    api.registerHook(
+    registerCommandHook(
       "command:reset",
       async () => {
         try {
@@ -499,8 +585,7 @@ export default {
         description: "Session cleanup on /reset command",
       },
     );
-
-    api.registerHook(
+    registerCommandHook(
       "command:stop",
       async () => {
         try {
@@ -664,13 +749,21 @@ export default {
     api.on(
       "before_prompt_build",
       () => {
-        if (!routingInstructions) return undefined;
-        log.debug("before_prompt_build[routing]", { hasInstructions: !!routingInstructions });
-        // v1.0.107 — visible marker so OpenClaw users can verify the routing
-        // block reached the model (Mickey-class verification path; mirrors
-        // OpenCode + Pi adapters).
-        const marker = `<!-- context-mode: routing block injected (sessionID=${String(sessionId).slice(0, 8)}) -->`;
-        return { appendSystemContext: marker + "\n" + routingInstructions };
+        if (!routingInstructions && !skillLikeInstructions) return undefined;
+        log.debug("before_prompt_build[routing+skill]", {
+          hasRoutingInstructions: !!routingInstructions,
+          hasSkillLikeInstructions: !!skillLikeInstructions,
+        });
+        const injectedBlocks: string[] = [];
+        if (routingInstructions) {
+          // v1.0.107 — visible marker so OpenClaw users can verify the routing
+          // block reached the model (Mickey-class verification path; mirrors
+          // OpenCode + Pi adapters).
+          const marker = `<!-- context-mode: routing block injected (sessionID=${String(sessionId).slice(0, 8)}) -->`;
+          injectedBlocks.push(marker + "\n" + routingInstructions);
+        }
+        if (skillLikeInstructions) injectedBlocks.push(skillLikeInstructions);
+        return { appendSystemContext: injectedBlocks.join("\n\n") };
       },
       { priority: 5 },
     );
@@ -728,13 +821,19 @@ export default {
         try {
           const e = (event ?? {}) as { input?: { prompt?: string } };
           const basePrompt = e?.input?.prompt ?? "";
-          if (!routingInstructions) return undefined;
+          if (!routingInstructions && !skillLikeInstructions) return undefined;
+          const injectedBlocks: string[] = [];
+          if (routingInstructions) injectedBlocks.push(routingInstructions);
+          if (skillLikeInstructions) injectedBlocks.push(skillLikeInstructions);
+          const injectedPromptBlock = injectedBlocks.join("\n\n");
           const newPrompt = basePrompt
-            ? `${basePrompt}\n\n${routingInstructions}`
-            : routingInstructions;
-          log.debug("subagent_spawning[inject-routing]", {
+            ? `${basePrompt}\n\n${injectedPromptBlock}`
+            : injectedPromptBlock;
+          log.debug("subagent_spawning[inject-routing+skill]", {
             basePromptLen: basePrompt.length,
-            blockLen: routingInstructions.length,
+            hasRoutingInstructions: !!routingInstructions,
+            hasSkillLikeInstructions: !!skillLikeInstructions,
+            blockLen: injectedPromptBlock.length,
           });
           return { inputOverride: { ...(e.input ?? {}), prompt: newPrompt } };
         } catch {
@@ -745,29 +844,33 @@ export default {
 
     // ── 9. Context engine — Compaction management ──────────
 
-    api.registerContextEngine("context-mode", () => ({
-      info: {
-        id: "context-mode",
-        name: "Context Mode",
-        ownsCompaction: false,
-      },
+    if (api.registerContextEngine) {
+      api.registerContextEngine("context-mode", () => ({
+        info: {
+          id: "context-mode",
+          name: "Context Mode",
+          ownsCompaction: false,
+        },
 
-      async ingest() {
-        return { ingested: true };
-      },
+        async ingest() {
+          return { ingested: true };
+        },
 
-      async assemble({ messages }: { messages: unknown[] }) {
-        return { messages, estimatedTokens: 0 };
-      },
+        async assemble({ messages }: { messages: unknown[] }) {
+          return { messages, estimatedTokens: 0 };
+        },
 
-      async compact() {
-        // No-op: session continuity is handled by before_compaction / after_compaction hooks.
-        // Returning ownsCompaction: false + compacted: false lets the host platform (OpenClaw)
-        // manage conversation truncation, preserving Anthropic thinking/redacted_thinking blocks.
-        // See: https://github.com/mksglu/context-mode/issues/191
-        return { ok: true, compacted: false };
-      },
-    }));
+        async compact() {
+          // No-op: session continuity is handled by before_compaction / after_compaction hooks.
+          // Returning ownsCompaction: false + compacted: false lets the host platform (OpenClaw)
+          // manage conversation truncation, preserving Anthropic thinking/redacted_thinking blocks.
+          // See: https://github.com/mksglu/context-mode/issues/191
+          return { ok: true, compacted: false };
+        },
+      }));
+    } else {
+      log.warn?.("api.registerContextEngine unavailable — skipping context engine registration");
+    }
 
     // ── 10. Auto-reply commands — ctx slash commands ──────
     // Update module-level refs so command handlers (registered once) always
@@ -777,7 +880,7 @@ export default {
     _latestPluginRoot = pluginRoot;
 
     if (api.registerCommand) {
-      api.registerCommand({
+      registerAutoReplyCommand({
         name: "ctx-stats",
         description: "Show context-mode session statistics",
         handler: () => {
@@ -785,8 +888,7 @@ export default {
           return { text };
         },
       });
-
-      api.registerCommand({
+      registerAutoReplyCommand({
         name: "ctx-doctor",
         description: "Run context-mode diagnostics",
         handler: () => {
@@ -808,7 +910,7 @@ export default {
         },
       });
 
-      api.registerCommand({
+      registerAutoReplyCommand({
         name: "ctx-upgrade",
         description: "Upgrade context-mode to the latest version",
         handler: () => {

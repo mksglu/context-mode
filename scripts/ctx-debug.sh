@@ -343,7 +343,7 @@ section "4. better-sqlite3 Native Module"
 # Find .node binary
 SQLITE_NODE_FILE=""
 if [ -d "$PLUGIN_ROOT/node_modules/better-sqlite3" ]; then
-  SQLITE_NODE_FILE="$(find "$PLUGIN_ROOT/node_modules/better-sqlite3" -name '*.node' -type f 2>/dev/null | head -1)"
+  SQLITE_NODE_FILE="$(find -H "$PLUGIN_ROOT/node_modules/better-sqlite3" -name '*.node' -type f 2>/dev/null | head -1)"
 fi
 check "better-sqlite3 .node binary exists" "$([ -n "$SQLITE_NODE_FILE" ] && echo true || echo false)"
 [ -n "$SQLITE_NODE_FILE" ] && kv "Binary path" "$(abbrev_path "$SQLITE_NODE_FILE")"
