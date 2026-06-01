@@ -232,25 +232,14 @@ context-mode hook codex stop
 - Codex emits structured tool names such as `Bash` and `apply_patch`; context-mode only normalizes legacy shell aliases.
 - updatedInput and updatedMCPToolOutput are in the schema but NOT implemented
 - Default hook timeout: 600 seconds
-- Codex plugin marketplace installs on Windows can fail with `missing plugin.json` if
-  Git checks out `plugins/context-mode` as a regular file containing `..` instead of
-  a directory symlink. The Codex marketplace manifest points at
-  `./plugins/context-mode` because Codex currently rejects the repository root
-  (`"./"`) as an empty local plugin source path. If this happens, use a local
-  marketplace wrapper or Windows junction so `plugins/context-mode` resolves to
-  the repository root and contains `.codex-plugin/plugin.json`.
-
-  Example local workaround:
-
-  ```cmd
-  mkdir "%USERPROFILE%\.codex\local-marketplaces\context-mode\.agents\plugins"
-  mkdir "%USERPROFILE%\.codex\local-marketplaces\context-mode\plugins"
-  mklink /J "%USERPROFILE%\.codex\local-marketplaces\context-mode\plugins\context-mode" "%USERPROFILE%\.codex\.tmp\marketplaces\context-mode"
-  ```
-
-  Then point `[marketplaces.context-mode]` in `%USERPROFILE%\.codex\config.toml`
-  at `%USERPROFILE%\.codex\local-marketplaces\context-mode` with
-  `source_type = "local"` and retry the install.
+- Older context-mode releases used a `plugins/context-mode -> ..` symlink shim
+  because Codex rejects the repository root (`"./"`) as an empty local plugin
+  source path. On native Windows, Git can check that symlink out as a regular
+  file containing only `..`, which makes `codex plugin add context-mode@context-mode`
+  fail with `missing plugin.json`. Current releases avoid this by declaring the
+  Codex marketplace plugin as a relative Git source (`url: "./"`), so Codex
+  materializes the installed marketplace root and finds `.codex-plugin/plugin.json`
+  without any symlink or junction.
 
   After installation succeeds, verify that Codex hooks are enabled in
   `%USERPROFILE%\.codex\config.toml`:

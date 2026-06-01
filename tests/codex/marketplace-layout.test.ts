@@ -5,7 +5,7 @@
  * it did. Every assertion mirrors a specific line in the Codex Rust source
  * under refs/platforms/codex/codex-rs/core-plugins/src/marketplace.rs.
  *
- * THE FAILURE MODE WE'RE PINNING (proven against Codex v0.130.0):
+ * THE FAILURE MODES WE'RE PINNING (proven against Codex v0.130.0/v0.131.0):
  *
  *   Before this fix, `codex plugin marketplace add <repo>` succeeded but
  *   the plugin never appeared in /plugin. Why? Codex deserializes our
@@ -20,15 +20,23 @@
  *   the plugin is dropped. Exit code stays 0, marketplace entry exists in
  *   ~/.codex/config.toml, but the plugins vec is empty.
  *
+ *   The first workaround used `./plugins/context-mode` plus a git symlink to
+ *   `..`, making the resolved plugin root the repository root on Unix. On
+ *   native Windows, Git commonly checks symlinks out as regular files
+ *   containing the target text (`..`), so `codex plugin add` failed with
+ *   `missing plugin.json`.
+ *
  *   So the contract Codex enforces is:
  *     1. marketplace.json MUST be at .agents/plugins/marketplace.json OR
  *        .claude-plugin/marketplace.json (MARKETPLACE_MANIFEST_RELATIVE_PATHS
  *        constant at marketplace.rs:21). Codex tries them in that order.
- *     2. Each plugin's `source` MUST resolve to a directory != marketplace root
- *        (the strip_prefix("./") + non-empty check).
- *     3. The resolved directory MUST contain `.codex-plugin/plugin.json`
- *        (otherwise load_plugin_manifest at line 401 returns None → plugin
- *        has no manifest → install fails downstream).
+ *     2. A local plugin source cannot reference the marketplace root
+ *        (`"./"` is rejected as an empty local path), so repo-root plugins
+ *        must avoid `source: "local"` + symlink shims.
+ *     3. A git URL source with `url: "./"` is resolved relative to the
+ *        marketplace root, cloned into Codex's staging directory, and installed
+ *        from that materialized repo root. That root contains
+ *        `.codex-plugin/plugin.json`, so install works without symlinks.
  *     4. `${CODEX_PLUGIN_ROOT}` placeholders are NOT interpolated — upstream
  *        openai/codex#19582 is OPEN. So our shipped manifests must work
  *        without any variable substitution.
@@ -36,7 +44,7 @@
 
 import { describe, test } from "vitest";
 import { strict as assert } from "node:assert";
-import { readFileSync, existsSync, realpathSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
@@ -62,6 +70,8 @@ interface RawPluginSourceObject {
   source: "local" | "url" | "git-subdir";
   path?: string;
   url?: string;
+  ref?: string;
+  sha?: string;
 }
 
 interface RawPluginEntry {
@@ -77,41 +87,15 @@ interface RawMarketplaceManifest {
   plugins: RawPluginEntry[];
 }
 
-/**
- * Mirror of Codex's `resolve_local_plugin_source_path` at marketplace.rs:498-525.
- * Returns the resolved absolute path on success, or throws with the EXACT
- * error message Codex emits via `warn!()` for that input.
- */
-function resolveLocalPluginSourcePath(
-  marketplaceRoot: string,
-  rawSourcePath: string,
-): string {
-  if (!rawSourcePath.startsWith("./")) {
-    throw new Error("local plugin source path must start with `./`");
-  }
-  const stripped = rawSourcePath.slice(2);
-  if (stripped.length === 0) {
-    throw new Error("local plugin source path must not be empty");
-  }
-  // Codex also rejects path traversal: any component != Normal(_).
-  if (stripped.split("/").some((c) => c === ".." || c === "" || c === ".")) {
-    throw new Error("local plugin source path must stay within the marketplace root");
-  }
-  return join(marketplaceRoot, stripped);
-}
-
-/**
- * Mirror of Codex's `RawMarketplaceManifestPluginSource` deserialize at
- * marketplace.rs:735-744 (untagged enum: Path(String) | Object(...)).
- */
-function extractSourcePath(source: string | RawPluginSourceObject): string {
-  if (typeof source === "string") return source;
-  if (source.source === "local" && typeof source.path === "string") {
-    return source.path;
-  }
-  throw new Error(
-    `unsupported plugin source shape: ${JSON.stringify(source)} — Codex would warn! and drop this plugin`,
+function requireObjectSource(
+  plugin: RawPluginEntry,
+): RawPluginSourceObject {
+  assert.equal(
+    typeof plugin.source,
+    "object",
+    `Plugin '${plugin.name}' should use an object source so the intent is explicit.`,
   );
+  return plugin.source as RawPluginSourceObject;
 }
 
 describe("Codex marketplace discovery contract — v0.130.0", () => {
@@ -142,38 +126,57 @@ describe("Codex marketplace discovery contract — v0.130.0", () => {
     );
   });
 
-  test("every plugin source resolves through Codex's strip_prefix non-empty check", () => {
+  test("does not rely on a local source symlink shim for the repo-root plugin", () => {
     const path = join(REPO_ROOT, ".agents/plugins/marketplace.json");
-    const marketplaceRoot = REPO_ROOT;
     const manifest = JSON.parse(readFileSync(path, "utf-8")) as RawMarketplaceManifest;
     for (const plugin of manifest.plugins) {
-      const sourcePath = extractSourcePath(plugin.source);
-      // This call throws the exact error Codex would `warn!` on. If it throws,
-      // Codex would silently drop this plugin and /plugin would never show it.
-      assert.doesNotThrow(
-        () => resolveLocalPluginSourcePath(marketplaceRoot, sourcePath),
-        `Plugin '${plugin.name}' has source "${sourcePath}" which Codex would reject. ` +
-          `Use "./plugins/${plugin.name}" instead of "./" or other unsupported shapes.`,
+      const source = requireObjectSource(plugin);
+      assert.notEqual(
+        source.source,
+        "local",
+        `Plugin '${plugin.name}' must not use a local source path. The old ` +
+          `./plugins/${plugin.name} symlink checked out as a regular '..' file on Windows.`,
       );
     }
   });
 
-  test("every plugin's resolved path contains .codex-plugin/plugin.json (real plugin tree)", () => {
+  test("uses a relative git self-clone so Codex installs from the materialized repo root", () => {
     const path = join(REPO_ROOT, ".agents/plugins/marketplace.json");
-    const marketplaceRoot = REPO_ROOT;
     const manifest = JSON.parse(readFileSync(path, "utf-8")) as RawMarketplaceManifest;
     for (const plugin of manifest.plugins) {
-      const sourcePath = extractSourcePath(plugin.source);
-      const resolved = resolveLocalPluginSourcePath(marketplaceRoot, sourcePath);
-      const realResolved = realpathSync(resolved);
-      const pluginJson = join(realResolved, ".codex-plugin", "plugin.json");
+      const source = requireObjectSource(plugin);
+      assert.equal(
+        source.source,
+        "url",
+        `Plugin '${plugin.name}' should use Codex's git URL source path, not a local symlink.`,
+      );
+      assert.equal(
+        source.url,
+        "./",
+        `Plugin '${plugin.name}' should clone the installed marketplace root itself.`,
+      );
+      assert.equal(
+        source.path,
+        undefined,
+        `Plugin '${plugin.name}' must install from the cloned repo root, not a subdir.`,
+      );
+
+      const pluginJson = join(REPO_ROOT, ".codex-plugin", "plugin.json");
       assert.ok(
         existsSync(pluginJson),
-        `Plugin '${plugin.name}' resolves to ${resolved} (realpath ${realResolved}) ` +
-          `but ${pluginJson} is missing. Codex's load_plugin_manifest (marketplace.rs:401) ` +
-          `would return None → /plugin install would fail.`,
+        `Plugin '${plugin.name}' self-clones the marketplace root, but ${pluginJson} is missing. ` +
+          `Codex's PluginStore would report missing plugin.json after materialization.`,
       );
     }
+  });
+
+  test("old Windows-hostile plugins/context-mode symlink shim is gone", () => {
+    const shim = join(REPO_ROOT, "plugins", "context-mode");
+    assert.ok(
+      !existsSync(shim),
+      `${shim} must not exist. Git symlinks often checkout as a regular '..' file on ` +
+        `native Windows, which makes Codex install fail with missing plugin.json.`,
+    );
   });
 
   test("no ${CODEX_PLUGIN_ROOT} / ${CLAUDE_PLUGIN_ROOT} placeholders in Codex-facing manifests (upstream openai/codex#19582)", () => {

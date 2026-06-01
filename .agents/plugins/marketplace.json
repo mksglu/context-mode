@@ -7,8 +7,8 @@
     {
       "name": "context-mode",
       "source": {
-        "source": "local",
-        "path": "./plugins/context-mode"
+        "source": "url",
+        "url": "./"
       },
       "policy": {
         "installation": "AVAILABLE",
