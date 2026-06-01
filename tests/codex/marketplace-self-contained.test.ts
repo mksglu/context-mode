@@ -38,6 +38,47 @@ function makeTempDir(prefix: string): string {
   return dir;
 }
 
+function buildNpmPackDryRunInvocation(
+  cacheDir: string,
+  platform: NodeJS.Platform = process.platform,
+): {
+  command: string;
+  args: string[];
+  options: {
+    cwd: string;
+    encoding: BufferEncoding;
+    env: NodeJS.ProcessEnv;
+  };
+} {
+  const options = {
+    cwd: REPO_ROOT,
+    encoding: "utf8" as BufferEncoding,
+    env: {
+      ...process.env,
+      npm_config_cache: cacheDir,
+    },
+  };
+
+  if (platform === "win32") {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", "npm pack --dry-run --json"],
+      options,
+    };
+  }
+
+  return {
+    command: "npm",
+    args: ["pack", "--dry-run", "--json"],
+    options,
+  };
+}
+
+function npmPackDryRunJson(cacheDir: string) {
+  const invocation = buildNpmPackDryRunInvocation(cacheDir);
+  return spawnSync(invocation.command, invocation.args, invocation.options);
+}
+
 function copyPackageArtifact(targetRoot: string): void {
   const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
     files?: string[];
@@ -155,14 +196,27 @@ async function waitForResponse(
 }
 
 describe("Codex marketplace plugin startup", () => {
+  test("uses a Windows-safe npm pack invocation", () => {
+    const cacheDir = "C:\\Temp\\context mode npm cache";
+    const invocation = buildNpmPackDryRunInvocation(cacheDir, "win32");
+
+    assert.equal(invocation.command, "cmd.exe");
+    assert.deepEqual(invocation.args, ["/d", "/s", "/c", "npm pack --dry-run --json"]);
+    assert.equal(invocation.options.env?.npm_config_cache, cacheDir);
+  });
+
   test("npm package includes the Codex bootstrap and vendor runtime files", () => {
     const cacheDir = makeTempDir("context-mode-npm-cache-");
-    const result = spawnSync("npm", ["pack", "--dry-run", "--json", "--cache", cacheDir], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-    });
+    const result = npmPackDryRunJson(cacheDir);
 
-    assert.equal(result.status, 0, result.stderr);
+    const spawnErr = result.error
+      ? `${result.error.name}: ${result.error.message}`
+      : "(none)";
+    assert.equal(
+      result.status,
+      0,
+      `npm pack failed: status=${String(result.status)} signal=${String(result.signal)} error=${spawnErr} stderr=${String(result.stderr)} stdout=${String(result.stdout)}`,
+    );
     const [pack] = JSON.parse(result.stdout) as Array<{
       files: Array<{ path: string }>;
     }>;
