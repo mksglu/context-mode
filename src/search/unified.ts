@@ -158,7 +158,8 @@ export function searchAllSources(opts: SearchAllSourcesOpts): UnifiedSearchResul
     if (sessionDB) {
       const eventsFilter: string | null =
         projectScope === undefined ? (projectDir || "") : projectScope;
-      const dbResults = sessionDB.searchEvents(query, limit, eventsFilter, source);
+      // Thread sort → orderMode (#737 fix: relevance = scored session events).
+      const dbResults = sessionDB.searchEvents(query, limit, eventsFilter, source, sort === "timeline" ? "timeline" : "relevance");
       sessionResults.push(
         ...dbResults.map((r: Pick<StoredEvent, "id" | "session_id" | "category" | "type" | "data" | "created_at">) => ({
           title: `[${r.category}] ${r.type}`,

@@ -26,6 +26,7 @@ import { loadDatabase } from "../db-base.js";
 import { sanitizeQuery, escapeLikeSource } from "../store.js";
 import { canonicalContentDbPath, hashProjectDirCanonical } from "../session/db.js";
 import { searchAutoMemory, type AutoMemoryAdapter } from "./auto-memory.js";
+import { buildEventMatch } from "./event-query.js";
 import type { UnifiedSearchResult } from "./unified.js";
 
 const DEBUG = process.env.DEBUG?.includes("context-mode");
@@ -300,8 +301,13 @@ export function readonlySearchContent(
 }
 
 /**
- * Open a session DB in read-only mode and run a LIKE search on session_events.
- * No project_dir filter — the DB file is the project boundary.
+ * Open a session DB in read-only mode and run a tokenized LIKE search on
+ * session_events. No project_dir filter — the DB file is the project boundary.
+ *
+ * #737 fix: uses buildEventMatch for multi-term scored matching so
+ * natural-language queries surface session memory.
+ *
+ * `orderMode` (default "relevance") — caller passes "timeline" for sort=timeline.
  *
  * BLOCKER 3: uses { readonly: true } — no WAL pragmas, no schema init.
  * Unreadable/corrupt DBs return [].
@@ -311,20 +317,43 @@ export function readonlySearchEvents(
   query: string,
   limit: number,
   source?: string,
+  orderMode: "timeline" | "relevance" = "relevance",
 ): UnifiedSearchResult[] {
+  // Empty query: never run LIKE '%%' which matches everything.
+  if (!query.trim()) return [];
   const Database = loadDatabase();
   let db: ReturnType<typeof Database> | null = null;
   try {
     db = new Database(dbPath, { readonly: true } as any);
-    const escaped = query.replace(/[%_]/g, (c) => "\\" + c);
+    const { matchClause, matchParams, scoreExpr, scoreParams, hasTerms } = buildEventMatch(query);
     const sourceParam = source ?? null;
+
+    // BLOCKER (agy review): bare integer in ORDER BY is a 1-based COLUMN INDEX
+    // in SQLite even when parenthesized; the 0-term fallback scoreExpr="1" would
+    // sort by id (col 1), not a constant. Only use the score when hasTerms.
+    const orderClause =
+      orderMode !== "relevance"
+        ? `id ASC`
+        : hasTerms
+          ? `(${scoreExpr}) DESC, created_at DESC, id ASC`
+          : `created_at DESC, id ASC`;
+
+    // Binding order: ...matchParams, sourceParam, sourceParam,
+    //                [...scoreParams if relevance], limit
     const sql = `
       SELECT id, session_id, category, type, data, created_at, project_dir
       FROM session_events
-      WHERE (data LIKE '%' || ? || '%' ESCAPE '\\' OR category LIKE '%' || ? || '%' ESCAPE '\\')
+      WHERE ${matchClause}
         AND (? IS NULL OR category = ?)
-      ORDER BY id ASC LIMIT ?`;
-    const rows = db.prepare(sql).all(escaped, escaped, sourceParam, sourceParam, limit) as Array<{
+      ORDER BY ${orderClause}
+      LIMIT ?`;
+    const params: unknown[] = [
+      ...matchParams,
+      sourceParam, sourceParam,
+      ...(orderMode === "relevance" ? scoreParams : []),
+      limit,
+    ];
+    const rows = db.prepare(sql).all(...params) as Array<{
       id: number; session_id: string; category: string; type: string; data: string; created_at: string; project_dir: string | null;
     }>;
     return rows.map(r => ({
@@ -504,7 +533,8 @@ export function searchAbsPathProject(opts: AbsPathSearchOpts): UnifiedSearchResu
     for (const dbPath of sessionDbPaths) {
       // Pass no `source` to readonlySearchEvents — category-equality filter
       // has wrong semantics for a source-label filter. Apply label match below.
-      let items = readonlySearchEvents(dbPath, query, limit);
+      // Thread sort → orderMode (#737 fix: relevance = scored order).
+      let items = readonlySearchEvents(dbPath, query, limit, undefined, sort === "timeline" ? "timeline" : "relevance");
       if (source) {
         items = items.filter(r => matchesSourceFilter(r, source));
       }
@@ -577,6 +607,10 @@ export interface GlobalFanoutOpts {
 export function searchGlobalFanout(opts: GlobalFanoutOpts): UnifiedSearchResult[] {
   const { query, limit, sessionsDir, contentDir, source, contentType, sort, configDir, adapter } = opts;
 
+  // Non-positive limit → nothing requested. Guard up front so the diversity
+  // cap's post-push break can't leak a single item (review NIT).
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+
   const { sessionDbs, contentDbs } = listProjectDbs(sessionsDir, contentDir);
 
   // Attribution (#737): map each content DB's hash → project_dir via its
@@ -599,7 +633,8 @@ export function searchGlobalFanout(opts: GlobalFanoutOpts): UnifiedSearchResult[
   //    equality (wrong semantics for a source-label filter). ──────────────────
   if (!contentType) {
     for (const dbPath of sessionDbs) {
-      let items = readonlySearchEvents(dbPath, query, limit);
+      // Thread sort → orderMode (#737 fix: relevance = scored order per DB).
+      let items = readonlySearchEvents(dbPath, query, limit, undefined, sort === "timeline" ? "timeline" : "relevance");
       if (source) {
         items = items.filter(r => matchesSourceFilter(r, source));
       }
@@ -623,18 +658,56 @@ export function searchGlobalFanout(opts: GlobalFanoutOpts): UnifiedSearchResult[
 
   // ── Sort ────────────────────────────────────────────────────────────────
   // MAJOR 2 fix: timeline = chronological ordering; relevance = RRF score (desc).
-  let sorted: UnifiedSearchResult[];
-
   if (sort === "timeline") {
-    sorted = Array.from(scoreMap.values()).map(v => v.result);
-    normalizeTimestamps(sorted);
-    sorted.sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? ""));
-  } else {
-    sorted = Array.from(scoreMap.values())
-      .sort((a, b) => b.score - a.score)
-      .map(v => v.result);
-    normalizeTimestamps(sorted);
+    const chronological = Array.from(scoreMap.values()).map(v => v.result);
+    normalizeTimestamps(chronological);
+    chronological.sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? ""));
+    return chronological.slice(0, limit);
   }
 
-  return sorted.slice(0, limit);
+  // Relevance: RRF score DESC. On EQUAL score, prefer session memory over
+  // content so session hits are not evicted purely by scoreMap insertion order
+  // (content DBs are applied before session DBs). TIE-ONLY nudge — never
+  // promotes a lower-scored item above a higher-scored one (RRF-safe).
+  //
+  // Note: readonlySearchContent returns origin: "current-session" for ALL
+  // content items (including cross-project ones). We therefore give
+  // "prior-session" events a STRICTLY lower number than "current-session"
+  // so session recall beats content-noise on equal RRF scores.
+  const originPriority = (o?: string): number =>
+    o === "prior-session" ? 0 : o === "auto-memory" ? 1 : 2;
+  const sorted = Array.from(scoreMap.values())
+    .sort((a, b) =>
+      b.score - a.score ||
+      originPriority(a.result.origin) - originPriority(b.result.origin) ||
+      0,
+    )
+    .map(v => v.result);
+  normalizeTimestamps(sorted);
+
+  // Session diversity cap (#737, eval-driven): stop one chatty session (e.g.
+  // the CURRENT debugging session, which floods the KB with the very topic
+  // being worked on) from monopolizing the result window. HARD cap: keep at
+  // most CAP items per sessionId, in RRF order, DROPPING a session's surplus
+  // (no backfill — backfilling would just re-admit the chatty session and
+  // defeat the purpose). Items with no sessionId (content, auto-memory) are
+  // NEVER capped. RRF-safe: order is preserved; only surplus same-session
+  // items are removed, never a higher-scored item displaced by a lower one.
+  // Trade-off: a query whose answer lives entirely in one session returns at
+  // most CAP of its events — acceptable for GLOBAL recall, which favours
+  // breadth (the session name is surfaced; drill in for depth).
+  const CAP = Math.max(3, Math.floor(limit / 4));
+  const perSession = new Map<string, number>();
+  const capped: UnifiedSearchResult[] = [];
+  for (const r of sorted) {
+    const sid = r.sessionId;
+    if (sid) {
+      const n = perSession.get(sid) ?? 0;
+      if (n >= CAP) continue; // drop this chatty session's surplus
+      perSession.set(sid, n + 1);
+    }
+    capped.push(r);
+    if (capped.length >= limit) break;
+  }
+  return capped;
 }

@@ -14,9 +14,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync, rmSync, statSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { ContentStore } from "../../src/store.js";
 import { SessionDB } from "../../src/session/db.js";
-import { listProjectDbs, searchGlobalFanout, readonlySearchContent, searchAbsPathProject, listSessionDbsForProject } from "../../src/search/global-fanout.js";
+import { listProjectDbs, searchGlobalFanout, readonlySearchContent, readonlySearchEvents, searchAbsPathProject, listSessionDbsForProject } from "../../src/search/global-fanout.js";
 import { hashProjectDirCanonical, resolveContentStorePath } from "../../src/session/db.js";
 
 // ─────────────────────────────────────────────────────────
@@ -880,5 +881,203 @@ describe("attribution (#737): results name their project + session", () => {
     const results = searchAbsPathProject({ query: "quokka", limit: 10, contentDir, sessionsDir, projectDir });
     const hit = results.find((r) => r.origin === "current-session");
     expect(hit?.project).toBe(projectDir);
+  });
+
+  // ── Source-fairness regression (#737 reviewer Note) ───────────────────────
+  // Verifies that session-event hits are NOT fully evicted by content noise
+  // when many content DBs each produce a rank-0 hit for a common term.
+  // Source-fairness regression (#737 review Note → BLOCKER fix):
+  // Content DBs populate scoreMap before session DBs. When all hits tie on RRF
+  // score (each DB returns exactly one rank-0 hit for the common token), the
+  // pure-score sort keeps Map insertion order, so all N content items precede
+  // the 1 session item and limit < N+1 evicts the session entirely.
+  //
+  // Fix: origin-priority tie-break (prior-session=0, content=2) sorts the
+  // session hit to the front of equal-score groups without ever promoting a
+  // lower-scored item above a higher-scored one (RRF-safe).
+  test("source fairness: prior-session hit survives limit when tied with content noise (origin tie-break)", () => {
+    const { sessionsDir, contentDir } = makeDirs();
+
+    // Common token shared by ALL content DBs AND the session DB.
+    // FTS5 MATCH on content + tokenized LIKE on session both resolve it,
+    // so all 15 items (14 content + 1 session) enter scoreMap at score 1/61.
+    const COMMON_TOKEN = "fairnesstoken737";
+
+    // 1 session DB
+    const SESSION_PROJECT = "/home/user/fairness-session-proj";
+    const sdb = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(SESSION_PROJECT)}.db`) });
+    const sid = `fair-sess-${randomUUID().slice(0, 8)}`;
+    sdb.ensureSession(sid, SESSION_PROJECT);
+    sdb.insertEvent(sid,
+      { type: "role", category: "role", data: `the session answer contains ${COMMON_TOKEN}`, priority: 5 },
+      "PostToolUse",
+      { projectDir: SESSION_PROJECT, source: "env", confidence: 1 },
+    );
+    sdb.close();
+
+    // 14 content DBs — each with DISTINCT text so no two fuse under itemKey dedup.
+    // Each yields one rank-0 FTS MATCH hit for COMMON_TOKEN → score = 1/61.
+    const NOISE_COUNT = 14;
+    for (let i = 0; i < NOISE_COUNT; i++) {
+      const proj = `/home/user/fairness-noise-${i}`;
+      const hash = hashProjectDirCanonical(proj);
+      const cstore = new ContentStore(join(contentDir, `${hash}.db`));
+      cstore.index({ content: `noise content item ${i} contains ${COMMON_TOKEN} document unique${i}`, source: `noise-src-${i}` });
+      cstore.close();
+    }
+
+    // limit=10 < 15 total tied hits.
+    // Without origin tie-break: content items fill all 10 slots (Map insertion
+    // order), session evicted → test would FAIL.
+    // With tie-break: session (priority=0) sorts before content (priority=2) on
+    // equal score → session in position 0, survives slice → test PASSES.
+    const results = searchGlobalFanout({
+      query: COMMON_TOKEN,
+      limit: 10,
+      sessionsDir,
+      contentDir,
+      sort: "relevance",
+    });
+
+    const sessionHit = results.find(r => r.origin === "prior-session");
+    expect(sessionHit).toBeDefined();
+    expect(sessionHit?.project).toBe(SESSION_PROJECT);
+  });
+
+  // ── Multi-term natural-language session recall (#737 fix verification) ────
+  test("multi-term query matches session event that contains only a subset of terms", () => {
+    const { sessionsDir, contentDir } = makeDirs();
+    const PROJECT = "/home/user/multiterm-proj";
+    const sdb = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(PROJECT)}.db`) });
+    const sid = `mt-sess-${randomUUID().slice(0, 8)}`;
+    // Event contains 'narumitw/pi-statusline' token and 'provider' but NOT 'customize' or 'how'.
+    // Tests that any-term matching surfaces events where only a SUBSET of query terms are present.
+    sdb.ensureSession(sid, PROJECT);
+    sdb.insertEvent(sid,
+      { type: "role", category: "role", data: "npm:@narumitw/pi-statusline how to add the provider name to the model name", priority: 5 },
+      "PostToolUse",
+      { projectDir: PROJECT, source: "env", confidence: 1 },
+    );
+    sdb.close();
+
+    // Single-project search via searchEvents (null = no project filter)
+    const sdb2 = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(PROJECT)}.db`) });
+    const hits = sdb2.searchEvents(
+      "how did we customize narumitw/pi-statusline",
+      10,
+      null,
+      undefined,
+      "relevance",
+    );
+    sdb2.close();
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].data).toContain("narumitw");
+  });
+
+  // ── 0-term fallback ORDER BY (agy review BLOCKER) ─────────────────────────
+  // An all-stopword query takes the whole-phrase fallback (hasTerms=false,
+  // scoreExpr="1"). SQLite treats a bare integer in ORDER BY as a 1-based
+  // COLUMN INDEX, so `ORDER BY (1) DESC` silently sorted by id (col 1) instead
+  // of recency. After the fix, relevance fallback must order by created_at DESC.
+  test("relevance fallback (all-stopword query) orders by recency, not id", () => {
+    const { sessionsDir } = makeDirs();
+    const PROJECT = "/home/user/fallback-order-proj";
+    const dbPath = join(sessionsDir, `${hashProjectDirCanonical(PROJECT)}.db`);
+    const sdb = new SessionDB({ dbPath });
+    const sid = `fb-${randomUUID().slice(0, 8)}`;
+    sdb.ensureSession(sid, PROJECT);
+    // Insertion order A,B,C → ids 1,2,3. All contain the all-stopword phrase.
+    for (const tag of ["A", "B", "C"]) {
+      sdb.insertEvent(sid,
+        { type: "role", category: "role", data: `the and or marker-${tag}`, priority: 5 },
+        "PostToolUse",
+        { projectDir: PROJECT, source: "env", confidence: 1 },
+      );
+    }
+    sdb.close();
+
+    // Force created_at so recency order (A newest, B oldest, C middle) DIVERGES
+    // from id order (A<B<C). Buggy `ORDER BY (1) DESC` → id DESC → C,B,A.
+    const raw = new DatabaseSync(dbPath);
+    raw.exec("UPDATE session_events SET created_at='2024-01-03T00:00:00' WHERE data LIKE '%marker-A%'");
+    raw.exec("UPDATE session_events SET created_at='2024-01-01T00:00:00' WHERE data LIKE '%marker-B%'");
+    raw.exec("UPDATE session_events SET created_at='2024-01-02T00:00:00' WHERE data LIKE '%marker-C%'");
+    raw.close();
+
+    const sdb2 = new SessionDB({ dbPath });
+    const hits = sdb2.searchEvents("the and or", 10, null, undefined, "relevance");
+    sdb2.close();
+
+    const order = hits.map(h => (h.data.match(/marker-([ABC])/) || [])[1]);
+    // created_at DESC: A(03), C(02), B(01) — NOT the buggy id-DESC C,B,A.
+    expect(order).toEqual(["A", "C", "B"]);
+
+    // Sibling assertion: the DUPLICATED matcher in global-fanout's
+    // readonlySearchEvents must apply the same fallback ordering (review MINOR).
+    const fanoutHits = readonlySearchEvents(dbPath, "the and or", 10, undefined, "relevance");
+    const fanoutOrder = fanoutHits.map(h => (h.content.match(/marker-([ABC])/) || [])[1]);
+    expect(fanoutOrder).toEqual(["A", "C", "B"]);
+  });
+
+  // ── Category weighting: human intent outranks mechanical bulk (#737) ──────
+  // A role event matching only 1 term must rank ABOVE a data event matching
+  // ALL 3 terms, because role is boosted x3 (boost-only scheme). Proves the
+  // human's question/decision surfaces over tool/data noise.
+  test("category boost: role event (1 term) outranks data event (3 terms)", () => {
+    const { sessionsDir } = makeDirs();
+    const PROJECT = "/home/user/catboost-proj";
+    const dbPath = join(sessionsDir, `${hashProjectDirCanonical(PROJECT)}.db`);
+    const sdb = new SessionDB({ dbPath });
+    const sid = `cb-${randomUUID().slice(0, 8)}`;
+    sdb.ensureSession(sid, PROJECT);
+    // data event: matches all 3 terms but NOT as a contiguous phrase (so it
+    // earns the term-sum, not the 100pt exact-phrase boost).
+    sdb.insertEvent(sid,
+      { type: "tool_call", category: "data", data: "extension notes; later we customize the bar; built on pi-statusline plugin", priority: 5 },
+      "PostToolUse", { projectDir: PROJECT, source: "env", confidence: 1 });
+    // role event: matches only 'pi-statusline' but is the human's question.
+    sdb.insertEvent(sid,
+      { type: "role", category: "role", data: "how do I tweak pi-statusline", priority: 5 },
+      "PostToolUse", { projectDir: PROJECT, source: "env", confidence: 1 });
+    sdb.close();
+
+    const sdb2 = new SessionDB({ dbPath });
+    const hits = sdb2.searchEvents("customize pi-statusline extension", 10, null, undefined, "relevance");
+    sdb2.close();
+    expect(hits.length).toBe(2);
+    // role (16*3=48) must beat data (9+16+9=34*1) despite matching fewer terms.
+    expect(hits[0].category).toBe("role");
+  });
+
+  // ── Session diversity cap: no single session monopolizes the window (#737) ─
+  test("diversity cap: a 1-hit session survives a 20-hit session at limit 10", () => {
+    const { sessionsDir, contentDir } = makeDirs();
+    const TOK = "diversitytoken737";
+    // Session A: 20 matching events (the 'chatty / self-polluting' session).
+    const PROJ_A = "/home/user/diverse-A";
+    const sa = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(PROJ_A)}.db`) });
+    const sidA = `disA-${randomUUID().slice(0, 8)}`;
+    sa.ensureSession(sidA, PROJ_A);
+    for (let i = 0; i < 20; i++) {
+      sa.insertEvent(sidA,
+        { type: "tool_call", category: "pi", data: `event ${i} mentions ${TOK} here`, priority: 5 },
+        "PostToolUse", { projectDir: PROJ_A, source: "env", confidence: 1 });
+    }
+    sa.close();
+    // Session B: exactly 1 matching event.
+    const PROJ_B = "/home/user/diverse-B";
+    const sb = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(PROJ_B)}.db`) });
+    const sidB = `disB-${randomUUID().slice(0, 8)}`;
+    sb.ensureSession(sidB, PROJ_B);
+    sb.insertEvent(sidB,
+      { type: "role", category: "role", data: `the B answer mentions ${TOK}`, priority: 5 },
+      "PostToolUse", { projectDir: PROJ_B, source: "env", confidence: 1 });
+    sb.close();
+
+    const results = searchGlobalFanout({ query: TOK, limit: 10, sessionsDir, contentDir, sort: "relevance" });
+    // Session B must appear (not crowded out); Session A capped at max(3, 10/4)=3.
+    expect(results.some(r => r.sessionId === sidB)).toBe(true);
+    const aCount = results.filter(r => r.sessionId === sidA).length;
+    expect(aCount).toBeLessThanOrEqual(3);
   });
 });

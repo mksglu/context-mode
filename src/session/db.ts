@@ -10,6 +10,7 @@ import { SQLiteBase, defaultDBPath } from "../db-base.js";
 import type { PreparedStatement } from "../db-base.js";
 import type { SessionEvent } from "../types.js";
 import type { ProjectAttribution } from "./project-attribution.js";
+import { buildEventMatch } from "../search/event-query.js";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync, mkdirSync, realpathSync, renameSync } from "node:fs";
@@ -1079,23 +1080,15 @@ export class SessionDB extends SQLiteBase {
     p(S.deleteResume, `DELETE FROM session_resume WHERE session_id = ?`);
 
     // ── Search ──
+    // NOTE: searchEvents now uses dynamic SQL (multi-term tokenized LIKE, #737 fix).
+    // These prepared statements are retained as unused stubs so S.searchEvents /
+    // S.searchEventsNoProject keys remain valid (avoids Map-miss if called elsewhere).
     p(S.searchEvents,
       `SELECT id, session_id, category, type, data, created_at
-       FROM session_events
-       WHERE (project_dir = ? OR project_dir = '')
-         AND (data LIKE '%' || ? || '%' ESCAPE '\\' OR category LIKE '%' || ? || '%' ESCAPE '\\')
-         AND (? IS NULL OR category = ?)
-       ORDER BY id ASC
-       LIMIT ?`);
-
-    // Slice A (#737): no-filter variant — used by global fan-out (projectDir=null)
+       FROM session_events WHERE 0 LIMIT 0`);
     p(S.searchEventsNoProject,
       `SELECT id, session_id, category, type, data, created_at
-       FROM session_events
-       WHERE (data LIKE '%' || ? || '%' ESCAPE '\\' OR category LIKE '%' || ? || '%' ESCAPE '\\')
-         AND (? IS NULL OR category = ?)
-       ORDER BY id ASC
-       LIMIT ?`);
+       FROM session_events WHERE 0 LIMIT 0`);
 
     // ── Cleanup ──
     p(S.getOldSessions,
@@ -1380,13 +1373,21 @@ export class SessionDB extends SQLiteBase {
    *
    * Performs a case-insensitive LIKE search across the `data` and `category`
    * columns. An optional `source` parameter filters by exact category match.
-   * Returns results ordered by monotonic id (chronological).
    *
-   * Slice A (#737): `projectDir` accepts `null` as an explicit "no filter"
-   * sentinel for global fan-out recall. When `null`, a separate prepared
-   * statement drops the `(project_dir = ? OR project_dir = '')` clause
-   * entirely, so ALL events across every project are matched. When a string
-   * (including `""`), the original exact-match + empty-dir behaviour is used.
+   * #737 fix: tokenizes multi-word queries so natural-language queries
+   * (e.g. "how did we customize narumitw/pi-statusline") match events that
+   * contain any of the meaningful terms, instead of requiring the entire
+   * phrase to appear verbatim. Whole-phrase LIKE fallback is preserved for
+   * exact-substring / literal-wildcard queries (100%, _task, UUIDs).
+   *
+   * `orderMode` (default "timeline"):
+   *   - "timeline": ORDER BY id ASC (chronological — documented contract;
+   *     preserves tests/session/session-db.test.ts:1204-1231 assertion).
+   *   - "relevance": ORDER BY weighted score DESC, created_at DESC, id ASC;
+   *     higher-weight tokens (package names with / or -) outrank generic words.
+   *
+   * `projectDir` accepts `null` as an explicit "no filter" sentinel
+   * (Slice A #737) — drops the project_dir clause so ALL events are matched.
    *
    * Best-effort: returns empty array on any error.
    */
@@ -1395,6 +1396,7 @@ export class SessionDB extends SQLiteBase {
     limit: number,
     projectDir: string | null,
     source?: string,
+    orderMode: "timeline" | "relevance" = "timeline",
   ): Array<{
     id: number;
     session_id: string;
@@ -1403,34 +1405,62 @@ export class SessionDB extends SQLiteBase {
     data: string;
     created_at: string;
   }> {
+    // Empty query: never run LIKE '%%' which matches everything.
+    if (!query.trim()) return [];
     try {
-      const escapedQuery = query.replace(/[%_]/g, (char) => "\\" + char);
+      const { matchClause, matchParams, scoreExpr, scoreParams, hasTerms } = buildEventMatch(query);
       const sourceParam = source ?? null;
+
+      // ORDER BY clause.
+      // BLOCKER (agy review): a bare integer in ORDER BY is a 1-based COLUMN
+      // INDEX in SQLite, even parenthesized — `ORDER BY (1) DESC` sorts by the
+      // 1st select column (id), NOT by a constant. The 0-term fallback sets
+      // scoreExpr="1", so only reference the score expression when hasTerms;
+      // otherwise fall straight through to recency.
+      const orderClause =
+        orderMode !== "relevance"
+          ? `id ASC`
+          : hasTerms
+            ? `(${scoreExpr}) DESC, created_at DESC, id ASC`
+            : `created_at DESC, id ASC`;
+
+      // Binding order (positional):
+      //   [projectDir?]  ..matchParams  sourceParam sourceParam  [..scoreParams if relevance]  limit
+      let sql: string;
+      let params: unknown[];
+
       if (projectDir === null) {
-        // Global: no project_dir filter — return events from all projects.
-        return this.stmt(S.searchEventsNoProject).all(
-          escapedQuery,
-          escapedQuery,
-          sourceParam,
-          sourceParam,
+        // No project_dir filter — all events across all projects.
+        sql = `SELECT id, session_id, category, type, data, created_at
+               FROM session_events
+               WHERE ${matchClause}
+                 AND (? IS NULL OR category = ?)
+               ORDER BY ${orderClause}
+               LIMIT ?`;
+        params = [
+          ...matchParams,
+          sourceParam, sourceParam,
+          ...(orderMode === "relevance" ? scoreParams : []),
           limit,
-        ) as Array<{
-          id: number;
-          session_id: string;
-          category: string;
-          type: string;
-          data: string;
-          created_at: string;
-        }>;
+        ];
+      } else {
+        sql = `SELECT id, session_id, category, type, data, created_at
+               FROM session_events
+               WHERE (project_dir = ? OR project_dir = '')
+                 AND ${matchClause}
+                 AND (? IS NULL OR category = ?)
+               ORDER BY ${orderClause}
+               LIMIT ?`;
+        params = [
+          projectDir,
+          ...matchParams,
+          sourceParam, sourceParam,
+          ...(orderMode === "relevance" ? scoreParams : []),
+          limit,
+        ];
       }
-      return this.stmt(S.searchEvents).all(
-        projectDir,
-        escapedQuery,
-        escapedQuery,
-        sourceParam,
-        sourceParam,
-        limit,
-      ) as Array<{
+
+      return this.db.prepare(sql).all(...params) as Array<{
         id: number;
         session_id: string;
         category: string;
