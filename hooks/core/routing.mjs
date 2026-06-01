@@ -704,7 +704,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         return mcpRedirect({
           action: "modify",
           updatedInput: {
-            command: `echo "context-mode: curl/wget redirected. Call ${t("ctx_execute")}(language, code) to fetch the URL, derive your answer in code, and print only the result — the raw HTTP body stays in the sandbox instead of entering your conversation. Or call ${t("ctx_fetch_and_index")}(url, source) when you want to query the response later via ${t("ctx_search")}. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH)."`,
+            command: `echo "context-mode: curl/wget redirected. Call ${t("ctx_execute")}(language, code) to fetch the URL, derive your answer in code, and print only the result — the raw HTTP body stays in the sandbox instead of entering your conversation. Or call ${t("ctx_fetch_and_index")}(url, source) when you want to query the response later via ${t("ctx_search")}. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH). Do not retry with curl, wget, or creating a custom Python script."`,
           },
           // D2 PRD Phase 3.1: marker payload for PostToolUse byte accounting.
           redirectMeta: {
