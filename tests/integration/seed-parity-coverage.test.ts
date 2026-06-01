@@ -13,8 +13,29 @@
 
 import { describe, test, beforeEach, afterEach, expect, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+
+// Mirrors hooks/platform-bridge.mjs::configPath() — on Windows the bridge
+// reads APPDATA, on POSIX it reads HOME. Tests must write platform.json
+// to whichever directory the bridge will actually look in.
+function platformConfigFile(fakeHome: string): string {
+  if (process.platform === "win32") {
+    return join(
+      process.env.APPDATA ?? join(fakeHome, "AppData", "Roaming"),
+      "context-mode",
+      "platform.json",
+    );
+  }
+  return join(fakeHome, ".context-mode", "platform.json");
+}
+
+function writePlatformConfig(fakeHome: string, config: Record<string, unknown>): string {
+  const cfgFile = platformConfigFile(fakeHome);
+  mkdirSync(dirname(cfgFile), { recursive: true });
+  writeFileSync(cfgFile, JSON.stringify(config));
+  return cfgFile;
+}
 
 import { SessionDB } from "../../src/session/db.js";
 import { attributeAndInsertEvents } from "../../hooks/session-loaders.mjs";
@@ -67,6 +88,7 @@ describe("seed-parity coverage gate", () => {
   let dbPath: string;
   let origHome: string | undefined;
   let origXdg: string | undefined;
+  let origAppData: string | undefined;
   let captured: CapturedPost[];
   let origFetch: typeof fetch;
 
@@ -75,18 +97,18 @@ describe("seed-parity coverage gate", () => {
     dbPath = join(fakeHome, "test.db");
     origHome = process.env.HOME;
     origXdg = process.env.XDG_CONFIG_HOME;
+    origAppData = process.env.APPDATA;
     process.env.HOME = fakeHome;
     delete process.env.XDG_CONFIG_HOME;
+    // Windows: configPath() reads APPDATA first. Override so the bridge
+    // looks under our fake home, not the runner's real Roaming dir.
+    process.env.APPDATA = join(fakeHome, "AppData", "Roaming");
 
     // Valid platform.json so the gate opens
-    mkdirSync(join(fakeHome, ".context-mode"), { recursive: true });
-    writeFileSync(
-      join(fakeHome, ".context-mode", "platform.json"),
-      JSON.stringify({
-        api_key: "ctxm_parity_gate",
-        platform_url: "https://capture.local/api/v1",
-      }),
-    );
+    writePlatformConfig(fakeHome, {
+      api_key: "ctxm_parity_gate",
+      platform_url: "https://capture.local/api/v1",
+    });
 
     captured = [];
     origFetch = globalThis.fetch;
@@ -102,6 +124,8 @@ describe("seed-parity coverage gate", () => {
     else delete process.env.HOME;
     if (origXdg !== undefined) process.env.XDG_CONFIG_HOME = origXdg;
     else delete process.env.XDG_CONFIG_HOME;
+    if (origAppData !== undefined) process.env.APPDATA = origAppData;
+    else delete process.env.APPDATA;
     try { rmSync(fakeHome, { recursive: true, force: true }); } catch { /* */ }
     vi.restoreAllMocks();
   });
