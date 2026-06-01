@@ -53,10 +53,11 @@ import {
 } from "./session/event-emit.js";
 import { persistToolCallCounter, restoreSessionStats } from "./session/persist-tool-calls.js";
 import { searchAllSources } from "./search/unified.js";
+import { searchGlobalFanout, searchAbsPathProject, listProjectDbs } from "./search/global-fanout.js";
+import { planCtxSearchScope, shouldReturnEmptyGuidance, effectiveSearchLimit } from "./search/ctx-search-plan.js";
 import {
   buildCtxSearchInputSchema,
   CTX_SEARCH_SHARED_MODE,
-  resolveProjectScope,
 } from "./search/ctx-search-schema.js";
 import { buildNodeCommand, type HookAdapter, type PlatformId, isInProcessPluginPlatform } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
@@ -607,6 +608,56 @@ export function getProjectDir(): string {
  */
 function resolveProjectPath(filePath: string): string {
   return isAbsolute(filePath) ? filePath : resolve(getProjectDir(), filePath);
+}
+
+/**
+ * Real working directory for the ctx_search "current" project scope (#737 Slice D).
+ *
+ * MAJOR 1 fix (#737 review): uses the full `resolveProjectDir` cascade with an
+ * env copy that strips CONTEXT_MODE_PROJECT_DIR. This preserves platform workspace
+ * var resolution, Claude/Codex transcript recovery, and plugin-path rejection —
+ * the same logic as getProjectDir() — but without the universal pin, so shared-DB
+ * mode `current` resolves to the real project dir, not the pinned env path.
+ *
+ * `getProjectDir()` continues to be used for DB-file path selection (which DB
+ * to open). `getCurrentWorkingProject()` is used exclusively for the row-level
+ * `project_dir = ?` filter.
+ */
+export function getCurrentWorkingProject(): string {
+  // Respect an active projectDirOverride (used in tests).
+  const override = projectDirOverride.getStore();
+  if (override) return override.projectDir;
+
+  // Build env copy without the universal pin so we resolve the real cwd.
+  // Platform workspace vars (CLAUDE_PROJECT_DIR, PI_PROJECT_DIR, etc.) and
+  // the Claude/Codex transcript heuristic still apply — same as getProjectDir()
+  // except CONTEXT_MODE_PROJECT_DIR is removed.
+  const envWithoutPin: Record<string, string | undefined> = { ...process.env };
+  delete envWithoutPin.CONTEXT_MODE_PROJECT_DIR;
+
+  let transcriptsRoot: string | undefined;
+  let strictPlatform: PlatformId | undefined;
+  let codexHome: string | undefined;
+  try {
+    const detected = detectPlatform().platform;
+    strictPlatform = detected;
+    if (detected === "claude-code") {
+      transcriptsRoot = join(homedir(), ".claude", "projects");
+    }
+    if (detected === "codex") {
+      codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
+    }
+  } catch { /* detection failure — leave undefined */ }
+
+  return resolveProjectDir({
+    env: envWithoutPin,
+    cwd: process.cwd(),
+    pwd: process.env.PWD,
+    transcriptsRoot,
+    transcriptMaxAgeMs: 5 * 60 * 1000,
+    strictPlatform,
+    codexHome,
+  });
 }
 
 /**
@@ -1211,13 +1262,17 @@ export function extractSnippet(
     return content.slice(0, maxLen) + "\n…";
   }
 
-  // Sort positions, merge overlapping windows
+  // Sort positions, merge overlapping windows.
+  // Window is forward-biased: when a match lands on a heading/section title,
+  // the explanatory detail usually FOLLOWS it, so we keep more context after
+  // the match than before (#737 snippet-detail fix).
   positions.sort((a, b) => a - b);
-  const WINDOW = 300;
+  const WINDOW = 520;          // forward context
+  const BACK = 200;            // trailing context before the match
   const windows: Array<[number, number]> = [];
 
   for (const pos of positions) {
-    const start = Math.max(0, pos - WINDOW);
+    const start = Math.max(0, pos - BACK);
     const end = Math.min(content.length, pos + WINDOW);
     if (windows.length > 0 && start <= windows[windows.length - 1][1]) {
       windows[windows.length - 1][1] = end;
@@ -2352,7 +2407,7 @@ WHEN:
   - You want to recall something that exists in storage (recently indexed content, prior session events, auto-memory) instead of re-reading raw sources
   - You have multiple related questions about the same body of knowledge — batch every question into one call (the ranking pipeline runs per-query but the round-trip cost is paid once)
   - You want to scope the query to one labelled source (pass \`source\` — partial match is fine)
-  - You want a chronological view across current session + prior sessions + persistent auto-memory (pass \`sort: "timeline"\` — the default \`relevance\` mode only ranks within the current session)
+  - You want to recall session events or auto-memory (decisions, blockers, errors) — the default \`relevance\` mode searches ALL three sources: indexed content, session events, and auto-memory. \`sort: "timeline"\` returns the same sources in chronological order.
   - You want to filter ranked results by content shape (pass \`contentType: "code"\` to surface implementation snippets or \`contentType: "prose"\` to surface explanations)
 
 WHEN NOT:
@@ -2365,37 +2420,22 @@ RETURNS:
 EXAMPLE: ctx_search(queries: ["root cause", "proposed fix", "test coverage"], source: "issue-#683")
 EXAMPLE: ctx_search(queries: ["what did we decide about caching"], source: "decision", sort: "timeline")
 EXAMPLE: ctx_search(queries: ["useEffect cleanup pattern"], source: "react-docs", contentType: "code", limit: 5)
-EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blockers"], sort: "timeline")`,
-    // Schema construction is centralised in `src/search/ctx-search-schema.ts`
-    // so the conditional `project` field (only registered when the host runs
-    // in shared-DB mode, `CONTEXT_MODE_PROJECT_DIR` set at module load) is a
-    // hard property of the tool surface — not a runtime hint. Fixes #737.
+EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blockers"], sort: "timeline")
+EXAMPLE: ctx_search(queries: ["redux patterns", "auth decisions"], project: "global")  // search ALL projects
+EXAMPLE: ctx_search(queries: ["auth flow"], project: "/home/user/other-project")  // specific project`,
+    // `project` field is always present (both per-project and shared-DB modes).
+    // Per-project users can pass project:"global" to fan-out across all project DBs.
+    // See src/search/ctx-search-schema.ts for full resolver contract.
     inputSchema: buildCtxSearchInputSchema(CTX_SEARCH_SHARED_MODE),
   },
   async (params) => {
     try {
-      const store = getStore();
-      const sort = (params as Record<string, unknown>).sort as string || "relevance";
-
-      // Guard: redirect when the index is empty — ctx_search is a follow-up
-      // tool that requires prior indexing. Skip for timeline mode (SessionDB/auto-memory may have data).
-      if (sort !== "timeline" && store.getStats().chunks === 0) {
-        return trackResponse("ctx_search", {
-          content: [{
-            type: "text" as const,
-            text: "Knowledge base is empty — no content has been indexed yet.\n\n" +
-              "ctx_search is a follow-up tool that queries previously indexed content. " +
-              "To gather and index content first, use:\n" +
-              "  • ctx_batch_execute(commands, queries) — run commands, auto-index output, and search in one call\n" +
-              "  • ctx_fetch_and_index(url) — fetch a URL, index it, then search with ctx_search\n" +
-              "  • ctx_index(content, source) — manually index text content\n\n" +
-              "After indexing, ctx_search becomes available for follow-up queries.",
-          }],
-          isError: true,
-        });
-      }
-
+      const sort = ((params as Record<string, unknown>).sort as string || "relevance") as "relevance" | "timeline";
       const raw = params as Record<string, unknown>;
+
+      // ── Parse params FIRST — BEFORE any getStore() call (BLOCKER B) ───────
+      // getStore() opens a writable ContentStore (WAL pragmas, schema init,
+      // corruption repair, stale cleanup). Defer until we know we need it.
 
       // Normalize: accept both query (string) and queries (array)
       const queryList: string[] = [];
@@ -2419,15 +2459,35 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
         project?: string;
       };
 
-      // Resolve the per-project scope (#737). When shared-DB mode is off the
-      // resolver returns `undefined` and `project` is silently ignored — the
-      // per-project DB is naturally isolated by directory hash, so there is
-      // nothing for an in-process filter to do.
-      const projectScope = resolveProjectScope(
+      // ── Scope plan (BLOCKER A + MAJOR D) ─────────────────────────────────
+      // global            → fan-out across all project DBs (no writable store)
+      // absPathPerProject → open that path's hashed DBs read-only (no writable store)
+      // rowFilter         → shared-DB: single DB + project_dir row filter
+      // current           → per-project: single DB, no row filter (default)
+      //
+      // BLOCKER A: abs-path in SHARED mode → rowFilter (shared DB + row filter).
+      //            abs-path in PER-PROJECT mode → absPathPerProject (hashed DBs).
+      const scopePlan = planCtxSearchScope(
         project,
         CTX_SEARCH_SHARED_MODE,
-        () => getProjectDir(),
+        () => getCurrentWorkingProject(),
       );
+
+      const isGlobal = scopePlan.kind === "global";
+      const isAbsPathPerProject = scopePlan.kind === "absPathPerProject";
+      const needsStore = !isGlobal && !isAbsPathPerProject;
+
+      // BLOCKER B: only open ContentStore when we need it (current/rowFilter).
+      const store = needsStore ? getStore() : null;
+
+      // Resolve the row-filter scope for the shared-DB / current path.
+      // rowFilter: the scope string (real cwd for "current", explicit path for abs-path-in-shared).
+      // current:   undefined → no row filter (per-project DB hash is the boundary).
+      const projectScope = ((): string | null | undefined => {
+        if (!needsStore) return undefined;
+        if (scopePlan.kind === "rowFilter") return scopePlan.scope;
+        return undefined; // "current" per-project
+      })();
 
       // Progressive throttling: track calls in time window
       const now = Date.now();
@@ -2450,22 +2510,35 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
         });
       }
 
-      // Determine per-query result limit based on throttle level
-      const effectiveLimit = searchCallCount > SEARCH_MAX_RESULTS_AFTER
-        ? 1 // after 3 calls: only 1 result per query
-        : Math.min(limit, 2); // normal: max 2
+      // Determine per-query result limit based on throttle level.
+      //
+      // Breadth scopes (global fan-out / abs-path) need a HIGHER per-query cap:
+      // cross-DB RRF ties every project's top hit at the same score, so a
+      // specific answer can sit behind generic common-term noise (#737 — the
+      // "download APK" how-to ranked #8). A 1-2 cap silently chops it off.
+      // A single global call returning ~8-12 hits is still bounded by the 40KB
+      // MAX_TOTAL guard below, so this does not enable context flooding.
+      const breadthScope = isGlobal || isAbsPathPerProject;
+      const effectiveLimit = effectiveSearchLimit({
+        breadthScope,
+        throttled: searchCallCount > SEARCH_MAX_RESULTS_AFTER,
+        requestedLimit: limit,
+      });
 
       const MAX_TOTAL = 40 * 1024; // 40KB total cap
+      // Reserve headroom for the throttle footer, coverage notice, and the
+      // "\n\n---\n\n" separators that are appended OUTSIDE the per-block loop,
+      // so the FULL response stays under MAX_TOTAL (#737 review MAJOR).
+      const RESULT_BUDGET = MAX_TOTAL - 2048;
       let totalSize = 0;
+      let totalResults = 0;
       const sections: string[] = [];
 
-      // Open SessionDB once before the loop (Blocker 4: avoid open/close per query).
-      // Issue #737: also open in relevance mode when a string `projectScope`
-      // is in play — the 2-step IN-clause needs SessionDB to translate
-      // `project_dir` → allow-set of session ids for the ContentStore filter.
+      // Open SessionDB once before the loop for single-DB paths (current/rowFilter).
+      // Bug 2 fix (#737): always open — sources 2+3 run in both sort modes.
+      // Global/abs-path open their own per-DB handles (read-only) inside the helpers.
       let timelineDB: InstanceType<typeof SessionDB> | null = null;
-      const needsSessionDB = sort === "timeline" || typeof projectScope === "string";
-      if (needsSessionDB) {
+      if (needsStore) {
         try {
           const sessionsDir = getSessionDir();
           const projectDir = getProjectDir();
@@ -2476,32 +2549,79 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
         } catch { /* SessionDB unavailable — search ContentStore + auto-memory only */ }
       }
 
-      // Resolve the session-id allow-set once for the relevance-mode path —
-      // searchAllSources resolves its own copy for timeline mode. Empty set
-      // is preserved (means "no events for this project"), which surfaces
-      // only legacy `session_id=''` chunks via the post-filter.
-      let relevanceAllowSet: Set<string> | undefined;
-      if (typeof projectScope === "string" && timelineDB) {
-        try {
-          relevanceAllowSet = new Set(timelineDB.getSessionIdsForProject(projectScope));
-        } catch { /* best-effort */ }
-      }
+      // Content dir for fan-out paths — obtained without opening a writable store.
+      // ensureWritableStorageDir creates the dir if missing (mkdir only, no DB open).
+      // BLOCKER B: never call getStore() / getStorePath() for global/absPath branches.
+      const fanoutContentDir = needsStore
+        ? null
+        : ensureWritableStorageDir(resolveContentStorageDir(getDefaultSessionDir));
 
       const configDir = _detectedAdapter?.getConfigDir() ?? resolveClaudeConfigDir();
 
+      // Coverage notice (#737): global fan-out is capped at
+      // CONTEXT_MODE_GLOBAL_FANOUT_MAX. If the cap drops DB files, results are
+      // INCOMPLETE — surface that loudly so neither the model nor the user
+      // silently trusts a partial cross-project answer.
+      let globalCoverageNote = "";
+      if (isGlobal) {
+        try {
+          const cov = listProjectDbs(getSessionDir(), fanoutContentDir ?? dirname(getStorePath()));
+          if (cov.truncated) {
+            globalCoverageNote =
+              `⚠ Global search INCOMPLETE: searched ${cov.opened} of ${cov.totalAvailable} project DB files ` +
+              `(cap CONTEXT_MODE_GLOBAL_FANOUT_MAX=${cov.cap}). ${cov.totalAvailable - cov.opened} project DB(s) were NOT searched. ` +
+              `Raise the cap (e.g. CONTEXT_MODE_GLOBAL_FANOUT_MAX=${cov.totalAvailable}) to search everything.`;
+          }
+        } catch { /* coverage is best-effort; never block the search */ }
+      }
+
       try {
       for (const q of queryList) {
-        if (totalSize > MAX_TOTAL) {
+        if (totalSize > RESULT_BUDGET) {
           sections.push(`## ${q}\n(output cap reached)\n`);
           continue;
         }
 
         let results;
-        if (sort === "timeline") {
+        if (isGlobal) {
+          // Slice E (#737): fan-out across all project DB files with RRF merge.
+          // BLOCKER B: uses fanoutContentDir (no writable ContentStore opened).
+          results = searchGlobalFanout({
+            query: q,
+            limit: effectiveLimit,
+            sessionsDir: getSessionDir(),
+            contentDir: fanoutContentDir ?? dirname(getStorePath()),
+            source,
+            contentType,
+            sort,
+            configDir,
+            adapter: _detectedAdapter ?? undefined,
+          });
+        } else if (isAbsPathPerProject) {
+          // BLOCKER A: per-project mode abs-path → open that project's hashed DBs read-only.
+          // BLOCKER B: no getStore() called.
+          // BLOCKER C: searchAbsPathProject resolves canonical hash paths
+          //            (no legacy rename) internally — read-only.
+          const absDir = scopePlan.dir;
+          results = searchAbsPathProject({
+            query: q,
+            limit: effectiveLimit,
+            contentDir: fanoutContentDir ?? dirname(getStorePath()),
+            sessionsDir: getSessionDir(),
+            projectDir: absDir,
+            source,
+            contentType,
+            sort,
+            configDir,
+            adapter: _detectedAdapter ?? undefined,
+          });
+        } else {
+          // current or rowFilter: single-DB path, store is open.
+          // Bug 2 fix: searchAllSources for BOTH sort modes (session+auto-memory in relevance).
           results = searchAllSources({
             query: q,
             limit: effectiveLimit,
-            store,
+            store: store!,
             sort,
             source,
             contentType,
@@ -2511,35 +2631,60 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
             adapter: _detectedAdapter ?? undefined,
             projectScope,
           });
-        } else {
-          results = store.searchWithFallback(
-            q,
-            effectiveLimit,
-            source,
-            contentType,
-            "like",
-            relevanceAllowSet,
-          );
         }
+
+        totalResults += results.length;
 
         if (results.length === 0) {
           sections.push(`## ${q}\nNo results found.`);
           continue;
         }
 
-        const formatted = results
-          .map((r, i) => {
-            const origin = (r as any).origin || "current-session";
-            const ts = (r as any).timestamp ? (r as any).timestamp.slice(0, 16).replace("T", " ") : "";
-            const header = `--- [${origin}${ts ? " | " + ts : ""} | ${r.source}] ---`;
-            const heading = `### ${r.title}`;
-            const snippet = extractSnippet(r.content, q, 1500, r.highlighted);
-            return `${header}\n${heading}\n\n${snippet}`;
-          })
-          .join("\n\n");
+        // Build result blocks while enforcing the 40KB MAX_TOTAL cap
+        // INCREMENTALLY (#737): breadth scopes can return up to 12 large
+        // snippets per query, so a per-query pre-check alone could blow the
+        // cap. Reserve the heading, then stop adding blocks the moment the
+        // running total (this block included) would exceed the budget.
+        const headingPrefix = `## ${q}\n\n`;
+        totalSize += headingPrefix.length;
+        const blocks: string[] = [];
+        for (const r of results) {
+          const origin = (r as any).origin || "current-session";
+          const ts = (r as any).timestamp ? (r as any).timestamp.slice(0, 16).replace("T", " ") : "";
+          // Attribution (#737): show originating project (basename) + short
+          // session id so cross-project/global recall names its source.
+          const projDir = (r as any).project as string | undefined;
+          // In breadth (global/abs-path) recall, a hit with NO recorded
+          // project is orphan content (indexed in a dir with no session DB).
+          // Label it explicitly as (unattributed) so the model does NOT
+          // borrow a neighbouring hit's project or the current session (#737).
+          const projName = projDir
+            ? (projDir.split(/[\\/]/).pop() || projDir)
+            : (breadthScope ? "(unattributed)" : "");
+          const sid = (r as any).sessionId ? String((r as any).sessionId).slice(0, 8) : "";
+          const attribution = `${projName ? " | proj:" + projName : ""}${sid ? " | sess:" + sid : ""}`;
+          const header = `--- [${origin}${ts ? " | " + ts : ""}${attribution} | ${r.source}] ---`;
+          const heading = `### ${r.title}`;
+          const snippet = extractSnippet(r.content, q, 2400, r.highlighted);
+          const block = `${header}\n${heading}\n\n${snippet}`;
 
-        sections.push(`## ${q}\n\n${formatted}`);
-        totalSize += formatted.length;
+          if (totalSize + block.length > RESULT_BUDGET) {
+            if (blocks.length === 0) {
+              // Guarantee at least one (truncated) block so the query is not empty.
+              const room = Math.max(0, RESULT_BUDGET - totalSize);
+              if (room > 80) {
+                blocks.push(block.slice(0, room) + "\n…(truncated)");
+                totalSize += room;
+              }
+            }
+            blocks.push("…(output cap reached — refine the query or narrow the scope)");
+            break;
+          }
+          blocks.push(block);
+          totalSize += block.length + 2; // +2 for the "\n\n" join separator
+        }
+
+        sections.push(headingPrefix + blocks.join("\n\n"));
       }
       } finally {
         try { timelineDB?.close(); } catch {}
@@ -2547,15 +2692,17 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
 
       let output = sections.join("\n\n---\n\n");
 
-      // Report auto-refreshed stale sources
-      if (store.lastRefreshCount > 0) {
+      // Surface global-fan-out truncation FIRST so it can't be missed (#737).
+      if (globalCoverageNote) {
+        output = `${globalCoverageNote}\n\n` + output;
+      }
+
+      // Report auto-refreshed stale sources (only on single-DB path where store is open).
+      if (store?.lastRefreshCount && store.lastRefreshCount > 0) {
         output = `> Auto-refreshed ${store.lastRefreshCount} stale source${store.lastRefreshCount > 1 ? "s" : ""} (file changed since indexing).\n\n` + output;
       }
 
-      // Throttle counter — always surfaced so agents can pace themselves
-      // proactively instead of discovering the limit only after results are
-      // already truncated. Soft warning after SEARCH_MAX_RESULTS_AFTER calls;
-      // gentle informational line before that.
+      // Throttle counter.
       const throttleRemaining = Math.max(0, SEARCH_BLOCK_AFTER - searchCallCount);
       const softCapRemaining = Math.max(0, SEARCH_MAX_RESULTS_AFTER - searchCallCount);
       if (searchCallCount >= SEARCH_MAX_RESULTS_AFTER) {
@@ -2568,13 +2715,48 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
           `Prefer ctx_search(queries: [...]) array form for multi-query workloads — it counts as a single call.`;
       }
 
-      if (output.trim().length === 0) {
-        const sources = store.listSources();
-        const sourceList = sources.length > 0
-          ? `\nIndexed sources: ${sources.map((s) => `"${s.label}" (${s.chunkCount} sections)`).join(", ")}`
-          : "";
+      // Empty-KB guidance (BLOCKER D + MINOR 1 fixes):
+      //   - BLOCKER D: guidance moved AFTER the search so auto-memory-only recall
+      //     (CLAUDE.md / memory files) is never blocked by an empty content store.
+      //   - MINOR 1: guidance only fires on the single-DB path where `store` is open.
+      //     For global/abs-path, store is null and chunks is always 0 regardless of
+      //     what is in the target DBs — the guidance would mislead (shows "empty" even
+      //     when the searched DBs are full but the query simply has no match).
+      if (totalResults === 0) {
+        if (store !== null) {
+          // Single-DB path (current / rowFilter): show guidance only when the
+          // content store is genuinely empty AND no other source returned hits.
+          const chunks = store.getStats().chunks;
+          if (shouldReturnEmptyGuidance({ chunks, totalResults })) {
+            return trackResponse("ctx_search", {
+              content: [{
+                type: "text" as const,
+                text: "This project has no indexed content yet.\n\n" +
+                  "If you're looking for past/cross-project history, retry with project:\"global\" — " +
+                  "it fans out across ALL your projects' sessions, content, and memory.\n\n" +
+                  "Otherwise, to index content for this project first, use:\n" +
+                  "  • ctx_batch_execute(commands, queries) — run commands, auto-index output, and search in one call\n" +
+                  "  • ctx_fetch_and_index(url) — fetch a URL, index it, then search with ctx_search\n" +
+                  "  • ctx_index(content, source) — manually index text content",
+              }],
+              isError: true,
+            });
+          }
+          // Content store not empty but no hits — show indexed sources.
+          const sources = store.listSources();
+          const sourceList = sources.length > 0
+            ? `\nIndexed sources: ${sources.map((s) => `"${s.label}" (${s.chunkCount} sections)`).join(", ")}`
+            : "";
+          return trackResponse("ctx_search", {
+            content: [{ type: "text" as const, text: `No results found.${sourceList}` }],
+          });
+        }
+        // Global / abs-path no-hit: store is null — plain "No results found."
+        // Never show "Knowledge base is empty" here; the target DBs may be full.
+        // If global fan-out was truncated, say so — the answer may live in an
+        // unsearched project DB.
         return trackResponse("ctx_search", {
-          content: [{ type: "text" as const, text: `No results found.${sourceList}` }],
+          content: [{ type: "text" as const, text: globalCoverageNote ? `No results found.\n\n${globalCoverageNote}` : "No results found." }],
         });
       }
 
