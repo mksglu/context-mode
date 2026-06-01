@@ -1095,6 +1095,33 @@ The `ctx_index` tool chunks markdown content by headings while keeping code bloc
 
 When you call `ctx_search`, it returns relevant content snippets focused around matching query terms — not full documents, not approximations, the actual indexed content with smart extraction around what you're looking for. `ctx_fetch_and_index` extends this to URLs: fetch, convert HTML to markdown, chunk, index. The raw page never enters context. Use the `contentType` parameter to filter results by type (e.g. `code` or `prose`).
 
+### Project Scope (`project:` parameter)
+
+`ctx_search` supports a `project` parameter to control which project's history is searched:
+
+| Value | Behaviour |
+|-------|-----------|
+| omit / `"current"` | Search only this project's indexed content, session events, and auto-memory (default). |
+| `"global"` | Fan-out across **every** project's stored sessions, content, and memory with RRF merge. |
+| `"/absolute/path"` | Scope to a specific project directory. |
+
+```
+# Search only this project (default)
+ctx_search(queries: ["authentication"])
+
+# Fan-out across all projects — great for "what did I decide about X anywhere?"
+ctx_search(queries: ["authentication JWT"], project: "global")
+
+# Scope to a specific project
+ctx_search(queries: ["authentication"], project: "/home/user/myproject")
+```
+
+Session memory (prior-session events and auto-memory) is searched in **both** `relevance` and `timeline` sort modes. The `sort` parameter controls only the ordering of results, not which sources are searched.
+
+Each `"global"` result is attributed to its originating **project** (and session id, when known) in the result header — e.g. `--- [prior-session | 2026-05-22 04:15 | proj:my-service | sess:3fbbe919 | …] ---` — so cross-project hits name where they came from.
+
+Global fan-out is bounded by [`CONTEXT_MODE_GLOBAL_FANOUT_MAX`](#search-environment-variables) (default `1024` DB files). If your install has more project DBs than the cap, `ctx_search` prepends a visible **"Global search INCOMPLETE"** notice stating how many DBs were searched and the exact value to raise the cap to — results are never silently truncated.
+
 ### Ranking: Reciprocal Rank Fusion
 
 Search runs two parallel strategies and merges them with **Reciprocal Rank Fusion (RRF)**:
@@ -1477,6 +1504,13 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 | Variable | Default | Purpose |
 |---|---|---|
 | `CONTEXT_MODE_DIR` | Adapter default, for example `~/.codex/context-mode` or `~/.claude/context-mode` | Since v1.0.147. Absolute writable root for context-mode storage. Sessions and stats use `<root>/sessions`; indexed content uses `<root>/content`. Empty or whitespace-only values are treated as unset and shown by `ctx_doctor`; non-empty values must be absolute. `~` is not expanded. |
+
+<a id="search-environment-variables"></a>
+### Search environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTEXT_MODE_GLOBAL_FANOUT_MAX` | `1024` | Maximum number of project DB files (session + content DBs combined) that a single `ctx_search(project: "global")` call opens. Bounds latency and file-handle use on pathological installs; read-only fan-out costs ~0.8 ms/DB, so the default stays sub-second even at 1000+ projects. When an install has more DB files than this cap, the fan-out searches a deterministic subset (project hashes sorted ascending) and `ctx_search` **prepends a visible "Global search INCOMPLETE" notice** reporting `searched X of Y` plus the exact value to set — coverage is never silently truncated. Values `≤ 0`, non-numeric, or unset fall back to `1024`. Most users never need to change this. |
 
 ### Routing-guidance environment variables
 
