@@ -1,22 +1,19 @@
 /**
  * ctx_search input-schema builder and project-scope resolver.
  *
- * Issue #737 introduces the optional `project:` parameter used by callers
- * running in the shared-DB mode (`CONTEXT_MODE_PROJECT_DIR` is set). The
- * field is registered conditionally so that in the default per-project DB
- * mode the LLM physically cannot pass it — the parameter does not exist
- * in the tool schema at all, which is a stronger guarantee than runtime
- * validation that depends on the model honouring documentation.
+ * Issue #737: the `project:` parameter is now present in ALL modes (not just
+ * shared-DB mode) so per-project users can use `project: "global"` to fan-out
+ * across all their project DBs.
  *
  * The handler in `src/server.ts` consumes both exports:
  *   - {@link buildCtxSearchInputSchema} composes the Zod object used at
- *     `registerTool` time, spreading the conditional `project` field only
- *     when `isSharedMode` is true.
- *   - {@link resolveProjectScope} normalises the raw param into the
- *     three-state contract consumed by `searchAllSources`:
- *       undefined → no filter
- *       null      → explicit cross-project recall (no filter)
- *       string    → restrict to that project directory
+ *     `registerTool` time. The `project` field is always present.
+ *   - {@link resolveProjectScope} normalises the raw param for shared-DB mode:
+ *       undefined/"current" → real cwd (getCurrentWorkingProject)
+ *       "global"            → null (no row filter; handler fans out)
+ *       <absolute-path>     → that string verbatim
+ *     In per-project mode the handler reads `project` directly and branches
+ *     on isGlobal / isAbsPath before calling resolveProjectScope.
  */
 
 import { z } from "zod";
@@ -52,27 +49,33 @@ function coerceJsonArray(val: unknown): unknown {
 /**
  * Build the Zod object passed to `server.registerTool("ctx_search", …)`.
  *
- * The base fields (`queries`, `limit`, `source`, `contentType`, `sort`)
- * are always present and mirror today's contract exactly. The `project`
- * field is only spread in when `isSharedMode` is true. When the host runs
- * with the default per-project DB layout the schema does not expose the
- * field at all, which keeps the tool surface honest about what is
- * actionable in that mode.
+ * The `project` field is now present in BOTH per-project and shared modes
+ * (Slice D/F, issue #737): per-project users need `project: "global"` to
+ * fan-out across all their project DBs. The `isSharedMode` parameter is
+ * kept for backwards-compatibility but no longer controls field presence.
+ *
+ * Values:
+ *   - omit / "current": search only this project's history (default).
+ *   - "global": fan-out across every project's stored sessions and memory.
+ *   - <absolute-path>: scope to that specific project directory.
+ *
+ * Session memory is searched in BOTH relevance and timeline sort modes
+ * (Bug 2 fix). `sort` now controls only the ordering of results.
  */
-export function buildCtxSearchInputSchema(isSharedMode: boolean) {
-  const projectField = isSharedMode
-    ? {
-        project: z
-          .string()
-          .optional()
-          .describe(
-            "Project scope. " +
-              "Default (omit): this session's project — auto-resolved from the host adapter. " +
-              "'global': span every project in the shared store (cross-project recall). " +
-              "<absolute-path>: scope to that specific project directory.",
-          ),
-      }
-    : ({} as Record<string, never>);
+export function buildCtxSearchInputSchema(_isSharedMode: boolean) {
+  const projectField = {
+    project: z
+      .string()
+      .optional()
+      .describe(
+        "Project scope: " +
+          "omit or 'current' — this project only (default); " +
+          "'global' — fan-out across every project's sessions, content, and memory; " +
+          "<absolute-path> — scope to that specific project directory. " +
+          "Stay on the default ('current'); only pass 'global' when the user explicitly asks to search across all/other projects (e.g. 'across my projects', 'anywhere', 'globally'). " +
+          "Session memory is searched in both relevance and timeline sort modes.",
+      ),
+  };
 
   return z.object({
     queries: z.preprocess(coerceJsonArray, z
@@ -105,8 +108,9 @@ export function buildCtxSearchInputSchema(isSharedMode: boolean) {
       .optional()
       .default("relevance")
       .describe(
-        "Sort mode. 'relevance' (default): BM25 ranked, current session only. " +
-          "'timeline': chronological across current session, prior sessions, and auto-memory.",
+        "Sort mode. 'relevance' (default): BM25-ranked results across all sources " +
+          "(content, session events, and auto-memory). " +
+          "'timeline': same sources but ordered chronologically.",
       ),
     ...projectField,
   });
@@ -116,10 +120,16 @@ export function buildCtxSearchInputSchema(isSharedMode: boolean) {
  * Normalise the raw `project` value into the three-state contract consumed
  * by {@link searchAllSources}.
  *
- *   - shared mode OFF                        → `undefined` (param ignored)
- *   - shared mode ON, param `undefined`      → current project (`getProjectDirFn()`)
- *   - shared mode ON, param `"global"`       → `null` (no filter — cross-project)
- *   - shared mode ON, param `<string>`       → that string verbatim
+ *   - shared mode OFF                              → `undefined` (single per-project DB, no row filter)
+ *   - shared mode ON, param `undefined`            → real cwd (`getProjectDirFn()` = getCurrentWorkingProject)
+ *   - shared mode ON, param `"current"`            → real cwd (same as undefined)
+ *   - shared mode ON, param `"global"`             → `null` (no row filter; handler fans out)
+ *   - shared mode ON, param `<absolute-path>`      → that string verbatim
+ *
+ * `getProjectDirFn` MUST be `getCurrentWorkingProject` (real process cwd),
+ * NOT `getProjectDir` (which returns the pinned env path in shared mode).
+ * Slice D (#737): decouples "which DB to open" (getProjectDir) from
+ * "which rows to filter" (getCurrentWorkingProject).
  *
  * The function is pure so it stays trivially testable without spinning up
  * the MCP server.
@@ -130,7 +140,7 @@ export function resolveProjectScope(
   getProjectDirFn: () => string,
 ): string | null | undefined {
   if (!isSharedMode) return undefined;
-  if (raw === undefined) return getProjectDirFn();
+  if (raw === undefined || raw === "current") return getProjectDirFn();
   if (raw === "global") return null;
   return raw;
 }

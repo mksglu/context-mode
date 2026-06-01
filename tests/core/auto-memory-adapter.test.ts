@@ -242,3 +242,86 @@ describe("searchAutoMemory project isolation (#663)", () => {
     expect(results[0].source).toContain("notes.md");
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// MINOR A: global auto-memory adapter base-dir detection
+// (basename is 16-hex hash vs. non-hex e.g. "memories")
+// ─────────────────────────────────────────────────────────
+
+describe("searchAutoMemory (MINOR A) — global adapter base-dir: hashed vs non-hashed basename", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    const { mkdtempSync } = require("node:fs");
+    const { tmpdir } = require("node:os");
+    tmpDir = mkdtempSync(require("node:path").join(tmpdir(), "ctxam-minor-a-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("adapter.getMemoryDir(undefined) returns a non-hex basename (e.g. 'memories') → used as-is as base dir, not dirname()", () => {
+    // Adapter whose getMemoryDir(undefined) returns <base>/memories (non-hex)
+    // The code must use that as the base dir directly, not dirname(<base>/memories).
+    const memoriesDir = join(tmpDir, "memories");
+    mkdirSync(join(memoriesDir, "hash1234"), { recursive: true });
+    writeFileSync(
+      join(memoriesDir, "hash1234", "notes.md"),
+      "MINOR-A-NONHEX-TOKEN is documented here for the global scan.\n",
+      "utf-8",
+    );
+
+    const adapter = {
+      getConfigDir: () => tmpDir,
+      getInstructionFiles: () => ["AGENTS.md"],
+      // basename = "memories" — NOT a 16-char hex string → use as-is
+      getMemoryDir: (_p?: string) => memoriesDir,
+    };
+
+    const results = searchAutoMemory(
+      ["MINOR-A-NONHEX-TOKEN"],
+      5,
+      null, // global: null projectDir
+      undefined,
+      adapter as any,
+    );
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].content).toContain("MINOR-A-NONHEX-TOKEN");
+  });
+
+  it("adapter.getMemoryDir(undefined) returns a 16-char hex basename → dirname() used as base dir", () => {
+    // Adapter whose getMemoryDir(undefined) returns <base>/<16hex> (hashed subdir)
+    // The code must use dirname(<16hex path>) as the base dir, then scan all subdirs.
+    const hexHash = "a1b2c3d4e5f67890";  // exactly 16 hex chars
+    const base = join(tmpDir, "mem_base");
+    const hashedSubdir = join(base, hexHash);
+    // Also create a SECOND subdir to prove the dirname() step lets us find them all
+    const otherHash = "0f1e2d3c4b5a6978";
+    mkdirSync(join(base, otherHash), { recursive: true });
+    writeFileSync(
+      join(base, otherHash, "data.md"),
+      "MINOR-A-HEXHASH-TOKEN found in another project hash dir.\n",
+      "utf-8",
+    );
+
+    const adapter = {
+      getConfigDir: () => tmpDir,
+      getInstructionFiles: () => ["AGENTS.md"],
+      // basename = hexHash (16 hex chars) → getMemoryDir returns the hashed subdir
+      getMemoryDir: (_p?: string) => hashedSubdir,
+    };
+
+    const results = searchAutoMemory(
+      ["MINOR-A-HEXHASH-TOKEN"],
+      5,
+      null, // global: null projectDir
+      undefined,
+      adapter as any,
+    );
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].content).toContain("MINOR-A-HEXHASH-TOKEN");
+  });
+});

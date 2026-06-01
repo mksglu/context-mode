@@ -479,6 +479,40 @@ export function resolveContentStorePath(opts: {
 }
 
 /**
+ * Compute the canonical content-store DB path for `projectDir` **without
+ * performing any legacy-rename migration**. Safe for read-only search paths
+ * (global fan-out, abs-path search) where no write must occur.
+ *
+ * Returns the canonical hash path regardless of whether it exists on disk.
+ * The caller is responsible for checking `existsSync` before opening.
+ */
+export function canonicalContentDbPath(opts: {
+  projectDir: string;
+  contentDir: string;
+}): string {
+  const { projectDir, contentDir } = opts;
+  const hash = hashProjectDirCanonical(projectDir);
+  return join(contentDir, `${hash}.db`);
+}
+
+/**
+ * Compute the canonical session DB path for `projectDir` **without
+ * performing any legacy-rename migration**. Safe for read-only search paths.
+ *
+ * Does NOT include a worktree suffix because the caller is targeting a
+ * specific project directory (abs-path search), not the currently active
+ * worktree. Returns the path regardless of whether it exists.
+ */
+export function canonicalSessionDbPath(opts: {
+  projectDir: string;
+  sessionsDir: string;
+}): string {
+  const { projectDir, sessionsDir } = opts;
+  const hash = hashProjectDirCanonical(projectDir);
+  return join(sessionsDir, `${hash}.db`);
+}
+
+/**
  * Resolve the SessionDB file path for a project, performing a one-shot
  * migration from legacy raw-casing filenames to canonical ones when only
  * the legacy file exists.
@@ -677,6 +711,7 @@ const S = {
   deleteResume: "deleteResume",
   getOldSessions: "getOldSessions",
   searchEvents: "searchEvents",
+  searchEventsNoProject: "searchEventsNoProject",
   incrementToolCall: "incrementToolCall",
   getToolCallTotals: "getToolCallTotals",
   getToolCallByTool: "getToolCallByTool",
@@ -1053,6 +1088,15 @@ export class SessionDB extends SQLiteBase {
        ORDER BY id ASC
        LIMIT ?`);
 
+    // Slice A (#737): no-filter variant — used by global fan-out (projectDir=null)
+    p(S.searchEventsNoProject,
+      `SELECT id, session_id, category, type, data, created_at
+       FROM session_events
+       WHERE (data LIKE '%' || ? || '%' ESCAPE '\\' OR category LIKE '%' || ? || '%' ESCAPE '\\')
+         AND (? IS NULL OR category = ?)
+       ORDER BY id ASC
+       LIMIT ?`);
+
     // ── Cleanup ──
     p(S.getOldSessions,
       `SELECT session_id FROM session_meta WHERE started_at < datetime('now', ? || ' days')`);
@@ -1332,18 +1376,24 @@ export class SessionDB extends SQLiteBase {
   }
 
   /**
-   * Search events by text query scoped to a project directory.
+   * Search session events by query text.
    *
    * Performs a case-insensitive LIKE search across the `data` and `category`
    * columns. An optional `source` parameter filters by exact category match.
    * Returns results ordered by monotonic id (chronological).
+   *
+   * Slice A (#737): `projectDir` accepts `null` as an explicit "no filter"
+   * sentinel for global fan-out recall. When `null`, a separate prepared
+   * statement drops the `(project_dir = ? OR project_dir = '')` clause
+   * entirely, so ALL events across every project are matched. When a string
+   * (including `""`), the original exact-match + empty-dir behaviour is used.
    *
    * Best-effort: returns empty array on any error.
    */
   searchEvents(
     query: string,
     limit: number,
-    projectDir: string,
+    projectDir: string | null,
     source?: string,
   ): Array<{
     id: number;
@@ -1356,6 +1406,23 @@ export class SessionDB extends SQLiteBase {
     try {
       const escapedQuery = query.replace(/[%_]/g, (char) => "\\" + char);
       const sourceParam = source ?? null;
+      if (projectDir === null) {
+        // Global: no project_dir filter — return events from all projects.
+        return this.stmt(S.searchEventsNoProject).all(
+          escapedQuery,
+          escapedQuery,
+          sourceParam,
+          sourceParam,
+          limit,
+        ) as Array<{
+          id: number;
+          session_id: string;
+          category: string;
+          type: string;
+          data: string;
+          created_at: string;
+        }>;
+      }
       return this.stmt(S.searchEvents).all(
         projectDir,
         escapedQuery,

@@ -1895,6 +1895,20 @@ describe("extractSnippet with highlight markers", () => {
     );
   });
 
+  test("forward-biased window captures detail AFTER a heading match (#737)", () => {
+    // Match term lands on a heading; the root-cause detail follows ~400 chars
+    // later — beyond the old 300-char window but inside the new forward window.
+    const pre = "x".repeat(2000);
+    const detail = "ROOTCAUSE_TOKEN the anthropic stream closed mid-flight on opus";
+    const gap = "y".repeat(360);
+    const content = `${pre}\n# Anthropic stream ended error\n${gap}\n${detail}\n${"z".repeat(2000)}`;
+    const result = extractSnippet(content, "stream ended", 2400);
+    assert.ok(
+      result.includes("ROOTCAUSE_TOKEN"),
+      `Expected forward window to include post-heading detail, got: ${result.slice(0, 300)}`,
+    );
+  });
+
   test("returns prefix when no matches found at all", () => {
     const content = buildContent("Nothing relevant here.", "Still nothing relevant.");
     const result = extractSnippet(content, "xylophone");
@@ -2842,8 +2856,10 @@ afterEach(() => {
   unifiedCleanups.length = 0;
 });
 
-describe("sort=relevance returns ContentStore only", () => {
-  test("relevance mode only queries ContentStore, ignores SessionDB and auto-memory", () => {
+describe("sort=relevance searches all sources (#737 Bug 2 fix)", () => {
+  test("relevance mode includes session events alongside ContentStore results", () => {
+    // Bug 2 fix: sort=relevance now searches all three sources.
+    // Previously session events were gated on sort=timeline; this was incorrect.
     const store = createUnifiedStore();
     store.indexPlainText(
       "Authentication middleware validates JWT tokens on every request.",
@@ -2870,9 +2886,11 @@ describe("sort=relevance returns ContentStore only", () => {
       configDir: "/nonexistent",
     });
 
-    // Should have results from ContentStore only
+    // ContentStore results should still be present
     expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.origin === "current-session")).toBe(true);
+    expect(results.some(r => r.origin === "current-session")).toBe(true);
+    // Session events are also included now (Bug 2 fix)
+    expect(results.some(r => r.origin === "prior-session")).toBe(true);
   });
 });
 
@@ -3047,8 +3065,9 @@ describe("empty index guard skipped in timeline mode", () => {
   });
 });
 
-describe("default sort is relevance (backward compatible)", () => {
-  test("omitting sort defaults to relevance behavior", () => {
+describe("default sort is relevance and now includes all sources (#737 Bug 2 fix)", () => {
+  test("omitting sort defaults to relevance and includes session events", () => {
+    // Bug 2 fix: default sort (relevance) now includes session events + auto-memory.
     const store = createUnifiedStore();
     store.indexPlainText(
       "Backward compatibility test for default search mode.",
@@ -3065,7 +3084,7 @@ describe("default sort is relevance (backward compatible)", () => {
       priority: 2,
     }, "PostToolUse");
 
-    // No sort param — should default to "relevance"
+    // No sort param — defaults to "relevance"
     const results = searchAllSources({
       query: "backward compatibility",
       limit: 5,
@@ -3076,9 +3095,11 @@ describe("default sort is relevance (backward compatible)", () => {
       configDir: "/nonexistent",
     });
 
-    // Should only have ContentStore results (relevance mode)
+    // ContentStore results still appear (unchanged behaviour)
     expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.origin === "current-session")).toBe(true);
+    expect(results.some(r => r.origin === "current-session")).toBe(true);
+    // Session events are now also included in relevance mode
+    expect(results.some(r => r.origin === "prior-session")).toBe(true);
   });
 });
 

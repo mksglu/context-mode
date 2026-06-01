@@ -2,8 +2,13 @@
  * Unified multi-source search — merges ContentStore, SessionDB, and
  * auto-memory results into a single ranked or chronological result set.
  *
- * Used by ctx_search when sort="timeline" to search across all sources,
- * or sort="relevance" (default) for ContentStore-only BM25 search.
+ * All three sources are always searched; `sort` controls only the final
+ * ordering (relevance vs. chronological). Issue #737 Bug 2 fix: sources
+ * are no longer gated on sort mode.
+ *
+ * MAJOR 3 fix (#737 review): per-source results are interleaved (round-robin)
+ * before truncation so session events and auto-memory always get representation
+ * even when the ContentStore fills the per-query limit.
  */
 
 import type { ContentStore, SearchResult } from "../store.js";
@@ -26,6 +31,10 @@ export interface UnifiedSearchResult {
   matchLayer?: string;
   highlighted?: string;
   contentType?: "code" | "prose";
+  /** Attribution (#737): project_dir this hit belongs to (cross-project recall). */
+  project?: string;
+  /** Attribution (#737): session id this hit was captured under, when known. */
+  sessionId?: string;
 }
 
 export interface SearchAllSourcesOpts {
@@ -59,10 +68,19 @@ export interface SearchAllSourcesOpts {
 // ─────────────────────────────────────────────────────────
 
 /**
- * Search across all available sources.
+ * Search across all available sources and interleave results.
  *
- * - sort="relevance" (default): BM25-ranked results from ContentStore only.
- * - sort="timeline": chronological merge of ContentStore + SessionDB + auto-memory.
+ * All three sources (ContentStore, SessionDB events, auto-memory) are
+ * ALWAYS searched regardless of `sort`. The `sort` parameter controls only
+ * the final ordering:
+ *   - "relevance" (default): per-source results are interleaved round-robin
+ *     so each source gets representation, then stable-sorted by rank/origin.
+ *   - "timeline": all results merged and sorted chronologically.
+ *
+ * MAJOR 3 fix (#737 review): each source's result list is collected
+ * independently; they are interleaved round-robin before the final slice so
+ * session events + auto-memory always appear even when ContentStore fills
+ * the per-query limit.
  *
  * Errors in any single source are caught and logged — partial results
  * are always returned.
@@ -82,10 +100,7 @@ export function searchAllSources(opts: SearchAllSourcesOpts): UnifiedSearchResul
     projectScope,
   } = opts;
 
-  const results: UnifiedSearchResult[] = [];
-
   // Capture session start time once — used as proxy for ContentStore items
-  // (we don't know exact indexing time, but all content is from current session)
   const sessionStartTime = new Date().toISOString();
 
   // ── Project scope (#737) ──
@@ -102,7 +117,8 @@ export function searchAllSources(opts: SearchAllSourcesOpts): UnifiedSearchResul
     }
   }
 
-  // ── Source 1: ContentStore (always, both modes) ──
+  // ── Source 1: ContentStore ────────────────────────────────────────────────
+  const contentResults: UnifiedSearchResult[] = [];
   try {
     const storeResults = store.searchWithFallback(
       query,
@@ -112,7 +128,7 @@ export function searchAllSources(opts: SearchAllSourcesOpts): UnifiedSearchResul
       "like",
       sessionIdAllowSet,
     );
-    results.push(
+    contentResults.push(
       ...storeResults.map((r: SearchResult) => ({
         title: r.title,
         content: r.content,
@@ -129,48 +145,83 @@ export function searchAllSources(opts: SearchAllSourcesOpts): UnifiedSearchResul
     if (DEBUG) process.stderr.write(`[ctx] ContentStore search failed: ${e}\n`);
   }
 
-  // ── Sources 2+3: timeline mode only ──
-  if (sort === "timeline") {
-    // Source 2: SessionDB — prior session events
-    try {
-      if (sessionDB) {
-        const dbResults = sessionDB.searchEvents(query, limit, projectDir || "", source);
-        results.push(
-          ...dbResults.map((r: Pick<StoredEvent, "id" | "session_id" | "category" | "type" | "data" | "created_at">) => ({
-            title: `[${r.category}] ${r.type}`,
-            content: r.data,
-            source: "prior-session",
-            origin: "prior-session" as const,
-            timestamp: r.created_at,
-          })),
-        );
-      }
-    } catch (e) {
-      if (DEBUG) process.stderr.write(`[ctx] SessionDB search failed: ${e}\n`);
-    }
+  // ── Sources 2+3: ALWAYS run (Bug 2 fix — sort controls ordering, not source set) ──
+  //
+  // projectScope drives the row-level filter for both sources:
+  //   - undefined → legacy behaviour (projectDir || "" for events, projectDir for memory)
+  //   - null      → no filter (cross-project global recall)
+  //   - string    → exact match (that project's events/memory)
 
-    // Source 3: Auto-memory
-    try {
-      const memResults = searchAutoMemory([query], limit, projectDir, configDir, adapter);
-      results.push(...memResults);
-    } catch (e) {
-      if (DEBUG) process.stderr.write(`[ctx] auto-memory search failed: ${e}\n`);
+  // Source 2: SessionDB — prior session events
+  const sessionResults: UnifiedSearchResult[] = [];
+  try {
+    if (sessionDB) {
+      const eventsFilter: string | null =
+        projectScope === undefined ? (projectDir || "") : projectScope;
+      const dbResults = sessionDB.searchEvents(query, limit, eventsFilter, source);
+      sessionResults.push(
+        ...dbResults.map((r: Pick<StoredEvent, "id" | "session_id" | "category" | "type" | "data" | "created_at">) => ({
+          title: `[${r.category}] ${r.type}`,
+          content: r.data,
+          source: "prior-session",
+          origin: "prior-session" as const,
+          timestamp: r.created_at,
+        })),
+      );
     }
+  } catch (e) {
+    if (DEBUG) process.stderr.write(`[ctx] SessionDB search failed: ${e}\n`);
+  }
+
+  // Source 3: Auto-memory
+  // projectScope=null → enumerate all memory hash dirs (global);
+  // projectScope=string → single hashed dir for that project;
+  // projectScope=undefined → legacy: use projectDir (may be undefined → current project).
+  const memResults: UnifiedSearchResult[] = [];
+  try {
+    const autoMemProjectDir: string | null | undefined =
+      projectScope === undefined ? projectDir : projectScope;
+    const hits = searchAutoMemory([query], limit, autoMemProjectDir, configDir, adapter);
+    memResults.push(...hits);
+  } catch (e) {
+    if (DEBUG) process.stderr.write(`[ctx] auto-memory search failed: ${e}\n`);
   }
 
   // ── Normalize timestamps for consistent sorting ──
   // SQLite datetime('now') → "YYYY-MM-DD HH:MM:SS" (no T, no Z)
   // ISO → "YYYY-MM-DDTHH:MM:SS.sssZ"
-  for (const r of results) {
-    if (r.timestamp && !r.timestamp.includes("T")) {
-      r.timestamp = r.timestamp.replace(" ", "T") + "Z";
+  for (const list of [contentResults, sessionResults, memResults]) {
+    for (const r of list) {
+      if (r.timestamp && !r.timestamp.includes("T")) {
+        r.timestamp = r.timestamp.replace(" ", "T") + "Z";
+      }
     }
   }
 
-  // ── Sort ──
+  // ── Merge and sort ──
   if (sort === "timeline") {
-    results.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+    // Chronological merge of all sources.
+    const all = [...contentResults, ...sessionResults, ...memResults];
+    all.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+    return all.slice(0, limit);
   }
 
-  return results.slice(0, limit);
+  // Relevance: round-robin interleave across sources so every source gets
+  // representation even when ContentStore fills the per-query limit.
+  // MAJOR 3 fix (#737 review): previously all sources were appended in order
+  // then sliced — session/auto-memory items vanished when content filled limit.
+  const interleaved: UnifiedSearchResult[] = [];
+  const maxLen = Math.max(contentResults.length, sessionResults.length, memResults.length);
+  for (let i = 0; i < maxLen && interleaved.length < limit; i++) {
+    if (i < contentResults.length && interleaved.length < limit) {
+      interleaved.push(contentResults[i]);
+    }
+    if (i < sessionResults.length && interleaved.length < limit) {
+      interleaved.push(sessionResults[i]);
+    }
+    if (i < memResults.length && interleaved.length < limit) {
+      interleaved.push(memResults[i]);
+    }
+  }
+  return interleaved;
 }

@@ -157,6 +157,23 @@ const MAX_CHUNK_BYTES = 4096;
 // ─────────────────────────────────────────────────────────
 
 /**
+ * Escape SQLite LIKE metacharacters in a source-label string and wrap in `%…%`
+ * for a partial-match filter.
+ *
+ * Backslash must be replaced first so subsequent escapes are not re-escaped.
+ * Exported so read-only fan-out search paths (global-fanout.ts) can apply the
+ * same escaping as ContentStore without duplicating the logic (#737 MAJOR B).
+ * Use with `ESCAPE '\\'` in the SQL statement.
+ */
+export function escapeLikeSource(source: string): string {
+  const escaped = source
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+  return `%${escaped}%`;
+}
+
+/**
  * Remove stale DB files from previous sessions whose processes no longer exist.
  */
 export function cleanupStaleDBs(): number {

@@ -7,7 +7,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, isAbsolute } from "node:path";
+import { join, isAbsolute, dirname } from "node:path";
 import { resolveClaudeConfigDir } from "../util/claude-config.js";
 import { hashProjectDirCanonical } from "../session/db.js";
 
@@ -47,9 +47,13 @@ export interface AutoMemoryAdapter {
  * Without an adapter (legacy callers), defaults to Claude conventions
  * (CLAUDE.md + ~/.claude/memory) for backwards compatibility.
  *
+ * Slice B (#737): `projectDir` accepts `null` as an explicit "global" sentinel.
+ * When `null`, ALL per-project memory hash subdirs under the base memory directory
+ * are enumerated for cross-project recall without migration.
+ *
  * @param queries  Array of search terms
  * @param limit    Max results to return
- * @param projectDir  Project directory path
+ * @param projectDir  Project directory path, or null for global recall
  * @param configDir   Explicit config dir override (legacy callers)
  * @param adapter     Platform adapter — supplies instruction files + memory dir
  * @returns Matching auto-memory results
@@ -57,7 +61,7 @@ export interface AutoMemoryAdapter {
 export function searchAutoMemory(
   queries: string[],
   limit: number = 5,
-  projectDir?: string,
+  projectDir?: string | null,
   configDir?: string,
   adapter?: AutoMemoryAdapter,
 ): AutoMemoryResult[] {
@@ -70,25 +74,26 @@ export function searchAutoMemory(
   // Issue #460 round-3: legacy fallback honors $CLAUDE_CONFIG_DIR via the
   // canonical util so callers without an adapter still respect relocated
   // CC config trees (and empty/whitespace env doesn't poison the path).
-  const adapterRelative = adapterConfigDir ? resolveAgainst(projectDir, adapterConfigDir) : null;
+  const adapterRelative = adapterConfigDir ? resolveAgainst(projectDir ?? undefined, adapterConfigDir) : null;
   const effectiveConfigDir = adapterRelative ?? configDir ?? resolveClaudeConfigDir();
   // Issue #663: scope memory dir by projectDir so parallel projects can't
   // read each other's auto-memory. Adapter-aware path delegates the
   // scoping to the adapter; legacy adapterless fallback applies the same
   // hash directly so the contract holds at both call sites.
-  const adapterMemoryDir = adapter?.getMemoryDir(projectDir);
+  // Slice B: null = global mode. Pass undefined to adapter to get the base dir.
+  const adapterMemoryDir = adapter?.getMemoryDir(projectDir ?? undefined);
   const fallbackMemoryBase = join(effectiveConfigDir, "memory");
   const fallbackMemoryDir = projectDir
     ? join(fallbackMemoryBase, hashProjectDirCanonical(projectDir))
     : fallbackMemoryBase;
   const memoryDir = adapterMemoryDir
-    ? resolveAgainst(projectDir, adapterMemoryDir)
+    ? resolveAgainst(projectDir ?? undefined, adapterMemoryDir)
     : fallbackMemoryDir;
 
   // Collect candidate files
   const candidates: Array<{ path: string; label: string }> = [];
 
-  // 1. Project-level instruction files
+  // 1. Project-level instruction files (skipped when projectDir is null/global)
   if (projectDir) {
     for (const fileName of instructionFiles) {
       const p = join(projectDir, fileName);
@@ -110,7 +115,46 @@ export function searchAutoMemory(
   }
 
   // 3. Memory directory
-  if (memoryDir && existsSync(memoryDir)) {
+  if (projectDir === null) {
+    // Slice B (#737) global mode: enumerate ALL per-project hash subdirs.
+    // Fallback: children of join(effectiveConfigDir, "memory").
+    //
+    // MAJOR 4 fix: adapter base-dir resolution. `adapter.getMemoryDir(undefined)`
+    // may return EITHER:
+    //   (a) the base memory dir itself (Codex `memories`, CONTEXT_MODE_DATA_DIR) — use as-is.
+    //   (b) a project-hashed subdir `<base>/<16hex>` — we must use dirname(<resolved>).
+    // Distinguish by checking whether the resolved basename is a 16-char hex string.
+    const globalBases: string[] = [fallbackMemoryBase];
+    if (adapterMemoryDir) {
+      const resolved = resolveAgainst(undefined, adapterMemoryDir);
+      const bname = resolved.split(/[\/\\]/).pop() ?? "";
+      const isProjectHash = /^[0-9a-f]{16}$/.test(bname);
+      const candidateBase = isProjectHash ? dirname(resolved) : resolved;
+      if (candidateBase && candidateBase !== "." && candidateBase !== fallbackMemoryBase) {
+        globalBases.push(candidateBase);
+      }
+    }
+    for (const base of globalBases) {
+      if (!existsSync(base)) continue;
+      try {
+        const entries = readdirSync(base, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const subDir = join(base, entry.name);
+          try {
+            const files = readdirSync(subDir).filter(f => f.endsWith(".md"));
+            for (const file of files) {
+              candidates.push({ path: join(subDir, file), label: `memory/${entry.name}/${file}` });
+            }
+          } catch (e) {
+            if (DEBUG) process.stderr.write(`[ctx] auto-memory subdir scan failed: ${e}\n`);
+          }
+        }
+      } catch (e) {
+        if (DEBUG) process.stderr.write(`[ctx] auto-memory global scan failed: ${e}\n`);
+      }
+    }
+  } else if (memoryDir && existsSync(memoryDir)) {
     try {
       const files = readdirSync(memoryDir).filter(f => f.endsWith(".md"));
       for (const file of files) {
