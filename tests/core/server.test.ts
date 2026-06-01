@@ -1505,8 +1505,12 @@ describe("ctx_index: Read deny-policy enforcement (#442)", () => {
       const searchText = searchResp.result?.content?.[0]?.text ?? "";
       const searchedEmpty =
         searchText.includes("No results found") ||
-        searchText.includes("After indexing");
+        searchText.includes("After indexing") ||
+        // #737 reworded the empty-KB guidance to point users at project:"global".
+        searchText.includes("no indexed content");
       expect(searchedEmpty).toBe(true);
+      // Load-bearing exfil pin: the denied secret must never surface in results.
+      expect(searchText).not.toContain(secretMarker);
     } finally {
       killProc(proc);
       rmSync(projectDir, { recursive: true, force: true });
