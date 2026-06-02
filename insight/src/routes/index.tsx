@@ -1,13 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, type AnalyticsData, type CategoryAnalyticsData } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { InsightCard, Stat, RatioBar, Mini } from "@/components/dashboard-widgets";
+import { generateInsights, generateCategoryInsights } from "@/lib/insights";
 import {
-  Brain, TrendingUp, AlertTriangle, CheckCircle,
+  Brain, TrendingUp, AlertTriangle,
   Zap, FileCode, GitBranch, Clock, Shield, Activity, Cpu,
-  Lightbulb, BookOpen, Wrench, Users, MessageSquare, Search,
+  Lightbulb, BookOpen, MessageSquare, Search,
   FolderOpen, Code,
 } from "lucide-react";
 
@@ -15,580 +17,43 @@ export const Route = createFileRoute("/")({ component: Dashboard });
 
 const COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
 
-// ── Insight types ──
-interface Insight {
-  icon: React.ReactNode;
-  severity: "positive" | "warning" | "critical" | "neutral";
-  metric: string;
-  evidence: string;
-  action: string;
-  roi: string;
-}
+const SEV_ORDER = { critical: 0, warning: 1, positive: 2, neutral: 3 };
 
-const SEV_STYLES = {
-  positive: { border: "border-emerald-500/30", bg: "bg-emerald-500/5", badge: "bg-emerald-500/15 text-emerald-400", label: "Nice" },
-  warning: { border: "border-amber-500/30", bg: "bg-amber-500/5", badge: "bg-amber-500/15 text-amber-400", label: "Heads up" },
-  critical: { border: "border-red-500/30", bg: "bg-red-500/5", badge: "bg-red-500/15 text-red-400", label: "Fix this" },
-  neutral: { border: "border-blue-500/30", bg: "bg-blue-500/5", badge: "bg-blue-500/15 text-blue-400", label: "FYI" },
-};
-
-function InsightCard({ icon, severity, metric, evidence, action, roi }: Insight) {
-  const s = SEV_STYLES[severity];
-  return (
-    <Card className={`${s.border} ${s.bg}`}>
-      <CardContent className="p-5">
-      {/* Header: badge + title */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${s.badge}`}>
-          {s.label}
-        </span>
-      </div>
-
-      {/* Main metric - the headline */}
-      <div className="flex items-center gap-2.5 mb-2">
-        <div className="shrink-0">{icon}</div>
-        <h4 className="text-base font-bold leading-tight">{metric}</h4>
-      </div>
-
-      {/* Evidence - short and readable */}
-      <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">{evidence}</p>
-
-      {/* Action + ROI as distinct blocks */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg bg-background/40 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">What to do</p>
-          <p className="text-xs leading-relaxed">{action}</p>
-        </div>
-        <div className="rounded-lg bg-background/40 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Why it matters</p>
-          <p className="text-xs leading-relaxed">{roi}</p>
-        </div>
-      </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Big number stat ──
-function Stat({ label, value, sub, icon: Icon, color }: {
-  label: string; value: string | number; sub: string; icon: typeof Zap; color: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</CardTitle>
-        <Icon className={`h-4 w-4 ${color}`} />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Ratio bar ──
-function RatioBar({ items }: { items: { label: string; value: number; color: string }[] }) {
-  const total = items.reduce((a, b) => a + b.value, 0);
-  if (total === 0) return null;
-  return (
-    <div>
-      <div className="flex h-3 rounded-full overflow-hidden bg-secondary">
-        {items.map((item, i) => (
-          <div key={i} className="transition-all" style={{
-            width: `${Math.max(Math.round(100 * item.value / total), 2)}%`,
-            background: item.color,
-          }} />
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-        {items.map((item, i) => (
-          <span key={i} className="text-[10px] text-muted-foreground flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
-            {item.label}: {item.value} ({Math.round(100 * item.value / total)}%)
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Mini number ──
-function Mini({ label, value, color }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div className="text-center">
-      <div className={`text-2xl font-bold tabular-nums ${color || ""}`}>{value}</div>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
-    </div>
-  );
-}
-
-// ── Insights engine ──
-function generateInsights(d: AnalyticsData): Insight[] {
-  const ins: Insight[] = [];
-  const t = d.totals;
-
-  // ── Reading more than writing
-  if (t.reads + t.writes >= 5) {
-    const ratio = t.readWriteRatio;
-    if (ratio > 5) {
-      ins.push({
-        icon: <BookOpen className="h-5 w-5 text-blue-500" />, severity: "neutral",
-        metric: `You read ${ratio}x more than you write`,
-        evidence: `${t.reads} files read vs ${t.writes} files written. You're spending most of your AI time understanding code, not producing it.`,
-        action: "Write a short plan before starting. Clarify what you want to change before reading everything.",
-        roi: "Planning upfront typically reduces the number of file re-reads.",
-      });
-    } else if (ratio < 2 && ratio > 0) {
-      ins.push({
-        icon: <FileCode className="h-5 w-5 text-emerald-500" />, severity: "positive",
-        metric: `Healthy balance: ${ratio}:1 read-to-write`,
-        evidence: `You're reading just enough to write confidently. ${t.writes} files written with only ${t.reads} reads.`,
-        action: "Keep this up — you're not over-analyzing or guessing blind.",
-        roi: "This balance leads to fewer bugs on first attempt.",
-      });
-    }
-  }
-
-  // ── Context filling up
-  if (t.totalSessions >= 3) {
-    const pct = t.compactRate;
-    if (pct > 60) {
-      ins.push({
-        icon: <Brain className="h-5 w-5 text-amber-500" />, severity: "warning",
-        metric: `${pct}% of your sessions run out of context`,
-        evidence: `${t.totalCompacts} times the agent had to compress your conversation. Each time, it forgets details from earlier work.`,
-        action: "Start fresh sessions for new tasks instead of continuing long ones.",
-        roi: `You'd recover ~${Math.round(t.totalCompacts * 3)} minutes of re-explaining lost context.`,
-      });
-    } else if (pct < 20 && t.totalSessions >= 5) {
-      ins.push({
-        icon: <CheckCircle className="h-5 w-5 text-emerald-500" />, severity: "positive",
-        metric: `Only ${pct}% context overflow — you're efficient`,
-        evidence: `${t.totalCompacts} compactions in ${t.totalSessions} sessions. Your tasks are well-scoped.`,
-        action: "Share this pattern with your team — most developers hit 60%+.",
-        roi: "Less context loss = less time re-explaining = faster completion.",
-      });
-    }
-  }
-
-  // ── Errors
-  if (t.totalEvents >= 20) {
-    const rate = t.errorRate;
-    if (rate > 10) {
-      ins.push({
-        icon: <AlertTriangle className="h-5 w-5 text-red-500" />, severity: "critical",
-        metric: `${rate}% of your tool calls fail`,
-        evidence: `${t.totalErrors} errors in ${t.totalEvents} calls. That's a lot of wasted back-and-forth.`,
-        action: "Check if the same error keeps repeating. Add a CLAUDE.md rule to prevent it.",
-        roi: `Fixing this saves ~${Math.round(t.totalErrors * 2)} minutes of retry loops.`,
-      });
-    } else if (rate < 3) {
-      ins.push({
-        icon: <Shield className="h-5 w-5 text-emerald-500" />, severity: "positive",
-        metric: `Only ${rate}% error rate — you're a power user`,
-        evidence: `${t.totalErrors} errors in ${t.totalEvents} calls. Almost everything works on the first try.`,
-        action: "Document your prompting style — others can learn from it.",
-        roi: "Clean usage means more time building, less time debugging.",
-      });
-    }
-  }
-
-  // ── Parallel work
-  if (t.totalSessions >= 2) {
-    if (t.totalSubagents > 0 && d.subagents.bursts > 0) {
-      ins.push({
-        icon: <Users className="h-5 w-5 text-emerald-500" />, severity: "positive",
-        metric: `You saved ~${d.subagents.timeSavedMin} min with parallel agents`,
-        evidence: `${d.subagents.parallelCount} tasks ran simultaneously in ${d.subagents.bursts} bursts (up to ${d.subagents.maxConcurrent} at once).`,
-        action: "Keep delegating research and exploration to subagents.",
-        roi: "Parallel work is the single biggest time multiplier available to you.",
-      });
-    } else if (t.totalSubagents === 0 && t.totalEvents > 50) {
-      ins.push({
-        icon: <Users className="h-5 w-5 text-muted-foreground" />, severity: "neutral",
-        metric: "Everything ran sequentially",
-        evidence: `${t.totalEvents} events, zero parallel agents. You're doing one thing at a time.`,
-        action: "Try subagents for research — fire 3-5 at once instead of doing them one by one.",
-        roi: "One parallel burst can turn 10 minutes of research into 2 minutes.",
-      });
-    }
-  }
-
-  // ── Prompt efficiency
-  if (t.totalPrompts >= 5 && t.totalSessions >= 2) {
-    const pps = t.promptsPerSession;
-    if (pps < 3) {
-      ins.push({
-        icon: <MessageSquare className="h-5 w-5 text-emerald-500" />, severity: "positive",
-        metric: `${pps} prompts per session — clear instructions`,
-        evidence: `You give the agent clear, complete instructions. It works autonomously without needing constant guidance.`,
-        action: "This is the ideal. Keep writing comprehensive upfront instructions.",
-        roi: "Every avoided back-and-forth saves context for actual work.",
-      });
-    }
-  }
-
-  // ── Mastery trend
-  if (d.masteryTrend && d.masteryTrend.length >= 3) {
-    const first = d.masteryTrend[0];
-    const last = d.masteryTrend[d.masteryTrend.length - 1];
-    if (last.error_rate < first.error_rate) {
-      ins.push({
-        icon: <TrendingUp className="h-5 w-5 text-emerald-500" />, severity: "positive",
-        metric: "Your error rate is dropping — you're getting better",
-        evidence: `Week 1: ${first.error_rate}%, Latest: ${last.error_rate}%. Consistent improvement over ${d.masteryTrend.length} weeks.`,
-        action: "Keep refining your prompting patterns.",
-        roi: "Lower errors = less retry time = faster completion.",
-      });
-    }
-  }
-
-
-  // ── Commit rate
-  if (t.commitsPerSession > 1) {
-    ins.push({
-      icon: <GitBranch className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `${t.commitsPerSession} commits per session — high output`,
-      evidence: `${t.totalCommits} total commits across ${t.totalSessions} sessions.`,
-      action: "Maintain this shipping cadence.",
-      roi: "Frequent commits reduce merge conflicts and context loss.",
-    });
-  }
-
-  // ── Edit-test cycles
-  if (t.totalEditTestCycles > t.totalSessions * 2) {
-    ins.push({
-      icon: <Activity className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `${t.totalEditTestCycles} edit-error cycles — lots of retry loops`,
-      evidence: `${(t.totalEditTestCycles / t.totalSessions).toFixed(1)} cycles per session on average.`,
-      action: "Write tests first, or add patterns to CLAUDE.md to prevent common errors.",
-      roi: "Fewer retry loops means faster task completion.",
-    });
-  }
-
-  // ── Task structure
-  if (t.totalTasks > 0 && t.totalSessions >= 2) {
-    ins.push({
-      icon: <Wrench className="h-5 w-5 text-blue-500" />, severity: "positive",
-      metric: `${(t.totalTasks / t.totalSessions).toFixed(1)} tasks per session — you plan ahead`,
-      evidence: `${t.totalTasks} structured tasks across ${t.totalSessions} sessions. You break work into steps.`,
-      action: "Keep using tasks — they make sessions resumable after breaks.",
-      roi: "Structured sessions are easier to resume and track progress.",
-    });
-  }
-
-  return ins;
-}
-
-function generateCategoryInsights(c: CategoryAnalyticsData): Insight[] {
-  const ins: Insight[] = [];
-  const cs = c.compositeScores;
-  const ei = c.errorIntelligence;
-  const del = c.delegation;
-  const gov = c.governance;
-  const ctx = c.contextHealth;
-  const fi = c.fileIntelligence;
-  const git = c.gitProductivity;
-  const totalEvents = c.categories.reduce((a, b) => a + b.count, 0);
-
-  // P1 removed — duplicate of generateInsights read:write ratio pattern
-
-  // ── P2: High file churn ──
-  if (fi.hotFiles.length > 3) {
-    const top = fi.hotFiles[0];
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `${fi.hotFiles.length} hot files with repeated edits`,
-      evidence: `${top.file.split('/').pop()} was touched ${top.touches} times. Possible rework loop.`,
-      action: "Read the full file before editing. Add constraints to CLAUDE.md.",
-      roi: `Fewer re-edits save ~${fi.hotFiles.length * 3} minutes per session.`,
-    });
-  }
-
-  // ── P3: Session failed — errors + 0 commits (★★ STRONG from agentisd #5) ──
-  if (ei.totalErrors > 3 && git.totalCommits === 0 && totalEvents > 50) {
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-red-500" />, severity: "critical",
-      metric: `${ei.totalErrors} errors, zero commits — session effort lost`,
-      evidence: `${totalEvents} events with ${ei.totalErrors} errors and no commits. All effort was lost.`,
-      action: "Review the error pattern, fix root cause, break tasks into smaller deliverable chunks.",
-      roi: `Recovering from failed sessions costs an additional ${Math.round(totalEvents * 0.5)} minutes.`,
-    });
-  }
-
-  // ── P4: Zero commits ──
-  if (git.totalCommits === 0 && totalEvents > 100) {
-    ins.push({
-      icon: <GitBranch className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: "No commits across all sessions",
-      evidence: `${totalEvents} events recorded, zero commits. Work may not be reaching the codebase.`,
-      action: "Commit incrementally — small commits are easier to review.",
-      roi: "Regular commits create a safety net for rollbacks.",
-    });
-  }
-
-  // ── Q1: High error resolution ──
-  if (ei.totalErrors >= 5 && ei.resolutionRate > 80) {
-    ins.push({
-      icon: <CheckCircle className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `${ei.resolutionRate}% of errors resolved within session`,
-      evidence: `${ei.resolvedErrors} of ${ei.totalErrors} errors fixed. Self-healing sessions.`,
-      action: "Keep this up — self-healing sessions are the gold standard.",
-      roi: "Each resolved error saves 5-10 min of next-session debugging.",
-    });
-  }
-
-  // ── Q2: Retry storm (>=2 to avoid single-fluke false positive) ──
-  if (ei.retryStorms >= 2) {
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-red-500" />, severity: "critical",
-      metric: `${ei.retryStorms} retry storm${ei.retryStorms > 1 ? 's' : ''} detected`,
-      evidence: `Sessions where the same tool was called 3+ times with similar input. The agent gets stuck in loops.`,
-      action: "Stop and re-think the approach. Add error context to CLAUDE.md.",
-      roi: `Breaking retry loops saves ~${ei.retryStorms * 5} minutes of wasted compute.`,
-    });
-  }
-
-  // ── Q3: Persistent errors ──
-  if (ei.totalErrors >= 5 && ei.resolutionRate < 30) {
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `Only ${ei.resolutionRate}% of errors get resolved`,
-      evidence: `${ei.totalErrors - ei.resolvedErrors} errors left unresolved. Technical debt accumulating.`,
-      action: "Address root causes — add patterns to prevent recurring errors.",
-      roi: `Resolving persistent errors prevents hours of future debugging.`,
-    });
-  }
-
-  // ── Q4: Slow tool bottleneck ──
-  if (ei.p95LatencyMs > 15000 && ei.slowestTool) {
-    ins.push({
-      icon: <Clock className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `${ei.slowestTool} averaging ${Math.round(ei.avgLatencyMs / 1000)}s — bottleneck`,
-      evidence: `P95 latency: ${Math.round(ei.p95LatencyMs / 1000)}s. ${ei.latencyByTool.length} tools tracked for latency.`,
-      action: "Check if tool can be replaced or if input can be simplified.",
-      roi: `Fixing bottleneck saves ~${Math.round(ei.latencyByTool.reduce((a, t) => a + t.count, 0) * ei.avgLatencyMs / 60000)} minutes total.`,
-    });
-  }
-
-  // ── S1: Power delegator ──
-  if (del.launched > 10 && del.completionRate > 70) {
-    ins.push({
-      icon: <Users className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `${del.launched} agents delegated — ${del.completionRate}% completion`,
-      evidence: `${del.parallelBursts} parallel bursts, up to ${del.maxConcurrent} concurrent. ~${del.timeSavedMin} min saved.`,
-      action: "Excellent use of parallelism. Share this pattern with the team.",
-      roi: `Parallel delegation saved ~${del.timeSavedMin} minutes.`,
-    });
-  }
-
-  // ── S2: No delegation ──
-  if (del.launched === 0 && totalEvents > 50) {
-    ins.push({
-      icon: <Users className="h-5 w-5 text-muted-foreground" />, severity: "neutral",
-      metric: "Everything ran sequentially — zero delegation",
-      evidence: `${totalEvents} events, zero parallel agents. Single-threaded workflow.`,
-      action: "Try subagents for research — fire 3-5 at once instead of one by one.",
-      roi: "One parallel burst turns 10 minutes of research into 2 minutes.",
-    });
-  }
-
-  // ── S3: Low agent completion ──
-  if (del.launched >= 5 && del.completionRate < 60) {
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `Only ${del.completionRate}% of agents complete successfully`,
-      evidence: `${del.launched} launched, ${del.completed} completed. ${del.launched - del.completed} failed or timed out.`,
-      action: "Simplify agent prompts. Break complex tasks into smaller units.",
-      roi: "Higher completion = less wasted compute.",
-    });
-  }
-
-  // ── S4: Parallel burst champion ──
-  if (del.maxConcurrent >= 4) {
-    ins.push({
-      icon: <Cpu className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `Peak parallelism: ${del.maxConcurrent} agents simultaneously`,
-      evidence: `${del.parallelBursts} bursts of parallel work. Maximum throughput achieved.`,
-      action: "You're using the platform at full capacity. Well done.",
-      roi: `Peak parallelism multiplies throughput by ${del.maxConcurrent}x.`,
-    });
-  }
-
-  // ── G1: High rejection rate ──
-  if (gov.totalRejections > 10) {
-    const topRej = gov.topRejected[0];
-    ins.push({
-      icon: <Shield className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `${gov.totalRejections} approaches rejected by user`,
-      evidence: `Top rejected: ${topRej?.tool || 'unknown'} (${topRej?.count || 0} times). The agent keeps trying things you don't want.`,
-      action: "Update CLAUDE.md with clearer constraints to prevent unwanted actions.",
-      roi: `Better rules prevent ${gov.totalRejections} unnecessary tool calls.`,
-    });
-  }
-
-  // ── G2: Productive session — commits + clean exit (★★ STRONG from agentisd #25) ──
-  if (git.totalCommits > 0 && ei.totalErrors < 3) {
-    ins.push({
-      icon: <CheckCircle className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `Productive sessions — ${git.totalCommits} commits, clean exit`,
-      evidence: `${git.totalCommits} commits with only ${ei.totalErrors} errors. Work shipped successfully.`,
-      action: "Document what made this session productive — replicate the pattern.",
-      roi: "Productive sessions compound. Each clean commit is future-proof.",
-    });
-  }
-
-  // ── G3: Plan discipline ──
-  if (gov.planApproved + gov.planRejected > 0 && gov.planApprovalRate > 80) {
-    ins.push({
-      icon: <CheckCircle className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `${gov.planApprovalRate}% of plans approved on first try`,
-      evidence: `${gov.planApproved} plans approved, ${gov.planRejected} rejected. Strong alignment.`,
-      action: "Strong planning discipline. Keep using plan mode for complex tasks.",
-      roi: "Approved plans mean fewer mid-session course corrections.",
-    });
-  }
-
-  // ── G4: Error rate high for event volume (★★ STRONG from agentisd #2) ──
-  if (ei.totalErrors > 0 && totalEvents > 30) {
-    const errorPct = Math.round(1000 * ei.totalErrors / totalEvents) / 10;
-    if (errorPct > 15) {
-      ins.push({
-        icon: <AlertTriangle className="h-5 w-5 text-red-500" />, severity: "warning",
-        metric: `${errorPct}% error rate — ${ei.totalErrors} errors in ${totalEvents} events`,
-        evidence: `Error rate is above 15%. Most tools should succeed on first try. High error rate wastes compute.`,
-        action: "Check repeating errors. Add error patterns to CLAUDE.md to prevent them.",
-        roi: `Fixing the top error source saves ~${Math.round(ei.totalErrors * 1.5)} minutes of retry loops.`,
-      });
-    }
-  }
-
-  // ── H1: Rules loaded consistently ──
-  if (ctx.uniqueRuleFiles > 0 && ctx.ruleLoadsPerSession > 1) {
-    ins.push({
-      icon: <FileCode className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: `${ctx.uniqueRuleFiles} rule files loaded consistently`,
-      evidence: `${ctx.ruleLoadsPerSession.toFixed(1)} loads per session. Rules are guiding behavior.`,
-      action: "Consistent rule loading means consistent behavior.",
-      roi: "Rules prevent the top error patterns.",
-    });
-  }
-
-  // ── H2: No rules ──
-  if (ctx.uniqueRuleFiles === 0) {
-    ins.push({
-      icon: <FileCode className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: "No CLAUDE.md or rule files detected",
-      evidence: "The agent runs without project-specific instructions.",
-      action: "Create a CLAUDE.md with project conventions, constraints, and patterns.",
-      roi: "Projects with CLAUDE.md consistently show lower error rates.",
-    });
-  }
-
-  // H3 (low skill usage) removed — filler, not actionable
-  // H4 (implement-heavy) removed — observational, no clear action
-
-  // ── W1: Unresolved blockers ──
-  if (ctx.totalBlockers > 0 && ctx.blockerResolutionRate < 50) {
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-red-500" />, severity: "critical",
-      metric: `${ctx.totalBlockers - ctx.resolvedBlockers} unresolved blockers`,
-      evidence: `Only ${ctx.blockerResolutionRate}% of blockers resolved. Open items: ${ctx.totalBlockers - ctx.resolvedBlockers}.`,
-      action: "Document blockers for the next session or escalate.",
-      roi: "Unresolved blockers multiply in cost over time.",
-    });
-  }
-
-  // ── W2: CLAUDE.md update correlated with error drop (★★★ KILLER from agentisd #22) ──
-  if (ctx.uniqueRuleFiles > 0 && ei.totalErrors > 0 && ei.resolutionRate > 50) {
-    ins.push({
-      icon: <FileCode className="h-5 w-5 text-emerald-500" />, severity: "positive",
-      metric: "CLAUDE.md loaded + errors resolving — rules are working",
-      evidence: `${ctx.uniqueRuleFiles} rule files loaded, ${ei.resolutionRate}% error resolution rate. Rules correlate with self-healing sessions.`,
-      action: "Update CLAUDE.md when you discover new error patterns — each rule prevents future errors.",
-      roi: "Sessions with rules loaded show measurably higher error resolution rates.",
-    });
-  }
-  if (ctx.uniqueRuleFiles === 0 && ei.totalErrors > 5) {
-    ins.push({
-      icon: <FileCode className="h-5 w-5 text-red-500" />, severity: "critical",
-      metric: `No CLAUDE.md + ${ei.totalErrors} errors — rules would prevent this`,
-      evidence: `${ei.totalErrors} errors without any project rules loaded. CLAUDE.md is the #1 way to reduce errors.`,
-      action: "Create CLAUDE.md with error patterns, constraints, and project conventions.",
-      roi: "Adding CLAUDE.md is the single most impactful action for reducing errors.",
-    });
-  }
-
-  // ── W3: Persistent struggle — same file across sessions (★★ STRONG from agentisd #13) ──
-  if (fi.hotFiles.length > 0 && fi.hotFiles[0].touches > 8) {
-    const worst = fi.hotFiles[0];
-    ins.push({
-      icon: <AlertTriangle className="h-5 w-5 text-red-500" />, severity: "warning",
-      metric: `${worst.file.split('/').pop()} touched ${worst.touches} times — persistent struggle`,
-      evidence: `File edited ${worst.touches} times across sessions. This suggests unclear requirements or wrong approach.`,
-      action: "Write a spec or test first. Consider if the approach needs rethinking entirely.",
-      roi: `Spec-first approach reduces rework from ${worst.touches} to ~3 edits.`,
-    });
-  }
-
-  // X1-X4 composite scores shown as hero cards — only generate insight for critical scores
-  if (cs.productivity < 40) {
-    ins.push({
-      icon: <TrendingUp className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `Productivity Score: ${cs.productivity}/100 — room to improve`,
-      evidence: `Low commit rate or high rework. Consider structured planning before execution.`,
-      action: "Start sessions with a plan. Commit incrementally. Delegate research to agents.",
-      roi: "Planning + committing incrementally improves output consistency.",
-    });
-  }
-  if (cs.quality < 40) {
-    ins.push({
-      icon: <Shield className="h-5 w-5 text-red-500" />, severity: "critical",
-      metric: `Quality Score: ${cs.quality}/100 — needs attention`,
-      evidence: `High error rate or unresolved errors. Retry loops detected.`,
-      action: "Add error patterns to CLAUDE.md. Write tests first. Break retry loops early.",
-      roi: "Addressing error patterns in-session prevents them from recurring.",
-    });
-  }
-  if (cs.contextHealth < 40) {
-    ins.push({
-      icon: <Brain className="h-5 w-5 text-amber-500" />, severity: "warning",
-      metric: `Context Health: ${cs.contextHealth}/100 — agent lacks guidance`,
-      evidence: `Missing rules, few skills, no plans. The agent works without context.`,
-      action: "Create CLAUDE.md, use plan mode, try skills like /commit.",
-      roi: "Better context hygiene directly correlates with fewer errors.",
-    });
-  }
-
-  return ins;
-}
-
-// ── Dashboard ──
 function Dashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [catData, setCatData] = useState<CategoryAnalyticsData | null>(null);
   const [showAllInsights, setShowAllInsights] = useState(false);
+
   useEffect(() => {
     api.analytics().then(setData);
-    api.categoryAnalytics().then(setCatData).catch(() => {}); // graceful — catData stays null, sections hidden
+    api.categoryAnalytics().then(setCatData).catch(() => {});
   }, []);
-  if (!data) return <p className="text-muted-foreground animate-pulse">Loading analytics...</p>;
+
+  const allInsights = useMemo(() => {
+    if (!data) return [];
+    const baseInsights = generateInsights(data);
+    const categoryInsights = catData ? generateCategoryInsights(catData) : [];
+    const combined = [...baseInsights, ...categoryInsights];
+    combined.sort((a, b) => (SEV_ORDER[a.severity] ?? 4) - (SEV_ORDER[b.severity] ?? 4));
+    return combined;
+  }, [data, catData]);
+
+  const derivedValues = useMemo(() => {
+    if (!data) return null;
+    return {
+      topTool: data.toolUsage[0],
+      topMcp: data.mcpTools[0],
+      peakHour: data.hourlyPattern.reduce((max, h) => h.count > (max?.count || 0) ? h : max, data.hourlyPattern[0]),
+      topProject: data.projectActivity[0],
+      topFile: data.fileActivity[0],
+    };
+  }, [data]);
+
+  if (!data || !derivedValues) return <p className="text-muted-foreground animate-pulse">Loading analytics...</p>;
 
   const t = data.totals;
-  const categoryInsights = catData ? generateCategoryInsights(catData) : [];
-  const allInsights = [...generateInsights(data), ...categoryInsights];
-  // Sort: critical first, then warning, positive, neutral
-  const SEV_ORDER = { critical: 0, warning: 1, positive: 2, neutral: 3 };
-  allInsights.sort((a, b) => (SEV_ORDER[a.severity] ?? 4) - (SEV_ORDER[b.severity] ?? 4));
   const insights = showAllInsights ? allInsights : allInsights.slice(0, 8);
-
-  // Compute derived values
-  const topTool = data.toolUsage[0];
-  const topMcp = data.mcpTools[0];
-  const peakHour = data.hourlyPattern.reduce((max, h) => h.count > (max?.count || 0) ? h : max, data.hourlyPattern[0]);
-  const topProject = data.projectActivity[0];
-  const topFile = data.fileActivity[0];
+  const { topTool, topMcp, peakHour, topProject, topFile } = derivedValues;
 
   return (
     <div className="space-y-6">
@@ -936,7 +401,6 @@ function Dashboard() {
 
       {/* ── Tool Mastery + Commit Rate ── */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Tool Mastery Curve */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -985,7 +449,6 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Commit Rate */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -1020,12 +483,10 @@ function Dashboard() {
             })()}
           </CardContent>
         </Card>
-
       </div>
 
       {/* ── Rules Health + Edit-Test Cycles ── */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* CLAUDE.md Health */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -1070,7 +531,6 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Edit-Test Cycles */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -1089,7 +549,7 @@ function Dashboard() {
                 return (
                   <div className="pt-2">
                     <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle className="h-5 w-5 text-emerald-500" />
+                      <AlertTriangle className="h-5 w-5 text-emerald-500" />
                       <span className="text-sm font-semibold">Zero retry loops</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1135,7 +595,6 @@ function Dashboard() {
               {(() => {
                 const commits = data.gitActivity.filter(g => g.action === "commit").length;
                 const pushes = data.gitActivity.filter(g => g.action === "push").length;
-                // Group by session
                 const sessions = new Map<string, { project: string; actions: string[]; time: string }>();
                 data.gitActivity.forEach(g => {
                   if (!sessions.has(g.session_id)) {
@@ -1227,7 +686,6 @@ function Dashboard() {
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Session Intelligence</h3>
             </div>
 
-            {/* Composite Scores */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <Card className={catData.compositeScores.productivity >= 70 ? "border-emerald-500/30" : catData.compositeScores.productivity < 40 ? "border-red-500/30" : "border-amber-500/30"}>
                 <CardContent className="pt-4">
@@ -1263,7 +721,6 @@ function Dashboard() {
               </Card>
             </div>
 
-            {/* Category Distribution */}
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -1291,7 +748,6 @@ function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* Error Intelligence */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-2">
@@ -1338,7 +794,6 @@ function Dashboard() {
 
           <Separator />
 
-          {/* ── Governance + Delegation ── */}
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
@@ -1394,7 +849,6 @@ function Dashboard() {
 
           <Separator />
 
-          {/* ── Git Productivity + Context Health ── */}
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
