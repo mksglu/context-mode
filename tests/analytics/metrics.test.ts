@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import { loadDatabase } from "../../src/db-base.js";
 import { AnalyticsEngine } from "../../src/session/analytics.js";
 
 // ─────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ import { AnalyticsEngine } from "../../src/session/analytics.js";
 // ─────────────────────────────────────────────────────────
 
 /** Schema matching src/session/db.ts */
-function createSchema(db: Database.Database): void {
+function createSchema(db: { exec(sql: string): any }): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS session_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +64,7 @@ interface InsertEventParams {
   data_hash?: string;
 }
 
-function insertEvent(db: Database.Database, params: InsertEventParams): void {
+function insertEvent(db: { prepare(sql: string): any }, params: InsertEventParams): void {
   db.prepare(`
     INSERT INTO session_events (session_id, type, category, priority, data, source_hook, created_at, data_hash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -81,7 +81,7 @@ function insertEvent(db: Database.Database, params: InsertEventParams): void {
 }
 
 function insertSession(
-  db: Database.Database,
+  db: { prepare(sql: string): any },
   sessionId: string,
   projectDir: string,
   startedAt: string,
@@ -100,13 +100,14 @@ function insertSession(
 // ═══════════════════════════════════════════════════════════
 
 describe("Analytics Metrics", () => {
-  let db: Database.Database;
+  let db: { exec(sql: string): any; prepare(sql: string): any; close(): void };
   let engine: AnalyticsEngine;
   const SESSION_ID = "test-session-001";
   const PROJECT_DIR = "/Users/dev/my-project";
 
   beforeEach(() => {
-    db = new Database(":memory:");
+    const Database = loadDatabase();
+    db = new Database(":memory:") as any;
     createSchema(db);
     engine = new AnalyticsEngine(db);
   });

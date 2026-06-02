@@ -641,16 +641,18 @@ describe("node:sqlite adapter (#228)", () => {
     db.close();
   });
 
-  test("loadDatabase: source checks platform before choosing node:sqlite (#228)", () => {
+  test("loadDatabase: source tries node:sqlite on all non-Bun platforms (#228)", () => {
     const src = readFileSync(resolve(ROOT, "src", "db-base.ts"), "utf-8");
     const loadDbSection = src.slice(src.indexOf("function loadDatabase"), src.indexOf("return _Database"));
-    // Must check Linux platform
-    expect(loadDbSection).toContain('process.platform');
-    expect(loadDbSection).toContain('"linux"');
+    // Must check Bun runtime before loading any driver
+    expect(loadDbSection).toContain('globalThis');
+    expect(loadDbSection).toContain('Bun');
     // Must reference NodeSQLiteAdapter
     expect(loadDbSection).toContain("NodeSQLiteAdapter");
     // Must still have better-sqlite3 fallback
     expect(loadDbSection).toContain("better-sqlite3");
+    // Must NOT be Linux-only — should work on all non-Bun platforms
+    expect(loadDbSection).not.toContain('process.platform');
   });
 
   test("NodeSQLiteAdapter provides full better-sqlite3 interface", async () => {

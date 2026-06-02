@@ -209,9 +209,11 @@ export function loadDatabase(): typeof DatabaseConstructor {
         }
         return adapter;
       } as any;
-    } else if (process.platform === "linux") {
-      // Linux — try node:sqlite to avoid native addon SIGSEGV (nodejs/node#62515).
-      // node:sqlite is built into Node >= 22.5, no flag needed since 22.13.
+    } else {
+      // All non-Bun Node.js — try node:sqlite first.
+      // node:sqlite is built into Node >= 22.5 on all platforms.
+      // Originally Linux-only to avoid native addon SIGSEGV (nodejs/node#62515),
+      // but also avoids missing native bindings on Windows/macOS with newer Node.
       try {
         const { DatabaseSync } = require(["node", "sqlite"].join(":"));
         _Database = function NodeDatabaseFactory(path: string, opts?: any) {
@@ -221,12 +223,9 @@ export function loadDatabase(): typeof DatabaseConstructor {
           return new NodeSQLiteAdapter(raw);
         } as any;
       } catch {
-        // node:sqlite not available — fall through to better-sqlite3
+        // node:sqlite not available (Node < 22.5) — fall through to better-sqlite3
         _Database = require("better-sqlite3") as typeof DatabaseConstructor;
       }
-    } else {
-      // Non-Linux Node.js — use better-sqlite3.
-      _Database = require("better-sqlite3") as typeof DatabaseConstructor;
     }
   }
   return _Database!;
