@@ -155,9 +155,17 @@ export function matchesAnyPattern(
 // Chained Command Splitting & Subshell Extraction
 // ==============================================================================
 
+function isEscaped(command: string, index: number): boolean {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && command[i] === "\\"; i--) {
+    backslashes++;
+  }
+  return backslashes % 2 === 1;
+}
+
 /**
  * Split a shell command on chain operators (&&, ||, ;, |, \n, \r, &) while
- * respecting single/double quotes, backticks, and escape backslashes.
+ * respecting single/double quotes, backticks, subshells, and escape backslashes.
  *
  * "echo hello && sudo rm -rf /" → ["echo hello", "sudo rm -rf /"]
  *
@@ -169,36 +177,51 @@ export function splitChainedCommands(command: string): string[] {
   let inSingle = false;
   let inDouble = false;
   let inBacktick = false;
+  let dollarParenDepth = 0;
 
   for (let i = 0; i < command.length; i++) {
     const ch = command[i];
-    const prev = i > 0 ? command[i - 1] : "";
+    const escaped = isEscaped(command, i);
 
-    if (ch === "'" && !inDouble && !inBacktick && prev !== "\\") {
+    if (ch === "'" && !inDouble && !inBacktick && !escaped) {
       inSingle = !inSingle;
       current += ch;
-    } else if (ch === '"' && !inSingle && !inBacktick && prev !== "\\") {
+    } else if (ch === '"' && !inSingle && !inBacktick && !escaped) {
       inDouble = !inDouble;
       current += ch;
-    } else if (ch === "`" && !inSingle && !inDouble && prev !== "\\") {
+    } else if (ch === "`" && !inSingle && !inDouble && !escaped) {
       inBacktick = !inBacktick;
       current += ch;
     } else if (!inSingle && !inDouble && !inBacktick) {
-      if ((ch === ";" || ch === "\n" || ch === "\r") && prev !== "\\") {
+      if (ch === "$" && command[i + 1] === "(" && !escaped) {
+        dollarParenDepth++;
+        current += ch + command[i + 1];
+        i++;
+      } else if (dollarParenDepth > 0 && ch === "(" && !escaped) {
+        dollarParenDepth++;
+        current += ch;
+      } else if (ch === ")" && dollarParenDepth > 0 && !escaped) {
+        dollarParenDepth--;
+        current += ch;
+      } else if (
+        dollarParenDepth === 0 &&
+        (ch === ";" || ch === "\n" || ch === "\r") &&
+        !escaped
+      ) {
         parts.push(current.trim());
         current = "";
-      } else if (ch === "|" && command[i + 1] === "|") {
+      } else if (dollarParenDepth === 0 && ch === "|" && command[i + 1] === "|") {
         parts.push(current.trim());
         current = "";
         i++; // skip second |
-      } else if (ch === "&" && command[i + 1] === "&") {
+      } else if (dollarParenDepth === 0 && ch === "&" && command[i + 1] === "&") {
         parts.push(current.trim());
         current = "";
         i++; // skip second &
-      } else if (ch === "&" && prev !== "\\") {
+      } else if (dollarParenDepth === 0 && ch === "&" && !escaped) {
         parts.push(current.trim());
         current = "";
-      } else if (ch === "|") {
+      } else if (dollarParenDepth === 0 && ch === "|") {
         // Single pipe — left side is a command too
         parts.push(current.trim());
         current = "";
@@ -229,13 +252,13 @@ export function extractSubshellCommands(command: string): string[] {
 
   for (let i = 0; i < command.length; i++) {
     const ch = command[i];
-    const prev = i > 0 ? command[i - 1] : "";
+    const escaped = isEscaped(command, i);
 
-    if (ch === "'" && !inDouble && backtickStart === -1 && prev !== "\\") {
+    if (ch === "'" && !inDouble && backtickStart === -1 && !escaped) {
       inSingle = !inSingle;
-    } else if (ch === '"' && !inSingle && backtickStart === -1 && prev !== "\\") {
+    } else if (ch === '"' && !inSingle && backtickStart === -1 && !escaped) {
       inDouble = !inDouble;
-    } else if (ch === "`" && !inSingle && !inDouble && prev !== "\\") {
+    } else if (ch === "`" && !inSingle && !inDouble && !escaped) {
       if (backtickStart === -1) {
         backtickStart = i + 1;
       } else {
@@ -245,15 +268,24 @@ export function extractSubshellCommands(command: string): string[] {
         backtickStart = -1;
       }
     } else if (!inSingle && backtickStart === -1) {
-      if (ch === "$" && command[i + 1] === "(" && prev !== "\\") {
-        dollarParenStarts.push(i + 2);
-        dollarParenDepths.push(parenDepth);
+      if (ch === "$" && command[i + 1] === "(" && !escaped) {
+        if (command[i + 2] === "(") {
+          // Arithmetic expansion is not command execution, but nested command
+          // substitutions inside it still get discovered by the scanner.
+          parenDepth += 2;
+          i += 2; // skip '(('
+        } else {
+          dollarParenStarts.push(i + 2);
+          dollarParenDepths.push(parenDepth);
+          parenDepth++;
+          i++; // skip '('
+        }
+      } else if (ch === "(" && !escaped) {
         parenDepth++;
-        i++; // skip '('
-      } else if (ch === "(") {
-        parenDepth++;
-      } else if (ch === ")") {
-        parenDepth--;
+      } else if (ch === ")" && !escaped) {
+        if (parenDepth > 0) {
+          parenDepth--;
+        }
         if (
           dollarParenDepths.length > 0 &&
           parenDepth === dollarParenDepths[dollarParenDepths.length - 1]
@@ -262,12 +294,23 @@ export function extractSubshellCommands(command: string): string[] {
           const start = dollarParenStarts.pop()!;
           const sub = command.slice(start, i);
           subshells.push(sub);
-          subshells.push(...extractSubshellCommands(sub));
         }
       }
     }
   }
   return subshells;
+}
+
+function collectCommandElements(command: string): string[] {
+  const elements: string[] = [];
+  const segments = splitChainedCommands(command);
+  for (const segment of segments) {
+    elements.push(segment);
+    for (const subshell of extractSubshellCommands(segment)) {
+      elements.push(...collectCommandElements(subshell));
+    }
+  }
+  return elements;
 }
 
 // ==============================================================================
@@ -451,12 +494,7 @@ export function evaluateCommand(
   caseInsensitive: boolean = process.platform === "win32" || process.platform === "darwin",
 ): CommandDecision {
   // Extract all main segments and nested subshell commands
-  const allCommands: string[] = [];
-  const mainSegments = splitChainedCommands(command);
-  for (const segment of mainSegments) {
-    allCommands.push(segment);
-    allCommands.push(...extractSubshellCommands(segment));
-  }
+  const allCommands = collectCommandElements(command);
 
   // 1. Deny check: If ANY segment or subshell command is denied, block the entire command
   for (const cmdElement of allCommands) {
@@ -516,12 +554,7 @@ export function evaluateCommandDenyOnly(
   policies: SecurityPolicy[],
   caseInsensitive: boolean = process.platform === "win32" || process.platform === "darwin",
 ): { decision: "deny" | "allow"; matchedPattern?: string } {
-  const allCommands: string[] = [];
-  const mainSegments = splitChainedCommands(command);
-  for (const segment of mainSegments) {
-    allCommands.push(segment);
-    allCommands.push(...extractSubshellCommands(segment));
-  }
+  const allCommands = collectCommandElements(command);
 
   for (const cmdElement of allCommands) {
     for (const policy of policies) {

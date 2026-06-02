@@ -189,6 +189,16 @@ describe("Chained Command Splitting", () => {
     const parts = splitChainedCommands("echo hello \\& git status");
     assert.deepEqual(parts, ["echo hello \\& git status"]);
   });
+
+  test("splitChainedCommands: does not split operators inside subshells", () => {
+    const parts = splitChainedCommands("git status $(sudo rm -rf / | cat) && echo done");
+    assert.deepEqual(parts, ["git status $(sudo rm -rf / | cat)", "echo done"]);
+  });
+
+  test("splitChainedCommands: tracks nested parentheses inside subshells", () => {
+    const parts = splitChainedCommands("echo $(printf '(x)' | cat) && git status");
+    assert.deepEqual(parts, ["echo $(printf '(x)' | cat)", "git status"]);
+  });
 });
 
 describe("extractSubshellCommands", () => {
@@ -214,6 +224,21 @@ describe("extractSubshellCommands", () => {
 
     const subs2 = extractSubshellCommands("echo \"$(sudo rm -rf /)\"");
     assert.deepEqual(subs2, ["sudo rm -rf /"]);
+  });
+
+  test("extractSubshellCommands: even backslashes do not escape command substitution", () => {
+    const subs = extractSubshellCommands("echo " + "\\\\" + "$(sudo rm -rf /)");
+    assert.deepEqual(subs, ["sudo rm -rf /"]);
+  });
+
+  test("extractSubshellCommands: arithmetic expansion is not treated as command substitution", () => {
+    const subs = extractSubshellCommands("echo $((1 + 2))");
+    assert.deepEqual(subs, []);
+  });
+
+  test("extractSubshellCommands: command substitution inside arithmetic is still extracted", () => {
+    const subs = extractSubshellCommands("echo $(( $(sudo rm -rf /) + 1 ))");
+    assert.deepEqual(subs, ["sudo rm -rf /"]);
   });
 });
 
@@ -290,6 +315,24 @@ describe("Chained Command Evaluation", () => {
     const policies = readBashPolicies(undefined, chainGlobalPath);
     const result = evaluateCommandDenyOnly("git status $(sudo rm -rf /)", policies, false);
     assert.equal(result.decision, "deny");
+  });
+
+  test("evaluateCommandDenyOnly: blocks denied commands before a pipe inside subshell", () => {
+    const policies = readBashPolicies(undefined, chainGlobalPath);
+    const result = evaluateCommandDenyOnly("git status $(sudo rm -rf / | cat)", policies, false);
+    assert.equal(result.decision, "deny");
+    assert.equal(result.matchedPattern, "Bash(sudo *)");
+  });
+
+  test("evaluateCommandDenyOnly: blocks command substitution after even backslashes", () => {
+    const policies = readBashPolicies(undefined, chainGlobalPath);
+    const result = evaluateCommandDenyOnly(
+      "git status " + "\\\\" + "$(sudo rm -rf /)",
+      policies,
+      false,
+    );
+    assert.equal(result.decision, "deny");
+    assert.equal(result.matchedPattern, "Bash(sudo *)");
   });
 
   test("evaluateCommand: respects case-insensitivity default", () => {
