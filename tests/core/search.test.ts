@@ -3381,5 +3381,157 @@ describe("SessionDB.searchEvents (unified)", () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// 11. Knowledge-reuse event (removed — read path must not mutate state)
+// 11. FIX B1+B2+B3: contentType/source filtering in searchAllSources (#737 review MAJORs)
+// ═══════════════════════════════════════════════════════════
+
+describe("FIX B1: contentType filter gates session events and auto-memory", () => {
+  test("contentType:'code' returns code chunks but NOT matching session events", () => {
+    const dir = join(tmpdir(), `fixb1-${randomUUID().slice(0,8)}`);
+    mkdirSync(dir, { recursive: true });
+    const storeDb = join(dir, "store.db");
+    const sessDb  = join(dir, "sess.db");
+    const memDir  = join(dir, "mem");
+    mkdirSync(memDir, { recursive: true });
+    const TOK = `fixb1tok${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    try {
+      // Content store with a code chunk
+      const store = new ContentStore(storeDb);
+      store.index({ content: `# Module\n\n\`\`\`js\nfunction ${TOK}() {}\n\`\`\``, source: "code-src" });
+      store.close();
+
+      // Session event with the same token
+      const db = new SessionDB({ dbPath: sessDb });
+      const sid = randomUUID();
+      db.ensureSession(sid, "/proj");
+      db.insertEvent(sid, { type: "role", category: "role", data: `user asked about ${TOK}`, priority: 5 },
+        "PostToolUse", { projectDir: "/proj", source: "env", confidence: 1 });
+      db.close();
+
+      const store2 = new ContentStore(storeDb);
+      const db2 = new SessionDB({ dbPath: sessDb });
+      const results = searchAllSources({
+        query: TOK,
+        limit: 10,
+        store: store2,
+        sessionDB: db2,
+        sort: "relevance",
+        contentType: "code",
+      });
+      store2.close(); db2.close();
+
+      // Must return code chunk
+      expect(results.some(r => r.source === "code-src")).toBe(true);
+      // Must NOT return session event
+      expect(results.some(r => r.origin === "prior-session")).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("FIX B2: source filter applied to auto-memory in searchAllSources", () => {
+  test("source:'notes' returns notes.md hit, excludes prefs.md", () => {
+    const dir = join(tmpdir(), `fixb2-${randomUUID().slice(0,8)}`);
+    mkdirSync(dir, { recursive: true });
+    const storeDb = join(dir, "store.db");
+    // searchAutoMemory resolves: join(configDir, "memory") when no adapter/projectDir
+    const memDir  = join(dir, "memory");
+    mkdirSync(memDir, { recursive: true });
+    const TOK = `fixb2tok${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    try {
+      writeFileSync(join(memDir, "notes.md"),  `# Notes\n${TOK} documented here`);
+      writeFileSync(join(memDir, "prefs.md"),  `# Prefs\n${TOK} also here`);
+      const store = new ContentStore(storeDb); store.close();
+      const store2 = new ContentStore(storeDb);
+      const results = searchAllSources({
+        query: TOK,
+        limit: 10,
+        store: store2,
+        sort: "relevance",
+        source: "notes",
+        configDir: dir,
+      });
+      store2.close();
+      const memHits = results.filter(r => r.origin === "auto-memory");
+      // notes.md must appear
+      expect(memHits.some(r => r.source.toLowerCase().includes("notes"))).toBe(true);
+      // prefs.md must be filtered out
+      expect(memHits.some(r => r.source.toLowerCase().includes("prefs"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("FIX B3: session event source field is category, source:'decision' works in single-DB", () => {
+  test("searchAllSources returns session events with source=category, not 'prior-session'", () => {
+    const dir = join(tmpdir(), `fixb3-${randomUUID().slice(0,8)}`);
+    mkdirSync(dir, { recursive: true });
+    const storeDb = join(dir, "store.db");
+    const sessDb  = join(dir, "sess.db");
+    const TOK = `fixb3tok${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    try {
+      const store = new ContentStore(storeDb); store.close();
+      const db = new SessionDB({ dbPath: sessDb });
+      const sid = randomUUID();
+      db.ensureSession(sid, "/proj");
+      db.insertEvent(sid, { type: "decision", category: "decision", data: `decided to use ${TOK}`, priority: 5 },
+        "PostToolUse", { projectDir: "/proj", source: "env", confidence: 1 });
+      db.close();
+
+      const store2 = new ContentStore(storeDb);
+      const db2 = new SessionDB({ dbPath: sessDb });
+      const results = searchAllSources({
+        query: TOK, limit: 10, store: store2, sessionDB: db2,
+        sort: "relevance", projectDir: "/proj",
+      });
+      store2.close(); db2.close();
+
+      const sessHit = results.find(r => r.origin === "prior-session");
+      expect(sessHit).toBeDefined();
+      // source must be the category name, not the literal 'prior-session'
+      expect(sessHit!.source).toBe("decision");
+      // origin must still be 'prior-session'
+      expect(sessHit!.origin).toBe("prior-session");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("source:'decision' filters single-DB session results correctly", () => {
+    const dir = join(tmpdir(), `fixb3b-${randomUUID().slice(0,8)}`);
+    mkdirSync(dir, { recursive: true });
+    const storeDb = join(dir, "store.db");
+    const sessDb  = join(dir, "sess.db");
+    const TOK = `fixb3btok${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    try {
+      const store = new ContentStore(storeDb); store.close();
+      const db = new SessionDB({ dbPath: sessDb });
+      const sid = randomUUID();
+      db.ensureSession(sid, "/proj");
+      db.insertEvent(sid, { type: "decision", category: "decision", data: `decided ${TOK}`, priority: 5 },
+        "PostToolUse", { projectDir: "/proj", source: "env", confidence: 1 });
+      db.insertEvent(sid, { type: "role",     category: "role",     data: `asked ${TOK}`,   priority: 5 },
+        "PostToolUse", { projectDir: "/proj", source: "env", confidence: 1 });
+      db.close();
+
+      const store2 = new ContentStore(storeDb);
+      const db2 = new SessionDB({ dbPath: sessDb });
+      const results = searchAllSources({
+        query: TOK, limit: 10, store: store2, sessionDB: db2,
+        sort: "relevance", projectDir: "/proj", source: "decision",
+      });
+      store2.close(); db2.close();
+
+      const cats = results.filter(r => r.origin === "prior-session").map(r => r.source);
+      expect(cats).toContain("decision");
+      expect(cats).not.toContain("role");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// 12. Knowledge-reuse event (removed — read path must not mutate state)
 // ═══════════════════════════════════════════════════════════

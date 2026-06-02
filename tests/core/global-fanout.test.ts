@@ -1081,3 +1081,77 @@ describe("attribution (#737): results name their project + session", () => {
     expect(aCount).toBeLessThanOrEqual(3);
   });
 });
+
+// ── FIX A: global dedupe — full-content hash prevents false cross-project fusion ─
+describe("FIX A: itemKey uses full-content hash, not 80-char prefix (#737 review MAJOR)", () => {
+  test("distinct documents sharing title+first-80-chars are NOT fused", () => {
+    // Both content DBs have the SAME title and the SAME first 80 characters
+    // but DIFFERENT tails — they are distinct and must both appear in results.
+    const { sessionsDir, contentDir } = makeDirs();
+    const TOK = `dedupefixtoken${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    const sharedPrefix = `${TOK} ${'x'.repeat(70)}`; // >80 chars shared prefix
+    for (const [proj, tail] of [["proj-A", "tail=AAAA"],["proj-B", "tail=BBBB"]] as const) {
+      const store = new ContentStore(join(contentDir, `${hashProjectDirCanonical(`/home/user/${proj}`)}.db`));
+      store.index({ content: `${sharedPrefix} ${tail}`, source: `src-${proj}` });
+      store.close();
+    }
+    const results = searchGlobalFanout({ query: TOK, limit: 10, sessionsDir, contentDir, sort: "relevance" });
+    const srcs = results.map(r => r.source);
+    // Both sources must appear — NOT fused into one.
+    expect(srcs).toContain("src-proj-A");
+    expect(srcs).toContain("src-proj-B");
+  });
+
+  test("truly byte-identical content in two DBs IS fused to one result (intended dedup)", () => {
+    const { sessionsDir, contentDir } = makeDirs();
+    const TOK = `identicaldedupe${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    const identical = `${TOK} this content is completely identical in both projects`;
+    for (const proj of ["dup-A", "dup-B"]) {
+      const store = new ContentStore(join(contentDir, `${hashProjectDirCanonical(`/home/user/${proj}`)}.db`));
+      store.index({ content: identical, source: `dup-src-${proj}` });
+      store.close();
+    }
+    const results = searchGlobalFanout({ query: TOK, limit: 10, sessionsDir, contentDir, sort: "relevance" });
+    // Fused — only one result, higher RRF score.
+    const hits = results.filter(r => r.content === identical);
+    expect(hits.length).toBe(1);
+  });
+});
+
+// ── FIX B3: source:"<category>" filter works for global session events ─────
+describe("FIX B3: source:'decision' returns session events in global search (#737 review MAJOR)", () => {
+  test("source:'decision' includes decision events, excludes role events", () => {
+    const { sessionsDir, contentDir } = makeDirs();
+    const TOK = `categorysrcfix${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    const PROJ = `/home/user/srcfix-proj`;
+    const sdb = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(PROJ)}.db`) });
+    const sid = `srcfix-${randomUUID().slice(0,8)}`;
+    sdb.ensureSession(sid, PROJ);
+    sdb.insertEvent(sid, { type: "decision", category: "decision", data: `we decided to use ${TOK}`, priority: 5 }, "PostToolUse", { projectDir: PROJ, source: "env", confidence: 1 });
+    sdb.insertEvent(sid, { type: "role",     category: "role",     data: `user asked about ${TOK}`, priority: 5 }, "PostToolUse", { projectDir: PROJ, source: "env", confidence: 1 });
+    sdb.close();
+
+    const results = searchGlobalFanout({ query: TOK, limit: 10, sessionsDir, contentDir, sort: "relevance", source: "decision" });
+    const cats = results.map(r => r.source);
+    expect(cats).toContain("decision");
+    expect(cats).not.toContain("role");
+  });
+
+  test("session event results carry their category as source field", () => {
+    const { sessionsDir, contentDir } = makeDirs();
+    const TOK = `catsrcfield${randomUUID().replace(/-/g,"").slice(0,6)}`;
+    const PROJ = `/home/user/catsrc-proj`;
+    const sdb = new SessionDB({ dbPath: join(sessionsDir, `${hashProjectDirCanonical(PROJ)}.db`) });
+    const sid = `catsrc-${randomUUID().slice(0,8)}`;
+    sdb.ensureSession(sid, PROJ);
+    sdb.insertEvent(sid, { type: "plan", category: "plan", data: `plan: ${TOK}`, priority: 5 }, "PostToolUse", { projectDir: PROJ, source: "env", confidence: 1 });
+    sdb.close();
+
+    const hits = readonlySearchEvents(join(sessionsDir, `${hashProjectDirCanonical(PROJ)}.db`), TOK, 5);
+    expect(hits.length).toBeGreaterThan(0);
+    // source must be the category, not the opaque literal 'prior-session'
+    expect(hits[0].source).toBe("plan");
+    // origin must still be 'prior-session' for provenance / RRF tie-break
+    expect(hits[0].origin).toBe("prior-session");
+  });
+});

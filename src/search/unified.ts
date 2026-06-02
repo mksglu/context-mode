@@ -152,40 +152,55 @@ export function searchAllSources(opts: SearchAllSourcesOpts): UnifiedSearchResul
   //   - null      → no filter (cross-project global recall)
   //   - string    → exact match (that project's events/memory)
 
-  // Source 2: SessionDB — prior session events
+  // Source 2: SessionDB — prior session events.
+  // Gate on !contentType: session events have no code/prose classification,
+  // so including them when contentType is set returns wrong result classes
+  // (mirrors the global-fanout contentType gate, #737 review MAJOR).
   const sessionResults: UnifiedSearchResult[] = [];
-  try {
-    if (sessionDB) {
-      const eventsFilter: string | null =
-        projectScope === undefined ? (projectDir || "") : projectScope;
-      // Thread sort → orderMode (#737 fix: relevance = scored session events).
-      const dbResults = sessionDB.searchEvents(query, limit, eventsFilter, source, sort === "timeline" ? "timeline" : "relevance");
-      sessionResults.push(
-        ...dbResults.map((r: Pick<StoredEvent, "id" | "session_id" | "category" | "type" | "data" | "created_at">) => ({
-          title: `[${r.category}] ${r.type}`,
-          content: r.data,
-          source: "prior-session",
-          origin: "prior-session" as const,
-          timestamp: r.created_at,
-        })),
-      );
+  if (!contentType) {
+    try {
+      if (sessionDB) {
+        const eventsFilter: string | null =
+          projectScope === undefined ? (projectDir || "") : projectScope;
+        // Thread sort → orderMode (#737 fix: relevance = scored session events).
+        const dbResults = sessionDB.searchEvents(query, limit, eventsFilter, source, sort === "timeline" ? "timeline" : "relevance");
+        sessionResults.push(
+          ...dbResults.map((r: Pick<StoredEvent, "id" | "session_id" | "category" | "type" | "data" | "created_at">) => ({
+            title: `[${r.category}] ${r.type}`,
+            content: r.data,
+            // Use category as source so source-based filtering (e.g. source:"decision")
+            // works uniformly via the shared partial matcher; origin preserves provenance.
+            source: r.category,
+            origin: "prior-session" as const,
+            timestamp: r.created_at,
+          })),
+        );
+      }
+    } catch (e) {
+      if (DEBUG) process.stderr.write(`[ctx] SessionDB search failed: ${e}\n`);
     }
-  } catch (e) {
-    if (DEBUG) process.stderr.write(`[ctx] SessionDB search failed: ${e}\n`);
   }
 
-  // Source 3: Auto-memory
+  // Source 3: Auto-memory.
+  // Gate on !contentType: auto-memory files have no code/prose classification.
+  // Also post-filter by source label when caller sets one (mirrors global-fanout,
+  // #737 review MAJOR).
   // projectScope=null → enumerate all memory hash dirs (global);
   // projectScope=string → single hashed dir for that project;
   // projectScope=undefined → legacy: use projectDir (may be undefined → current project).
   const memResults: UnifiedSearchResult[] = [];
-  try {
-    const autoMemProjectDir: string | null | undefined =
-      projectScope === undefined ? projectDir : projectScope;
-    const hits = searchAutoMemory([query], limit, autoMemProjectDir, configDir, adapter);
-    memResults.push(...hits);
-  } catch (e) {
-    if (DEBUG) process.stderr.write(`[ctx] auto-memory search failed: ${e}\n`);
+  if (!contentType) {
+    try {
+      const autoMemProjectDir: string | null | undefined =
+        projectScope === undefined ? projectDir : projectScope;
+      let hits = searchAutoMemory([query], limit, autoMemProjectDir, configDir, adapter);
+      if (source) {
+        hits = hits.filter((r) => r.source.toLowerCase().includes(source.toLowerCase()));
+      }
+      memResults.push(...hits);
+    } catch (e) {
+      if (DEBUG) process.stderr.write(`[ctx] auto-memory search failed: ${e}\n`);
+    }
   }
 
   // ── Normalize timestamps for consistent sorting ──

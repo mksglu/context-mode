@@ -359,7 +359,12 @@ export function readonlySearchEvents(
     return rows.map(r => ({
       title: `[${r.category}] ${r.type}`,
       content: r.data,
-      source: "prior-session",
+      // Set source to the event's category so source-based filtering works
+      // uniformly: matchesSourceFilter(r, "decision") checks r.source which
+      // is now "decision" instead of the opaque literal "prior-session".
+      // The origin field separately preserves the prior-session/current-session
+      // provenance for RRF tie-breaking and attribution display (#737 review MAJOR).
+      source: r.category,
       origin: "prior-session" as const,
       timestamp: r.created_at,
       project: r.project_dir || undefined,
@@ -438,14 +443,37 @@ function matchesSourceFilter(r: UnifiedSearchResult, source: string): boolean {
 const RRF_K = 60;
 
 /**
- * Dedupe key: title + first 80 chars of content.
+ * Tiny deterministic string hash (FNV-1a, 32-bit) used to build the dedupe key.
+ * Keeps the key bounded without truncating content (which caused false fusions
+ * when distinct documents shared a title + common 80-char prefix, e.g.
+ * boilerplate headers or repeated decision preambles).
+ */
+function fnv1a32(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16);
+}
+
+/**
+ * Dedupe key: title + FNV-1a hash of the FULL content.
  *
- * MAJOR 6 fix: intentionally excludes `source` so the same content appearing
- * in multiple project DBs (different sources) fuses into a single higher-scored
- * result instead of appearing as separate entries.
+ * Intentionally excludes `source`/`project` so the same content appearing
+ * in multiple project DBs fuses into a single higher-scored result instead
+ * of appearing as separate entries (intended cross-project dedup behavior).
+ *
+ * Using a full-content hash (not a prefix) prevents false fusions when two
+ * DISTINCT documents share only a title + common boilerplate prefix — a real
+ * collision scenario with license headers, decision preambles, etc. (#737 review).
+ *
+ * The content length is also folded into the key so two distinct contents would
+ * have to collide on BOTH the 32-bit FNV hash AND exact length to fuse falsely
+ * — practically impossible, without needing a wider/crypto hash (#737 review note).
  */
 function itemKey(r: UnifiedSearchResult): string {
-  return `${r.title}|${r.content.slice(0, 80)}`;
+  return `${r.title}|${r.content.length}|${fnv1a32(r.content)}`;
 }
 
 function applyRrf(
