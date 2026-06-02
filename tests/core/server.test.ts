@@ -3227,10 +3227,10 @@ import {
 interface MockResult { stdout: string; stderr?: string; timedOut?: boolean; }
 
 function mkMockExecutor(
-  handler: (code: string, timeout: number | undefined) => Promise<MockResult> | MockResult,
-): { execute: (input: { language: "shell"; code: string; timeout: number | undefined }) => Promise<MockResult> } {
+  handler: (code: string, timeout: number | undefined, cwd: string | undefined) => Promise<MockResult> | MockResult,
+): { execute: (input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }) => Promise<MockResult> } {
   return {
-    execute: async ({ code, timeout }) => Promise.resolve(handler(code, timeout)),
+    execute: async ({ code, timeout, cwd }) => Promise.resolve(handler(code, timeout, cwd)),
   };
 }
 
@@ -3271,6 +3271,22 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     expect(seenCode).not.toContain("NODE 2>&1");
     expect(outputs[0]).toContain("stdout");
     expect(outputs[0]).toContain("stderr");
+  });
+
+  test("passes cwd override to serial shell executions (#756)", async () => {
+    const seenCwds: Array<string | undefined> = [];
+    const exec = mkMockExecutor((_code, _timeout, cwd) => {
+      seenCwds.push(cwd);
+      return { stdout: "ok" };
+    });
+
+    await runBatchCommands(
+      [{ label: "cwd", command: "pwd" }],
+      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX, cwd: "/worktree/repo" },
+      exec,
+    );
+
+    expect(seenCwds).toEqual(["/worktree/repo"]);
   });
 
   test("cascading skip: timeout in first cmd skips the rest", async () => {
@@ -3391,6 +3407,26 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
     expect(outputs[0]).toContain("one stderr");
     expect(outputs[1]).toContain("two stdout");
     expect(outputs[1]).toContain("two stderr");
+  });
+
+  test("passes cwd override to parallel shell executions (#756)", async () => {
+    const seenCwds: Array<string | undefined> = [];
+    const exec = mkMockExecutor((_code, _timeout, cwd) => {
+      seenCwds.push(cwd);
+      return { stdout: "ok" };
+    });
+    const cmds: BatchCommand[] = [
+      { label: "A", command: "pwd" },
+      { label: "B", command: "git branch --show-current" },
+    ];
+
+    await runBatchCommands(
+      cmds,
+      { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX, cwd: "/worktree/repo" },
+      exec,
+    );
+
+    expect(seenCwds).toEqual(["/worktree/repo", "/worktree/repo"]);
   });
 
   test("order preservation: outputs match input order, not completion order", async () => {
