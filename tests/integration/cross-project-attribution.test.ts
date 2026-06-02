@@ -36,6 +36,12 @@ function platformConfigFile(fakeHome: string): string {
   return join(fakeHome, ".context-mode", "platform.json");
 }
 
+const gitSetupShell = process.platform === "win32" ? undefined : "/bin/bash";
+
+function shellPath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
 describe("cross-project attribution — Bug 7 repro", () => {
   let fakeHome: string;
   let projA: string;
@@ -63,7 +69,9 @@ describe("cross-project attribution — Bug 7 repro", () => {
       [projB, "git@github.com:acme/projB.git"],
     ] as const) {
       execSync(`git init -q && git remote add origin ${remote}`, {
-        cwd: dir, stdio: "ignore", shell: "/bin/bash",
+        cwd: dir,
+        stdio: "ignore",
+        ...(gitSetupShell ? { shell: gitSetupShell } : {}),
       });
     }
 
@@ -175,7 +183,7 @@ describe("cross-project attribution — Bug 7 repro", () => {
     const { extractEvents } = await import("../../src/session/extract.js");
     const bashInput = {
       tool_name: "Bash",
-      tool_input: { command: `git -C "${projB}" status` },
+      tool_input: { command: `git -C "${shellPath(projB)}" status` },
       tool_response: "",
     };
     const events = extractEvents(bashInput as Parameters<typeof extractEvents>[0]);
@@ -219,7 +227,7 @@ describe("cross-project attribution — Bug 7 repro", () => {
         workspace_roots: [projA],
         cwd: projA,
         tool_name: "Bash",
-        tool_input: { command: `cd "${projB}" && npm test` },
+        tool_input: { command: `cd "${shellPath(projB)}" && npm test` },
       },
       projA, "PostToolUse", resolveProjectAttributions,
     );
