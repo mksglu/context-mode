@@ -186,7 +186,7 @@ describe("seed-parity coverage gate", () => {
 
     const events = [
       { type: "error_tool", category: "error", data: "ENOENT: no such file", priority: 1 },
-      { type: "git",        category: "git",   data: "fix: navbar overflow", priority: 1 },
+      { type: "git_commit", category: "git",   data: "fix: navbar overflow", priority: 1 },
       { type: "file_edit",  category: "file",  data: "/proj/src/file.ts", priority: 2 },
     ];
 
@@ -235,7 +235,7 @@ describe("seed-parity coverage gate", () => {
       { type: "file_write", category: "file", data: "/proj/a.ts",     priority: 2 },
       { type: "file_edit",  category: "file", data: "/proj/b.ts",     priority: 2 },
       { type: "error_tool", category: "error", data: "ENOENT",        priority: 1 },
-      { type: "git",        category: "git",  data: "commit msg",     priority: 1 },
+      { type: "git_commit", category: "git",  data: "commit msg",     priority: 1 },
     ];
 
     const resolveAttribs = (evs: { type: string }[]) =>

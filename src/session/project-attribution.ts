@@ -249,16 +249,30 @@ export function resolveProjectAttributions(
 ): ProjectAttribution[] {
   const out: ProjectAttribution[] = [];
   let lastKnown = context.lastKnownProjectDir ? normalizePath(context.lastKnownProjectDir) : "";
+  // v1.0.162 Bug 8 — track whether an in-batch CWD-level event has explicitly
+  // re-scoped the project. When extract.ts emits a cwd event for `cd /projB`
+  // or `git -C /projB ...`, subsequent path-less events in the same batch
+  // (e.g. the git operation event itself) currently fall back to the hook's
+  // inputProjectDir, which still points at the session startup cwd. The
+  // user's INTENTIONAL scoping should win over the hook's startup cwd —
+  // shadow inputProjectDir with the carried-forward lastKnown once a high-
+  // confidence cwd event has fired in this batch.
+  let inBatchCwdScope = false;
 
   for (const ev of events) {
+    const effectiveInputCwd = inBatchCwdScope ? lastKnown : context.inputProjectDir;
     const attribution = resolveProjectAttribution(ev, {
       ...context,
+      inputProjectDir: effectiveInputCwd,
       lastKnownProjectDir: lastKnown || context.lastKnownProjectDir || null,
     });
     out.push(attribution);
 
     if (attribution.projectDir && attribution.confidence >= ATTRIBUTION_CONFIDENCE.CARRY_FORWARD_THRESHOLD) {
       lastKnown = attribution.projectDir;
+      if (attribution.confidence >= ATTRIBUTION_CONFIDENCE.CWD_EVENT) {
+        inBatchCwdScope = true;
+      }
     }
   }
 

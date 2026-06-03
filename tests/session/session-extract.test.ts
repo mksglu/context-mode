@@ -282,9 +282,13 @@ describe("Git Events", () => {
     };
 
     const events = extractEvents(input);
-    const gitEvents = events.filter(e => e.type === "git");
-    assert.equal(gitEvents.length, 1);
-    assert.equal(gitEvents[0].data, "commit");
+    // v1.0.161: commits with a -m message surface as type='git_commit' so the
+    // rollup aggregator can distinguish actual commits from other git ops.
+    // category stays 'git' for downstream consumers that filter by category.
+    const gitCategoryEvents = events.filter(e => e.category === "git");
+    assert.equal(gitCategoryEvents.length, 1);
+    assert.equal(gitCategoryEvents[0].type, "git_commit");
+    assert.equal(gitCategoryEvents[0].data, "feat: add session continuity");
   });
 
   test("extracts git event from push command", () => {

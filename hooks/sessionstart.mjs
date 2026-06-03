@@ -50,7 +50,7 @@ await runHook(async () => {
 
   // Resolve absolute path for imports (fileURLToPath for Windows compat)
   const HOOK_DIR = dirname(fileURLToPath(import.meta.url));
-  const { loadSessionDB, loadProjectAttribution } = createSessionLoaders(HOOK_DIR);
+  const { loadSessionDB, loadProjectAttribution, loadExtract } = createSessionLoaders(HOOK_DIR);
 
   // Emit a `session_start` canonical event at the boundary of each session
   // lifecycle transition (startup / resume / compact). The platform's insight
@@ -71,10 +71,24 @@ await runHook(async () => {
         }),
         priority: 1,
       };
+
+      // PRD #4 — emit session_settings_snapshot alongside lifecycle when
+      // the SessionStart envelope carries any of mcp_servers / model /
+      // permission_mode. Best-effort: missing fields → no snapshot.
+      const eventsToEmit = [lifecycleEvent];
+      try {
+        const extract = await loadExtract();
+        if (typeof extract.extractSessionSettings === "function") {
+          eventsToEmit.push(...extract.extractSessionSettings(input));
+        }
+      } catch {
+        // settings snapshot is opportunistic — never block lifecycle on it
+      }
+
       attributeAndInsertEvents(
         db,
         sessionId,
-        [lifecycleEvent],
+        eventsToEmit,
         input,
         projectDir,
         "SessionStart",

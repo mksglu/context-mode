@@ -1861,11 +1861,11 @@ function shortPath(abs: string): string {
  * the section disappears cleanly on a fresh install.
  *
  * Math constants:
- *   Opus 4   = $15.00 per 1M input tokens (fallback when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN not set)
- *   Sonnet 4 = $3.00  per 1M input tokens
- *   GPT-4o   = $2.50  per 1M input tokens
- *   Gemini 2 = $1.25  per 1M input tokens
- *   Haiku 4  = $0.80  per 1M input tokens
+ *   Opus 4.7/4.8 = $5.00 per 1M input tokens (fallback when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN not set)
+ *   Sonnet 4.6   = $3.00 per 1M input tokens
+ *   GPT-4o       = $2.50 per 1M input tokens
+ *   Gemini 2     = $1.25 per 1M input tokens
+ *   Haiku 4.5    = $1.00 per 1M input tokens
  *   Cursor Pro       = $20  / month  → "X months of Cursor Pro"
  *   Claude Max       = $200 / month  → "X.X months of Claude Max"
  *   Weekend coding   ≈ $73.67        → "X weekends of nonstop API coding"
@@ -1902,7 +1902,7 @@ export function renderCostExample(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _geminiUsd = ((lifetimeTokens * 1.25) / 1_000_000).toFixed(2);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _haikuUsd  = ((lifetimeTokens * 0.8)  / 1_000_000).toFixed(2);
+  const _haikuUsd  = ((lifetimeTokens * 1.0)  / 1_000_000).toFixed(2);
 
   const usingDynamicPrice =
     process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN !== undefined;
@@ -1923,7 +1923,7 @@ export function renderCostExample(
     );
   } else {
     out.push(
-      `  $${usdStr(lifetimeUsd)} of Opus 4 tokens your team didn't burn.`,
+      `  $${usdStr(lifetimeUsd)} of Opus 4.7 tokens your team didn't burn.`,
     );
   }
 
@@ -2386,7 +2386,8 @@ function fmtNum(n: number): string {
 
 // ── Pricing (Bug #6) — per-token USD rate ─────────────────
 // Reads PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN when set by a Pi host;
-// falls back to the Opus 4 input rate ($15/1M) for all other adapters.
+// falls back to the Opus 4.7/4.8 input rate ($5/1M) for all other adapters.
+// Verified against platform.claude.com/docs/en/about-claude/pricing 2026-06.
 //
 // IMPORTANT: this is a FUNCTION, not a const. Pi sets the env var
 // AFTER the MCP server has been imported (the bridge spawns the server
@@ -2399,8 +2400,8 @@ function fmtNum(n: number): string {
 
 /**
  * Per-token USD rate — resolves on every call.
- * Dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set, Opus 4 input
- * ($15 per 1M tokens) otherwise.
+ * Dynamic when PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN is set, Opus 4.7/4.8 input
+ * ($5 per 1M tokens) otherwise.
  */
 export function pricePerToken(): number {
   const env = process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN;
@@ -2408,7 +2409,7 @@ export function pricePerToken(): number {
     const parsed = Number(env);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
-  return 15 / 1_000_000; // Opus 4 input fallback
+  return 5 / 1_000_000; // Opus 4.7/4.8 input fallback
 }
 
 /**
@@ -2420,7 +2421,7 @@ export function pricePerToken(): number {
  *
  * @deprecated Use pricePerToken() to honor PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN.
  */
-export const OPUS_INPUT_PRICE_PER_TOKEN = 15 / 1_000_000;
+export const OPUS_INPUT_PRICE_PER_TOKEN = 5 / 1_000_000;
 
 /** Convert a token count to a USD string at the current per-token rate. */
 export function tokensToUsd(tokens: number): string {

@@ -29,30 +29,30 @@ afterEach(() => {
 });
 
 describe("pricePerToken() — dynamic env resolution (PR #741 follow-up)", () => {
-  it("returns the Opus 4 input fallback ($15/1M) when env is unset", () => {
+  it("returns the Opus 4.7/4.8 input fallback ($5/1M) when env is unset", () => {
     delete process.env[ENV_NAME];
-    expect(pricePerToken()).toBeCloseTo(15 / 1_000_000, 15);
+    expect(pricePerToken()).toBeCloseTo(5 / 1_000_000, 15);
   });
 
   it("reads PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN when set AFTER module load", () => {
     // This is the key invariant: import happened above (env unset), but
     // a later setter must be honored on the next call. A frozen const
     // would still report the Opus fallback here.
-    process.env[ENV_NAME] = "0.000003"; // Sonnet-ish rate, $3/1M
+    process.env[ENV_NAME] = "0.000003"; // Sonnet 4.6 rate, $3/1M
     expect(pricePerToken()).toBeCloseTo(0.000003, 12);
   });
 
   it("switches back to the fallback when env is cleared mid-run", () => {
-    process.env[ENV_NAME] = "0.0000008"; // Haiku-ish, $0.80/1M
-    expect(pricePerToken()).toBeCloseTo(0.0000008, 12);
+    process.env[ENV_NAME] = "0.000001"; // Haiku 4.5, $1.00/1M
+    expect(pricePerToken()).toBeCloseTo(0.000001, 12);
     delete process.env[ENV_NAME];
-    expect(pricePerToken()).toBeCloseTo(15 / 1_000_000, 15);
+    expect(pricePerToken()).toBeCloseTo(5 / 1_000_000, 15);
   });
 
   it("ignores empty / non-numeric / non-positive env values and falls back", () => {
     for (const bad of ["", "  ", "abc", "0", "-1", "Infinity", "NaN"]) {
       process.env[ENV_NAME] = bad;
-      expect(pricePerToken()).toBeCloseTo(15 / 1_000_000, 15);
+      expect(pricePerToken()).toBeCloseTo(5 / 1_000_000, 15);
     }
   });
 
@@ -63,10 +63,11 @@ describe("pricePerToken() — dynamic env resolution (PR #741 follow-up)", () =>
     expect(tokensToUsd(1_000_000)).toBe("$10.00");
   });
 
-  it("OPUS_INPUT_PRICE_PER_TOKEN back-compat alias still resolves to $15/1M", () => {
+  it("OPUS_INPUT_PRICE_PER_TOKEN back-compat alias resolves to $5/1M (Opus 4.7/4.8)", () => {
     // Third-party consumers that still import the original const name
     // get the fallback literal. Pricing dedup invariant (PR #401 P1.1)
-    // preserved.
-    expect(OPUS_INPUT_PRICE_PER_TOKEN).toBeCloseTo(15 / 1_000_000, 15);
+    // preserved. Updated 2026-06: Opus 4.7/4.8 ship at $5/1M, not the
+    // earlier Opus 4 $15/1M rate.
+    expect(OPUS_INPUT_PRICE_PER_TOKEN).toBeCloseTo(5 / 1_000_000, 15);
   });
 });

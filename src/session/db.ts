@@ -604,6 +604,11 @@ export interface SessionRollup {
   unique_files: number;
   max_file_edits: number;
   has_commit: 0 | 1;
+  // v1.0.161 (Bug 2): latest commit subject from this session's type='git_commit'
+  // events — stamped onto every outgoing event via the rollup spread so
+  // has_commit=1 rows always carry a meaningful commit_message. Empty string
+  // when the session has no commit events yet.
+  commit_message: string;
   edit_test_cycles: number;
   duration_min: number;
   compact_count: number;
@@ -667,6 +672,7 @@ const S = {
   getSessionStats: "getSessionStats",
   getSessionRollup: "getSessionRollup",
   getMaxFileEdits: "getMaxFileEdits",
+  getLatestCommitMessage: "getLatestCommitMessage",
   incrementCompactCount: "incrementCompactCount",
   upsertResume: "upsertResume",
   getResume: "getResume",
@@ -979,7 +985,7 @@ export class SessionDB extends SQLiteBase {
          COALESCE(SUM(CASE WHEN category = 'error' THEN 1 ELSE 0 END), 0) AS errors,
          COUNT(DISTINCT type) AS unique_tools,
          COUNT(DISTINCT CASE WHEN category = 'file' THEN data END) AS unique_files,
-         CASE WHEN SUM(CASE WHEN category = 'git' THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END AS has_commit,
+         CASE WHEN SUM(CASE WHEN type = 'git_commit' THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END AS has_commit,
          CAST(COALESCE((MAX(strftime('%s', created_at)) - MIN(strftime('%s', created_at))) / 60.0, 0) AS INTEGER) AS duration_min,
          COALESCE(SUM(CASE WHEN type = 'external_ref' THEN 1 ELSE 0 END), 0) AS sources_indexed,
          CAST(COALESCE(SUM(bytes_avoided) / 1024.0, 0) AS INTEGER) AS total_chunks,
@@ -997,6 +1003,18 @@ export class SessionDB extends SQLiteBase {
          WHERE session_id = ? AND category = 'file' AND type IN ('file_edit', 'file_write')
          GROUP BY data
        )`);
+
+    // v1.0.161 (Bug 2): latest commit message from session's type='git_commit'
+    // events. Used by rollup spread to stamp commit_message symmetric with
+    // has_commit on every outgoing event. Separate prepared statement (vs.
+    // sub-select in getSessionRollup) keeps the binding shape uniform — every
+    // rollup query takes a single sessionId parameter.
+    p(S.getLatestCommitMessage,
+      `SELECT data
+       FROM session_events
+       WHERE session_id = ? AND type = 'git_commit'
+       ORDER BY id DESC
+       LIMIT 1`);
 
     p(S.incrementCompactCount,
       `UPDATE session_meta SET compact_count = compact_count + 1 WHERE session_id = ?`);
@@ -1437,6 +1455,7 @@ export class SessionDB extends SQLiteBase {
   getSessionRollup(sessionId: string): SessionRollup {
     const main = this.stmt(S.getSessionRollup).get(sessionId) as Partial<SessionRollup> | undefined;
     const maxRow = this.stmt(S.getMaxFileEdits).get(sessionId) as { max_file_edits?: number } | undefined;
+    const commitRow = this.stmt(S.getLatestCommitMessage).get(sessionId) as { data?: string } | undefined;
     const meta = this.getSessionStats(sessionId);
 
     // edit_test_cycles: heuristic — min(file edits, errors) approximates
@@ -1457,6 +1476,7 @@ export class SessionDB extends SQLiteBase {
       unique_files: main?.unique_files ?? 0,
       max_file_edits: maxRow?.max_file_edits ?? 0,
       has_commit: main?.has_commit ?? 0,
+      commit_message: commitRow?.data ?? "",
       edit_test_cycles: editTestCycles,
       duration_min: main?.duration_min ?? 0,
       compact_count: meta?.compact_count ?? 0,

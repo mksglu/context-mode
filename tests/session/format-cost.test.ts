@@ -36,10 +36,12 @@ import { describe, expect, test } from "vitest";
 import { renderCostExample } from "../../src/session/analytics.js";
 
 describe("renderCostExample", () => {
-  // Canonical fixture: 356 MB / 93.3M tokens / 67 days → $1399.73 on Opus 4.
-  // Token count back-solved from the target dollar figure so the math is
-  // numerically exact:
-  //   1399.73 USD = tokens × 15 / 1e6  →  tokens = 93_315_333
+  // Canonical fixture: 356 MB / 93.3M tokens / 67 days → $466.58 on Opus 4.7.
+  // Token count back-solved against the *old* Opus 4 $15/1M rate ($1399.73)
+  // and kept stable so the byte/token narrative still reads cleanly. With
+  // the 2026-06 Opus 4.7/4.8 rate of $5/1M, the same token count emits
+  // $466.58 (3× lower because the per-token rate dropped 3×):
+  //   466.58 USD = tokens × 5 / 1e6  →  tokens = 93_315_333
   // Lifetime byte total stays at 356 MB even though the implied byte/token
   // ratio (3.81) doesn't match — the helper's only job is to render what
   // the caller passes, not to derive bytes from tokens.
@@ -47,9 +49,11 @@ describe("renderCostExample", () => {
   const LIFETIME_TOKENS = 93_315_333;
   const LIFETIME_DAYS   = 67;
 
-  test("emits the headline byte/token tally + Opus-4 dollar figure", () => {
+  test("emits the headline byte/token tally + Opus 4.7 dollar figure", () => {
     const text = renderCostExample(LIFETIME_BYTES, LIFETIME_TOKENS, LIFETIME_DAYS).join("\n");
-    expect(text).toMatch(/\$1399\.73 of Opus 4 tokens your team didn't burn/);
+    // Updated 2026-06: Opus 4.7/4.8 rate is $5/1M (was $15/1M for Opus 4),
+    // so 93,315,333 tokens → $466.58 (was $1399.73 at the old rate).
+    expect(text).toMatch(/\$466\.58 of Opus 4\.7 tokens your team didn't burn/);
   });
 
   test("mentions Cursor Pro paid for itself", () => {
