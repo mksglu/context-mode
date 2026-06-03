@@ -39,7 +39,7 @@ This puts the `context-mode` binary in PATH, which is required for:
 | **PostToolUse equivalent** | `PostToolUse` | `AfterTool` | `PostToolUse` | `PostToolUse` | `postToolUse` | `tool.execute.after` | `PostToolUse` | `PostToolUse` | -- | -- | -- |
 | **PreCompact equivalent** | `PreCompact` | `PreCompress` | `PreCompact` | `PreCompact` | -- | `experimental.session.compacting` | -- | `PreCompact` | -- | -- | -- |
 | **SessionStart** | `SessionStart` | `SessionStart` | `SessionStart` | `SessionStart` | -- (buggy in Cursor) | -- | `SessionStart` | `SessionStart` | -- | -- | -- |
-| **Stop equivalent** | -- | -- | `Stop` | `Stop` | `stop` | -- | `Stop` | `Stop` | -- | -- | -- |
+| **Stop equivalent** | `Stop` | -- | `Stop` | `Stop` | `stop` | -- | `Stop` | `Stop` | -- | -- | -- |
 | **Can modify args** | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | -- | -- | -- |
 | **Can modify output** | Yes | Yes | Yes | Yes | No | Yes (caveat) | No | Yes | -- | -- | -- |
 | **Can inject session context** | Yes | Yes | Yes | Yes | Yes | -- | Yes | Yes | -- | -- | -- |
@@ -78,6 +78,7 @@ Claude Code is the primary platform for context-mode. All hooks communicate via 
 - `PreCompact` -- fires before context compaction
 - `SessionStart` -- fires when a session starts, resumes, or compacts
 - `UserPromptSubmit` -- fires when user submits a prompt
+- `Stop` -- fires when the assistant turn is about to end
 
 **Blocking:** `permissionDecision: "deny"` in response JSON
 
