@@ -9,6 +9,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const originalCwd = process.cwd();
 process.chdir(__dirname);
 
+// Debug logging helper — self-heal layers swallow errors by design so they
+// never block MCP boot, but when CONTEXT_MODE_DEBUG is set we want visibility
+// into what failed. Single helper avoids repeating the env check everywhere.
+const _dbg = (...args) => {
+  if (process.env.CONTEXT_MODE_DEBUG) {
+    process.stderr.write(`[start.mjs] ${args.join(" ")}\n`);
+  }
+};
+
 // Resolve the Claude Code config dir, honoring $CLAUDE_CONFIG_DIR (incl. leading ~).
 // Mirrors hooks/session-helpers.mjs::resolveConfigDir and hooks/run-hook.mjs (#453).
 // Inlined here because start.mjs runs before any other module loads — we cannot
@@ -141,7 +150,7 @@ if (cacheMatch) {
             nodePath: process.execPath,
             platform: process.platform,
           });
-        } catch { /* best effort — never block startup */ }
+        } catch (e) { _dbg("normalize-hooks pre-bump failed:", e); }
 
         const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
         for (const [key, entries] of Object.entries(ip.plugins || {})) {
@@ -169,16 +178,16 @@ if (cacheMatch) {
           if (!resolve(rp).startsWith(cacheRoot + sep)) continue;
           try {
             // Remove dangling symlink before creating new one
-            try { if (lstatSync(rp).isSymbolicLink()) unlinkSync(rp); } catch {}
+            try { if (lstatSync(rp).isSymbolicLink()) unlinkSync(rp); } catch (e) { _dbg("unlink dangling symlink failed:", e); }
             const rpParent = dirname(rp);
             if (!existsSync(rpParent)) mkdirSync(rpParent, { recursive: true });
             symlinkSync(__dirname, rp, process.platform === "win32" ? "junction" : undefined);
-          } catch { /* best effort */ }
+          } catch (e) { _dbg("symlink heal failed:", e); }
         }
       }
     }
-  } catch {
-    /* best effort — don't block server startup */
+  } catch (e) {
+    _dbg("self-heal layer 1 failed:", e);
   }
 }
 
@@ -204,12 +213,12 @@ try {
   const pluginCacheRoot = resolve(claudeConfigDir, "plugins", "cache");
   const settingsPath = resolve(claudeConfigDir, "settings.json");
   try { healInstalledPlugins({ registryPath, pluginCacheRoot, pluginKey }); }
-  catch { /* best effort */ }
+  catch (e) { _dbg("healInstalledPlugins failed:", e); }
   // v1.0.116: Claude Code's plugin loader reads settings.json.enabledPlugins
   // (NOT installed_plugins.json) — heal that one too so /ctx-upgrade-induced
   // disable state is repaired before next /reload-plugins.
   try { healSettingsEnabledPlugins({ settingsPath, pluginKey }); }
-  catch { /* best effort */ }
+  catch (e) { _dbg("healSettingsEnabledPlugins failed:", e); }
   // v1.0.119 — Layer 5b (Issue #523): heal .claude-plugin/plugin.json's
   // mcpServers["context-mode"].args[0] when /ctx-upgrade left a tmpdir-prefixed
   // path baked in. Iterates EVERY installed cache entry's installPath so
@@ -229,11 +238,11 @@ try {
               pluginCacheRoot,
               pluginKey,
             });
-          } catch { /* best effort — per-entry */ }
+          } catch (e) { _dbg("healPluginJsonMcpServers per-entry failed:", e); }
         }
       }
     }
-  } catch { /* best effort */ }
+  } catch (e) { _dbg("heal plugin.json mcpServers failed:", e); }
   // Issue #609 — Layer 5c (replaces v1.0.122 healMcpJsonArgs per-entry loop):
   // sweep stale `.mcp.json` files from every per-version cache dir. cli.ts
   // no longer writes `.mcp.json` (PR fix for #609), so the only `.mcp.json`
@@ -243,8 +252,8 @@ try {
   // One sweep per boot — bounded, idempotent, best-effort.
   try {
     sweepStaleMcpJson({ pluginCacheRoot, pluginKey });
-  } catch { /* best effort */ }
-} catch { /* best effort — never block MCP boot */ }
+  } catch (e) { _dbg("sweepStaleMcpJson failed:", e); }
+} catch (e) { _dbg("self-heal layer 3+4 failed:", e); }
 
 // ── Self-heal Layer 4: Deploy global SessionStart hook + register in settings.json ──
 // This hook lives outside the plugin directory (~/.claude/hooks/) so it works
@@ -273,7 +282,7 @@ try {
   // Clean up old bash version if it exists
   const oldBashHook = resolve(globalHooksDir, "context-mode-cache-heal.sh");
   if (existsSync(oldBashHook)) {
-    try { unlinkSync(oldBashHook); } catch {}
+    try { unlinkSync(oldBashHook); } catch (e) { _dbg("unlink old bash hook failed:", e); }
   }
   if (!existsSync(globalHooksDir)) mkdirSync(globalHooksDir, { recursive: true });
   const healScript = `#!/usr/bin/env node
@@ -339,7 +348,7 @@ try{
   // Always re-assert shebang + chmod +x on Unix so the bare-script hook
   // command is spawnable even if the file was created without exec bit.
   if (process.platform !== "win32") {
-    try { ensureShebangAndExecBit(healHookPath); } catch { /* best effort */ }
+    try { ensureShebangAndExecBit(healHookPath); } catch (e) { _dbg("ensureShebangAndExecBit failed:", e); }
   }
 
   // Register the hook in $CLAUDE_CONFIG_DIR/settings.json (Claude Code doesn't auto-discover hook files).
@@ -379,9 +388,9 @@ try{
         platform: process.platform,
         nodePath: process.execPath,
       });
-    } catch { /* best effort */ }
+    } catch (e) { _dbg("selfHealCacheHealHook failed:", e); }
   }
-} catch { /* best effort */ }
+} catch (e) { _dbg("self-heal layer 4 (deploy hook) failed:", e); }
 
 // ── Self-heal Layer 5: Windows hooks.json + plugin.json normalization (#378) ──
 // Static committed files use ${CLAUDE_PLUGIN_ROOT} placeholder + bare `node`.
@@ -408,14 +417,14 @@ if (!process.env.VITEST) {
       const { resolveHookRuntime } = await import("./build/runtime.js");
       const r = resolveHookRuntime();
       if (r.isBun) jsRuntimePath = r.path;
-    } catch { /* best effort — fall through to nodePath default */ }
+    } catch (e) { _dbg("resolveHookRuntime failed:", e); }
     normalizeHooksOnStartup({
       pluginRoot: __dirname,
       nodePath: process.execPath,
       jsRuntimePath,
       platform: process.platform,
     });
-  } catch { /* best effort — never block server startup */ }
+  } catch (e) { _dbg("normalizeHooksOnStartup failed:", e); }
 }
 
 // Ensure native dependencies + ABI compatibility (shared with hooks via ensure-deps.mjs)
@@ -459,9 +468,9 @@ import "./hooks/ensure-deps.mjs";
           shell: IS_WIN32,
         },
       );
-      child.on("error", () => { /* best effort — npm missing, broken cache, etc. */ });
+      child.on("error", (e) => { _dbg("npm install child error:", e); });
       child.unref();
-    } catch { /* best effort — never block MCP boot */ }
+    } catch (e) { _dbg("spawn npm install failed:", e); }
   }
 }
 
@@ -484,7 +493,7 @@ if (!process.env.VITEST) {
       "./hooks/heal-partial-install.mjs"
     );
     healPartialInstallFromMarketplace({ pluginRoot: __dirname });
-  } catch { /* best effort, never block boot */ }
+  } catch (e) { _dbg("healPartialInstall failed:", e); }
 }
 
 // ── Algo-D4: plugin cache integrity check ──
@@ -533,12 +542,12 @@ if (existsSync(resolve(__dirname, "server.bundle.mjs"))) {
   if (!existsSync(resolve(__dirname, "node_modules"))) {
     try {
       execSync("npm install --silent", { cwd: __dirname, stdio: "pipe", timeout: 60000 });
-    } catch { /* best effort */ }
+    } catch (e) { _dbg("npm install (dev) failed:", e); }
   }
   if (!existsSync(resolve(__dirname, "build", "server.js"))) {
     try {
       execSync("npx tsc --silent", { cwd: __dirname, stdio: "pipe", timeout: 30000 });
-    } catch { /* best effort */ }
+    } catch (e) { _dbg("tsc (dev) failed:", e); }
   }
   await import("./build/server.js");
 }

@@ -30,5 +30,20 @@ export default defineConfig({
     // Without this, Ubuntu CI consistently fails with "Worker exited unexpectedly"
     // even though all tests pass.
     teardownTimeout: isCI ? 15_000 : 5_000,
+    // Coverage configuration — use v8 provider for accurate TS coverage.
+    // Run with: npm run test:coverage
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      exclude: [
+        // Adapter index files are thin re-exports — covered by adapter-specific tests
+        "src/adapters/**/index.ts",
+        // Type-only files
+        "src/types.ts",
+        "src/adapters/types.ts",
+      ],
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "coverage",
+    },
   },
 });

@@ -100,6 +100,7 @@
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "benchmark": "npx tsx tests/benchmark.ts",
     "test:use-cases": "npx tsx tests/use-cases.ts",
