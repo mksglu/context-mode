@@ -105,6 +105,17 @@ describe("detectPlatform — config directory branches", () => {
     expect(signal.confidence).toBe("high");
   });
 
+  it("PI_CODING_AGENT=true wins over stale ~/.claude when Pi spawns the MCP server (issue #760)", () => {
+    existsSyncMock.mockImplementation(
+      ((p: unknown) =>
+        p === resolve(home, ".claude") || p === resolve(home, ".pi")) as typeof fs.existsSync,
+    );
+    process.env.PI_CODING_AGENT = "true";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("pi");
+    expect(signal.confidence).toBe("high");
+  });
+
   it.each<[string, string]>([
     ["OPENCODE_CLIENT", "desktop"],
     ["OPENCODE_TERMINAL", "1"],
