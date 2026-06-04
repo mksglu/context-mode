@@ -41,5 +41,4 @@
 ## Optional
 
 - [tests/](https://raw.githubusercontent.com/mksglu/context-mode/main/tests/): Test suite — unit and integration tests for executor, store, and security layers
-- [benchmarks/](https://raw.githubusercontent.com/mksglu/context-mode/main/benchmarks/): Context savings benchmarks — measured reduction across real Claude Code sessions
 - [CHANGELOG.md](https://raw.githubusercontent.com/mksglu/context-mode/main/CHANGELOG.md): Version history and release notes

@@ -20,15 +20,6 @@ const runtimes = detectRuntimes();
 const executor = new PolyglotExecutor({ runtimes });
 
 describe("Runtime Detection", () => {
-  test("detects JavaScript runtime (bun or node)", async () => {
-    const isBun = runtimes.javascript.endsWith("bun");
-    const isAbsoluteNode = runtimes.javascript.startsWith("/") || runtimes.javascript.includes("\\");
-    assert.ok(
-      isBun || isAbsoluteNode,
-      `Expected bun path or absolute node path, got: ${runtimes.javascript}`,
-    );
-  });
-
   test("detects JavaScript runtime (bun or absolute node path)", async () => {
     // runtimes.javascript is either a bun path/command or process.execPath —
     // never the bare string "node", since snap/wrapper envs need the real binary.
