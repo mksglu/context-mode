@@ -68,6 +68,10 @@ describe("detectPlatform", () => {
     delete process.env.IDEA_HOME;
     delete process.env.JETBRAINS_CLIENT_ID;
     delete process.env.CONTEXT_MODE_PLATFORM;
+    // Copilot CLI env vars (plan-remediation.md Phase 3.2 regression guards).
+    delete process.env.COPILOT_CLI;
+    delete process.env.COPILOT_CWD;
+    delete process.env.COPILOT_HOME;
     // Issue #539 slice 2: tests in this file pre-date the installed_plugins.json
     // fallback and assume env-var-only detection. Seed the plugin cache to a
     // "miss" so the fallback never triggers — explicit slice-2 coverage lives
@@ -93,6 +97,34 @@ describe("detectPlatform", () => {
     process.env.CLAUDE_SESSION_ID = "abc-123";
     const signal = detectPlatform();
     expect(signal.platform).toBe("claude-code");
+    expect(signal.confidence).toBe("high");
+  });
+
+  // ── Copilot CLI ────────────────────────────────────────
+  // GitHub Copilot CLI sets COPILOT_CLI=1 AND CLAUDE_PLUGIN_ROOT.
+  // Listed BEFORE claude-code in PLATFORM_ENV_VARS so COPILOT_CLI=1
+  // wins over the shared CLAUDE_PLUGIN_ROOT (fork-before-parent
+  // convention). Regression guard: plan-remediation.md Phase 3.2.
+
+  it("returns copilot-cli when COPILOT_CLI=1 AND CLAUDE_PLUGIN_ROOT are both set (phase 3.2 key regression)", () => {
+    process.env.COPILOT_CLI = "1";
+    process.env.CLAUDE_PLUGIN_ROOT = "/some/root/copilot";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("copilot-cli");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("returns claude-code when CLAUDE_PLUGIN_ROOT is set but COPILOT_CLI is unset (unchanged behaviour)", () => {
+    process.env.CLAUDE_PLUGIN_ROOT = "/some/root";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("claude-code");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("returns copilot-cli when COPILOT_CWD is set (copilot-cli workspace var)", () => {
+    process.env.COPILOT_CWD = "/some/copilot/dir";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("copilot-cli");
     expect(signal.confidence).toBe("high");
   });
 
@@ -646,6 +678,24 @@ describe("PLATFORM_ENV_VARS — typed registry (issue #545 algorithmic design)",
     expect(claudeEntries).toContainEqual({ name: "CLAUDE_CODE_ENTRYPOINT", role: "identification" });
     expect(claudeEntries).toContainEqual({ name: "CLAUDE_PLUGIN_ROOT", role: "identification" });
     expect(claudeEntries).toContainEqual({ name: "CLAUDE_SESSION_ID", role: "identification" });
+  });
+
+  it("copilot-cli entry is listed before claude-code (fork-before-parent for CLAUDE_PLUGIN_ROOT disambiguation)", async () => {
+    const { PLATFORM_ENV_VARS } = await import("../../src/adapters/detect.js");
+    const platforms = Array.from(PLATFORM_ENV_VARS.keys());
+    const copilotIdx = platforms.indexOf("copilot-cli");
+    const claudeIdx = platforms.indexOf("claude-code");
+    expect(copilotIdx).toBeGreaterThanOrEqual(0);
+    expect(claudeIdx).toBeGreaterThanOrEqual(0);
+    expect(copilotIdx).toBeLessThan(claudeIdx);
+  });
+
+  it("copilot-cli registry has COPILOT_CLI (identification) and COPILOT_CWD (workspace) entries", async () => {
+    const { PLATFORM_ENV_VARS } = await import("../../src/adapters/detect.js");
+    const copilotEntries = PLATFORM_ENV_VARS.get("copilot-cli");
+    expect(copilotEntries).toBeDefined();
+    expect(copilotEntries).toContainEqual({ name: "COPILOT_CLI", role: "identification" });
+    expect(copilotEntries).toContainEqual({ name: "COPILOT_CWD", role: "workspace" });
   });
 
   it("getEnvVarNames(p) shim returns string[] for backwards compatibility", async () => {

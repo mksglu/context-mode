@@ -6,8 +6,8 @@
  * so bun is preferred when available.
  *
  * Adapters that emit CLI dispatcher commands (codex, cursor, vscode-copilot,
- * jetbrains-copilot) are NOT in scope here — they invoke `context-mode hook
- * <adapter> <event>` which inherits the CLI's runtime choice.
+ * jetbrains-copilot, copilot-cli) are NOT in scope here — they invoke
+ * `context-mode hook <adapter> <event>` which inherits the CLI's runtime choice.
  *
  * Adapters with no JSON-hook layer (pi, omp, opencode, kilo, openclaw,
  * antigravity, zed) are NOT in scope here.
@@ -151,6 +151,18 @@ describe("CLI-dispatcher adapters keep their dispatcher form (#738 non-regressio
     );
     for (const cmd of cmds) {
       expect(cmd).toMatch(/^context-mode hook jetbrains-copilot /);
+    }
+  });
+
+  test("copilot-cli emits 'context-mode hook copilot-cli <event>' shape", async () => {
+    const { CopilotCliAdapter } = await import("../../src/adapters/copilot-cli/index.js");
+    const adapter = new CopilotCliAdapter();
+    const config = adapter.generateHookConfig("/plugin/root") as Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+    const cmds = Object.values(config).flatMap((arr) =>
+      arr.flatMap((e) => e.hooks.map((h) => h.command))
+    );
+    for (const cmd of cmds) {
+      expect(cmd).toMatch(/^context-mode hook copilot-cli /);
     }
   });
 });

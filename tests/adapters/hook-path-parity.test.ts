@@ -118,6 +118,7 @@ describe("hook path parity across adapters (issue #712)", () => {
           "cursor",
           "codex",
           "jetbrains-copilot",
+          "copilot-cli",
         ].filter((s) => s !== adapter.subdir);
         for (const [hookType, scriptName] of Object.entries(adapter.scripts)) {
           const cmd = adapter.build(hookType, "/fixed/plugin/root");

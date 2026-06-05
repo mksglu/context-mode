@@ -35,6 +35,7 @@ const ALL_PLATFORMS: ReadonlyArray<PlatformId> = [
   "cursor",
   "vscode-copilot",
   "jetbrains-copilot",
+  "copilot-cli",
   "opencode",
   "kilo",
   "qwen-code",

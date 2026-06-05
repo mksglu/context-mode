@@ -54,6 +54,7 @@ describe("server getProjectDir wiring — strictPlatform for all adapters (issue
   // Adapters with no workspace var (rely on universal escape hatch / pwd / cwd).
   const platformsNoOwnVar: ReadonlyArray<PlatformId> = [
     "codex",
+    "copilot-cli",
     "kilo",
     "kiro",
     "zed",
@@ -110,6 +111,8 @@ describe("server getProjectDir wiring — strictPlatform for all adapters (issue
         cwd: "/anchor/cwd",
         pwd: "/Users/x/from-shell",
         strictPlatform: platform,
+        // Codex special case: don't read from actual ~/.codex in test env
+        codexHome: "/nonexistent/codex",
       });
       // No own workspace var matches (we set leaks, not the platform's own
       // value). PWD is the next tier. PI / OMP have own vars set in the

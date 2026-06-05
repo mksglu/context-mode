@@ -60,6 +60,7 @@ describe("detectPlatform — config directory branches", () => {
     [".qwen", "qwen-code"],
     [".kimi-code", "kimi"],
     [".openclaw", "openclaw"],
+    [".copilot", "copilot-cli"],
   ])("detects %s → %s at medium confidence", (dir, expected) => {
     forceDir(resolve(home, dir));
     const signal = detectPlatform();
@@ -161,6 +162,7 @@ describe("detectPlatform — config directory branches", () => {
     [".kiro", "kiro"],
     [".qwen", "qwen-code"],
     [".kimi-code", "kimi"],
+    [".copilot", "copilot-cli"],
     [".gemini", "gemini-cli"],
     [".claude", "claude-code"],
     [".codex", "codex"],

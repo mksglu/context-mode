@@ -51,6 +51,38 @@ describe("vscode-copilot formatter", () => {
   });
 });
 
+describe("copilot-cli formatter", () => {
+  it("deny emits permissionDecision and permissionDecisionReason", () => {
+    const result = formatters["copilot-cli"].deny("operation not allowed");
+    expect(result.permissionDecision).toBe("deny");
+    expect(result.permissionDecisionReason).toBe("operation not allowed");
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+  });
+
+  it("ask emits permissionDecision without hookSpecificOutput", () => {
+    const result = formatters["copilot-cli"].ask();
+    expect(result.permissionDecision).toBe("ask");
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+  });
+
+  it("modify emits hookSpecificOutput with allow decision and routed message", () => {
+    const result = formatters["copilot-cli"].modify({ prompt: "modified input" });
+    const output = result.hookSpecificOutput;
+    expect(output.hookEventName).toBe("PreToolUse");
+    expect(output.permissionDecision).toBe("allow");
+    expect(output.permissionDecisionReason).toBe("Routed to context-mode sandbox");
+    expect(output.updatedInput).toEqual({ prompt: "modified input" });
+  });
+
+  it("context emits hookSpecificOutput with additionalContext", () => {
+    const result = formatters["copilot-cli"].context("additional info");
+    const output = result.hookSpecificOutput;
+    expect(output.hookEventName).toBe("PreToolUse");
+    expect(output.additionalContext).toBe("additional info");
+    expect(output).not.toHaveProperty("permissionDecision");
+  });
+});
+
 describe("formatDecision integration", () => {
   it("claude-code deny flows through with correct field names", () => {
     const result = formatDecision("claude-code", { action: "deny", reason: "sandbox only" });
@@ -62,5 +94,30 @@ describe("formatDecision integration", () => {
     const result = formatDecision("claude-code", { action: "modify", updatedInput: { command: "echo hi" } });
     expect(result.hookSpecificOutput.permissionDecision).toBe("deny");
     expect(result.hookSpecificOutput.permissionDecisionReason).toBeDefined();
+  });
+
+  it("copilot-cli deny flows through with correct field names", () => {
+    const result = formatDecision("copilot-cli", { action: "deny", reason: "denied" });
+    expect(result.permissionDecision).toBe("deny");
+    expect(result.permissionDecisionReason).toBe("denied");
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+  });
+
+  it("copilot-cli ask flows through correctly", () => {
+    const result = formatDecision("copilot-cli", { action: "ask" });
+    expect(result.permissionDecision).toBe("ask");
+  });
+
+  it("copilot-cli modify flows through with allow and updatedInput", () => {
+    const result = formatDecision("copilot-cli", { action: "modify", updatedInput: { file: "test.ts" } });
+    expect(result.hookSpecificOutput.permissionDecision).toBe("allow");
+    expect(result.hookSpecificOutput.permissionDecisionReason).toBe("Routed to context-mode sandbox");
+    expect(result.hookSpecificOutput.updatedInput).toEqual({ file: "test.ts" });
+  });
+
+  it("copilot-cli context flows through with additionalContext", () => {
+    const result = formatDecision("copilot-cli", { action: "context", additionalContext: "extra context data" });
+    expect(result.hookSpecificOutput.additionalContext).toBe("extra context data");
+    expect(result.hookSpecificOutput.hookEventName).toBe("PreToolUse");
   });
 });

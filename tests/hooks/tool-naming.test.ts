@@ -100,6 +100,12 @@ describe("getToolName", () => {
     );
   });
 
+  it("returns correct name for copilot-cli", () => {
+    expect(getToolName("copilot-cli", "ctx_execute")).toBe(
+      "context-mode_ctx_execute",
+    );
+  });
+
   it("returns correct name for kiro", () => {
     expect(getToolName("kiro", "ctx_execute_file")).toBe(
       "@context-mode/ctx_execute_file",
@@ -154,6 +160,7 @@ describe("KNOWN_PLATFORMS", () => {
     expect(KNOWN_PLATFORMS).toContain("kilo");
     expect(KNOWN_PLATFORMS).toContain("vscode-copilot");
     expect(KNOWN_PLATFORMS).toContain("jetbrains-copilot");
+    expect(KNOWN_PLATFORMS).toContain("copilot-cli");
     expect(KNOWN_PLATFORMS).toContain("kiro");
     expect(KNOWN_PLATFORMS).toContain("zed");
     expect(KNOWN_PLATFORMS).toContain("cursor");

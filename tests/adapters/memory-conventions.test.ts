@@ -21,6 +21,7 @@ import { OpenCodeAdapter } from "../../src/adapters/opencode/index.js";
 import { CursorAdapter } from "../../src/adapters/cursor/index.js";
 import { VSCodeCopilotAdapter } from "../../src/adapters/vscode-copilot/index.js";
 import { JetBrainsCopilotAdapter } from "../../src/adapters/jetbrains-copilot/index.js";
+import { CopilotCliAdapter } from "../../src/adapters/copilot-cli/index.js";
 import { KiroAdapter } from "../../src/adapters/kiro/index.js";
 import { ZedAdapter } from "../../src/adapters/zed/index.js";
 import { AntigravityAdapter } from "../../src/adapters/antigravity/index.js";
@@ -158,6 +159,32 @@ describe("Adapter memory conventions", () => {
     });
   });
 
+  describe("CopilotCliAdapter", () => {
+    const a = new CopilotCliAdapter();
+    it("getConfigDir is <project>/.github (absolute)", () => {
+      expect(a.getConfigDir(projectDir)).toBe(resolve(projectDir, ".github"));
+    });
+    it("getInstructionFiles is ['copilot-instructions.md']", () => {
+      expect(a.getInstructionFiles()).toEqual(["copilot-instructions.md"]);
+    });
+    it("getMemoryDir honors CWD when no projectDir is provided", () => {
+      // When getMemoryDir() is called without args, it implicitly uses
+      // process.cwd() via getConfigDir(), resulting in cwd/.github/memory.
+      expect(a.getMemoryDir()).toBe(resolve(process.cwd(), ".github", "memory"));
+    });
+    it("getMemoryDir appends a per-projectDir hash subdir under the base", () => {
+      // Per BaseAdapter, getMemoryDir(projectDir) = <base>/<hash(projectDir)>
+      // where <base> = getMemoryDir(). Assert the arg actually affects the
+      // result (catches a regression that drops projectDir) without coupling
+      // to the hash implementation.
+      const base = a.getMemoryDir();
+      const withProject = a.getMemoryDir(projectDir);
+      expect(withProject.startsWith(base)).toBe(true);
+      expect(withProject).not.toBe(base);
+      expect(a.getMemoryDir(resolve(projectDir, "other"))).not.toBe(withProject);
+    });
+  });
+
   describe("KiroAdapter", () => {
     const a = new KiroAdapter();
     it("getConfigDir is <project>/.kiro (absolute)", () => {
@@ -233,6 +260,7 @@ describe("Adapter memory conventions", () => {
       { name: "CursorAdapter", instance: new CursorAdapter() },
       { name: "VSCodeCopilotAdapter", instance: new VSCodeCopilotAdapter() },
       { name: "JetBrainsCopilotAdapter", instance: new JetBrainsCopilotAdapter() },
+      { name: "CopilotCliAdapter", instance: new CopilotCliAdapter() },
       { name: "KiroAdapter", instance: new KiroAdapter() },
       { name: "ZedAdapter", instance: new ZedAdapter() },
       { name: "AntigravityAdapter", instance: new AntigravityAdapter() },
