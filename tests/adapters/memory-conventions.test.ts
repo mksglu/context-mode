@@ -1,7 +1,9 @@
 import "../setup-home";
 import { fakeHome } from "../setup-home";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { homedir } from "node:os";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 
 // Adapters that honor XDG_CONFIG_HOME / APPDATA (e.g. opencode) read the env
@@ -182,6 +184,280 @@ describe("Adapter memory conventions", () => {
       expect(withProject.startsWith(base)).toBe(true);
       expect(withProject).not.toBe(base);
       expect(a.getMemoryDir(resolve(projectDir, "other"))).not.toBe(withProject);
+    });
+
+    // ── getSessionDir ──────────────────────────────────────
+
+    describe("getSessionDir", () => {
+      let savedEnv: Record<string, string | undefined>;
+      let tmpDirs: string[];
+
+      afterEach(() => {
+        // restore env
+        for (const [k, v] of Object.entries(savedEnv)) {
+          if (v === undefined) delete process.env[k];
+          else process.env[k] = v;
+        }
+        // clean up tmp dirs
+        for (const d of tmpDirs) {
+          try { rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      });
+
+      it("default (no override) → ~/.copilot/context-mode/sessions", () => {
+        savedEnv = { COPILOT_HOME: process.env.COPILOT_HOME, CONTEXT_MODE_DATA_DIR: process.env.CONTEXT_MODE_DATA_DIR };
+        tmpDirs = [];
+        delete process.env.COPILOT_HOME;
+        delete process.env.CONTEXT_MODE_DATA_DIR;
+        const adapter = new CopilotCliAdapter();
+        const dir = adapter.getSessionDir();
+        expect(dir).toBe(join(homedir(), ".copilot", "context-mode", "sessions"));
+      });
+
+      it("COPILOT_HOME override → <COPILOT_HOME>/context-mode/sessions", () => {
+        const fakeHome2 = mkdtempSync(join(tmpdir(), "ctx-copilot-home-"));
+        savedEnv = { COPILOT_HOME: process.env.COPILOT_HOME, CONTEXT_MODE_DATA_DIR: process.env.CONTEXT_MODE_DATA_DIR };
+        tmpDirs = [fakeHome2];
+        delete process.env.CONTEXT_MODE_DATA_DIR;
+        process.env.COPILOT_HOME = fakeHome2;
+        const adapter = new CopilotCliAdapter();
+        const dir = adapter.getSessionDir();
+        expect(dir).toBe(join(fakeHome2, "context-mode", "sessions"));
+      });
+
+      it("CONTEXT_MODE_DATA_DIR takes precedence over COPILOT_HOME", () => {
+        const dataDir = mkdtempSync(join(tmpdir(), "ctx-data-dir-"));
+        const copilotHome = mkdtempSync(join(tmpdir(), "ctx-copilot-home-"));
+        savedEnv = { COPILOT_HOME: process.env.COPILOT_HOME, CONTEXT_MODE_DATA_DIR: process.env.CONTEXT_MODE_DATA_DIR };
+        tmpDirs = [dataDir, copilotHome];
+        process.env.CONTEXT_MODE_DATA_DIR = dataDir;
+        process.env.COPILOT_HOME = copilotHome;
+        const adapter = new CopilotCliAdapter();
+        const dir = adapter.getSessionDir();
+        expect(dir).toBe(join(dataDir, "context-mode", "sessions"));
+        expect(dir).not.toContain(copilotHome);
+      });
+    });
+
+    // ── getProjectDir ──────────────────────────────────────
+
+    describe("getProjectDir", () => {
+      let savedCopilotCwd: string | undefined;
+
+      afterEach(() => {
+        if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+        else process.env.COPILOT_CWD = savedCopilotCwd;
+      });
+
+      it("COPILOT_CWD set → returns that value", () => {
+        savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = "/some/project/dir";
+        const adapter = new CopilotCliAdapter();
+        // Access protected method via cast
+        expect((adapter as unknown as { getProjectDir(): string }).getProjectDir()).toBe("/some/project/dir");
+      });
+
+      it("COPILOT_CWD unset → returns process.cwd()", () => {
+        savedCopilotCwd = process.env.COPILOT_CWD;
+        delete process.env.COPILOT_CWD;
+        const adapter = new CopilotCliAdapter();
+        expect((adapter as unknown as { getProjectDir(): string }).getProjectDir()).toBe(process.cwd());
+      });
+    });
+
+    // ── validateHooks — Task A RED test (CWD bug) ─────────
+    // validateHooks must inspect the PROJECT's .github/hooks, not process.cwd()
+
+    describe("validateHooks", () => {
+      let tmpProject: string;
+      let tmpPluginRoot: string;
+
+      afterEach(() => {
+        try { rmSync(tmpProject, { recursive: true, force: true }); } catch { /* ignore */ }
+        try { rmSync(tmpPluginRoot, { recursive: true, force: true }); } catch { /* ignore */ }
+      });
+
+      it("missing .github/hooks dir → returns single fail result (resolves against project dir, not cwd)", () => {
+        // project dir has NO .github/hooks — but process.cwd() might have one
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-no-hooks-"));
+        tmpPluginRoot = mkdtempSync(join(tmpdir(), "ctx-plugin-root-"));
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          const results = adapter.validateHooks(tmpPluginRoot);
+          // Must report failure for missing hooks dir
+          expect(results[0].status).toBe("fail");
+          expect(results[0].check).toBe("Hooks directory");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+
+      it("missing context-mode.json → returns fail for hook config", () => {
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-no-json-"));
+        tmpPluginRoot = mkdtempSync(join(tmpdir(), "ctx-plugin-root-"));
+        // Create .github/hooks dir but no context-mode.json
+        mkdirSync(join(tmpProject, ".github", "hooks"), { recursive: true });
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          const results = adapter.validateHooks(tmpPluginRoot);
+          const hookConfig = results.find(r => r.check === "Hook configuration");
+          expect(hookConfig).toBeDefined();
+          expect(hookConfig!.status).toBe("fail");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+
+      it("context-mode.json present but missing PreToolUse → fail for PreToolUse hook", () => {
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-no-pre-"));
+        tmpPluginRoot = mkdtempSync(join(tmpdir(), "ctx-plugin-root-"));
+        mkdirSync(join(tmpProject, ".github", "hooks"), { recursive: true });
+        writeFileSync(
+          join(tmpProject, ".github", "hooks", "context-mode.json"),
+          JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "node sessionstart.mjs" }] }] } }),
+        );
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          const results = adapter.validateHooks(tmpPluginRoot);
+          const preToolUse = results.find(r => r.check === "PreToolUse hook");
+          expect(preToolUse).toBeDefined();
+          expect(preToolUse!.status).toBe("fail");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+
+      it("context-mode.json present but missing SessionStart → fail for SessionStart hook", () => {
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-no-sess-"));
+        tmpPluginRoot = mkdtempSync(join(tmpdir(), "ctx-plugin-root-"));
+        mkdirSync(join(tmpProject, ".github", "hooks"), { recursive: true });
+        writeFileSync(
+          join(tmpProject, ".github", "hooks", "context-mode.json"),
+          JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "node pretooluse.mjs" }] }] } }),
+        );
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          const results = adapter.validateHooks(tmpPluginRoot);
+          const sessionStart = results.find(r => r.check === "SessionStart hook");
+          expect(sessionStart).toBeDefined();
+          expect(sessionStart!.status).toBe("fail");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+
+      it("happy path — both hooks present → both pass, plus warn results", () => {
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-happy-"));
+        tmpPluginRoot = mkdtempSync(join(tmpdir(), "ctx-plugin-root-"));
+        mkdirSync(join(tmpProject, ".github", "hooks"), { recursive: true });
+        writeFileSync(
+          join(tmpProject, ".github", "hooks", "context-mode.json"),
+          JSON.stringify({
+            hooks: {
+              PreToolUse: [{ hooks: [{ type: "command", command: "node pretooluse.mjs" }] }],
+              SessionStart: [{ hooks: [{ type: "command", command: "node sessionstart.mjs" }] }],
+            },
+          }),
+        );
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          const results = adapter.validateHooks(tmpPluginRoot);
+          expect(results.find(r => r.check === "PreToolUse hook")!.status).toBe("pass");
+          expect(results.find(r => r.check === "SessionStart hook")!.status).toBe("pass");
+          expect(results.find(r => r.check === "Hook scripts")!.status).toBe("warn");
+          expect(results.find(r => r.check === "Matcher support")!.status).toBe("warn");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+
+      it("Task A regression: inspects PROJECT dir .github/hooks, not process.cwd()", () => {
+        // process.cwd() is the repo root (which has a real .github/hooks).
+        // We create a fresh empty project dir — validateHooks must look there, not cwd.
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-cwd-bug-"));
+        tmpPluginRoot = mkdtempSync(join(tmpdir(), "ctx-plugin-root-"));
+        // tmpProject deliberately has NO .github/hooks
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          const results = adapter.validateHooks(tmpPluginRoot);
+          // Must fail because tmpProject has no .github/hooks —
+          // if the bug is present it would succeed by reading cwd's hooks.
+          expect(results[0].status).toBe("fail");
+          expect(results[0].message).toContain(".github/hooks/");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+    });
+
+    // ── checkPluginRegistration ────────────────────────────
+
+    describe("checkPluginRegistration", () => {
+      it("returns warn status", () => {
+        const result = new CopilotCliAdapter().checkPluginRegistration();
+        expect(result.status).toBe("warn");
+        expect(result.check).toContain("registration");
+      });
+    });
+
+    // ── getInstalledVersion ────────────────────────────────
+
+    describe("getInstalledVersion", () => {
+      let tmpProject: string;
+
+      afterEach(() => {
+        try { rmSync(tmpProject, { recursive: true, force: true }); } catch { /* ignore */ }
+      });
+
+      it("returns 'configured' when context-mode.json has hooks", () => {
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-ver-configured-"));
+        mkdirSync(join(tmpProject, ".github", "hooks"), { recursive: true });
+        writeFileSync(
+          join(tmpProject, ".github", "hooks", "context-mode.json"),
+          JSON.stringify({ hooks: { PreToolUse: [] } }),
+        );
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          expect(adapter.getInstalledVersion()).toBe("configured");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
+
+      it("returns 'unknown' when context-mode.json is absent or unreadable", () => {
+        tmpProject = mkdtempSync(join(tmpdir(), "ctx-project-ver-unknown-"));
+        // no .github/hooks at all
+        const savedCopilotCwd = process.env.COPILOT_CWD;
+        process.env.COPILOT_CWD = tmpProject;
+        try {
+          const adapter = new CopilotCliAdapter();
+          expect(adapter.getInstalledVersion()).toBe("unknown");
+        } finally {
+          if (savedCopilotCwd === undefined) delete process.env.COPILOT_CWD;
+          else process.env.COPILOT_CWD = savedCopilotCwd;
+        }
+      });
     });
   });
 

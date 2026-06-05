@@ -4408,6 +4408,7 @@ describe("getSessionDirSegments — sync platform → segments map", () => {
     expect(getSessionDirSegments("opencode")).toEqual([".config", "opencode"]);
     expect(getSessionDirSegments("zed")).toEqual([".config", "zed"]);
     expect(getSessionDirSegments("jetbrains-copilot")).toEqual([".config", "JetBrains"]);
+    expect(getSessionDirSegments("copilot-cli")).toEqual([".copilot"]);
   });
 
   test("returns null for unknown platform", async () => {
