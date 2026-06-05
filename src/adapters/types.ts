@@ -479,6 +479,7 @@ export type PlatformId =
   | "codex"
   | "vscode-copilot"
   | "jetbrains-copilot"
+  | "copilot-cli"
   | "cursor"
   | "antigravity"
   | "kiro"

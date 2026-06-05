@@ -120,6 +120,12 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     precompact: "hooks/jetbrains-copilot/precompact.mjs",
     sessionstart: "hooks/jetbrains-copilot/sessionstart.mjs",
   },
+  "copilot-cli": {
+    pretooluse: "hooks/copilot-cli/pretooluse.mjs",
+    posttooluse: "hooks/copilot-cli/posttooluse.mjs",
+    precompact: "hooks/copilot-cli/precompact.mjs",
+    sessionstart: "hooks/copilot-cli/sessionstart.mjs",
+  },
   "kimi": {
     pretooluse: "hooks/kimi/pretooluse.mjs",
     posttooluse: "hooks/kimi/posttooluse.mjs",

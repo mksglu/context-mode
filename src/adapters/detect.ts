@@ -133,16 +133,25 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
   // Order matters: forks listed BEFORE the fork's parent so collision
   // detection works. Every entry verified against platform's own runtime
   // source code (PR #376 follow-up: full audit, May 2026 — see git blame).
+  // copilot-cli — GitHub Copilot CLI sets COPILOT_CLI=1 AND CLAUDE_PLUGIN_ROOT.
+  // Listed BEFORE claude-code so the COPILOT_CLI marker wins over the shared
+  // CLAUDE_PLUGIN_ROOT (fork-before-parent convention, cf. cursor/antigravity
+  // before vscode-copilot). Disambiguation: COPILOT_CLI=1 => copilot-cli;
+  // CLAUDE_PLUGIN_ROOT without COPILOT_CLI => claude-code.
+  ["copilot-cli", [
+    { name: "COPILOT_CLI",  role: "identification" },
+    { name: "COPILOT_CWD",  role: "workspace" },
+    { name: "COPILOT_HOME", role: "identification", detect: false },
+  ]],
   // Claude Code — verified against a live `env` dump (2026-05-11):
   //   CLAUDE_CODE_ENTRYPOINT=cli              (set on every CC session)
   //   CLAUDE_PLUGIN_ROOT=/Users/.../<version>  (set when a plugin is loaded)
   //   CLAUDE_PROJECT_DIR=/Users/.../project    (set in hooks context)
   //   CLAUDE_SESSION_ID=<uuid>                 (legacy session marker)
-  // CLAUDE_CODE_ENTRYPOINT and CLAUDE_PLUGIN_ROOT are CC-exclusive — they
-  // are the disambiguators for issue #539 (Claude Code running inside a
-  // VS Code integrated terminal that has VSCODE_PID set). They MUST be
-  // checked here so detect resolves to claude-code BEFORE falling through
-  // to vscode-copilot below.
+  // CLAUDE_CODE_ENTRYPOINT is the primary CC-exclusive marker. CLAUDE_PLUGIN_ROOT
+  // is also set by Copilot CLI (see copilot-cli above); use CLAUDE_CODE_ENTRYPOINT
+  // for unambiguous detection (issue #539: Claude Code running inside a VS Code
+  // integrated terminal that has VSCODE_PID set).
   ["claude-code", [
     { name: "CLAUDE_CODE_ENTRYPOINT", role: "identification" },
     { name: "CLAUDE_PLUGIN_ROOT",     role: "identification" },
@@ -352,6 +361,7 @@ export function getSessionDirSegments(platform: string): string[] | null {
     case "opencode":         return [".config", "opencode"];
     case "zed":              return [".config", "zed"];
     case "jetbrains-copilot": return [".config", "JetBrains"];
+    case "copilot-cli":      return [".copilot"];
     default:                 return null;
   }
 }
@@ -388,7 +398,7 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
   if (platformOverride) {
     const validPlatforms: PlatformId[] = [
       "claude-code", "gemini-cli", "kilo", "opencode", "codex",
-      "vscode-copilot", "jetbrains-copilot", "cursor", "antigravity", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
+      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
     ];
     if (validPlatforms.includes(platformOverride as PlatformId)) {
       return {
@@ -514,6 +524,14 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
     };
   }
 
+  if (existsSync(resolve(home, ".copilot"))) {
+    return {
+      platform: "copilot-cli",
+      confidence: "medium",
+      reason: "~/.copilot/ directory exists",
+    };
+  }
+
   // Cursor / host IDEs — checked AFTER all CLI agents (issue #542).
   if (existsSync(resolve(home, ".cursor"))) {
     return {
@@ -606,6 +624,11 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "jetbrains-copilot": {
       const { JetBrainsCopilotAdapter } = await import("./jetbrains-copilot/index.js");
       return new JetBrainsCopilotAdapter();
+    }
+
+    case "copilot-cli": {
+      const { CopilotCliAdapter } = await import("./copilot-cli/index.js");
+      return new CopilotCliAdapter();
     }
 
     case "cursor": {
