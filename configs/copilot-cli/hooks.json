@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      { "type": "command", "command": "context-mode hook copilot-cli pretooluse" }
+    ],
+    "PostToolUse": [
+      { "type": "command", "command": "context-mode hook copilot-cli posttooluse" }
+    ],
+    "PreCompact": [
+      { "type": "command", "command": "context-mode hook copilot-cli precompact" }
+    ],
+    "SessionStart": [
+      { "type": "command", "command": "context-mode hook copilot-cli sessionstart" }
+    ]
+  }
+}
