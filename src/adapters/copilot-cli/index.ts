@@ -89,7 +89,7 @@ export class CopilotCliAdapter extends CopilotBaseAdapter {
   validateHooks(pluginRoot: string): DiagnosticResult[] {
     const results: DiagnosticResult[] = [];
 
-    const hooksDir = resolve(".github", "hooks");
+    const hooksDir = resolve(this.getProjectDir(), ".github", "hooks");
     try {
       accessSync(hooksDir, constants.R_OK);
     } catch {
@@ -170,6 +170,14 @@ export class CopilotCliAdapter extends CopilotBaseAdapter {
       message: "Copilot CLI MCP server config is not reliably CLI-inspectable",
       fix: "Verify Copilot CLI has a context-mode MCP server entry",
     };
+  }
+
+  getSettingsPath(projectDir?: string): string {
+    // Override the single path seam so read (readSettings), write
+    // (writeSettings), backup (backupSettings), and configureAllHooks all
+    // resolve to the SAME file under the project dir (COPILOT_CWD or cwd) —
+    // not the MCP server's process.cwd(). Avoids a split-brain read/write.
+    return resolve(projectDir ?? this.getProjectDir(), ".github", "hooks", "context-mode.json");
   }
 
   getInstalledVersion(): string {
