@@ -10,6 +10,7 @@
  * | Antigravity        | mcp__context-mode__<tool>                                  |
  * | OpenCode           | context-mode_<tool>                                        |
  * | VS Code Copilot    | context-mode_<tool>                                        |
+ * | Copilot CLI        | context-mode_<tool>                                        |
  * | Kiro               | @context-mode/<tool>                                       |
  * | Zed                | mcp:context-mode:<tool>                                    |
  * | Cursor / Codex / OpenClaw / Pi | bare <tool>                                    |
@@ -23,6 +24,7 @@ const TOOL_PREFIXES = {
   "kilo":           (tool) => `context-mode_${tool}`,
   "vscode-copilot": (tool) => `context-mode_${tool}`,
   "jetbrains-copilot": (tool) => `context-mode_${tool}`,
+  "copilot-cli":    (tool) => `context-mode_${tool}`,
   "kiro":           (tool) => `@context-mode/${tool}`,
   "zed":            (tool) => `mcp:context-mode:${tool}`,
   "cursor":         (tool) => tool,
