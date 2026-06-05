@@ -137,7 +137,8 @@ describe("GitHub Copilot CLI hooks", () => {
 
       expect(result.exitCode).toBe(0);
       const out = JSON.parse(result.stdout);
-      expect(out.hookSpecificOutput.additionalContext).toContain("ctx_batch_execute");
+      // Flat schema per GitHub Copilot CLI hooks reference (no hookSpecificOutput wrapper)
+      expect(out.additionalContext).toContain("ctx_batch_execute");
     });
 
     test("run_in_terminal: curl is redirected to echo", () => {
@@ -148,8 +149,9 @@ describe("GitHub Copilot CLI hooks", () => {
 
       expect(result.exitCode).toBe(0);
       const out = JSON.parse(result.stdout);
-      expect(out.hookSpecificOutput.updatedInput.command).toContain("context-mode");
-      expect(out.hookSpecificOutput.updatedInput.command).toContain("ctx_fetch_and_index");
+      // Flat schema per GitHub Copilot CLI hooks reference (no hookSpecificOutput wrapper)
+      expect(out.modifiedArgs.command).toContain("context-mode");
+      expect(out.modifiedArgs.command).toContain("ctx_fetch_and_index");
     });
 
     test("handles empty input gracefully (no crash)", () => {

@@ -130,6 +130,9 @@ export const formatters = {
   },
 
   "copilot-cli": {
+    // GitHub Copilot CLI reads a FLAT hook-output JSON — no hookSpecificOutput
+    // wrapper and no hookEventName field in PreToolUse responses.
+    // Schema reference: docs.github.com hooks-reference (pre-tool-use SDK page).
     deny: (reason) => ({
       permissionDecision: "deny",
       permissionDecisionReason: reason,
@@ -137,19 +140,14 @@ export const formatters = {
     ask: () => ({
       permissionDecision: "ask",
     }),
+    // Flat allow + modifiedArgs (NOT updatedInput, NOT wrapped in hookSpecificOutput).
     modify: (updatedInput) => ({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "allow",
-        permissionDecisionReason: "Routed to context-mode sandbox",
-        updatedInput,
-      },
+      permissionDecision: "allow",
+      modifiedArgs: updatedInput,
     }),
+    // Flat additionalContext only (NOT wrapped in hookSpecificOutput, NO hookEventName).
     context: (additionalContext) => ({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        additionalContext,
-      },
+      additionalContext,
     }),
   },
 

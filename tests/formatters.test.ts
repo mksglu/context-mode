@@ -65,21 +65,24 @@ describe("copilot-cli formatter", () => {
     expect(result).not.toHaveProperty("hookSpecificOutput");
   });
 
-  it("modify emits hookSpecificOutput with allow decision and routed message", () => {
+  it("modify emits flat allow with modifiedArgs (no hookSpecificOutput wrapper, no hookEventName)", () => {
     const result = formatters["copilot-cli"].modify({ prompt: "modified input" });
-    const output = result.hookSpecificOutput;
-    expect(output.hookEventName).toBe("PreToolUse");
-    expect(output.permissionDecision).toBe("allow");
-    expect(output.permissionDecisionReason).toBe("Routed to context-mode sandbox");
-    expect(output.updatedInput).toEqual({ prompt: "modified input" });
+    // Flat schema per GitHub Copilot CLI hooks reference
+    expect(result.permissionDecision).toBe("allow");
+    expect(result.modifiedArgs).toEqual({ prompt: "modified input" });
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+    expect(result).not.toHaveProperty("hookEventName");
+    expect(result).not.toHaveProperty("updatedInput");
+    expect(result).not.toHaveProperty("permissionDecisionReason");
   });
 
-  it("context emits hookSpecificOutput with additionalContext", () => {
+  it("context emits flat additionalContext (no hookSpecificOutput wrapper, no hookEventName)", () => {
     const result = formatters["copilot-cli"].context("additional info");
-    const output = result.hookSpecificOutput;
-    expect(output.hookEventName).toBe("PreToolUse");
-    expect(output.additionalContext).toBe("additional info");
-    expect(output).not.toHaveProperty("permissionDecision");
+    // Flat schema per GitHub Copilot CLI hooks reference
+    expect(result.additionalContext).toBe("additional info");
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+    expect(result).not.toHaveProperty("hookEventName");
+    expect(result).not.toHaveProperty("permissionDecision");
   });
 });
 
@@ -108,16 +111,22 @@ describe("formatDecision integration", () => {
     expect(result.permissionDecision).toBe("ask");
   });
 
-  it("copilot-cli modify flows through with allow and updatedInput", () => {
+  it("copilot-cli modify flows through flat: allow + modifiedArgs (no hookSpecificOutput, no updatedInput)", () => {
     const result = formatDecision("copilot-cli", { action: "modify", updatedInput: { file: "test.ts" } });
-    expect(result.hookSpecificOutput.permissionDecision).toBe("allow");
-    expect(result.hookSpecificOutput.permissionDecisionReason).toBe("Routed to context-mode sandbox");
-    expect(result.hookSpecificOutput.updatedInput).toEqual({ file: "test.ts" });
+    // Flat schema per GitHub Copilot CLI hooks reference
+    expect(result.permissionDecision).toBe("allow");
+    expect(result.modifiedArgs).toEqual({ file: "test.ts" });
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+    expect(result).not.toHaveProperty("updatedInput");
+    expect(result).not.toHaveProperty("hookEventName");
+    expect(result).not.toHaveProperty("permissionDecisionReason");
   });
 
-  it("copilot-cli context flows through with additionalContext", () => {
+  it("copilot-cli context flows through flat: additionalContext only (no hookSpecificOutput, no hookEventName)", () => {
     const result = formatDecision("copilot-cli", { action: "context", additionalContext: "extra context data" });
-    expect(result.hookSpecificOutput.additionalContext).toBe("extra context data");
-    expect(result.hookSpecificOutput.hookEventName).toBe("PreToolUse");
+    // Flat schema per GitHub Copilot CLI hooks reference
+    expect(result.additionalContext).toBe("extra context data");
+    expect(result).not.toHaveProperty("hookSpecificOutput");
+    expect(result).not.toHaveProperty("hookEventName");
   });
 });
