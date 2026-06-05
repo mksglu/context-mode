@@ -12,7 +12,7 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { ContentStore, cleanupStaleDBs } from "../src/store.js";
+import { ContentStore, cleanupStaleDBs, MAX_CHUNK_BYTES } from "../src/store.js";
 import {
   withRetry,
   closeDB,
@@ -2110,5 +2110,48 @@ describe("ctx_index TOCTOU symlink swap (#442 round-3)", () => {
     } finally {
       try { fsSync.unlinkSync(safePath); } catch { /* ignore */ }
     }
+  });
+});
+
+describe("Plain-text chunk byte cap (#781)", () => {
+  // A few very long lines: line count stays under the default linesPerChunk (20),
+  // so the buggy plain-text path returned the whole blob as ONE uncapped chunk.
+  // Each line is built from ordinary words (not one mega-token) so FTS5 tokenizes
+  // normally, and carries a unique `marker<i>` so search can locate its chunk.
+  const LINE_COUNT = 8;
+  const WORDS_PER_LINE = 2000; // ~ "lorem " * 2000 ≈ 12 KB/line, well above MAX_CHUNK_BYTES
+
+  function buildFewLongLines(): string {
+    const filler = "lorem ".repeat(WORDS_PER_LINE).trim();
+    const lines: string[] = [];
+    for (let i = 0; i < LINE_COUNT; i++) {
+      lines.push(`marker${i} ${filler}`);
+    }
+    return lines.join("\n");
+  }
+
+  test("indexPlainText splits oversized output instead of one giant chunk", () => {
+    const store = createStore();
+    const result = store.indexPlainText(buildFewLongLines(), "big-plain");
+    assert.ok(
+      result.totalChunks > 1,
+      `oversized plain-text output must be split into multiple chunks, got ${result.totalChunks}`,
+    );
+    store.close();
+  });
+
+  test("no indexed plain-text chunk exceeds MAX_CHUNK_BYTES", () => {
+    const store = createStore();
+    store.indexPlainText(buildFewLongLines(), "big-plain");
+    for (let i = 0; i < LINE_COUNT; i++) {
+      const hits = store.search(`marker${i}`, 1);
+      assert.ok(hits.length > 0, `marker${i} should be searchable`);
+      const bytes = Buffer.byteLength(hits[0].content);
+      assert.ok(
+        bytes <= MAX_CHUNK_BYTES,
+        `chunk for marker${i} is ${bytes} bytes, exceeds cap ${MAX_CHUNK_BYTES}`,
+      );
+    }
+    store.close();
   });
 });

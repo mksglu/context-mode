@@ -150,7 +150,7 @@ function maxEditDistance(wordLength: number): number {
 // Oversized chunks (e.g., a 50KB section between two headings) hurt BM25
 // length normalization and produce unwieldy search results. Split at paragraph
 // boundaries when a chunk exceeds this cap.
-const MAX_CHUNK_BYTES = 4096;
+export const MAX_CHUNK_BYTES = 4096;
 
 // ─────────────────────────────────────────────────────────
 // ContentStore
@@ -1747,6 +1747,7 @@ export class ContentStore {
   #chunkPlainText(
     text: string,
     linesPerChunk: number,
+    maxChunkBytes: number = MAX_CHUNK_BYTES,
   ): Array<{ title: string; content: string }> {
     // Try blank-line splitting first for naturally-sectioned output
     const sections = text.split(/\n\s*\n/);
@@ -1769,12 +1770,15 @@ export class ContentStore {
 
     const lines = text.split("\n");
 
-    // Small enough for a single chunk
+    // Small enough for a single chunk by line count — but still enforce the byte
+    // cap, otherwise a few very long lines produce one oversized chunk that bloats
+    // the FTS5 content DB and times out subsequent queries (#781).
     if (lines.length <= linesPerChunk) {
-      return [{ title: "Output", content: text }];
+      return this.#capPlainTextByBytes(text, "Output", maxChunkBytes);
     }
 
-    // Fixed-size line groups with 2-line overlap
+    // Fixed-size line groups with 2-line overlap. Each group is additionally
+    // sub-split by bytes so a slice containing long lines stays under the cap (#781).
     const chunks: Array<{ title: string; content: string }> = [];
     const overlap = 2;
     const step = Math.max(linesPerChunk - overlap, 1);
@@ -1785,13 +1789,79 @@ export class ContentStore {
       const startLine = i + 1;
       const endLine = Math.min(i + slice.length, lines.length);
       const firstLine = slice[0]?.trim().slice(0, 80);
-      chunks.push({
-        title: firstLine || `Lines ${startLine}-${endLine}`,
-        content: slice.join("\n"),
-      });
+      const title = firstLine || `Lines ${startLine}-${endLine}`;
+      chunks.push(
+        ...this.#capPlainTextByBytes(slice.join("\n"), title, maxChunkBytes),
+      );
     }
 
     return chunks;
+  }
+
+  /**
+   * Split plain-text content into pieces that never exceed `maxChunkBytes`.
+   * Prefers line boundaries; a single line longer than the cap is hard-split on
+   * UTF-8 character boundaries so multi-byte sequences are never severed. Mirrors
+   * the byte-cap guarantee `#chunkMarkdown` already provides for markdown (#781).
+   */
+  #capPlainTextByBytes(
+    content: string,
+    title: string,
+    maxChunkBytes: number,
+  ): Array<{ title: string; content: string }> {
+    if (Buffer.byteLength(content) <= maxChunkBytes) {
+      return content.length > 0 ? [{ title, content }] : [];
+    }
+
+    const parts: string[] = [];
+    let current = "";
+    let currentBytes = 0;
+
+    const pushCurrent = () => {
+      if (current.length > 0) {
+        parts.push(current);
+        current = "";
+        currentBytes = 0;
+      }
+    };
+
+    const lines = content.split("\n");
+    for (let li = 0; li < lines.length; li++) {
+      // Re-attach the newline to every line except the last so joined parts
+      // round-trip to the original content.
+      const line = li < lines.length - 1 ? `${lines[li]}\n` : lines[li];
+      const lineBytes = Buffer.byteLength(line);
+
+      if (lineBytes <= maxChunkBytes) {
+        if (currentBytes > 0 && currentBytes + lineBytes > maxChunkBytes) {
+          pushCurrent();
+        }
+        current += line;
+        currentBytes += lineBytes;
+        continue;
+      }
+
+      // A single line is itself over the cap — flush, then hard-split it on
+      // character boundaries so no UTF-8 code point is cut in half.
+      pushCurrent();
+      for (const ch of line) {
+        const chBytes = Buffer.byteLength(ch);
+        if (currentBytes > 0 && currentBytes + chBytes > maxChunkBytes) {
+          pushCurrent();
+        }
+        current += ch;
+        currentBytes += chBytes;
+      }
+    }
+    pushCurrent();
+
+    const numbered = parts.length > 1;
+    return parts
+      .map((part, idx) => ({
+        title: numbered ? `${title} (${idx + 1})` : title,
+        content: part,
+      }))
+      .filter((c) => c.content.length > 0);
   }
 
   #walkJSON(
