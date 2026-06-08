@@ -181,6 +181,40 @@ describe("SHELL env var override", () => {
     }
   });
 
+  test("Windows prefers pwsh over powershell when bash unavailable", async () => {
+    const originalPlatform = process.platform;
+    const originalShell = process.env.SHELL;
+    delete process.env.SHELL;
+
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd === "where bash") throw new Error("no bash");
+      if (cmd === "where pwsh") return "C:\\Program Files\\PowerShell\\7\\pwsh.exe\r\n";
+      if (cmd === '"pwsh" --version') return "v7.4.0\n";
+      if (cmd === '"powershell" --version') return "v5.1.0\n";
+      if (cmd === '"node" --version') return "v25.0.0\n";
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    const execFileSync = vi.fn((cmd: string) => {
+      if (cmd === "node") return Buffer.from("v25.0.0\n");
+      throw new Error(`unmocked execFileSync: ${cmd}`);
+    });
+    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
+
+    try {
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      vi.resetModules();
+      const { detectRuntimes } = await import("../src/runtime.js");
+      const r = detectRuntimes();
+      expect(r.shell).toBe("pwsh");
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
+      if (originalShell === undefined) delete process.env.SHELL;
+      else process.env.SHELL = originalShell;
+      vi.doUnmock("node:child_process");
+      vi.resetModules();
+    }
+  });
+
   test("Windows ignores SHELL override pointing at WSL bash shim", async () => {
     const originalPlatform = process.platform;
     const wslBash = "C:\\Windows\\System32\\bash.exe";
