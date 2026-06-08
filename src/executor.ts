@@ -74,6 +74,20 @@ export function buildShellScriptContent(
   return `export PATH=${quoteForPosixShell(inheritedPath)}\n${code}`;
 }
 
+function isPowerShell(shellPath: string | null | undefined): boolean {
+  const shellName = shellPath?.toLowerCase() ?? "";
+  return shellName.includes("powershell") || shellName.includes("pwsh");
+}
+
+export function buildPowerShellScriptContent(code: string): string {
+  return [
+    "[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()",
+    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()",
+    "$OutputEncoding = [System.Text.UTF8Encoding]::new()",
+    code,
+  ].join("\n");
+}
+
 /**
  * Resolve the real OS temp directory, bypassing any TMPDIR env override.
  * os.tmpdir() reads TMPDIR from the environment, which some shells/tools
@@ -255,9 +269,13 @@ export class PolyglotExecutor {
       ),
     );
     if (language === "shell") {
+      const shellPath = this.#runtimes.shell;
+      const shellCode = isWin && isPowerShell(shellPath)
+        ? buildPowerShellScriptContent(code)
+        : code;
       writeFileSync(
         fp,
-        buildShellScriptContent(code, process.env.PATH, process.platform),
+        buildShellScriptContent(shellCode, process.env.PATH, process.platform),
         { encoding: "utf-8", mode: 0o700 },
       );
     } else {

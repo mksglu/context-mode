@@ -198,6 +198,17 @@ function resolveWindowsBash(): string | null {
   }
 }
 
+function resolveWindowsShell(): string {
+  return resolveWindowsBash()
+    ?? (commandExists("sh")
+      ? "sh"
+      : commandExists("pwsh")
+        ? "pwsh"
+        : commandExists("powershell")
+          ? "powershell"
+          : "cmd.exe");
+}
+
 function getVersion(cmd: string, args: string[] = ["--version"]): string {
   try {
     // DEP0190 fix: avoid args array with shell:true on Windows.
@@ -320,9 +331,7 @@ export function detectRuntimes(): RuntimeMap {
         : runnableExists("py")
           ? "py"
           : null,
-    shell: shellOverride ?? (isWin
-      ? (resolveWindowsBash() ?? (commandExists("sh") ? "sh" : commandExists("powershell") ? "powershell" : "cmd.exe"))
-      : commandExists("bash") ? "bash" : "sh"),
+    shell: shellOverride ?? (isWin ? resolveWindowsShell() : (commandExists("bash") ? "bash" : "sh")),
     ruby: commandExists("ruby") ? "ruby" : null,
     go: commandExists("go") ? "go" : null,
     rust: commandExists("rustc") ? "rustc" : null,
