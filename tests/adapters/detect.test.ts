@@ -53,6 +53,7 @@ describe("detectPlatform", () => {
     delete process.env.CURSOR_CWD;
     delete process.env.CURSOR_SESSION_ID;
     delete process.env.CURSOR_TRACE_ID;
+    delete process.env.QODER_AGENT;
     delete process.env.VSCODE_PID;
     delete process.env.VSCODE_CWD;
     delete process.env.QWEN_PROJECT_DIR;
@@ -479,7 +480,7 @@ describe("detectPlatform", () => {
   it("returns a valid platform as default when no env vars are set", () => {
     // No env vars set — result depends on which config dirs exist on this machine.
     const signal = detectPlatform();
-    expect(["claude-code", "gemini-cli", "codex", "cursor", "opencode", "kilo", "openclaw", "vscode-copilot", "antigravity", "kiro", "pi", "omp", "zed", "qwen-code", "jetbrains-copilot", "kimi"]).toContain(signal.platform);
+    expect(["claude-code", "gemini-cli", "codex", "cursor", "opencode", "kilo", "openclaw", "vscode-copilot", "antigravity", "kiro", "pi", "omp", "zed", "qwen-code", "jetbrains-copilot", "kimi", "qoder"]).toContain(signal.platform);
   });
 });
 

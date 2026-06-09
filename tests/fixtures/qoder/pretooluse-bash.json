@@ -1,0 +1,9 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "qoder-session-001",
+  "transcript_path": "/tmp/qoder-transcript.jsonl",
+  "cwd": "/tmp/qoder-project",
+  "tool_name": "Bash",
+  "tool_input": { "command": "curl https://example.com/api" },
+  "extra": { "email": "user@example.com" }
+}

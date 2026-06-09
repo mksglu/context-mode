@@ -1,0 +1,9 @@
+{
+  "hook_event_name": "PostToolUse",
+  "session_id": "qoder-session-001",
+  "transcript_path": "/tmp/qoder-transcript.jsonl",
+  "cwd": "/tmp/qoder-project",
+  "tool_name": "Bash",
+  "tool_input": { "command": "ls -la" },
+  "tool_response": "total 24\ndrwxr-xr-x  5 user user 4096 src/\n-rw-r--r--  1 user user  256 package.json"
+}
