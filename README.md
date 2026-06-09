@@ -41,7 +41,7 @@ Context Mode is an MCP server that solves all four sides of this problem:
 
 1. **Context Saving** — Sandbox tools keep raw data out of the context window. 315 KB becomes 5.4 KB. 98% reduction.
 2. **Session Continuity** — Every file edit, git operation, task, error, and user decision is tracked in SQLite. When the conversation compacts, context-mode doesn't dump this data back into context — it indexes events into FTS5 and retrieves only what's relevant via BM25 search. The model picks up exactly where you left off. If you don't `--continue`, previous session data is deleted immediately — a fresh session means a clean slate.
-3. **Think in Code** — The LLM should program the analysis, not compute it. Instead of reading 50 files into context to count functions, the agent writes a script that does the counting and `console.log()`s only the result. One script replaces ten tool calls and saves 100x context. This is a mandatory paradigm across all 17 supported clients, plus the OpenClaw gateway integration: stop treating the LLM as a data processor, treat it as a code generator.
+3. **Think in Code** — The LLM should program the analysis, not compute it. Instead of reading 50 files into context to count functions, the agent writes a script that does the counting and `console.log()`s only the result. One script replaces ten tool calls and saves 100x context. This is a mandatory paradigm across all 18 supported clients, plus the OpenClaw gateway integration: stop treating the LLM as a data processor, treat it as a code generator.
 
    ```js
    // Before: 47 × Read() = 700 KB.  After: 1 × ctx_execute() = 3.6 KB.
@@ -62,6 +62,23 @@ Context Mode is an MCP server that solves all four sides of this problem:
 ## Install
 
 Platforms are grouped by install complexity. Hook-capable platforms get automatic routing enforcement. Non-hook platforms need a one-time routing file copy.
+
+<details>
+<summary><strong>Qoder</strong> — native plugin, fully automatic</summary>
+
+**Prerequisite:** Node.js 22.5 or newer.
+
+Install and verify from a checkout:
+
+```bash
+qoder plugins validate .
+qoder plugins install .
+qoder plugins list
+```
+
+In Qoder IDE, package the repository so `.qoder-plugin/`, `hooks/`, `skills/`, `start.mjs`, and the runtime bundles remain at the ZIP root, then use **Upload Plugin**. The native plugin registers the MCP server, skills, and all six hooks: `PreToolUse`, `PostToolUse`, `SessionStart`, `PreCompact`, `UserPromptSubmit`, and `Stop`.
+
+</details>
 
 <details open>
 <summary><strong>Claude Code</strong> — plugin marketplace, fully automatic</summary>

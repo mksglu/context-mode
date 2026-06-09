@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "node",
+      "args": ["${QODER_PLUGIN_ROOT}/start.mjs"],
+      "env": {
+        "CONTEXT_MODE_PLATFORM": "qoder"
+      }
+    }
+  }
+}

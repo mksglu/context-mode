@@ -155,6 +155,12 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
   ["antigravity", [
     { name: "ANTIGRAVITY_CLI_ALIAS", role: "identification" },
   ]],
+  // Qoder plugin hooks receive QODER_PLUGIN_ROOT. The native MCP config also
+  // sets CONTEXT_MODE_PLATFORM=qoder, so server startup does not depend on
+  // passive editor-process variables inherited from VS Code.
+  ["qoder", [
+    { name: "QODER_PLUGIN_ROOT", role: "identification" },
+  ]],
   // cursor (VSCode fork) — listed before vscode-copilot. CURSOR_TRACE_ID has
   // 800+ hits in major OSS detection libs (Vercel Next.js, Bun, Google
   // gemini-cli, Nx, CrewAI). CURSOR_CWD is the documented workspace var
@@ -349,6 +355,7 @@ export function getSessionDirSegments(platform: string): string[] | null {
     case "pi":               return [".pi"];
     case "omp":              return [".omp"];
     case "qwen-code":        return [".qwen"];
+    case "qoder":            return [".qoder"];
     case "kimi":             return [".kimi-code"];
     case "kilo":             return [".config", "kilo"];
     case "opencode":         return [".config", "opencode"];
@@ -390,7 +397,7 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
   if (platformOverride) {
     const validPlatforms: PlatformId[] = [
       "claude-code", "gemini-cli", "kilo", "opencode", "codex",
-      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
+      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi", "qoder",
     ];
     if (validPlatforms.includes(platformOverride as PlatformId)) {
       return {
@@ -580,6 +587,15 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
     };
   }
 
+  // Qoder — checked BEFORE ~/.cursor (issue #542: CLI agents before host IDEs).
+  if (existsSync(resolve(home, ".qoder"))) {
+    return {
+      platform: "qoder",
+      confidence: "medium",
+      reason: "~/.qoder/ directory exists",
+    };
+  }
+
   // Cursor / host IDEs — checked AFTER all CLI agents (issue #542).
   if (existsSync(resolve(home, ".cursor"))) {
     return {
@@ -725,6 +741,11 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "kimi": {
       const { KimiAdapter } = await import("./kimi/index.js");
       return new KimiAdapter();
+    }
+
+    case "qoder": {
+      const { QoderAdapter } = await import("./qoder/index.js");
+      return new QoderAdapter();
     }
 
     default: {

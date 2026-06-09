@@ -67,6 +67,8 @@ describe("Issue #539 — Claude Code inside VS Code disambiguation", () => {
     clearPlatformDetectionEnv();
     delete process.env.CLAUDE_PLUGIN_DATA;
     delete process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS;
+    delete process.env.QODER_AGENT;
+    delete process.env.QODER_PLUGIN_ROOT;
     delete process.env.VSCODE_PID;
     delete process.env.VSCODE_CWD;
     delete process.env.CODEX_THREAD_ID;

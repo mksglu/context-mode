@@ -153,6 +153,14 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     sessionstart: "hooks/sessionstart.mjs",
     userpromptsubmit: "hooks/userpromptsubmit.mjs",
   },
+  "qoder": {
+    pretooluse: "hooks/qoder/pretooluse.mjs",
+    posttooluse: "hooks/qoder/posttooluse.mjs",
+    precompact: "hooks/qoder/precompact.mjs",
+    sessionstart: "hooks/qoder/sessionstart.mjs",
+    userpromptsubmit: "hooks/qoder/userpromptsubmit.mjs",
+    stop: "hooks/qoder/stop.mjs",
+  },
 };
 
 async function hookDispatch(platform: string, event: string): Promise<void> {

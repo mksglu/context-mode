@@ -1,0 +1,15 @@
+{
+  "name": "context-mode",
+  "version": "1.0.169",
+  "description": "MCP server that saves 98% of your context window with session continuity, sandboxed execution, and FTS5 search.",
+  "author": {
+    "name": "Mert Koseoğlu",
+    "url": "https://github.com/mksglu"
+  },
+  "homepage": "https://github.com/mksglu/context-mode#readme",
+  "repository": "https://github.com/mksglu/context-mode",
+  "license": "Elastic-2.0",
+  "mcpServers": "./.qoder-plugin/mcp.json",
+  "hooks": "./.qoder-plugin/hooks.json",
+  "skills": "./skills/"
+}

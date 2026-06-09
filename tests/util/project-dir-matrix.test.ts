@@ -10,8 +10,8 @@
  *   3. With ONLY CONTEXT_MODE_PROJECT_DIR="/escape" set, result is "/escape"
  *      for every host (universal escape hatch invariant).
  *
- * Generates 17 × 16 × 3 = 816 assertions from one parameterized test. Adding
- * adapter #18 to PLATFORM_ENV_VARS grows the matrix automatically — no edit
+ * Generates 18 × 17 × 3 = 918 assertions from one parameterized test. Adding
+ * adapter #19 to PLATFORM_ENV_VARS grows the matrix automatically — no edit
  * to this file. This is the structural test for MUST-3 (17 adapters equal).
  */
 
@@ -26,7 +26,7 @@ import {
 import type { PlatformId } from "../../src/adapters/types.js";
 
 // Hard-coded list of all registered platforms — kept in sync with detect.ts
-// CLIENT_NAME_TO_PLATFORM. If an 18th adapter is added, append it here.
+// CLIENT_NAME_TO_PLATFORM. If a new adapter is added, append it here.
 // (We can't reflect it from PLATFORM_ENV_VARS alone because some adapters
 // have no env vars — kiro, openclaw, antigravity-via-mcp-only, zed,
 // copilot-cli, antigravity-cli.)
@@ -48,6 +48,7 @@ const ALL_PLATFORMS: ReadonlyArray<PlatformId> = [
   "omp",
   "copilot-cli",
   "antigravity-cli",
+  "qoder",
 ];
 
 describe("resolveProjectDir matrix — MUST-3 invariant (issue #545)", () => {

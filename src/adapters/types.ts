@@ -488,6 +488,7 @@ export type PlatformId =
   | "pi"
   | "omp"
   | "kimi"
+  | "qoder"
   | "zed"
   | "qwen-code"
   | "unknown";

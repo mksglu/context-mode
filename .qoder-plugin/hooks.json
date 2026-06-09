@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Shell|Read|Grep|WebFetch|Task|apply_patch|Edit|Write|mcp__",
+        "hooks": [{ "type": "command", "command": "node \"$QODER_PLUGIN_ROOT/hooks/qoder/pretooluse.mjs\"", "timeout": 30 }]
+      }
+    ],
+    "PostToolUse": [
+      { "hooks": [{ "type": "command", "command": "node \"$QODER_PLUGIN_ROOT/hooks/qoder/posttooluse.mjs\"", "timeout": 30 }] }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [{ "type": "command", "command": "node \"$QODER_PLUGIN_ROOT/hooks/qoder/sessionstart.mjs\"", "timeout": 30 }]
+      }
+    ],
+    "PreCompact": [
+      { "hooks": [{ "type": "command", "command": "node \"$QODER_PLUGIN_ROOT/hooks/qoder/precompact.mjs\"", "timeout": 30 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "node \"$QODER_PLUGIN_ROOT/hooks/qoder/userpromptsubmit.mjs\"", "timeout": 30 }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "node \"$QODER_PLUGIN_ROOT/hooks/qoder/stop.mjs\"", "timeout": 30 }] }
+    ]
+  }
+}

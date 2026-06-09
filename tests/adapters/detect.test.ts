@@ -21,6 +21,7 @@ import { JetBrainsCopilotAdapter } from "../../src/adapters/jetbrains-copilot/in
 import { OMPAdapter } from "../../src/adapters/omp/index.js";
 import { PiAdapter } from "../../src/adapters/pi/index.js";
 import { KimiAdapter } from "../../src/adapters/kimi/index.js";
+import { QoderAdapter } from "../../src/adapters/qoder/index.js";
 
 // ─────────────────────────────────────────────────────────
 // detectPlatform — env var detection
@@ -55,6 +56,8 @@ describe("detectPlatform", () => {
     delete process.env.CURSOR_CWD;
     delete process.env.CURSOR_SESSION_ID;
     delete process.env.CURSOR_TRACE_ID;
+    delete process.env.QODER_AGENT;
+    delete process.env.QODER_PLUGIN_ROOT;
     delete process.env.VSCODE_PID;
     delete process.env.VSCODE_CWD;
     delete process.env.QWEN_PROJECT_DIR;
@@ -210,6 +213,15 @@ describe("detectPlatform", () => {
     process.env.OPENCODE = "1";
     const signal = detectPlatform();
     expect(signal.platform).toBe("opencode");
+    expect(signal.confidence).toBe("high");
+  });
+
+  // ── Qoder ──────────────────────────────────────────────
+
+  it("returns qoder when QODER_PLUGIN_ROOT is set", () => {
+    process.env.QODER_PLUGIN_ROOT = "/installed/context-mode";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("qoder");
     expect(signal.confidence).toBe("high");
   });
 
@@ -518,7 +530,7 @@ describe("detectPlatform", () => {
   it("returns a valid platform as default when no env vars are set", () => {
     // No env vars set — result depends on which config dirs exist on this machine.
     const signal = detectPlatform();
-    expect(["claude-code", "gemini-cli", "codex", "cursor", "opencode", "kilo", "openclaw", "vscode-copilot", "copilot-cli", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "jetbrains-copilot", "kimi"]).toContain(signal.platform);
+    expect(["claude-code", "gemini-cli", "codex", "cursor", "opencode", "kilo", "openclaw", "vscode-copilot", "copilot-cli", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "jetbrains-copilot", "kimi", "qoder"]).toContain(signal.platform);
   });
 });
 
@@ -660,6 +672,11 @@ describe("getAdapter", () => {
   it("returns KimiAdapter for kimi", async () => {
     const adapter = await getAdapter("kimi");
     expect(adapter).toBeInstanceOf(KimiAdapter);
+  });
+
+  it("returns QoderAdapter for qoder", async () => {
+    const adapter = await getAdapter("qoder");
+    expect(adapter).toBeInstanceOf(QoderAdapter);
   });
 
   it("returns ClaudeCodeAdapter for unknown platform", async () => {
