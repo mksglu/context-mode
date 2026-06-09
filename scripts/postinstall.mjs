@@ -250,9 +250,11 @@ if (process.platform === "win32" && process.env.npm_config_global === "true") {
     // npm prefix is where both the .cmd shims and node_modules live
     // Use npm_config_prefix env (set during install) or fall back to `npm config get prefix`
     // Note: `npm bin -g` was removed in npm v9+, so we use prefix instead
+    // Issue #801 — Windows `spawnSync npm ENOENT`: npm resolves to npm.cmd
+    const npmBin = process.platform === "win32" ? "npm.cmd" : "npm";
     const prefix = (
       process.env.npm_config_prefix ||
-      execSync("npm config get prefix", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim()
+      execSync(`${npmBin} config get prefix`, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], shell: process.platform === "win32" }).trim()
     );
 
     const actualPkgDir = pkgRoot;

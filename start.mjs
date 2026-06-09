@@ -530,14 +530,18 @@ if (existsSync(resolve(__dirname, "server.bundle.mjs"))) {
   await import("./server.bundle.mjs");
 } else {
   // Dev or npm install — full build
+  // Issue #801 — Windows `spawnSync npm ENOENT`: npm/npx resolve to .cmd shims
+  const IS_WIN32_DEV = process.platform === "win32";
+  const NPM_BIN_DEV = IS_WIN32_DEV ? "npm.cmd" : "npm";
+  const NPX_BIN_DEV = IS_WIN32_DEV ? "npx.cmd" : "npx";
   if (!existsSync(resolve(__dirname, "node_modules"))) {
     try {
-      execSync("npm install --silent", { cwd: __dirname, stdio: "pipe", timeout: 60000 });
+      execSync(`${NPM_BIN_DEV} install --silent`, { cwd: __dirname, stdio: "pipe", timeout: 60000, shell: IS_WIN32_DEV });
     } catch { /* best effort */ }
   }
   if (!existsSync(resolve(__dirname, "build", "server.js"))) {
     try {
-      execSync("npx tsc --silent", { cwd: __dirname, stdio: "pipe", timeout: 30000 });
+      execSync(`${NPX_BIN_DEV} tsc --silent`, { cwd: __dirname, stdio: "pipe", timeout: 30000, shell: IS_WIN32_DEV });
     } catch { /* best effort */ }
   }
   await import("./build/server.js");
