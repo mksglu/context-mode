@@ -229,8 +229,9 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
   //   refs/platforms/oh-my-pi/packages/coding-agent/src/mcp/transports/stdio.ts:55-63
   // (env passthrough only, no synthesis). The Pi runtime DOES set
   // PI_CONFIG_DIR (config dir override), PI_SESSION_FILE (active session
-  // path), and PI_COMPILED (binary build marker). PI_CODING_AGENT_DIR is
-  // owned by OMP above; keep it there.
+  // path), PI_COMPILED (binary build marker), and PI_CODING_AGENT=true
+  // in package-spawned MCP children (#760). PI_CODING_AGENT_DIR is owned
+  // by OMP above; keep it there.
   //
   // Issue #545 — PI_WORKSPACE_DIR / PI_PROJECT_DIR are workspace vars set
   // by Pi's bridge so the resolver picks them up under strict mode.
@@ -245,6 +246,7 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
     { name: "PI_CONFIG_DIR",    role: "identification" },
     { name: "PI_SESSION_FILE",  role: "identification" },
     { name: "PI_COMPILED",      role: "identification" },
+    { name: "PI_CODING_AGENT",  role: "identification" },
   ]],
   // openclaw — removed (runtime never sets OPENCLAW_HOME or OPENCLAW_CLI;
   // detection falls through to ~/.openclaw/ config-dir tier below).

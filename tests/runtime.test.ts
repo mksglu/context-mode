@@ -881,6 +881,9 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     // process.execPath to avoid re-invoking the snap wrapper via PATH.
     // The allowlist gate must NOT regress this — basename "node" is in
     // JS_RUNTIMES so execPath is returned as-is.
+    //
+    // #800 liveness guard: snap-node paths are stable and always exist on
+    // disk, so the existsSync guard passes and execPath is returned.
     stubExecPath("/snap/node/current/bin/node");
 
     const execSync = vi.fn((cmd: string) => {
@@ -890,7 +893,7 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
       throw new Error(`unmocked execSync: ${cmd}`);
     });
     const execFileSync = vi.fn(() => Buffer.from("ok\n"));
-    const existsSync = vi.fn(() => false);
+    const existsSync = vi.fn((p: string) => p === "/snap/node/current/bin/node");
 
     vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
     vi.doMock("node:fs", async () => {
@@ -924,7 +927,7 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
       throw new Error(`unmocked execSync: ${cmd}`);
     });
     const execFileSync = vi.fn(() => Buffer.from("1.1.0\n"));
-    const existsSync = vi.fn(() => false);
+    const existsSync = vi.fn((p: string) => p === "/home/user/.bun/bin/bun");
 
     vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
     vi.doMock("node:fs", async () => {
@@ -938,6 +941,74 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     // bun branch fires first; javascript should be a bun runtime (not
     // collapsed to bare "node" even though basename(execPath) === "bun").
     expect(r.javascript).toMatch(/bun$/);
+  });
+
+  test("Homebrew Cellar ENOENT (#800): execPath basename is 'node' but file deleted — falls back to PATH node", async () => {
+    // Simulate Homebrew Node: process.execPath is a versioned Cellar path
+    // (/opt/homebrew/Cellar/node/26.0.0/bin/node).  After `brew upgrade` +
+    // `brew cleanup`, the old Cellar is deleted, so existsSync returns false.
+    // The liveness guard must fall through to PATH-resolved "node".
+    stubExecPath("/opt/homebrew/Cellar/node/26.0.0/bin/node");
+
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd === "where bun") throw new Error("bun not found");
+      if (cmd === "command -v node") return "/opt/homebrew/bin/node\n";
+      if (cmd === "where node") return "C:\\Program Files\\nodejs\\node.exe\n";
+      if (/^command -v\s/.test(cmd)) throw new Error("not found");
+      if (/^where\s/.test(cmd)) throw new Error("not found");
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    const execFileSync = vi.fn(() => Buffer.from("ok\n"));
+    // Cellar path is deleted; bun fallback paths don't exist (simulate no-bun host).
+    // Cross-platform: bunFallbackPaths returns POSIX paths (/.bun/bin/bun) and
+    // Windows paths (\\.bun\\bin\\bun.exe, \\bun\\bin\\bun.exe) — all must be
+    // blocked so bunExists() returns false and PATH node is resolved.
+    const CELLAR_PATH = "/opt/homebrew/Cellar/node/26.0.0/bin/node";
+    const BUN_PATH_RE = /[\/\\]\.?bun[\/\\]bin[\/\\]bun/;
+    const existsSync = vi.fn((p: string) => p !== CELLAR_PATH && !BUN_PATH_RE.test(p));
+
+    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync };
+    });
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes();
+
+    // Must NOT return the stale Cellar path — that's the bug.
+    expect(r.javascript).not.toBe("/opt/homebrew/Cellar/node/26.0.0/bin/node");
+    // Must fall back to PATH-resolved "node".
+    expect(r.javascript).toBe("node");
+  });
+
+  test("Homebrew Cellar ENOENT (#800): stale execPath AND node missing on PATH → returns null", async () => {
+    // Worst-case: Homebrew Cellar deleted AND no node on PATH.
+    // Runtime resolution must return null so ctx_doctor surfaces an
+    // actionable error instead of a cryptic spawn ENOENT.
+    stubExecPath("/opt/homebrew/Cellar/node/26.0.0/bin/node");
+
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd === "where bun") throw new Error("bun not found");
+      if (/^command -v\s/.test(cmd)) throw new Error("not found");
+      if (/^where\s/.test(cmd)) throw new Error("not found");
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    const execFileSync = vi.fn(() => {
+      throw new Error("not found");
+    });
+    const existsSync = vi.fn(() => false); // Nothing exists — no Cellar, no bun
+
+    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync };
+    });
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes();
+
+    expect(r.javascript).toBeNull();
   });
 
   test("doctor surfaces clear error when javascript runtime is null", async () => {

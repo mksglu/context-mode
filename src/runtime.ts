@@ -273,7 +273,17 @@ export function resolveJavascriptRuntime(
   if (JS_RUNTIMES.has(base)) {
     // Real JS runtime (node, bun, deno) — preserves #190 snap-Node fix
     // because the snap wrapper's binary is literally named `node`.
-    return execPath;
+    //
+    // Issue #800 — liveness guard: on Homebrew, process.execPath points into
+    // the versioned Cellar (/opt/homebrew/Cellar/node/26.0.0/bin/node).
+    // `brew upgrade` + `brew cleanup` deletes the old Cellar, so the path
+    // dangles for the life of the already-running MCP server.  If the path
+    // doesn't exist on disk, skip it and fall through to PATH node.
+    if (existsSync(execPath)) {
+      return execPath;
+    }
+    // Stale execPath (deleted Cellar, corrupted install, uninstall while
+    // process alive).  Fall through to PATH resolution below.
   }
 
   // Host binary (opencode/kilo/etc.) — fall back to node on PATH.
