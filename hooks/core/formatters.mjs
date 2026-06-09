@@ -183,6 +183,54 @@ export const formatters = {
       agent_message: additionalContext,
     }),
   },
+
+  "qoder": {
+    deny: (reason) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: reason,
+      },
+    }),
+    ask: () => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "ask",
+      },
+    }),
+    modify: (updatedInput) => {
+      const ui = updatedInput ?? {};
+      const isObj = ui !== null && typeof ui === "object" && !Array.isArray(ui);
+      const isBashCommandRedirect = isObj && "command" in ui;
+      if (!isBashCommandRedirect) {
+        return {
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            updatedInput: ui,
+          },
+        };
+      }
+      const rawCmd = ui.command;
+      const cmd = typeof rawCmd === "string" ? rawCmd : "";
+      const m = cmd.match(/^echo\s+"(.+)"$/s);
+      const reason = m
+        ? m[1]
+        : "Redirected to ctx_execute / ctx_fetch_and_index.";
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: reason,
+        },
+      };
+    },
+    context: (additionalContext) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        additionalContext,
+      },
+    }),
+  },
 };
 
 /**

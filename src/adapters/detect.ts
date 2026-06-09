@@ -155,6 +155,11 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
   ["antigravity", [
     { name: "ANTIGRAVITY_CLI_ALIAS", role: "identification" },
   ]],
+  // qoder (VS Code-based IDE) — QODER_AGENT=true set by Qoder runtime.
+  // Listed BEFORE vscode-copilot: Qoder inherits VSCODE_PID as a VS Code fork.
+  ["qoder", [
+    { name: "QODER_AGENT", role: "identification" },
+  ]],
   // cursor (VSCode fork) — listed before vscode-copilot. CURSOR_TRACE_ID has
   // 800+ hits in major OSS detection libs (Vercel Next.js, Bun, Google
   // gemini-cli, Nx, CrewAI). CURSOR_CWD is the documented workspace var
@@ -345,6 +350,7 @@ export function getSessionDirSegments(platform: string): string[] | null {
     case "pi":               return [".pi"];
     case "omp":              return [".omp"];
     case "qwen-code":        return [".qwen"];
+    case "qoder":            return [".qoder"];
     case "kimi":             return [".kimi-code"];
     case "kilo":             return [".config", "kilo"];
     case "opencode":         return [".config", "opencode"];
@@ -387,6 +393,7 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
     const validPlatforms: PlatformId[] = [
       "claude-code", "gemini-cli", "kilo", "opencode", "codex",
       "vscode-copilot", "jetbrains-copilot", "cursor", "antigravity", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
+      "qoder",
     ];
     if (validPlatforms.includes(platformOverride as PlatformId)) {
       return {
@@ -509,6 +516,15 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
       platform: "openclaw",
       confidence: "medium",
       reason: "~/.openclaw/ directory exists",
+    };
+  }
+
+  // Qoder — checked BEFORE ~/.cursor (issue #542: CLI agents before host IDEs).
+  if (existsSync(resolve(home, ".qoder"))) {
+    return {
+      platform: "qoder",
+      confidence: "medium",
+      reason: "~/.qoder/ directory exists",
     };
   }
 
@@ -647,6 +663,11 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "kimi": {
       const { KimiAdapter } = await import("./kimi/index.js");
       return new KimiAdapter();
+    }
+
+    case "qoder": {
+      const { QoderAdapter } = await import("./qoder/index.js");
+      return new QoderAdapter();
     }
 
     default: {
