@@ -114,10 +114,27 @@ function zod3ToV4(v: unknown, depth = 0): z.ZodType {
       break;
     }
 
-    case "ZodEffects":
-      // Host schema only. Original Zod 3 schema still parses in execute().
-      result = zod3ToV4(def.schema, depth + 1);
+    case "ZodEffects": {
+      // Preserve preprocess coercion (coerceJsonArray, coerceBoolean, etc.)
+      // when the OpenCode plugin host receives stringified primitives from the
+      // LLM tool-call bridge. The transform function is plain JS with no Zod
+      // internals, so it works identically with Zod v4's z.preprocess().
+      // Fixes: ctx_fetch_and_index `requests` array / `force` boolean rejected
+      // as "Expected array, received string" in OpenCode in-process plugin path.
+      const effect = def.effect as Record<string, unknown> | undefined;
+      if (effect?.type === "preprocess" && typeof effect?.transform === "function") {
+        const innerSchema = zod3ToV4(def.schema, depth + 1);
+        result = z.preprocess(
+          effect.transform as (val: unknown) => unknown,
+          innerSchema,
+        );
+      } else {
+        // Refinement / transform effects — host schema only.
+        // Original Zod 3 schema still parses in execute().
+        result = zod3ToV4(def.schema, depth + 1);
+      }
       break;
+    }
 
     default:
       // Never leak raw Zod 3 schemas back to a v4 host.
