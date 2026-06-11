@@ -90,9 +90,11 @@ describe("e2e: OpenCode plugin validation chain", () => {
     }
   });
 
-  it("accepts empty requests as string '[]' (optional treats as absent)", () => {
-    // coerceJsonArray converts "[]" → [], .min(1) rejects [],
-    // then .optional() absorbs the error.
+  it("accepts empty requests as string '[]' (min constraint not retained by converter)", () => {
+    // coerceJsonArray converts "[]" → []. The v3→v4 converter does not
+    // preserve .min(1), so the empty array passes z.array() validation.
+    // The real validation (v3 inputSchema.parse() inside plugin.ts) still
+    // enforces .min(1) and the handler catches empty batches separately.
     const r = v4Validator.safeParse({ requests: "[]", concurrency: 1 });
     expect(r.success).toBe(true);
   });
