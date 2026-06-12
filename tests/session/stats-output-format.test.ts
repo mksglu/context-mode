@@ -66,9 +66,9 @@ function emptyLifetime(): LifetimeStats {
 }
 
 describe("Opus pricing", () => {
-  test("tokensToUsd uses $15 per 1M input tokens", () => {
-    expect(tokensToUsd(1_000_000)).toBe("$15.00");
-    expect(tokensToUsd(42_000)).toBe("$0.63");
+  test("tokensToUsd uses $5 per 1M input tokens (Opus 4.7/4.8 2026 rate)", () => {
+    expect(tokensToUsd(1_000_000)).toBe("$5.00");
+    expect(tokensToUsd(42_000)).toBe("$0.21");
     expect(tokensToUsd(0)).toBe("$0.00");
   });
 });
@@ -327,7 +327,7 @@ describe("formatReport — Bugs #5/#6/#7/#8", () => {
     expect(text).toMatch(/17,493 captures across 123 projects/);
 
     // Section 4 — cost example + EXAMPLES disclaimer.
-    expect(text).toMatch(/\$1399\.73 of Opus 4 tokens your team didn't burn/);
+    expect(text).toMatch(/\$466\.58 of Opus 4\.7 tokens your team didn't burn/);
     expect(text).toMatch(/Opus rates shown for context/);
 
     // Section 5 — auto-memory tally.

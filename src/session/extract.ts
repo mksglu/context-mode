@@ -340,15 +340,276 @@ function extractGit(input: HookInput): SessionEvent[] {
   if (input.tool_name !== "Bash") return [];
 
   const cmd = String(input.tool_input["command"] ?? "");
-  const match = GIT_PATTERNS.find(p => p.pattern.test(cmd));
+
+  // Bug 8 (v1.0.162) — parse the git invocation algorithmically so flags
+  // between `git` and the operation token are tolerated (`git -C /path
+  // status`, `git --no-pager log`, etc.). Falls back to the legacy regex
+  // pattern scan when the algorithmic parse cannot locate a `git` token —
+  // preserves backward compat for commands like `cd /repo && git status`
+  // where the algorithmic parse sees `cd` as the first token instead.
+  const parsed = parseGitInvocation(cmd);
+  let match: { pattern: RegExp; operation: string } | undefined;
+  if (parsed && parsed.operation) {
+    match = GIT_PATTERNS.find(p => p.operation === parsed.operation);
+  }
+  if (!match) {
+    match = GIT_PATTERNS.find(p => p.pattern.test(cmd));
+  }
   if (!match) return [];
 
-  return [{
+  // Bug 1 (v1.0.161) — for `git commit` operations, parse -m / -am / --message=
+  // from the Bash command via shell-like argv tokenization so downstream
+  // consumers receive the actual commit subject in `data`. Falls back to the
+  // operation name when no message argument is present (--amend / --no-edit /
+  // -F file / interactive editor flow). Tokenizer is hand-rolled char-by-char
+  // (no regex) to mirror real shell quoting/cluster-flag semantics.
+  //
+  // When a message is captured, the event surfaces as type='git_commit' so the
+  // rollup aggregator can distinguish ACTUAL commits from other git operations
+  // (status/diff/log were inflating has_commit on every event — see
+  // session-loaders.mjs rollup stamp + Bug 2).
+  // Bug 8 cwd hint — when `-C <dir>` is present in the git invocation, emit
+  // a leading cwd event so the attribution carry-forward (LAST_SEEN source)
+  // routes downstream events in the same batch to the scoped directory's
+  // project. Without the hint, `git -C /projB status` while cwd=/projA
+  // misattributes to /projA.
+  const out: SessionEvent[] = [];
+  if (parsed?.scopedDir) {
+    out.push({
+      type: "cwd",
+      category: "cwd",
+      data: safeString(parsed.scopedDir),
+      priority: 2,
+    });
+  }
+
+  if (match.operation === "commit") {
+    const msg = extractCommitMessageFromCommand(cmd);
+    if (msg) {
+      out.push({
+        type: "git_commit",
+        category: "git",
+        data: safeString(msg),
+        priority: 2,
+      });
+      return out;
+    }
+  }
+
+  out.push({
     type: "git",
     category: "git",
     data: safeString(match.operation),
     priority: 2,
-  }];
+  });
+  return out;
+}
+
+// Algorithmic git invocation parser — tokenizes the Bash command and walks
+// argv to extract the `-C <dir>` scope hint and the operation subcommand.
+// Tolerates env-prefix assignments and any number of flags between `git`
+// and the operation. Returns null when no `git` token is found (caller
+// falls back to the legacy regex pattern scan).
+interface ParsedGit {
+  scopedDir: string | null;
+  operation: string | null;
+}
+
+/**
+ * Gap #2 (16-oss-verify-gap-prd) — expand leading `~` / `~/` to homedir.
+ * Does NOT support `~user/path` (no current-user resolution at bridge
+ * layer; that requires a passwd lookup). Returns input unchanged when
+ * there is no tilde or the path starts with `~<otheruser>`.
+ */
+function expandHomeTilde(path: string): string {
+  if (typeof path !== "string" || path.length === 0) return path;
+  if (path === "~") return getHomedirSafe();
+  if (path.startsWith("~/")) return getHomedirSafe() + path.slice(1);
+  return path;
+}
+
+/**
+ * Lazily-resolved homedir — avoids a require/import at module init time.
+ * Falls back to "~" (no-op expansion) when the environment is sandboxed
+ * without HOME / USERPROFILE.
+ */
+function getHomedirSafe(): string {
+  try {
+    const home = process.env.HOME
+      || process.env.USERPROFILE
+      || (process.env.HOMEDRIVE && process.env.HOMEPATH
+          ? process.env.HOMEDRIVE + process.env.HOMEPATH
+          : "");
+    return home || "~";
+  } catch {
+    return "~";
+  }
+}
+
+function parseGitInvocation(cmd: string): ParsedGit | null {
+  const tokens = tokenizeCommand(cmd);
+  let i = 0;
+  // Skip env-style assignments at the head (FOO=bar git ...)
+  while (i < tokens.length && isEnvAssignment(tokens[i])) i++;
+  // Locate the `git` token (allow common runners like `sudo git ...`)
+  while (i < tokens.length && tokens[i] !== "git" && !tokens[i].endsWith("/git")) {
+    // Stop runner-skipping at the first non-assignment, non-runner token
+    if (!isCommonRunner(tokens[i])) break;
+    i++;
+  }
+  if (i >= tokens.length) return null;
+  if (tokens[i] !== "git" && !tokens[i].endsWith("/git")) return null;
+  i++; // consume `git`
+
+  let scopedDir: string | null = null;
+  let operation: string | null = null;
+  while (i < tokens.length) {
+    const t = tokens[i];
+    if (t === "-C" || t === "--directory") {
+      scopedDir = tokens[i + 1] ?? null;
+      i += 2;
+      continue;
+    }
+    // Gap #2 — `--directory=/path` equals-form (tokenizer keeps it as one)
+    if (t.startsWith("--directory=")) {
+      scopedDir = t.slice("--directory=".length);
+      i++;
+      continue;
+    }
+    if (t.length > 0 && t[0] === "-") {
+      // Generic flag — skip the flag itself. We do NOT consume the next
+      // token as its value generically because git's per-flag arg shape
+      // varies; the dedicated extractCommitMessageFromCommand handles -m
+      // separately.
+      i++;
+      continue;
+    }
+    // First bare (non-flag) token after `git` = operation
+    operation = t;
+    break;
+  }
+  if (scopedDir) scopedDir = expandHomeTilde(scopedDir);
+  return { scopedDir, operation };
+}
+
+function isEnvAssignment(token: string): boolean {
+  if (token.length === 0) return false;
+  // FOO=bar shape: starts with an uppercase letter, contains an `=`
+  let sawEq = false;
+  for (let j = 0; j < token.length; j++) {
+    const c = token.charCodeAt(j);
+    if (j === 0) {
+      // First char must be A-Z or underscore
+      if (!((c >= 65 && c <= 90) || c === 95)) return false;
+    } else if (c === 61 /* = */) {
+      sawEq = true;
+      break;
+    } else if (!((c >= 65 && c <= 90) || (c >= 48 && c <= 57) || c === 95)) {
+      // Body chars must be A-Z, 0-9, or _
+      return false;
+    }
+  }
+  return sawEq;
+}
+
+function isCommonRunner(token: string): boolean {
+  // Runners that wrap real commands. We skip them when locating `git`
+  // so `sudo git status` works the same as `git status`.
+  switch (token) {
+    case "sudo":
+    case "doas":
+    case "env":
+    case "exec":
+    case "time":
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Shell-like argv tokenizer — handles single/double quotes, backslash escapes,
+// and merges adjacent quoted/unquoted segments per POSIX shell behavior
+// (`echo a"b c"d` → ["ab cd"]). Pure char loop; no regex.
+function tokenizeCommand(cmd: string): string[] {
+  const tokens: string[] = [];
+  const n = cmd.length;
+  let i = 0;
+  while (i < n) {
+    while (i < n && (cmd[i] === " " || cmd[i] === "\t")) i++;
+    if (i >= n) break;
+    let buf = "";
+    while (i < n && cmd[i] !== " " && cmd[i] !== "\t") {
+      const ch = cmd[i];
+      if (ch === '"' || ch === "'") {
+        const quote = ch;
+        i++;
+        while (i < n && cmd[i] !== quote) {
+          if (cmd[i] === "\\" && i + 1 < n) {
+            buf += cmd[i + 1];
+            i += 2;
+          } else {
+            buf += cmd[i];
+            i++;
+          }
+        }
+        if (i < n) i++; // consume closing quote
+      } else if (ch === "\\" && i + 1 < n) {
+        buf += cmd[i + 1];
+        i += 2;
+      } else {
+        buf += ch;
+        i++;
+      }
+    }
+    tokens.push(buf);
+  }
+  return tokens;
+}
+
+// Linear scan over argv looking for a commit-message-bearing flag:
+//   --message=<value>   long form, attached value
+//   --message <value>   long form, separate token
+//   -m / -am / -cm ...  short cluster ending in 'm', value in next token
+// Returns null when no message arg is present — caller falls back to
+// operation name. Pure char checks; no regex.
+function extractCommitMessageFromCommand(cmd: string): string | null {
+  const argv = tokenizeCommand(cmd);
+  const longPrefix = "--message=";
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    // Long form: --message=VALUE
+    if (arg.length > longPrefix.length && arg.startsWith(longPrefix)) {
+      const v = arg.slice(longPrefix.length);
+      return v.length > 0 ? v : null;
+    }
+    // Long form: --message VALUE
+    if (arg === "--message") {
+      const v = argv[i + 1];
+      return v && v.length > 0 ? v : null;
+    }
+    // Short cluster ending in 'm' (e.g. -m, -am, -cm). Cluster must be
+    // single-dash followed by only lowercase letters, last letter 'm'.
+    if (
+      arg.length >= 2 &&
+      arg[0] === "-" &&
+      arg[1] !== "-" &&
+      arg[arg.length - 1] === "m" &&
+      isLowerAlphaRun(arg, 1)
+    ) {
+      const v = argv[i + 1];
+      return v && v.length > 0 ? v : null;
+    }
+  }
+  return null;
+}
+
+function isLowerAlphaRun(s: string, start: number): boolean {
+  if (start >= s.length) return false;
+  for (let i = start; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 97 || c > 122) return false; // not a-z
+  }
+  return true;
 }
 
 /**
@@ -383,6 +644,39 @@ function extractTask(input: HookInput): SessionEvent[] {
  * Note: Shift+Tab and /plan command do NOT fire PostToolUse hooks
  * (Claude Code bug #15660). Only programmatic EnterPlanMode is tracked.
  */
+/**
+ * FNV-1a 32-bit hash → 8-char lowercase hex. Stable across runs/platforms.
+ * Used for plan_hash so identical plans dedupe at the platform side.
+ */
+function fnv1a32Hex(s: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    hash ^= s.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * Read the plan text from the ExitPlanMode envelope. SDK carries it on
+ * the OUTPUT (ExitPlanModeOutput @ :2222), but the PRD body cites input.
+ * Try both so we are spec-flexible.
+ */
+function extractExitPlanText(input: HookInput): string | null {
+  const inputPlan = input.tool_input["plan"];
+  if (typeof inputPlan === "string" && inputPlan.length > 0) return inputPlan;
+  const resp = input.tool_response;
+  if (typeof resp === "string" && resp.length > 0) {
+    try {
+      const parsed = JSON.parse(resp);
+      if (parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).plan === "string") {
+        return (parsed as Record<string, unknown>).plan as string;
+      }
+    } catch { /* fall through */ }
+  }
+  return null;
+}
+
 function extractPlan(input: HookInput): SessionEvent[] {
   if (input.tool_name === "EnterPlanMode") {
     return [{
@@ -398,12 +692,23 @@ function extractPlan(input: HookInput): SessionEvent[] {
 
     // Plan exit event with allowedPrompts detail
     const prompts = input.tool_input["allowedPrompts"];
-    const detail = Array.isArray(prompts) && prompts.length > 0
+    let detail = Array.isArray(prompts) && prompts.length > 0
       ? `exited plan mode (allowed: ${safeStringAny(prompts.map((p: unknown) => {
           if (typeof p === "object" && p !== null && "prompt" in p) return String((p as Record<string, unknown>).prompt);
           return String(p);
         }).join(", "))})`
       : "exited plan mode";
+
+    // §11 / PRD #6 — append plan_bytes + plan_hash so the platform can
+    // dedupe identical plans across sessions and JOIN plan_mode_authorized
+    // writes against a stable plan id. Plan source: tool_input.plan first
+    // (per PRD), fall back to tool_response.plan (SDK actually carries it
+    // there per ExitPlanModeOutput @ sdk-tools.d.ts:2222).
+    const plan = extractExitPlanText(input);
+    if (typeof plan === "string" && plan.length > 0) {
+      detail += ` plan_bytes:${plan.length} plan_hash:${fnv1a32Hex(plan)}`;
+    }
+
     events.push({
       type: "plan_exit",
       category: "plan",
@@ -868,16 +1173,296 @@ function extractExternalRef(input: HookInput): SessionEvent[] {
 
 /**
  * Category 8: env (worktree)
- * EnterWorktree tool — tracks worktree creation.
+ * EnterWorktree + ExitWorktree tools — tracks worktree lifecycle.
  */
 function extractWorktree(input: HookInput): SessionEvent[] {
-  if (input.tool_name !== "EnterWorktree") return [];
+  if (input.tool_name === "EnterWorktree") {
+    const name = String(input.tool_input["name"] ?? "unnamed");
+    return [{
+      type: "worktree",
+      category: "env",
+      data: safeString(`entered worktree: ${name}`),
+      priority: 2,
+    }];
+  }
 
-  const name = String(input.tool_input["name"] ?? "unnamed");
+  if (input.tool_name === "ExitWorktree") {
+    const discard = Boolean(input.tool_input["discard_changes"]);
+    return [{
+      type: "worktree_exit",
+      category: "env",
+      data: safeString(`exited worktree (discard_changes:${discard})`),
+      priority: 2,
+    }];
+  }
+
+  return [];
+}
+
+/**
+ * Algorithmic URL host extraction — no regex.
+ * Skips scheme, returns everything up to the first path/query/fragment marker.
+ * Port is preserved as part of the host signature.
+ */
+function extractHostFromUrl(url: string): string | null {
+  if (typeof url !== "string" || url.length === 0) return null;
+  const protoEnd = url.indexOf("://");
+  if (protoEnd < 0) return null;
+  const start = protoEnd + 3;
+  if (start >= url.length) return null;
+  let end = url.length;
+  for (let i = start; i < url.length; i++) {
+    const c = url.charCodeAt(i);
+    if (c === 47 || c === 63 || c === 35) { end = i; break; }
+  }
+  const host = url.slice(start, end);
+  return host.length > 0 ? host : null;
+}
+
+/**
+ * WebFetch response metadata — captures bytes/code/durationMs and host
+ * (privacy: never the full URL or query string). Redirect-loop detection
+ * is temporal, not single-field — SDK has no redirect_url.
+ */
+function extractWebFetchMetadata(input: HookInput): SessionEvent[] {
+  if (input.tool_name !== "WebFetch") return [];
+  const resp = input.tool_response;
+  if (typeof resp !== "string" || resp.length === 0) return [];
+
+  let parsed: unknown;
+  try { parsed = JSON.parse(resp); } catch { return []; }
+  if (!parsed || typeof parsed !== "object") return [];
+
+  const obj = parsed as Record<string, unknown>;
+  const parts: string[] = [];
+
+  if (typeof obj.code === "number") parts.push(`code:${obj.code}`);
+  if (typeof obj.bytes === "number") parts.push(`bytes:${obj.bytes}`);
+  if (typeof obj.durationMs === "number") parts.push(`durMs:${obj.durationMs}`);
+  if (typeof obj.url === "string") {
+    const host = extractHostFromUrl(obj.url);
+    if (host) parts.push(`host:${host}`);
+  }
+
+  if (parts.length === 0) return [];
+
   return [{
-    type: "worktree",
-    category: "env",
-    data: safeString(`entered worktree: ${name}`),
+    type: "webfetch_metadata",
+    category: "data",
+    data: safeString(parts.join(" ")),
+    priority: 3,
+  }];
+}
+
+/**
+ * Bash outcome signals — captures the three fields that DO exist on
+ * BashOutput (SDK :2160-2200): interrupted (boolean), stderr (length-only
+ * for privacy), returnCodeInterpretation (semantic non-zero exit hint).
+ * NO exit_code field exists in the SDK.
+ */
+function extractBashOutcome(input: HookInput): SessionEvent[] {
+  if (input.tool_name !== "Bash") return [];
+  const resp = input.tool_response;
+  if (typeof resp !== "string" || resp.length === 0) return [];
+
+  let parsed: unknown;
+  try { parsed = JSON.parse(resp); } catch { return []; }
+  if (!parsed || typeof parsed !== "object") return [];
+
+  const obj = parsed as Record<string, unknown>;
+  const hasSignal =
+    typeof obj.interrupted === "boolean" ||
+    typeof obj.stderr === "string" ||
+    typeof obj.returnCodeInterpretation === "string";
+  if (!hasSignal) return [];
+
+  const parts: string[] = [];
+  if (typeof obj.interrupted === "boolean") {
+    parts.push(`interrupted:${obj.interrupted}`);
+  }
+  if (typeof obj.returnCodeInterpretation === "string") {
+    parts.push(`rcInterp:${obj.returnCodeInterpretation.slice(0, 80)}`);
+  }
+  if (typeof obj.stderr === "string") {
+    parts.push(`stderrBytes:${obj.stderr.length}`);
+  }
+
+  return [{
+    type: "bash_outcome",
+    category: "data",
+    data: safeString(parts.join(" ")),
+    priority: 3,
+  }];
+}
+
+/**
+ * FileReadOutput size metadata — branches on the text/image variant.
+ * Captures sizes/line counts only; never file content. Image dimensions
+ * are formatted as "WxH" when both width/height are numeric.
+ */
+function extractFileReadMetadata(input: HookInput): SessionEvent[] {
+  if (input.tool_name !== "Read") return [];
+  const resp = input.tool_response;
+  if (typeof resp !== "string" || resp.length === 0) return [];
+
+  let parsed: unknown;
+  try { parsed = JSON.parse(resp); } catch { return []; }
+  if (!parsed || typeof parsed !== "object") return [];
+
+  const obj = parsed as Record<string, unknown>;
+  const variant = obj.type;
+  if (variant !== "text" && variant !== "image") return [];
+
+  const parts: string[] = [`type:${variant}`];
+
+  if (variant === "text") {
+    if (typeof obj.numLines === "number") parts.push(`lines:${obj.numLines}`);
+    if (typeof obj.totalLines === "number") parts.push(`totalLines:${obj.totalLines}`);
+    if (typeof obj.startLine === "number") parts.push(`start:${obj.startLine}`);
+  } else {
+    if (typeof obj.originalSize === "number") parts.push(`origSize:${obj.originalSize}`);
+    const dims = obj.dimensions;
+    if (dims && typeof dims === "object") {
+      const d = dims as Record<string, unknown>;
+      if (typeof d.width === "number" && typeof d.height === "number") {
+        parts.push(`dims:${d.width}x${d.height}`);
+      }
+    }
+  }
+
+  return [{
+    type: "file_read_metadata",
+    category: "data",
+    data: safeString(parts.join(" ")),
+    priority: 3,
+  }];
+}
+
+/**
+ * Per-model USD price table — Anthropic public list pricing, $/MTok.
+ * Verified against platform.claude.com/docs/en/about-claude/pricing,
+ * cloudzero.com, finout.io 2026-06 (cache: 5-min cache_write = 1.25× input,
+ * cache_read = 0.10× input). Fast-mode variants (e.g. opus-4-8-fast at
+ * $10/$50) are intentionally NOT mapped — they ship as separate model
+ * ids and would dilute the standard-tier dashboards if blended here.
+ *
+ * NOTE: 16-oss-verify-gap-prd Gap #1 quoted Opus at $15/$75 — that is
+ * the prior Opus 4 (non-4.7) rate. Opus 4.7 and 4.8 ship at $5/$25.
+ */
+const MODEL_PRICING_USD_PER_MTOK: Record<string, {
+  input: number;
+  output: number;
+  cache_write: number;
+  cache_read: number;
+}> = {
+  "claude-opus-4-8":   { input: 5.00, output: 25.00, cache_write: 6.25, cache_read: 0.50 },
+  "claude-opus-4-7":   { input: 5.00, output: 25.00, cache_write: 6.25, cache_read: 0.50 },
+  "claude-sonnet-4-6": { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 },
+  "claude-haiku-4-5":  { input: 1.00, output:  5.00, cache_write: 1.25, cache_read: 0.10 },
+  default:             { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 },
+};
+
+function resolveModelKey(input: HookInput, parsedResp: Record<string, unknown>): string {
+  const candidates: unknown[] = [
+    input.tool_input?.model,
+    (input as unknown as Record<string, unknown>).model,
+    parsedResp.model,
+  ];
+  const keys = Object.keys(MODEL_PRICING_USD_PER_MTOK).filter((k) => k !== "default");
+  for (const c of candidates) {
+    if (typeof c !== "string" || c.length === 0) continue;
+    if (c in MODEL_PRICING_USD_PER_MTOK) return c;
+    // Prefix match for date-suffixed model ids
+    // (e.g. claude-haiku-4-5-20251001 → claude-haiku-4-5)
+    for (const key of keys) {
+      if (c.startsWith(key)) return key;
+    }
+  }
+  return "default";
+}
+
+function computeCostUsd(
+  modelKey: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreationTokens: number,
+  cacheReadTokens: number,
+): number {
+  const price = MODEL_PRICING_USD_PER_MTOK[modelKey] ?? MODEL_PRICING_USD_PER_MTOK.default;
+  const totalMicroDollars =
+    inputTokens * price.input +
+    outputTokens * price.output +
+    cacheCreationTokens * price.cache_write +
+    cacheReadTokens * price.cache_read;
+  return totalMicroDollars / 1_000_000;
+}
+
+/**
+ * AgentOutput.usage capture — fires on the Task sub-agent dispatcher.
+ * Captures the 7 cost/perf fields from sdk-tools.d.ts:64-75. Derives
+ * cost_usd from per-model pricing (Gap #1 fix). The platform persists
+ * these as typed columns post-release; the bridge emits them as
+ * structured tokens in event.data for forward-compatible ingestion.
+ */
+function extractAgentUsage(input: HookInput): SessionEvent[] {
+  if (input.tool_name !== "Task") return [];
+  const resp = input.tool_response;
+  if (typeof resp !== "string" || resp.length === 0) return [];
+
+  let parsed: unknown;
+  try { parsed = JSON.parse(resp); } catch { return []; }
+  if (!parsed || typeof parsed !== "object") return [];
+
+  const out = parsed as Record<string, unknown>;
+  const usage = (out.usage && typeof out.usage === "object")
+    ? out.usage as Record<string, unknown>
+    : {};
+
+  const hasSignal =
+    typeof out.totalTokens === "number" ||
+    typeof out.totalDurationMs === "number" ||
+    typeof usage.input_tokens === "number" ||
+    typeof usage.output_tokens === "number" ||
+    typeof usage.service_tier === "string";
+  if (!hasSignal) return [];
+
+  const parts: string[] = [];
+  if (typeof out.totalTokens === "number") parts.push(`totalTokens:${out.totalTokens}`);
+  if (typeof out.totalDurationMs === "number") parts.push(`totalDurMs:${out.totalDurationMs}`);
+  if (typeof usage.input_tokens === "number") parts.push(`tokens_in:${usage.input_tokens}`);
+  if (typeof usage.output_tokens === "number") parts.push(`tokens_out:${usage.output_tokens}`);
+  if (typeof usage.cache_creation_input_tokens === "number") {
+    parts.push(`cache_create:${usage.cache_creation_input_tokens}`);
+  }
+  if (typeof usage.cache_read_input_tokens === "number") {
+    parts.push(`cache_read:${usage.cache_read_input_tokens}`);
+  }
+  if (typeof usage.service_tier === "string") {
+    parts.push(`tier:${usage.service_tier.slice(0, 32)}`);
+  }
+
+  // Gap #1 (16-oss-verify-gap-prd) — derive cost_usd from per-model pricing
+  // when at least one token count is present. Zero-token case skips cost
+  // so dashboard never shows misleading "$0.00 for nothing" rows.
+  const inputTokens = typeof usage.input_tokens === "number" ? usage.input_tokens : 0;
+  const outputTokens = typeof usage.output_tokens === "number" ? usage.output_tokens : 0;
+  const cacheCreate = typeof usage.cache_creation_input_tokens === "number"
+    ? usage.cache_creation_input_tokens
+    : 0;
+  const cacheRead = typeof usage.cache_read_input_tokens === "number"
+    ? usage.cache_read_input_tokens
+    : 0;
+  const anyTokens = inputTokens > 0 || outputTokens > 0 || cacheCreate > 0 || cacheRead > 0;
+  if (anyTokens) {
+    const modelKey = resolveModelKey(input, out);
+    const cost = computeCostUsd(modelKey, inputTokens, outputTokens, cacheCreate, cacheRead);
+    parts.push(`cost_usd:${cost.toFixed(6).replace(/0+$/, "").replace(/\.$/, ".0")}`);
+  }
+
+  return [{
+    type: "agent_usage",
+    category: "cost",
+    data: safeString(parts.join(" ")),
     priority: 2,
   }];
 }
@@ -1343,6 +1928,10 @@ export function extractEvents(rawInput: HookInput): SessionEvent[] {
     events.push(...extractDecision(input));
     events.push(...extractConstraint(input));
     events.push(...extractWorktree(input));
+    events.push(...extractWebFetchMetadata(input));
+    events.push(...extractBashOutcome(input));
+    events.push(...extractFileReadMetadata(input));
+    events.push(...extractAgentUsage(input));
     events.push(...extractAgentFinding(input));
     events.push(...extractExternalRef(input));
 
@@ -1367,6 +1956,7 @@ export function extractUserEvents(message: string): SessionEvent[] {
   try {
     const events: SessionEvent[] = [];
 
+    events.push(...extractUserPlan(message));
     events.push(...extractUserDecision(message));
     events.push(...extractRole(message));
     events.push(...extractIntent(message));
@@ -1378,4 +1968,190 @@ export function extractUserEvents(message: string): SessionEvent[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Issue #4 (new PRD) — SessionStart settings + MCP servers snapshot.
+ *
+ * Emits ONE session_settings_snapshot event when ≥1 setting is available
+ * on the SessionStart input. The data field carries key:value tokens
+ * (mcp_count, mcp_servers, model, permission_mode) so the platform can
+ * compute MCP integration counts and primary-model adoption per org.
+ * mcp_servers list is truncated to first 8 names.
+ */
+export function extractSessionSettings(input: unknown): SessionEvent[] {
+  if (!input || typeof input !== "object") return [];
+
+  const obj = input as Record<string, unknown>;
+  const parts: string[] = [];
+
+  const mcpServers = obj.mcp_servers;
+  let mcpKeys: string[] | null = null;
+  if (mcpServers && typeof mcpServers === "object" && !Array.isArray(mcpServers)) {
+    mcpKeys = Object.keys(mcpServers as Record<string, unknown>);
+    parts.push(`mcp_count:${mcpKeys.length}`);
+    if (mcpKeys.length > 0) {
+      parts.push(`mcp_servers:${mcpKeys.slice(0, 8).join(",")}`);
+    }
+  }
+
+  if (typeof obj.model === "string") {
+    parts.push(`model:${obj.model.slice(0, 64)}`);
+  }
+
+  if (typeof obj.permission_mode === "string") {
+    parts.push(`permission_mode:${obj.permission_mode.slice(0, 32)}`);
+  }
+
+  if (parts.length === 0) return [];
+
+  return [{
+    type: "session_settings_snapshot",
+    category: "env",
+    data: safeString(parts.join(" ")),
+    priority: 2,
+  }];
+}
+
+/**
+ * §11 Layer 1 + Layer 3 — multilingual prompt features.
+ *
+ * Reference: context-mode-platform/docs/prds/2026-06-insight-data-flow/
+ *   11-multilingual-prompt-algorithm.md
+ *
+ * Script-agnostic via Unicode property regex (`\p{L}`, `\p{Lu}`,
+ * `\p{Script=X}`). No per-language tables, no franc/fasttext deps.
+ * Layer 1 returns 10 numeric/string features; Layer 3 appends a
+ * `prompt_word_tokens: string[]` array for the platform's streaming
+ * word-frequency UPSERT.
+ *
+ * Privacy: features carry no prose. Layer 3 tokens are deduped
+ * letter-only words ≥3 chars; platform aggregates by (org_id, week,
+ * word) so no individual token surfaces in UI.
+ */
+export interface PromptFeatures {
+  prompt_length: number;
+  prompt_word_count: number;
+  prompt_uppercase_ratio: number;
+  prompt_file_ref_count: number;
+  prompt_path_ref_count: number;
+  prompt_script_primary: string | null;
+  prompt_script_count: number;
+  prompt_question_glyph_count: number;
+  prompt_code_block_count: number;
+  prompt_url_count: number;
+  prompt_word_tokens: string[];
+}
+
+const PROMPT_SCRIPT_NAMES = [
+  "Latin", "Cyrillic", "Arabic", "Han", "Hangul",
+  "Hiragana", "Katakana", "Devanagari", "Hebrew", "Thai", "Greek",
+] as const;
+
+const EMPTY_PROMPT_FEATURES: PromptFeatures = {
+  prompt_length: 0,
+  prompt_word_count: 0,
+  prompt_uppercase_ratio: 0,
+  prompt_file_ref_count: 0,
+  prompt_path_ref_count: 0,
+  prompt_script_primary: null,
+  prompt_script_count: 0,
+  prompt_question_glyph_count: 0,
+  prompt_code_block_count: 0,
+  prompt_url_count: 0,
+  prompt_word_tokens: [],
+};
+
+/**
+ * Verbatim mirror of §11 Layer 1 reference implementation + Layer 3
+ * token extraction. Uses Unicode property regex per the spec — the
+ * "no regex" project default does NOT apply here because the spec
+ * explicitly mandates `\p{Script=X}` for script-agnostic classification.
+ */
+export function extractUserPromptFeatures(prompt: unknown): PromptFeatures {
+  if (typeof prompt !== "string" || prompt.length === 0) {
+    return { ...EMPTY_PROMPT_FEATURES, prompt_word_tokens: [] };
+  }
+
+  const letters = prompt.match(/\p{L}+/gu) ?? [];
+  const upperCount = (prompt.match(/\p{Lu}/gu) ?? []).length;
+  const totalLetters = letters.join("").length;
+  const fences = (prompt.match(/```/g) ?? []).length;
+
+  const scripts: Record<string, number> = {};
+  for (const name of PROMPT_SCRIPT_NAMES) {
+    const re = new RegExp(`\\p{Script=${name}}`, "gu");
+    const n = (prompt.match(re) ?? []).length;
+    if (n > 0) scripts[name] = n;
+  }
+  const primary =
+    Object.entries(scripts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+  for (const word of letters) {
+    if (word.length < 3) continue;
+    const lower = word.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    tokens.push(lower);
+  }
+
+  return {
+    prompt_length: prompt.length,
+    prompt_word_count: letters.length,
+    prompt_uppercase_ratio: totalLetters === 0 ? 0 : upperCount / totalLetters,
+    prompt_file_ref_count: (prompt.match(/(\w+\/)+\w+\.\w+/g) ?? []).length,
+    prompt_path_ref_count: (prompt.match(/\.{0,2}\/[\w\/.-]+/g) ?? []).length,
+    prompt_script_primary: primary,
+    prompt_script_count: Object.keys(scripts).length,
+    prompt_question_glyph_count: (prompt.match(/[?？؟]/gu) ?? []).length,
+    prompt_code_block_count: Math.floor(fences / 2),
+    prompt_url_count: (prompt.match(/https?:\/\/[^\s]+/gu) ?? []).length,
+    prompt_word_tokens: tokens,
+  };
+}
+
+/**
+ * UserPromptSubmit-driven `/plan` slash detector.
+ *
+ * Compensates for Claude Code Bug #15660: programmatic EnterPlanMode tool
+ * calls fire PostToolUse, but the `/plan` slash command and Shift+Tab do
+ * NOT. Shift+Tab is unrecoverable from the OSS bridge without an upstream
+ * SDK change; this detector handles the slash case.
+ *
+ * Algorithmic (no regex): tolerate leading whitespace, require lowercase
+ * "/plan", reject longer slashes like "/plans" via the next-char check.
+ */
+function extractUserPlan(message: string): SessionEvent[] {
+  if (typeof message !== "string" || message.length === 0) return [];
+
+  let i = 0;
+  while (i < message.length) {
+    const c = message.charCodeAt(i);
+    if (c !== 32 && c !== 9) break;
+    i++;
+  }
+
+  if (i + 5 > message.length) return [];
+  if (message.slice(i, i + 5) !== "/plan") return [];
+
+  if (i + 5 < message.length) {
+    const next = message.charCodeAt(i + 5);
+    const isWordBoundary =
+      next === 32 || next === 9 || next === 10 || next === 13;
+    if (!isWordBoundary) return [];
+  }
+
+  const arg = message.slice(i + 5).trim();
+  const detail = arg.length > 0
+    ? `plan via /plan slash: ${arg.slice(0, 120)}`
+    : "plan via /plan slash";
+
+  return [{
+    type: "plan_enter",
+    category: "plan",
+    data: safeString(detail),
+    priority: 2,
+  }];
 }

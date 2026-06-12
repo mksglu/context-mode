@@ -79,7 +79,7 @@ function baseLifetime(): LifetimeStats {
  * narrative renderer (section 4 — "For example: what would that cost?").
  */
 function extractLifetimeUsd(text: string): number {
-  const m = text.match(/\$(\d+(?:\.\d+)?) of Opus 4 tokens/);
+  const m = text.match(/\$(\d+(?:\.\d+)?) of Opus 4.7 tokens/);
   if (!m) throw new Error(`section-4 Opus line not found in:\n${text}`);
   return parseFloat(m[1]);
 }
@@ -106,7 +106,7 @@ describe("formatReport — Phase 8 realBytes opt", () => {
     });
     // Conservative estimate: 16,366 lifetime events × 256 / 4 + rescue = ~$69
     // The narrative renderer surfaces this via section 4's Opus-4 line.
-    expect(text).toMatch(/\$\d+\.\d+ of Opus 4 tokens/);
+    expect(text).toMatch(/\$\d+\.\d+ of Opus 4.7 tokens/);
   });
 
   test("8.2 realBytes lifts lifetime $ above the conservative estimate", () => {

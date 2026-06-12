@@ -314,9 +314,11 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
 
   // Slice 2 RED: with TWO real adapters seeded under HOME, the statusline
   // surfaces the cross-tool aggregate. Counts adapters via "across N tools".
-  // 60s timeout for the same reason as the slice 1 test above — Windows is
-  // slow at fork+exec and the multi-adapter walk multiplies the cost.
-  test("renders 'across N tools' when 2+ real adapters detected", { timeout: 60_000 }, () => {
+  // Reuses STATUSLINE_SQLITE_TIMEOUT_MS (300s Windows / 30s elsewhere) for
+  // parity with the slice 1 test — Windows is slow at fork+exec and the
+  // multi-adapter walk multiplies the cost. The previously-hardcoded 60s
+  // tripped on Windows runner load (CI #401 observed 186s with retry x2).
+  test("renders 'across N tools' when 2+ real adapters detected", { timeout: STATUSLINE_SQLITE_TIMEOUT_MS }, () => {
     seedRealAdapter(join(home, ".claude", "context-mode", "sessions"), "claude");
     seedRealAdapter(join(home, ".gemini", "context-mode", "sessions"), "gemini");
 

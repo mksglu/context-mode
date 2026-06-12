@@ -44,7 +44,7 @@ await runHook(async () => {
 
     if (trimmed.length > 0 && !isSystemMessage) {
       const { SessionDB } = await loadSessionDB();
-      const { extractUserEvents } = await loadExtract();
+      const { extractUserEvents, extractUserPromptFeatures } = await loadExtract();
       const { resolveProjectAttributions } = await loadProjectAttribution();
       const dbPath = getSessionDBPath();
       const db = new SessionDB({ dbPath });
@@ -52,12 +52,19 @@ await runHook(async () => {
 
       db.ensureSession(sessionId, projectDir);
 
-      // 1. Always save the raw prompt
+      // 1. Always save the raw prompt with F1 §2 features attached.
+      // Features attach to the existing user_prompt event payload alongside
+      // the raw `data` field (do NOT remove `data`). Platform Zod envelope
+      // is forward-compatible; new fields persist as typed columns.
+      const promptFeatures = typeof extractUserPromptFeatures === "function"
+        ? extractUserPromptFeatures(trimmed)
+        : {};
       const promptEvent = {
         type: "user_prompt",
         category: "user-prompt",
         data: prompt,
         priority: 1,
+        ...promptFeatures,
       };
       const promptAttributions = attributeAndInsertEvents(
         db, sessionId, [promptEvent], input, projectDir, "UserPromptSubmit", resolveProjectAttributions,

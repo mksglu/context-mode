@@ -80,7 +80,7 @@ describe("zod3ShapeToV4", () => {
     expect((result.config as any)._zod).toBeDefined();
   });
 
-  it("converts ZodEffects (strips to inner schema)", () => {
+  it("preserves ZodEffects preprocess — coerces string to array", () => {
     const z3Shape = {
       input: z.preprocess(
         (val) => (typeof val === "string" ? val.split(",") : val),
@@ -89,6 +89,40 @@ describe("zod3ShapeToV4", () => {
     };
     const result = zod3ShapeToV4(z3Shape as Record<string, unknown>);
     expect((result.input as any)._zod).toBeDefined();
+    // The preprocess must survive: a comma-separated string should be accepted
+    // and split into an array.
+    const parsed = (result.input as any).safeParse("a,b,c");
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toEqual(["a", "b", "c"]);
+    // Non-string arrays pass through unchanged.
+    const parsed2 = (result.input as any).safeParse(["x", "y"]);
+    expect(parsed2.success).toBe(true);
+    expect(parsed2.data).toEqual(["x", "y"]);
+  });
+
+  it("preserves ZodEffects preprocess — coerces string to boolean", () => {
+    const coerceBool = (val: unknown) =>
+      typeof val === "string"
+        ? val.trim().toLowerCase() === "true"
+        : val;
+    const z3Shape = {
+      force: z.preprocess(coerceBool, z.boolean()),
+    };
+    const result = zod3ShapeToV4(z3Shape as Record<string, unknown>);
+    expect((result.force as any)._zod).toBeDefined();
+    expect((result.force as any).safeParse("true").data).toBe(true);
+    expect((result.force as any).safeParse("false").data).toBe(false);
+    expect((result.force as any).safeParse(true).data).toBe(true);
+  });
+
+  it("strips ZodEffects refinement to inner schema", () => {
+    const z3Shape = {
+      email: z.string().refine((v) => v.includes("@"), "must contain @"),
+    };
+    const result = zod3ShapeToV4(z3Shape as Record<string, unknown>);
+    expect((result.email as any)._zod).toBeDefined();
+    // Refinement is stripped — the inner string schema should accept any string
+    expect((result.email as any).safeParse("no-at-sign").success).toBe(true);
   });
 
   it("returns z.unknown() for null/non-object values", () => {

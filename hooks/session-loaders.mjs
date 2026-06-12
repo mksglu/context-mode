@@ -195,11 +195,14 @@ function enrichEventForPlatform(event, attribution) {
   if (event?.type === "blocker") enriched.blocker_status = "open";
   else if (event?.type === "blocker_resolved") enriched.blocker_status = "resolved";
 
-  // Git events: surface commit message + mark has_commit at the event level
-  // (rollup-level has_commit comes from the session-wide stamp; both win
-  // when set — `{...enriched, ...rollup}` order keeps rollup authoritative
-  // for non-git events while git events stay marked).
-  if (event?.category === "git" && dataStr.length > 0) {
+  // v1.0.161 (Bug 2): gate per-event commit_message + has_commit on
+  // type='git_commit', NOT category='git'. Non-commit git operations
+  // (push/diff/status) used to inflate commit_message with the operation
+  // name and falsely raise has_commit on rows that should have remained
+  // commit-neutral. The rollup spread now stamps both fields symmetrically
+  // from the session's latest actual commit — see SessionDB.getSessionRollup
+  // and src/session/extract.ts:extractGit type discriminator.
+  if (event?.type === "git_commit" && dataStr.length > 0) {
     enriched.commit_message = dataStr.slice(0, 500);
     enriched.has_commit = 1;
   }
