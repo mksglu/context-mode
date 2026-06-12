@@ -60,7 +60,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg-3);color:var(--a
 
 /* ── Typography ── */
 .section-num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.12em;text-transform:uppercase}
-.h1{font-family:var(--mono);font-size:clamp(3rem,8vw,5.5rem);font-weight:600;color:var(--fg);line-height:1;letter-spacing:-.03em;display:inline-flex;align-items:baseline;gap:0}
+.h1{font-family:var(--mono);font-size:clamp(3rem,8vw,5.5rem);font-weight:600;color:var(--fg);line-height:1;letter-spacing:-.03em;display:flex;align-items:baseline;gap:0}
 .h1 .prompt{color:var(--text-4);font-weight:500;margin-right:.18em}
 .h1 .dash{color:var(--accent-2)}
 .h1 .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em;box-shadow:0 0 24px rgba(16,185,129,.45);animation:blink 1.06s steps(2) infinite}
@@ -88,7 +88,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg-3);color:var(--a
 .hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,rgba(75,123,236,0.06) 0%,transparent 70%);pointer-events:none}
 .scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,0.012) 4px,transparent 5px);pointer-events:none;-webkit-mask-image:radial-gradient(ellipse at center,#000 30%,transparent 80%);mask-image:radial-gradient(ellipse at center,#000 30%,transparent 80%)}
 .hero-inner{position:relative;z-index:1}
-.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-3);margin-bottom:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-3);border:1px solid var(--border);border-radius:6px}
+.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-3);margin-top:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-3);border:1px solid var(--border);border-radius:6px;align-self:flex-start}
 .hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(16,185,129,.7)}
 .hero-tag a{color:var(--text-3)}
 .hero-sub{font-size:clamp(1.1rem,2.5vw,1.4rem);color:var(--text-2);font-weight:300;margin-top:22px;max-width:880px;line-height:1.55}
@@ -288,8 +288,8 @@ footer{padding:64px 0 40px;text-align:center;background:var(--bg-2);border-top:1
 <section class="hero">
   <div class="scan"></div>
   <div class="hero-inner wrap rev">
-    <p class="hero-tag"><span class="dot"></span>open-source plugin · ELv2 · part of <a href="/">Context Mode</a></p>
     <h1 class="h1"><span class="prompt">$</span>context<span class="dash">-</span>mode<span class="cursor"></span></h1>
+    <p class="hero-tag"><span class="dot"></span>open-source plugin · ELv2 · part of <a href="/">Context Mode</a></p>
     <p class="hero-sub">
       <strong>The other half of the context problem.</strong> An MCP plugin that sandboxes tool output and indexes it into a local FTS5 store. Your AI coding agent searches that store instead of re-sending raw bytes every turn. <em>15 platforms. <span class="js-user-count">287,000+</span> developers. Runs entirely on your machine.</em>
     </p>
