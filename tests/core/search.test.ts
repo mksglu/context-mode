@@ -1915,6 +1915,53 @@ describe("extractSnippet with highlight markers", () => {
   });
 });
 
+describe("extractSnippet collapses over-long separators", () => {
+  test("collapses an 80-char banner into a lossless ccc…×N marker", () => {
+    const banner = "=".repeat(80);
+    const content = `Section heading\n${banner}\nbody about connections.`;
+    const result = extractSnippet(content, "connections");
+    assert.ok(
+      result.includes("===…×80"),
+      `Expected banner collapsed to "===…×80", got: ${result}`,
+    );
+    assert.ok(!result.includes(banner), "Full 80-char banner should be gone");
+  });
+
+  test("leaves short markdown markup untouched (threshold is 12)", () => {
+    // "---" rule, "***" bold, "~~~" fence, "@@" diff hunk all stay verbatim.
+    const content = "intro\n---\n***\n~~~\n@@ connections @@\ntail";
+    const result = extractSnippet(content, "connections");
+    assert.equal(result, content);
+  });
+
+  test("collapse is lossless about original length via ×N suffix", () => {
+    const content = `lead connections ${"-".repeat(40)} trail`;
+    const result = extractSnippet(content, "connections");
+    assert.ok(
+      result.includes("---…×40"),
+      `Expected "---…×40" recording the 40-char run, got: ${result}`,
+    );
+  });
+
+  test("never touches whitespace runs", () => {
+    // 30 spaces are whitespace, not a separator — structure must survive.
+    const content = `connections${" ".repeat(30)}tail`;
+    const result = extractSnippet(content, "connections");
+    assert.equal(result, content);
+  });
+
+  test("collapses separators even when the snippet is windowed/truncated", () => {
+    const banner = "#".repeat(60);
+    const content = `Intro about connections ${banner} ${"tail word ".repeat(400)}`;
+    const result = extractSnippet(content, "connections", 1500);
+    assert.ok(result.length <= 1600, "snippet should stay bounded by maxLen");
+    assert.ok(
+      !/(\S)\1{11,}/.test(result),
+      `No 12+ char separator run should survive, got: ${result.slice(0, 160)}`,
+    );
+  });
+});
+
 describe("Store integration: highlighted field", () => {
   test("search returns highlighted field with STX/ETX markers", () => {
     const store = new ContentStore(":memory:");

@@ -1127,13 +1127,34 @@ function stripMarkers(highlighted: string): string {
   return highlighted.replaceAll(STX, "").replaceAll(ETX, "");
 }
 
+/**
+ * Collapse an over-long separator — a single non-whitespace character repeated
+ * 12+ times (e.g. "=" * 80 banners, "----" horizontal rules) — into `ccc…×N`.
+ * Decorative separators carried in indexed content waste context tokens on
+ * recall while conveying almost no information; the `×N` suffix keeps the
+ * result lossless about the original length.
+ *
+ * Threshold is 12 so real markup survives untouched: markdown rules ("---"),
+ * bold/em ("***", "___"), fence markers ("~~~"), diff hunks ("@@"). Only the
+ * separator character itself is touched — whitespace and newline structure are
+ * never altered, so this is safe to apply to an already-windowed snippet
+ * without disturbing FTS5 highlight offsets (computed before this runs).
+ */
+function collapseSeparators(text: string, keep = 3): string {
+  if (!text) return text;
+  return text.replace(
+    /(\S)\1{11,}/g,
+    (sep, ch: string) => ch.repeat(keep) + `…×${sep.length}`,
+  );
+}
+
 export function extractSnippet(
   content: string,
   query: string,
   maxLen = 1500,
   highlighted?: string,
 ): string {
-  if (content.length <= maxLen) return content;
+  if (content.length <= maxLen) return collapseSeparators(content);
 
   // Derive match positions from FTS5 highlight markers when available
   const positions: number[] = [];
@@ -1163,7 +1184,7 @@ export function extractSnippet(
 
   // No matches at all — return prefix
   if (positions.length === 0) {
-    return content.slice(0, maxLen) + "\n…";
+    return collapseSeparators(content.slice(0, maxLen)) + "\n…";
   }
 
   // Sort positions, merge overlapping windows
@@ -1193,7 +1214,7 @@ export function extractSnippet(
     total += part.length;
   }
 
-  return parts.join("\n\n");
+  return collapseSeparators(parts.join("\n\n"));
 }
 
 export type BatchQueryScope = "batch" | "global";
