@@ -327,14 +327,25 @@ robocopy . "$env:USERPROFILE\.cursor\plugins\local\context-mode" /MIR `
   /XF *.log .gitignore *.bundle.mjs.map
 ```
 
-**macOS / Linux:**
+**macOS / Linux:** - Cursor 3.5+ [no longer accepts](https://forum.cursor.com/t/local-plugins-symlink-on-windows-doesnt-work/159427/12) symlinks to targets outside `~/.cursor/plugins/local`, so use `rsync` to copy:
 
 ```bash
 git clone https://github.com/mksglu/context-mode.git
-ln -s "$PWD/context-mode" ~/.cursor/plugins/local/context-mode
+rsync -a --delete --exclude 'node_modules/' \
+  --exclude '.git/' \
+  --exclude 'build/' \
+  --exclude 'insight/' \
+  --exclude 'web/' \
+  --exclude 'tests/' \
+  --exclude 'scripts/' \
+  --exclude '.vscode/' \
+  --exclude '*.log' \
+  --exclude '.gitignore' \
+  --exclude '*.bundle.mjs.map' \
+  context-mode ~/.cursor/plugins/local/
 ```
 
-Restart Cursor. The plugin appears in **Settings → Plugins** as "Context Mode (Local)". To pull updates, re-run the same `robocopy` / `ln -s` line.
+Restart Cursor. The plugin appears in **Settings → Plugins** as "Context Mode (Local)". To pull updates, re-run the same `robocopy` / `rsync` line.
 
 > **Note:** if `.cursor/hooks.json` already contains context-mode entries from a prior `Option B` install, `context-mode doctor` will warn about duplicate hook firings. Remove one configuration to keep events single-fire.
 
