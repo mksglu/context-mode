@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Context Mode Insight — Engineering signal for AI-assisted teams</title>
+<meta name="description" content="The first Solution on Context Mode Platform. Per-engineer productivity rate, retry waste, role-narrowed views for CTO, EM, IC, CISO, FinOps. Built on the OSS plugin 287,000+ developers already trust. $20 / seat / month.">
+<link rel="canonical" href="https://context-mode.com/insight">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-insight-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-insight.png">
+
+<meta property="og:image" content="https://context-mode.com/og/insight.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta property="og:image:alt" content="Context Mode Insight — Engineering signal for AI-assisted teams">
+<meta property="og:url" content="https://context-mode.com/insight">
+<meta property="og:site_name" content="Context Mode">
+<meta name="twitter:site" content="@contextmode">
+<meta name="twitter:image" content="https://context-mode.com/og/insight.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Context Mode Insight — Engineering signal at $20/seat">
+<meta property="og:description" content="The first Solution on Context Mode Platform. Per-engineer productivity rate, role-narrowed views, built on the OSS plugin your team already runs.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Context Mode Insight — Engineering signal at $20/seat">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ── Tokens · Insight surface (light editorial) per brand/STRATEGY.md ── */
+:root{
+  --bg:#fff;--bg-alt:#f7f8fa;--bg-warm:#fbf9f3;
+  --ink:#0f1419;--text-2:#3d4854;--text-3:#6b7a8d;--text-4:#9ca8b6;
+  --border:#e3e7ec;--border-light:#eef0f3;
+  --accent:#1a56db;--accent-light:#e8effc;--accent-dark:#143faa;
+  --accent-dev:#10b981;--accent-dev-bg:#e6f5ee;
+  --purple:#5b21b6;--purple-light:#ede9fe;
+  --rose:#9f1239;--rose-light:#ffe4e6;
+  --orange:#b45309;--orange-light:#fef3c7;
+  --night:#0f1419;--night-2:#141c26;--night-3:#1e2a3a;
+  --cyan-dark:#4b7bec;--blue-pale:#a3bfff;--mint-dark:#5eead4;
+  --serif:'Instrument Serif',Georgia,serif;
+  --sans:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono','SF Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--text-2);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:1.6}
+::selection{background:var(--accent-light);color:var(--accent-dark)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg-alt);color:var(--accent-dark);padding:2px 7px;border-radius:4px;font-weight:500}
+
+.wrap{max-width:1280px;margin:0 auto;padding:0 32px}
+.wrap-narrow{max-width:880px;margin:0 auto;padding:0 32px}
+
+/* Typography */
+.section-num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.12em;text-transform:uppercase}
+.h1{font-family:var(--sans);font-size:clamp(2.6rem,6.5vw,4.5rem);font-weight:600;color:var(--ink);line-height:1;letter-spacing:-.035em}
+.h2{font-family:var(--sans);font-size:clamp(1.8rem,4.5vw,2.6rem);font-weight:600;color:var(--ink);line-height:1.15;letter-spacing:-.025em}
+.h2 em{font-style:normal;font-family:var(--serif);font-weight:400;font-style:italic;color:var(--accent);letter-spacing:-.015em;font-size:1.1em}
+.h3{font-family:var(--sans);font-size:clamp(1.2rem,2.6vw,1.5rem);font-weight:600;color:var(--ink);line-height:1.25;letter-spacing:-.015em}
+.lead{font-size:clamp(1.05rem,2vw,1.3rem);line-height:1.55;color:var(--text-3);font-weight:300;margin-top:18px;max-width:780px}
+.lead strong{color:var(--ink);font-weight:600}
+.lead em{font-style:normal;color:var(--accent);font-weight:500}
+.body{font-size:17px;line-height:1.75;color:var(--text-2);margin-bottom:1.1rem}
+.body strong{color:var(--ink);font-weight:600}
+.body em{font-style:normal;color:var(--accent);font-weight:500}
+.muted{color:var(--text-3);font-size:14.5px;line-height:1.65}
+.rule{width:48px;height:2px;background:var(--accent);margin:18px 0 24px;border-radius:1px}
+.rev{opacity:0;transform:translateY(14px);transition:opacity .55s,transform .55s}
+.rev.v{opacity:1;transform:none}
+.sep{border:none;border-top:1px solid var(--border-light);margin:0}
+.chapter{padding:88px 0}
+.chapter-tight{padding:56px 0}
+
+/* ── Top nav (shadcn) ── */
+.topnav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--border-light)}
+.topnav-inner{display:flex;align-items:center;gap:2.5rem;height:60px}
+.topnav-brand{display:inline-flex;align-items:baseline;gap:0;font-family:var(--sans);font-weight:600;font-size:1.05rem;color:var(--ink);letter-spacing:-.02em;line-height:1;text-decoration:none}
+.topnav-brand:hover{text-decoration:none}
+.topnav-brand .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);font-size:1.18em;letter-spacing:-.015em;margin-left:.16em}
+.topnav-brand .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.16em}
+.topnav-menu{display:flex;align-items:center;gap:.25rem;flex:1}
+.topnav-item{font-family:var(--sans);font-size:14px;font-weight:500;color:var(--text-2);padding:.5rem .875rem;border-radius:.375rem;letter-spacing:-.005em;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:.375rem;cursor:pointer;background:transparent;border:0}
+.topnav-item:hover{color:var(--ink);background:var(--bg-alt);text-decoration:none}
+.topnav-item.active{color:var(--ink);background:var(--accent-light)}
+.topnav-item .caret{font-size:10px;color:var(--text-4)}
+.topnav-cta{display:flex;gap:.5rem;align-items:center}
+.topnav-cta .btn{height:2.25rem;padding:.5rem .875rem;font-size:13.5px}
+
+/* Solutions dropdown */
+.dropdown{position:relative}
+.dropdown-menu{position:absolute;top:calc(100% + .5rem);left:0;min-width:380px;background:#fff;border:1px solid var(--border);border-radius:.75rem;box-shadow:0 12px 40px -8px rgba(15,20,25,.12),0 4px 12px -4px rgba(15,20,25,.06);padding:.625rem;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s,transform .15s,visibility .15s}
+.dropdown:hover .dropdown-menu,.dropdown:focus-within .dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.dropdown-label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-4);padding:.625rem .75rem .375rem;display:flex;align-items:center;gap:.5rem}
+.dropdown-label::after{content:"";flex:1;height:1px;background:var(--border-light)}
+.dropdown-item{display:block;padding:.625rem .75rem;border-radius:.5rem;text-decoration:none;color:inherit;transition:.12s}
+.dropdown-item:hover{background:var(--bg-alt);text-decoration:none}
+.dropdown-item.active{background:var(--accent-light)}
+.dropdown-item-title{display:flex;align-items:baseline;gap:.16em;font-family:var(--sans);font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.005em;line-height:1.2}
+.dropdown-item-title .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);font-size:1.18em;letter-spacing:-.015em}
+.dropdown-item.future .dropdown-item-title .italic{color:var(--text-4)}
+.dropdown-item-desc{font-family:var(--sans);font-size:12.5px;color:var(--text-3);margin-top:.25rem;display:flex;align-items:center;gap:.5rem;line-height:1.4}
+.dropdown-item-desc .badge-mini{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:1px 6px;border-radius:3px}
+.dropdown-item-desc .badge-mini.live{color:var(--accent-dev);background:var(--accent-dev-bg);border:1px solid rgba(16,185,129,.18)}
+.dropdown-item-desc .badge-mini.coming{color:var(--text-4);background:var(--bg-alt);border:1px solid var(--border-light)}
+@media(max-width:720px){.topnav-menu{display:none}.topnav-cta .btn{height:2.25rem;padding:.5rem .75rem;font-size:13px}}
+
+/* Wordmark (hero) */
+.cm-wordmark{display:inline-flex;align-items:baseline;gap:0;line-height:1;font-size:clamp(3rem,8vw,5.5rem)}
+.cm-wordmark .sans{font-family:var(--sans);font-weight:600;color:var(--ink);letter-spacing:-.035em}
+.cm-wordmark .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);letter-spacing:-.03em;font-size:1.18em;margin-left:.12em}
+.cm-wordmark .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em}
+
+/* Hero */
+.hero{padding:96px 0 64px;background:linear-gradient(180deg,#fff 0%,#fafbfc 60%,#fff 100%);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-20%;right:-10%;width:520px;height:520px;background:radial-gradient(circle,var(--accent-light) 0%,transparent 70%);opacity:.55;pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,var(--accent-dev-bg) 0%,transparent 70%);opacity:.5;pointer-events:none}
+.hero-inner{position:relative;z-index:1}
+.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-4);margin-bottom:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-alt);border:1px solid var(--border-light);border-radius:6px}
+.hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(26,86,219,.6)}
+.hero-tag a{color:var(--text-3)}
+.hero-sub{font-size:clamp(1.1rem,2.5vw,1.4rem);color:var(--text-2);font-weight:300;margin-top:22px;max-width:880px;line-height:1.55}
+.hero-sub strong{color:var(--ink);font-weight:600}
+.hero-sub em{font-style:normal;color:var(--accent);font-weight:500}
+.hero-price{display:inline-flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:15px;color:var(--text-2);margin-top:22px;padding:10px 16px;background:var(--accent-light);border-radius:.5rem;letter-spacing:.01em}
+.hero-price strong{color:var(--accent-dark);font-weight:700}
+.hero-cta{display:flex;gap:.625rem;margin-top:36px;flex-wrap:wrap}
+.hero-stats{display:flex;flex-wrap:wrap;gap:36px;margin-top:44px;padding-top:32px;border-top:1px solid var(--border-light)}
+.hero-stat{min-width:90px}
+.hero-stat .val{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--ink);line-height:1}
+.hero-stat .lbl{font-family:var(--mono);font-size:12px;color:var(--text-4);margin-top:4px;letter-spacing:.06em;text-transform:uppercase}
+
+/* shadcn card */
+.card{background:#fff;color:var(--ink);border:1px solid var(--border);border-radius:.75rem;box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);display:flex;flex-direction:column;transition:box-shadow .2s,border-color .2s,transform .2s}
+.card:hover{box-shadow:0 4px 16px -2px rgb(0 0 0 / .06),0 2px 4px -2px rgb(0 0 0 / .04);border-color:#d4dae2;transform:translateY(-1px);text-decoration:none}
+.card-header{padding:1.5rem 1.5rem .75rem;display:flex;flex-direction:column;gap:.5rem}
+.card-content{padding:.5rem 1.5rem 1rem;display:flex;flex-direction:column;gap:.75rem}
+.card-footer{padding:0 1.5rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.card-title{font-family:var(--sans);font-size:1.25rem;font-weight:600;color:var(--ink);letter-spacing:-.015em;line-height:1.2;margin-top:.25rem}
+.card-description{font-size:14.5px;color:var(--text-3);line-height:1.6;font-weight:400;margin-top:.25rem}
+.card-description strong{color:var(--ink);font-weight:600}
+.card-description em{font-style:normal;color:var(--accent);font-weight:500}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:.375rem;padding:.25rem .625rem;border-radius:.375rem;border:1px solid transparent;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;line-height:1;align-self:flex-start}
+.badge-org{color:var(--accent-dark);background:var(--accent-light);border-color:rgba(26,86,219,.15)}
+.badge-dev{color:var(--accent-dev);background:var(--accent-dev-bg);border-color:rgba(16,185,129,.15)}
+.badge-purple{color:var(--purple);background:var(--purple-light);border-color:rgba(91,33,182,.15)}
+.badge-rose{color:var(--rose);background:var(--rose-light);border-color:rgba(159,18,57,.15)}
+.badge-orange{color:var(--orange);background:var(--orange-light);border-color:rgba(180,83,9,.15)}
+.badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+/* Button */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;white-space:nowrap;border-radius:.5rem;font-family:var(--sans);font-size:14px;font-weight:500;line-height:1;padding:.625rem 1rem;height:2.5rem;transition:.15s;cursor:pointer;border:1px solid transparent;letter-spacing:-.005em}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-primary:hover{background:var(--accent-dark);text-decoration:none}
+.btn-ghost{color:var(--text-2);background:#fff;border-color:var(--border)}
+.btn-ghost:hover{background:var(--bg-alt);color:var(--ink);text-decoration:none;border-color:var(--border)}
+
+/* Trust strip */
+.trust{padding:36px 0;background:var(--bg-alt);border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light)}
+.trust-grid{display:flex;flex-direction:column;gap:18px}
+.trust-headline{font-family:var(--sans);font-size:1.15rem;font-weight:600;color:var(--ink);line-height:1.4;letter-spacing:-.01em;max-width:880px}
+.trust-headline strong{font-style:normal;font-family:var(--mono);font-size:.95rem;color:var(--accent-dark);font-weight:600;background:var(--accent-light);padding:2px 8px;border-radius:4px;margin-right:6px}
+.trust-brands{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
+.trust-brands span{font-size:14px;font-weight:600;color:var(--text-3);transition:color .2s;cursor:default}
+.trust-brands span:hover{color:var(--ink)}
+
+/* Persona pain · 3up */
+.pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:32px}
+@media(max-width:900px){.pain-grid{grid-template-columns:1fr}}
+.pain-quote{font-family:var(--sans);font-size:1.2rem;font-weight:500;color:var(--ink);line-height:1.4;margin-top:.625rem;letter-spacing:-.005em}
+.pain-quote::before{content:'"';color:var(--accent);font-weight:600;margin-right:2px}
+.pain-quote::after{content:'"';color:var(--accent);font-weight:600;margin-left:2px}
+.pain-quote em{font-style:italic;color:var(--accent)}
+
+/* Persona MCP demo · 3up */
+.demos{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:32px}
+@media(max-width:1100px){.demos{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.demos{grid-template-columns:1fr}}
+
+.demo{background:var(--night);color:#cbd5e1;border:1px solid rgba(255,255,255,.08);border-radius:.75rem;padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1rem;transition:.15s}
+.demo:hover{border-color:rgba(255,255,255,.16);transform:translateY(-1px)}
+.demo .persona-tag{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--blue-pale);background:rgba(75,123,236,.12);border:1px solid rgba(163,191,255,.22);padding:.25rem .625rem;border-radius:.375rem;display:inline-block;align-self:flex-start}
+.demo .persona-tag.t-em{color:#7dd3fc;background:rgba(56,189,248,.12);border-color:rgba(125,211,252,.22)}
+.demo .persona-tag.t-ic{color:#a7f3d0;background:rgba(16,185,129,.12);border-color:rgba(167,243,208,.22)}
+.demo .persona-tag.t-ciso{color:#fda4af;background:rgba(244,63,94,.12);border-color:rgba(253,164,175,.22)}
+.demo .persona-tag.t-finops{color:#fcd34d;background:rgba(245,158,11,.12);border-color:rgba(252,211,77,.22)}
+.demo .persona-tag.t-devops{color:#c4b5fd;background:rgba(139,92,246,.12);border-color:rgba(196,181,253,.22)}
+.demo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#cbd5e1;white-space:pre-wrap;word-break:break-word;margin:0}
+.demo .you{color:#fff}
+.demo .ai{color:#94a3b8}
+.demo .tool{color:#4b7bec;font-weight:500}
+.demo .str{color:#5eead4}
+.demo .result{color:#5eead4;font-weight:500;display:block}
+.demo .result::before{content:'▸ ';color:#5eead4;font-weight:600;margin-right:2px}
+.demo .comment{color:#475569;font-style:italic}
+
+/* ChatGPT-style conversational responses */
+.demo .chat{display:flex;flex-direction:column;gap:.875rem}
+.demo .chat-row{display:flex;flex-direction:column;gap:.375rem}
+.demo .chat-label{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:#64748b}
+.demo .chat-label.ai{color:#7dd3fc}
+.demo .chat-you{font-family:var(--sans);font-size:14px;line-height:1.45;color:#fff;font-weight:500;letter-spacing:-.005em}
+.demo .chat-ai{font-family:var(--sans);font-size:13.5px;line-height:1.55;color:#cbd5e1;letter-spacing:-.002em}
+.demo .chat-ai strong{color:#fff;font-weight:600}
+.demo .chat-ai em{color:#a7f3d0;font-style:normal;font-weight:500}
+.demo .chat-ai .num{color:#5eead4;font-variant-numeric:tabular-nums;font-weight:600}
+.demo .chat-tldr{margin-top:.5rem;padding-top:.625rem;border-top:1px dashed rgba(255,255,255,.10);font-size:13px;color:#fff;font-weight:500}
+.demo .chat-tldr::before{content:'→ ';color:#7dd3fc;font-weight:700;margin-right:.125rem}
+.demo .chat-source{display:flex;align-items:center;gap:.5rem;margin-top:.25rem;font-family:var(--mono);font-size:10px;color:#475569;letter-spacing:.04em}
+.demo .chat-source-dot{width:5px;height:5px;border-radius:50%;background:#10b981;box-shadow:0 0 6px rgba(16,185,129,.6);flex-shrink:0}
+.demo .chat-source code{font-family:var(--mono);color:#94a3b8;background:rgba(75,123,236,.10);border:1px solid rgba(75,123,236,.18);padding:1px 5px;border-radius:3px}
+
+/* Metric row */
+.metrics-row{display:flex;flex-wrap:wrap;gap:.75rem;margin:32px 0 0}
+.metric{flex:1;min-width:170px;padding:1.25rem 1.5rem;background:#fff;border:1px solid var(--border);border-radius:.75rem;box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);display:flex;flex-direction:column;gap:.375rem;transition:border-color .2s}
+.metric:hover{border-color:#d4dae2}
+.metric .label{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--text-4)}
+.metric .num{font-family:var(--mono);font-size:2rem;font-weight:600;color:var(--ink);letter-spacing:-.025em;line-height:1;margin-top:.125rem}
+.metric .desc{font-size:13px;color:var(--text-3);margin-top:.125rem}
+
+/* Flow */
+.flow{background:var(--bg-alt);border:1px solid var(--border-light);border-radius:.75rem;padding:32px;font-family:var(--mono);font-size:13.5px;line-height:1.95;color:var(--text-2);margin-top:32px}
+.flow .step{display:grid;grid-template-columns:32px 130px 1fr;gap:14px;padding:10px 0;align-items:start}
+.flow .step:not(:last-child){border-bottom:1px dashed var(--border-light)}
+.flow .num{font-weight:600;color:var(--accent)}
+.flow .lbl{font-weight:600;color:var(--ink)}
+.flow .det{color:var(--text-3);font-family:var(--sans);font-size:13.5px}
+.flow .det strong{color:var(--ink);font-weight:600}
+
+/* Pricing · two-column layout */
+.pricing-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:2.5rem;margin-top:48px;align-items:start}
+@media(max-width:900px){.pricing-grid{grid-template-columns:1fr;gap:1.5rem}}
+
+.pricing-card{
+  padding:2rem 1.75rem;
+  background:linear-gradient(135deg,#fff 0%,var(--accent-light) 380%);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);
+  display:flex;flex-direction:column;
+  position:sticky;top:2rem;
+}
+@media(max-width:900px){.pricing-card{position:static}}
+.pricing-card .pricing-head{display:flex;flex-direction:column;gap:.875rem}
+.pricing-display{display:flex;align-items:baseline;gap:.25rem;margin:0;line-height:1}
+.pricing-display .dollar{font-family:var(--mono);font-size:1.5rem;font-weight:600;color:var(--accent-dark)}
+.pricing-display .amount{font-family:var(--mono);font-size:4rem;font-weight:600;color:var(--ink);letter-spacing:-.04em;line-height:1}
+.pricing-display .period{font-family:var(--sans);font-size:1rem;color:var(--text-3);font-weight:400;margin-left:.5rem;letter-spacing:-.005em}
+.pricing-desc{font-size:14px;color:var(--text-3);line-height:1.55;margin-top:.625rem}
+.pricing-desc strong{color:var(--ink);font-weight:600}
+.pricing-card .btn{height:3rem;width:100%;font-size:15px;font-weight:600;margin-top:1.25rem}
+.pricing-fine-print{
+  font-size:12.5px;color:var(--text-4);line-height:1.5;
+  margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border-light);
+  font-family:var(--mono);letter-spacing:0;
+}
+
+.includes h4{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.12em;text-transform:uppercase;margin-bottom:1.25rem;display:inline-flex;align-items:center;gap:.625rem}
+.includes h4::before{content:"";width:24px;height:1px;background:var(--accent)}
+.includes-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column}
+.includes-list li{display:flex;align-items:flex-start;gap:.75rem;font-size:15px;color:var(--text-2);line-height:1.55;padding:.875rem 0;border-bottom:1px solid var(--border-light)}
+.includes-list li:last-child{border-bottom:0}
+.includes-list li strong{color:var(--ink);font-weight:600}
+.includes-list .ck{
+  color:var(--accent-dev);font-weight:700;
+  flex-shrink:0;width:1.25rem;height:1.25rem;
+  background:var(--accent-dev-bg);border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;margin-top:.125rem;
+}
+.includes-note{
+  margin-top:1.5rem;padding:1rem 1.25rem;
+  background:var(--bg-alt);border:1px solid var(--border-light);
+  border-radius:.5rem;font-size:13.5px;color:var(--text-3);line-height:1.6;
+}
+.includes-note strong{color:var(--ink);font-weight:600}
+
+/* Final */
+.final{background:var(--night);border-radius:1rem;padding:64px 48px;margin:64px 0;color:#fff;position:relative;overflow:hidden}
+.final::before{content:'';position:absolute;top:-30%;right:-15%;width:500px;height:500px;background:radial-gradient(circle,rgba(75,123,236,.2) 0%,transparent 70%);pointer-events:none}
+.final-inner{position:relative;z-index:1}
+.final h2{color:#fff;font-family:var(--sans);font-weight:600;font-size:clamp(2rem,5vw,2.8rem);line-height:1.1;letter-spacing:-.025em;display:inline-flex;align-items:baseline;gap:0}
+.final h2 .sans{font-weight:600}
+.final h2 .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue-pale);letter-spacing:-.015em;font-size:1.18em;margin-left:.16em}
+.final .ld{font-size:1.05rem;color:#94a3b8;margin-top:18px;line-height:1.65;max-width:640px}
+.final-cta{display:flex;gap:.625rem;margin-top:32px;flex-wrap:wrap}
+.final-cta a{font-size:14px;font-weight:600;padding:13px 28px;border-radius:.5rem;transition:.15s;letter-spacing:-.005em}
+.final-cta .pri{background:var(--cyan-dark);color:#fff}.final-cta .pri:hover{background:#3b6dd9;text-decoration:none}
+.final-cta .sec{color:#cbd5e1;border:1px solid #1e2a3a}.final-cta .sec:hover{border-color:var(--cyan-dark);text-decoration:none}
+
+/* Footer */
+footer{padding:64px 0 40px;text-align:center;background:var(--bg-alt);border-top:1px solid var(--border-light)}
+.footer-q{font-family:var(--sans);font-weight:600;font-size:clamp(1.3rem,3vw,1.8rem);color:var(--ink);line-height:1.35;max-width:680px;margin:0 auto 8px;padding:0 24px;letter-spacing:-.02em;display:inline-flex;align-items:baseline;gap:0}
+.footer-q .sans{font-weight:600}
+.footer-q .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);font-size:1.18em;letter-spacing:-.015em;margin-left:.16em}
+.footer-q .cursor{display:inline-block;width:.30em;height:.92em;background:var(--accent);margin-left:.16em}
+.footer-tagline{font-family:var(--sans);font-size:1rem;font-weight:300;color:var(--text-3);margin:0 auto 32px;max-width:540px}
+.footer-links{font-size:14px;color:var(--text-3);margin-bottom:8px}
+.footer-meta{margin-top:18px;font-size:12px;color:var(--text-4)}
+.footer-addr{margin-top:24px;font-size:11px;color:var(--text-4);line-height:1.65}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ TOP NAV ═══════════════════════════════════════ -->
+<nav class="topnav">
+  <div class="wrap topnav-inner">
+    <a href="/" class="topnav-brand">Context Mode<span class="italic">Insight</span><span class="cursor"></span></a>
+    <div class="topnav-menu">
+      <div class="dropdown">
+        <button class="topnav-item" aria-haspopup="true">Solutions <span class="caret">▾</span></button>
+        <div class="dropdown-menu">
+          <div class="dropdown-label">Platform</div>
+          <a href="/insight" class="dropdown-item active">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Insight</span></div>
+            <div class="dropdown-item-desc">Org observability for AI-assisted engineering <span class="badge-mini live">live · $20/seat</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Memory</span></div>
+            <div class="dropdown-item-desc">Long-term memory for AI coding agents <span class="badge-mini coming">2026</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Audit</span></div>
+            <div class="dropdown-item-desc">SOC 2 evidence for AI-assisted work <span class="badge-mini coming">2026</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Cost</span></div>
+            <div class="dropdown-item-desc">Per-team AI spend attribution <span class="badge-mini coming">2026</span></div>
+          </a>
+        </div>
+      </div>
+      <a href="/oss" class="topnav-item">OSS Plugin</a>
+      <a href="https://github.com/mksglu/context-mode" class="topnav-item">GitHub</a>
+      <a href="https://discord.gg/DCN9jUgN5v" class="topnav-item">Discord</a>
+    </div>
+    <div class="topnav-cta">
+      <a href="https://platform.context-mode.com" class="btn btn-primary">Sign in →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════ HERO ═══════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-inner wrap rev">
+    <p class="hero-tag"><span class="dot"></span>the first Solution on <a href="https://context-mode.com">Context Mode Platform</a></p>
+    <h1 class="cm-wordmark"><span class="sans">Context Mode</span><span class="italic">Insight</span><span class="cursor"></span></h1>
+    <p class="hero-sub">
+      <strong>Engineering signal for AI-assisted teams.</strong> Per-engineer productive rate. Retry waste per team. Patterns named, actions prescribed. Role-narrowed for <em>CTO, EM, IC, CISO, FinOps, DevOps</em> — same MCP endpoint, six different views.
+    </p>
+    <p class="hero-price">Built on the OSS plugin <strong>287,000+ developers</strong> already trust. <strong>$20 / seat / month.</strong></p>
+
+    <div class="hero-cta">
+      <a href="https://platform.context-mode.com" class="btn btn-primary">Sign in →</a>
+      <a href="https://context-mode.com/oss" class="btn btn-ghost">View the OSS plugin</a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">222</div><div class="lbl">patterns</div></div>
+      <div class="hero-stat"><div class="val">13</div><div class="lbl">MCP tools</div></div>
+      <div class="hero-stat"><div class="val">14</div><div class="lbl">AI adapters</div></div>
+      <div class="hero-stat"><div class="val">7</div><div class="lbl">personas</div></div>
+      <div class="hero-stat"><div class="val">$20</div><div class="lbl">per seat / month</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ TRUST STRIP ═══════════════════════════════════════ -->
+<section class="trust">
+  <div class="wrap">
+    <div class="trust-grid rev">
+      <div class="trust-headline">
+        <strong>Engineers at these companies run the OSS plugin <em>locally</em></strong>. Insight is the opt-in org layer — self-serve at platform.context-mode.com.
+      </div>
+      <div class="trust-brands">
+        <span>Microsoft</span><span>Google</span><span>Meta</span><span>ByteDance</span><span>Red Hat</span><span>GitHub</span><span>Stripe</span><span>Datadog</span><span>IBM</span><span>NVIDIA</span><span>Supabase</span><span>Amazon</span><span>Notion</span><span>Salesforce</span><span>Anthropic</span><span>Vercel</span><span>Cursor</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ PROBLEM ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:780px">
+      <p class="section-num">§ 01 · the problem</p>
+      <h2 class="h2">You shipped Claude Code to 50 engineers.<br>Now <em>what?</em></h2>
+      <div class="rule"></div>
+      <p class="lead">The seat license is signed. The plugin is rolled out. Engineering is moving faster — or it looks like it is. Then the questions start arriving from three different rooms at once.</p>
+    </div>
+
+    <div class="pain-grid rev">
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-purple"><span class="dot"></span>CTO · Board deck Friday</span>
+          <p class="pain-quote">What is the AI investment <em>actually</em> returning?</p>
+        </div>
+        <div class="card-content">
+          <p class="card-description">Bill is <strong>$50K / month</strong>. Productivity claims float. No structured observability — only the invoice. Cannot defend the line item without a metric.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-org"><span class="dot"></span>EM · Monday 1:1s</span>
+          <p class="pain-quote">Ahmet has been stuck on <em>auth.ts</em> for three days. Who else is stuck?</p>
+        </div>
+        <div class="card-content">
+          <p class="card-description">Blockers visible only when someone Slacks for help. The <strong>quiet stuck</strong> stays invisible. Sprint slips. 1:1 prep is guesswork.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-rose"><span class="dot"></span>CISO · Audit window</span>
+          <p class="pain-quote">What did the AI <em>actually</em> touch? Where are the secrets?</p>
+        </div>
+        <div class="card-content">
+          <p class="card-description">Sessions on every laptop, behind every API key. Compliance demands an audit log. <strong>The AI is faster than the audit trail</strong>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ SOLUTION ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:780px">
+      <p class="section-num">§ 02 · the solution</p>
+      <h2 class="h2">Same plugin. <em>Three new doors.</em></h2>
+      <div class="rule"></div>
+      <p class="lead">The OSS plugin <strong>287,000+ developers</strong> already trust now optionally forwards <em>structural events</em> to your org — never source code, never prompt content. Insight runs <strong>222 patterns</strong> over those events server-side.</p>
+    </div>
+
+    <div class="flow rev">
+      <div class="step"><div class="num">01</div><div class="lbl">Connect</div><div class="det">Your team is already running the plugin. <strong>One opt-in switch</strong> — same workflow, no disruption. Onboarding takes a single command.</div></div>
+      <div class="step"><div class="num">02</div><div class="lbl">Protect</div><div class="det">Your code, prompts, and IP <strong>never leave your machines</strong>. Only structural metadata — tool names, error counts, file paths — reaches the Platform.</div></div>
+      <div class="step"><div class="num">03</div><div class="lbl">Detect</div><div class="det"><strong>222 patterns run continuously</strong> — capacity imbalance, error spikes, rework concentration, blockers your engineers can't see. By Monday morning, the findings are waiting.</div></div>
+      <div class="step"><div class="num">04</div><div class="lbl">Answer</div><div class="det">Your <strong>CTO sees ROI</strong>. Your <strong>EM sees who's stuck</strong>. Your <strong>CISO sees the audit trail</strong>. Same data layer, three different conversations — no one has to translate.</div></div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ PERSONAS ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:780px">
+      <p class="section-num">§ 03 · personas × insights</p>
+      <h2 class="h2">When the agent <em>asks</em>, the dashboard already <em>answered</em>.</h2>
+      <div class="rule"></div>
+      <p class="lead">Six personas. Six Mondays. <strong>One MCP endpoint</strong>, dynamically narrowed by role at issue time.</p>
+    </div>
+
+    <div class="demos rev">
+
+      <div class="demo">
+        <span class="persona-tag">CTO · board prep</span>
+        <div class="chat">
+          <div class="chat-row">
+            <span class="chat-label">You</span>
+            <div class="chat-you">What is our AI tool investment returning this quarter?</div>
+          </div>
+          <div class="chat-row">
+            <span class="chat-label ai">Claude</span>
+            <div class="chat-ai">
+              <p>All <span class="num">47 of 47</span> engineers are active on Context Mode this quarter — that's <em>100% adoption</em> across 90 days. Org health is <span class="num">87/100</span> with a <strong>B+</strong> on commit quality, and <span class="num">71%</span> of sessions land productive output (above the 60% healthy band).</p>
+              <p class="chat-tldr">Defensible snapshot for the board ROI slide.</p>
+            </div>
+          </div>
+          <div class="chat-source"><span class="chat-source-dot"></span>checked <code>engagement_health</code> · org · 90d</div>
+        </div>
+      </div>
+
+      <div class="demo">
+        <span class="persona-tag t-em">EM · Monday triage</span>
+        <div class="chat">
+          <div class="chat-row">
+            <span class="chat-label">You</span>
+            <div class="chat-you">Who's stuck on my teams this week?</div>
+          </div>
+          <div class="chat-row">
+            <span class="chat-label ai">Claude</span>
+            <div class="chat-ai">
+              <p>The <strong>backend team</strong> has <span class="num">3 unresolved blockers</span> open — two are commit‑stall patterns, one is a rules‑file mismatch. You're also seeing <span class="num">12 persistent errors</span> (high severity) and a <em>rejection volume of 8</em> sessions, which is warning territory.</p>
+              <p class="chat-tldr">Open standup with the 3 blockers — frontend looks clean.</p>
+            </div>
+          </div>
+          <div class="chat-source"><span class="chat-source-dot"></span>checked <code>find_blockers</code> · team · 7d</div>
+        </div>
+      </div>
+
+      <div class="demo">
+        <span class="persona-tag t-ic">IC · growth check</span>
+        <div class="chat">
+          <div class="chat-row">
+            <span class="chat-label">You</span>
+            <div class="chat-you">How am I doing vs my team this week?</div>
+          </div>
+          <div class="chat-row">
+            <span class="chat-label ai">Claude</span>
+            <div class="chat-ai">
+              <p>You're at <span class="num">78%</span> productive sessions — solidly above your team's median. One thing to flag: <code style="font-family:var(--mono);color:#fda4af;background:rgba(244,63,94,.10);padding:1px 5px;border-radius:3px;font-size:.92em">auth.ts</code> is your hottest file with <em>4× the average edit density</em>, worth considering a split. Your rules‑file correlation is <span class="num">0.62</span> (healthy).</p>
+              <p class="chat-tldr">Strong evidence for your perf cycle write‑up.</p>
+            </div>
+          </div>
+          <div class="chat-source"><span class="chat-source-dot"></span>checked <code>how_am_i</code> · 7d</div>
+        </div>
+      </div>
+
+      <div class="demo">
+        <span class="persona-tag t-ciso">CISO · audit window</span>
+        <div class="chat">
+          <div class="chat-row">
+            <span class="chat-label">You</span>
+            <div class="chat-you">Any high‑severity AI risks this month?</div>
+          </div>
+          <div class="chat-row">
+            <span class="chat-label ai">Claude</span>
+            <div class="chat-ai">
+              <p>Three findings worth attention: <span class="num">2 secret‑shaped paths</span> were detected and <em>redacted at the boundary</em> (no exfil), <span class="num">1 destructive command</span> was attempted and <em>sandboxed</em> before execution, and <span class="num">1 member</span> is running at an <strong>8× MCP call rate</strong> vs peer median — worth a conversation.</p>
+              <p class="chat-tldr">Full SOC 2 evidence trail ready to export.</p>
+            </div>
+          </div>
+          <div class="chat-source"><span class="chat-source-dot"></span>checked <code>identify_risk</code> · org · severity: high</div>
+        </div>
+      </div>
+
+      <div class="demo">
+        <span class="persona-tag t-finops">FinOps · cost lens</span>
+        <div class="chat">
+          <div class="chat-row">
+            <span class="chat-label">You</span>
+            <div class="chat-you">Where is our AI spend going this week?</div>
+          </div>
+          <div class="chat-row">
+            <span class="chat-label ai">Claude</span>
+            <div class="chat-ai">
+              <p>Total token spend is <strong>up <span class="num">22% WoW</span></strong>, driven almost entirely by Opus on the Frontend team. Cost per shipped commit is healthy at <span class="num">$0.84</span>, but there's a clear <em>retry pattern</em> burning <strong><span class="num">$1,840/mo</span></strong> — same prompt, refined three times because of a missing context boundary.</p>
+              <p class="chat-tldr">Pair‑program through the retry pattern — fastest unlock.</p>
+            </div>
+          </div>
+          <div class="chat-source"><span class="chat-source-dot"></span>checked <code>top_patterns</code> · org · category: cost</div>
+        </div>
+      </div>
+
+      <div class="demo">
+        <span class="persona-tag t-devops">DevOps · release sign-off</span>
+        <div class="chat">
+          <div class="chat-row">
+            <span class="chat-label">You</span>
+            <div class="chat-you">Is backend's commit quality healthy this week?</div>
+          </div>
+          <div class="chat-row">
+            <span class="chat-label ai">Claude</span>
+            <div class="chat-ai">
+              <p>Backend's commit mix is balanced: <span class="num">41%</span> feat, <span class="num">28%</span> fix, <span class="num">22%</span> refactor — a textbook healthy ratio. Cadence is <span class="num">178</span> commits over 7 days (steady), and the <strong>fix ratio of 28%</strong> sits squarely in the <em>healthy band</em> (20–35%).</p>
+              <p class="chat-tldr">Release sign‑off green — no quality flags blocking tag.</p>
+            </div>
+          </div>
+          <div class="chat-source"><span class="chat-source-dot"></span>checked <code>top_patterns</code> · team: backend · 7d</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ CATALOG ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:780px">
+      <p class="section-num">§ 04 · the catalog</p>
+      <h2 class="h2">222 patterns. Nine categories. Seven personas.</h2>
+      <div class="rule"></div>
+      <p class="lead">Each pattern names a specific signal in your team's AI workflow — and either flags it for action or surfaces it as evidence.</p>
+    </div>
+
+    <div class="metrics-row rev">
+      <div class="metric"><span class="label">Catalog</span><span class="num">222</span><span class="desc">patterns evaluated org-wide</span></div>
+      <div class="metric"><span class="label">Endpoint</span><span class="num">13</span><span class="desc">remote MCP tools</span></div>
+      <div class="metric"><span class="label">Coverage</span><span class="num">14</span><span class="desc">AI assistants supported</span></div>
+      <div class="metric"><span class="label">Role-narrowed</span><span class="num">7</span><span class="desc">persona views</span></div>
+    </div>
+
+    <div class="rev" style="margin-top:32px;display:flex;flex-wrap:wrap;gap:.5rem">
+      <span class="badge badge-org">Adoption · 24</span>
+      <span class="badge badge-org">Engagement · 31</span>
+      <span class="badge badge-dev">Workflow · 38</span>
+      <span class="badge badge-dev">Quality · 42</span>
+      <span class="badge badge-purple">Effectiveness · 28</span>
+      <span class="badge badge-purple">Efficiency · 26</span>
+      <span class="badge badge-rose">Risk · 18</span>
+      <span class="badge badge-orange">Cost · 15</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ PRICING ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:780px">
+      <p class="section-num">§ 05 · pricing</p>
+      <h2 class="h2">One tier. <em>Predictable.</em></h2>
+      <div class="rule"></div>
+      <p class="lead"><strong>$20 per seat per month.</strong> No annual variant. No volume discount. No founder discount. No grandfathering. The same price next quarter as it is today.</p>
+    </div>
+
+    <div class="rev pricing-grid">
+
+      <!-- Left · Pricing card (shadcn, compact) -->
+      <div class="pricing-card">
+        <div class="pricing-head">
+          <span class="badge badge-org"><span class="dot"></span>PRO · the only tier</span>
+          <h3 class="pricing-display">
+            <span class="dollar">$</span><span class="amount">20</span>
+            <span class="period">/ seat / month</span>
+          </h3>
+          <p class="pricing-desc">Per member of your org — <strong>active or invited</strong>. Billed monthly via Stripe. Cancel any time from the customer portal.</p>
+        </div>
+        <a class="btn btn-primary" href="https://platform.context-mode.com">Start for $20 / seat →</a>
+        <p class="pricing-fine-print">
+          No free tier · No trial · No annual variant<br>
+          No volume discount · No grandfathering
+        </p>
+      </div>
+
+      <!-- Right · What's included -->
+      <div class="includes">
+        <h4>What's included</h4>
+        <ul class="includes-list">
+          <li><span class="ck">✓</span><span><strong>All 222 patterns</strong> evaluated continuously at org scope</span></li>
+          <li><span class="ck">✓</span><span><strong>MCP endpoint</strong> with all 13 first-class tools · scopes: self · team · org</span></li>
+          <li><span class="ck">✓</span><span><strong>14 AI adapters</strong> supported — Claude Code, Cursor, Copilot, Codex, Gemini, more</span></li>
+          <li><span class="ck">✓</span><span><strong>90-day data retention</strong> with edge-cached read access</span></li>
+          <li><span class="ck">✓</span><span><strong>7 persona views</strong> — Owner, Manager, Member · CTO · EM · IC · CISO · FinOps · DevOps</span></li>
+          <li><span class="ck">✓</span><span><strong>REST API</strong> for CI / Slack / compliance pipelines</span></li>
+          <li><span class="ck">✓</span><span><strong>Email support</strong> with 24-hour SLA</span></li>
+        </ul>
+        <div class="includes-note">
+          <strong>Privacy boundary stays at the plugin.</strong> Structural events only — tool name, file path, error counts. Never source code, never prompt content, never file content. The OSS plugin you ship with stays free forever.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ FINAL CTA ═══════════════════════════════════════ -->
+<section class="chapter-tight">
+  <div class="wrap">
+    <div class="final rev">
+      <div class="final-inner">
+        <h2><span class="sans">Open the</span><span class="italic">Insight.</span></h2>
+        <p class="ld">
+          Your team is already running <code style="background:rgba(255,255,255,.06);color:#a3bfff;border:1px solid rgba(255,255,255,.08)">context-mode</code> on every machine. Flip the switch — see what they're doing with it.
+        </p>
+        <div class="final-cta">
+          <a href="https://platform.context-mode.com" class="pri">Start for $20 / seat →</a>
+          <a href="https://context-mode.com" class="sec">Back to Context Mode</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
+<footer>
+  <p class="footer-q"><span class="sans">Context Mode</span><span class="italic">Insight</span><span class="cursor"></span></p>
+  <p class="footer-tagline">The first Solution on Context Mode Platform.</p>
+  <p class="footer-links">
+    <a href="https://context-mode.com" style="color:var(--text-3)">↗ Context Mode</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="https://context-mode.com/oss" style="color:var(--text-3)">OSS plugin</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="https://platform.context-mode.com" style="color:var(--text-3)">Sign in</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="https://discord.gg/DCN9jUgN5v" style="color:var(--text-3)">Discord</a>
+  </p>
+  <p class="footer-meta">Built by <a href="https://mksg.lu" style="color:var(--text-3)">B. Mert Köseoğlu</a></p>
+  <p class="footer-addr">MKSF LTD · Suite 8805 5 Brayford Square · London E1 0SG · United Kingdom</p>
+</footer>
+
+<script>
+const o=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('v');o.unobserve(x.target);}});},{threshold:.06,rootMargin:'0px 0px -20px 0px'});
+document.querySelectorAll('.rev').forEach(e=>o.observe(e));
+</script>
+</body>
+</html>

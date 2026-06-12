@@ -1,0 +1,69 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Context Mode · OG · 1200×630</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  .frame{
+    width:1200px;height:630px;
+    background:
+      radial-gradient(ellipse at 22% 30%,#e8effc 0%,transparent 60%),
+      radial-gradient(ellipse at 78% 78%,#e6f5ee 0%,transparent 55%),
+      #ffffff;
+    padding:64px 80px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    position:relative;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .frame::after{
+    content:'';position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(15,20,25,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15,20,25,.025) 1px, transparent 1px);
+    background-size:32px 32px;
+    pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 30%, transparent 70%);
+  }
+  .head{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .badge{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#1a56db;
+    background:rgba(26,86,219,.08);border:1px solid rgba(26,86,219,.18);
+    padding:6px 12px;border-radius:6px;letter-spacing:.06em;text-transform:uppercase}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;box-shadow:0 0 8px rgba(16,185,129,.5)}
+  .meta{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b7a8d;letter-spacing:.06em}
+  .stack{position:relative;z-index:2}
+  .wordmark{display:inline-flex;align-items:baseline;font-weight:700;font-size:130px;line-height:.95;letter-spacing:-.045em;color:#0f1419}
+  .cursor{display:inline-block;width:38px;height:108px;background:#1a56db;margin-left:14px;transform:translateY(8px)}
+  .tagline{margin-top:28px;font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400;font-size:48px;line-height:1.1;color:#1a56db;letter-spacing:-.02em;max-width:920px}
+  .sub{margin-top:18px;font-size:20px;line-height:1.45;color:#4b5c70;max-width:820px;font-weight:400}
+  .foot{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .stats{display:flex;gap:36px;font-family:'IBM Plex Mono',monospace}
+  .stat .val{font-size:24px;font-weight:600;color:#0f1419;letter-spacing:-.01em}
+  .stat .lbl{font-size:11px;color:#6b7a8d;letter-spacing:.10em;text-transform:uppercase;margin-top:2px}
+  .url{font-family:'IBM Plex Mono',monospace;font-size:14px;color:#1a56db;font-weight:600;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="head">
+    <span class="badge"><span class="dot"></span>Open · MCP · Platform</span>
+    <span class="meta">context-mode.com</span>
+  </div>
+  <div class="stack">
+    <div class="wordmark">Context Mode<span class="cursor"></span></div>
+    <div class="tagline">the other half of the context problem.</div>
+    <div class="sub">An MCP plugin 287,000+ developers run locally — and a Platform with Solutions for engineering orgs.</div>
+  </div>
+  <div class="foot">
+    <div class="stats">
+      <div class="stat"><div class="val">287,000+</div><div class="lbl">developers</div></div>
+      <div class="stat"><div class="val">15</div><div class="lbl">platforms</div></div>
+      <div class="stat"><div class="val">#1</div><div class="lbl">on Hacker News</div></div>
+      <div class="stat"><div class="val">ELv2</div><div class="lbl">open source</div></div>
+    </div>
+    <div class="url">→ context-mode.com</div>
+  </div>
+</div>
+</body></html>

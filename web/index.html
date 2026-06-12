@@ -3,62 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>context-mode Insights — $20/seat AI engineering analytics</title>
-<meta name="description" content="The analytics layer for organizations deploying Claude Code, Cursor, Copilot, Codex, Gemini. 222 patterns, 13 MCP tools, role-aware, privacy-first. Pro $20/seat/month. Sits on top of the open-source plugin 250,000+ developers already trust.">
-<meta name="keywords" content="AI engineering analytics, Claude Code insights, Cursor metrics, Copilot ROI, MCP server, AI productivity, engineering manager dashboard, AI audit, agentic analytics, developer productivity">
-<link rel="canonical" href="https://context-mode.com/insights">
+<title>Context Mode — The other half of the context problem</title>
+<meta name="description" content="An open-source MCP plugin (300,000+ developers) and a commercial Platform that builds Solutions on top. context-mode keeps raw data out of the LLM context window. Insight surfaces what your team is doing with the saved tokens.">
+<meta name="keywords" content="context mode, ai coding context, mcp plugin, claude code, cursor, copilot, ai engineering insight, ai engineering platform">
+<link rel="canonical" href="https://context-mode.com/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-<!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="context-mode Insights — $20/seat AI engineering analytics">
-<meta property="og:description" content="You shipped Claude Code to 50 engineers. Now know what they did. 222 patterns, 13 MCP tools, role-aware. OSS collects events. Platform shows what's happening. $20/seat. From the team behind the open-source plugin 250K+ developers trust.">
-<meta property="og:url" content="https://context-mode.com/insights">
-<meta property="og:site_name" content="context-mode Platform">
+<meta property="og:title" content="Context Mode — The other half of the context problem">
+<meta property="og:description" content="An MCP plugin 300,000+ developers run locally. A Platform with Solutions for engineering orgs. One name, two surfaces.">
+<meta property="og:url" content="https://context-mode.com/">
+<meta property="og:site_name" content="Context Mode">
+<meta property="og:image" content="https://context-mode.com/og/master.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta property="og:image:alt" content="Context Mode — the other half of the context problem">
 
-<!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="context-mode Insights — $20/seat AI engineering analytics">
-<meta name="twitter:description" content="222 patterns. 13 MCP tools. 14 adapters. Pro $20/seat/month. Role-aware schemas. Privacy-first. Built on the OSS plugin 250K+ developers already run.">
-<meta name="twitter:creator" content="@AcikAnaliz">
-
-<!-- Structured Data -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "context-mode Insights",
-  "applicationCategory": "BusinessApplication",
-  "operatingSystem": "Web, macOS, Linux, Windows",
-  "description": "Enterprise observability for AI-assisted engineering. Ingests structured session events from the context-mode OSS plugin (250,000+ developer installs), runs 222 patterns server-side, surfaces actionable findings via Dashboard, REST API, and remote MCP — role-tuned for IC, Manager, EM, CTO, Board, Security, and FinOps personas. Pro tier $20 per seat per month.",
-  "url": "https://context-mode.com/insights",
-  "offers": {
-    "@type": "Offer",
-    "price": "20.00",
-    "priceCurrency": "USD",
-    "availability": "https://schema.org/InStock",
-    "url": "https://platform.context-mode.com"
-  },
-  "author": {
-    "@type": "Person",
-    "name": "B. Mert Köseoğlu",
-    "url": "https://mksg.lu"
-  }
-}
-</script>
+<meta name="twitter:site" content="@contextmode">
+<meta name="twitter:title" content="Context Mode — The other half of the context problem">
+<meta name="twitter:description" content="An MCP plugin 300K+ developers run locally. A Platform with Solutions for engineering orgs.">
+<meta name="twitter:image" content="https://context-mode.com/og/master.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
+/* ── Design tokens (from brand/STRATEGY.md v1.0) ── */
 :root{
   --bg:#fff;--bg-alt:#f7f8fa;--bg-code:#f1f3f5;--bg-warm:#fbf9f3;
-  --text:#0f1419;--text-2:#3d4854;--text-3:#6b7a8d;--text-4:#9ca8b6;
+  --ink:#0f1419;--text-2:#3d4854;--text-3:#6b7a8d;--text-4:#9ca8b6;
   --border:#e3e7ec;--border-light:#eef0f3;
   --accent:#1a56db;--accent-light:#e8effc;--accent-dark:#143faa;
-  --green:#0d7c4a;--green-light:#e6f5ee;
-  --orange:#b45309;--orange-light:#fef3c7;
-  --purple:#5b21b6;--purple-light:#ede9fe;
-  --rose:#9f1239;--rose-light:#ffe4e6;
+  --accent-dev:#10b981;--accent-dev-2:#34d399;--accent-dev-bg:#e6f5ee;
   --night:#0f1419;--night-2:#141c26;--night-3:#1e2a3a;
   --serif:'Instrument Serif',Georgia,serif;
   --sans:'IBM Plex Sans',-apple-system,sans-serif;
@@ -70,367 +50,460 @@ body{font-family:var(--sans);color:var(--text-2);background:var(--bg);-webkit-fo
 ::selection{background:var(--accent-light);color:var(--accent-dark)}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
-code{font-family:var(--mono);font-size:.9em;background:var(--bg-code);color:var(--accent-dark);padding:2px 7px;border-radius:4px;font-weight:500;overflow-wrap:anywhere;word-break:normal}
-pre code{overflow-wrap:normal;word-break:normal;white-space:pre}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg-code);color:var(--accent-dark);padding:2px 7px;border-radius:4px;font-weight:500}
 
-/* ── Layout primitives — wider than typical narrow column ── */
 .wrap{max-width:1280px;margin:0 auto;padding:0 32px}
-.wrap-narrow{max-width:840px;margin:0 auto;padding:0 32px}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:32px}
-.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-.aside-main{display:grid;grid-template-columns:280px 1fr;gap:48px}
-
-@media(max-width:900px){
-  .grid-2,.grid-3,.grid-4,.aside-main{grid-template-columns:1fr}
-}
+.wrap-narrow{max-width:880px;margin:0 auto;padding:0 32px}
 
 /* ── Typography ── */
 .kicker{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-light);padding:4px 10px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;display:inline-block;margin-bottom:14px}
-.kicker.g{color:var(--green);background:var(--green-light)}
-.kicker.o{color:var(--orange);background:var(--orange-light)}
-.kicker.p{color:var(--purple);background:var(--purple-light)}
-.kicker.r{color:var(--rose);background:var(--rose-light)}
+.kicker.g{color:var(--accent-dev);background:var(--accent-dev-bg)}
 .section-num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.12em}
-.h1{font-family:var(--serif);font-size:clamp(2.8rem,7vw,5.2rem);font-style:italic;font-weight:400;color:var(--text);line-height:1;letter-spacing:-.03em}
-.h2{font-family:var(--serif);font-size:clamp(1.8rem,4.5vw,2.8rem);font-weight:400;color:var(--text);line-height:1.15;letter-spacing:-.02em}
-.h3{font-family:var(--serif);font-size:clamp(1.3rem,3vw,1.7rem);font-style:italic;font-weight:400;color:var(--text);line-height:1.25;letter-spacing:-.01em}
-.h4{font-family:var(--sans);font-size:1.05rem;font-weight:600;color:var(--text);line-height:1.4}
-.lead{font-size:clamp(1.05rem,2vw,1.35rem);line-height:1.65;color:var(--text-3);font-weight:300}
-.body{font-size:17px;line-height:1.85;color:var(--text-2);margin-bottom:1.2rem}
-.body strong{color:var(--text);font-weight:600}
+.h1{font-family:var(--sans);font-size:clamp(3rem,7.5vw,5.5rem);font-weight:600;color:var(--ink);line-height:1;letter-spacing:-.035em}
+.h2{font-family:var(--sans);font-size:clamp(1.8rem,4.5vw,2.8rem);font-weight:600;color:var(--ink);line-height:1.1;letter-spacing:-.025em}
+.h3{font-family:var(--sans);font-size:clamp(1.3rem,3vw,1.7rem);font-weight:600;color:var(--ink);line-height:1.25;letter-spacing:-.015em}
+.lead{font-size:clamp(1.05rem,2vw,1.35rem);line-height:1.55;color:var(--text-3);font-weight:300;margin-top:18px;max-width:780px}
+.lead strong{color:var(--ink);font-weight:600}
+.body{font-size:17px;line-height:1.75;color:var(--text-2);margin-bottom:1.1rem}
+.body strong{color:var(--ink);font-weight:600}
+.body em{font-style:normal;color:var(--accent);font-weight:500}
 .muted{color:var(--text-3);font-size:14.5px;line-height:1.65}
-.chapter-close{margin-top:24px;padding:18px 22px;background:var(--bg-alt);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;font-size:16px;color:var(--text);line-height:1.65}
-.chapter-close strong{color:var(--accent-dark);font-weight:700}
-.rule{width:48px;height:2px;background:var(--accent);margin:.4rem 0 1.6rem;border-radius:1px}
-.rev{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+.rule{width:48px;height:2px;background:var(--accent);margin:18px 0 24px;border-radius:1px}
+.rule.g{background:var(--accent-dev)}
+.rev{opacity:0;transform:translateY(14px);transition:opacity .55s,transform .55s}
 .rev.v{opacity:1;transform:none}
-
-/* ── Section scaffolding ── */
-.chapter{padding:88px 0 16px}
-.chapter-tight{padding:48px 0 16px}
 .sep{border:none;border-top:1px solid var(--border-light);margin:0}
+.chapter{padding:88px 0}
+.chapter-tight{padding:56px 0}
+
+/* ── Top nav (shadcn) ── */
+.topnav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--border-light)}
+.topnav-inner{display:flex;align-items:center;gap:2.5rem;height:60px}
+.topnav-brand{display:inline-flex;align-items:baseline;gap:0;font-family:var(--sans);font-weight:600;font-size:1.05rem;color:var(--ink);letter-spacing:-.02em;line-height:1;text-decoration:none}
+.topnav-brand:hover{text-decoration:none}
+.topnav-brand .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em}
+.topnav-menu{display:flex;align-items:center;gap:.25rem;flex:1}
+.topnav-item{font-family:var(--sans);font-size:14px;font-weight:500;color:var(--text-2);padding:.5rem .875rem;border-radius:.375rem;letter-spacing:-.005em;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:.375rem;cursor:pointer;background:transparent;border:0}
+.topnav-item:hover{color:var(--ink);background:var(--bg-alt);text-decoration:none}
+.topnav-item .caret{font-size:10px;color:var(--text-4)}
+.topnav-cta{display:flex;gap:.5rem;align-items:center}
+.topnav-cta .btn{height:2.25rem;padding:.5rem .875rem;font-size:13.5px}
+
+/* Solutions dropdown */
+.dropdown{position:relative}
+.dropdown-menu{
+  position:absolute;top:calc(100% + .5rem);left:0;
+  min-width:380px;
+  background:#fff;border:1px solid var(--border);border-radius:.75rem;
+  box-shadow:0 12px 40px -8px rgba(15,20,25,.12),0 4px 12px -4px rgba(15,20,25,.06);
+  padding:.625rem;
+  opacity:0;visibility:hidden;transform:translateY(-4px);
+  transition:opacity .15s,transform .15s,visibility .15s;
+}
+.dropdown:hover .dropdown-menu,.dropdown:focus-within .dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.dropdown-label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-4);padding:.625rem .75rem .375rem;display:flex;align-items:center;gap:.5rem}
+.dropdown-label::after{content:"";flex:1;height:1px;background:var(--border-light)}
+.dropdown-item{display:block;padding:.625rem .75rem;border-radius:.5rem;text-decoration:none;color:inherit;transition:.12s}
+.dropdown-item:hover{background:var(--bg-alt);text-decoration:none}
+.dropdown-item-title{display:flex;align-items:baseline;gap:.16em;font-family:var(--sans);font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.005em;line-height:1.2}
+.dropdown-item-title .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);font-size:1.18em;letter-spacing:-.015em}
+.dropdown-item.future .dropdown-item-title .italic{color:var(--text-4)}
+.dropdown-item-desc{font-family:var(--sans);font-size:12.5px;color:var(--text-3);margin-top:.25rem;display:flex;align-items:center;gap:.5rem;line-height:1.4}
+.dropdown-item-desc .badge-mini{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:1px 6px;border-radius:3px}
+.dropdown-item-desc .badge-mini.live{color:var(--accent-dev);background:var(--accent-dev-bg);border:1px solid rgba(16,185,129,.18)}
+.dropdown-item-desc .badge-mini.coming{color:var(--text-4);background:var(--bg-alt);border:1px solid var(--border-light)}
+
+@media(max-width:720px){
+  .topnav-menu{display:none}
+  .topnav-cta .btn{height:2.25rem;padding:.5rem .75rem;font-size:13px}
+}
+
+/* ── Master wordmark (hero) ── */
+.cm-master{display:inline-flex;align-items:baseline;gap:0;line-height:1;font-family:var(--sans);font-weight:600;letter-spacing:-.035em;color:var(--ink);font-size:clamp(3rem,8vw,5.5rem)}
+.cm-master .cursor{display:inline-block;background:var(--accent);margin-left:.10em;width:.30em;height:.92em}
 
 /* ── Hero ── */
-.hero{padding:72px 0 48px;background:linear-gradient(180deg,#fff 0%,#fafbfc 60%,#fff 100%);position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-20%;right:-10%;width:520px;height:520px;background:radial-gradient(circle,var(--accent-light) 0%,transparent 70%);opacity:.5;pointer-events:none}
-.hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,var(--green-light) 0%,transparent 70%);opacity:.45;pointer-events:none}
+.hero{padding:96px 0 64px;background:linear-gradient(180deg,#fff 0%,#fafbfc 60%,#fff 100%);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-20%;right:-10%;width:520px;height:520px;background:radial-gradient(circle,var(--accent-light) 0%,transparent 70%);opacity:.55;pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,var(--accent-dev-bg) 0%,transparent 70%);opacity:.5;pointer-events:none}
 .hero-inner{position:relative;z-index:1}
-.hero-product-tag{font-size:13px;color:var(--text-4);margin-bottom:24px;letter-spacing:.04em}
-.hero-product-tag a{color:var(--text-3)}
-.hero-sub{font-size:clamp(1.1rem,2.5vw,1.45rem);color:var(--text-2);font-weight:300;margin-top:18px;max-width:780px;line-height:1.55}
-.hero-price-anchor{font-family:var(--mono);font-size:14px;color:var(--text-2);margin-top:24px;letter-spacing:.01em;padding:10px 16px;background:var(--accent-light);border-radius:6px;display:inline-block}
-.hero-price-anchor strong{color:var(--accent-dark);font-weight:700}
+.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-4);margin-bottom:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-alt);border:1px solid var(--border-light);border-radius:6px}
+.hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-dev);box-shadow:0 0 10px rgba(16,185,129,.6)}
+.hero-sub{font-size:clamp(1.1rem,2.5vw,1.45rem);color:var(--text-2);font-weight:300;margin-top:22px;max-width:880px;line-height:1.55}
+.hero-sub strong{color:var(--ink);font-weight:600}
+.hero-sub em{font-style:normal;color:var(--accent);font-weight:500}
 .hero-stats{display:flex;flex-wrap:wrap;gap:36px;margin-top:44px;padding-top:32px;border-top:1px solid var(--border-light)}
-.hero-stat{min-width:80px}
-.hero-stat .val{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--text);line-height:1}
+.hero-stat{min-width:90px}
+.hero-stat .val{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--ink);line-height:1}
 .hero-stat .lbl{font-size:12px;color:var(--text-4);margin-top:4px;letter-spacing:.04em;text-transform:uppercase}
-.hero-cta{display:flex;gap:12px;margin-top:36px;flex-wrap:wrap}
-.cta{font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;transition:all .15s;border:1px solid transparent;display:inline-flex;align-items:center;gap:8px}
-.cta.pri{background:var(--text);color:#fff}.cta.pri:hover{background:var(--accent-dark);text-decoration:none}
-.cta.sec{color:var(--text-2);border-color:var(--border);background:#fff}.cta.sec:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
-.hero-tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
-.hero-tags a{min-width:0;max-width:100%;font-family:var(--mono);font-size:12px;font-weight:500;padding:5px 12px;border-radius:4px;transition:.15s;overflow-wrap:anywhere}
-.hero-tags .t-oss{color:var(--accent-dark);background:var(--accent-light)}
-.hero-tags .t-mcp{color:var(--green);background:var(--green-light)}
+
+/* ── shadcn-style card primitives ── */
+.card{
+  background:hsl(0 0% 100%);
+  color:var(--ink);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);
+  display:flex;
+  flex-direction:column;
+  transition:box-shadow .2s cubic-bezier(.4,0,.2,1),transform .2s cubic-bezier(.4,0,.2,1),border-color .2s;
+}
+.card:hover{
+  box-shadow:0 4px 16px -2px rgb(0 0 0 / .06),0 2px 4px -2px rgb(0 0 0 / .04);
+  border-color:#d4dae2;
+  transform:translateY(-1px);
+  text-decoration:none;
+}
+.card-header{padding:1.5rem 1.5rem 0;display:flex;flex-direction:column;gap:.375rem}
+.card-content{padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1rem}
+.card-footer{padding:0 1.5rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+
+.badge{
+  display:inline-flex;align-items:center;gap:.375rem;
+  padding:.25rem .625rem;
+  border-radius:.375rem;
+  border:1px solid transparent;
+  font-family:var(--mono);
+  font-size:11px;font-weight:600;
+  letter-spacing:.04em;
+  line-height:1;
+  align-self:flex-start;
+  transition:.15s;
+}
+.badge-dev{color:var(--accent-dev);background:var(--accent-dev-bg);border-color:rgb(16 185 129 / .15)}
+.badge-org{color:var(--accent-dark);background:var(--accent-light);border-color:rgb(26 86 219 / .15)}
+.badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+.card-title{
+  font-family:var(--mono);
+  font-size:1.5rem;font-weight:600;
+  letter-spacing:-.025em;
+  color:var(--ink);
+  line-height:1;
+  display:flex;align-items:baseline;gap:.16em;
+  margin-top:.25rem;
+}
+.card-title.sans{font-family:var(--sans)}
+.card-title .prompt{color:var(--text-3);font-weight:500;margin-right:.18em}
+.card-title .dash{color:var(--accent-dev-2)}
+.card-title .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em}
+.card.dev-card .card-title .cursor{background:var(--accent-dev)}
+
+.card-description{
+  font-size:14.5px;
+  color:var(--text-3);
+  line-height:1.55;
+  font-weight:400;
+  margin-top:.5rem;
+}
+.card-description strong{color:var(--text-2);font-weight:600}
+
+/* Specs list — quiet, separated, no chip-look */
+.specs{
+  display:flex;flex-direction:column;
+  border-top:1px solid var(--border-light);
+}
+.specs > div{
+  display:flex;align-items:center;
+  padding:.625rem 0;
+  border-bottom:1px solid var(--border-light);
+  font-size:13px;
+}
+.specs > div:last-child{border-bottom:0}
+.specs .k{
+  font-family:var(--mono);
+  color:var(--text-4);
+  letter-spacing:.04em;text-transform:uppercase;
+  font-size:11px;font-weight:600;
+  min-width:120px;
+}
+.specs .v{
+  font-family:var(--mono);
+  color:var(--ink);
+  font-size:13px;font-weight:500;
+}
+
+/* shadcn button */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:.5rem;
+  white-space:nowrap;
+  border-radius:.5rem;
+  font-family:var(--sans);
+  font-size:14px;font-weight:500;
+  line-height:1;
+  padding:.625rem 1rem;
+  height:2.5rem;
+  transition:.15s;
+  cursor:pointer;
+  border:1px solid transparent;
+  letter-spacing:-.005em;
+}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-primary:hover{background:var(--accent-dark);text-decoration:none}
+.btn-ghost{color:var(--text-2);background:transparent;border-color:var(--border)}
+.btn-ghost:hover{background:var(--bg-alt);color:var(--ink);text-decoration:none;border-color:var(--border)}
+
+.card.dev-card .btn-primary{background:var(--accent-dev);color:#fff}
+.card.dev-card .btn-primary:hover{background:#0a8a5d}
+
+/* Dual-path grid */
+.dual{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:48px}
+@media(max-width:900px){.dual{grid-template-columns:1fr}}
 
 /* ── Trust strip ── */
-.trust{padding:32px 0;background:var(--bg-alt);border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light)}
-.trust-grid{display:flex;flex-direction:column;gap:20px}
-.trust-headline{font-family:var(--sans);font-size:1.25rem;font-weight:600;color:var(--text);line-height:1.4;letter-spacing:-.01em;max-width:880px}
-.trust-headline strong{font-style:normal;font-family:var(--mono);font-size:1.05rem;color:var(--accent-dark);font-weight:600;background:var(--accent-light);padding:2px 8px;border-radius:4px;margin-right:6px}
+.trust{padding:36px 0;background:var(--bg-alt);border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light)}
+.trust-grid{display:flex;flex-direction:column;gap:18px}
+.trust-headline{font-family:var(--sans);font-size:1.15rem;font-weight:600;color:var(--ink);line-height:1.4;letter-spacing:-.01em;max-width:880px}
+.trust-headline strong{font-style:normal;font-family:var(--mono);font-size:.95rem;color:var(--accent-dark);font-weight:600;background:var(--accent-light);padding:2px 8px;border-radius:4px;margin-right:6px}
 .trust-brands{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
 .trust-brands span{font-size:14px;font-weight:600;color:var(--text-3);transition:color .2s;cursor:default}
-.trust-brands span:hover{color:var(--text)}
-@media(max-width:600px){.trust-brands{gap:6px 16px}.trust-brands span{font-size:13px}}
+.trust-brands span:hover{color:var(--ink)}
 
-/* ── Problem cards (3-up) ── */
-.pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:32px}
-@media(max-width:900px){.pain-grid{grid-template-columns:1fr}}
-.pain{padding:28px;border:1px solid var(--border);border-radius:10px;background:#fff;position:relative}
-.pain .role{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
-.pain .quote{font-family:var(--sans);font-size:1.15rem;font-weight:500;color:var(--text);line-height:1.45;margin-bottom:14px;letter-spacing:-.005em}
-.pain .quote::before{content:'"';color:var(--accent);font-weight:600;margin-right:2px}
-.pain .quote::after{content:'"';color:var(--accent);font-weight:600;margin-left:2px}
-.pain .fact{font-size:14.5px;color:var(--text-3);line-height:1.65}
-.pain .fact strong{color:var(--text);font-weight:600}
+/* ── Story layout ── */
+.story{display:grid;grid-template-columns:280px 1fr;gap:48px;align-items:start;margin-top:36px}
+@media(max-width:900px){.story{grid-template-columns:1fr}}
+.story-aside .kicker{margin-bottom:0}
+.story-aside h3{font-family:var(--sans);font-size:1.05rem;font-weight:600;margin:14px 0 12px;color:var(--ink)}
+.story-aside p{font-size:14px;color:var(--text-3);line-height:1.6}
 
-/* ── Solution architecture (asymmetric) ── */
-.arch-wrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:48px;align-items:start;margin-top:36px}
-@media(max-width:900px){.arch-wrap{grid-template-columns:minmax(0,1fr)}}
-.arch-flow{background:var(--bg-alt);border:1px solid var(--border-light);border-radius:10px;padding:32px;font-family:var(--mono);font-size:13.5px;line-height:1.95;color:var(--text-2)}
-.arch-flow .step{display:flex;gap:14px;padding:8px 0;align-items:start}
-.arch-flow .step:not(:last-child){border-bottom:1px dashed var(--border-light)}
-.arch-flow .num{font-weight:600;color:var(--accent);min-width:18px}
-.arch-flow .lbl{font-weight:600;color:var(--text);min-width:120px}
-.arch-flow .det{color:var(--text-3);flex:1;font-family:var(--sans);font-size:13px}
+/* ── Flow diagram ── */
+.flow{background:var(--bg-alt);border:1px solid var(--border-light);border-radius:12px;padding:32px;font-family:var(--mono);font-size:13.5px;line-height:1.95;color:var(--text-2);margin-top:32px}
+.flow .step{display:grid;grid-template-columns:32px 130px 1fr;gap:14px;padding:10px 0;align-items:start}
+.flow .step:not(:last-child){border-bottom:1px dashed var(--border-light)}
+.flow .num{font-weight:600;color:var(--accent)}
+.flow .lbl{font-weight:600;color:var(--ink)}
+.flow .det{color:var(--text-3);font-family:var(--sans);font-size:13.5px}
 
-/* ── Persona card (wider, magazine-style) ── */
-.personas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:32px}
-@media(max-width:900px){.personas{grid-template-columns:minmax(0,1fr)}}
-/* persona cards — shadcn philosophy: subtle border, soft shadow on hover, no decorative side strip */
-.persona{min-width:0;border:1px solid var(--border);border-radius:12px;padding:28px;background:#fff;transition:box-shadow .2s,border-color .2s}
-.persona:hover{box-shadow:0 4px 16px rgba(15,20,25,.04);border-color:var(--border)}
-.persona-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border-light)}
-.persona-name{font-family:var(--sans);font-size:1.1rem;font-weight:600;color:var(--text);line-height:1.2;letter-spacing:-.01em}
-.persona-role{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);background:var(--bg-alt);padding:4px 10px;border-radius:4px;border:1px solid var(--border-light)}
-.persona-ask{font-family:var(--sans);color:var(--text);font-size:1rem;font-weight:500;line-height:1.55;margin-bottom:18px;letter-spacing:-.005em}
-.persona-ask::before,.persona-ask::after{content:none}
-.persona-call{max-width:100%;font-family:var(--mono);font-size:12.5px;background:var(--bg-alt);color:var(--accent-dark);padding:10px 14px;border-radius:6px;display:block;margin-bottom:16px;overflow-x:auto;white-space:pre;border:1px solid var(--border-light);overflow-wrap:normal;word-break:normal}
-.persona-ret{font-size:14.5px;color:var(--text-2);line-height:1.7;margin-bottom:16px}
-.persona-ret strong{color:var(--text);font-weight:600}
-.persona-act{font-size:13.5px;color:var(--text);font-weight:500;display:flex;align-items:center;gap:8px;padding-top:16px;border-top:1px solid var(--border-light)}
-.persona-price-callout{font-family:var(--mono);font-size:12.5px;color:var(--text-2);line-height:1.55;margin-top:14px;padding:10px 14px;background:var(--accent-light);border-radius:6px;border-left:3px solid var(--accent)}
-.persona-price-callout strong{color:var(--accent-dark);font-weight:700}
-@media(max-width:600px){.persona{padding:24px 20px}.persona-call{white-space:pre-wrap;overflow-x:auto;overflow-wrap:anywhere;word-break:normal}}
+/* ── Info card · shadcn callout pattern ── */
+.info-card{
+  margin:2rem 0;
+  background:hsl(0 0% 100%);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);
+  overflow:hidden;
+}
+.info-card .card-header{padding:1.25rem 1.5rem .75rem}
+.info-card .card-content{padding:0 1.5rem 1.5rem;display:flex;flex-direction:column;gap:.875rem}
+.info-card .card-content p{
+  font-size:15px;line-height:1.65;color:var(--text-2);margin:0;
+}
+.info-card .card-content p strong{color:var(--ink);font-weight:600}
+.info-card .card-content p em{font-style:normal;color:var(--accent-dev);font-weight:500}
 
-/* ── MCP-first feature section (the agentic emphasis) ── */
-.mcp-feature{min-width:0;background:linear-gradient(135deg,var(--night) 0%,var(--night-2) 100%);color:#fff;border-radius:16px;padding:56px;margin:48px 0;position:relative;overflow:hidden}
-.mcp-feature::before{content:'';position:absolute;top:-50%;right:-20%;width:600px;height:600px;background:radial-gradient(circle,rgba(75,123,236,.18) 0%,transparent 70%);pointer-events:none}
-.mcp-feature::after{content:'';position:absolute;bottom:-30%;left:-10%;width:400px;height:400px;background:radial-gradient(circle,rgba(13,124,74,.15) 0%,transparent 70%);pointer-events:none}
-.mcp-inner{min-width:0;position:relative;z-index:1}
-.mcp-head{max-width:820px;margin-bottom:40px}
-@media(max-width:900px){.mcp-feature{padding:36px 24px}.mcp-head{margin-bottom:28px}}
-.mcp-kicker{font-family:var(--mono);font-size:11px;font-weight:600;color:#4b7bec;background:rgba(75,123,236,.18);padding:5px 12px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;display:inline-block;margin-bottom:18px}
-.mcp-title{font-family:var(--serif);font-size:clamp(2rem,5vw,3rem);font-weight:400;color:#fff;line-height:1.1;letter-spacing:-.02em;margin-bottom:18px}
-.mcp-title em{font-style:italic;color:#a3bfff}
-.mcp-body{font-size:16px;color:#cbd5e1;line-height:1.8;margin-bottom:14px}
-.mcp-body:last-of-type{margin-bottom:0}
-.mcp-body strong{color:#fff;font-weight:600}
-.mcp-demos-grid{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:40px 0 44px}
-@media(max-width:1100px){.mcp-demos-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:700px){.mcp-demos-grid{grid-template-columns:minmax(0,1fr);gap:14px;margin:28px 0 32px}}
-.mcp-demo-card{min-width:0;background:#0a0e14;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:22px 22px 24px;display:flex;flex-direction:column;min-height:340px;transition:border-color .2s ease}
-.mcp-demo-card:hover{border-color:rgba(163,191,255,.22)}
-.mcp-demo-card .persona-tag{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#a3bfff;background:rgba(75,123,236,.14);border:1px solid rgba(163,191,255,.22);padding:4px 10px;border-radius:4px;display:inline-block;align-self:flex-start;margin-bottom:14px}
-.mcp-demo-card .persona-tag.t-em{color:#7dd3fc;background:rgba(56,189,248,.12);border-color:rgba(125,211,252,.22)}
-.mcp-demo-card .persona-tag.t-ic{color:#a7f3d0;background:rgba(16,185,129,.12);border-color:rgba(167,243,208,.22)}
-.mcp-demo-card .persona-tag.t-ciso{color:#fda4af;background:rgba(244,63,94,.12);border-color:rgba(253,164,175,.22)}
-.mcp-demo-card .persona-tag.t-finops{color:#fcd34d;background:rgba(245,158,11,.12);border-color:rgba(252,211,77,.22)}
-.mcp-demo-card .persona-tag.t-devops{color:#c4b5fd;background:rgba(139,92,246,.12);border-color:rgba(196,181,253,.22)}
-.mcp-demo{min-width:0;background:transparent;border:0;border-radius:0;padding:0;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#cbd5e1;overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin:0}
-.mcp-demo .you{color:#fff}
-.mcp-demo .ai{color:#94a3b8}
-.mcp-demo .tool-call{color:#4b7bec;font-weight:500}
-.mcp-demo .result{color:#5eead4}
-.mcp-demo .comment{color:#475569;font-style:italic}
-.mcp-demo .value{color:#5eead4;font-weight:500;display:block;font-size:13.5px;line-height:1.7}
-.mcp-demo .value::before{content:'▸ ';color:#5eead4;font-weight:600;margin-right:2px}
-.mcp-tools-wrap{min-width:0;position:relative;z-index:1}
-.mcp-tools-label{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;margin-bottom:14px}
-.mcp-tools-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-@media(max-width:900px){.mcp-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:560px){.mcp-tools-grid{grid-template-columns:minmax(0,1fr)}}
-.mcp-tool{min-width:0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:12px 14px}
-.mcp-tool .n{font-family:var(--mono);font-size:12.5px;font-weight:600;color:#a3bfff}
-.mcp-tool .d{font-size:11.5px;color:#94a3b8;margin-top:3px;line-height:1.4}
+/* ── Metric card (shadcn) ── */
+.metrics-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:32px}
+.metric{
+  flex:1;min-width:170px;
+  padding:1.25rem 1.5rem;
+  background:hsl(0 0% 100%);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);
+  display:flex;flex-direction:column;gap:.375rem;
+  transition:border-color .2s,box-shadow .2s;
+}
+.metric:hover{border-color:#d4dae2}
+.metric .label{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:.10em;text-transform:uppercase;color:var(--text-4);
+}
+.metric .num{
+  font-family:var(--mono);font-size:2rem;font-weight:600;
+  color:var(--ink);letter-spacing:-.025em;line-height:1;
+  margin-top:.125rem;
+}
+.metric .desc{font-size:13px;color:var(--text-3);margin-top:.125rem}
 
-/* ── 4-stat row (pattern catalog) ── */
-.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:32px 0}
-@media(max-width:900px){.metrics-row{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){.metrics-row{grid-template-columns:1fr}}
-.metric{padding:28px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;flex-direction:column;gap:10px}
-.metric .l{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.08em;text-transform:uppercase}
-.metric .n{font-family:var(--sans);font-size:2.75rem;font-weight:600;color:var(--text);line-height:1;letter-spacing:-.02em}
-.metric .d{font-family:var(--sans);font-size:13.5px;color:var(--text-3);line-height:1.5;font-weight:400}
+/* ── Solution card (shadcn) ── */
+.solutions{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-top:32px}
+@media(max-width:900px){.solutions{grid-template-columns:1fr}}
+.solution-card{
+  background:hsl(0 0% 100%);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);
+  display:flex;flex-direction:column;
+  transition:box-shadow .2s,border-color .2s,transform .2s;
+}
+.solution-card:hover{
+  box-shadow:0 4px 16px -2px rgb(0 0 0 / .06),0 2px 4px -2px rgb(0 0 0 / .04);
+  border-color:#d4dae2;
+  transform:translateY(-1px);
+  text-decoration:none;
+}
+.solution-card.future{background:var(--bg-alt);box-shadow:none}
+.solution-card.future:hover{transform:none;box-shadow:none}
+.solution-card .card-header{padding:1.5rem 1.5rem .75rem}
+.solution-card .card-content{padding:.5rem 1.5rem 1rem}
+.solution-card .card-footer{padding:0 1.5rem 1.5rem}
+.solution-wordmark{
+  display:inline-flex;align-items:baseline;gap:.12em;
+  font-size:1.5rem;line-height:1;margin-top:.5rem;
+}
+.solution-wordmark .sans{font-family:var(--sans);font-weight:600;color:var(--ink);letter-spacing:-.025em}
+.solution-wordmark .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);letter-spacing:-.015em;font-size:1.18em}
+.solution-card.future .solution-wordmark .sans{color:var(--text-3)}
+.solution-card.future .solution-wordmark .italic{color:var(--text-4)}
+.solution-link{
+  font-family:var(--mono);font-size:13px;font-weight:500;
+  color:var(--accent);
+  display:inline-flex;align-items:center;gap:.375rem;
+}
+.solution-link.muted{color:var(--text-4)}
 
-/* ── Pattern categories tag cloud ── */
-.cat-cloud{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
-.cat-chip{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;background:#fff;border:1px solid var(--border)}
-.cat-chip .c{font-family:var(--mono);font-size:11px;color:var(--text-4);margin-left:8px}
-
-/* ── Pattern catalog grid (persona × pattern × category) ── */
-.pattern-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:32px}
-@media(max-width:1100px){.pattern-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:680px){.pattern-grid{grid-template-columns:1fr}}
-.pattern-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:22px 22px 18px;display:flex;flex-direction:column;transition:box-shadow .2s,border-color .2s}
-.pattern-card:hover{box-shadow:0 4px 16px rgba(15,20,25,.04)}
-.pattern-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
-.pattern-card-title{font-family:var(--sans);font-size:1.05rem;font-weight:600;color:var(--text);letter-spacing:-.005em;line-height:1.25}
-.pattern-card-role{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:6px;white-space:nowrap;border:1px solid var(--border)}
-.pattern-card-role.r-cto{color:var(--purple);background:var(--purple-light);border-color:transparent}
-.pattern-card-role.r-em{color:var(--accent);background:var(--accent-light);border-color:transparent}
-.pattern-card-role.r-mgr{color:var(--accent-dark);background:var(--accent-light);border-color:transparent}
-.pattern-card-role.r-ic{color:var(--green);background:var(--green-light);border-color:transparent}
-.pattern-card-role.r-sec{color:var(--rose);background:var(--rose-light);border-color:transparent}
-.pattern-card-role.r-fin{color:var(--orange);background:var(--orange-light);border-color:transparent}
-.pattern-card-role.r-dev{color:var(--text-2);background:var(--bg-alt);border-color:var(--border)}
-.pattern-card-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:14px}
-.pattern-list{list-style:none;padding:0;margin:0;border-top:1px solid var(--border-light)}
-.pattern-row{padding:12px 0;border-bottom:1px solid var(--border-light);display:flex;flex-direction:column;gap:4px}
-.pattern-row:last-child{border-bottom:none;padding-bottom:0}
-.pattern-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.pattern-id{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);background:var(--bg-code);padding:2px 7px;border-radius:4px;letter-spacing:-.01em;word-break:break-all}
-.pattern-cat{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--text-3);background:var(--bg-alt);border:1px solid var(--border-light);padding:2px 7px;border-radius:4px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
-.pattern-desc{font-size:13px;color:var(--text-2);line-height:1.55}
-
-/* ── Privacy boundary ── */
-.privacy-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
-@media(max-width:900px){.privacy-grid{grid-template-columns:1fr}}
-.privacy-col{padding:28px;border-radius:10px;background:var(--bg-alt);border:1px solid var(--border)}
-.privacy-col h4{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;color:var(--text-3)}
-.privacy-col ul{list-style:none;padding:0}
-.privacy-col li{padding:8px 0;font-size:14.5px;color:var(--text-2);line-height:1.55;display:flex;gap:10px;border-bottom:1px solid rgba(0,0,0,.04)}
-.privacy-col li:last-child{border:none}
-.privacy-col li::before{font-family:var(--mono);font-weight:700;flex-shrink:0;margin-top:1px;color:var(--text-3)}
-.privacy-col.we-do li::before{content:'+'}
-.privacy-col.we-dont li::before{content:'−'}
-
-/* ── Data flow visualization ── */
-.dataflow{padding:32px;background:linear-gradient(135deg,var(--bg-alt) 0%,#fff 100%);border:1px solid var(--border-light);border-radius:12px;margin:32px 0}
-.dataflow-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch;position:relative}
-@media(max-width:900px){.dataflow-row{grid-template-columns:1fr}}
-.dataflow-node{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px;position:relative}
-.dataflow-node .pin{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text-4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-.dataflow-node .ttl{font-family:var(--sans);font-size:.95rem;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:8px;letter-spacing:-.005em}
-.dataflow-node ul{font-size:12.5px;color:var(--text-3);line-height:1.65;list-style:none;padding:0;margin:0}
-.dataflow-node li{display:flex;gap:6px}
-.dataflow-node li::before{content:'·';color:var(--accent);font-weight:700;flex-shrink:0}
-
-/* ── Adapter showcase grid (§ 08) ── */
-.adapter-group{margin-top:32px}
-.adapter-group + .adapter-group{margin-top:40px}
-.adapter-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding-bottom:10px;margin-bottom:18px;border-bottom:1px solid var(--border-light)}
-.adapter-group-title{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--text);letter-spacing:.08em;text-transform:uppercase}
-.adapter-group-meta{font-family:var(--mono);font-size:11px;color:var(--text-4);letter-spacing:.04em}
-.adapter-group-lead{font-size:14px;color:var(--text-3);line-height:1.55;margin-bottom:18px;max-width:780px}
-.adapter-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media(max-width:900px){.adapter-grid{grid-template-columns:1fr}}
-.adapter-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 18px 16px;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
-.adapter-card:hover{border-color:var(--accent-light);box-shadow:0 4px 18px rgba(15,20,25,.05);transform:translateY(-1px)}
-.adapter-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-.adapter-name{font-family:var(--sans);font-size:1rem;font-weight:600;color:var(--text);letter-spacing:-.005em}
-.adapter-paradigm{font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--text-3);background:var(--bg-alt);padding:3px 8px;border-radius:4px;letter-spacing:.02em;white-space:nowrap}
-.adapter-paradigm.json{color:var(--accent-dark);background:var(--accent-light)}
-.adapter-paradigm.ts{color:var(--purple);background:var(--purple-light)}
-.adapter-paradigm.ext{color:var(--orange);background:var(--orange-light)}
-.adapter-paradigm.mcp{color:var(--rose);background:var(--rose-light)}
-.adapter-fires{font-family:var(--sans);font-size:13px;line-height:1.55;color:var(--text-3);margin-bottom:10px}
-.adapter-events{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.adapter-event{font-family:var(--mono);font-size:10.5px;color:var(--text-2);background:var(--bg-code);padding:2px 7px;border-radius:3px;letter-spacing:.01em}
-.adapter-event.dim{color:var(--text-4);background:var(--bg-alt);font-style:italic}
-
-/* ── Local-only callout (shadcn info box) ── */
-.local-callout{margin-top:28px;padding:28px 32px;background:#fff;border:1px solid var(--border);border-radius:12px}
-@media(max-width:600px){.local-callout{padding:24px}}
-.local-callout strong.title{display:block;font-family:var(--sans);font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:14px;letter-spacing:-.01em;line-height:1.3}
-.local-callout p{font-size:14.5px;color:var(--text-2);line-height:1.7;margin:0 0 14px 0}
-.local-callout p:last-child{margin-bottom:0}
-.local-callout p strong{color:var(--text);font-weight:600}
-.local-callout code{background:var(--bg-code);padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:12.5px;color:var(--text)}
-
-/* ── Integration teaser ── */
-.integ-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}
-@media(max-width:700px){.integ-grid{grid-template-columns:1fr 1fr}}
-.integ{padding:20px;border:1px solid var(--border);border-radius:8px;background:#fff;text-align:center;position:relative;display:flex;flex-direction:column;align-items:center;gap:8px}
-.integ-name{font-family:var(--sans);font-size:.95rem;font-weight:600;color:var(--text);letter-spacing:-.005em}
-.integ-status{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-4)}
-.integ.live .integ-status{color:var(--green)}
-.integ:not(.live) .integ-status{font-style:italic;font-weight:500}
-
-/* ── Security access grid ── */
-.access-row{display:grid;grid-template-columns:120px 140px 1fr;gap:18px;padding:18px 0;border-bottom:1px solid var(--border-light)}
-.access-row:last-child{border:none}
-.access-role{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
-.access-scope{font-family:var(--sans);font-size:.95rem;font-weight:600;color:var(--text);letter-spacing:-.005em}
-.access-detail{font-size:14px;color:var(--text-3);line-height:1.6}
-@media(max-width:700px){.access-row{grid-template-columns:1fr;gap:6px}}
-
-/* ── GTM CTA strip (per-section conversion buttons) ── */
-.gtm-strip{display:flex;gap:16px;flex-wrap:wrap;margin-top:32px;align-items:center}
-.gtm-strip .cta{font-size:14px;font-weight:600;padding:11px 22px;border-radius:6px;letter-spacing:-.005em;transition:.15s}
-@media(max-width:600px){.gtm-strip{flex-direction:column;align-items:stretch}.gtm-strip .cta{text-align:center}}
-
-/* ── FAQ ── */
-.faq{margin-top:32px}
-.faq details{border-top:1px solid var(--border-light);padding:18px 0}
-.faq details:last-child{border-bottom:1px solid var(--border-light)}
-.faq summary{font-family:var(--sans);font-weight:600;font-size:1rem;color:var(--text);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;letter-spacing:-.005em}
-.faq summary::after{content:'+';font-family:var(--mono);color:var(--text-4);font-weight:400;font-size:1.4rem;line-height:1}
-.faq details[open] summary::after{content:'–'}
-.faq p{font-size:15px;color:var(--text-3);line-height:1.8;margin-top:14px}
+/* ── Surface card (DEV vs ORG, § 04) ── */
+.surfaces{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-top:36px}
+@media(max-width:900px){.surfaces{grid-template-columns:1fr}}
+.surface{
+  padding:1.75rem;
+  background:hsl(0 0% 100%);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgb(0 0 0 / .04);
+  display:flex;flex-direction:column;gap:1rem;
+  transition:border-color .2s;
+}
+.surface:hover{border-color:#d4dae2}
+.surface-mark{
+  font-family:var(--mono);font-size:1.5rem;font-weight:600;
+  color:var(--ink);letter-spacing:-.025em;line-height:1;
+  display:flex;align-items:baseline;gap:.16em;
+  margin-top:.25rem;
+}
+.surface-mark.sans{font-family:var(--sans);font-size:1.35rem}
+.surface-mark .prompt{color:var(--text-3);font-weight:500;margin-right:.18em}
+.surface-mark .dash{color:var(--accent-dev-2)}
+.surface-mark .cursor{display:inline-block;width:.30em;height:.92em;margin-left:.10em;background:var(--accent)}
+.surface.dev .surface-mark .cursor{background:var(--accent-dev)}
+.surface-desc{font-size:14px;color:var(--text-3);line-height:1.65}
+.surface-desc strong{color:var(--ink);font-weight:600}
 
 /* ── Final CTA ── */
 .final{background:var(--night);border-radius:16px;padding:64px 48px;margin:64px 0;color:#fff;position:relative;overflow:hidden}
-.final::before{content:'';position:absolute;top:-30%;right:-15%;width:500px;height:500px;background:radial-gradient(circle,rgba(75,123,236,.2) 0%,transparent 70%);pointer-events:none}
-.final-inner{position:relative;z-index:1}
-.final h2{color:#fff;font-family:var(--serif);font-size:clamp(2rem,5vw,3rem);font-weight:400;line-height:1.15;letter-spacing:-.02em}
-.final .ld{font-size:1.05rem;color:#94a3b8;margin-top:16px;line-height:1.65;max-width:640px}
+.final::before{content:'';position:absolute;top:-30%;right:-15%;width:500px;height:500px;background:radial-gradient(circle,rgba(16,185,129,.18) 0%,transparent 70%);pointer-events:none}
+.final::after{content:'';position:absolute;bottom:-30%;left:-15%;width:500px;height:500px;background:radial-gradient(circle,rgba(75,123,236,.15) 0%,transparent 70%);pointer-events:none}
+.final-inner{position:relative;z-index:1;max-width:780px}
+.final h2{color:#fff;font-family:var(--sans);font-weight:600;font-size:clamp(2rem,5vw,2.8rem);line-height:1.1;letter-spacing:-.025em}
+.final .ld{font-size:1.05rem;color:#94a3b8;margin-top:18px;line-height:1.65;max-width:680px}
+.final .ld em{font-style:normal;color:#a3bfff;font-weight:500}
 .final-cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
-.final-cta a{font-size:14px;font-weight:600;padding:13px 28px;border-radius:6px;transition:.15s}
-.final-cta .pri{background:#4b7bec;color:#fff}.final-cta .pri:hover{background:#3b6dd9;text-decoration:none}
+.final-cta a{font-size:14px;font-weight:600;padding:13px 28px;border-radius:6px;transition:.15s;letter-spacing:-.005em}
+.final-cta .pri{background:#10b981;color:#fff}.final-cta .pri:hover{background:#0a8a5d;text-decoration:none}
 .final-cta .sec{color:#cbd5e1;border:1px solid #1e2a3a}.final-cta .sec:hover{border-color:#4b7bec;text-decoration:none}
-
-/* ── Pricing chapter ── */
-.pricing-card{border:1px solid var(--border);border-radius:16px;padding:48px 40px;background:var(--bg-alt);max-width:540px;margin:32px auto}
-.pricing-card .plan-name{font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-size:13px;margin:0 0 8px}
-.pricing-card .plan-price{margin:0;line-height:1;color:var(--text)}
-.pricing-card .plan-price strong{font-family:var(--serif);font-size:64px;font-weight:600;letter-spacing:-.04em;color:var(--text)}
-.pricing-card .plan-period{color:var(--text-3);font-size:18px;margin-left:6px;font-weight:400}
-.pricing-card .plan-features{list-style:none;padding:0;margin:32px 0;font-size:14.5px;color:var(--text-2)}
-.pricing-card .plan-features li{padding:10px 0;border-bottom:1px dashed var(--border-light)}
-.pricing-card .plan-features li:last-child{border-bottom:0}
-.pricing-card .pricing-cta{display:block;text-align:center;padding:16px;background:var(--text);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin-top:24px;transition:.15s}
-.pricing-card .pricing-cta:hover{background:var(--accent-dark);text-decoration:none}
-.pricing-card .pricing-fine{color:var(--text-3);font-size:13px;margin-top:20px;line-height:1.5}
-.pricing-deny-list{margin:48px auto 0;padding:32px;background:var(--bg-warm);border-radius:12px;max-width:540px}
-.pricing-deny-list .kicker{margin-bottom:10px}
-.pricing-deny-list p{color:var(--text-2);font-size:14.5px;line-height:1.65;margin:0}
-@media (max-width:640px){
-  .pricing-card{padding:32px 22px}
-  .pricing-card .plan-price strong{font-size:48px}
-  .pricing-deny-list{padding:24px 20px}
-}
 
 /* ── Footer ── */
 footer{padding:64px 0 40px;text-align:center;background:var(--bg-alt);border-top:1px solid var(--border-light)}
-.footer-q{font-family:var(--serif);font-size:clamp(1.3rem,3vw,1.8rem);font-style:italic;color:var(--text);line-height:1.35;max-width:680px;margin:0 auto 24px;padding:0 24px}
+.footer-q{font-family:var(--sans);font-weight:600;font-size:clamp(1.3rem,3vw,1.8rem);color:var(--ink);line-height:1.35;max-width:680px;margin:0 auto 8px;padding:0 24px;letter-spacing:-.02em;display:inline-flex;align-items:baseline;gap:.12em}
+.footer-q .cursor{display:inline-block;width:.30em;height:.92em;background:var(--accent);margin-left:.08em}
+.footer-tagline{font-family:var(--sans);font-size:1.05rem;font-weight:300;color:var(--text-3);margin:0 auto 32px;max-width:540px}
 .footer-links{font-size:14px;color:var(--text-3);margin-bottom:8px}
 .footer-meta{margin-top:18px;font-size:12px;color:var(--text-4)}
 .footer-addr{margin-top:24px;font-size:11px;color:var(--text-4);line-height:1.65}
-
-/* ── Sticky bottom CTA ── */
-.sticky-cta{position:fixed;bottom:0;left:0;right:0;background:var(--bg-alt);border-top:1px solid var(--border);padding:14px 24px;z-index:100;transform:translateY(100%);transition:transform .35s ease;box-shadow:0 -4px 24px rgba(15,20,25,.04)}
-.sticky-cta.visible{transform:translateY(0)}
-.sticky-cta .sticky-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;max-width:1080px;margin:0 auto;width:100%}
-.sticky-cta .sticky-text{color:var(--text-2);font-size:14px;margin:0}
-.sticky-cta .sticky-text strong{color:var(--text);font-weight:700}
-.sticky-cta .sticky-button{background:var(--text);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;white-space:nowrap;transition:.15s}
-.sticky-cta .sticky-button:hover{background:var(--accent-dark);text-decoration:none}
-@media (max-width:640px){
-  .sticky-cta{padding:12px 16px}
-  .sticky-cta .sticky-inner{flex-direction:column;gap:10px;align-items:stretch}
-  .sticky-cta .sticky-text{font-size:13px;text-align:center}
-  .sticky-cta .sticky-button{text-align:center}
-}
 </style>
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════ TOP NAV ═══════════════════════════════════════ -->
+<nav class="topnav">
+  <div class="wrap topnav-inner">
+    <a href="/" class="topnav-brand">Context Mode<span class="cursor"></span></a>
+    <div class="topnav-menu">
+      <div class="dropdown">
+        <button class="topnav-item" aria-haspopup="true">Solutions <span class="caret">▾</span></button>
+        <div class="dropdown-menu">
+          <div class="dropdown-label">Platform</div>
+          <a href="/insight" class="dropdown-item">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Insight</span></div>
+            <div class="dropdown-item-desc">Org observability for AI-assisted engineering <span class="badge-mini live">live · $20/seat</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Memory</span></div>
+            <div class="dropdown-item-desc">Long-term memory for AI coding agents <span class="badge-mini coming">2026</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Audit</span></div>
+            <div class="dropdown-item-desc">SOC2 compliance trail for the AI surface <span class="badge-mini coming">2026</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Cost</span></div>
+            <div class="dropdown-item-desc">Token spend × velocity per team <span class="badge-mini coming">2026</span></div>
+          </a>
+        </div>
+      </div>
+      <a href="/oss" class="topnav-item">OSS Plugin</a>
+      <a href="https://github.com/mksglu/context-mode" class="topnav-item">GitHub</a>
+      <a href="https://discord.gg/DCN9jUgN5v" class="topnav-item">Discord</a>
+    </div>
+    <div class="topnav-cta">
+      <a href="/insight" class="btn btn-primary">Open Insight →</a>
+    </div>
+  </div>
+</nav>
+
 <!-- ═══════════════════════════════════════ HERO ═══════════════════════════════════════ -->
 <section class="hero">
   <div class="hero-inner wrap rev">
-    <p class="hero-product-tag">the first Solution from <a href="/">Context Mode Platform</a> · for enterprise AI engineering</p>
-    <h1 class="h1">Insights — measure the engineering signal your AI tools are actually shipping.</h1>
-    <p class="hero-sub">Role-aware observability for Claude Code, Cursor, Copilot, Codex, Gemini, and 9 more AI assistants. 222 patterns. 13 MCP tools. Privacy-first. Sits on top of the open-source plugin <strong>250,000+ developers already trust</strong>.</p>
-    <p class="hero-price-anchor">OSS collects. Platform understands. <strong>$20 / seat / month.</strong></p>
-
-    <div class="hero-cta">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-      <a href="https://github.com/mksglu/context-mode" class="cta sec">Or run the OSS plugin locally</a>
-    </div>
-
-    <div class="hero-tags">
-      <a href="/oss" class="t-oss">⚡ open-source plugin · ELv2</a>
-      <a href="https://github.com/mksglu/context-mode" class="t-oss" style="margin-left:8px">→ source on GitHub</a>
-    </div>
-
+    <p class="hero-tag"><span class="dot"></span>open-source plugin · commercial platform · <span id="stat-tag-users">287,000+</span> developers</p>
+    <h1 class="cm-master">Context Mode<span class="cursor"></span></h1>
+    <p class="hero-sub">
+      <strong>The other half of the context problem</strong> — for developers and for engineering orgs.
+      An MCP plugin that keeps raw data out of the LLM context window. A Platform that surfaces <em>what your team is doing</em>
+      with the saved tokens. Same engine, two surfaces, your choice.
+    </p>
     <div class="hero-stats">
-      <div class="hero-stat"><div class="val" id="stat-devs">250K+</div><div class="lbl">devs on OSS</div></div>
-      <div class="hero-stat"><div class="val">222</div><div class="lbl">patterns</div></div>
-      <div class="hero-stat"><div class="val">13</div><div class="lbl">MCP tools</div></div>
-      <div class="hero-stat"><div class="val">14</div><div class="lbl">AI adapters</div></div>
-      <div class="hero-stat"><div class="val">7</div><div class="lbl">personas</div></div>
+      <div class="hero-stat"><div class="val" id="stat-users">287k+</div><div class="lbl">developers</div></div>
+      <div class="hero-stat"><div class="val">15</div><div class="lbl">AI platforms</div></div>
+      <div class="hero-stat"><div class="val">#1</div><div class="lbl">on Hacker News</div></div>
+      <div class="hero-stat"><div class="val" id="stat-stars">—</div><div class="lbl">GitHub stars</div></div>
+      <div class="hero-stat"><div class="val">OSS</div><div class="lbl">ELv2 license</div></div>
+    </div>
+
+    <!-- Two paths · shadcn cards -->
+    <div class="dual">
+
+      <!-- OSS card -->
+      <a href="/oss" class="card dev-card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>For developers · Free</span>
+          <h3 class="card-title"><span class="prompt">$</span>context<span class="dash">-</span>mode<span class="cursor"></span></h3>
+          <p class="card-description">
+            Keeps raw data <strong>out of the LLM context window</strong> on your machine. Save up to 98% of context per session. Works on Claude Code, Cursor, Copilot, Codex, Gemini, and 10 more.
+          </p>
+        </div>
+        <div class="card-content">
+          <div class="specs">
+            <div><span class="k">install</span><span class="v">npm i -g context-mode</span></div>
+            <div><span class="k">license</span><span class="v">Elastic License 2.0</span></div>
+            <div><span class="k">runs</span><span class="v">entirely on your machine</span></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="btn btn-primary">Install the plugin →</span>
+        </div>
+      </a>
+
+      <!-- Platform card -->
+      <a href="/insight" class="card">
+        <div class="card-header">
+          <span class="badge badge-org"><span class="dot"></span>For engineering orgs · $20/seat</span>
+          <h3 class="card-title sans">Context Mode Platform<span class="cursor"></span></h3>
+          <p class="card-description">
+            The org layer on top of the same plugin. Solutions that show you <strong>what your team is doing</strong> with the AI tools they already run. Privacy-first — structural events only, never source code.
+          </p>
+        </div>
+        <div class="card-content">
+          <div class="specs">
+            <div><span class="k">first solution</span><span class="v">Context Mode Insight</span></div>
+            <div><span class="k">pricing</span><span class="v">$20 / seat / month</span></div>
+            <div><span class="k">scopes</span><span class="v">self · team · org</span></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="btn btn-primary">See the Platform →</span>
+        </div>
+      </a>
     </div>
   </div>
 </section>
@@ -440,993 +513,325 @@ footer{padding:64px 0 40px;text-align:center;background:var(--bg-alt);border-top
   <div class="wrap">
     <div class="trust-grid rev">
       <div class="trust-headline">
-        <strong>Engineers at these companies run the open-source plugin <em>locally</em>.</strong><br>
-        Insights is the opt-in org-layer extension &mdash; Pro tier $20 per seat per month, self-serve at platform.context-mode.com.
+        <strong>Used across teams at</strong> companies that ship AI-assisted code every day.
       </div>
       <div class="trust-brands">
-        <span>Microsoft</span><span>Google</span><span>Meta</span><span>ByteDance</span><span>Red Hat</span><span>GitHub</span><span>Stripe</span><span>Datadog</span><span>IBM</span><span>NVIDIA</span><span>Supabase</span><span>Amazon</span><span>Canva</span><span>Notion</span><span>Salesforce</span><span>Hasura</span><span>Framer</span><span>Cursor</span><span>Vercel</span><span>Anthropic</span>
+        <span>Microsoft</span><span>Google</span><span>Meta</span><span>ByteDance</span><span>Red Hat</span><span>GitHub</span><span>Stripe</span><span>Datadog</span><span>IBM</span><span>NVIDIA</span><span>Supabase</span><span>Amazon</span><span>Canva</span><span>Notion</span><span>Salesforce</span><span>Hasura</span><span>Cursor</span><span>Vercel</span><span>Anthropic</span>
       </div>
     </div>
-
-    <div class="local-callout rev">
-      <strong class="title">Open-source plugin = local-only by design.</strong>
-      <p>Context Mode operates at the MCP protocol layer — raw data (web pages, API responses, file analyses, log files) stays in a sandboxed subprocess on the developer machine and never enters the LLM context window. The SQLite knowledge base lives in the home directory and dies when the session ends.</p>
-      <p><strong>Nothing leaves the machine.</strong> No telemetry, no cloud sync, no usage tracking, no account required. The 250,000+ developers running the plugin today have never sent a byte to us.</p>
-      <p><strong>Insights = explicit opt-in.</strong> Generate a token in the dashboard, the same plugin starts forwarding <em>structured events</em> (tool name, file path, error count — never prompt content, never source code). Remove the token, forwarding stops.</p>
-    </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════ PRICING ═══════════════════════════════════════ -->
-<section class="chapter" id="pricing">
-  <div class="wrap">
-    <div class="rev" style="max-width:880px;margin:0 auto;text-align:center">
-      <p class="kicker">Pricing</p>
-      <h2 class="h2">One tier. Twenty dollars per seat. Predictable.</h2>
-      <div class="rule" style="margin-left:auto;margin-right:auto"></div>
-      <p class="lead">No annual variant. No volume discount. No founder discount. No grandfathering.</p>
-    </div>
-
-    <div class="pricing-card rev">
-      <p class="plan-name">Pro</p>
-      <p class="plan-price"><strong>$20</strong><span class="plan-period"> / seat / month</span></p>
-
-      <ul class="plan-features">
-        <li>222 patterns evaluated at org scope</li>
-        <li>MCP scopes &mdash; self, team, org</li>
-        <li>All 14 adapters supported</li>
-        <li>90-day data retention</li>
-        <li>Org Projects, Members, Teams, Untracked Activity</li>
-        <li>Persona views &mdash; Owner, Manager, Member</li>
-        <li>Email support (24-hour SLA)</li>
-        <li>Public cloud at platform.context-mode.com</li>
-      </ul>
-
-      <a class="pricing-cta" href="https://platform.context-mode.com">Start for $20 / seat →</a>
-
-      <p class="pricing-fine">Per-seat means per member of your org (active or invited). Billed monthly. No annual variant, no volume discount, no free tier, no trial. Cancel any time via the Stripe Customer Portal &mdash; no refunds for the current period.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════ PROBLEM ═══════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════ PLUGIN STORY ═══════════════════════════════════════ -->
 <section class="chapter">
   <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 01 · the problem</p>
-      <h2 class="h2">You shipped Claude Code to 50 engineers.<br>Now what?</h2>
-      <div class="rule"></div>
-      <p class="lead">The seat license is signed. The plugin is rolled out. Engineering is moving faster — or it looks like it is. Then the questions start arriving from three different rooms at once.</p>
-    </div>
-
-    <div class="pain-grid rev">
-      <div class="pain">
-        <div class="role">CTO · Board deck Friday</div>
-        <p class="quote">"What is the AI investment actually returning? I need a number."</p>
-        <p class="fact">Bill is <strong>$50K/mo</strong>. Productivity claims float. No structured observability — only the invoice. Cannot defend the line item without a metric.</p>
-      </div>
-      <div class="pain">
-        <div class="role">EM · Monday 1:1s</div>
-        <p class="quote">"Ahmet has been stuck on auth.ts for three days. Who else is stuck?"</p>
-        <p class="fact">Blockers visible only when someone Slacks for help. The <strong>quiet stuck</strong> stays invisible. Sprint slips. 1:1 prep is guesswork.</p>
-      </div>
-      <div class="pain">
-        <div class="role">CISO · Audit window</div>
-        <p class="quote">"What did the AI actually touch? Where are the secrets?"</p>
-        <p class="fact">Sessions happen on every laptop, behind every API key. Compliance demands an audit log. <strong>The AI is faster than the audit trail</strong>.</p>
-      </div>
-    </div>
-
-    <div class="rev" style="margin-top:48px;max-width:780px">
-      <p class="body" style="font-family:var(--sans);font-size:1.05rem;font-weight:500;color:var(--text);line-height:1.65">Burning roughly <strong style="color:var(--accent-dark);font-weight:700">$60K / year</strong> across 50 engineers on stuck context cycles — error loops, rewrites, re-prompts — that no dashboard surfaces.</p>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-    </div>
-  </div>
-</section>
-
-<hr class="sep">
-
-<!-- ═══════════════════════════════════════ SOLUTION ═══════════════════════════════════════ -->
-<section class="chapter">
-  <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 02 · the solution</p>
-      <h2 class="h2">Insights — the analytics layer on top of the open-source plugin.</h2>
-      <div class="rule"></div>
-      <p class="lead">The context-mode OSS plugin already runs locally for 250,000+ developers. Every Claude Code, Cursor, Copilot, Codex, Gemini, Kimi, Qwen, JetBrains, Kiro session emits structured events through its hook system. Insights ingests those events server-side and runs <strong style="color:var(--text)">222 patterns</strong> over them.</p>
-    </div>
-
-    <div class="arch-wrap">
+    <div class="story">
+      <aside class="story-aside rev">
+        <span class="kicker g">§ 01 · The plugin</span>
+        <h3>For developers</h3>
+        <p>Free, open-source, ELv2. Runs locally on your machine. No cloud, no telemetry, no account.</p>
+      </aside>
       <div class="rev">
-        <p class="body">The findings surface in three places — same data, three doors in. Web Dashboard for the human eye. REST API for CI/CD and compliance pulls. <strong>Remote MCP</strong> for the AI agent reasoning over your engineering operations live.</p>
-        <p class="body">Nothing on the developer laptop changes. The hook fires fire-and-forget on every tool call. <strong>Same plugin. Same workflow. Three new doors.</strong></p>
-        <p class="muted">All operations are role-narrowed at the schema layer. A Member token cannot pass <code>scope: "org"</code> — the enum literally lacks the value. Defense at the schema, not the controller.</p>
-        <p class="body chapter-close">The OSS plugin stays free forever &mdash; it is the collector. The Platform is where your team sees what's happening. Pro tier is a flat <strong>$20 per seat per month</strong>. No tiers, no trial, no surprise metering.</p>
+        <h2 class="h2"><code>context-mode</code> keeps raw data <em>out</em> of the LLM context.</h2>
+        <div class="rule g"></div>
+        <p class="body">
+          Your AI coding agent burns through context. Every <code>gh issue list</code>, every grep, every file read piles
+          into the conversation and gets re-sent every turn. Fifty turns in, that one command has cost you
+          <strong>750,000 input tokens</strong>.
+        </p>
+        <p class="body">
+          context-mode is an MCP plugin that <strong>intercepts large tool output</strong> before it touches context.
+          Raw data goes into a local FTS5 store. The agent searches it when it needs to. Same answers. Same work.
+          <strong>30× fewer tokens.</strong>
+        </p>
+        <p class="body">
+          Works on <em>15 platforms</em> — Claude Code, Cursor, Copilot, Codex, Gemini CLI, JetBrains Copilot, Kiro,
+          and 8 more. <strong><span class="js-user-count">287,000+</span> developers</strong> run it locally today.
+        </p>
+        <div style="display:flex;gap:.625rem;margin-top:1.5rem;flex-wrap:wrap">
+          <a href="/oss" class="btn btn-primary" style="background:var(--accent-dev);color:#fff">Full story · OSS landing →</a>
+          <a href="https://github.com/mksglu/context-mode" class="btn btn-ghost">View on GitHub</a>
+        </div>
       </div>
-
-      <div class="arch-flow rev">
-        <div class="step"><div class="num">01</div><div class="lbl">Plugin</div><div class="det">Local hook system emits structured envelopes — tool calls, file paths, error counts, token usage, commit messages. No prompt content, no file content.</div></div>
-        <div class="step"><div class="num">02</div><div class="lbl">Ingest</div><div class="det">Cloudflare Worker validates with Zod, writes typed columns to D1. Streaming word-count UPSERT for §11 Layer-3 topics. Edge-cached reads.</div></div>
-        <div class="step"><div class="num">03</div><div class="lbl">Engine</div><div class="det">222 patterns evaluated in batch via D1 native <code>batch()</code>. Sub-second p95 for org-rollups. Patterns derive intent from event correlation, not text vocabulary.</div></div>
-        <div class="step"><div class="num">04</div><div class="lbl">Surface</div><div class="det">Dashboard (web). REST (CI / Slack / compliance). MCP (agent). Same data, three role-narrowed schemas.</div></div>
-      </div>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
     </div>
   </div>
 </section>
 
 <hr class="sep">
 
-<!-- ═══════════════════════════════════════ MCP-FIRST FEATURE ═══════════════════════════════════════ -->
-<section class="chapter-tight">
-  <div class="wrap">
-    <div class="rev">
-      <p class="section-num">§ 03 · agentic by design</p>
-    </div>
-
-    <div class="mcp-feature rev">
-      <div class="mcp-inner">
-        <div class="mcp-head">
-          <span class="mcp-kicker">remote MCP — first-class agent surface</span>
-          <h2 class="mcp-title">When the agent <em>asks</em>, the dashboard already <em>answered</em>.</h2>
-          <p class="mcp-body">Six personas. Six Mondays. <strong>One MCP endpoint</strong>, dynamically narrowed by role at issue time. Your CTO closes a board deck. Your EM preps a 1:1. Your CISO opens an audit window. Each agent calls the same server — and reaches a different surface.</p>
-          <p class="mcp-body">Thirteen first-class tools — not an API wrapper. Sub-second cached responses. Works in <strong>Claude Code, Cursor, Codex</strong>, and every MCP-capable agent. Schema enforcement is structural — a Member token's <code style="background:rgba(255,255,255,.08);color:#a3bfff">find_blockers</code> literally cannot accept <code style="background:rgba(255,255,255,.08);color:#a3bfff">scope: "org"</code>.</p>
-        </div>
-
-        <div class="mcp-demos-grid">
-
-          <div class="mcp-demo-card">
-            <span class="persona-tag">CTO · board prep</span>
-            <pre class="mcp-demo"><span class="comment">// Quarterly board deck — ROI slide</span>
-<span class="you">You: "what is our AI tool investment
-returning this quarter?"</span>
-
-<span class="ai">Claude →</span> <span class="tool-call">engagement_health</span>(
-  scope: <span class="result">"org"</span>, period: <span class="result">"90d"</span>
-)
-        ↓
-<span class="value">47/47 active · 100% adoption</span><span class="value">Health 87/100 · quality B+</span><span class="value">Productive rate 71% · adoption gap 12%</span>
-<span class="ai">Claude: Defensible board-ready snapshot. Adoption
-        gap suggests a follow-up in next month's planning.</span>
-
-<span class="result">Insights cited: exec_org_health_score,
-exec_quality_grade, productive_rate_org,
-adoption_org_gap</span></pre>
-          </div>
-
-          <div class="mcp-demo-card">
-            <span class="persona-tag t-em">EM · Monday triage</span>
-            <pre class="mcp-demo"><span class="comment">// 1:1 prep before standup</span>
-<span class="you">You: "who's stuck on my teams
-this week?"</span>
-
-<span class="ai">Claude →</span> <span class="tool-call">find_blockers</span>(
-  scope: <span class="result">"team"</span>, period: <span class="result">"7d"</span>
-)
-        ↓
-<span class="value">3 unresolved blockers · backend team</span><span class="value">12 persistent errors (high severity)</span><span class="value">Rejection volume 8 (warn)</span>
-<span class="ai">Claude: Start standup with the 3 blockers.
-        Pair-program the error spike.</span>
-
-<span class="result">Insights cited: team_unresolved_blockers,
-team_persistent_errors, team_rejection_volume</span></pre>
-          </div>
-
-          <div class="mcp-demo-card">
-            <span class="persona-tag t-ic">IC · growth check</span>
-            <pre class="mcp-demo"><span class="comment">// self-review before perf cycle</span>
-<span class="you">You: "how am I doing vs my team?"</span>
-
-<span class="ai">Claude →</span> <span class="tool-call">how_am_i</span>(period: <span class="result">"7d"</span>)
-        ↓
-<span class="value">78% productive sessions this week</span><span class="value">Hot file: auth.ts (consider split / review)</span><span class="value">Rules correlation 0.62 — above team median</span>
-<span class="ai">Claude: Solid trajectory for perf cycle.
-        Watch auth.ts concentration.</span>
-
-<span class="result">Insights cited: personal_productive_session_new,
-personal_hot_files_new, personal_rules_correlation</span></pre>
-          </div>
-
-          <div class="mcp-demo-card">
-            <span class="persona-tag t-ciso">CISO · audit window</span>
-            <pre class="mcp-demo"><span class="comment">// monthly SOC2 evidence pull</span>
-<span class="you">You: "any high-severity AI risks
-this month?"</span>
-
-<span class="ai">Claude →</span> <span class="tool-call">identify_risk</span>(
-  scope: <span class="result">"org"</span>, period: <span class="result">"30d"</span>,
-  severity: <span class="result">"high"</span>
-)
-        ↓
-<span class="value">2 secret-shaped paths (auto-redacted)</span><span class="value">1 destructive command (sandbox scope)</span><span class="value">1 member · 8x MCP call rate (flagged)</span>
-<span class="ai">Claude: All caught at ingest. SOC2 evidence
-        trail ready for the auditor.</span>
-
-<span class="result">Insights cited: secret_leak_proxy,
-policy_violation_destructive_command,
-mcp_tool_abuse_high_rate</span></pre>
-          </div>
-
-          <div class="mcp-demo-card">
-            <span class="persona-tag t-finops">FinOps · cost lens</span>
-            <pre class="mcp-demo"><span class="comment">// CFO Friday — AI spend review</span>
-<span class="you">You: "where is our AI spend going?"</span>
-
-<span class="ai">Claude →</span> <span class="tool-call">top_patterns</span>(
-  scope: <span class="result">"org"</span>, category: <span class="result">"cost"</span>,
-  period: <span class="result">"30d"</span>
-)
-        ↓
-<span class="value">Token spend +22% WoW (Opus-dominant)</span><span class="value">Cost per commit $0.84</span><span class="value">Retry waste $1,840/mo (Frontend team)</span>
-<span class="ai">Claude: Spend trending up — pair-program through
-        the Frontend retry pattern.</span>
-
-<span class="result">Insights cited: token_spend_org_high,
-cost_per_commit_org, tool_waste_high_retry_cost</span></pre>
-          </div>
-
-          <div class="mcp-demo-card">
-            <span class="persona-tag t-devops">DevOps · release sign-off</span>
-            <pre class="mcp-demo"><span class="comment">// pre-tag quality gate</span>
-<span class="you">You: "is backend's commit quality
-healthy this week?"</span>
-
-<span class="ai">Claude →</span> <span class="tool-call">top_patterns</span>(
-  scope: <span class="result">"team"</span>, team_id: <span class="result">"backend"</span>,
-  category: <span class="result">"workflow"</span>, period: <span class="result">"7d"</span>
-)
-        ↓
-<span class="value">41% feat · 28% fix · 22% refactor · 9% chore</span><span class="value">Cadence 178 commits this week</span><span class="value">Fix ratio 28% (healthy band)</span>
-<span class="ai">Claude: Backend release sign-off green.
-        Cross-language classifier holding up.</span>
-
-<span class="result">Insights cited: commit_healthy_mix,
-commit_strong_cadence, commit_fix_heavy</span></pre>
-          </div>
-
-        </div>
-
-        <div class="mcp-tools-wrap">
-          <div class="mcp-tools-label">— all 13 first-class tools, one endpoint —</div>
-          <div class="mcp-tools-grid">
-            <div class="mcp-tool"><div class="n">how_am_i</div><div class="d">Personal snapshot + peer percentile</div></div>
-            <div class="mcp-tool"><div class="n">how_is_team</div><div class="d">Single-team productivity + risks</div></div>
-            <div class="mcp-tool"><div class="n">compare_teams</div><div class="d">Cross-team leaderboard</div></div>
-            <div class="mcp-tool"><div class="n">find_blockers</div><div class="d">Ranked who is stuck and why</div></div>
-            <div class="mcp-tool"><div class="n">identify_risk</div><div class="d">Severity-sorted risk surface</div></div>
-            <div class="mcp-tool"><div class="n">engagement_health</div><div class="d">Adoption + ROI estimate</div></div>
-            <div class="mcp-tool"><div class="n">top_patterns</div><div class="d">Exploratory entry, by scope</div></div>
-            <div class="mcp-tool"><div class="n">what_changed</div><div class="d">Period-over-period deltas</div></div>
-            <div class="mcp-tool"><div class="n">top_members</div><div class="d">Performers + at-risk leaderboard</div></div>
-            <div class="mcp-tool"><div class="n">activity_breakdown</div><div class="d">Tool · platform · category mix</div></div>
-            <div class="mcp-tool"><div class="n">activity_timeline</div><div class="d">Hourly · daily session series</div></div>
-            <div class="mcp-tool"><div class="n">member_detail</div><div class="d">Single-IC deep drill (scope-aware)</div></div>
-            <div class="mcp-tool"><div class="n">commit_quality_team</div><div class="d">Verb-family + Conv-Commits classifier</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-    </div>
-  </div>
-</section>
-
-<hr class="sep">
-
-<!-- ═══════════════════════════════════════ PERSONAS ═══════════════════════════════════════ -->
-<section class="chapter" id="scenarios">
-  <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 04 · persona × insight</p>
-      <h2 class="h2">Six people. Six Mondays. One data layer.</h2>
-      <div class="rule"></div>
-      <p class="lead">The same insight engine answers radically different questions depending on who is asking. Each persona's tool schema is dynamically narrowed at issue time — role is not a UI filter, it is a structural constraint.</p>
-    </div>
-
-    <div class="personas">
-      <!-- CTO / Owner -->
-      <div class="persona ceo">
-        <div class="persona-head">
-          <div class="persona-name">Sarah · CTO</div>
-          <div class="persona-role">owner · org</div>
-        </div>
-        <p class="persona-ask">"What is my AI tool investment actually returning? Show me org-level metrics for the last 30 days — I have a board deck Friday."</p>
-        <code class="persona-call">engagement_health(scope: "org", period: "30d")</code>
-        <p class="persona-ret"><strong>Org ROI snapshot:</strong> 47 / 47 active. Adoption <strong>100%</strong>. Estimated savings <strong>34 hours / week / engineer</strong> (Think-in-Code substitution rate, high confidence). <code>compare_teams</code> shows Backend leading Frontend by <strong>+18% productivity, −12% error rate</strong>. Quarterly cost per resolved blocker: $42.</p>
-        <p class="persona-act">→ Renews the seat license. Board deck has a number.</p>
-        <p class="persona-price-callout">Org pays <strong>47 × $20 = $940 / month</strong>. Renewal is a Stripe quantity update, not a procurement event.</p>
-      </div>
-
-      <!-- EM -->
-      <div class="persona em">
-        <div class="persona-head">
-          <div class="persona-name">Brad · EM</div>
-          <div class="persona-role">manager · 3 teams</div>
-        </div>
-        <p class="persona-ask">"This week's stuck list. Whom should I unblock first?"</p>
-        <code class="persona-call">find_blockers(scope: "team", period: "7d", limit: 5)</code>
-        <p class="persona-ret"><strong>Top:</strong> Alex M. — <code>error_cycle_member_high</code> in <code>auth.ts</code>, 12 retries, 0 commits, severity high. <strong>Two more:</strong> a frontend dev hit <code>rejection_loop</code> on a CSS refactor (5d); a backend dev is on <code>blocked_on</code> &gt; 14d for a migration. Server narrows results by <code>managed_teams</code> — Brad sees Backend, Frontend, Design only.</p>
-        <p class="persona-act">→ 1:1 schedule rewritten. Pattern broken before sprint end.</p>
-      </div>
-
-      <!-- IC -->
-      <div class="persona ic">
-        <div class="persona-head">
-          <div class="persona-name">Alex · IC</div>
-          <div class="persona-role">member · self</div>
-        </div>
-        <p class="persona-ask">"How am I doing? Am I above or below team average — and what should I work on?"</p>
-        <code class="persona-call">how_am_i(period: "7d")</code>
-        <p class="persona-ret"><strong>Personal snapshot:</strong> productivity 78, quality 71. Strengths: <code>parallel_tool_use_high</code>, <code>think_in_code_adopter</code>. Growth: <code>read_before_edit_skipped</code> — 6× this week. Peer benchmark (anonymised): <strong>62nd percentile</strong>. Recommendation: "When editing a file you haven't opened this session, read it first — your error_cycle rate drops 40% in those sessions."</p>
-        <p class="persona-act">→ Workflow adjusted. No one else sees the score.</p>
-      </div>
-
-      <!-- CISO -->
-      <div class="persona ciso">
-        <div class="persona-head">
-          <div class="persona-name">Carter · CISO</div>
-          <div class="persona-role">manager · security</div>
-        </div>
-        <p class="persona-ask">"What did the AI actually touch? Any secret patterns? Anyone running destructive commands?"</p>
-        <code class="persona-call">identify_risk(scope: "org", period: "30d", severity: "high")</code>
-        <p class="persona-ret"><strong>3 high findings:</strong> <code>secret_leak_proxy</code> — 2 events surfaced `.env`-shaped basenames in <code>file_paths</code> (auto-redacted). <code>policy_violation_destructive_command</code> — 1 <code>rm -rf</code> in a sandbox. <code>mcp_tool_abuse_high_rate</code> — 1 member 8× normal MCP call rate. Audit-grade evidence count per finding.</p>
-        <p class="persona-act">→ Tickets filed. Audit window closes clean.</p>
-      </div>
-
-      <!-- FinOps -->
-      <div class="persona finops">
-        <div class="persona-head">
-          <div class="persona-name">Sophia · FinOps</div>
-          <div class="persona-role">finance · cost</div>
-        </div>
-        <p class="persona-ask">"Where is the AI spend going? Which teams are cost-efficient, which are over-prompting?"</p>
-        <code class="persona-call">top_patterns(scope: "org", category: "cost", period: "30d")</code>
-        <p class="persona-ret"><strong>Top cost signals:</strong> <code>token_spend_org_high</code> trending <strong>+22%</strong> WoW (Opus 4.7 dominant). <code>cost_per_commit_org</code> $0.84 — within target. <code>tool_waste_high_retry_cost</code> — Frontend retries cost <strong>$1,840 / mo</strong>. <code>agent_efficiency_member_low</code> flags 2 members with low resolved-blocker / spend ratio.</p>
-        <p class="persona-act">→ Cost / commit reported in CFO weekly. Frontend pair-programs through retries.</p>
-        <p class="persona-price-callout">The <strong>$50K/mo</strong> AI line item now has a sibling Platform line: <strong>$940/mo</strong> for visibility into the other $50K. Two clicks to defend in the budget review.</p>
-      </div>
-
-      <!-- DevOps / Engineering Lead -->
-      <div class="persona devops">
-        <div class="persona-head">
-          <div class="persona-name">Henry · DevOps</div>
-          <div class="persona-role">manager · release</div>
-        </div>
-        <p class="persona-ask">"Is the commit quality healthy? Which teams are merging real subjects vs `wip` placeholders?"</p>
-        <code class="persona-call">commit_quality_team(team_id: "backend", period: "7d")</code>
-        <p class="persona-ret"><strong>178 commits classified:</strong> 41% feat, 28% fix, 22% refactor, 9% other. Conv Commits prefix hit rate: <strong>72%</strong>. Subject length distribution healthy (mean 52 chars). <code>commit_message_quality_low</code> not firing. Cross-language by construction — verb-family + Conv Commits prefix detection works on any alphabet.</p>
-        <p class="persona-act">→ Backend release sign-off green. Frontend gets a "tighten commit messages" nudge.</p>
-      </div>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-    </div>
-  </div>
-</section>
-
-<hr class="sep">
-
-<!-- ═══════════════════════════════════════ DATA FLOW ═══════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════ PLATFORM STORY ═══════════════════════════════════════ -->
 <section class="chapter">
   <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 06 · what we ingest</p>
-      <h2 class="h2">Structural events. Never source code.</h2>
-      <div class="rule"></div>
+    <div class="story">
+      <aside class="story-aside rev">
+        <span class="kicker">§ 02 · The Platform</span>
+        <h3>For engineering orgs</h3>
+        <p>$20 / seat / month. Same plugin, opt-in event forwarding. Privacy-first.</p>
+      </aside>
+      <div class="rev">
+        <h2 class="h2">You're already saving money. <em>Reinvest a fraction of it here.</em></h2>
+        <div class="rule"></div>
+        <p class="body">
+          Your team is already running <code>context-mode</code> on every machine. Every session <strong>saves up to 98% of context</strong>
+          per call — real budget back in your pocket, every day, on every developer. The OSS plugin pays for itself before lunch.
+        </p>
+        <p class="body">
+          <strong>Context Mode Platform takes a small slice of those savings</strong> and turns the plugin's existing data into an org view
+          your CTO, EM, and CISO can defend. You're not adding a new tool — you're activating a layer that's already there.
+        </p>
 
-      <div class="local-callout" style="margin-bottom:24px">
-        <strong class="title">Read this first: the OSS plugin ships nothing.</strong>
-        <p>The open-source plugin you install runs <strong>100% locally</strong> — FTS5 SQLite on your machine, zero telemetry, zero cloud calls, no account. 250,000+ developers use it today without ever sending us a byte.</p>
-        <p>The schema below describes Insights only — the opt-in org layer. The <em>same</em> plugin starts emitting these structured events <strong>only after</strong> you generate a token in the dashboard and paste it into your config. Remove the token, forwarding stops. No silent uploads, ever.</p>
-      </div>
-      <p class="lead">The open-source plugin emits a tightly-scoped envelope per AI tool call. Every field is observable to the local engineer — nothing surprising travels.</p>
-    </div>
+        <!-- How the data flows — shadcn info card -->
+        <div class="info-card">
+          <div class="card-header">
+            <span class="badge badge-dev"><span class="dot"></span>How the data flows</span>
+          </div>
+          <div class="card-content">
+            <p>
+              The OSS plugin already <strong>captures structural events</strong> on every tool call — tool name, file path, error counts, decisions made. Locally, in a SQLite store on the developer's machine. <em>This is happening right now, for free, whether you're a Platform customer or not.</em>
+            </p>
+            <p>
+              When you opt into Platform, those same events forward to your <strong>private org workspace</strong> over an authenticated channel. <strong>Never source code. Never prompt content. Never file content.</strong> Just the structural metadata your engineers' workflow already generates. One switch, no new install, no developer interruption.
+            </p>
+          </div>
+        </div>
 
-    <div class="dataflow rev">
-      <div class="dataflow-row">
-        <div class="dataflow-node">
-          <div class="pin">01 · Tool calls</div>
-          <div class="ttl">What the agent did</div>
-          <ul>
-            <li>Tool name (Read, Edit, Bash, Task, …)</li>
-            <li>Duration, exit status</li>
-            <li>File paths touched</li>
-            <li>Error / retry counts</li>
-          </ul>
-        </div>
-        <div class="dataflow-node">
-          <div class="pin">02 · Session signal</div>
-          <div class="ttl">How long, how deep</div>
-          <ul>
-            <li>Session start / end</li>
-            <li>Compact cycles</li>
-            <li>Source files surfaced</li>
-            <li>Search queries (count, not text)</li>
-          </ul>
-        </div>
-        <div class="dataflow-node">
-          <div class="pin">03 · Prompt features</div>
-          <div class="ttl">10 universal signals</div>
-          <ul>
-            <li>Unicode script (Latin / Han / Arabic / …)</li>
-            <li>Length, word count, uppercase ratio</li>
-            <li>Code-block count, URL count</li>
-            <li>Streaming word tokens (DF-gated)</li>
-          </ul>
-        </div>
-        <div class="dataflow-node">
-          <div class="pin">04 · Git context</div>
-          <div class="ttl">What shipped</div>
-          <ul>
-            <li>Commit message subject (verb-family classified)</li>
-            <li>Worktree lifecycle</li>
-            <li>ExitPlanMode signals (plan bytes, hash)</li>
-            <li>Agent token usage + cost_usd</li>
-          </ul>
+        <div class="flow">
+          <div class="step"><div class="num">01</div><div class="lbl">Connect</div><div class="det">Your team is already running the plugin. One opt-in switch — <strong>same workflow, no disruption</strong>. Onboarding takes a single command.</div></div>
+          <div class="step"><div class="num">02</div><div class="lbl">Protect</div><div class="det">Your code, prompts, and IP <strong>never leave your machines</strong>. Only structural metadata — tool names, error counts, file paths — reaches the Platform.</div></div>
+          <div class="step"><div class="num">03</div><div class="lbl">Detect</div><div class="det"><strong>Pattern detection runs continuously</strong> — capacity imbalance, error spikes, rework concentration, blockers your engineers can't see. By Monday morning, the findings are waiting.</div></div>
+          <div class="step"><div class="num">04</div><div class="lbl">Answer</div><div class="det">Your <strong>CTO sees the ROI</strong>. Your <strong>EM sees who's stuck</strong>. Your <strong>CISO sees the audit trail</strong>. Same data layer, three different conversations — no one has to translate.</div></div>
         </div>
       </div>
-    </div>
-
-    <div class="privacy-grid rev">
-      <div class="privacy-col we-do">
-        <h4>+ Structural events we ingest</h4>
-        <ul>
-          <li>Tool name, duration, exit status</li>
-          <li>File paths touched (basename, not content)</li>
-          <li>Error category enum (typed taxonomy)</li>
-          <li>Commit message subject only (`-m` argument)</li>
-          <li>Session metadata (start, compact count, source count)</li>
-          <li>10 Unicode-property prompt features (per §11 Layer-1)</li>
-          <li>Streaming word tokens (deduped, lowercased, length ≥ 3)</li>
-          <li>Agent token usage + per-model cost derivation</li>
-        </ul>
-      </div>
-      <div class="privacy-col we-dont">
-        <h4>− What we never collect</h4>
-        <ul>
-          <li>Prompt content (raw user text)</li>
-          <li>File content (any byte of any source file)</li>
-          <li>Tool output (response payloads stay local)</li>
-          <li>Authentication tokens / API keys</li>
-          <li>Personally identifiable information beyond org-set email</li>
-          <li>Per-language vocabulary lists or stop-word tables</li>
-          <li>Cross-org event leakage (member-scope strictly enforced)</li>
-          <li>Telemetry from the OSS plugin without explicit token grant</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
     </div>
   </div>
 </section>
 
 <hr class="sep">
 
-<!-- ═══════════════════════════════════════ PATTERN CATALOG ═══════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════ SOLUTIONS ═══════════════════════════════════════ -->
 <section class="chapter">
   <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 07 · the catalog</p>
-      <h2 class="h2">222 patterns. Nine categories. Seven personas.</h2>
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 03 · Solutions</p>
+      <h2 class="h2">Solutions on the Platform.</h2>
       <div class="rule"></div>
-      <p class="lead">Each pattern is a SQL query plus a severity rule plus a suggested action. Built by analysing real session telemetry from 250,000+ open-source plugin installs — empirically derived, never invented.</p>
+      <p class="lead">
+        A <strong>Solution</strong> is a discrete product on the Platform. Today there is one. More are coming.
+        Same plugin, same event stream, different lenses.
+      </p>
     </div>
 
-    <div class="metrics-row rev">
-      <div class="metric"><div class="l">Patterns</div><div class="n">222</div><div class="d">Each is SQL + severity rule + suggested action.</div></div>
-      <div class="metric"><div class="l">Categories</div><div class="n">9</div><div class="d">Adoption, effectiveness, quality, cost, security, and four more.</div></div>
-      <div class="metric"><div class="l">Personas</div><div class="n">7</div><div class="d">IC, Manager, EM, CTO, Board, Security, FinOps.</div></div>
-      <div class="metric"><div class="l">Adapters</div><div class="n">10</div><div class="d">Claude Code, Cursor, Codex, Copilot, Gemini, and five more.</div></div>
+    <!-- Insight platform metrics — shadcn cards -->
+    <div class="rev metrics-row">
+      <div class="metric">
+        <span class="label">Platform metric</span>
+        <span class="num">222</span>
+        <span class="desc">behavioral patterns</span>
+      </div>
+      <div class="metric">
+        <span class="label">Platform metric</span>
+        <span class="num">13</span>
+        <span class="desc">remote MCP tools</span>
+      </div>
+      <div class="metric">
+        <span class="label">Platform metric</span>
+        <span class="num">14</span>
+        <span class="desc">AI adapters</span>
+      </div>
+      <div class="metric">
+        <span class="label">Platform metric</span>
+        <span class="num">7</span>
+        <span class="desc">persona views</span>
+      </div>
     </div>
 
-    <p class="muted rev" style="text-align:center;margin-top:8px">Every pattern carries an <code>evidence_count</code> on the wire — when Insights says "Ahmet is stuck", you can drill to the 12 event rows that backed the finding.</p>
+    <div class="solutions rev">
 
-    <div class="pattern-grid rev">
-
-      <!-- CTO -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">CTO &middot; org-wide AI program</div>
-          <div class="pattern-card-role r-cto">CTO</div>
+      <a href="/insight" class="solution-card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>Live · v1.0</span>
+          <div class="solution-wordmark"><span class="sans">Context Mode</span><span class="italic">Insight</span></div>
         </div>
-        <div class="pattern-card-meta">12 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">exec_org_health_score</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Org health snapshot: active members, productive rate, error rate.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">exec_quality_grade</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Quality tier (A-F) from org-wide error rate for the executive deck.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">exec_member_roi</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">Per-engineer AI utilization &mdash; operations per member, per period.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">exec_error_cost</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Dollar cost of unresolved error cycles across the org.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">productive_rate_org</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Share of sessions that produce a commit &mdash; the org productivity baseline.</div></li>
-        </ul>
+        <div class="card-content">
+          <p class="card-description">
+            <strong>Org observability for AI-assisted engineering.</strong> Productive session rate per engineer. Retry waste per team. Patterns named, actions prescribed. Role-narrowed for CTO, EM, IC, CISO, FinOps, DevOps.
+          </p>
+        </div>
+        <div class="card-footer">
+          <span class="solution-link">platform.context-mode.com →</span>
+        </div>
+      </a>
+
+      <div class="solution-card future">
+        <div class="card-header">
+          <span class="badge badge-org" style="background:#fff;color:var(--text-4);border-color:var(--border)"><span class="dot"></span>Coming · 2026</span>
+          <div class="solution-wordmark"><span class="sans">Context Mode</span><span class="italic">Memory</span></div>
+        </div>
+        <div class="card-content">
+          <p class="card-description">
+            <strong>Long-term memory for AI coding agents.</strong> Carry decisions, conventions, and architectural rules across sessions, teammates, and projects. Same plugin, persistent context.
+          </p>
+        </div>
+        <div class="card-footer">
+          <span class="solution-link muted">— roadmap —</span>
+        </div>
       </div>
 
-      <!-- EM -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">Engineering Manager &middot; multi-team</div>
-          <div class="pattern-card-role r-em">EM</div>
+      <div class="solution-card future">
+        <div class="card-header">
+          <span class="badge badge-org" style="background:#fff;color:var(--text-4);border-color:var(--border)"><span class="dot"></span>Coming · 2026</span>
+          <div class="solution-wordmark"><span class="sans">Context Mode</span><span class="italic">Audit</span></div>
         </div>
-        <div class="pattern-card-meta">18 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">team_vs_team_capacity</span><span class="pattern-cat">engagement</span></div><div class="pattern-desc">Which team runs hot per engineer vs which team is under-loaded.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">over_stretched_team_ranking</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Top-3 capacity-strained teams &mdash; high volume crossed with high errors.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">hiring_signal_team_pressure</span><span class="pattern-cat">engagement</span></div><div class="pattern-desc">Small-team distress index &mdash; an empirical hiring signal.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">cross_team_adoption_gap</span><span class="pattern-cat">adoption</span></div><div class="pattern-desc">Spread between top and bottom team adoption, in percentage points.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">manager_intervention_overdue</span><span class="pattern-cat">workflow</span></div><div class="pattern-desc">Teams with sustained warnings for 2+ weeks &mdash; escalate now.</div></li>
-        </ul>
+        <div class="card-content">
+          <p class="card-description">
+            <strong>Compliance trail for the AI surface.</strong> What the agent touched, when, under whose policy. SOC2-ready audit log built from structural events your plugin already emits.
+          </p>
+        </div>
+        <div class="card-footer">
+          <span class="solution-link muted">— roadmap —</span>
+        </div>
       </div>
 
-      <!-- Manager / Team Lead -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">Manager &middot; single team</div>
-          <div class="pattern-card-role r-mgr">MGR</div>
+      <div class="solution-card future">
+        <div class="card-header">
+          <span class="badge badge-org" style="background:#fff;color:var(--text-4);border-color:var(--border)"><span class="dot"></span>Coming · 2026</span>
+          <div class="solution-wordmark"><span class="sans">Context Mode</span><span class="italic">Cost</span></div>
         </div>
-        <div class="pattern-card-meta">24 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">adoption_rate_low</span><span class="pattern-cat">adoption</span></div><div class="pattern-desc">Team adoption below 50% of members &mdash; rollout stalled.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">error_rate_spike_team</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Sudden error-rate surge week-over-week on the team.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">team_agent_quality</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">Agent completion rate &mdash; how often the AI finishes what it starts.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">team_unresolved_blockers</span><span class="pattern-cat">workflow</span></div><div class="pattern-desc">Open blockers across the team that have not been cleared.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">productive_rate_low_team</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Sessions are running but few produce commits &mdash; below-target productivity.</div></li>
-        </ul>
-      </div>
-
-      <!-- IC -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">Individual Contributor &middot; personal</div>
-          <div class="pattern-card-role r-ic">IC</div>
+        <div class="card-content">
+          <p class="card-description">
+            <strong>Token spend × velocity, per team.</strong> Where the money went, where it converted to shipped code, which team's pattern is bleeding budget. FinOps lens for the AI line item.
+          </p>
         </div>
-        <div class="pattern-card-meta">32 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">personal_hot_files_new</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">Heavy rework on a single file &mdash; many edits to the most-touched path.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">personal_productive_session_new</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Productive-session rate just climbed &mdash; positive signal.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">personal_error_resolution_high</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Strong personal error-resolution rate within the same session.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">personal_commit_high_new</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">High output &mdash; large share of sessions ship a commit.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">personal_rules_correlation</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">CLAUDE.md and rules files loaded &mdash; workflow correlates with quality.</div></li>
-        </ul>
-      </div>
-
-      <!-- Security -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">Security &middot; CISO / AppSec</div>
-          <div class="pattern-card-role r-sec">SEC</div>
+        <div class="card-footer">
+          <span class="solution-link muted">— roadmap —</span>
         </div>
-        <div class="pattern-card-meta">7 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">secret_leak_proxy</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Secret-shaped basenames touched in <code>file_paths</code>.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">policy_violation_destructive_command</span><span class="pattern-cat">workflow</span></div><div class="pattern-desc">Destructive shell invocations &mdash; <code>rm -rf</code>, <code>--force</code>.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">permission_escalation_attempt</span><span class="pattern-cat">workflow</span></div><div class="pattern-desc">Permission-denied retry chains by the same member.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">mcp_tool_abuse_high_rate</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">A single member runs MCP calls at many multiples of team average.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">secret_in_commit_message</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Secret-shaped string detected inside a commit subject.</div></li>
-        </ul>
       </div>
-
-      <!-- FinOps -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">FinOps &middot; AI unit economics</div>
-          <div class="pattern-card-role r-fin">FIN</div>
-        </div>
-        <div class="pattern-card-meta">6 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">token_spend_org_high</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">Org-wide token spend trending up week-over-week.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">cost_per_commit_org</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Unit economics &mdash; dollars per AI-assisted commit.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">cost_per_feature_outlier</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">Feature buckets with disproportionate AI spend.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">tool_waste_high_retry_cost</span><span class="pattern-cat">quality</span></div><div class="pattern-desc">Dollars burned on failed-and-retried tool calls &mdash; avoidable waste.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">agent_efficiency_member_low</span><span class="pattern-cat">efficiency</span></div><div class="pattern-desc">Coaching signal &mdash; spend per resolved blocker, by member.</div></li>
-        </ul>
-      </div>
-
-      <!-- DevOps / Release -->
-      <div class="pattern-card">
-        <div class="pattern-card-head">
-          <div class="pattern-card-title">DevOps / Release &middot; shipping cadence</div>
-          <div class="pattern-card-role r-dev">DEV</div>
-        </div>
-        <div class="pattern-card-meta">19 patterns serve this persona</div>
-        <ul class="pattern-list">
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">commit_healthy_mix</span><span class="pattern-cat">workflow</span></div><div class="pattern-desc">Healthy feature-vs-fix commit ratio &mdash; balanced shipping.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">commit_fix_heavy</span><span class="pattern-cat">workflow</span></div><div class="pattern-desc">Fix-heavy mix &mdash; large share of commits are fixes, not features.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">commit_strong_cadence</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Strong shipping cadence &mdash; healthy commit frequency for the period.</div></li>
-          <li class="pattern-row"><div class="pattern-row-top"><span class="pattern-id">commit_volume_low</span><span class="pattern-cat">effectiveness</span></div><div class="pattern-desc">Below-baseline commit volume &mdash; cadence has dropped.</div></li>
-        </ul>
-      </div>
-
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com/docs" class="cta pri">Browse all patterns</a>
-      <a href="https://platform.context-mode.com" class="cta sec">Start for $20 / seat</a>
     </div>
   </div>
 </section>
 
 <hr class="sep">
 
-<!-- ═══════════════════════════════════════ ADAPTERS ═══════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════ ARCHITECTURE SUMMARY ═══════════════════════════════════════ -->
 <section class="chapter">
   <div class="wrap">
-    <div class="rev" style="max-width:880px">
-      <p class="section-num">§ 08 · adapters</p>
-      <h2 class="h2">Adapters &middot; supported AI assistants.</h2>
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 04 · How it fits together</p>
+      <h2 class="h2">One engine, two surfaces, many Solutions.</h2>
       <div class="rule"></div>
-      <p class="lead">Context Mode integrates with <strong>14</strong> AI assistants via <strong>three</strong> distinct hook paradigms. Insights ingests structured events from each — same envelope shape, same pattern engine.</p>
+      <p class="lead">
+        The OSS plugin is the entry point. The Platform is what you opt into when you want the org view.
+        Solutions are what you actually buy.
+      </p>
     </div>
 
-    <!-- Group 1: Hook-rich json-stdio -->
-    <div class="adapter-group rev">
-      <div class="adapter-group-head">
-        <div class="adapter-group-title">Hook-rich &middot; json-stdio</div>
-        <div class="adapter-group-meta">8 adapters &middot; full event surface</div>
+    <div class="rev surfaces">
+      <div class="surface dev">
+        <span class="badge badge-dev"><span class="dot"></span>Dev surface · Free</span>
+        <div class="surface-mark"><span class="prompt">$</span>context<span class="dash">-</span>mode<span class="cursor"></span></div>
+        <p class="surface-desc">
+          <strong>The plugin.</strong> Runs locally. No account, no cloud, no network. The free workflow <span class="js-user-count">287,000+</span> developers ship code with every day.
+        </p>
       </div>
-      <p class="adapter-group-lead">Host fires hook commands per tool boundary, prompt boundary, session boundary, and pre-compact. Each hook receives a JSON envelope on stdin; the plugin emits a structured event back via stdout. Maximum signal density &mdash; every extractor in <code>src/session/extract.ts</code> can fire.</p>
-      <div class="adapter-grid">
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Claude Code</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">Canonical hook host. PreToolUse intercepts every tool call; PostToolUse captures outcome; UserPromptSubmit fires per prompt.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span><span class="adapter-event">PreCompact</span><span class="adapter-event">Stop</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Codex</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">codex-rs hook system &mdash; 5 event types. Reuses the Claude Code envelope; <code>apply_patch</code> calls route through <code>extractApplyPatchTargets</code>.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span><span class="adapter-event">PreCompact</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Cursor</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">Hook envelope matches Claude Code. Adds <code>afterAgentResponse</code> for agent-loop boundaries; <code>Stop</code> surrogate via that hook.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span><span class="adapter-event">afterAgentResponse</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Gemini CLI</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">Google's terminal agent &mdash; full hook surface. <code>GEMINI.md</code> routing file; same extractor stack as Claude Code.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span><span class="adapter-event">PreCompact</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">JetBrains Copilot</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">IntelliJ / WebStorm / PyCharm Copilot agent. Hook envelope identical to VS Code Copilot; shared <code>copilot-base.ts</code>.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Kiro</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">AWS Kiro agent. Same hook envelope; <code>KIRO.md</code> routing file. Full extractor stack including <code>extractAgentUsage</code>.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Qwen Code</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">Alibaba Qwen coding agent &mdash; Claude Code hook envelope. <code>QWEN.md</code> routing file; cross-language prompt features via Unicode regex.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">VS Code Copilot</div><div class="adapter-paradigm json">json-stdio</div></div>
-          <div class="adapter-fires">Agent-mode hooks via the Copilot extension surface. <code>copilot-instructions.md</code> routing file; standard envelope.</div>
-          <div class="adapter-events"><span class="adapter-event">PreToolUse</span><span class="adapter-event">PostToolUse</span><span class="adapter-event">UserPromptSubmit</span><span class="adapter-event">SessionStart</span></div>
-        </div>
+      <div class="surface">
+        <span class="badge badge-org"><span class="dot"></span>Org surface · $20/seat</span>
+        <div class="surface-mark sans">Context Mode Platform<span class="cursor"></span></div>
+        <p class="surface-desc">
+          <strong>The commercial umbrella.</strong> Hosts Solutions. Opt-in event forwarding from the same plugin — one switch, no new install.
+        </p>
       </div>
-      <p class="muted" style="margin-top:14px;font-size:13px">Data captured: tool calls, file paths, prompt features (10 Unicode properties + L3 word tokens), commit message subjects, agent usage tokens with derived <code>cost_usd</code>, ExitPlanMode plan size + hash, ExitWorktree discard flag, SessionStart model + MCP-server snapshot.</p>
     </div>
 
-    <!-- Group 2: Plugin-based ts-plugin -->
-    <div class="adapter-group rev">
-      <div class="adapter-group-head">
-        <div class="adapter-group-title">Plugin-based &middot; ts-plugin</div>
-        <div class="adapter-group-meta">3 adapters &middot; in-process hooks</div>
-      </div>
-      <p class="adapter-group-lead">TypeScript plugin loaded directly by the host process. No subprocess boundary &mdash; hooks fire as in-process callbacks. Routing + extraction shares the same <code>extractEvents</code> path as json-stdio, surrogating missing host primitives.</p>
-      <div class="adapter-grid">
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Kilo</div><div class="adapter-paradigm ts">ts-plugin</div></div>
-          <div class="adapter-fires">Kilo Code &mdash; Cline-family agent. Plugin loaded via <code>kilo.json</code> <code>plugin</code> entry. Shares the <code>extractEvents</code> path; <code>AGENTS.md</code> routing.</div>
-          <div class="adapter-events"><span class="adapter-event">tool_call:before</span><span class="adapter-event">tool_call:after</span><span class="adapter-event">command:new</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">OpenClaw</div><div class="adapter-paradigm ts">ts-plugin</div></div>
-          <div class="adapter-fires">OpenClaw plugin via <code>api.registerHook()</code> + <code>api.on()</code>. <code>tool_call:before</code> can mutate <code>event.params</code> or block; <code>before_prompt_build</code> injects routing instructions.</div>
-          <div class="adapter-events"><span class="adapter-event">tool_call:before</span><span class="adapter-event">tool_call:after</span><span class="adapter-event">command:new</span><span class="adapter-event">before_prompt_build</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">OpenCode</div><div class="adapter-paradigm ts">ts-plugin</div></div>
-          <div class="adapter-fires"><code>tool.execute.before</code> / <code>tool.execute.after</code> for tool boundaries. No SessionStart primitive &mdash; <code>chat.system.transform</code> surrogates context injection; <code>chat.message</code> surrogates UserPromptSubmit.</div>
-          <div class="adapter-events"><span class="adapter-event">tool.execute.before</span><span class="adapter-event">tool.execute.after</span><span class="adapter-event">chat.message</span><span class="adapter-event">experimental.session.compacting</span><span class="adapter-event">chat.system.transform</span></div>
-        </div>
-      </div>
-      <p class="muted" style="margin-top:14px;font-size:13px">Data captured: same envelope as json-stdio. OpenCode's missing SessionStart is recovered via plugin-init scan + <code>chat.system.transform</code> injection; OC-2 inline filter on <code>chat.message</code> preserves the CCv2 user-prompt envelope.</p>
-    </div>
-
-    <!-- Group 3: MCP-only hosts -->
-    <div class="adapter-group rev">
-      <div class="adapter-group-head">
-        <div class="adapter-group-title">MCP-only hosts</div>
-        <div class="adapter-group-meta">3 adapters &middot; tool-side signal</div>
-      </div>
-      <p class="adapter-group-lead">Host exposes no hook pipeline. Signal arrives via the remote MCP server &mdash; <code>ctx_*</code> tool invocations from within the host become the event stream. All capabilities report false in the JSON-stdio matrix; routing instructions injected via per-host instruction file.</p>
-      <div class="adapter-grid">
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Antigravity</div><div class="adapter-paradigm mcp">mcp-only</div></div>
-          <div class="adapter-fires">Google Antigravity &mdash; no hooks; MCP via <code>~/.gemini/antigravity/mcp_config.json</code> <code>mcpServers</code>. <code>GEMINI.md</code> routing file (separate content from Gemini CLI).</div>
-          <div class="adapter-events"><span class="adapter-event">mcp.tool_call</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Pi</div><div class="adapter-paradigm mcp">mcp-only</div></div>
-          <div class="adapter-fires">Pi coding agent &mdash; JS-callback runtime API wired through <code>src/adapters/pi/extension.ts</code>; HookAdapter reports mcp-only. Isolated session dir at <code>~/.pi/context-mode/sessions/</code>. <code>AGENTS.md</code> routing.</div>
-          <div class="adapter-events"><span class="adapter-event">mcp.tool_call</span></div>
-        </div>
-        <div class="adapter-card">
-          <div class="adapter-card-head"><div class="adapter-name">Zed</div><div class="adapter-paradigm mcp">mcp-only</div></div>
-          <div class="adapter-fires">Zed editor &mdash; no CLI hook pipeline. MCP via <code>~/.config/zed/settings.json</code> <code>context_servers</code> section. All hook capabilities false; full MCP integration.</div>
-          <div class="adapter-events"><span class="adapter-event">mcp.tool_call</span></div>
-        </div>
-      </div>
-      <p class="muted" style="margin-top:14px;font-size:13px">Data captured: <code>ctx_*</code> tool invocations only &mdash; arguments, source label, timing. No tool-boundary capture from the host. Signal density lower than json-stdio or ts-plugin, but the pattern engine still runs over what the MCP server sees.</p>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-    </div>
+    <p class="body rev" style="max-width:840px;margin-top:36px">
+      <strong>Privacy boundary stays where it should:</strong> the plugin only emits <em>structural events</em> —
+      tool name, file path, error counts — never prompt content, never source code. The OSS plugin you ship with stays
+      free forever. The Platform is what you choose if you want the org view.
+    </p>
   </div>
 </section>
 
 <hr class="sep">
-
-<!-- ═══════════════════════════════════════ UI PANEL MOCKUP ═══════════════════════════════════════ -->
-<!-- ═══════════════════════════════════════ INTEGRATIONS ═══════════════════════════════════════ -->
-<section class="chapter">
-  <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 09 · integrations</p>
-      <h2 class="h2">Where your team already lives.</h2>
-      <div class="rule"></div>
-      <p class="lead">Insights publishes structured findings via webhooks. Linear, Jira, and Slack consume them natively. Block merges. Open tickets. Post digests. Auto-close on resolution.</p>
-    </div>
-
-    <div class="integ-grid rev">
-      <div class="integ live">
-        <div class="integ-name">Remote MCP</div>
-        <div class="integ-status">live · token auth</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">REST API</div>
-        <div class="integ-status">live · key auth</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Slack</div>
-        <div class="integ-status">live · webhook</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Linear</div>
-        <div class="integ-status">live · issue sync</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Jira</div>
-        <div class="integ-status">live · issue sync</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">GitHub Action</div>
-        <div class="integ-status">live · merge gate</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Notion</div>
-        <div class="integ-status">live · digest export</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Microsoft Teams</div>
-        <div class="integ-status">live · webhook</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Discord</div>
-        <div class="integ-status">live · webhook</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Zapier</div>
-        <div class="integ-status">live · zap trigger</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Email digest</div>
-        <div class="integ-status">live · weekly</div>
-      </div>
-      <div class="integ live">
-        <div class="integ-name">Webhook (generic)</div>
-        <div class="integ-status">live · custom POST</div>
-      </div>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="mailto:beta@context-mode.com" class="cta pri">Request an integration</a>
-      <a href="https://platform.context-mode.com" class="cta sec">Start for $20 / seat</a>
-    </div>
-  </div>
-</section>
-
-<hr class="sep">
-
-<!-- ═══════════════════════════════════════ SECURITY & ROLES ═══════════════════════════════════════ -->
-<section class="chapter">
-  <div class="wrap">
-    <div class="rev" style="max-width:780px">
-      <p class="section-num">§ 10 · security &amp; access</p>
-      <h2 class="h2">Three roles. One schema-enforced ceiling.</h2>
-      <div class="rule"></div>
-      <p class="lead">Most analytics products bolt RBAC on top with middleware checks. Insights enforces it one layer earlier — at the MCP tool schema itself.</p>
-    </div>
-
-    <div class="rev" style="margin-top:24px">
-      <div class="access-row">
-        <div class="access-role">owner</div>
-        <div class="access-scope">org</div>
-        <div class="access-detail">CTO, founder, billing owner. Sees everything. Manages members, tiers, billing. <code>scope</code> enum includes <code>"org"</code>, <code>"team"</code>, <code>"member"</code>, <code>"self"</code>.</div>
-      </div>
-      <div class="access-row">
-        <div class="access-role">manager</div>
-        <div class="access-scope">team-set</div>
-        <div class="access-detail">EM, Team Lead, Director, CISO, DevOps Lead. <code>managed_teams</code> column narrows the read — 1 team = Team Lead, N teams = EM. Server filters; schema enforces.</div>
-      </div>
-      <div class="access-row">
-        <div class="access-role">member</div>
-        <div class="access-scope">self</div>
-        <div class="access-detail">IC / developer. Sees own metrics plus anonymised peer benchmarks. Their team appears as "Team A" when peers compare. <code>scope</code> enum literally lacks <code>"org"</code>.</div>
-      </div>
-    </div>
-
-    <p class="muted rev" style="margin-top:24px">Member-scope reads bypass org-aggregate whitelist filters — a member's full activity counts toward their personal KPIs even when their project is pending org review. Defense at the schema layer, not the controller.</p>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-    </div>
-  </div>
-</section>
-
-<hr class="sep">
-
-<!-- ═══════════════════════════════════════ FAQ ═══════════════════════════════════════ -->
-<section class="chapter" id="faq">
-  <div class="wrap">
-    <div class="rev" style="max-width:880px;margin:0 auto;text-align:center">
-      <p class="section-num">§ 12 · faq</p>
-      <h2 class="h2">Questions before the call.</h2>
-      <div class="rule" style="margin-left:auto;margin-right:auto"></div>
-    </div>
-
-    <div class="faq rev" style="max-width:840px;margin-left:auto;margin-right:auto">
-      <details>
-        <summary>How much does Insights cost?</summary>
-        <p>Pro tier is <strong>$20 per seat per month</strong>. Per-seat means per member of your org (active or invited). Billed monthly. No annual variant, no volume discount, no Enterprise SKU, no free tier, no trial. Self-serve at <a href="https://platform.context-mode.com">platform.context-mode.com</a>.</p>
-      </details>
-      <details>
-        <summary>Can I try it free?</summary>
-        <p>The context-mode <strong>OSS collector is free forever</strong> &mdash; install it from the <a href="https://github.com/mksglu/context-mode">GitHub README</a> to run analytics locally on your own machine. The Platform layer (the thing you would see at platform.context-mode.com) is paid from day one. There is no Insights trial.</p>
-      </details>
-      <details>
-        <summary>What is your refund policy?</summary>
-        <p>No refunds. You can cancel any time from the Stripe Customer Portal &mdash; your subscription ends at the close of the current billing period. No partial-month credits. Member adds and removes mid-cycle sync to Stripe as quantity changes, billed pro-rated on the next invoice.</p>
-      </details>
-      <details>
-        <summary>Do you offer SSO / SAML / SOC 2?</summary>
-        <p>Not in the Pro tier. The OSS collector is source-available under ELv2 and can be run self-hosted if your buying process requires those controls.</p>
-      </details>
-      <details>
-        <summary>What data do you ingest?</summary>
-        <p>Structured session events emitted by the OSS plugin's hook system — never prompt content, never source code, never file content. The envelope covers: tool calls (name, duration, exit status), prompt boundaries, file paths touched, error and retry counts, commit message subjects, agent token usage with derived cost, session metadata (compact count, sources indexed, search queries), ExitPlanMode signals (plan byte size, plan hash), ExitWorktree signals (discard-changes flag), SessionStart settings and MCP-server snapshots, Layer-3 streaming word-token counts, and 10 universal Unicode-property prompt features. The plugin operates locally; only the structured envelope ships when an Insights token is present.</p>
-      </details>
-      <details>
-        <summary>Who sees what?</summary>
-        <p>Owner sees the org. Manager sees the teams listed in their <code>managed_teams</code> column. Member sees themselves plus anonymised peer benchmarks. Enforced at the MCP schema layer — a Member token literally cannot pass <code>scope: "org"</code> because the enum lacks the value.</p>
-      </details>
-      <details>
-        <summary>Does the OSS plugin still work without Insights?</summary>
-        <p>Yes — and that is the default posture. The OSS plugin is licensed under <strong>Elastic License 2.0</strong> (source-available) and operates at the MCP protocol layer: raw data stays in a sandboxed subprocess and never enters the LLM context window. Nothing leaves the machine — no telemetry, no cloud sync, no usage tracking, no account required. The SQLite knowledge base lives in the home directory and dies when the session ends. Insights is an explicit opt-in: generate a token in the dashboard and the same plugin starts forwarding structured events. Remove the token, forwarding stops.</p>
-      </details>
-      <details>
-        <summary>How are the patterns built?</summary>
-        <p>Empirically, from real session telemetry across the OSS adapter surface (16 platform integrations on the OSS side; 14 currently exposed in the Insights install CLI — Claude Code, Codex, Cursor, Gemini CLI, JetBrains Copilot, Kiro, Qwen Code, VS Code Copilot, Kilo, OpenClaw, OpenCode, Antigravity, Pi, and Zed). The catalog ships <strong>222 patterns</strong> across <strong>9 categories</strong> (adoption, effectiveness, efficiency, quality, workflow, engagement, prompt, security, cost), each one wired through <code>getMetricValue</code> + <code>AggregateData</code> in the engine and independently testable. Every pattern is SQL + threshold + severity + suggested action, audited against existing event flows.</p>
-      </details>
-      <details>
-        <summary>What is the agentic / MCP angle?</summary>
-        <p>The remote MCP endpoint is a first-class surface — every dashboard widget has an MCP twin. The agent server ships <strong>13 tools</strong> today: <code>find_blockers</code>, <code>what_changed</code>, <code>top_patterns</code>, <code>how_is_team</code>, <code>compare_teams</code>, <code>how_am_i</code>, <code>identify_risk</code>, <code>engagement_health</code>, <code>top_members</code>, <code>activity_timeline</code>, <code>activity_breakdown</code>, <code>member_detail</code>, and <code>commit_quality_team</code>. Tool schemas are dynamically computed per token — the schema itself enforces access boundaries (a Member token cannot ask org-scope questions because the enum lacks the value).</p>
-      </details>
-      <details>
-        <summary>Does cross-language work?</summary>
-        <p>Yes by construction. Commit Quality classifier uses Conv Commits ASCII prefix (cross-language) + structural signals (issue refs, file paths) — never English verb dictionaries. Prompt features use Unicode property regex (`\p{Script=X}`, `\p{L}+`) — never language detection libraries. Streaming topics use DF-ratio (count / N_prompts) which is organic to the org's actual vocabulary, Turkish or otherwise.</p>
-      </details>
-      <details>
-        <summary>How does Insights relate to Context Mode Platform?</summary>
-        <p><strong>Context Mode Platform</strong> is the umbrella — the OSS plugin, the event ingestion layer, the pattern engine, the dashboard, the remote MCP. <strong>Insights</strong> is the first Solution built on top of it: the org-layer analytics surface, role-tuned, persona-aware. Two more Solutions are on the roadmap: <strong>Audit</strong> turns the event stream into compliance reports for the CISO persona; <strong>Risk Score</strong> scores AI-authored changes inside a PR for the DevOps Lead persona, exposed as a GitHub Action.</p>
-      </details>
-    </div>
-
-    <div class="gtm-strip rev">
-      <a href="https://platform.context-mode.com" class="cta pri">Start for $20 / seat →</a>
-    </div>
-  </div>
-</section>
 
 <!-- ═══════════════════════════════════════ FINAL CTA ═══════════════════════════════════════ -->
-<div class="wrap">
-  <div class="final rev">
-    <div class="final-inner">
-      <p style="font-family:var(--mono);font-size:11px;font-weight:600;color:#4b7bec;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px">Ready to look?</p>
-      <h2>Fifteen minutes. One Monday. Real data.</h2>
-      <p class="ld">If your team already runs the open-source plugin, we can have your first three findings live on the call. Bring an EM. We will run <code style="background:#1a2535;color:#a3bfff">find_blockers</code> against your real session telemetry.</p>
-
-      <div class="final-cta">
-        <a href="https://platform.context-mode.com" class="pri">Start for $20 / seat →</a>
-        <a href="mailto:beta@context-mode.com" class="sec">beta@context-mode.com</a>
+<section class="chapter-tight">
+  <div class="wrap">
+    <div class="final rev">
+      <div class="final-inner">
+        <h2>One name. Two surfaces. <em style="font-family:var(--serif);font-style:italic;color:#a3bfff">Your call.</em></h2>
+        <p class="ld">
+          If you're a developer — install the plugin. It's <em>free, local, and quiet</em>. Three commands and you're saving tokens.
+          If you're an engineering org — open the Platform and see what your team is doing with the saved tokens.
+        </p>
+        <div class="final-cta">
+          <a href="/oss" class="pri">Install context-mode (OSS) →</a>
+          <a href="/insight" class="sec">Open the Platform →</a>
+        </div>
       </div>
-
-      <p style="font-family:var(--mono);font-size:12px;color:#475569;margin-top:32px;letter-spacing:.04em">— Pro $20 / seat / month · <a href="https://platform.context-mode.com" style="color:inherit;text-decoration:underline">platform.context-mode.com</a> · OSS collector free forever.</p>
     </div>
   </div>
-</div>
+</section>
 
 <!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
 <footer>
-  <p class="footer-q">Stop guessing what your AI investment is doing.<br>Read the patterns.</p>
+  <p class="footer-q"><span>Context Mode</span><span class="cursor"></span></p>
+  <p class="footer-tagline">The other half of the context problem.</p>
   <p class="footer-links">
     <a href="/oss">OSS plugin</a>
     <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="/insight">Platform</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
     <a href="https://github.com/mksglu/context-mode">GitHub</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="https://discord.gg/DCN9jUgN5v">Discord</a>
   </p>
   <p class="footer-meta">Built by <a href="https://mksg.lu" style="color:var(--text-3)">B. Mert Köseoğlu</a></p>
   <p class="footer-addr">MKSF LTD · Suite 8805 5 Brayford Square · London E1 0SG · United Kingdom</p>
 </footer>
 
-<div class="sticky-cta" id="sticky-cta" aria-hidden="true">
-  <div class="sticky-inner">
-    <p class="sticky-text"><strong>Pro $20 / seat / month.</strong> No tiers, no trial, no surprise bills.</p>
-    <a class="sticky-button" href="https://platform.context-mode.com">Start →</a>
-  </div>
-</div>
-
 <script>
 // Reveal on scroll
-const o = new IntersectionObserver(e => {
-  e.forEach(x => {
-    if (x.isIntersecting) {
-      x.target.classList.add('v');
-      o.unobserve(x.target);
-    }
-  });
-}, { threshold: .06, rootMargin: '0px 0px -20px 0px' });
-document.querySelectorAll('.rev').forEach(e => o.observe(e));
+const o=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('v');o.unobserve(x.target);}});},{threshold:.06,rootMargin:'0px 0px -20px 0px'});
+document.querySelectorAll('.rev').forEach(e=>o.observe(e));
 
-// Dynamic platform stats (graceful fallback to static values)
-fetch('https://platform.context-mode.com/api/v1/public/stats')
-  .then(r => r.json())
-  .then(d => {
-    if (d.orgs) document.getElementById('stat-orgs').textContent = d.orgs;
-    if (d.devs) document.getElementById('stat-devs').textContent = d.devs;
+// Dynamic stats from context-mode/main/stats.json — single source of truth
+function toLongForm(short){
+  if(!short) return null;
+  const m = String(short).match(/^([\d.]+)\s*([kKmM])?\+?$/);
+  if(!m) return short;
+  let num = parseFloat(m[1]);
+  if(m[2] && /k/i.test(m[2])) num *= 1000;
+  else if(m[2] && /m/i.test(m[2])) num *= 1000000;
+  return Math.round(num).toLocaleString('en-US') + '+';
+}
+
+fetch('https://raw.githubusercontent.com/mksglu/context-mode/main/stats.json')
+  .then(r=>r.json())
+  .then(d=>{
+    if(!d) return;
+    if(d.message){
+      const heroStat=document.getElementById('stat-users');
+      if(heroStat) heroStat.textContent=d.message;
+    }
+    const longForm=d.message_long||d.users_long||toLongForm(d.message);
+    if(longForm){
+      document.querySelectorAll('.js-user-count').forEach(el=>{el.textContent=longForm});
+      const tag=document.getElementById('stat-tag-users');
+      if(tag) tag.textContent=longForm;
+    }
   })
-  .catch(() => {});
+  .catch(()=>{});
 
-// Sticky CTA: reveal after 80vh scroll
-(function(){
-  const cta = document.getElementById('sticky-cta');
-  if (!cta) return;
-  const threshold = () => window.innerHeight * 0.8;
-  let visible = false;
-  const onScroll = () => {
-    const shouldShow = window.scrollY > threshold();
-    if (shouldShow !== visible) {
-      visible = shouldShow;
-      cta.classList.toggle('visible', visible);
-      cta.setAttribute('aria-hidden', visible ? 'false' : 'true');
+// GitHub stars
+fetch('https://api.github.com/repos/mksglu/context-mode')
+  .then(r=>r.json())
+  .then(d=>{
+    if(d && d.stargazers_count){
+      const v=d.stargazers_count;
+      const el=document.getElementById('stat-stars');
+      if(el) el.textContent = v >= 1000 ? (v/1000).toFixed(1)+'k' : v;
     }
-  };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-})();
-
+  })
+  .catch(()=>{});
 </script>
 </body>
 </html>
