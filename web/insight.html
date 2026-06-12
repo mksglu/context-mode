@@ -114,7 +114,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg-alt);color:var(-
 /* Wordmark (hero) */
 .cm-wordmark{display:flex;align-items:baseline;gap:0;line-height:1;font-size:clamp(3rem,8vw,5.5rem)}
 .cm-wordmark .sans{font-family:var(--sans);font-weight:600;color:var(--ink);letter-spacing:-.035em}
-.cm-wordmark .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);letter-spacing:-.03em;font-size:1.18em;margin-left:.12em}
+.cm-wordmark .italic{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent);letter-spacing:-.03em;font-size:1em;margin-left:.14em}
 .cm-wordmark .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em}
 
 /* Hero */
@@ -122,7 +122,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg-alt);color:var(-
 .hero::before{content:'';position:absolute;top:-20%;right:-10%;width:520px;height:520px;background:radial-gradient(circle,var(--accent-light) 0%,transparent 70%);opacity:.55;pointer-events:none}
 .hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,var(--accent-dev-bg) 0%,transparent 70%);opacity:.5;pointer-events:none}
 .hero-inner{position:relative;z-index:1}
-.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-4);margin-bottom:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-alt);border:1px solid var(--border-light);border-radius:6px}
+.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-4);margin-top:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-alt);border:1px solid var(--border-light);border-radius:6px;align-self:flex-start}
 .hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(26,86,219,.6)}
 .hero-tag a{color:var(--text-3)}
 .hero-sub{font-size:clamp(1.1rem,2.5vw,1.4rem);color:var(--text-2);font-weight:300;margin-top:22px;max-width:880px;line-height:1.55}
@@ -350,8 +350,8 @@ footer{padding:64px 0 40px;text-align:center;background:var(--bg-alt);border-top
 <!-- ═══════════════════════════════════════ HERO ═══════════════════════════════════════ -->
 <section class="hero">
   <div class="hero-inner wrap rev">
-    <p class="hero-tag"><span class="dot"></span>the first Solution on <a href="https://context-mode.com">Context Mode Platform</a></p>
     <h1 class="cm-wordmark"><span class="sans">Context Mode</span><span class="italic">Insight</span><span class="cursor"></span></h1>
+    <p class="hero-tag"><span class="dot"></span>the first Solution on <a href="https://context-mode.com">Context Mode Platform</a></p>
     <p class="hero-sub">
       <strong>Engineering signal for AI-assisted teams.</strong> Per-engineer productive rate. Retry waste per team. Patterns named, actions prescribed. Role-narrowed for <em>CTO, EM, IC, CISO, FinOps, DevOps</em> — same MCP endpoint, six different views.
     </p>

@@ -127,7 +127,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg-code);color:var(
 .hero::before{content:'';position:absolute;top:-20%;right:-10%;width:520px;height:520px;background:radial-gradient(circle,var(--accent-light) 0%,transparent 70%);opacity:.55;pointer-events:none}
 .hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,var(--accent-dev-bg) 0%,transparent 70%);opacity:.5;pointer-events:none}
 .hero-inner{position:relative;z-index:1}
-.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-4);margin-bottom:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-alt);border:1px solid var(--border-light);border-radius:6px}
+.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-4);margin-top:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-alt);border:1px solid var(--border-light);border-radius:6px;align-self:flex-start}
 .hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-dev);box-shadow:0 0 10px rgba(16,185,129,.6)}
 .hero-sub{font-size:clamp(1.1rem,2.5vw,1.45rem);color:var(--text-2);font-weight:300;margin-top:22px;max-width:880px;line-height:1.55}
 .hero-sub strong{color:var(--ink);font-weight:600}
@@ -445,8 +445,8 @@ footer{padding:64px 0 40px;text-align:center;background:var(--bg-alt);border-top
 <!-- ═══════════════════════════════════════ HERO ═══════════════════════════════════════ -->
 <section class="hero">
   <div class="hero-inner wrap rev">
-    <p class="hero-tag"><span class="dot"></span>open-source plugin · commercial platform · <span id="stat-tag-users">287,000+</span> developers</p>
     <h1 class="cm-master">Context Mode<span class="cursor"></span></h1>
+    <p class="hero-tag"><span class="dot"></span>open-source plugin · commercial platform · <span id="stat-tag-users">287,000+</span> developers</p>
     <p class="hero-sub">
       <strong>The other half of the context problem</strong> — for developers and for engineering orgs.
       An MCP plugin that keeps raw data out of the LLM context window. A Platform that surfaces <em>what your team is doing</em>
