@@ -707,6 +707,7 @@ export default function piExtension(pi: any): void {
         _pendingContext = "";
       }
     } catch {
+      _pendingContext = ""; // Reset — ensure no stale data escapes
       // best effort — never break agent start
     }
   });
@@ -716,14 +717,18 @@ export default function piExtension(pi: any): void {
   // messages rather than mutating systemPrompt at the beginning. This preserves
   // prefix prompt cache for DeepSeek, Anthropic, and OpenAI.
   pi.on("context", (event: any) => {
-    if (!_pendingContext) return;
-    const ctx = _pendingContext;
-    _pendingContext = "";
-    event.messages.push({
-      role: "user",
-      content: ctx,
-    });
-    return { messages: event.messages };
+    try {
+      if (!_pendingContext) return;
+      const ctx = _pendingContext;
+      _pendingContext = "";
+      event.messages.push({
+        role: "user",
+        content: ctx,
+      });
+      return { messages: event.messages };
+    } catch {
+      // best effort — never break context assembly
+    }
   });
 
   // ── 4b. before_provider_response — capture response metadata ───
