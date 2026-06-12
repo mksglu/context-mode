@@ -21,6 +21,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -290,6 +291,150 @@ describe("healInstalledPlugins — defensive paths", () => {
       readFileSync(resolve(__dirname, "../../package.json"), "utf-8"),
     ) as { files: string[] };
     expect(pkg.files).toContain("scripts/heal-installed-plugins.mjs");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Issue #795 — symlinked config dir (~/.claude → another volume).
+// The registry stores *physical* install paths while the heal callers
+// compute the cache root through the *symlink*, so a purely lexical
+// resolve+startsWith containment check never matches and every heal
+// silently skips the plugin. The guards must compare physical (realpath)
+// forms too — without losing their teeth against `..` escapes.
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Create a directory symlink (junction on Windows — no admin needed).
+ * Returns false when the environment cannot create symlinks at all so
+ * the test can bail instead of failing on an unrelated OS restriction.
+ */
+function trySymlinkDir(target: string, linkPath: string): boolean {
+  try {
+    symlinkSync(target, linkPath, "junction");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe("healInstalledPlugins — #795 symlinked cache root", () => {
+  it("heals when pluginCacheRoot is given via a symlink but the registry stores physical paths", () => {
+    const fake = buildFakeRegistry({
+      entryVersion: "1.0.99",
+      cacheVersion: "1.0.113",
+    });
+    const linkRoot = join(makeTmp("ctx-link-"), "cache-link");
+    if (!trySymlinkDir(fake.cacheRoot, linkRoot)) return; // env cannot symlink
+
+    const result = healInstalledPlugins({
+      registryPath: fake.registryPath,
+      pluginCacheRoot: linkRoot, // symlink form (what a relocated ~/.claude computes)
+      pluginKey: KEY,
+    });
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.healed).toContain("entry-version");
+    const after = readRegistry(fake.registryPath) as {
+      plugins: Record<string, Array<{ version: string }>>;
+    };
+    expect(after.plugins[KEY][0].version).toBe("1.0.113");
+  });
+
+  it("heals when the registry stores symlink paths but pluginCacheRoot is physical", () => {
+    const fake = buildFakeRegistry({
+      entryVersion: "1.0.99",
+      cacheVersion: "1.0.113",
+    });
+    const linkRoot = join(makeTmp("ctx-link-"), "cache-link");
+    if (!trySymlinkDir(fake.cacheRoot, linkRoot)) return; // env cannot symlink
+
+    // Rewrite the registry entry to the symlinked form of the same dir.
+    const ip = readRegistry(fake.registryPath) as {
+      plugins: Record<string, Array<{ installPath: string }>>;
+    };
+    ip.plugins[KEY][0].installPath = join(
+      linkRoot,
+      "context-mode",
+      "context-mode",
+      "1.0.113",
+    );
+    writeFileSync(fake.registryPath, JSON.stringify(ip, null, 2) + "\n");
+
+    const result = healInstalledPlugins({
+      registryPath: fake.registryPath,
+      pluginCacheRoot: fake.cacheRoot, // physical form
+      pluginKey: KEY,
+    });
+
+    expect(result.healed).toContain("entry-version");
+  });
+
+  it("still rejects `..` escapes when the cache root is symlinked", () => {
+    const fake = buildFakeRegistry({
+      entryVersion: "1.0.99",
+      cacheVersion: "1.0.113",
+    });
+    const linkRoot = join(makeTmp("ctx-link-"), "cache-link");
+    if (!trySymlinkDir(fake.cacheRoot, linkRoot)) return; // env cannot symlink
+
+    // Tamper: a traversal path that lexically starts at the symlinked root
+    // but escapes it — must fail BOTH the lexical and the physical check.
+    const escapeDir = makeTmp("ctx-escape-");
+    const ip = readRegistry(fake.registryPath) as {
+      plugins: Record<string, Array<{ installPath: string }>>;
+    };
+    ip.plugins[KEY][0].installPath = join(linkRoot, "..", "..", escapeDir);
+    writeFileSync(fake.registryPath, JSON.stringify(ip, null, 2) + "\n");
+
+    const result = healInstalledPlugins({
+      registryPath: fake.registryPath,
+      pluginCacheRoot: linkRoot,
+      pluginKey: KEY,
+    });
+    expect(result.healed).not.toContain("entry-version");
+  });
+});
+
+describe("healPluginJsonMcpServers — #795 symlinked cache root", () => {
+  it("heals through a symlinked pluginCacheRoot", () => {
+    const fake = buildFakeRegistry({
+      entryVersion: "1.0.113",
+      cacheVersion: "1.0.113",
+    });
+    // Seed a poisoned mcpServers args[0] in the cache plugin.json.
+    const pluginJsonPath = resolve(fake.cacheDir, ".claude-plugin", "plugin.json");
+    writeFileSync(
+      pluginJsonPath,
+      JSON.stringify(
+        {
+          name: "context-mode",
+          version: "1.0.113",
+          mcpServers: {
+            "context-mode": {
+              command: "node",
+              args: ["/tmp/context-mode-upgrade-1736000000000/start.mjs"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const linkRoot = join(makeTmp("ctx-link-"), "cache-link");
+    if (!trySymlinkDir(fake.cacheRoot, linkRoot)) return; // env cannot symlink
+
+    const result = healPluginJsonMcpServers({
+      pluginRoot: fake.cacheDir, // physical (as the registry records it)
+      pluginCacheRoot: linkRoot, // symlink (as a relocated ~/.claude computes it)
+      pluginKey: KEY,
+    });
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.healed).toContain("plugin-json-args");
+    const after = JSON.parse(readFileSync(pluginJsonPath, "utf-8"));
+    expect(after.mcpServers["context-mode"].args[0]).toBe(
+      "${CLAUDE_PLUGIN_ROOT}/start.mjs",
+    );
   });
 });
 

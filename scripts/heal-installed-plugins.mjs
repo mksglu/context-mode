@@ -17,8 +17,36 @@
  * @see https://github.com/anthropics/claude-code/issues/46915
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync, realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
+
+/**
+ * Best-effort realpath: dereference symlinks when the path exists, fall
+ * back to the lexical resolve when it doesn't (e.g. a stale installPath).
+ */
+function toRealPath(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+
+/**
+ * Containment check shared by the path-traversal guards below.
+ *
+ * `path.resolve` rejects `..` escapes but does not dereference symlinks.
+ * When the Claude config dir is relocated and symlinked back (#795 —
+ * `~/.claude` → another volume), the registry stores *physical* install
+ * paths while the computed cache root keeps the *symlink* path, the
+ * lexical forms never match, and every heal silently skips the plugin.
+ * Containment holds when either the lexical or the physical forms match;
+ * a `..` escape fails both, so the traversal guard keeps its teeth.
+ */
+function isInsideRoot(childPath, rootPath) {
+  if (resolve(childPath).startsWith(resolve(rootPath) + sep)) return true;
+  return toRealPath(childPath).startsWith(toRealPath(rootPath) + sep);
+}
 
 /**
  * @typedef {Object} HealResult
@@ -77,10 +105,8 @@ export function healInstalledPlugins({ registryPath, pluginCacheRoot, pluginKey 
     if (!installPath || typeof installPath !== "string") continue;
 
     // Path-traversal guard: only consult plugin.json files inside the
-    // declared plugin cache root.
-    const resolvedInstall = resolve(installPath);
-    const cacheRootWithSep = resolve(pluginCacheRoot) + sep;
-    if (!resolvedInstall.startsWith(cacheRootWithSep)) continue;
+    // declared plugin cache root (symlink-aware, #795).
+    if (!isInsideRoot(installPath, pluginCacheRoot)) continue;
 
     const cachePluginJson = resolve(installPath, ".claude-plugin", "plugin.json");
     if (!existsSync(cachePluginJson)) continue;
@@ -223,10 +249,8 @@ export function healPluginJsonMcpServers({ pluginRoot, pluginCacheRoot, pluginKe
   }
 
   // Path-traversal guard: refuse to touch a plugin root that escapes the
-  // declared cache root. Mirrors HEAL 3's guard.
-  const resolvedRoot = resolve(pluginRoot);
-  const cacheRootWithSep = resolve(pluginCacheRoot) + sep;
-  if (!resolvedRoot.startsWith(cacheRootWithSep)) {
+  // declared cache root (symlink-aware, #795). Mirrors HEAL 3's guard.
+  if (!isInsideRoot(pluginRoot, pluginCacheRoot)) {
     return { healed: [], skipped: "outside-cache-root" };
   }
 
@@ -332,10 +356,9 @@ export function healMcpJsonArgs({ pluginRoot, pluginCacheRoot, pluginKey }) {
   }
 
   // Path-traversal guard: refuse to touch a plugin root that escapes the
-  // declared cache root. Mirrors healPluginJsonMcpServers + HEAL 3.
-  const resolvedRoot = resolve(pluginRoot);
-  const cacheRootWithSep = resolve(pluginCacheRoot) + sep;
-  if (!resolvedRoot.startsWith(cacheRootWithSep)) {
+  // declared cache root (symlink-aware, #795). Mirrors
+  // healPluginJsonMcpServers + HEAL 3.
+  if (!isInsideRoot(pluginRoot, pluginCacheRoot)) {
     return { healed: [], skipped: "outside-cache-root" };
   }
 
