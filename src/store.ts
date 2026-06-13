@@ -152,6 +152,23 @@ function maxEditDistance(wordLength: number): number {
 // boundaries when a chunk exceeds this cap.
 const MAX_CHUNK_BYTES = 4096;
 
+// Blank-line sectioning is used only for output that is *naturally* sectioned:
+// at least a few sections, not an unbounded explosion, and no single section so
+// large that the split is clearly not the real structure (those fall back to
+// line-grouping). Sections that pass the heuristic but still exceed
+// MAX_CHUNK_BYTES are sub-split so no persisted chunk breaks the cap.
+const MIN_BLANK_LINE_SECTIONS = 3;
+const MAX_BLANK_LINE_SECTIONS = 200;
+const BLANK_SECTION_STRATEGY_MAX_BYTES = 5000;
+
+// Number of leading characters of a chunk's first line used as its title.
+const CHUNK_TITLE_MAX_CHARS = 80;
+
+// When byte-splitting an oversized single line, prefer to break at a whitespace
+// boundary for readability — but only if that boundary is past this fraction of
+// the slice, otherwise we'd waste too much of the byte budget.
+const WHITESPACE_BREAK_RATIO = 0.5;
+
 // ─────────────────────────────────────────────────────────
 // ContentStore
 // ─────────────────────────────────────────────────────────
@@ -1746,9 +1763,32 @@ export class ContentStore {
   }
 
   /**
+   * Return the largest prefix of `str` whose UTF-8 byte length does not exceed
+   * `maxBytes`, walking by Unicode code point so multibyte sequences (CJK) and
+   * surrogate pairs (emoji) are never cut mid-character. Guarantees forward
+   * progress: if even the first code point exceeds `maxBytes`, it is still
+   * returned whole (a 1-4 byte overshoot beats an infinite loop).
+   */
+  #byteCappedPrefix(str: string, maxBytes: number): string {
+    if (Buffer.byteLength(str) <= maxBytes) return str;
+    let prefix = "";
+    let bytes = 0;
+    for (const char of str) {
+      const charBytes = Buffer.byteLength(char);
+      if (bytes + charBytes > maxBytes) break;
+      prefix += char;
+      bytes += charBytes;
+    }
+    // Defensive: a single code point wider than the cap (only possible with a
+    // pathologically small maxBytes) still advances by one character.
+    if (prefix.length === 0) return [...str][0] ?? "";
+    return prefix;
+  }
+
+  /**
    * Split a single oversized plain-text chunk into byte-capped sub-chunks
    * by accumulating lines until the byte count would exceed maxChunkBytes.
-   * Falls back to character-based splitting for extremely long single lines.
+   * Falls back to byte-accurate splitting for extremely long single lines.
    */
   #splitOversizedPlainChunk(
     lines: string[],
@@ -1777,15 +1817,17 @@ export class ContentStore {
         let remaining = line;
         let linePart = 1;
         while (remaining.length > 0) {
-          // Find a split point within maxChunkBytes, preferring whitespace boundaries
-          let slice = remaining.slice(0, maxChunkBytes);
-          // Try to break at a space near the end for readability
-          if (remaining.length > maxChunkBytes) {
+          // Byte-accurate slice: never exceeds the cap, never cuts a multibyte
+          // character (CJK) or surrogate pair (emoji) in half.
+          let slice = this.#byteCappedPrefix(remaining, maxChunkBytes);
+          // Try to break at a whitespace boundary near the end for readability,
+          // but only when text remains after this slice.
+          if (slice.length < remaining.length) {
             const lastSpace = slice.lastIndexOf(" ");
             const lastNewline = slice.lastIndexOf("\n");
             const breakPoint = Math.max(lastSpace, lastNewline);
-            if (breakPoint > maxChunkBytes * 0.5) {
-              slice = remaining.slice(0, breakPoint);
+            if (breakPoint > slice.length * WHITESPACE_BREAK_RATIO) {
+              slice = slice.slice(0, breakPoint);
             }
           }
           const linePartTitle = partIndex === 1 && linePart === 1
@@ -1821,20 +1863,21 @@ export class ContentStore {
     // Try blank-line splitting first for naturally-sectioned output
     const sections = text.split(/\n\s*\n/);
     if (
-      sections.length >= 3 &&
-      sections.length <= 200 &&
-      sections.every((s) => Buffer.byteLength(s) < 5000)
+      sections.length >= MIN_BLANK_LINE_SECTIONS &&
+      sections.length <= MAX_BLANK_LINE_SECTIONS &&
+      sections.every((s) => Buffer.byteLength(s) < BLANK_SECTION_STRATEGY_MAX_BYTES)
     ) {
-      return sections
-        .map((section, i) => {
-          const trimmed = section.trim();
-          const firstLine = trimmed.split("\n")[0].slice(0, 80);
-          return {
-            title: firstLine || `Section ${i + 1}`,
-            content: trimmed,
-          };
-        })
-        .filter((s) => s.content.length > 0);
+      return sections.flatMap((section, i) => {
+        const trimmed = section.trim();
+        if (trimmed.length === 0) return [];
+        const title = trimmed.split("\n")[0].slice(0, CHUNK_TITLE_MAX_CHARS) || `Section ${i + 1}`;
+        // A section may pass the strategy guard yet still exceed the byte cap
+        // (4097–4999B band): sub-split it so no stored chunk breaks the cap.
+        if (Buffer.byteLength(trimmed) <= maxChunkBytes) {
+          return [{ title, content: trimmed }];
+        }
+        return this.#splitOversizedPlainChunk(trimmed.split("\n"), title, maxChunkBytes);
+      });
     }
 
     const lines = text.split("\n");
@@ -1857,7 +1900,7 @@ export class ContentStore {
       if (slice.length === 0) break;
       const startLine = i + 1;
       const endLine = Math.min(i + slice.length, lines.length);
-      const firstLine = slice[0]?.trim().slice(0, 80);
+      const firstLine = slice[0]?.trim().slice(0, CHUNK_TITLE_MAX_CHARS);
       const joined = slice.join("\n");
 
       // Enforce byte cap: sub-split oversized line-group chunks
