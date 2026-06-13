@@ -1267,11 +1267,12 @@ export interface BatchRunOptions {
   timeout: number | undefined;
   concurrency: number;
   nodeOptsPrefix: string;
+  cwd?: string;
   onFsBytes?: (bytes: number) => void;
 }
 
 interface BatchExecutor {
-  execute(input: { language: "shell"; code: string; timeout: number | undefined }): Promise<{ stdout: string; timedOut?: boolean }>;
+  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{ stdout: string; timedOut?: boolean }>;
 }
 
 function quotePosixSingle(value: string): string {
@@ -1372,7 +1373,7 @@ export async function runBatchCommands(
   opts: BatchRunOptions,
   executor: BatchExecutor,
 ): Promise<BatchRunResult> {
-  const { timeout, concurrency, nodeOptsPrefix, onFsBytes } = opts;
+  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes } = opts;
 
   if (concurrency <= 1) {
     // Serial path — shared timeout budget, cascading skip on timeout.
@@ -1398,6 +1399,7 @@ export async function runBatchCommands(
         language: "shell",
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout: perCmdTimeout,
+        cwd,
       });
       outputs.push(formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes));
       if (result.timedOut) {
@@ -1420,6 +1422,7 @@ export async function runBatchCommands(
         language: "shell",
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout,
+        cwd,
       });
       // Always route partial output through formatCommandOutput so __CM_FS__
       // markers are stripped + counted, even when the command timed out.
@@ -1524,6 +1527,10 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         .optional()
         .default(false)
         .describe("Keep process running after timeout (for servers/daemons). Returns partial output without killing the process. IMPORTANT: Do NOT add setTimeout/self-close timers in background scripts — the process must stay alive until the timeout detaches it. For server+fetch patterns, prefer putting both server and fetch in ONE ctx_execute call instead of using background."),
+      cwd: z
+        .string()
+        .optional()
+        .describe("Optional working directory for shell commands. Non-shell languages still execute from their sandbox temp directory."),
       intent: z
         .string()
         .optional()
@@ -1535,7 +1542,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         ),
     }),
   },
-  async ({ language, code, timeout, background, intent }) => {
+  async ({ language, code, timeout, background, cwd, intent }) => {
     // Security: deny-only firewall
     if (language === "shell") {
       const denied = checkDenyPolicy(code, "execute");
@@ -1613,7 +1620,7 @@ ${code}
 __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nsetInterval(()=>{},2147483647);' : ''}
 })(typeof require!=='undefined'?require:null);`;
       }
-      const result = await executor.execute({ language, code: instrumentedCode, timeout, background });
+      const result = await executor.execute({ language, code: instrumentedCode, timeout, background, cwd });
 
       // Echo the executed source code before stdout so users can audit
       // and tooling can block command patterns (Issues #717 + #736).
@@ -3484,6 +3491,10 @@ EXAMPLE: ctx_batch_execute(
           ">1 switches to per-command timeouts (no shared budget) and " +
           "individual `(timed out)` blocks instead of cascading skip.",
         ),
+      cwd: z
+        .string()
+        .optional()
+        .describe("Optional working directory for all shell commands in this batch."),
       query_scope: z
         .enum(["batch", "global"])
         .optional()
@@ -3498,7 +3509,7 @@ EXAMPLE: ctx_batch_execute(
         ),
     }),
   },
-  async ({ commands, queries, timeout, concurrency, query_scope }) => {
+  async ({ commands, queries, timeout, concurrency, cwd, query_scope }) => {
     // Security: check each command against deny patterns
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
@@ -3519,6 +3530,7 @@ EXAMPLE: ctx_batch_execute(
           timeout,
           concurrency,
           nodeOptsPrefix,
+          cwd,
           onFsBytes: (bytes) => { sessionStats.bytesSandboxed += bytes; },
         },
         executor,
