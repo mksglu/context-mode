@@ -3450,6 +3450,99 @@ describe("installed_plugins.json installPath containment", () => {
       rmSync(claudeRoot, { recursive: true, force: true });
     }
   });
+
+  // Issue #795: when ~/.claude is a symlink to another volume, the
+  // healCacheMidSession traversal guard in server.ts compares a lexical
+  // cacheRoot (symlink path, e.g. /Users/me/.claude/plugins/cache) against
+  // a physical installPath from the plugin registry (e.g.
+  // /Volumes/SSD/claude-code/plugins/cache/...). Without canonicalizing
+  // cacheRoot via realpathSync, the startsWith check fails and the heal
+  // is skipped for every user with a symlinked ~/.claude.
+  //
+  // RED→GREEN: the source-level assertion (realpathSync on cacheRoot inside
+  // healCacheMidSession) FAILS when the fix is reverted. The algorithmic
+  // assertions prove the lexical comparison rejects and the canonical
+  // comparison accepts the symlinked-layout entry.
+
+  const SERVER_SOURCE = readFileSync(resolve(ROOT, "src/server.ts"), "utf-8");
+
+  test("server.ts: healCacheMidSession canonicalizes cacheRoot with realpathSync (#795)", () => {
+    // Locate the healCacheMidSession function body.
+    const healStart = SERVER_SOURCE.indexOf("function healCacheMidSession");
+    expect(healStart).toBeGreaterThan(0);
+    const healBody = SERVER_SOURCE.slice(healStart);
+    // Bound to the end of the function (the next top-level "function").
+    const nextFn = healBody.indexOf("\nfunction ");
+    const fnSlice = nextFn > 0 ? healBody.slice(0, nextFn) : healBody;
+
+    // The fix canonicalizes cacheRoot via realpathSync with a try/catch
+    // fallback, matching the pattern already used in cli.ts.
+    expect(fnSlice).toMatch(/realpathSync\(cacheRoot\)/);
+    // The traversal guard must use the canonical cacheRootCanon, not the
+    // lexical cacheRoot directly.
+    expect(fnSlice).toMatch(/cacheRootCanon\s*\+\s*sep/);
+    // Pre-fix shape: startsWith(cacheRoot + sep) without canonicalization.
+    // This pattern MUST NOT appear in the traversal guard for installPath.
+    // (It may still appear in comments or string literals, so we scope the
+    // negative assertion to the line that checks installPath containment.)
+    expect(fnSlice).toMatch(/resolve\(rp\)\.startsWith\(cacheRootCanon/);
+  });
+
+  test("algorithm: canonical cacheRoot accepts physical installPath when ~/.claude is a symlink (#795)", async () => {
+    // Skip on Windows: symlink-permission requirements vary and the
+    // scenario the issue targets (symlink-rehomed ~/.claude to another
+    // volume) is a macOS/macOS-on-Linux-Desktop pattern.
+    if (process.platform === "win32") return;
+
+    const fs = await import("node:fs");
+
+    // Build two directories: the "real" target (simulates the external volume)
+    // and the symlink path (simulates ~/.claude → external).
+    const sandbox = mkdtempSync(join(tmpdir(), "ctx-795-cache-root-symlink-"));
+    try {
+      const realTarget = join(sandbox, "real-claude-root");
+      const symlinkPath = join(sandbox, "dot-claude");
+      mkdirSync(realTarget, { recursive: true });
+
+      // Create the cache tree inside the real target.
+      const realCacheRoot = resolve(realTarget, "plugins", "cache");
+      const versionDir = resolve(realCacheRoot, "context-mode", "context-mode", "1.0.161");
+      mkdirSync(versionDir, { recursive: true });
+
+      // Simulate ~/.claude → realTarget
+      fs.symlinkSync(realTarget, symlinkPath, process.platform === "win32" ? "junction" : "dir");
+
+      // The cacheRoot as computed by resolveClaudeConfigDir():
+      // path.resolve does NOT dereference symlinks, so cacheRoot uses the
+      // symlink path (NOT the real path).
+      const lexicalCacheRoot = resolve(symlinkPath, "plugins", "cache");
+      // The canonical cacheRoot (what the fix produces via realpathSync).
+      const canonicalCacheRoot = fs.realpathSync(lexicalCacheRoot);
+      const canonicalCacheRootWithSep = canonicalCacheRoot + sep;
+
+      // installPath as stored by the plugin registry: the physical path
+      // under the real target (not the symlink path).
+      const physicalInstallPath = resolve(realTarget, "plugins", "cache", "context-mode", "context-mode", "1.0.161");
+
+      // Verification 1 — OLD behaviour (lexical, no fix):
+      // The lexical comparison fails because the physical installPath
+      // (/.../real-claude-root/...) does not start with the symlink-path
+      // cacheRoot (/.../dot-claude/...).
+      const lexicalPasses = resolve(physicalInstallPath).startsWith(lexicalCacheRoot + sep);
+      expect(lexicalPasses).toBe(false); // RED: would skip the heal
+
+      // Verification 2 — FIXED behaviour (canonical cacheRoot):
+      // After canonicalizing cacheRoot via realpathSync, the physical
+      // installPath does start with the canonical prefix.
+      // realpathSync is used on both sides because on macOS /var is itself a
+      // symlink to /private/var — resolve() alone stays on the non-canonical
+      // side and fails the startsWith check.
+      const canonicalPasses = fs.realpathSync(resolve(physicalInstallPath)).startsWith(canonicalCacheRootWithSep);
+      expect(canonicalPasses).toBe(true); // GREEN: heal proceeds
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── better-sqlite3 binding self-heal (#408) ───────────────────────────────

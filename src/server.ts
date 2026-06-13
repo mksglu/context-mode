@@ -61,6 +61,7 @@ import {
 import { buildNodeCommand, type HookAdapter, type PlatformId, isInProcessPluginPlatform } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
+import { stripJsonComments } from "./util/jsonc.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
 import { loadDatabase } from "./db-base.js";
@@ -116,61 +117,6 @@ export function shouldSuppressMcpToolsForNativePluginHost(
   if (platform !== "opencode" && platform !== "kilo") return false;
   const settings = opts.settings ?? readNativePluginHostSettings(platform);
   return settingsHasContextModePlugin(settings) && settingsHasLegacyContextModeMcp(settings);
-}
-
-function stripJsonComments(str: string): string {
-  let out = "";
-  let inString = false;
-  let escaped = false;
-  let inBlockComment = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    const next = str[i + 1];
-
-    if (inBlockComment) {
-      if (c === "*" && next === "/") {
-        inBlockComment = false;
-        i++;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      out += c;
-      escaped = false;
-      continue;
-    }
-
-    if (c === "\\") {
-      out += c;
-      escaped = inString;
-      continue;
-    }
-
-    if (c === '"') {
-      inString = !inString;
-      out += c;
-      continue;
-    }
-
-    if (!inString && c === "/" && next === "/") {
-      while (i < str.length && str[i] !== "\n") i++;
-      if (i < str.length) out += "\n";
-      continue;
-    }
-
-    if (!inString && c === "/" && next === "*") {
-      inBlockComment = true;
-      i++;
-      continue;
-    }
-
-    out += c;
-  }
-
-  return out
-    .replace(/,(\s*[}\]])/g, "$1");
 }
 
 function readNativePluginHostSettings(platform: PlatformId): Record<string, unknown> | null {
@@ -797,6 +743,15 @@ function healCacheMidSession(): void {
     if (!existsSync(ipPath)) return;
     const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
     const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+    // Issue #795: canonicalize cacheRoot so the traversal guard works when
+    // ~/.claude is a symlink to another volume.  path.resolve() does not
+    // dereference symlinks, so installPath values stored as physical paths
+    // (e.g. /Volumes/SSD/.../plugins/cache/...) would fail the startsWith
+    // check against a symlink-path cacheRoot (/Users/me/.claude/...).
+    // realpathSync follows the symlink chain to the canonical location.
+    let cacheRootCanon: string;
+    try { cacheRootCanon = realpathSync(cacheRoot); }
+    catch { cacheRootCanon = cacheRoot; }
     // Plugin root: build/ for tsc, plugin root for bundle
     const pluginRoot = existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
     for (const [key, entries] of Object.entries((ip.plugins ?? {}) as Record<string, Array<{ installPath?: string }>>)) {
@@ -804,8 +759,8 @@ function healCacheMidSession(): void {
       for (const entry of entries) {
         const rp = entry.installPath;
         if (!rp || existsSync(rp)) continue;
-        // Path traversal guard
-        if (!resolve(rp).startsWith(cacheRoot + sep)) continue;
+        // Path traversal guard (canonical comparison — see #795)
+        if (!resolve(rp).startsWith(cacheRootCanon + sep)) continue;
         // Remove dangling symlink
         try { if (lstatSync(rp).isSymbolicLink()) unlinkSync(rp); } catch {}
         const parent = dirname(rp);
@@ -1312,11 +1267,12 @@ export interface BatchRunOptions {
   timeout: number | undefined;
   concurrency: number;
   nodeOptsPrefix: string;
+  cwd?: string;
   onFsBytes?: (bytes: number) => void;
 }
 
 interface BatchExecutor {
-  execute(input: { language: "shell"; code: string; timeout: number | undefined }): Promise<{ stdout: string; timedOut?: boolean }>;
+  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{ stdout: string; timedOut?: boolean }>;
 }
 
 function quotePosixSingle(value: string): string {
@@ -1417,7 +1373,7 @@ export async function runBatchCommands(
   opts: BatchRunOptions,
   executor: BatchExecutor,
 ): Promise<BatchRunResult> {
-  const { timeout, concurrency, nodeOptsPrefix, onFsBytes } = opts;
+  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes } = opts;
 
   if (concurrency <= 1) {
     // Serial path — shared timeout budget, cascading skip on timeout.
@@ -1443,6 +1399,7 @@ export async function runBatchCommands(
         language: "shell",
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout: perCmdTimeout,
+        cwd,
       });
       outputs.push(formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes));
       if (result.timedOut) {
@@ -1465,6 +1422,7 @@ export async function runBatchCommands(
         language: "shell",
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout,
+        cwd,
       });
       // Always route partial output through formatCommandOutput so __CM_FS__
       // markers are stripped + counted, even when the command timed out.
@@ -1569,6 +1527,10 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         .optional()
         .default(false)
         .describe("Keep process running after timeout (for servers/daemons). Returns partial output without killing the process. IMPORTANT: Do NOT add setTimeout/self-close timers in background scripts — the process must stay alive until the timeout detaches it. For server+fetch patterns, prefer putting both server and fetch in ONE ctx_execute call instead of using background."),
+      cwd: z
+        .string()
+        .optional()
+        .describe("Optional working directory for shell commands. Non-shell languages still execute from their sandbox temp directory."),
       intent: z
         .string()
         .optional()
@@ -1580,7 +1542,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         ),
     }),
   },
-  async ({ language, code, timeout, background, intent }) => {
+  async ({ language, code, timeout, background, cwd, intent }) => {
     // Security: deny-only firewall
     if (language === "shell") {
       const denied = checkDenyPolicy(code, "execute");
@@ -1658,7 +1620,7 @@ ${code}
 __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nsetInterval(()=>{},2147483647);' : ''}
 })(typeof require!=='undefined'?require:null);`;
       }
-      const result = await executor.execute({ language, code: instrumentedCode, timeout, background });
+      const result = await executor.execute({ language, code: instrumentedCode, timeout, background, cwd });
 
       // Echo the executed source code before stdout so users can audit
       // and tooling can block command patterns (Issues #717 + #736).
@@ -3529,6 +3491,10 @@ EXAMPLE: ctx_batch_execute(
           ">1 switches to per-command timeouts (no shared budget) and " +
           "individual `(timed out)` blocks instead of cascading skip.",
         ),
+      cwd: z
+        .string()
+        .optional()
+        .describe("Optional working directory for all shell commands in this batch."),
       query_scope: z
         .enum(["batch", "global"])
         .optional()
@@ -3543,7 +3509,7 @@ EXAMPLE: ctx_batch_execute(
         ),
     }),
   },
-  async ({ commands, queries, timeout, concurrency, query_scope }) => {
+  async ({ commands, queries, timeout, concurrency, cwd, query_scope }) => {
     // Security: check each command against deny patterns
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
@@ -3564,6 +3530,7 @@ EXAMPLE: ctx_batch_execute(
           timeout,
           concurrency,
           nodeOptsPrefix,
+          cwd,
           onFsBytes: (bytes) => { sessionStats.bytesSandboxed += bytes; },
         },
         executor,

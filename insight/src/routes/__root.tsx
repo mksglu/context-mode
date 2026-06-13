@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
-import { Database, Brain, History, Search, Building2 } from "lucide-react";
+import { Database, Brain, History, Search } from "lucide-react";
 
 import "../styles.css";
 
@@ -8,7 +8,6 @@ const NAV = [
   { to: "/knowledge", label: "Knowledge Base", icon: Brain },
   { to: "/sessions", label: "Sessions", icon: History },
   { to: "/search", label: "Search", icon: Search },
-  { to: "/enterprise", label: "Enterprise", icon: Building2 },
 ] as const;
 
 export const Route = createRootRoute({

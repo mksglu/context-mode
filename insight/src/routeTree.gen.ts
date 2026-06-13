@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
-import { Route as EnterpriseRouteImport } from './routes/enterprise'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsDbHashSessionIdRouteImport } from './routes/sessions_.$dbHash.$sessionId'
 import { Route as KnowledgeDbHashSourceIdRouteImport } from './routes/knowledge_.$dbHash.$sourceId'
@@ -30,11 +29,6 @@ const SearchRoute = SearchRouteImport.update({
 const KnowledgeRoute = KnowledgeRouteImport.update({
   id: '/knowledge',
   path: '/knowledge',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EnterpriseRoute = EnterpriseRouteImport.update({
-  id: '/enterprise',
-  path: '/enterprise',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -55,7 +49,6 @@ const KnowledgeDbHashSourceIdRoute = KnowledgeDbHashSourceIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/enterprise': typeof EnterpriseRoute
   '/knowledge': typeof KnowledgeRoute
   '/search': typeof SearchRoute
   '/sessions': typeof SessionsRoute
@@ -64,7 +57,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/enterprise': typeof EnterpriseRoute
   '/knowledge': typeof KnowledgeRoute
   '/search': typeof SearchRoute
   '/sessions': typeof SessionsRoute
@@ -74,7 +66,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/enterprise': typeof EnterpriseRoute
   '/knowledge': typeof KnowledgeRoute
   '/search': typeof SearchRoute
   '/sessions': typeof SessionsRoute
@@ -85,7 +76,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/enterprise'
     | '/knowledge'
     | '/search'
     | '/sessions'
@@ -94,7 +84,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/enterprise'
     | '/knowledge'
     | '/search'
     | '/sessions'
@@ -103,7 +92,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/enterprise'
     | '/knowledge'
     | '/search'
     | '/sessions'
@@ -113,7 +101,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  EnterpriseRoute: typeof EnterpriseRoute
   KnowledgeRoute: typeof KnowledgeRoute
   SearchRoute: typeof SearchRoute
   SessionsRoute: typeof SessionsRoute
@@ -144,13 +131,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/enterprise': {
-      id: '/enterprise'
-      path: '/enterprise'
-      fullPath: '/enterprise'
-      preLoaderRoute: typeof EnterpriseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -177,7 +157,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  EnterpriseRoute: EnterpriseRoute,
   KnowledgeRoute: KnowledgeRoute,
   SearchRoute: SearchRoute,
   SessionsRoute: SessionsRoute,

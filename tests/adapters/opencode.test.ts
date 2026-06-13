@@ -393,6 +393,47 @@ describe("OpenCodeAdapter", () => {
       rmSync(root, { recursive: true, force: true });
     });
 
+    // Issue #806: the naive line-comment regex (/\/\/.*$/gm) truncated every
+    // string value containing `//` — e.g. "$schema" or mcp URLs — so a
+    // perfectly valid opencode.jsonc failed JSON.parse, readSettings returned
+    // null, and doctor reported "[FAIL] Plugin configuration: Could not read
+    // opencode.json or opencode.jsonc".
+    it("readSettings parses opencode.jsonc whose string values contain URLs (#806)", () => {
+      const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
+      const dir = join(root, "project");
+      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, "opencode.jsonc"),
+        `{
+  "$schema": "https://opencode.ai/config.json",
+  // context-mode plugin registration
+  "plugin": ["context-mode/plugin"],
+  "mcp": {
+    "context7": { "type": "remote", "url": "https://mcp.context7.com/mcp" }
+  }
+}
+`,
+      );
+      const run = spawnSync(
+        process.execPath,
+        [
+          tsx,
+          "-e",
+          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.readSettings()))`,
+        ],
+        { cwd: dir, env: env(join(root, "home")), encoding: "utf-8" },
+      );
+      expect(run.status).toBe(0);
+      expect(JSON.parse(run.stdout)).toEqual({
+        $schema: "https://opencode.ai/config.json",
+        plugin: ["context-mode/plugin"],
+        mcp: { context7: { type: "remote", url: "https://mcp.context7.com/mcp" } },
+      });
+      rmSync(root, { recursive: true, force: true });
+    });
+
     it("prefers opencode.json over opencode.jsonc when both exist", () => {
       const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
       const dir = join(root, "project");
@@ -572,6 +613,32 @@ describe("OpenCodeAdapter for KiloCode", () => {
         const a = new OpenCodeAdapter("kilo");
         const settings = a.readSettings() as { marker?: string } | null;
         expect(settings?.marker).toBe("from-dot-kilocode");
+      } finally {
+        process.chdir(prev);
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    // Issue #806 (kilo path): the same adapter parses kilo.jsonc, so URLs in
+    // string values must survive comment stripping there too.
+    it("readSettings parses kilo.jsonc whose string values contain URLs (#806)", () => {
+      const root = mkdtempSync(join(tmpdir(), "kilo-jsonc-url-"));
+      const prev = process.cwd();
+      try {
+        writeFileSync(
+          join(root, "kilo.jsonc"),
+          `{
+  // kilo config with URL-bearing string values
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["context-mode/plugin"]
+}
+`,
+        );
+        process.chdir(root);
+        const a = new OpenCodeAdapter("kilo");
+        const settings = a.readSettings() as { $schema?: string; plugin?: string[] } | null;
+        expect(settings?.$schema).toBe("https://opencode.ai/config.json");
+        expect(settings?.plugin).toEqual(["context-mode/plugin"]);
       } finally {
         process.chdir(prev);
         rmSync(root, { recursive: true, force: true });

@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Context Saving — context-mode plugin saves 98% of your AI agent's context window</title>
+<meta name="description" content="Context Saving is the open-source context-mode plugin that keeps raw data out of the LLM context window. Sandbox tool output, index it into FTS5, search on demand. 287,000+ developers across 15 platforms.">
+<link rel="canonical" href="https://context-mode.com/context-saving">
+<link rel="icon" type="image/svg+xml" href="/favicon-context-saving.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-context-saving-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-context-saving.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Context Saving — the other half of the context problem">
+<meta property="og:description" content="Your AI coding agent burns through context in 20 minutes. The context-mode plugin keeps 98% of tool output out of the conversation. 287,000+ developers across 15 platforms.">
+<meta property="og:url" content="https://context-mode.com/context-saving">
+<meta property="og:site_name" content="context-mode">
+<meta property="og:image" content="https://context-mode.com/og/context-saving.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta property="og:image:alt" content="Context Saving — the other half of the context problem">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@contextmode">
+<meta name="twitter:title" content="Context Saving — Save 98% of your AI coding agent's context window">
+<meta name="twitter:image" content="https://context-mode.com/og/context-saving.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ── Tokens · Context Saving surface (dark terminal) per brand/STRATEGY.md ── */
+:root{
+  --bg:#050807;--bg-2:#0d1b14;--bg-3:#0a0f0c;
+  --fg:#fafafa;--text-2:#cbd5e1;--text-3:#94a3b8;--text-4:#6b7a8d;
+  --border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.14);
+  --border-light:rgba(255,255,255,0.04);
+  --accent:#10b981;
+  --accent-2:#34d399;
+  --accent-bg:rgba(16,185,129,0.10);
+  --accent-border:rgba(16,185,129,0.22);
+  --orange:#fb923c;
+  --rose:#fb7185;
+  --blue:#a3bfff;
+  --sans:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono','SF Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--text-2);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:1.6;min-height:100vh}
+::selection{background:var(--accent-bg);color:var(--accent-2)}
+a{color:var(--accent-2);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg-3);color:var(--accent-2);padding:2px 7px;border-radius:4px;font-weight:500;border:1px solid var(--border-light)}
+
+.wrap{max-width:1280px;margin:0 auto;padding:0 32px}
+.wrap-narrow{max-width:880px;margin:0 auto;padding:0 32px}
+
+/* ── Typography ── */
+.section-num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-4);letter-spacing:.12em;text-transform:uppercase}
+.h1{font-family:var(--mono);font-size:clamp(3rem,8vw,5.5rem);font-weight:600;color:var(--fg);line-height:1;letter-spacing:-.03em;display:flex;align-items:baseline;gap:0}
+.h1 .prompt{color:var(--text-4);font-weight:500;margin-right:.18em}
+.h1 .dash{color:var(--accent-2)}
+.h1 .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em;box-shadow:0 0 18px rgba(16,185,129,.40);animation:blink 1.4s ease-in-out infinite;will-change:opacity;transform:translateZ(0);backface-visibility:hidden}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.28}}
+@media(prefers-reduced-motion:reduce){.h1 .cursor{animation:none;opacity:.85}}
+.h2{font-family:var(--sans);font-size:clamp(1.8rem,4.5vw,2.6rem);font-weight:600;color:var(--fg);line-height:1.15;letter-spacing:-.025em}
+.h3{font-family:var(--sans);font-size:clamp(1.2rem,2.6vw,1.5rem);font-weight:600;color:var(--fg);line-height:1.25;letter-spacing:-.015em}
+.lead{font-size:clamp(1.05rem,2vw,1.3rem);line-height:1.55;color:var(--text-2);font-weight:300;margin-top:18px;max-width:780px}
+.lead strong{color:var(--fg);font-weight:600}
+.lead em{font-style:normal;color:var(--accent-2);font-weight:500}
+.body{font-size:17px;line-height:1.75;color:var(--text-2);margin-bottom:1.1rem}
+.body strong{color:var(--fg);font-weight:600}
+.body em{font-style:normal;color:var(--accent-2);font-weight:500}
+.muted{color:var(--text-3);font-size:14.5px;line-height:1.65}
+.rule{width:48px;height:2px;background:var(--accent);margin:18px 0 24px;border-radius:1px}
+.rev{opacity:0;transform:translateY(14px);transition:opacity .55s,transform .55s}
+.rev.v{opacity:1;transform:none}
+.sep{border:none;border-top:1px solid var(--border-light);margin:0}
+.chapter{padding:88px 0}
+.chapter-tight{padding:56px 0}
+
+/* ── Hero ── */
+.hero{position:relative;padding:96px 0 64px;background:radial-gradient(ellipse at 25% 30%,#0a1810 0%,#050807 65%);overflow:hidden}
+.hero::before{content:'';position:absolute;top:-30%;right:-15%;width:540px;height:540px;background:radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%);pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-30%;left:-15%;width:480px;height:480px;background:radial-gradient(circle,rgba(75,123,236,0.06) 0%,transparent 70%);pointer-events:none}
+.scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,0.012) 4px,transparent 5px);pointer-events:none;-webkit-mask-image:radial-gradient(ellipse at center,#000 30%,transparent 80%);mask-image:radial-gradient(ellipse at center,#000 30%,transparent 80%)}
+.hero-inner{position:relative;z-index:1}
+.hero-tag{font-family:var(--mono);font-size:13px;color:var(--text-3);margin-top:24px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:10px;padding:6px 14px;background:var(--bg-3);border:1px solid var(--border);border-radius:6px;align-self:flex-start}
+.hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(16,185,129,.7)}
+.hero-tag a{color:var(--text-3)}
+.hero-sub{font-size:clamp(1.1rem,2.5vw,1.4rem);color:var(--text-2);font-weight:300;margin-top:22px;max-width:880px;line-height:1.55}
+.hero-sub strong{color:var(--fg);font-weight:600}
+.hero-sub em{font-style:normal;color:var(--accent-2);font-weight:500}
+.hero-stats{display:flex;flex-wrap:wrap;gap:36px;margin-top:44px;padding-top:32px;border-top:1px solid var(--border)}
+.hero-stat{min-width:90px}
+.hero-stat .val{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--fg);line-height:1}
+.hero-stat .lbl{font-family:var(--mono);font-size:12px;color:var(--text-4);margin-top:4px;letter-spacing:.06em;text-transform:uppercase}
+
+/* ── shadcn card · dark variant ── */
+.card{
+  background:rgba(255,255,255,0.025);
+  color:var(--text-2);
+  border:1px solid var(--border);
+  border-radius:.75rem;
+  box-shadow:0 1px 2px 0 rgba(0,0,0,.20);
+  display:flex;flex-direction:column;
+  transition:box-shadow .2s,border-color .2s,transform .2s;
+}
+.card:hover{box-shadow:0 4px 18px -2px rgba(0,0,0,.30);border-color:var(--border-strong);transform:translateY(-1px);text-decoration:none}
+.card-header{padding:1.5rem 1.5rem .75rem;display:flex;flex-direction:column;gap:.5rem}
+.card-content{padding:.5rem 1.5rem 1rem;display:flex;flex-direction:column;gap:1rem}
+.card-footer{padding:0 1.5rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.card-title{font-family:var(--sans);font-size:1.25rem;font-weight:600;color:var(--fg);letter-spacing:-.02em;line-height:1.2;margin-top:.25rem}
+.card-description{font-size:14.5px;color:var(--text-3);line-height:1.6;font-weight:400;margin-top:.25rem}
+.card-description strong{color:var(--fg);font-weight:600}
+.card-description em{font-style:normal;color:var(--accent-2);font-weight:500}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:.375rem;padding:.25rem .625rem;border-radius:.375rem;border:1px solid transparent;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;line-height:1;align-self:flex-start;transition:.15s}
+.badge-dev{color:var(--accent-2);background:var(--accent-bg);border-color:var(--accent-border)}
+.badge-rose{color:var(--rose);background:rgba(244,63,94,0.10);border-color:rgba(244,63,94,0.22)}
+.badge-blue{color:var(--blue);background:rgba(75,123,236,0.10);border-color:rgba(75,123,236,0.22)}
+.badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+/* Button */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;white-space:nowrap;border-radius:.5rem;font-family:var(--sans);font-size:14px;font-weight:500;line-height:1;padding:.625rem 1rem;height:2.5rem;transition:.15s;border:1px solid transparent;letter-spacing:-.005em}
+.btn-primary{background:var(--accent);color:#04130b}
+.btn-primary:hover{background:var(--accent-2);text-decoration:none;color:#04130b}
+.btn-ghost{color:var(--text-2);background:transparent;border-color:var(--border-strong)}
+.btn-ghost:hover{background:rgba(255,255,255,0.04);color:var(--fg);text-decoration:none;border-color:var(--border-strong)}
+
+/* Pain card · 3up */
+.pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:32px}
+@media(max-width:900px){.pain-grid{grid-template-columns:1fr}}
+.pain-stat{font-family:var(--mono);font-size:2.25rem;font-weight:600;color:var(--orange);line-height:1;margin-top:.25rem;letter-spacing:-.02em}
+.pain-src{font-family:var(--mono);font-size:11px;color:var(--text-4);margin-top:.625rem;letter-spacing:.04em;text-transform:uppercase}
+
+/* Bench · 4up */
+.bench{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin:36px 0 0}
+@media(max-width:900px){.bench{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:540px){.bench{grid-template-columns:1fr}}
+.bench-item{padding:1.25rem 1.25rem;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:.75rem;text-align:center}
+.bench-item:hover{border-color:var(--border-strong)}
+.bench-item .n{font-family:var(--mono);font-size:2.25rem;font-weight:600;color:var(--accent-2);line-height:1;letter-spacing:-.02em}
+.bench-item .d{font-family:var(--mono);font-size:11px;color:var(--text-4);margin:.5rem 0 .25rem;letter-spacing:.04em;text-transform:uppercase}
+.bench-item .l{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text-2)}
+
+/* Hook layer rows */
+.hook-list{display:grid;gap:.75rem;margin-top:32px;max-width:880px}
+.hook{display:grid;grid-template-columns:auto auto 1fr;gap:18px;align-items:baseline;padding:1rem 1.25rem;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:.625rem}
+.hook .num{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent-2)}
+.hook .name{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--fg);min-width:140px}
+.hook .det{font-family:var(--sans);font-size:14px;color:var(--text-3);line-height:1.55}
+@media(max-width:600px){.hook{grid-template-columns:1fr;gap:6px}.hook .name{min-width:0}}
+
+/* Terminal code block */
+.term-block{background:#020403;border:1px solid var(--border);border-radius:.625rem;padding:1.5rem 1.75rem;font-family:var(--mono);font-size:13.5px;line-height:1.85;color:#cbd5e1;margin:32px 0;overflow-x:auto;white-space:pre}
+.term-block .c{color:var(--text-4)}
+.term-block .k{color:var(--blue)}
+.term-block .s{color:var(--accent-2)}
+
+/* Continuity grid */
+.cont{display:grid;grid-template-columns:repeat(3,1fr);gap:.625rem 1.5rem;margin:24px 0 0;max-width:780px}
+@media(max-width:600px){.cont{grid-template-columns:1fr 1fr}}
+.cont div{display:flex;align-items:center;gap:8px;font-size:14.5px;color:var(--text-2)}
+.cont .ck{color:var(--accent-2);font-weight:700;font-size:13px}
+
+/* Platform tags */
+.platform-tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:28px}
+.platform-tags .tag{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent-2);background:var(--accent-bg);padding:5px 11px;border-radius:.25rem;letter-spacing:.02em;border:1px solid var(--accent-border)}
+
+/* Install cards */
+.install-list{display:grid;gap:.75rem;margin-top:32px;max-width:680px}
+.install{padding:1.25rem 1.5rem;border:1px solid var(--border);border-radius:.625rem;background:rgba(255,255,255,0.025);transition:.15s}
+.install:hover{border-color:var(--border-strong)}
+.install.pri{border-color:var(--accent-border);background:var(--accent-bg)}
+.install .il{font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.install .il .pill{font-family:var(--mono);font-size:10px;color:var(--accent-2);background:var(--accent-bg);padding:2px 8px;border-radius:3px;letter-spacing:.04em;border:1px solid var(--accent-border)}
+.install code{display:block;font-size:14.5px;background:transparent;border:none;padding:0;color:var(--fg);font-weight:500}
+
+/* Insight teaser */
+.insight-teaser{padding:2rem 2.25rem;background:linear-gradient(135deg,rgba(75,123,236,0.06) 0%,rgba(255,255,255,0.02) 100%);border:1px solid var(--border);border-radius:.75rem;margin:32px 0}
+.insight-teaser h3{color:var(--fg);display:inline-flex;align-items:baseline;gap:.12em;font-size:1.5rem;line-height:1;margin-bottom:.625rem}
+.insight-teaser h3 .sans{font-family:var(--sans);font-weight:600;letter-spacing:-.025em}
+.insight-teaser h3 .italic{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400;color:var(--blue);letter-spacing:-.015em;font-size:1.18em}
+
+/* Footer */
+footer{padding:64px 0 40px;text-align:center;background:var(--bg-2);border-top:1px solid var(--border-light)}
+.footer-q{font-family:var(--mono);font-weight:600;font-size:clamp(1.2rem,2.6vw,1.6rem);color:var(--fg);line-height:1.35;max-width:680px;margin:0 auto 8px;padding:0 24px;display:inline-flex;align-items:baseline;gap:.16em}
+.footer-q .prompt{color:var(--text-4);font-weight:500;margin-right:.18em}
+.footer-q .dash{color:var(--accent-2)}
+.footer-q .cursor{display:inline-block;background:var(--accent);width:.30em;height:.92em;margin-left:.10em}
+.footer-tagline{font-family:var(--sans);font-size:1rem;font-weight:300;color:var(--text-3);margin:0 auto 32px;max-width:540px}
+.footer-links{font-size:14px;color:var(--text-3);margin-bottom:8px}
+.footer-meta{margin-top:18px;font-size:12px;color:var(--text-4)}
+.footer-addr{margin-top:24px;font-size:11px;color:var(--text-4);line-height:1.65}
+
+/* Sticky CTA */
+.sticky-cta{position:fixed;bottom:0;left:0;right:0;background:var(--bg-2);border-top:1px solid var(--border);padding:14px 24px;z-index:100;transform:translateY(100%);transition:transform .35s ease;box-shadow:0 -4px 24px rgba(0,0,0,.25);backdrop-filter:blur(10px)}
+.sticky-cta.visible{transform:translateY(0)}
+.sticky-cta .sticky-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;max-width:1080px;margin:0 auto;width:100%}
+.sticky-cta .sticky-text{color:var(--text-2);font-size:14px;margin:0}
+.sticky-cta .sticky-text strong{color:var(--fg);font-weight:700}
+.sticky-cta .sticky-button{background:var(--accent);color:#04130b;padding:10px 22px;border-radius:.5rem;text-decoration:none;font-weight:700;font-size:14px;white-space:nowrap;transition:.15s}
+.sticky-cta .sticky-button:hover{background:var(--accent-2);text-decoration:none}
+@media(max-width:640px){.sticky-cta{padding:12px 16px}.sticky-cta .sticky-inner{flex-direction:column;gap:10px;align-items:stretch}.sticky-cta .sticky-text{font-size:13px;text-align:center}.sticky-cta .sticky-button{text-align:center}}
+
+/* ── Top nav (dark terminal) ── */
+.topnav{position:sticky;top:0;z-index:50;background:rgba(5,8,7,.78);backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--border)}
+.topnav-inner{display:flex;align-items:center;gap:2rem;height:58px}
+.topnav-brand{display:inline-flex;align-items:baseline;gap:.06em;font-family:var(--mono);font-weight:600;font-size:.95rem;color:var(--fg);letter-spacing:-.005em;line-height:1;text-decoration:none}
+.topnav-brand:hover{text-decoration:none}
+.topnav-brand .prompt{color:var(--text-4);margin-right:.3em;font-weight:400}
+.topnav-brand .dash{color:var(--text-4)}
+.topnav-brand .cursor{display:inline-block;background:var(--accent);width:.32em;height:.92em;margin-left:.12em;animation:nav-blink 1.4s ease-in-out infinite;will-change:opacity;transform:translateZ(0)}
+@keyframes nav-blink{0%,100%{opacity:1}50%{opacity:.32}}
+.topnav-menu{display:flex;align-items:center;gap:.125rem;flex:1}
+.topnav-item{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text-3);padding:.45rem .75rem;border-radius:.375rem;letter-spacing:.005em;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:.375rem;cursor:pointer;background:transparent;border:0}
+.topnav-item:hover{color:var(--fg);background:rgba(255,255,255,.04);text-decoration:none}
+.topnav-item.active{color:var(--accent);background:var(--accent-bg)}
+.topnav-item .caret{font-size:10px;color:var(--text-4)}
+.topnav-cta{display:flex;gap:.5rem;align-items:center}
+.topnav-cta .btn{height:2.125rem;padding:.45rem .875rem;font-size:13px}
+
+/* Solutions dropdown */
+.dropdown{position:relative}
+.dropdown-menu{position:absolute;top:calc(100% + .375rem);left:0;min-width:380px;background:rgba(13,27,20,.96);backdrop-filter:blur(14px);border:1px solid var(--border-strong);border-radius:.625rem;box-shadow:0 16px 50px -8px rgba(0,0,0,.6),0 4px 16px -4px rgba(0,0,0,.4);padding:.5rem;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s,transform .15s,visibility .15s}
+.dropdown:hover .dropdown-menu,.dropdown:focus-within .dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.dropdown-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--text-4);padding:.5rem .625rem .25rem;display:flex;align-items:center;gap:.5rem}
+.dropdown-label::after{content:"";flex:1;height:1px;background:var(--border-light)}
+.dropdown-item{display:block;padding:.625rem .75rem;border-radius:.4375rem;text-decoration:none;color:inherit;transition:.12s;border:1px solid transparent}
+.dropdown-item:hover{background:rgba(255,255,255,.035);text-decoration:none;border-color:var(--border-light)}
+.dropdown-item.active{background:var(--accent-bg);border-color:rgba(16,185,129,.18)}
+.dropdown-item-title{display:flex;align-items:baseline;gap:.12em;font-family:var(--sans);font-size:14.5px;font-weight:600;color:var(--fg);letter-spacing:-.005em;line-height:1.2}
+.dropdown-item-title .italic{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400;color:#4b7bec;font-size:1.18em;letter-spacing:-.015em}
+.dropdown-item.future .dropdown-item-title .italic{color:var(--text-4)}
+.dropdown-item-desc{font-family:var(--sans);font-size:12.5px;color:var(--text-3);margin-top:.25rem;display:flex;align-items:center;gap:.5rem;line-height:1.4}
+.dropdown-item-desc .badge-mini{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:1px 6px;border-radius:3px}
+.dropdown-item-desc .badge-mini.live{color:#10b981;background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.22)}
+.dropdown-item-desc .badge-mini.coming{color:var(--text-4);background:rgba(255,255,255,.03);border:1px solid var(--border)}
+@media(max-width:760px){.topnav-menu{display:none}.topnav-cta .btn{padding:.45rem .65rem;font-size:12.5px}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ TOP NAV (dark) ═══════════════════════════════════════ -->
+<nav class="topnav">
+  <div class="wrap topnav-inner">
+    <a href="/" class="topnav-brand"><span class="prompt">$</span>context<span class="dash">-</span>mode<span class="cursor"></span></a>
+    <div class="topnav-menu">
+      <a href="/context-saving" class="topnav-item active">Context Saving</a>
+      <div class="dropdown">
+        <button class="topnav-item" aria-haspopup="true">Solutions <span class="caret">▾</span></button>
+        <div class="dropdown-menu">
+          <div class="dropdown-label">Platform</div>
+          <a href="/insight" class="dropdown-item">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Insight</span></div>
+            <div class="dropdown-item-desc">Org observability for AI-assisted engineering <span class="badge-mini live">live · $20/seat</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Memory</span></div>
+            <div class="dropdown-item-desc">Long-term memory for AI coding agents <span class="badge-mini coming">2026</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Audit</span></div>
+            <div class="dropdown-item-desc">SOC 2 evidence for AI-assisted work <span class="badge-mini coming">2026</span></div>
+          </a>
+          <a href="#" class="dropdown-item future" onclick="return false">
+            <div class="dropdown-item-title">Context Mode<span class="italic">Cost</span></div>
+            <div class="dropdown-item-desc">Per-team AI spend attribution <span class="badge-mini coming">2026</span></div>
+          </a>
+        </div>
+      </div>
+      <a href="https://github.com/mksglu/context-mode" class="topnav-item">GitHub</a>
+      <a href="https://discord.gg/DCN9jUgN5v" class="topnav-item">Discord</a>
+    </div>
+    <div class="topnav-cta">
+      <a href="/insight" class="btn btn-ghost">Insight →</a>
+      <a href="https://github.com/mksglu/context-mode" class="btn btn-primary">Install</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════ HERO ═══════════════════════════════════════ -->
+<section class="hero">
+  <div class="scan"></div>
+  <div class="hero-inner wrap rev">
+    <h1 class="h1"><span class="prompt">$</span>context<span class="dash">-</span>mode<span class="cursor"></span></h1>
+    <p class="hero-tag"><span class="dot"></span>open-source plugin · ELv2 · part of <a href="/">Context Mode</a></p>
+    <p class="hero-sub">
+      <strong>The other half of the context problem.</strong> An MCP plugin that sandboxes tool output and indexes it into a local FTS5 store. Your AI coding agent searches that store instead of re-sending raw bytes every turn. <em>15 platforms. <span class="js-user-count">287,000+</span> developers. Runs entirely on your machine.</em>
+    </p>
+
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val" id="stat-users">287k+</div><div class="lbl">developers</div></div>
+      <div class="hero-stat"><div class="val">15</div><div class="lbl">platforms</div></div>
+      <div class="hero-stat"><div class="val">#1</div><div class="lbl">on Hacker News</div></div>
+      <div class="hero-stat"><div class="val" id="stat-stars">—</div><div class="lbl">GitHub stars</div></div>
+      <div class="hero-stat"><div class="val">ELv2</div><div class="lbl">open source</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ PROBLEM ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 01 · the problem</p>
+      <h2 class="h2">The context window problem.</h2>
+      <div class="rule"></div>
+      <p class="lead">Here's the thing about Claude Code, Cursor, Copilot, Codex, Gemini CLI. The LLM has no memory. Every turn, the full conversation gets re-sent — every file read, every command output, every grep result. It piles up.</p>
+    </div>
+
+    <div class="rev" style="max-width:840px;margin-top:28px">
+      <p class="body">Run <code>gh issue list</code> once. <strong>59 KB of JSON</strong> comes back. About 15,000 tokens. Next turn, those 15,000 tokens get sent again. Turn after that, again. Fifty turns in, that one command has cost you <strong>750,000 input tokens</strong>.</p>
+      <p class="body">Now do that 20 times in a session. Average output per call: 30 KB. That's 600 KB sitting in your conversation, re-sent 50 times over. <strong>30 MB of input tokens on tool output alone.</strong></p>
+      <p class="body" style="color:var(--accent-2);font-style:italic;border-left:2px solid var(--accent);padding-left:1rem">That's where your limit goes.</p>
+      <p class="body">Eventually the context window fills up and the agent compacts. Summarizes the conversation. Throws away the originals. <em>You start over.</em></p>
+    </div>
+
+    <div class="pain-grid rev">
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-rose"><span class="dot"></span>Accuracy</span>
+          <div class="pain-stat" style="color:var(--rose)">50%</div>
+        </div>
+        <div class="card-content">
+          <p class="card-description">drop at <strong>32K tokens</strong>. 11 of 12 models tested. Your agent makes worse decisions as context fills up.</p>
+          <p class="pain-src">NoLiMa, 2025</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-blue"><span class="dot"></span>Latency</span>
+          <div class="pain-stat" style="color:var(--orange)">15 min</div>
+        </div>
+        <div class="card-content">
+          <p class="card-description">spent <strong>re-establishing context</strong> after each reset. Developers re-explain their codebase from scratch, every time.</p>
+          <p class="pain-src">Internal telemetry</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>Cost</span>
+          <div class="pain-stat" style="color:var(--accent-2)">$60K</div>
+        </div>
+        <div class="card-content">
+          <p class="card-description">per year for a 50-seat team on an agent that <strong>forgets every 20 minutes</strong>. $100/seat/month, burned on re-sent tool output.</p>
+          <p class="pain-src">50-seat reference org</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bench rev">
+      <div class="bench-item"><div class="n">56 KB</div><div class="d">per snapshot</div><div class="l">Playwright</div></div>
+      <div class="bench-item"><div class="n">59 KB</div><div class="d">per query</div><div class="l">GitHub Issues</div></div>
+      <div class="bench-item"><div class="n">45 KB</div><div class="d">per analysis</div><div class="l">Access Logs</div></div>
+      <div class="bench-item"><div class="n">30 MB</div><div class="d">re-sent / session</div><div class="l">Total cost</div></div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ SOLUTION ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 02 · the solution</p>
+      <h2 class="h2">Intercept, sandbox, index.</h2>
+      <div class="rule"></div>
+      <p class="lead">context-mode is an MCP server that sits between your agent and its tools. When a tool call would dump large output into the conversation, context-mode <em>intercepts it</em> and runs it in a sandboxed subprocess. Raw data never touches context. It goes into a local FTS5 database with BM25 ranking. The agent searches it when it needs to.</p>
+    </div>
+
+    <div class="rev" style="max-width:880px;margin-top:24px">
+      <p class="body">The plugin hooks into <strong>five points</strong> in the session lifecycle:</p>
+    </div>
+
+    <div class="hook-list rev">
+      <div class="hook"><span class="num">01</span><span class="name">PreToolUse</span><span class="det">Route tool calls. Block <code>curl</code> / <code>wget</code>, redirect large output to sandbox.</span></div>
+      <div class="hook"><span class="num">02</span><span class="name">PostToolUse</span><span class="det">Capture events. File ops, git, errors, decisions → SessionDB.</span></div>
+      <div class="hook"><span class="num">03</span><span class="name">SessionStart</span><span class="det">Restore state. Inject resume snapshot, reload indexed knowledge.</span></div>
+      <div class="hook"><span class="num">04</span><span class="name">PreCompact</span><span class="det">Preserve state. Build snapshot right before context wipe.</span></div>
+      <div class="hook"><span class="num">05</span><span class="name">UserPromptSubmit</span><span class="det">Capture intent. Track decisions, corrections, session mode.</span></div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ RESULTS ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 03 · results</p>
+      <h2 class="h2">Measured, not estimated.</h2>
+      <div class="rule"></div>
+      <p class="lead">Real numbers from real sessions. Not projections.</p>
+    </div>
+
+    <div class="bench rev">
+      <div class="bench-item"><div class="n">99.5%</div><div class="d">56.2 KB → 299 B</div><div class="l">Playwright</div></div>
+      <div class="bench-item"><div class="n">98%</div><div class="d">58.9 KB → 1.1 KB</div><div class="l">GitHub Issues</div></div>
+      <div class="bench-item"><div class="n">99.7%</div><div class="d">45.1 KB → 155 B</div><div class="l">Access Logs</div></div>
+      <div class="bench-item"><div class="n">98%</div><div class="d">315 KB → 5.4 KB</div><div class="l">Full Session</div></div>
+    </div>
+
+    <div class="rev" style="max-width:840px;margin-top:32px">
+      <p class="body">Without context-mode, those 20 tool calls put 600 KB into the conversation. Over 50 turns, 30 MB re-sent. With it, the same calls produce 20 KB. Over 50 turns, 1 MB. <strong>Same work. Same answers. 30× fewer tokens.</strong></p>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ THINK IN CODE ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 04 · paradigm</p>
+      <h2 class="h2">Think in Code.</h2>
+      <div class="rule"></div>
+      <p class="lead">Sandboxing tool output handles the result side. But there's still a problem on the input side. When the agent wants to analyze 47 files, it calls <code>Read()</code> on each. Every file enters context. Every file stays.</p>
+    </div>
+
+    <div class="rev" style="max-width:840px;margin-top:24px">
+      <p class="body">v1.0.64 made this a rule, not a suggestion. We call it <strong>Think in Code</strong>. The idea fits in one sentence: <em>if you need to analyze, count, filter, or process data, write code that does it.</em> Stop pulling raw data into context to process mentally.</p>
+    </div>
+
+<div class="term-block rev"><span class="c">// Before: 47 files × Read() = 700 KB in context</span>
+<span class="c">// After: 1 ctx_execute() = 3.6 KB in context</span>
+
+<span class="k">ctx_execute</span>(<span class="s">"javascript"</span>, `
+  <span class="k">const</span> fs = require(<span class="s">'fs'</span>);
+  <span class="k">const</span> files = fs.readdirSync(<span class="s">'src'</span>).filter(f =&gt; f.endsWith(<span class="s">'.ts'</span>));
+  files.forEach(f =&gt; {
+    <span class="k">const</span> lines = fs.readFileSync(<span class="s">'src/'</span>+f,<span class="s">'utf8'</span>).split(<span class="s">'\n'</span>).length;
+    console.log(f + <span class="s">': '</span> + lines + <span class="s">' lines'</span>);
+  });
+`);
+
+<span class="c">// 47 files analyzed. 15,314 LoC processed.</span>
+<span class="c">// Context used: 3.6 KB. Reduction: 200×.</span></div>
+
+    <div class="rev" style="max-width:840px;margin-top:24px">
+      <p class="body">The LLM writes a script. The script runs in a sandbox. Only stdout enters context. <em>Your CPU does the work for free.</em> Tokens cost money.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ CONTINUITY ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 05 · continuity</p>
+      <h2 class="h2">Your AI never starts from scratch.</h2>
+      <div class="rule"></div>
+      <p class="lead">Most tools lose everything when context compacts. context-mode does not. Every file operation, every decision, every error and its fix gets written to a local SQLite database. Next session, it loads back in.</p>
+    </div>
+
+    <div class="cont rev">
+      <div><span class="ck">✓</span> Your prompts</div>
+      <div><span class="ck">✓</span> Files tracked</div>
+      <div><span class="ck">✓</span> Project rules</div>
+      <div><span class="ck">✓</span> Your decisions</div>
+      <div><span class="ck">✓</span> Git operations</div>
+      <div><span class="ck">✓</span> Errors &amp; fixes</div>
+      <div><span class="ck">✓</span> Environment</div>
+      <div><span class="ck">✓</span> Session mode</div>
+      <div><span class="ck">✓</span> Tool patterns</div>
+    </div>
+
+    <div class="rev" style="max-width:840px;margin-top:28px">
+      <p class="body"><strong>26 events</strong> carry over through each reset. Nothing lost. <em>You do not explain your codebase twice.</em></p>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ INSIGHT TEASER ═══════════════════════════════════════ -->
+<section class="chapter-tight">
+  <div class="wrap">
+    <div class="rev wrap-narrow" style="padding:0">
+      <p class="section-num">§ 06 · for engineering orgs</p>
+      <h2 class="h2">Same plugin. <em style="font-style:normal;color:var(--blue)">One more door.</em></h2>
+      <div class="rule" style="background:var(--blue)"></div>
+    </div>
+
+    <a href="/insight" class="insight-teaser rev" style="display:block;color:inherit;text-decoration:none">
+      <h3><span class="sans">Context Mode</span><span class="italic">Insight</span></h3>
+      <p class="muted">
+        Org observability for AI-assisted engineering. Same plugin your team already runs — opt-in event forwarding into a private workspace. <strong style="color:var(--fg)">$20 / seat / month.</strong> Built on the structural events context-mode already captures locally.
+      </p>
+      <p style="margin-top:1rem;font-family:var(--mono);font-size:13px;color:var(--blue)">platform.context-mode.com →</p>
+    </a>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ PLATFORMS ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 07 · platforms</p>
+      <h2 class="h2">15 platforms, one plugin.</h2>
+      <div class="rule"></div>
+      <p class="lead">Works on Claude Code, Cursor, Copilot, Codex, Gemini CLI, and ten more. Platforms with hook support get automatic routing. The rest use instruction-based rules. <em>Same plugin everywhere.</em></p>
+    </div>
+
+    <div class="platform-tags rev">
+      <span class="tag">Claude Code</span><span class="tag">Cursor</span><span class="tag">Codex CLI</span><span class="tag">VS Code Copilot</span><span class="tag">JetBrains Copilot</span><span class="tag">Gemini CLI</span><span class="tag">Qwen Code</span><span class="tag">Kiro</span><span class="tag">OpenCode</span><span class="tag">KiloCode</span><span class="tag">Zed</span><span class="tag">OpenClaw</span><span class="tag">Pi</span><span class="tag">Oh My Pi</span><span class="tag">Antigravity</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ SECURITY ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 08 · security</p>
+      <h2 class="h2">Privacy-first. Your code never leaves your machine.</h2>
+      <div class="rule"></div>
+      <p class="lead">context-mode runs entirely on your local machine. <em>No cloud. No telemetry. No accounts. No tracking.</em> Your code, prompts, file paths, session data stay on your disk. Source-available under <strong>Elastic License 2.0</strong>.</p>
+    </div>
+
+    <div class="rev" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:32px">
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>Dangerous command blocking</span>
+        </div>
+        <div class="card-content">
+          <p class="card-description"><code>curl</code>, <code>wget</code>, inline HTTP, <code>rm -rf</code> blocked at PreToolUse. Redirected to sandbox or denied.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>Environment variable denylist</span>
+        </div>
+        <div class="card-content">
+          <p class="card-description">60+ env vars stripped from sandbox execution. API keys, tokens, secrets never exposed to subprocess.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>Zero network access</span>
+        </div>
+        <div class="card-content">
+          <p class="card-description">No data sent anywhere. No insight. No heartbeat. No phone-home. <em>Fully air-gapped operation.</em></p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="badge badge-dev"><span class="dot"></span>Source-available</span>
+        </div>
+        <div class="card-content">
+          <p class="card-description">Elastic License 2.0. Full source on GitHub. <em>Audit the code yourself.</em> No compiled blobs.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ INSTALL ═══════════════════════════════════════ -->
+<section class="chapter">
+  <div class="wrap">
+    <div class="rev" style="max-width:840px">
+      <p class="section-num">§ 09 · install</p>
+      <h2 class="h2">Two commands, two minutes.</h2>
+      <div class="rule"></div>
+      <p class="lead">No configuration. No accounts. No tokens. Install the plugin, restart your editor, the routing engine takes over on the next tool call.</p>
+    </div>
+
+    <div class="install-list rev">
+      <div class="install pri">
+        <div class="il">Claude Code <span class="pill">recommended</span></div>
+        <code>/plugin marketplace add mksglu/context-mode</code>
+      </div>
+      <div class="install">
+        <div class="il">All platforms</div>
+        <code>npm install -g context-mode</code>
+      </div>
+    </div>
+
+    <p style="font-family:var(--mono);font-size:12.5px;color:var(--text-4);margin-top:18px;letter-spacing:.02em">Open source · Elastic License 2.0 · Node.js 18+ · Works with Bun</p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
+<footer>
+  <p class="footer-q"><span class="prompt">$</span><span>context</span><span class="dash">-</span><span>mode</span><span class="cursor"></span></p>
+  <p class="footer-tagline">The other half of the context problem.</p>
+  <p class="footer-links">
+    <a href="/" style="color:var(--text-3)">↗ Context Mode</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="/insight" style="color:var(--text-3)">Platform</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="https://github.com/mksglu/context-mode" style="color:var(--text-3)">GitHub</a>
+    <span style="color:var(--text-4);margin:0 8px">·</span>
+    <a href="https://discord.gg/DCN9jUgN5v" style="color:var(--text-3)">Discord</a>
+  </p>
+  <p class="footer-meta">Built by <a href="https://mksg.lu" style="color:var(--text-3)">B. Mert Köseoğlu</a></p>
+  <p class="footer-addr">MKSF LTD · Suite 8805 5 Brayford Square · London E1 0SG · United Kingdom</p>
+</footer>
+
+<!-- Sticky CTA -->
+<div class="sticky-cta" id="sticky-cta" aria-hidden="true">
+  <div class="sticky-inner">
+    <p class="sticky-text"><strong>Free, open-source, runs locally.</strong> Two commands, two minutes.</p>
+    <a class="sticky-button" href="https://github.com/mksglu/context-mode#install">Get Started →</a>
+  </div>
+</div>
+
+<script>
+const o=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('v');o.unobserve(x.target);}});},{threshold:.06,rootMargin:'0px 0px -20px 0px'});
+document.querySelectorAll('.rev').forEach(e=>o.observe(e));
+
+// Dynamic stats from context-mode/main/stats.json
+function toLongForm(short){
+  if(!short) return null;
+  const m = String(short).match(/^([\d.]+)\s*([kKmM])?\+?$/);
+  if(!m) return short;
+  let num = parseFloat(m[1]);
+  if(m[2] && /k/i.test(m[2])) num *= 1000;
+  else if(m[2] && /m/i.test(m[2])) num *= 1000000;
+  return Math.round(num).toLocaleString('en-US') + '+';
+}
+fetch('https://raw.githubusercontent.com/mksglu/context-mode/main/stats.json')
+  .then(r=>r.json())
+  .then(d=>{
+    if(!d) return;
+    if(d.message){const el=document.getElementById('stat-users');if(el) el.textContent=d.message}
+    const longForm=d.message_long||d.users_long||toLongForm(d.message);
+    if(longForm){document.querySelectorAll('.js-user-count').forEach(el=>{el.textContent=longForm})}
+  })
+  .catch(()=>{});
+
+// GitHub stars
+fetch('https://api.github.com/repos/mksglu/context-mode')
+  .then(r=>r.json())
+  .then(d=>{
+    if(d && d.stargazers_count){
+      const v=d.stargazers_count;
+      const el=document.getElementById('stat-stars');
+      if(el) el.textContent = v >= 1000 ? (v/1000).toFixed(1)+'k' : v;
+    }
+  })
+  .catch(()=>{});
+
+// Sticky CTA reveal
+(function(){
+  const cta=document.getElementById('sticky-cta');if(!cta)return;
+  const threshold=()=>window.innerHeight*0.8;let visible=false;
+  const onScroll=()=>{const shouldShow=window.scrollY>threshold();if(shouldShow!==visible){visible=shouldShow;cta.classList.toggle('visible',visible);cta.setAttribute('aria-hidden',String(!visible))}};
+  window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+})();
+</script>
+</body>
+</html>
