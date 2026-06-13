@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#FFFFFF"/>
+  <text x="6" y="46" font-family="-apple-system,BlinkMacSystemFont,'IBM Plex Sans',system-ui,sans-serif" font-size="36" font-weight="700" fill="#0F1419" letter-spacing="-2">CM</text>
+  <rect x="50" y="16" width="8" height="32" fill="#1A56DB" rx="1"/>
+</svg>

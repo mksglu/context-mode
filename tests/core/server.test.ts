@@ -44,6 +44,7 @@ import {
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
+import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
 const runtimes = detectRuntimes();
@@ -5240,6 +5241,96 @@ test("OpenCode legacy MCP suppression parses JSONC URLs without stripping // ins
     process.chdir(cwd);
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// #787 review regression, applied to server.ts: its local stripJsonComments
+// ended with a whole-string trailing-comma regex that deleted commas INSIDE
+// string values ("[1, ]" -> "[1 ]"). That corruption always leaves the JSON
+// valid (only the comma char is deleted; the anchoring bracket stays), and
+// shouldSuppressMcpToolsForNativePluginHost() — the only public surface over
+// readNativePluginHostSettings() — checks just the plugin array for a
+// "context-mode" substring and the mcp object for a "context-mode" key, so a
+// deleted in-string comma can never flip the boolean ("context-mode" contains
+// no comma to delete and no bracket to leave behind). Pin the fix
+// structurally instead: server.ts must delegate to the shared string-aware
+// src/util/jsonc.ts — whose in-string-comma behavior IS pinned by the
+// "parseJsonc / stripJsonComments" suite below — and must not reintroduce a
+// local whole-string trailing-comma regex.
+test("server.ts delegates JSONC stripping to string-aware src/util/jsonc (#787 in-string trailing-comma regression)", async () => {
+  const serverSrc = readFileSync(resolve(__dirname, "../../src/server.ts"), "utf8");
+  expect(serverSrc).toContain('from "./util/jsonc.js"');
+  expect(serverSrc).not.toContain('.replace(/,(\\s*[}\\]])/g');
+  // End-to-end sanity through the public boolean: a JSONC config that needs
+  // the strip path (comment + real trailing comma) and embeds a
+  // trailing-comma-like pattern inside a string value still parses and
+  // suppresses.
+  const { shouldSuppressMcpToolsForNativePluginHost } = await import("../../src/server.js");
+  const dir = mkdtempSync(join(tmpdir(), "opencode-jsonc-comma-"));
+  const cwd = process.cwd();
+  try {
+    writeFileSync(join(dir, "opencode.jsonc"), `{
+      // forces the comment/trailing-comma strip path
+      "note": "array literal: [1, ]",
+      "plugin": ["context-mode"],
+      "mcp": {
+        "context-mode": { "type": "local", "command": ["context-mode"] }
+      },
+    }\n`);
+    process.chdir(dir);
+    expect(shouldSuppressMcpToolsForNativePluginHost({ platform: "opencode" })).toBe(true);
+  } finally {
+    process.chdir(cwd);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ─── src/util/jsonc — shared string-aware JSONC strip/parse (#787/#806) ─────
+// The naive regex strippers that lived in src/server.ts and the OpenCode
+// adapter corrupted string VALUES: `//` inside URLs was cut as a "comment"
+// (#806), and a whole-string trailing-comma regex ate commas inside string
+// literals ("[1, ]" -> "[1 ]", the 386a196 regression). These tests pin the
+// shared util that replaced both.
+describe("parseJsonc / stripJsonComments (src/util/jsonc)", () => {
+  test("preserves // inside string values (URLs) while stripping line comments", () => {
+    const jsonc = '{\n  // strip me\n  "url": "https://mcp.context7.com/mcp"\n}';
+    expect(parseJsonc<{ url: string }>(jsonc)?.url).toBe("https://mcp.context7.com/mcp");
+    expect(stripJsonComments('{"url": "https://example.com/x"}')).toBe('{"url": "https://example.com/x"}');
+  });
+
+  test("treats // after an escaped quote as still inside the string", () => {
+    const jsonc = '{ // c\n "say": "say \\"hi\\" // not a comment" }';
+    expect(parseJsonc<{ say: string }>(jsonc)?.say).toBe('say "hi" // not a comment');
+  });
+
+  test("parses CRLF input with line comments", () => {
+    const jsonc = '{\r\n  // comment\r\n  "a": 1,\r\n  "b": 2\r\n}\r\n';
+    expect(parseJsonc(jsonc)).toEqual({ a: 1, b: 2 });
+  });
+
+  test("removes trailing commas before } and ], including whitespace/comment-separated ones", () => {
+    expect(parseJsonc('{ // c\n "a": [1, 2,], "b": { "c": 3, }, }')).toEqual({ a: [1, 2], b: { c: 3 } });
+    expect(parseJsonc('{ "a": 1, /* note */ }')).toEqual({ a: 1 });
+  });
+
+  test("strips a block comment containing a URL without touching neighbors", () => {
+    const jsonc = '{ /* see https://example.com/docs */ "a": 1, // tail\n "b": 2 }';
+    expect(parseJsonc(jsonc)).toEqual({ a: 1, b: 2 });
+  });
+
+  test("preserves a comma inside a string value (the 386a196 regression)", () => {
+    const jsonc = '{\n  // forces the strip path\n  "note": "array literal: [1, ]"\n}';
+    expect(parseJsonc<{ note: string }>(jsonc)?.note).toBe("array literal: [1, ]");
+    expect(stripJsonComments('{"a":"x, ]","b":[1,]}')).toBe('{"a":"x, ]","b":[1]}');
+  });
+
+  test("plain valid JSON passes through parseJsonc unchanged", () => {
+    const raw = '{"a": [1, 2], "u": "https://example.com", "s": "x, ]"}';
+    expect(parseJsonc(raw)).toEqual(JSON.parse(raw));
+  });
+
+  test("returns undefined when input is not JSON at all", () => {
+    expect(parseJsonc("not json at all {{")).toBeUndefined();
+  });
 });
 
 // Issue #623: when ctx_* tool registration is suppressed for the legacy MCP

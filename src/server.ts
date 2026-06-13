@@ -61,6 +61,7 @@ import {
 import { buildNodeCommand, type HookAdapter, type PlatformId, isInProcessPluginPlatform } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
+import { stripJsonComments } from "./util/jsonc.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
 import { loadDatabase } from "./db-base.js";
@@ -116,61 +117,6 @@ export function shouldSuppressMcpToolsForNativePluginHost(
   if (platform !== "opencode" && platform !== "kilo") return false;
   const settings = opts.settings ?? readNativePluginHostSettings(platform);
   return settingsHasContextModePlugin(settings) && settingsHasLegacyContextModeMcp(settings);
-}
-
-function stripJsonComments(str: string): string {
-  let out = "";
-  let inString = false;
-  let escaped = false;
-  let inBlockComment = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    const next = str[i + 1];
-
-    if (inBlockComment) {
-      if (c === "*" && next === "/") {
-        inBlockComment = false;
-        i++;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      out += c;
-      escaped = false;
-      continue;
-    }
-
-    if (c === "\\") {
-      out += c;
-      escaped = inString;
-      continue;
-    }
-
-    if (c === '"') {
-      inString = !inString;
-      out += c;
-      continue;
-    }
-
-    if (!inString && c === "/" && next === "/") {
-      while (i < str.length && str[i] !== "\n") i++;
-      if (i < str.length) out += "\n";
-      continue;
-    }
-
-    if (!inString && c === "/" && next === "*") {
-      inBlockComment = true;
-      i++;
-      continue;
-    }
-
-    out += c;
-  }
-
-  return out
-    .replace(/,(\s*[}\]])/g, "$1");
 }
 
 function readNativePluginHostSettings(platform: PlatformId): Record<string, unknown> | null {
@@ -797,6 +743,15 @@ function healCacheMidSession(): void {
     if (!existsSync(ipPath)) return;
     const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
     const cacheRoot = resolve(claudeRoot, "plugins", "cache");
+    // Issue #795: canonicalize cacheRoot so the traversal guard works when
+    // ~/.claude is a symlink to another volume.  path.resolve() does not
+    // dereference symlinks, so installPath values stored as physical paths
+    // (e.g. /Volumes/SSD/.../plugins/cache/...) would fail the startsWith
+    // check against a symlink-path cacheRoot (/Users/me/.claude/...).
+    // realpathSync follows the symlink chain to the canonical location.
+    let cacheRootCanon: string;
+    try { cacheRootCanon = realpathSync(cacheRoot); }
+    catch { cacheRootCanon = cacheRoot; }
     // Plugin root: build/ for tsc, plugin root for bundle
     const pluginRoot = existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
     for (const [key, entries] of Object.entries((ip.plugins ?? {}) as Record<string, Array<{ installPath?: string }>>)) {
@@ -804,8 +759,8 @@ function healCacheMidSession(): void {
       for (const entry of entries) {
         const rp = entry.installPath;
         if (!rp || existsSync(rp)) continue;
-        // Path traversal guard
-        if (!resolve(rp).startsWith(cacheRoot + sep)) continue;
+        // Path traversal guard (canonical comparison — see #795)
+        if (!resolve(rp).startsWith(cacheRootCanon + sep)) continue;
         // Remove dangling symlink
         try { if (lstatSync(rp).isSymbolicLink()) unlinkSync(rp); } catch {}
         const parent = dirname(rp);
