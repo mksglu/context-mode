@@ -1074,7 +1074,9 @@ describe("Bin entry uses cli.bundle.mjs", () => {
   it("server.ts ctx_upgrade uses cli.bundle.mjs with fallback", () => {
     const src = readFileSync(resolve(ROOT, "src", "server.ts"), "utf-8");
     // ctx_upgrade handler must prefer cli.bundle.mjs
-    const upgradeSection = src.slice(src.indexOf("ctx_upgrade"), src.indexOf("ctx_upgrade") + 800);
+    const upgradeStart = src.indexOf('server.registerTool(\n  "ctx_upgrade"');
+    const upgradeEnd = src.indexOf("// ── ctx-purge", upgradeStart);
+    const upgradeSection = src.slice(upgradeStart, upgradeEnd);
     expect(upgradeSection).toContain("cli.bundle.mjs");
   });
 

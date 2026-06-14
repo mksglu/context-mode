@@ -1237,7 +1237,7 @@ describe("ctx_index: projectRoot path resolution (#365)", () => {
     const buildEntry = resolve(__dirname, "..", "..", "build", "server.js");
     if (!existsSync(buildEntry)) {
       // Compile src → build/ on demand. Bundle is untouched (CI rebuilds it).
-      execSync("npx tsc --silent", {
+      execSync("npx tsc --pretty false", {
         cwd: resolve(__dirname, "..", ".."),
         stdio: "pipe",
         timeout: 60_000,
@@ -1248,24 +1248,21 @@ describe("ctx_index: projectRoot path resolution (#365)", () => {
     // env carries only IDEA_INITIAL_DIRECTORY pointing at the real project.
     const fakeIdeBin = mkdtempSync(join(tmpdir(), "ctx-jetbrains-bin-"));
 
-    // Strip every PROJECT_DIR env var from the inherited env so the cascade
-    // is forced to consult IDEA_INITIAL_DIRECTORY. Issue #545 (v1.0.124):
-    // also strip the claude-code IDENTIFICATION vars so detectPlatform()
-    // doesn't misclassify the spawned MCP child as claude-code (which would
-    // then run strict-mode and ban IDEA_INITIAL_DIRECTORY as a foreign var).
-    // The test process inherits CLAUDE_CODE_ENTRYPOINT / CLAUDE_PLUGIN_ROOT
-    // from whatever Claude Code session launched the test runner.
+    // Strip inherited platform workspace/identification vars so the cascade is
+    // forced to consult IDEA_INITIAL_DIRECTORY. Issue #545 (v1.0.124): when a
+    // host env var (Claude Code, Codex, etc.) leaks into this child,
+    // detectPlatform() can pick that host, enter strict mode, and ban
+    // IDEA_INITIAL_DIRECTORY as a foreign var.
     const cleanEnv = { ...process.env };
-    delete cleanEnv.CLAUDE_PROJECT_DIR;
-    delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
-    delete cleanEnv.CLAUDE_PLUGIN_ROOT;
-    delete cleanEnv.CLAUDE_SESSION_ID;
-    delete cleanEnv.GEMINI_PROJECT_DIR;
-    delete cleanEnv.VSCODE_CWD;
-    delete cleanEnv.OPENCODE_PROJECT_DIR;
-    delete cleanEnv.PI_PROJECT_DIR;
-    delete cleanEnv.PI_WORKSPACE_DIR;
-    delete cleanEnv.CONTEXT_MODE_PROJECT_DIR;
+    for (const key of Object.keys(cleanEnv)) {
+      if (
+        /^(CLAUDE|CODEX|GEMINI|VSCODE|CURSOR|OPENCODE|KILO|KIRO|PI|OMP|ZED|QWEN|KIMI|ANTIGRAVITY|OPENCLAW|COPILOT)_/.test(key) ||
+        key === "CONTEXT_MODE_PLATFORM" ||
+        key === "CONTEXT_MODE_PROJECT_DIR"
+      ) {
+        delete cleanEnv[key];
+      }
+    }
 
     const proc = spawn("node", [buildEntry], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -2421,6 +2418,32 @@ describe("ctx_upgrade tool: inline fallback for missing CLI", () => {
     expect(serverSrc).toContain("cli.bundle.mjs");
     // The bundle path should be checked before fallback
     expect(serverSrc).toMatch(/existsSync\(bundlePath\)/);
+  });
+
+  test("ctx_doctor and ctx_upgrade prefer the Codex plugin manager runtime root only for Codex", () => {
+    expect(serverSrc).toContain("parseCodexContextModePluginRoot");
+    expect(serverSrc).toContain("function resolveCodexRuntimePluginRoot");
+    expect(serverSrc).toContain("function getRuntimeAwarePackageRoot");
+
+    const helperBody = serverSrc.slice(
+      serverSrc.indexOf("function getRuntimeAwarePackageRoot"),
+      serverSrc.indexOf("// Prevent silent MCP server death"),
+    );
+    expect(helperBody).toContain('platformId === "codex"');
+    expect(helperBody).toContain("resolveCodexRuntimePluginRoot(packageRoot)");
+
+    const doctorBody = serverSrc.slice(
+      serverSrc.indexOf('server.registerTool(\n  "ctx_doctor"'),
+      serverSrc.indexOf('server.registerTool(\n  "ctx_upgrade"'),
+    );
+    const upgradeBody = serverSrc.slice(
+      serverSrc.indexOf('server.registerTool(\n  "ctx_upgrade"'),
+      serverSrc.indexOf("// ── ctx-purge"),
+    );
+
+    expect(doctorBody).toContain("getRuntimeAwarePackageRoot(currentPlatform)");
+    expect(upgradeBody).toContain("platformId = signal.platform");
+    expect(upgradeBody).toContain("getRuntimeAwarePackageRoot(platformId)");
   });
 
   test("tries build/cli.js second", () => {

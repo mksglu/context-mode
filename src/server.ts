@@ -60,6 +60,7 @@ import {
 } from "./search/ctx-search-schema.js";
 import { buildNodeCommand, type HookAdapter, type PlatformId, isInProcessPluginPlatform } from "./adapters/types.js";
 import { detectPlatform, getSessionDirSegments } from "./adapters/detect.js";
+import { parseCodexContextModePluginRoot } from "./adapters/codex/index.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { stripJsonComments } from "./util/jsonc.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
@@ -76,6 +77,42 @@ const VERSION: string = (() => {
   }
   return "unknown";
 })();
+
+function getPackageRoot(): string {
+  return existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
+}
+
+function resolveCodexRuntimePluginRoot(fallbackRoot: string): string {
+  try {
+    const probe = process.platform === "win32"
+      ? spawnSync("cmd.exe", ["/d", "/s", "/c", "codex plugin list"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 5000,
+      })
+      : spawnSync("codex", ["plugin", "list"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 5000,
+      });
+    if (probe.status !== 0) return fallbackRoot;
+    const runtimeRoot = parseCodexContextModePluginRoot(String(probe.stdout));
+    if (runtimeRoot && existsSync(resolve(runtimeRoot, ".codex-plugin", "hooks.json"))) {
+      return runtimeRoot;
+    }
+  } catch {
+    // Best effort only. Non-Codex hosts and older Codex builds may not expose
+    // plugin list; keep the package-root fallback for those environments.
+  }
+  return fallbackRoot;
+}
+
+function getRuntimeAwarePackageRoot(platformId?: PlatformId): string {
+  const packageRoot = getPackageRoot();
+  return platformId === "codex"
+    ? resolveCodexRuntimePluginRoot(packageRoot)
+    : packageRoot;
+}
 
 // Prevent silent MCP server death from unhandled async errors.
 //
@@ -753,7 +790,7 @@ function healCacheMidSession(): void {
     try { cacheRootCanon = realpathSync(cacheRoot); }
     catch { cacheRootCanon = cacheRoot; }
     // Plugin root: build/ for tsc, plugin root for bundle
-    const pluginRoot = existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
+    const pluginRoot = getPackageRoot();
     for (const [key, entries] of Object.entries((ip.plugins ?? {}) as Record<string, Array<{ installPath?: string }>>)) {
       if (key !== "context-mode@context-mode") continue;
       for (const entry of entries) {
@@ -3871,8 +3908,16 @@ server.registerTool(
     // safe across all MCP renderers — using plain-text status prefixes
     // (`[OK]` / `[FAIL]` / `[WARN]`) instead.
     const lines: string[] = ["context-mode doctor", ""];
-    // __pkg_dir is build/ for tsc, plugin root for bundle — resolve to plugin root
-    const pluginRoot = existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
+    let currentPlatform: PlatformId | undefined;
+    try {
+      currentPlatform = detectPlatform(server.server.getClientVersion() ?? undefined).platform;
+    } catch {
+      currentPlatform = detectPlatform().platform;
+    }
+    // __pkg_dir is build/ for tsc, plugin root for bundle — resolve to plugin root.
+    // Codex is special: when plugin-manager runtime root differs from the
+    // current package root, diagnose the root Codex will actually execute.
+    const pluginRoot = getRuntimeAwarePackageRoot(currentPlatform);
 
     // Runtimes
     const total = 11;
@@ -3979,8 +4024,33 @@ server.registerTool(
     inputSchema: z.object({}),
   },
   async () => {
-    // __pkg_dir is build/ for tsc, plugin root for bundle — resolve to plugin root
-    const pluginRoot = existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
+    // Issue #542 — thread MCP clientInfo into the spawned upgrade
+    // process. detectPlatform() runs IN-PROCESS here (no spawn boundary)
+    // so clientInfo from the MCP handshake is the highest-confidence
+    // signal available. We forward the resolved PlatformId as a
+    // --platform flag (cross-shell safe on POSIX, Git Bash, PowerShell,
+    // and cmd.exe — unlike env-var prefixes). If detection fails we
+    // skip the flag and let upgrade()'s own detectPlatform() fall back.
+    let platformFlag = "";
+    let nodeOpts: { platform: string; jsRuntime: string } | undefined =
+      undefined;
+    let platformId: PlatformId | undefined;
+    try {
+      const clientInfo = server.server.getClientVersion();
+      const signal = detectPlatform(clientInfo ?? undefined);
+      platformId = signal.platform;
+      platformFlag = ` --platform ${signal.platform}`;
+      nodeOpts = isInProcessPluginPlatform(signal.platform) && runtimes.javascript
+        ? { platform: signal.platform, jsRuntime: runtimes.javascript }
+        : undefined;
+    } catch {
+      try { platformId = detectPlatform().platform; } catch { /* best effort — fall back to upgrade()'s own detect */ }
+    }
+
+    // __pkg_dir is build/ for tsc, plugin root for bundle — resolve to plugin root.
+    // Only Codex may replace it with the plugin-manager runtime root; other
+    // adapters can coexist with Codex on the same machine.
+    const pluginRoot = getRuntimeAwarePackageRoot(platformId);
     const bundlePath = resolve(pluginRoot, "cli.bundle.mjs");
     const fallbackPath = resolve(pluginRoot, "build", "cli.js");
 
@@ -3997,26 +4067,6 @@ server.registerTool(
         rmSync(insightCacheDir, { recursive: true, force: true });
       }
     } catch { /* best effort — don't block upgrade */ }
-
-    // Issue #542 — thread MCP clientInfo into the spawned upgrade
-    // process. detectPlatform() runs IN-PROCESS here (no spawn boundary)
-    // so clientInfo from the MCP handshake is the highest-confidence
-    // signal available. We forward the resolved PlatformId as a
-    // --platform flag (cross-shell safe on POSIX, Git Bash, PowerShell,
-    // and cmd.exe — unlike env-var prefixes). If detection fails we
-    // skip the flag and let upgrade()'s own detectPlatform() fall back.
-    let platformFlag = "";
-    let nodeOpts: { platform: string; jsRuntime: string } | undefined =
-      undefined;
-    try {
-      const { detectPlatform } = await import("./adapters/detect.js");
-      const clientInfo = server.server.getClientVersion();
-      const signal = detectPlatform(clientInfo ?? undefined);
-      platformFlag = ` --platform ${signal.platform}`;
-      nodeOpts = isInProcessPluginPlatform(signal.platform) && runtimes.javascript
-        ? { platform: signal.platform, jsRuntime: runtimes.javascript }
-        : undefined;
-    } catch { /* best effort — fall back to upgrade()'s own detect */ }
 
 
     let cmd: string;
@@ -4510,7 +4560,7 @@ server.registerTool(
     const explicitSessionDir = sessionDir || insightSessionDir;
     const explicitContentDir = contentDir || insightContentDir;
     // __pkg_dir is build/ for tsc, plugin root for bundle — resolve to plugin root
-    const pluginRoot = existsSync(resolve(__pkg_dir, "package.json")) ? __pkg_dir : dirname(__pkg_dir);
+    const pluginRoot = getPackageRoot();
     const insightSource = resolve(pluginRoot, "insight");
     // Use adapter-aware path by default, but allow MCP callers to pass explicit
     // Insight data dirs for hosts whose adapter/default detection is unavailable.
