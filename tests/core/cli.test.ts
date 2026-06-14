@@ -2614,12 +2614,14 @@ describe("Cache dir safety (#181)", () => {
     expect(blockStart, "lazy cleanup block must exist").toBeGreaterThan(-1);
     const block = SESSION_SOURCE.slice(blockStart, blockStart + 1500);
 
-    // The age check MUST use lstatSync (does not follow symlinks).
-    expect(block).toMatch(/lstatSync\(\s*join\(\s*cacheParent\s*,\s*d\s*\)\s*\)/);
+    // The age check MUST use lstatSync (does not follow symlinks). The path may
+    // be held in a local variable as long as it is derived from cacheParent + d.
+    expect(block).toMatch(/const\s+oldDir\s*=\s*join\(\s*cacheParent\s*,\s*d\s*\)/);
+    expect(block).toMatch(/lstatSync\(\s*oldDir\s*\)/);
 
     // The age check MUST NOT use statSync (follows symlinks → wrongly evaluates
     // the link target's mtime, causing fresh symlinks to be deleted).
-    expect(block).not.toMatch(/[^l]statSync\(\s*join\(\s*cacheParent/);
+    expect(block).not.toMatch(/(^|[^l])statSync\(\s*(?:join\(\s*cacheParent\s*,\s*d\s*\)|oldDir)\s*\)/);
   });
 });
 
