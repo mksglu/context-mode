@@ -28,7 +28,7 @@ await runHook(async () => {
   const { readStdin } = await import("./core/stdin.mjs");
   const { routePreToolUse, initSecurity } = await import("./core/routing.mjs");
   const { formatDecision } = await import("./core/formatters.mjs");
-  const { parseStdin, getSessionId, resolveConfigDir } = await import("./session-helpers.mjs");
+  const { parseStdin, getInputProjectDir, getSessionId, resolveConfigDir } = await import("./session-helpers.mjs");
 
   // ─── Manual recursive copy (avoids cpSync libuv crash on non-ASCII paths, Windows + Node 24) ───
   function copyDirSync(src, dest) {
@@ -163,9 +163,10 @@ await runHook(async () => {
   const input = parseStdin(raw);
   const tool = input.tool_name ?? "";
   const toolInput = input.tool_input ?? {};
+  const projectDir = getInputProjectDir(input);
 
   // ─── Route and format response ───
-  const decision = routePreToolUse(tool, toolInput, process.env.CLAUDE_PROJECT_DIR, "claude-code", getSessionId(input));
+  const decision = routePreToolUse(tool, toolInput, projectDir, "claude-code", getSessionId(input));
   const response = formatDecision("claude-code", decision);
 
   // ─── Write latency marker for cross-hook timing (Category 27) ───

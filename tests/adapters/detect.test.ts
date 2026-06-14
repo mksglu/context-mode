@@ -62,6 +62,7 @@ describe("detectPlatform", () => {
     delete process.env.PI_CONFIG_DIR;
     delete process.env.PI_SESSION_FILE;
     delete process.env.PI_COMPILED;
+    delete process.env.PI_CODING_AGENT;
     delete process.env.PI_PROJECT_DIR;
     delete process.env.IDEA_INITIAL_DIRECTORY;
     delete process.env.IDEA_HOME;
@@ -250,7 +251,8 @@ describe("detectPlatform", () => {
   // refs/platforms/oh-my-pi/packages/coding-agent/src/mcp/transports/stdio.ts:55-63
   // — env passthrough only, no synthesis). Detection markers now use the
   // Pi-exclusive PI_CONFIG_DIR / PI_SESSION_FILE / PI_COMPILED set by
-  // the runtime.
+  // the runtime. Issue #760 adds PI_CODING_AGENT=true as the package-server
+  // marker Pi passes to its spawned MCP child.
 
   it("detects pi via PI_CONFIG_DIR env var", () => {
     process.env.PI_CONFIG_DIR = "/home/u/.pi";
@@ -261,6 +263,13 @@ describe("detectPlatform", () => {
 
   it("detects pi via PI_SESSION_FILE env var", () => {
     process.env.PI_SESSION_FILE = "/home/u/.pi/sessions/abc.json";
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("pi");
+    expect(signal.confidence).toBe("high");
+  });
+
+  it("detects pi via PI_CODING_AGENT env var", () => {
+    process.env.PI_CODING_AGENT = "true";
     const signal = detectPlatform();
     expect(signal.platform).toBe("pi");
     expect(signal.confidence).toBe("high");
