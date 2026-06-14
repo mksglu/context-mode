@@ -517,6 +517,28 @@ describe("Security Policy Enforcement", () => {
     assert.equal(result.stdout, "", "Non-shell language should passthrough");
   });
 
+  test("MCP execute + shell pins cwd from hook input over stale CLAUDE_PROJECT_DIR (#756)", () => {
+    const mainRepo = mkdtempSync(join(tmpdir(), "ctx-756-main-"));
+    const worktree = mkdtempSync(join(tmpdir(), "ctx-756-worktree-"));
+    try {
+      const result = runHook(
+        {
+          cwd: worktree,
+          tool_name: "mcp__plugin_context-mode_context-mode__ctx_execute",
+          tool_input: { language: "shell", code: "pwd" },
+        },
+        { ...secEnv, CLAUDE_PROJECT_DIR: mainRepo },
+      );
+      assert.equal(result.exitCode, 0);
+      const parsed = JSON.parse(result.stdout);
+      assert.equal(parsed.hookSpecificOutput.updatedInput.cwd, worktree);
+      assert.equal(parsed.hookSpecificOutput.updatedInput.code, "pwd");
+    } finally {
+      rmSyncRobust(mainRepo);
+      rmSyncRobust(worktree);
+    }
+  });
+
   test("Security: MCP execute_file + .env path denied", () => {
     const result = runHook(
       {
@@ -574,21 +596,28 @@ describe("Security Policy Enforcement", () => {
     assert.equal(parsed.hookSpecificOutput.permissionDecision, "deny");
   });
 
-  test("Security: MCP batch_execute with all allowed commands passthrough", () => {
-    const result = runHook(
-      {
-        tool_name: "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
-        tool_input: {
-          commands: [
-            { label: "list", command: "ls -la" },
-            { label: "git", command: "git log --oneline -5" },
-          ],
+  test("MCP batch_execute with allowed commands pins cwd from hook input (#756)", () => {
+    const worktree = mkdtempSync(join(tmpdir(), "ctx-756-batch-worktree-"));
+    try {
+      const result = runHook(
+        {
+          cwd: worktree,
+          tool_name: "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+          tool_input: {
+            commands: [
+              { label: "list", command: "ls -la" },
+              { label: "git", command: "git log --oneline -5" },
+            ],
+          },
         },
-      },
-      secEnv,
-    );
-    assert.equal(result.exitCode, 0);
-    assert.equal(result.stdout, "", "All allowed commands should passthrough");
+        secEnv,
+      );
+      assert.equal(result.exitCode, 0);
+      const parsed = JSON.parse(result.stdout);
+      assert.equal(parsed.hookSpecificOutput.updatedInput.cwd, worktree);
+    } finally {
+      rmSyncRobust(worktree);
+    }
   });
 });
 

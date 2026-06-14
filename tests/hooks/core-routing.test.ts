@@ -514,6 +514,45 @@ describe("routePreToolUse", () => {
       );
       expect(result).toBeNull();
     });
+
+    it("pins Claude Code ctx_execute shell cwd from hook projectDir (#756)", () => {
+      const result = routePreToolUse(
+        "mcp__plugin_context-mode_context-mode__ctx_execute",
+        { language: "shell", code: "pwd" },
+        "/worktree/repo",
+        "claude-code",
+      );
+      expect(result?.action).toBe("modify");
+      expect(result?.updatedInput).toEqual({
+        language: "shell",
+        code: "pwd",
+        cwd: "/worktree/repo",
+      });
+    });
+
+    it("pins Claude Code ctx_batch_execute cwd from hook projectDir (#756)", () => {
+      const result = routePreToolUse(
+        "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+        { commands: [{ label: "branch", command: "git rev-parse --abbrev-ref HEAD" }] },
+        "/worktree/repo",
+        "claude-code",
+      );
+      expect(result?.action).toBe("modify");
+      expect(result?.updatedInput).toEqual({
+        commands: [{ label: "branch", command: "git rev-parse --abbrev-ref HEAD" }],
+        cwd: "/worktree/repo",
+      });
+    });
+
+    it("does not overwrite explicit ctx_execute cwd", () => {
+      const result = routePreToolUse(
+        "mcp__plugin_context-mode_context-mode__ctx_execute",
+        { language: "shell", code: "pwd", cwd: "/explicit" },
+        "/worktree/repo",
+        "claude-code",
+      );
+      expect(result).toBeNull();
+    });
   });
 
   describe("Codex context-mode MCP execute security", () => {
