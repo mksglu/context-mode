@@ -770,6 +770,49 @@ describe("Subagent Events", () => {
       `completed agent event type should indicate completion, got: "${subagentEvents[0].type}"`,
     );
   });
+
+  test("extracts Codex generic agent job launch from worker prompt", () => {
+    const events = extractUserEvents([
+      "You are processing one item for a generic agent job.",
+      "Job ID: test-job-123",
+      "Item ID: dead_code_hunter",
+      "",
+      "Task instruction:",
+      "Read-only review work for the current diff.",
+      "",
+      "You MUST call the `report_agent_job_result` tool exactly once.",
+    ].join("\n"));
+
+    const subagentEvents = events.filter(e => e.category === "subagent");
+    assert.equal(subagentEvents.length, 1);
+    assert.equal(subagentEvents[0].type, "subagent_launched");
+    assert.equal(subagentEvents[0].priority, 3);
+    assert.ok(subagentEvents[0].data.includes("test-job-123"));
+    assert.ok(subagentEvents[0].data.includes("dead_code_hunter"));
+  });
+
+  test("extracts Codex generic agent job completion from report tool", () => {
+    const input = {
+      tool_name: "report_agent_job_result",
+      tool_input: {
+        job_id: "test-job-123",
+        item_id: "dead_code_hunter",
+        result: {
+          role: "Dead Code Hunter",
+          findings: [],
+        },
+      },
+      tool_response: "ok",
+    };
+
+    const events = extractEvents(input);
+    const subagentEvents = events.filter(e => e.category === "subagent");
+    assert.equal(subagentEvents.length, 1);
+    assert.equal(subagentEvents[0].type, "subagent_completed");
+    assert.equal(subagentEvents[0].priority, 2);
+    assert.ok(subagentEvents[0].data.includes("Dead Code Hunter"));
+    assert.ok(subagentEvents[0].data.includes("0 findings"));
+  });
 });
 
 // ════════════════════════════════════════════

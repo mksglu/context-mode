@@ -880,6 +880,43 @@ function extractSubagent(input: HookInput): SessionEvent[] {
   }];
 }
 
+function extractCodexAgentJobResult(input: HookInput): SessionEvent[] {
+  if (input.tool_name !== "report_agent_job_result") return [];
+
+  const jobId = safeStringAny(input.tool_input["job_id"]).trim();
+  const itemId = safeStringAny(input.tool_input["item_id"]).trim();
+  if (!jobId || !itemId) return [];
+
+  const rawResult = input.tool_input["result"];
+  let result: Record<string, unknown> | null = null;
+  if (rawResult && typeof rawResult === "object" && !Array.isArray(rawResult)) {
+    result = rawResult as Record<string, unknown>;
+  } else if (typeof rawResult === "string" && rawResult.trim()) {
+    try {
+      const parsed = JSON.parse(rawResult);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        result = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Result details are optional; job_id + item_id are enough.
+    }
+  }
+
+  const role = safeStringAny(result?.role ?? result?.reviewer).trim();
+  const rawFindings = result?.findings;
+  const findings = Array.isArray(rawFindings) ? rawFindings.length : undefined;
+  const parts = [`[completed] Codex agent job ${jobId} item ${itemId}`];
+  if (role) parts.push(`role ${role}`);
+  if (findings !== undefined) parts.push(`${findings} findings`);
+
+  return [{
+    type: "subagent_completed",
+    category: "subagent",
+    data: safeString(parts.join(" | ")),
+    priority: 2,
+  }];
+}
+
 /**
  * Category 14: mcp
  * MCP tool calls (context7, playwright, claude-mem, ctx-stats, etc.).
@@ -1739,6 +1776,25 @@ function extractData(message: string): SessionEvent[] {
   }];
 }
 
+function extractCodexAgentJobPrompt(message: string): SessionEvent[] {
+  const text = safeString(message).trim();
+  if (!text.startsWith("You are processing one item for a generic agent job.")) return [];
+
+  const jobId = text.match(/^Job ID:\s*(.+)$/m)?.[1]?.trim() ?? "";
+  const itemId = text.match(/^Item ID:\s*(.+)$/m)?.[1]?.trim() ?? "";
+  if (!jobId || !itemId) return [];
+
+  const taskLine = text.match(/^Task instruction:\s*([\s\S]*?)(?:\n\n|$)/m)?.[1]?.trim() ?? "";
+  const summary = taskLine ? ` | ${taskLine.split(/\r?\n/)[0].trim()}` : "";
+
+  return [{
+    type: "subagent_launched",
+    category: "subagent",
+    data: safeString(`[launched] Codex agent job ${jobId} item ${itemId}${summary}`),
+    priority: 3,
+  }];
+}
+
 // ── Cross-event stateful extractors ───────────────────────────────────────
 
 /**
@@ -1923,6 +1979,7 @@ export function extractEvents(rawInput: HookInput): SessionEvent[] {
     events.push(...extractPlan(input));
     events.push(...extractSkill(input));
     events.push(...extractSubagent(input));
+    events.push(...extractCodexAgentJobResult(input));
     events.push(...extractMcp(input));
     events.push(...extractMcpToolCall(input));
     events.push(...extractDecision(input));
@@ -1956,6 +2013,7 @@ export function extractUserEvents(message: string): SessionEvent[] {
   try {
     const events: SessionEvent[] = [];
 
+    events.push(...extractCodexAgentJobPrompt(message));
     events.push(...extractUserPlan(message));
     events.push(...extractUserDecision(message));
     events.push(...extractRole(message));

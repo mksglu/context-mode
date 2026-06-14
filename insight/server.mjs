@@ -232,6 +232,41 @@ function mergeByKey(arr, key, mergeFn) {
   return [...map.values()];
 }
 
+function compareCreatedAt(a, b) {
+  return new Date(a.created_at) - new Date(b.created_at);
+}
+
+function querySubagentLaunchRows(db) {
+  const nativeRows = safeAll(db, `SELECT data as task, created_at, session_id FROM session_events
+    WHERE type IN ('subagent', 'subagent_launched') ORDER BY created_at ASC`);
+  const legacyCodexRows = safeAll(db, `SELECT se.data as task, se.created_at, se.session_id
+    FROM session_events se
+    WHERE se.type = 'user_prompt'
+      AND se.data LIKE 'You are processing one item for a generic agent job.%'
+      AND NOT EXISTS (
+        SELECT 1 FROM session_events native
+        WHERE native.session_id = se.session_id
+          AND native.type IN ('subagent', 'subagent_launched')
+      )
+    ORDER BY se.created_at ASC`);
+  return [...nativeRows, ...legacyCodexRows];
+}
+
+function computeSubagentBursts(rows) {
+  const sorted = [...rows].sort(compareCreatedAt);
+  const bursts = [];
+  let currentBurst = [];
+  for (const row of sorted) {
+    if (currentBurst.length === 0) { currentBurst.push(row); continue; }
+    const last = currentBurst[currentBurst.length - 1];
+    const gap = (new Date(row.created_at) - new Date(last.created_at)) / 1000;
+    if (gap <= 30) { currentBurst.push(row); }
+    else { if (currentBurst.length > 0) bursts.push([...currentBurst]); currentBurst = [row]; }
+  }
+  if (currentBurst.length > 0) bursts.push(currentBurst);
+  return bursts;
+}
+
 // ── Input validation ────────────────────────────────────
 function isValidHash(hash) {
   return /^[a-f0-9_]+$/.test(hash);
@@ -412,7 +447,7 @@ function apiAnalytics() {
         WHEN type = 'file_search' THEN 'Grep'
         WHEN type = 'mcp' THEN 'context-mode'
         WHEN type = 'git' THEN 'Git'
-        WHEN type = 'subagent' THEN 'Agent'
+        WHEN type IN ('subagent', 'subagent_launched', 'subagent_completed') THEN 'Agent'
         WHEN type = 'task' THEN 'Task'
         WHEN type = 'error_tool' THEN 'Error'
         ELSE type
@@ -500,20 +535,8 @@ function apiAnalytics() {
       LEFT JOIN session_meta sm ON se.session_id = sm.session_id
       WHERE se.type = 'git' ORDER BY se.created_at DESC LIMIT 20`);
   });
-  const rawSubagents = queryAllSessionDBs(db =>
-    safeAll(db, `SELECT data as task, created_at, session_id FROM session_events
-      WHERE type = 'subagent' ORDER BY created_at ASC`)
-  );
-  const bursts = [];
-  let currentBurst = [];
-  for (const s of rawSubagents) {
-    if (currentBurst.length === 0) { currentBurst.push(s); continue; }
-    const last = currentBurst[currentBurst.length - 1];
-    const gap = (new Date(s.created_at) - new Date(last.created_at)) / 1000;
-    if (gap <= 30) { currentBurst.push(s); }
-    else { if (currentBurst.length > 0) bursts.push([...currentBurst]); currentBurst = [s]; }
-  }
-  if (currentBurst.length > 0) bursts.push(currentBurst);
+  const rawSubagents = queryAllSessionDBs(querySubagentLaunchRows);
+  const bursts = computeSubagentBursts(rawSubagents);
   const parallelBursts = bursts.filter(b => b.length >= 2);
   const subagents = {
     total: rawSubagents.length,
@@ -783,7 +806,7 @@ function apiCategoryAnalytics() {
     file: ["file_read", "file_write", "file_edit", "file_glob", "file_search"],
     git: ["git"],
     error: ["error_tool"],
-    subagent: ["subagent_launched", "subagent_completed"],
+    subagent: ["subagent", "subagent_launched", "subagent_completed"],
     "rejected-approach": ["rejected"],
     latency: ["tool_latency"],
     decision: ["decision", "decision_question"],
@@ -898,17 +921,21 @@ function apiCategoryAnalytics() {
 
   // 3. Delegation metrics
   const subagentCat = categories.find(c => c.category === "subagent");
-  const launched = subagentCat ? (subagentCat.types.subagent_launched || 0) : 0;
+  const rawSubagents = queryAllSessionDBs(querySubagentLaunchRows);
+  const nativeLaunched = subagentCat ? ((subagentCat.types.subagent || 0) + (subagentCat.types.subagent_launched || 0)) : 0;
+  const launched = rawSubagents.length;
+  const legacyCodexLaunched = Math.max(0, launched - nativeLaunched);
+  if (subagentCat && legacyCodexLaunched > 0) {
+    subagentCat.types.codex_agent_job_prompt = legacyCodexLaunched;
+    subagentCat.count += legacyCodexLaunched;
+  }
   let completed = subagentCat ? (subagentCat.types.subagent_completed || 0) : 0;
   if (completed > launched && launched > 0) completed = launched; // cap anomaly
   const completionRate = launched > 0 ? Math.round(1000 * completed / launched) / 10 : 0;
 
-  // Parallel bursts: sessions with >1 subagent_launched in same session
-  const parallelBurstData = queryAllSessionDBs(db =>
-    safeAll(db, `SELECT session_id, COUNT(*) as cnt FROM session_events WHERE type = 'subagent_launched' GROUP BY session_id HAVING cnt > 1`)
-  );
-  const parallelBursts = parallelBurstData.length;
-  const maxConcurrent = parallelBurstData.reduce((m, r) => Math.max(m, r.cnt || 0), 0);
+  const burstData = computeSubagentBursts(rawSubagents).filter(b => b.length > 1);
+  const parallelBursts = burstData.length;
+  const maxConcurrent = burstData.reduce((m, b) => Math.max(m, b.length), 0);
   // Rough estimate: each completed subagent saves ~2 min
   const timeSavedMin = Math.round(completed * 2);
 
