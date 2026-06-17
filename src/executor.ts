@@ -585,10 +585,19 @@ export class PolyglotExecutor {
       env["PATH"] = isWin ? "" : "/usr/local/bin:/usr/bin:/bin";
     }
 
-    // Windows-critical env vars and path fixes
+    // Windows-critical PATH fixes.
     if (isWin) {
-      env["MSYS_NO_PATHCONV"] = "1";
-      env["MSYS2_ARG_CONV_EXCL"] = "*";
+      // Do not carry global MSYS path-conversion blockers into Git Bash.
+      // Native Windows tools launched from bash (notably git.exe) need MSYS
+      // to convert /tmp-style arguments to Windows paths so sibling tools see
+      // the same filesystem location (#791).
+      for (const key of Object.keys(env)) {
+        const upper = key.toUpperCase();
+        if (upper === "MSYS_NO_PATHCONV" || upper === "MSYS2_ARG_CONV_EXCL") {
+          delete env[key];
+        }
+      }
+
       const gitUsrBin = "C:\\Program Files\\Git\\usr\\bin";
       const gitBin = "C:\\Program Files\\Git\\bin";
       if (!env["PATH"].includes(gitUsrBin)) {
