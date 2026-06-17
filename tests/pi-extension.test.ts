@@ -637,7 +637,7 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 5: Resume injection", () => {
-    it("returns modified systemPrompt when unconsumed resume exists", async () => {
+    it("delivers resume snapshot through context hook, not systemPrompt", async () => {
       await registerPiExtension(api);
 
       // Build up session state: capture events → compact → build resume
@@ -662,16 +662,73 @@ describe("Pi Extension", () => {
       await api._trigger("session_before_compact", {});
       await api._trigger("session_compact", {});
 
-      // Now before_agent_start should inject the resume
+      // before_agent_start should prepare context without mutating systemPrompt
       const result = await api._trigger("before_agent_start", {
         systemPrompt: "You are a helpful assistant.",
       });
+      expect(result?.systemPrompt ?? null).toBe(null);
 
-      // If resume injection is supported, the result should contain
-      // a modified system prompt with session_resume data
-      if (result?.systemPrompt) {
-        expect(result.systemPrompt).toContain("session_resume");
-      }
+      // The context hook should deliver the resume as a trailing user message.
+      const messages = [{ role: "system", content: "You are a helpful assistant." }];
+      const ctxResult = await api._trigger("context", { messages });
+
+      expect(ctxResult?.messages).toBe(messages);
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toEqual({
+        role: "system",
+        content: "You are a helpful assistant.",
+      });
+      expect(messages[1].role).toBe("user");
+      expect(String(messages[1].content)).toContain("session_resume");
+      expect(String(messages[1].content)).not.toContain("You are a helpful assistant.");
+    });
+
+    it("appends resume and active context after existing messages", async () => {
+      await registerPiExtension(api);
+
+      await api._trigger("session_start", {
+        session_id: "resume-test-2",
+        project_dir: tempDir,
+      });
+
+      await api._trigger("tool_result", {
+        tool_name: "read",
+        tool_input: { file_path: "/src/main.ts" },
+        tool_result: "export const value = 1;",
+      });
+
+      await api._trigger("tool_result", {
+        tool_name: "write",
+        tool_input: { file_path: "/src/main.ts", content: "export const value = 2;" },
+        tool_result: "wrote /src/main.ts",
+      });
+
+      await api._trigger("session_before_compact", {});
+      await api._trigger("session_compact", {});
+
+      const result = await api._trigger("before_agent_start", {
+        systemPrompt: "Stable system prompt.",
+        prompt: "Continue with the refactor and avoid lodash.",
+      });
+      expect(result?.systemPrompt ?? null).toBe(null);
+
+      const messages = [
+        { role: "system", content: "Stable system prompt." },
+        { role: "user", content: "Continue with the refactor." },
+      ];
+      const ctxResult = await api._trigger("context", { messages });
+
+      expect(ctxResult?.messages).toBe(messages);
+      expect(messages).toHaveLength(3);
+      expect(messages[0]).toEqual({ role: "system", content: "Stable system prompt." });
+      expect(messages[1]).toEqual({ role: "user", content: "Continue with the refactor." });
+      expect(messages[2].role).toBe("user");
+
+      const trailing = String(messages[2].content);
+      expect(trailing).toContain("context-mode active");
+      expect(trailing).toContain("session_resume");
+      expect(trailing).toContain("how_to_search");
+      expect(trailing).not.toContain("Stable system prompt.");
     });
 
     it("returns nothing when no resume exists", async () => {
