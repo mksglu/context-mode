@@ -51,6 +51,11 @@ export function buildScriptFilename(
   return `script.${SCRIPT_EXT[language]}`;
 }
 
+function isPowerShellRuntime(shellPath?: string | null): boolean {
+  const shellName = shellPath?.toLowerCase() ?? "";
+  return shellName.includes("powershell") || shellName.includes("pwsh");
+}
+
 /**
  * Pure helper — exported for unit testing. Adds `windowsHide: true` on Windows
  * to prevent the spawned shell from creating a visible console window that
@@ -69,9 +74,22 @@ export function buildShellScriptContent(
   code: string,
   inheritedPath: string | undefined,
   platform: NodeJS.Platform,
+  shellPath?: string | null,
 ): string {
-  if (platform === "win32" || !inheritedPath) return code;
+  if (platform === "win32") {
+    if (!isPowerShellRuntime(shellPath)) return code;
+    const utf8Prelude = [
+      "$OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
+      "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
+    ].join("\n");
+    return `${utf8Prelude}\n${code}`;
+  }
+  if (!inheritedPath) return code;
   return `export PATH=${quoteForPosixShell(inheritedPath)}\n${code}`;
+}
+
+export function encodeShellScriptContent(script: string, shellPath?: string | null): string {
+  return isPowerShellRuntime(shellPath) ? `\uFEFF${script}` : script;
 }
 
 /**
@@ -257,7 +275,10 @@ export class PolyglotExecutor {
     if (language === "shell") {
       writeFileSync(
         fp,
-        buildShellScriptContent(code, process.env.PATH, process.platform),
+        encodeShellScriptContent(
+          buildShellScriptContent(code, process.env.PATH, process.platform, this.#runtimes.shell),
+          this.#runtimes.shell,
+        ),
         { encoding: "utf-8", mode: 0o700 },
       );
     } else {
