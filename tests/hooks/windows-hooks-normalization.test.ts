@@ -507,4 +507,44 @@ describe("normalize-hooks survives a version bump (#604)", () => {
     expect(healedV136).toContain("/1.0.136/");
     expect(healedV136).not.toContain("/1.0.135/");
   });
+
+  test("normalizeHooksOnStartup self-heals stale hooks.json on macOS (darwin) without bun swap", () => {
+    const cacheBase = makeTmp();
+    const v135Dir = join(cacheBase, "context-mode", "context-mode", "1.0.135");
+    const v136Dir = join(cacheBase, "context-mode", "context-mode", "1.0.136");
+    mkdirSync(join(v135Dir, "hooks"), { recursive: true });
+    mkdirSync(join(v136Dir, "hooks"), { recursive: true });
+
+    // v135 boot: write absolute path simulating a previously normalized hooks.json on macOS.
+    const normalizedV135 = JSON.stringify({
+      hooks: {
+        SessionStart: [
+          {
+            matcher: "",
+            hooks: [
+              {
+                type: "command",
+                command: `"node" "${v135Dir}/hooks/sessionstart.mjs"`,
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    writeFileSync(join(v136Dir, "hooks", "hooks.json"), normalizedV135);
+
+    // v136 boot: normalize must re-point the stale absolute paths even on darwin.
+    normalizeHooksOnStartup({
+      pluginRoot: v136Dir,
+      nodePath: NODE,
+      platform: "darwin",
+    });
+    const healedV136 = readFileSync(
+      join(v136Dir, "hooks", "hooks.json"),
+      "utf-8",
+    );
+    expect(healedV136).toContain("/1.0.136/");
+    expect(healedV136).not.toContain("/1.0.135/");
+  });
 });

@@ -253,19 +253,24 @@ export function normalizePluginJson(content, nodePath, pluginRoot) {
  */
 export function normalizeHooksJsonOnly({ pluginRoot, nodePath, jsRuntimePath, platform }) {
   const effectiveRuntime = jsRuntimePath || nodePath;
-  // #378 path: always normalize on Windows/Linux to heal placeholder + bare-node.
-  // #738 path: also fire on macOS when we have a real bun swap to perform — the
-  // legacy gate skipped darwin because system node was reliable there, but bun
-  // resolution is the new perf-win that the gate now needs to allow through.
-  const isPlatformGated = platform !== "win32" && platform !== "linux";
-  const hasBunSwap = jsRuntimePath && jsRuntimePath !== nodePath;
-  if (isPlatformGated && !hasBunSwap) return;
-  if (!pluginRoot || !effectiveRuntime) return;
 
   try {
     const hooksPath = resolve(pluginRoot, "hooks", "hooks.json");
     if (existsSync(hooksPath)) {
       const original = readFileSync(hooksPath, "utf-8");
+
+      const currentVersion = pluginRootVersion(pluginRoot);
+      const hasStale = hasStaleCacheVersionSegment(original, currentVersion);
+
+      // #378 path: always normalize on Windows/Linux to heal placeholder + bare-node.
+      // #738 path: also fire on macOS when we have a real bun swap to perform.
+      // Additionally, always normalize on any platform if the hook commands contain stale versions.
+      const isPlatformGated = platform !== "win32" && platform !== "linux";
+      const hasBunSwap = jsRuntimePath && jsRuntimePath !== nodePath;
+
+      if (!hasStale && isPlatformGated && !hasBunSwap) return;
+      if (!pluginRoot || !effectiveRuntime) return;
+
       if (needsHookNormalization(original, pluginRoot)) {
         const next = normalizeHooksJson(original, effectiveRuntime, pluginRoot);
         if (next !== original) {
