@@ -371,8 +371,20 @@ export class PolyglotExecutor {
           resolved = true;
           if (proc.pid) this.#backgroundedPids.add(proc.pid);
           proc.unref();
-          proc.stdout!.destroy();
-          proc.stderr!.destroy();
+          // Do NOT destroy stdout/stderr — closing the read end of the pipe
+          // sends SIGPIPE to the child on its next write, killing it.
+          // Instead, replace the data listeners with no-op drains that
+          // consume the stream without accumulating buffers. This keeps
+          // the pipe open and prevents the child from blocking on a full
+          // pipe buffer.
+          if (proc.stdout) {
+            proc.stdout.removeAllListeners("data");
+            proc.stdout.on("data", () => {});
+          }
+          if (proc.stderr) {
+            proc.stderr.removeAllListeners("data");
+            proc.stderr.on("data", () => {});
+          }
           const rawStdout = Buffer.concat(stdoutChunks).toString("utf-8");
           const rawStderr = Buffer.concat(stderrChunks).toString("utf-8");
           res({
