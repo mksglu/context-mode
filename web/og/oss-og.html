@@ -1,0 +1,72 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>context-mode OSS · OG · 1200×630</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  .frame{
+    width:1200px;height:630px;
+    background:
+      radial-gradient(ellipse at 78% 22%,rgba(16,185,129,.10) 0%,transparent 50%),
+      radial-gradient(ellipse at 18% 82%,rgba(75,123,236,.08) 0%,transparent 50%),
+      #050807;
+    padding:64px 80px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    position:relative;
+    font-family:'IBM Plex Mono',monospace;
+    color:#fafafa;
+  }
+  .frame::after{
+    content:'';position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+    background-size:32px 32px;
+    pointer-events:none;mask-image:radial-gradient(ellipse at center,#000 35%,transparent 75%);
+  }
+  .scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,rgba(255,255,255,.012) 3px,rgba(255,255,255,.012) 4px);pointer-events:none}
+  .head{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .badge{font-size:12.5px;font-weight:600;color:#10b981;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.22);padding:6px 12px;border-radius:6px;letter-spacing:.08em;text-transform:uppercase}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;box-shadow:0 0 10px rgba(16,185,129,.7)}
+  .meta{font-size:12px;color:#6b7a8d;letter-spacing:.08em}
+  .stack{position:relative;z-index:2}
+  .wordmark{display:inline-flex;align-items:baseline;font-weight:600;font-size:120px;line-height:.95;letter-spacing:-.04em;color:#fafafa}
+  .wordmark .prompt{color:#6b7a8d;margin-right:.3em;font-weight:400}
+  .wordmark .dash{color:#475569}
+  .cursor{display:inline-block;width:34px;height:100px;background:#10b981;margin-left:12px;transform:translateY(8px);box-shadow:0 0 24px rgba(16,185,129,.4)}
+  .tagline{margin-top:30px;font-family:'IBM Plex Sans',sans-serif;font-style:normal;font-weight:600;font-size:42px;line-height:1.15;color:#fafafa;letter-spacing:-.025em;max-width:980px}
+  .tagline em{font-style:normal;color:#10b981;font-weight:600}
+  .sub{margin-top:18px;font-family:'IBM Plex Sans',sans-serif;font-size:18px;line-height:1.5;color:#94a3b8;max-width:900px;font-weight:400}
+  .sub code{font-family:'IBM Plex Mono',monospace;background:rgba(16,185,129,.08);color:#10b981;padding:2px 8px;border-radius:4px;font-size:.92em;border:1px solid rgba(16,185,129,.18)}
+  .foot{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .stats{display:flex;gap:36px}
+  .stat .val{font-size:24px;font-weight:600;color:#fafafa;letter-spacing:-.01em}
+  .stat .lbl{font-size:11px;color:#6b7a8d;letter-spacing:.10em;text-transform:uppercase;margin-top:2px}
+  .url{font-size:14px;color:#10b981;font-weight:600;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="scan"></div>
+  <div class="head">
+    <span class="badge"><span class="dot"></span>Open Source · ELv2 · MCP Plugin</span>
+    <span class="meta">context-mode.com/oss</span>
+  </div>
+  <div class="stack">
+    <div class="wordmark"><span class="prompt">$</span>context<span class="dash">-</span>mode<span class="cursor"></span></div>
+    <div class="tagline">The <em>other half</em> of the context problem.</div>
+    <div class="sub">An MCP plugin that sandboxes tool output and indexes it into a local FTS5 store. Your AI coding agent searches that store instead of re-sending raw bytes every turn. Runs entirely on your machine.</div>
+  </div>
+  <div class="foot">
+    <div class="stats">
+      <div class="stat"><div class="val">287,000+</div><div class="lbl">developers</div></div>
+      <div class="stat"><div class="val">15</div><div class="lbl">platforms</div></div>
+      <div class="stat"><div class="val">#1</div><div class="lbl">on Hacker News</div></div>
+      <div class="stat"><div class="val">ELv2</div><div class="lbl">license</div></div>
+    </div>
+    <div class="url">→ context-mode.com/oss</div>
+  </div>
+</div>
+</body></html>

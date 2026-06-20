@@ -126,6 +126,21 @@ type CodexVersionRunner = (
   },
 ) => string | Buffer;
 
+interface CodexAdapterOptions {
+  codexPluginListRunner?: CodexVersionRunner;
+}
+
+interface CodexPluginHookStatus {
+  enabled: boolean;
+  configuredRoot: string;
+  configuredManifestAvailable: boolean;
+  runtimeRoot: string | null;
+  runtimeManifestAvailable: boolean;
+  rootMismatch: boolean;
+  hooksAvailable: boolean;
+  ownsHooksForUpgrade: boolean;
+}
+
 export function probeCodexCliVersion(runCommand: CodexVersionRunner = execFileSync): string | null {
   try {
     const output = process.platform === "win32"
@@ -144,6 +159,14 @@ export function probeCodexCliVersion(runCommand: CodexVersionRunner = execFileSy
   } catch {
     return null;
   }
+}
+
+export function parseCodexContextModePluginRoot(raw: string): string | null {
+  for (const line of raw.split(/\r?\n/)) {
+    const match = line.match(/^\s*context-mode@context-mode\s+installed,\s+enabled\s+\S+\s+(.+?)\s*$/);
+    if (match?.[1]) return match[1].trim();
+  }
+  return null;
 }
 
 function getTomlSection(raw: string, sectionName: string): string | null {
@@ -273,8 +296,11 @@ function parseTomlQuotedString(raw: string): string | null {
 // ─────────────────────────────────────────────────────────
 
 export class CodexAdapter extends BaseAdapter implements HookAdapter {
-  constructor() {
+  private readonly codexPluginListRunner: CodexVersionRunner;
+
+  constructor(options: CodexAdapterOptions = {}) {
     super([".codex"]);
+    this.codexPluginListRunner = options.codexPluginListRunner ?? execFileSync;
   }
 
   readonly name = "Codex CLI";
@@ -590,13 +616,34 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
     }
 
     const expected = this.generateHookConfig("");
-    const codexPluginEnabled = settingsReadable && hasCodexPluginEnabled(settingsRaw);
-    const codexPluginHooksAvailable = codexPluginEnabled && this.hasCodexPluginHookManifest(pluginRoot);
+    const pluginHookStatus = this.getCodexPluginHookStatus(pluginRoot, settingsRaw, settingsReadable);
+    const codexPluginEnabled = pluginHookStatus.enabled;
+    const codexPluginHooksAvailable = pluginHookStatus.hooksAvailable;
+    if (codexPluginEnabled && pluginHookStatus.runtimeRoot) {
+      results.push({
+        check: "Codex plugin root",
+        status: pluginHookStatus.rootMismatch ? "warn" : "pass",
+        message: pluginHookStatus.rootMismatch
+          ? `context-mode doctor is running from ${pluginHookStatus.configuredRoot}, but Codex plugin manager reports ${pluginHookStatus.runtimeRoot}`
+          : `Codex plugin manager reports ${pluginHookStatus.runtimeRoot}`,
+        ...(pluginHookStatus.rootMismatch
+          ? { fix: "Restart Codex after upgrade; run context-mode upgrade to keep native user-hook fallback until the plugin root converges" }
+          : {}),
+      });
+    } else if (codexPluginEnabled) {
+      results.push({
+        check: "Codex plugin root",
+        status: "warn",
+        message: "context-mode@context-mode is enabled, but `codex plugin list` did not report its runtime root",
+        fix: "Restart Codex or verify `codex plugin list` shows context-mode@context-mode installed and enabled",
+      });
+    }
     if (codexPluginEnabled && !codexPluginHooksAvailable) {
+      const expectedRoot = pluginHookStatus.runtimeRoot ?? pluginRoot;
       results.push({
         check: "Codex plugin hooks",
         status: "fail",
-        message: `context-mode Codex plugin is enabled, but ${join(pluginRoot, ".codex-plugin", "hooks.json")} is missing`,
+        message: `context-mode Codex plugin is enabled, but ${join(expectedRoot, ".codex-plugin", "hooks.json")} is missing`,
         fix: "Reinstall or upgrade the context-mode Codex plugin",
       });
     }
@@ -786,7 +833,8 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
     } catch {
       settingsRaw = "";
     }
-    const codexPluginOwnsHooks = hasCodexPluginEnabled(settingsRaw) && this.hasCodexPluginHookManifest(pluginRoot);
+    const pluginHookStatus = this.getCodexPluginHookStatus(pluginRoot, settingsRaw, settingsRaw.length > 0);
+    const codexPluginOwnsHooks = pluginHookStatus.ownsHooksForUpgrade;
     let hookFile: CodexHooksFile;
     if (hookConfig.ok) {
       hookFile = hookConfig.config;
@@ -1006,6 +1054,65 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
 
   private hasCodexPluginHookManifest(pluginRoot: string): boolean {
     return existsSync(join(pluginRoot, ".codex-plugin", "hooks.json"));
+  }
+
+  private getCodexPluginHookStatus(
+    pluginRoot: string,
+    settingsRaw: string,
+    settingsReadable: boolean,
+  ): CodexPluginHookStatus {
+    const enabled = settingsReadable && hasCodexPluginEnabled(settingsRaw);
+    const configuredRoot = resolve(pluginRoot);
+    const configuredManifestAvailable = this.hasCodexPluginHookManifest(configuredRoot);
+    const runtimeRoot = enabled ? this.probeCodexContextModePluginRoot() : null;
+    const runtimeManifestAvailable = runtimeRoot
+      ? this.hasCodexPluginHookManifest(runtimeRoot)
+      : false;
+    const rootMismatch = runtimeRoot
+      ? !this.samePath(configuredRoot, runtimeRoot)
+      : false;
+
+    const hooksAvailable = enabled && (
+      runtimeManifestAvailable
+      || (!runtimeRoot && configuredManifestAvailable)
+    );
+
+    return {
+      enabled,
+      configuredRoot,
+      configuredManifestAvailable,
+      runtimeRoot,
+      runtimeManifestAvailable,
+      rootMismatch,
+      hooksAvailable,
+      ownsHooksForUpgrade: enabled
+        && runtimeRoot !== null
+        && runtimeManifestAvailable
+        && !rootMismatch,
+    };
+  }
+
+  private probeCodexContextModePluginRoot(): string | null {
+    try {
+      const output = process.platform === "win32"
+        ? this.codexPluginListRunner("cmd.exe", ["/d", "/s", "/c", "codex plugin list"], {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "ignore"],
+          timeout: 5000,
+        })
+        : this.codexPluginListRunner("codex", ["plugin", "list"], {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "ignore"],
+          timeout: 5000,
+        });
+      return parseCodexContextModePluginRoot(String(output));
+    } catch {
+      return null;
+    }
+  }
+
+  private samePath(left: string, right: string): boolean {
+    return this.normalizeCommand(resolve(left)) === this.normalizeCommand(resolve(right));
   }
 
   private pruneStaleUserHookTrustState(
