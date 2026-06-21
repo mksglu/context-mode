@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { CodexAdapter, probeCodexCliVersion } from "../../src/adapters/codex/index.js";
+import { CodexAdapter, parseCodexContextModePluginRoot, probeCodexCliVersion } from "../../src/adapters/codex/index.js";
 import { resolveSessionDbPath, SessionDB } from "../../src/session/db.js";
 
 function writeCodexPluginManifest(pluginRoot: string): void {
@@ -25,11 +25,30 @@ enabled = true
 ${extra}`;
 }
 
+function pluginListOutput(pluginRoot: string): string {
+  return `Marketplace \`context-mode\`
+/Users/test/.codex/.tmp/marketplaces/context-mode/.agents/plugins/marketplace.json
+
+PLUGIN                    STATUS              VERSION  PATH
+context-mode@context-mode  installed, enabled  1.0.162  ${pluginRoot}
+`;
+}
+
+function adapterWithCodexPluginRoot(pluginRoot: string): CodexAdapter {
+  return new CodexAdapter({
+    codexPluginListRunner: () => pluginListOutput(pluginRoot),
+  });
+}
+
 describe("CodexAdapter", () => {
   let adapter: CodexAdapter;
 
   beforeEach(() => {
-    adapter = new CodexAdapter();
+    adapter = new CodexAdapter({
+      codexPluginListRunner: () => {
+        throw new Error("codex plugin list unavailable in unit tests");
+      },
+    });
   });
 
   // ── Capabilities ──────────────────────────────────────
@@ -290,7 +309,11 @@ describe("CodexAdapter", () => {
       process.env.CODEX_HOME = codexHome;
 
       try {
-        const customAdapter = new CodexAdapter();
+        const customAdapter = new CodexAdapter({
+          codexPluginListRunner: () => {
+            throw new Error("codex plugin list unavailable in unit tests");
+          },
+        });
         expect(customAdapter.getSettingsPath()).toBe(join(codexHome, "config.toml"));
         expect(customAdapter.getHooksPath()).toBe(join(codexHome, "hooks.json"));
         expect(customAdapter.getSessionDir()).toBe(join(codexHome, "context-mode", "sessions"));
@@ -317,6 +340,15 @@ describe("CodexAdapter", () => {
       expect(probeCodexCliVersion(() => {
         throw new Error("ENOENT");
       })).toBeNull();
+    });
+
+    it("parses the context-mode runtime root from `codex plugin list` output", () => {
+      const pluginRoot = join(homedir(), ".codex", ".tmp", "marketplaces", "context-mode");
+      expect(parseCodexContextModePluginRoot(pluginListOutput(pluginRoot))).toBe(pluginRoot);
+    });
+
+    it("returns null when context-mode is not installed in `codex plugin list` output", () => {
+      expect(parseCodexContextModePluginRoot("browser@openai-bundled installed, enabled 0.1 /tmp/browser")).toBeNull();
     });
 
     it("surfaces Codex CLI binary availability in diagnostics", () => {
@@ -575,6 +607,7 @@ describe("CodexAdapter", () => {
 
     it("removes context-mode user hooks when the Codex plugin owns hooks", () => {
       const pluginRoot = join(codexDir, "plugin-root");
+      adapter = adapterWithCodexPluginRoot(pluginRoot);
       writeCodexPluginManifest(pluginRoot);
       writeFileSync(join(codexDir, "config.toml"), pluginEnabledSettings(), "utf-8");
       writeFileSync(hooksPath, JSON.stringify({
@@ -603,9 +636,39 @@ describe("CodexAdapter", () => {
       expect(changes.some((change) => change.includes("Removed duplicate context-mode user hooks"))).toBe(true);
     });
 
+    it("keeps native fallback hooks when the running doctor root differs from the Codex plugin manager root", () => {
+      const doctorRoot = join(codexDir, "versioned-cache-root");
+      const runtimeRoot = join(codexDir, "marketplace-root");
+      adapter = adapterWithCodexPluginRoot(runtimeRoot);
+      writeCodexPluginManifest(doctorRoot);
+      writeCodexPluginManifest(runtimeRoot);
+      writeFileSync(join(codexDir, "config.toml"), pluginEnabledSettings(), "utf-8");
+      writeFileSync(hooksPath, JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            { matcher: "Bash", hooks: [{ type: "command", command: "node /opt/homebrew/lib/node_modules/oh-my-codex/dist/scripts/codex-native-hook.js" }] },
+          ],
+        },
+      }, null, 2), "utf-8");
+
+      const changes = adapter.configureAllHooks(doctorRoot);
+
+      const written = JSON.parse(readFileSync(hooksPath, "utf-8")) as {
+        hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+      };
+      expect(written.hooks.PreToolUse).toHaveLength(2);
+      expect(written.hooks.PreToolUse.some((entry) =>
+        entry.hooks[0]?.command === "context-mode hook codex pretooluse",
+      )).toBe(true);
+      expect(written.hooks.PostToolUse[0]?.hooks[0]?.command).toBe("context-mode hook codex posttooluse");
+      expect(changes.some((change) => change.includes("Removed duplicate context-mode user hooks"))).toBe(false);
+      expect(changes).toContain("Wrote native Codex hooks to " + hooksPath);
+    });
+
     it("removes standalone MCP registration and stale user-hook trust state in plugin mode", () => {
       const pluginRoot = join(codexDir, "plugin-root");
       const stateHooksPath = hooksPath.replace(/\//g, "\\");
+      adapter = adapterWithCodexPluginRoot(pluginRoot);
       writeCodexPluginManifest(pluginRoot);
       writeFileSync(hooksPath, JSON.stringify({
         hooks: {
@@ -708,8 +771,44 @@ trusted_hash = "sha256:stale"
       expect(results.some((result) => result.check === "Stop hook" && result.status === "pass")).toBe(true);
     });
 
+    it("uses the Codex plugin manager runtime root instead of failing on a stale doctor root", () => {
+      const staleDoctorRoot = join(codexDir, "unversioned-stale-root");
+      const runtimeRoot = join(codexDir, "marketplace-runtime-root");
+      adapter = adapterWithCodexPluginRoot(runtimeRoot);
+      writeCodexPluginManifest(runtimeRoot);
+      writeFileSync(join(codexDir, "config.toml"), pluginEnabledSettings(), "utf-8");
+
+      const results = adapter.validateHooks(staleDoctorRoot);
+
+      const root = results.find((result) => result.check === "Codex plugin root");
+      expect(root?.status).toBe("warn");
+      expect(root?.message).toContain(staleDoctorRoot);
+      expect(root?.message).toContain(runtimeRoot);
+      expect(results.some((result) =>
+        result.check === "Codex plugin hooks"
+        && result.status === "fail"
+        && result.message.includes(staleDoctorRoot),
+      )).toBe(false);
+      expect(results.some((result) => result.check === "Stop hook" && result.status === "pass")).toBe(true);
+    });
+
+    it("fails against the Codex plugin manager runtime root when that manifest is missing", () => {
+      const staleDoctorRoot = join(codexDir, "unversioned-stale-root");
+      const runtimeRoot = join(codexDir, "missing-runtime-root");
+      adapter = adapterWithCodexPluginRoot(runtimeRoot);
+      writeCodexPluginManifest(staleDoctorRoot);
+      writeFileSync(join(codexDir, "config.toml"), pluginEnabledSettings(), "utf-8");
+
+      const results = adapter.validateHooks(staleDoctorRoot);
+
+      const pluginHooks = results.find((result) => result.check === "Codex plugin hooks");
+      expect(pluginHooks?.status).toBe("fail");
+      expect(pluginHooks?.message).toContain(join(runtimeRoot, ".codex-plugin", "hooks.json"));
+    });
+
     it("warns when plugin mode still has standalone npx MCP registration", () => {
       const pluginRoot = join(codexDir, "plugin-root");
+      adapter = adapterWithCodexPluginRoot(pluginRoot);
       writeCodexPluginManifest(pluginRoot);
       writeFileSync(join(codexDir, "config.toml"), pluginEnabledSettings(`
 [mcp_servers.context-mode]
