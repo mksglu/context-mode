@@ -28,7 +28,7 @@ import {
   hasBunRuntime,
 } from "./runtime.js";
 import { classifyNonZeroExit } from "./exit-classify.js";
-import { startLifecycleGuard } from "./lifecycle.js";
+import { startLifecycleGuard, noteMcpActivity, noteRequestStart, noteRequestEnd, attachMcpActivityTap } from "./lifecycle.js";
 import { charSafePrefix } from "./truncate.js";
 import {
   describeStorageDirectorySource,
@@ -293,6 +293,10 @@ function wrapToolHandler(
   handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
 ): (toolArgs: Record<string, unknown>) => Promise<unknown> {
   return async (toolArgs: Record<string, unknown>) => {
+    // #854: mark a tool call in-flight so the bridge-child idle reaper never
+    // shuts the server down mid-execution during a long ctx_execute/batch that
+    // emits no further inbound messages. Symmetric end in finally (success+error).
+    noteRequestStart();
     try {
       return await handler(toolArgs);
     } catch (err) {
@@ -306,6 +310,8 @@ function wrapToolHandler(
         }
       }
       throw err;
+    } finally {
+      noteRequestEnd();
     }
   };
 }
@@ -874,6 +880,9 @@ function healCacheMidSession(): void {
 }
 
 function trackResponse(toolName: string, response: ToolResult): ToolResult {
+  // #854: a response is activity too — refresh the bridge-child idle clock so a
+  // chatty/streaming call keeps its server alive even between inbound frames.
+  noteMcpActivity();
   // Mid-session cache heal — one-shot, first tool call
   healCacheMidSession();
   // Prepend version outdated warning if needed
@@ -4803,6 +4812,13 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // #854: refresh the bridge-child idle clock on each inbound MCP message so an
+  // abandoned bridge child (CONTEXT_MODE_BRIDGE_DEPTH>0) self-terminates instead
+  // of accumulating under a long-lived Pi/omp parent. Best-effort; no stdin touch.
+  attachMcpActivityTap(
+    transport as unknown as { onmessage?: (message: unknown, extra?: unknown) => unknown },
+  );
 
   // Write MCP readiness sentinel (#230)
   try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }

@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
-import { startLifecycleGuard, makeDefaultIsParentAlive } from "../src/lifecycle.js";
+import { startLifecycleGuard, makeDefaultIsParentAlive, bridgeChildIdleTimeoutMs, noteMcpActivity, noteRequestStart, noteRequestEnd, attachMcpActivityTap } from "../src/lifecycle.js";
 
 // Resolve the tsx binary. Prefer the local devDep so the test doesn't depend
 // on a global tsx install or on Git Bash's `which` being on PATH; the PATH
@@ -413,4 +413,107 @@ describe.skipIf(isWindows)("Lifecycle Guard — Integration (real process)", () 
 
     assert.equal(code, 43, "Child should exit with code 43 on SIGTERM");
   }, 10_000);
+});
+
+// #854 — bridge-child request-idle reaper. Pi/omp loads the extension per
+// sub-context and spawns one bridge child each, reaping them only at
+// session_shutdown (which never fires for sub-contexts), so idle children
+// accumulate under one long-lived parent. A depth>0 child with no MCP activity
+// self-exits; depth-0 (the #602 keep-alive class) is never touched, and the
+// trigger is idle time (not stdin EOF) so the #236 contract holds.
+describe("bridgeChildIdleTimeoutMs (#854)", () => {
+  test("returns 0 (disabled) for depth-0 / absent / malformed", () => {
+    assert.equal(bridgeChildIdleTimeoutMs({}), 0, "absent depth → disabled");
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "0" }), 0);
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "-1" }), 0);
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "x" }), 0);
+  });
+
+  test("returns the 3-min default for bridge children (depth>0)", () => {
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "1" }), 180_000);
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "2" }), 180_000);
+  });
+
+  test("honors CONTEXT_MODE_BRIDGE_IDLE_MS override (positive only)", () => {
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "1", CONTEXT_MODE_BRIDGE_IDLE_MS: "5000" }), 5000);
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "1", CONTEXT_MODE_BRIDGE_IDLE_MS: "0" }), 0, "non-positive override disables");
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_DEPTH: "1", CONTEXT_MODE_BRIDGE_IDLE_MS: "-5" }), 0);
+    assert.equal(bridgeChildIdleTimeoutMs({ CONTEXT_MODE_BRIDGE_IDLE_MS: "5000" }), 0, "override ignored when not a bridge child");
+  });
+});
+
+describe("Lifecycle Guard — bridge-child idle reaper (#854)", () => {
+  test("reaps a bridge child with no MCP activity (parent stays alive)", async () => {
+    let shutdownCalled = false;
+    const cleanup = startLifecycleGuard({
+      checkIntervalMs: 60_000,     // keep the parent-death poll out of the way
+      isParentAlive: () => true,    // parent ALIVE — only the idle path can fire
+      bridgeIdleMs: 50,             // tiny idle window (idle-tick floor is 1s)
+      onShutdown: () => { shutdownCalled = true; },
+    });
+    await new Promise((r) => setTimeout(r, 1300)); // > one 1s idle tick, no activity
+    cleanup();
+    assert.equal(shutdownCalled, true, "an idle bridge child must self-shut-down (#854)");
+  });
+
+  test("does NOT reap while MCP activity continues", async () => {
+    let shutdownCalled = false;
+    const cleanup = startLifecycleGuard({
+      checkIntervalMs: 60_000,
+      isParentAlive: () => true,
+      bridgeIdleMs: 5000,           // 5s window; idle-tick ~1.25s
+      onShutdown: () => { shutdownCalled = true; },
+    });
+    for (let i = 0; i < 4; i++) { noteMcpActivity(); await new Promise((r) => setTimeout(r, 400)); }
+    cleanup();
+    assert.equal(shutdownCalled, false, "an actively-used bridge child must not be reaped");
+  });
+
+  test("depth-0 servers are NEVER reaped on idle (#602 guard)", async () => {
+    let shutdownCalled = false;
+    const cleanup = startLifecycleGuard({
+      checkIntervalMs: 60_000,
+      isParentAlive: () => true,
+      bridgeIdleMs: 0,              // depth-0 / disabled → no idle reaper installed
+      onShutdown: () => { shutdownCalled = true; },
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    cleanup();
+    assert.equal(shutdownCalled, false, "depth-0 keep-alive servers must never idle-reap (#602)");
+  });
+
+  test("does NOT reap while a tool call is in flight (#854 in-flight guard)", async () => {
+    let shutdownCalled = false;
+    const cleanup = startLifecycleGuard({
+      checkIntervalMs: 60_000,
+      isParentAlive: () => true,
+      bridgeIdleMs: 50,                 // tiny window; idle-tick floor is 1s
+      onShutdown: () => { shutdownCalled = true; },
+    });
+    noteRequestStart();                 // a long tool call is running…
+    try {
+      await new Promise((r) => setTimeout(r, 1300)); // …past the idle window, no inbound msgs
+      assert.equal(shutdownCalled, false, "must NOT reap a bridge child with a call in flight (#643)");
+    } finally {
+      noteRequestEnd();                 // always balance the counter — no cross-test leak of module-global state
+    }
+    await new Promise((r) => setTimeout(r, 1300)); // now genuinely idle
+    cleanup();
+    assert.equal(shutdownCalled, true, "reaps once the in-flight call ends and it goes idle");
+  });
+
+  test("attachMcpActivityTap delegates to the prior onmessage; no-op when absent/null", () => {
+    const calls: Array<[unknown, unknown]> = [];
+    const t: { onmessage?: (m: unknown, e?: unknown) => unknown } = {
+      onmessage: (m: unknown, e?: unknown) => { calls.push([m, e]); return "ok"; },
+    };
+    attachMcpActivityTap(t);
+    const ret = t.onmessage!({ a: 1 }, { b: 2 });
+    assert.equal(ret, "ok", "wrapped onmessage must return the prior handler's result");
+    assert.deepEqual(calls, [[{ a: 1 }, { b: 2 }]], "wrapped onmessage must delegate args");
+    const empty: { onmessage?: (m: unknown, e?: unknown) => unknown } = {};
+    attachMcpActivityTap(empty);
+    assert.equal(empty.onmessage, undefined, "no onmessage → no-op (does not synthesize one)");
+    attachMcpActivityTap(null); // must not throw
+  });
 });
