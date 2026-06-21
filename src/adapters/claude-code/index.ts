@@ -127,7 +127,7 @@ export class ClaudeCodeAdapter extends ClaudeCodeBaseAdapter implements HookAdap
     //     available, else `process.execPath` (#369 PATH resolution on Git
     //     Bash, #738 bun cold-start win).
     // Pre-D3 we hand-rolled `node "${pluginRoot}/hooks/X.mjs"` for all
-    // five events; bare `node` made claude-code the lone outlier and
+    // six events; bare `node` made claude-code the lone outlier and
     // dropping the execPath swap re-opened the Windows class. Algo-D3.5
     // (CI invariant in tests/adapters/claude-code.test.ts) locks this in
     // for adapter #16.
@@ -179,6 +179,17 @@ export class ClaudeCodeAdapter extends ClaudeCodeBaseAdapter implements HookAdap
             {
               type: "command",
               command: buildHookRuntimeCommand(`${pluginRoot}/hooks/sessionstart.mjs`),
+            },
+          ],
+        },
+      ],
+      Stop: [
+        {
+          matcher: "",
+          hooks: [
+            {
+              type: "command",
+              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/stop.mjs`),
             },
           ],
         },

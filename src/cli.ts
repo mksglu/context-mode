@@ -81,6 +81,7 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     precompact: "hooks/precompact.mjs",
     sessionstart: "hooks/sessionstart.mjs",
     userpromptsubmit: "hooks/userpromptsubmit.mjs",
+    stop: "hooks/stop.mjs",
   },
   "gemini-cli": {
     beforeagent: "hooks/gemini-cli/beforeagent.mjs",

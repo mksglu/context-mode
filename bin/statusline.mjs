@@ -96,7 +96,12 @@ function readStdinJson() {
     const raw = readFileSync(0, "utf-8");
     if (!raw.trim()) return {};
     return JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    // The payload is load-bearing — it carries session_id, which resolves the
+    // per-session KPI. Empty stdin (normal first render) returned above and
+    // stays silent; a non-empty payload that fails to parse is a real anomaly
+    // worth one latched stderr line (never pollutes the statusline's stdout).
+    warnOnce("stdin-parse", `failed to parse statusline stdin JSON: ${err?.message ?? err}`);
     return {};
   }
 }
@@ -187,8 +192,23 @@ function findClaudePidDarwin() {
   return process.ppid;
 }
 
-function resolveSessionId() {
+function resolveSessionId(payload) {
+  // PRIMARY: the session_id Claude Code delivers in the statusLine stdin
+  // payload. This is the SAME id the recording hooks key session_events by,
+  // so it's the only source that reliably matches stored per-session data.
+  //
+  // Claude Code does NOT export a CLAUDE_SESSION_ID env var — session_id is
+  // delivered only in the stdin JSON (statusline.md "Available data"). And the
+  // /proc PID walk yields `pid-<n>`, which never matches a UUID-keyed session.
+  // So without reading the payload, the per-session KPI is unreachable and the
+  // bar falls back to the global lifetime aggregate — identical in every
+  // session and seemingly "frozen".
+  const fromPayload = payload?.session_id;
+  if (typeof fromPayload === "string" && fromPayload) return fromPayload;
+  // Fallback when the payload carries no session_id (and how test fixtures
+  // pin a deterministic id). NOT an override — payload wins when present.
   if (process.env.CLAUDE_SESSION_ID) return process.env.CLAUDE_SESSION_ID;
+  // Last resort: walk the process tree (only matches pid-keyed events).
   return `pid-${findClaudePid()}`;
 }
 
@@ -208,9 +228,9 @@ function statusDot(pct) {
 
 // ── Main render ──────────────────────────────────────────────────────────
 async function main() {
-  readStdinJson(); // drain stdin even if unused, keeps Claude Code happy
+  const payload = readStdinJson(); // canonical source of session_id
   const sessionsDir = resolveSessionDir();
-  const sessionId = resolveSessionId();
+  const sessionId = resolveSessionId(payload);
 
   const analytics = await loadAnalytics();
 
