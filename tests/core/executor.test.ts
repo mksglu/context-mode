@@ -1,32 +1,27 @@
 import { describe, expect, test } from "vitest";
 import {
-  buildShellScriptContent,
-  encodeShellScriptContent,
+  buildPowerShellScriptContent,
   PolyglotExecutor,
 } from "../../src/executor.js";
 import { detectRuntimes, type RuntimeMap } from "../../src/runtime.js";
 
 describe("PowerShell script encoding", () => {
-  test("writes PowerShell scripts as UTF-8 with BOM and UTF-8 output prelude", () => {
-    const script = buildShellScriptContent("Write-Output 'ok'", undefined, "win32", "powershell.exe");
-    const encoded = encodeShellScriptContent(script, "powershell.exe");
+  test("prefixes a UTF-8 BOM ahead of the UTF-8 encoding prelude", () => {
+    const script = buildPowerShellScriptContent("Write-Output 'ok'");
 
-    expect(encoded.charCodeAt(0)).toBe(0xfeff);
-    expect(encoded).toContain("$OutputEncoding = [System.Text.UTF8Encoding]::new($false)");
-    expect(encoded).toContain("[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)");
-  });
-
-  test("leaves non-PowerShell Windows shells unchanged", () => {
-    const script = "echo ok";
-
-    expect(buildShellScriptContent(script, undefined, "win32", "cmd.exe")).toBe(script);
-    expect(encodeShellScriptContent(script, "cmd.exe")).toBe(script);
+    // Windows PowerShell 5.1 only reliably detects a script as UTF-8 when the
+    // file opens with a BOM; without it the body is read as the ANSI code page.
+    expect(script.charCodeAt(0)).toBe(0xfeff);
+    expect(script).toContain("[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()");
+    expect(script).toContain("[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()");
+    expect(script).toContain("$OutputEncoding = [System.Text.UTF8Encoding]::new()");
+    expect(script.endsWith("Write-Output 'ok'")).toBe(true);
   });
 
   test.skipIf(process.platform !== "win32")(
     "preserves non-ASCII stdout and cwd through Windows PowerShell",
     async () => {
-      const text = "\u65E5\u672C\u8A9E caf\u00E9 \uD55C\uAE00 \u0639\u0631\u0628\u064A \u05E2\u05D1\u05E8\u05D9\u062A \u0395\u03BB\u03BB\u03B7\u03BD\u03B9\u03BA\u03AC \u0939\u093F\u0928\u094D\u0926\u0940 \u0E44\u0E17\u0E22";
+      const text = "日本語 café 한글 عربي עבריت Ελληνικά हिन्दी ไทย";
       const cwd = process.cwd();
       const runtimes: RuntimeMap = { ...detectRuntimes(), shell: "powershell.exe" };
       const executor = new PolyglotExecutor({ runtimes });

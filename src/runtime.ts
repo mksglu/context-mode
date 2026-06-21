@@ -171,36 +171,69 @@ function bunFallbackPaths(): string[] {
   return home ? [`${home}/.bun/bin/bun`] : [];
 }
 
+/** Well-known Git-for-Windows bash.exe locations (MSYS bash that performs
+ *  Windows→POSIX path conversion for native git — #826). */
+const KNOWN_GIT_BASH_PATHS = [
+  "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+  "C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
+];
+
 /**
- * On Windows, resolve the first non-WSL bash in PATH.
- * WSL bash (C:\Windows\System32\bash.exe) cannot handle Windows paths,
- * so we skip it and prefer Git Bash or MSYS2 bash instead.
+ * On Windows, resolve the first non-WSL bash that is actually available.
+ *
+ * Availability is gated by `where bash` (#796): bash must be discoverable on
+ * PATH for us to claim it. WSL bash (C:\Windows\System32\bash.exe) cannot
+ * handle Windows paths, so we skip it and prefer Git Bash / MSYS2 bash.
+ *
+ * Routing the gate through `where bash` — rather than probing the known Git
+ * Bash paths with existsSync first — is deliberate: when bash is genuinely
+ * unavailable, the caller must fall through to pwsh (PR intent). Probing the
+ * filesystem first re-detected a real Git Bash on the runner even though the
+ * scenario was "bash unavailable", so pwsh was never reached.
+ *
+ * #826 is preserved: when `where bash` surfaces a Git Bash candidate we
+ * canonicalize it to the absolute Git\usr\bin\bash.exe path (so native git
+ * keeps MSYS path conversion) by preferring a matching known path that exists.
  */
 function resolveWindowsBash(): string | null {
-  // First, try well-known Git Bash locations directly (works even when
-  // Git\usr\bin is not on PATH, which is common in MCP server environments
-  // that only inherit Git\cmd from the system PATH).
-  const knownPaths = [
-    "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
-    "C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
-  ];
-  for (const p of knownPaths) {
-    if (existsSync(p)) return p;
-  }
-
-  // Fallback: scan PATH via `where bash`, skipping WSL and WindowsApps entries.
+  let candidates: string[];
   try {
     const result = execSync("where bash", { encoding: "utf-8", stdio: "pipe" });
-    const candidates = result.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-    for (const p of candidates) {
-      const lower = p.toLowerCase();
-      if (lower.includes("system32") || lower.includes("windowsapps")) continue;
-      return p;
-    }
-    return null;
+    candidates = result.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
   } catch {
+    // bash not on PATH → genuinely unavailable. Fall through to pwsh/etc.
     return null;
   }
+
+  for (const p of candidates) {
+    const lower = p.toLowerCase();
+    if (lower.includes("system32") || lower.includes("windowsapps")) continue;
+    // Prefer the canonical Git\usr\bin\bash.exe so native git retains MSYS
+    // path conversion. `where bash` on a Git-for-Windows install may surface
+    // the Git\cmd\bash shim or usr\bin path; upgrade to a known absolute path
+    // when one exists on disk.
+    for (const known of KNOWN_GIT_BASH_PATHS) {
+      if (existsSync(known)) return known;
+    }
+    return p;
+  }
+  return null;
+}
+
+function resolveWindowsShell(windowsBash: string | null = resolveWindowsBash()): string {
+  // Prefer Git Bash (#826) so native git keeps its MSYS path conversion.
+  // The caller passes the already-resolved windowsBash to avoid probing the
+  // filesystem twice (it also feeds the cmd.exe shellOverride guard above).
+  // Fall back through POSIX sh, then PowerShell Core (pwsh) for proper UTF-8
+  // handling, then Windows PowerShell, then cmd.exe as the last resort.
+  return windowsBash
+    ?? (commandExists("sh")
+      ? "sh"
+      : commandExists("pwsh")
+        ? "pwsh"
+        : commandExists("powershell")
+          ? "powershell"
+          : "cmd.exe");
 }
 
 function getVersion(cmd: string, args: string[] = ["--version"]): string {
@@ -341,7 +374,7 @@ export function detectRuntimes(): RuntimeMap {
           ? "py"
           : null,
     shell: shellOverride ?? (isWin
-      ? (windowsBash ?? (commandExists("sh") ? "sh" : commandExists("powershell") ? "powershell" : "cmd.exe"))
+      ? resolveWindowsShell(windowsBash)
       : commandExists("bash") ? "bash" : "sh"),
     ruby: commandExists("ruby") ? "ruby" : null,
     go: commandExists("go") ? "go" : null,

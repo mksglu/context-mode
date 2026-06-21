@@ -7,6 +7,7 @@ import {
   PolyglotExecutor,
   buildScriptFilename,
   buildShellScriptContent,
+  buildPowerShellScriptContent,
   buildSpawnOptions,
 } from "../src/executor.js";
 import {
@@ -212,6 +213,13 @@ describe("Runtime Detection", () => {
   test("buildShellScriptContent leaves Windows shell scripts unchanged", () => {
     const script = buildShellScriptContent("echo ok", "C:\\parent\\bin", "win32");
     assert.equal(script, "echo ok");
+  });
+
+  test("buildPowerShellScriptContent prefixes UTF-8 encoding setup", () => {
+    const script = buildPowerShellScriptContent('Write-Output "ok"');
+    assert.ok(script.startsWith("[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()"));
+    assert.ok(script.includes("$OutputEncoding = [System.Text.UTF8Encoding]::new()"));
+    assert.ok(script.endsWith('Write-Output "ok"'));
   });
 });
 
