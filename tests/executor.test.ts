@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from "vitest";
 import { strict as assert } from "node:assert";
-import { existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, rmSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -16,6 +16,12 @@ import {
   getRuntimeSummary,
   type RuntimeMap,
 } from "../src/runtime.js";
+import {
+  isConfineRequested,
+  isConfineSupported,
+  landlockHelperPath,
+  CONFINE_FS_ENV,
+} from "../src/sandbox/landlock.js";
 
 const runtimes = detectRuntimes();
 const executor = new PolyglotExecutor({ runtimes });
@@ -2080,5 +2086,66 @@ describe("killSiblingMcpServers (#559)", () => {
     });
     // Process was already dead — counts as 0 since we never observed it alive.
     assert.equal(report.totalKilled, 0);
+  });
+});
+
+describe("FS confinement env knob (issue #852)", () => {
+  test("isConfineRequested parses the opt-in flag", () => {
+    assert.equal(isConfineRequested({}), false);
+    assert.equal(isConfineRequested({ [CONFINE_FS_ENV]: "1" }), true);
+    assert.equal(isConfineRequested({ [CONFINE_FS_ENV]: "true" }), true);
+    assert.equal(isConfineRequested({ [CONFINE_FS_ENV]: "YES" }), true);
+    assert.equal(isConfineRequested({ [CONFINE_FS_ENV]: "0" }), false);
+    assert.equal(isConfineRequested({ [CONFINE_FS_ENV]: "off" }), false);
+  });
+});
+
+// Real OS-level confinement only exists where a Landlock launcher can be built
+// (Linux ≥ 5.13 + a C compiler). Skip elsewhere — the env-knob unit test above
+// still runs on every platform.
+const confineAvailable = isConfineSupported() && landlockHelperPath() !== null;
+
+describe.skipIf(!confineAvailable)("Landlock FS confinement (issue #852)", () => {
+  const base = mkdtempSync(join(tmpdir(), "ctx852-"));
+  const projectDir = join(base, "project");
+  mkdirSync(projectDir, { recursive: true });
+  const inProjectFile = join(projectDir, "inside.txt");
+  writeFileSync(inProjectFile, "INSIDE_SECRET", "utf8");
+
+  // A file OUTSIDE the project (and outside every allowed subtree): a sibling
+  // temp dir. The project root and the per-exec sandbox tmp dir are granted,
+  // but not their parents, so this stays denied under confinement.
+  const outsideDir = mkdtempSync(join(tmpdir(), "ctx852-outside-"));
+  const outsideFile = join(outsideDir, "outside.txt");
+  writeFileSync(outsideFile, "OUTSIDE_SECRET", "utf8");
+
+  afterAll(() => {
+    rmSync(base, { recursive: true, force: true });
+    rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  // Reads both an in-project and an out-of-project file, reporting each result.
+  const probe = `const fs = require('fs');
+try { process.stdout.write('IN:' + fs.readFileSync(${JSON.stringify(inProjectFile)}, 'utf8') + '\\n'); }
+catch (e) { process.stdout.write('IN_ERR:' + e.code + '\\n'); }
+try { process.stdout.write('OUT:' + fs.readFileSync(${JSON.stringify(outsideFile)}, 'utf8') + '\\n'); }
+catch (e) { process.stdout.write('OUT_ERR:' + e.code + '\\n'); }`;
+
+  test("RED: without confinement, code reads a file outside the project", async () => {
+    const ex = new PolyglotExecutor({ runtimes, projectRoot: projectDir, confineFs: false });
+    const r = await ex.execute({ language: "javascript", code: probe });
+    // This is the #852 escape: the executor reads outside the project freely.
+    expect(r.stdout).toContain("INSIDE_SECRET");
+    expect(r.stdout).toContain("OUTSIDE_SECRET");
+  });
+
+  test("GREEN: with confinement, the outside read is denied; in-project still works", async () => {
+    const ex = new PolyglotExecutor({ runtimes, projectRoot: projectDir, confineFs: true });
+    const r = await ex.execute({ language: "javascript", code: probe });
+    // Runtime still functions inside the project…
+    expect(r.stdout).toContain("INSIDE_SECRET");
+    // …but the project-external read is blocked by Landlock.
+    expect(r.stdout).not.toContain("OUTSIDE_SECRET");
+    expect(r.stdout).toMatch(/OUT_ERR:(EACCES|EPERM|ENOENT)/);
   });
 });

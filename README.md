@@ -1586,6 +1586,24 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 
 `tool_input` for any `mcp__*` tool call is also redacted before persistence — the regex matcher in `hooks/posttooluse.mjs` masks `authorization`, `auth_token`, `access_token`, `refresh_token`, `bearer`, `token`, `secret`, `password`, `passwd`, `pwd`, `api_key` / `apikey` / `x_api_key`, `cookie` / `set-cookie`, `signature`, `private_key`, and `client_secret` (case-insensitive, hyphen/underscore-insensitive) to `[REDACTED]` so credentials in MCP arguments don't end up in the session DB.
 
+### Filesystem confinement (opt-in, Linux)
+
+The deny rules above are **pattern-based** — they block only what you explicitly deny. They do **not** confine the executor to your project. `ctx_execute` / `ctx_execute_file` run arbitrary code in a subprocess that is **not** covered by the harness's own filesystem sandbox, so that subprocess can read any file your user account can — even if you enabled the harness sandbox expecting project confinement ([#852](https://github.com/mksglu/context-mode/issues/852)). In-process checks cannot stop this: arbitrary code can call `fs.readFileSync` directly. **Granting permission to run `ctx_execute*` is equivalent to granting full code execution.** See [SECURITY.md](SECURITY.md) for the full threat model.
+
+For an OS-level boundary, opt in:
+
+```bash
+export CONTEXT_MODE_CONFINE_FS=1
+```
+
+On Linux ≥ 5.13 with a C compiler (`cc`/`gcc`/`clang`) available, context-mode then applies a [Landlock](https://docs.kernel.org/userspace-api/landlock.html) ruleset that **denies reads outside your project** (plus the system directories a runtime needs to start). Even arbitrary code inside `ctx_execute` cannot read your project-external files (`$HOME`, other repos, secrets). It **fails closed** — if the ruleset cannot be applied, execution is refused rather than run unconfined.
+
+Limitations (this version): Linux only — on macOS/Windows the flag errors instead of silently running unconfined; macOS (`sandbox-exec`) and Windows are tracked follow-ups. Governs **reads** only; writes and network are not yet confined. Off by default so legitimate out-of-project reads keep working.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTEXT_MODE_CONFINE_FS` | unset (off) | Set to `1`/`true`/`yes`/`on` to confine `ctx_execute*` filesystem reads to the project root via Linux Landlock. Fails closed when confinement can't be applied. Linux-only in this version. |
+
 ### Storage environment variables
 
 | Variable | Default | Purpose |

@@ -1,6 +1,6 @@
 import { spawn, execSync, execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdtempSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   detectRuntimes,
@@ -8,6 +8,12 @@ import {
   type RuntimeMap,
   type Language,
 } from "./runtime.js";
+import {
+  isConfineRequested,
+  isConfineSupported,
+  buildConfinedCommand,
+  CONFINE_FS_ENV,
+} from "./sandbox/landlock.js";
 export type { ExecResult } from "./types.js";
 import type { ExecResult } from "./types.js";
 
@@ -228,6 +234,23 @@ interface ExecuteFileOptions extends ExecuteOptions {
   path: string;
 }
 
+/**
+ * Directories a runtime binary needs read access to under confinement: the
+ * binary's own directory and its install prefix (e.g. a Node under `~/.nvm`
+ * lives outside the always-allowed system dirs). Symlinks are resolved. Returns
+ * `[]` for a bare command name — its real location is on PATH within the
+ * system dirs that are always granted.
+ */
+function runtimeDirs(bin: string): string[] {
+  try {
+    const real = realpathSync(bin);
+    const d = dirname(real);
+    return [d, dirname(d)];
+  } catch {
+    return [];
+  }
+}
+
 export class PolyglotExecutor {
   #hardCapBytes: number;
   /**
@@ -239,6 +262,13 @@ export class PolyglotExecutor {
    */
   #projectRootResolver: () => string;
   #runtimes: RuntimeMap;
+  /**
+   * Resolves whether each spawn should run under OS-level FS confinement.
+   * Stored as a thunk (like {@link #projectRootResolver}) so it tracks the live
+   * env-cascade; a boolean/function override is accepted for tests. Defaults to
+   * reading `CONTEXT_MODE_CONFINE_FS` per call.
+   */
+  #confineResolver: () => boolean;
 
   /** PIDs of backgrounded processes — killed on cleanup to prevent zombies. */
   #backgroundedPids = new Set<number>();
@@ -247,6 +277,7 @@ export class PolyglotExecutor {
     hardCapBytes?: number;
     projectRoot?: string | (() => string);
     runtimes?: RuntimeMap;
+    confineFs?: boolean | (() => boolean);
   }) {
     this.#hardCapBytes = opts?.hardCapBytes ?? 100 * 1024 * 1024; // 100MB
     const pr = opts?.projectRoot;
@@ -256,6 +287,14 @@ export class PolyglotExecutor {
       this.#projectRootResolver = () => pr;
     } else {
       this.#projectRootResolver = () => process.cwd();
+    }
+    const cf = opts?.confineFs;
+    if (typeof cf === "function") {
+      this.#confineResolver = cf;
+    } else if (typeof cf === "boolean") {
+      this.#confineResolver = () => cf;
+    } else {
+      this.#confineResolver = () => isConfineRequested();
     }
     this.#runtimes = opts?.runtimes ?? detectRuntimes();
   }
@@ -413,6 +452,33 @@ export class PolyglotExecutor {
     timeout: number | undefined,
     background = false,
   ): Promise<ExecResult> {
+    // Issue #852 — when the session opts into FS confinement, wrap the command
+    // so it runs under an OS sandbox (Linux Landlock) that denies reads outside
+    // the project. The harness sandbox does not cover this out-of-process
+    // executor, so arbitrary code (e.g. `ctx_execute` calling fs.readFileSync)
+    // could otherwise read any file. Fail CLOSED: if confinement was requested
+    // but cannot be honored, refuse rather than run unconfined.
+    if (this.#confineResolver()) {
+      if (!isConfineSupported()) {
+        return {
+          stdout: "",
+          stderr: `${CONFINE_FS_ENV} is set but filesystem confinement is only supported on Linux (Landlock) in this version.`,
+          exitCode: 1,
+          timedOut: false,
+        };
+      }
+      const allow = [this.#projectRoot, sandboxTmpDir, cwd, ...runtimeDirs(cmd[0])];
+      const confined = buildConfinedCommand(cmd, allow);
+      if (!confined) {
+        return {
+          stdout: "",
+          stderr: `${CONFINE_FS_ENV} is set but no Landlock launcher could be built (needs a C compiler — cc/gcc/clang — and a Landlock-capable kernel ≥ 5.13). Refusing to run unconfined.`,
+          exitCode: 1,
+          timedOut: false,
+        };
+      }
+      cmd = confined;
+    }
     return new Promise((res) => {
       // Only .cmd/.bat shims need shell on Windows; real executables don't.
       // Using shell: true globally causes process-tree kill issues with MSYS2/Git Bash.
