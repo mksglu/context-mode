@@ -1074,7 +1074,9 @@ describe("Bin entry uses cli.bundle.mjs", () => {
   it("server.ts ctx_upgrade uses cli.bundle.mjs with fallback", () => {
     const src = readFileSync(resolve(ROOT, "src", "server.ts"), "utf-8");
     // ctx_upgrade handler must prefer cli.bundle.mjs
-    const upgradeSection = src.slice(src.indexOf("ctx_upgrade"), src.indexOf("ctx_upgrade") + 800);
+    const upgradeStart = src.indexOf('server.registerTool(\n  "ctx_upgrade"');
+    const upgradeEnd = src.indexOf("// ── ctx-purge", upgradeStart);
+    const upgradeSection = src.slice(upgradeStart, upgradeEnd);
     expect(upgradeSection).toContain("cli.bundle.mjs");
   });
 
@@ -2614,12 +2616,14 @@ describe("Cache dir safety (#181)", () => {
     expect(blockStart, "lazy cleanup block must exist").toBeGreaterThan(-1);
     const block = SESSION_SOURCE.slice(blockStart, blockStart + 1500);
 
-    // The age check MUST use lstatSync (does not follow symlinks).
-    expect(block).toMatch(/lstatSync\(\s*join\(\s*cacheParent\s*,\s*d\s*\)\s*\)/);
+    // The age check MUST use lstatSync (does not follow symlinks). The path may
+    // be held in a local variable as long as it is derived from cacheParent + d.
+    expect(block).toMatch(/const\s+oldDir\s*=\s*join\(\s*cacheParent\s*,\s*d\s*\)/);
+    expect(block).toMatch(/lstatSync\(\s*oldDir\s*\)/);
 
     // The age check MUST NOT use statSync (follows symlinks → wrongly evaluates
     // the link target's mtime, causing fresh symlinks to be deleted).
-    expect(block).not.toMatch(/[^l]statSync\(\s*join\(\s*cacheParent/);
+    expect(block).not.toMatch(/(^|[^l])statSync\(\s*(?:join\(\s*cacheParent\s*,\s*d\s*\)|oldDir)\s*\)/);
   });
 });
 

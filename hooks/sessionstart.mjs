@@ -42,7 +42,7 @@ await runHook(async () => {
   const { createSessionLoaders, attributeAndInsertEvents } = await import("./session-loaders.mjs");
   const { join, dirname } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
-  const { readFileSync, unlinkSync, readdirSync, rmSync, lstatSync } = await import("node:fs");
+  const { readFileSync, unlinkSync, readdirSync, rmSync, lstatSync, realpathSync, symlinkSync } = await import("node:fs");
 
   const detectedPlatform = detectPlatformFromEnv();
   const toolNamer = createToolNamer(detectedPlatform);
@@ -398,12 +398,44 @@ await runHook(async () => {
             const now = Date.now();
             for (const d of readdirSync(cacheParent)) {
               if (d === myDir) continue;
+              const oldDir = join(cacheParent, d);
               try {
-                const st = lstatSync(join(cacheParent, d));
-                if (now - st.mtimeMs > ONE_HOUR) {
-                  rmSync(join(cacheParent, d), { recursive: true, force: true });
+                const st = lstatSync(oldDir);
+                let danglingBreadcrumb = false;
+                if (st.isSymbolicLink()) {
+                  try {
+                    realpathSync(oldDir);
+                  } catch {
+                    danglingBreadcrumb = true;
+                  }
                 }
-              } catch { /* skip */ }
+                if (danglingBreadcrumb || now - st.mtimeMs > ONE_HOUR) {
+                  rmSync(oldDir, { recursive: true, force: true });
+                  // Leave a breadcrumb symlink (junction on Windows) in the
+                  // removed version's place so sessions that loaded hooks
+                  // from it before an auto-update keep resolving their
+                  // scripts instead of erroring on every hook call until
+                  // restart (#814, #807). Also fires when the entry was
+                  // itself a stale breadcrumb, re-pointing it at the live
+                  // root (a chain of updates would otherwise leave links
+                  // targeting intermediate versions that no longer exist).
+                  // The fresh mtime makes #644's lstat age gate protect it
+                  // for the next hour, and the next sweep refreshes it
+                  // again. Same pattern as healCacheMidSession (server.ts)
+                  // and postinstall.mjs.
+                  try {
+                    symlinkSync(pluginRoot, oldDir, process.platform === "win32" ? "junction" : undefined);
+                  } catch { /* best effort — plain delete is the pre-#814 behaviour */ }
+                }
+              } catch {
+                // On Windows, a dangling junction can fail before we can read
+                // its own mtime. Treat that as a stale breadcrumb and try to
+                // repoint it at the live root; failures remain best-effort.
+                try {
+                  rmSync(oldDir, { recursive: true, force: true });
+                  symlinkSync(pluginRoot, oldDir, process.platform === "win32" ? "junction" : undefined);
+                } catch { /* skip */ }
+              }
             }
           }
         }
