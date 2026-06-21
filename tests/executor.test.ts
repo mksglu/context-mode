@@ -217,7 +217,10 @@ describe("Runtime Detection", () => {
 
   test("buildPowerShellScriptContent prefixes UTF-8 encoding setup", () => {
     const script = buildPowerShellScriptContent('Write-Output "ok"');
-    assert.ok(script.startsWith("[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()"));
+    // Windows PowerShell 5.1 only reliably detects a script as UTF-8 when the
+    // file opens with a BOM; without it the body is read as the ANSI code page.
+    assert.equal(script.charCodeAt(0), 0xfeff);
+    assert.ok(script.startsWith("﻿[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()"));
     assert.ok(script.includes("$OutputEncoding = [System.Text.UTF8Encoding]::new()"));
     assert.ok(script.endsWith('Write-Output "ok"'));
   });
