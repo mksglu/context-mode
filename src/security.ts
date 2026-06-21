@@ -152,12 +152,20 @@ export function matchesAnyPattern(
 }
 
 // ==============================================================================
-// Chained Command Splitting
+// Chained Command Splitting & Subshell Extraction
 // ==============================================================================
 
+function isEscaped(command: string, index: number): boolean {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && command[i] === "\\"; i--) {
+    backslashes++;
+  }
+  return backslashes % 2 === 1;
+}
+
 /**
- * Split a shell command on chain operators (&&, ||, ;, |) while
- * respecting single/double quotes and backticks.
+ * Split a shell command on chain operators (&&, ||, ;, |, \n, \r, &) while
+ * respecting single/double quotes, backticks, subshells, and escape backslashes.
  *
  * "echo hello && sudo rm -rf /" → ["echo hello", "sudo rm -rf /"]
  *
@@ -169,33 +177,51 @@ export function splitChainedCommands(command: string): string[] {
   let inSingle = false;
   let inDouble = false;
   let inBacktick = false;
+  let dollarParenDepth = 0;
 
   for (let i = 0; i < command.length; i++) {
     const ch = command[i];
-    const prev = i > 0 ? command[i - 1] : "";
+    const escaped = isEscaped(command, i);
 
-    if (ch === "'" && !inDouble && !inBacktick && prev !== "\\") {
+    if (ch === "'" && !inDouble && !inBacktick && !escaped) {
       inSingle = !inSingle;
       current += ch;
-    } else if (ch === '"' && !inSingle && !inBacktick && prev !== "\\") {
+    } else if (ch === '"' && !inSingle && !inBacktick && !escaped) {
       inDouble = !inDouble;
       current += ch;
-    } else if (ch === "`" && !inSingle && !inDouble && prev !== "\\") {
+    } else if (ch === "`" && !inSingle && !inDouble && !escaped) {
       inBacktick = !inBacktick;
       current += ch;
     } else if (!inSingle && !inDouble && !inBacktick) {
-      if (ch === ";") {
+      if (ch === "$" && command[i + 1] === "(" && !escaped) {
+        dollarParenDepth++;
+        current += ch + command[i + 1];
+        i++;
+      } else if (dollarParenDepth > 0 && ch === "(" && !escaped) {
+        dollarParenDepth++;
+        current += ch;
+      } else if (ch === ")" && dollarParenDepth > 0 && !escaped) {
+        dollarParenDepth--;
+        current += ch;
+      } else if (
+        dollarParenDepth === 0 &&
+        (ch === ";" || ch === "\n" || ch === "\r") &&
+        !escaped
+      ) {
         parts.push(current.trim());
         current = "";
-      } else if (ch === "|" && command[i + 1] === "|") {
+      } else if (dollarParenDepth === 0 && ch === "|" && command[i + 1] === "|") {
         parts.push(current.trim());
         current = "";
         i++; // skip second |
-      } else if (ch === "&" && command[i + 1] === "&") {
+      } else if (dollarParenDepth === 0 && ch === "&" && command[i + 1] === "&") {
         parts.push(current.trim());
         current = "";
         i++; // skip second &
-      } else if (ch === "|") {
+      } else if (dollarParenDepth === 0 && ch === "&" && !escaped) {
+        parts.push(current.trim());
+        current = "";
+      } else if (dollarParenDepth === 0 && ch === "|") {
         // Single pipe — left side is a command too
         parts.push(current.trim());
         current = "";
@@ -208,6 +234,83 @@ export function splitChainedCommands(command: string): string[] {
   }
   if (current.trim()) parts.push(current.trim());
   return parts.filter((p) => p.length > 0);
+}
+
+/**
+ * Recursively extract all nested subshell commands from `$()` and `` `...` ``.
+ * Handles escaping and quote contexts to ensure correct command boundary detection.
+ */
+export function extractSubshellCommands(command: string): string[] {
+  const subshells: string[] = [];
+  let inSingle = false;
+  let inDouble = false;
+  let backtickStart = -1;
+
+  const dollarParenStarts: number[] = [];
+  const dollarParenDepths: number[] = [];
+  let parenDepth = 0;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    const escaped = isEscaped(command, i);
+
+    if (ch === "'" && !inDouble && backtickStart === -1 && !escaped) {
+      inSingle = !inSingle;
+    } else if (ch === '"' && !inSingle && backtickStart === -1 && !escaped) {
+      inDouble = !inDouble;
+    } else if (ch === "`" && !inSingle && !inDouble && !escaped) {
+      if (backtickStart === -1) {
+        backtickStart = i + 1;
+      } else {
+        const sub = command.slice(backtickStart, i);
+        subshells.push(sub);
+        subshells.push(...extractSubshellCommands(sub));
+        backtickStart = -1;
+      }
+    } else if (!inSingle && backtickStart === -1) {
+      if (ch === "$" && command[i + 1] === "(" && !escaped) {
+        if (command[i + 2] === "(") {
+          // Arithmetic expansion is not command execution, but nested command
+          // substitutions inside it still get discovered by the scanner.
+          parenDepth += 2;
+          i += 2; // skip '(('
+        } else {
+          dollarParenStarts.push(i + 2);
+          dollarParenDepths.push(parenDepth);
+          parenDepth++;
+          i++; // skip '('
+        }
+      } else if (ch === "(" && !escaped) {
+        parenDepth++;
+      } else if (ch === ")" && !escaped) {
+        if (parenDepth > 0) {
+          parenDepth--;
+        }
+        if (
+          dollarParenDepths.length > 0 &&
+          parenDepth === dollarParenDepths[dollarParenDepths.length - 1]
+        ) {
+          dollarParenDepths.pop();
+          const start = dollarParenStarts.pop()!;
+          const sub = command.slice(start, i);
+          subshells.push(sub);
+        }
+      }
+    }
+  }
+  return subshells;
+}
+
+function collectCommandElements(command: string): string[] {
+  const elements: string[] = [];
+  const segments = splitChainedCommands(command);
+  for (const segment of segments) {
+    elements.push(segment);
+    for (const subshell of extractSubshellCommands(segment)) {
+      elements.push(...collectCommandElements(subshell));
+    }
+  }
+  return elements;
 }
 
 // ==============================================================================
@@ -388,28 +491,51 @@ interface CommandDecision {
 export function evaluateCommand(
   command: string,
   policies: SecurityPolicy[],
-  caseInsensitive: boolean = process.platform === "win32",
+  caseInsensitive: boolean = process.platform === "win32" || process.platform === "darwin",
 ): CommandDecision {
-  // Check each segment of chained commands against deny patterns
-  const segments = splitChainedCommands(command);
-  for (const segment of segments) {
+  // Extract all main segments and nested subshell commands
+  const allCommands = collectCommandElements(command);
+
+  // 1. Deny check: If ANY segment or subshell command is denied, block the entire command
+  for (const cmdElement of allCommands) {
     for (const policy of policies) {
-      const denyMatch = matchesAnyPattern(segment, policy.deny, caseInsensitive);
+      const denyMatch = matchesAnyPattern(cmdElement, policy.deny, caseInsensitive);
       if (denyMatch) return { decision: "deny", matchedPattern: denyMatch };
     }
   }
 
-  // Check ask/allow against the full command (original behavior)
+  // 2. Allow/Ask check: Evaluate segment-by-segment in precedence order.
+  // The command is allowed if and only if EVERY segment and subshell is explicitly allowed.
+  // If any element matches an ask pattern or matches no allow pattern, it defaults to ask.
   for (const policy of policies) {
-    const askMatch = matchesAnyPattern(command, policy.ask, caseInsensitive);
-    if (askMatch) return { decision: "ask", matchedPattern: askMatch };
+    let allAllowed = true;
+    let anyAsk = false;
+    let matchedAskPattern: string | undefined;
+    let matchedAllowPattern: string | undefined;
 
-    const allowMatch = matchesAnyPattern(
-      command,
-      policy.allow,
-      caseInsensitive,
-    );
-    if (allowMatch) return { decision: "allow", matchedPattern: allowMatch };
+    for (const cmdElement of allCommands) {
+      const askMatch = matchesAnyPattern(cmdElement, policy.ask, caseInsensitive);
+      if (askMatch) {
+        anyAsk = true;
+        matchedAskPattern = askMatch;
+        break; // Ask wins immediately within this policy
+      }
+
+      const allowMatch = matchesAnyPattern(cmdElement, policy.allow, caseInsensitive);
+      if (!allowMatch) {
+        allAllowed = false;
+      } else {
+        matchedAllowPattern = allowMatch;
+      }
+    }
+
+    if (anyAsk) {
+      return { decision: "ask", matchedPattern: matchedAskPattern };
+    }
+
+    if (allAllowed && allCommands.length > 0) {
+      return { decision: "allow", matchedPattern: matchedAllowPattern };
+    }
   }
 
   return { decision: "ask" };
@@ -421,17 +547,18 @@ export function evaluateCommand(
  * The server has no UI for "ask" prompts, so allow/ask patterns are
  * irrelevant. Returns "deny" if any deny pattern matches, otherwise "allow".
  *
- * Also splits chained commands to prevent bypass.
+ * Also splits chained commands and nested subshells to prevent bypass.
  */
 export function evaluateCommandDenyOnly(
   command: string,
   policies: SecurityPolicy[],
-  caseInsensitive: boolean = process.platform === "win32",
+  caseInsensitive: boolean = process.platform === "win32" || process.platform === "darwin",
 ): { decision: "deny" | "allow"; matchedPattern?: string } {
-  const segments = splitChainedCommands(command);
-  for (const segment of segments) {
+  const allCommands = collectCommandElements(command);
+
+  for (const cmdElement of allCommands) {
     for (const policy of policies) {
-      const denyMatch = matchesAnyPattern(segment, policy.deny, caseInsensitive);
+      const denyMatch = matchesAnyPattern(cmdElement, policy.deny, caseInsensitive);
       if (denyMatch) return { decision: "deny", matchedPattern: denyMatch };
     }
   }
@@ -468,7 +595,7 @@ export function evaluateCommandDenyOnly(
 export function evaluateFilePath(
   filePath: string,
   denyGlobs: string[][],
-  caseInsensitive: boolean = process.platform === "win32",
+  caseInsensitive: boolean = process.platform === "win32" || process.platform === "darwin",
   projectRoot?: string,
 ): { denied: boolean; matchedPattern?: string } {
   const toForward = (path: string): string => path.replace(/\\/g, "/");

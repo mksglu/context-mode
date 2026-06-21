@@ -26,6 +26,7 @@ let routePreToolUse: (
   projectDir?: string,
   platform?: string,
   sessionId?: string,
+  options?: { mcpToolsAvailable?: boolean },
 ) => {
   action: string;
   reason?: string;
@@ -36,7 +37,7 @@ let routePreToolUse: (
 let resetGuidanceThrottle: () => void;
 let initSecurity: (buildDir: string) => Promise<boolean>;
 let ROUTING_BLOCK: string;
-let createRoutingBlock: (t: any, options?: { includeCommands?: boolean }) => string;
+let createRoutingBlock: (t: any, options?: { includeCommands?: boolean; toolSearchBootstrap?: boolean }) => string;
 let READ_GUIDANCE: string;
 let GREP_GUIDANCE: string;
 
@@ -396,6 +397,52 @@ describe("routePreToolUse", () => {
       const result = routePreToolUse("mcp_web_fetch", { url: "https://example.com" });
       expect(result).toBeNull();
     });
+
+    it("passes WebFetch through when the caller context cannot invoke ctx_* tools (#794)", () => {
+      const result = routePreToolUse(
+        "WebFetch",
+        { url: "https://example.com" },
+        undefined,
+        "claude-code",
+        "subagent-webfetch",
+        { mcpToolsAvailable: false },
+      );
+      expect(result).toBeNull();
+    });
+
+    it("keeps WebFetch redirected when options are omitted", () => {
+      const result = routePreToolUse(
+        "WebFetch",
+        { url: "https://example.com" },
+        undefined,
+        "claude-code",
+        "main-webfetch-default-options",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("deny");
+      expect(result!.reason).toContain("ctx_fetch_and_index");
+    });
+
+    it("Claude Code pretooluse treats subagent hook payloads as ctx_* unavailable (#794)", async () => {
+      const main = await spawnPreToolUseHook({
+        tool_name: "WebFetch",
+        tool_input: { url: "https://example.com" },
+        session_id: "core-routing-main-webfetch",
+      });
+      expect(main.status).toBe(0);
+      expect(main.parsed?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      expect(main.parsed?.hookSpecificOutput?.permissionDecisionReason).toContain("ctx_fetch_and_index");
+
+      const subagent = await spawnPreToolUseHook({
+        tool_name: "WebFetch",
+        tool_input: { url: "https://example.com" },
+        session_id: "core-routing-subagent-webfetch",
+        agent_id: "agent-794",
+        agent_type: "claude-code-guide",
+      });
+      expect(subagent.status).toBe(0);
+      expect(subagent.stdout).toBe("");
+    });
   });
 
   // ─── MCP readiness: all redirects degrade gracefully (#230) ───
@@ -418,6 +465,27 @@ describe("routePreToolUse", () => {
       const result = routePreToolUse("Bash", { command: "./gradlew build" });
       expect(result).toBeNull();
     });
+
+    it("allows MCP-backed redirects when the caller context cannot invoke ctx_* tools", () => {
+      const cases = [
+        ["Bash", { command: "curl https://example.com" }],
+        ["Bash", { command: "node -e \"fetch('https://example.com')\"" }],
+        ["Bash", { command: "./gradlew build" }],
+        ["WebFetch", { url: "https://example.com" }],
+      ] as const;
+
+      for (const [tool, input] of cases) {
+        const result = routePreToolUse(
+          tool,
+          input,
+          undefined,
+          "claude-code",
+          `subagent-${tool}`,
+          { mcpToolsAvailable: false },
+        );
+        expect(result).toBeNull();
+      }
+    });
   });
 
   // ─── Subagent ctx_commands omission (#233) ──────────────
@@ -433,6 +501,19 @@ describe("routePreToolUse", () => {
       const prompt = (result!.updatedInput as Record<string, string>).prompt;
       expect(prompt).not.toContain("<ctx_commands>");
       expect(prompt).toContain("<tool_selection_hierarchy>");
+    });
+
+    it("injects Claude Code Agent routing and ToolSearch bootstrap by default", () => {
+      const result = routePreToolUse("Agent", {
+        prompt: "Research this repository",
+        subagent_type: "general-purpose",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+      const prompt = (result!.updatedInput as Record<string, string>).prompt;
+      expect(prompt).toContain("<context_window_protection>");
+      expect(prompt).toContain("ToolSearch");
+      expect(prompt).not.toContain("<ctx_commands>");
     });
 
     it("ROUTING_BLOCK constant includes ctx_commands for main session", () => {
@@ -511,6 +592,45 @@ describe("routePreToolUse", () => {
           commands: [{ label: "test", command: "ls -la" }],
           queries: ["file list"],
         },
+      );
+      expect(result).toBeNull();
+    });
+
+    it("pins Claude Code ctx_execute shell cwd from hook projectDir (#756)", () => {
+      const result = routePreToolUse(
+        "mcp__plugin_context-mode_context-mode__ctx_execute",
+        { language: "shell", code: "pwd" },
+        "/worktree/repo",
+        "claude-code",
+      );
+      expect(result?.action).toBe("modify");
+      expect(result?.updatedInput).toEqual({
+        language: "shell",
+        code: "pwd",
+        cwd: "/worktree/repo",
+      });
+    });
+
+    it("pins Claude Code ctx_batch_execute cwd from hook projectDir (#756)", () => {
+      const result = routePreToolUse(
+        "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+        { commands: [{ label: "branch", command: "git rev-parse --abbrev-ref HEAD" }] },
+        "/worktree/repo",
+        "claude-code",
+      );
+      expect(result?.action).toBe("modify");
+      expect(result?.updatedInput).toEqual({
+        commands: [{ label: "branch", command: "git rev-parse --abbrev-ref HEAD" }],
+        cwd: "/worktree/repo",
+      });
+    });
+
+    it("does not overwrite explicit ctx_execute cwd", () => {
+      const result = routePreToolUse(
+        "mcp__plugin_context-mode_context-mode__ctx_execute",
+        { language: "shell", code: "pwd", cwd: "/explicit" },
+        "/worktree/repo",
+        "claude-code",
       );
       expect(result).toBeNull();
     });
@@ -1102,6 +1222,25 @@ async function spawnRoutingProbe(
 ): Promise<{ status: number | null; stdout: string; parsed: any }> {
   const { spawnSync } = await import("node:child_process");
   const r = spawnSync("node", ["--input-type=module", "-e", code], {
+    encoding: "utf-8",
+    timeout: 15_000,
+    env: { ...process.env, ...env },
+  });
+  const stdout = (r.stdout ?? "").trim();
+  let parsed: any = null;
+  try { parsed = JSON.parse(stdout); } catch { /* surface raw */ }
+  return { status: r.status, stdout, parsed };
+}
+
+async function spawnPreToolUseHook(
+  input: Record<string, unknown>,
+  env: Record<string, string> = {},
+): Promise<{ status: number | null; stdout: string; parsed: any }> {
+  const { spawnSync } = await import("node:child_process");
+  const repoRoot = resolve(SLICE4_DIRNAME, "..", "..");
+  const r = spawnSync(process.execPath, ["hooks/pretooluse.mjs"], {
+    cwd: repoRoot,
+    input: JSON.stringify(input),
     encoding: "utf-8",
     timeout: 15_000,
     env: { ...process.env, ...env },

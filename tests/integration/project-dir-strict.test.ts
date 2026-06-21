@@ -38,6 +38,15 @@ function makeForeignLeakEnv(): Record<string, string> {
 }
 
 describe("server getProjectDir wiring — strictPlatform for all adapters (issue #545)", () => {
+  const cleanup: string[] = [];
+
+  afterEach(() => {
+    while (cleanup.length) {
+      const p = cleanup.pop();
+      if (p) try { rmSync(p, { recursive: true, force: true }); } catch {}
+    }
+  });
+
   // Adapters with at least one workspace var.
   const platformsWithOwnVar: ReadonlyArray<PlatformId> = [
     "claude-code",
@@ -100,6 +109,12 @@ describe("server getProjectDir wiring — strictPlatform for all adapters (issue
   }
 
   it("every platform: with no own var set and no escape hatch, falls through to PWD", () => {
+    // Keep the pure resolver matrix independent from the developer's live
+    // Codex session logs. The production Codex branch intentionally checks
+    // session logs before PWD, so this fixture must provide an empty home.
+    const emptyCodexHome = mkdtempSync(join(tmpdir(), "ctx-empty-codex-home-"));
+    cleanup.push(emptyCodexHome);
+
     const allPlatforms: ReadonlyArray<PlatformId> = [
       ...platformsWithOwnVar,
       ...platformsNoOwnVar,
@@ -110,6 +125,7 @@ describe("server getProjectDir wiring — strictPlatform for all adapters (issue
         cwd: "/anchor/cwd",
         pwd: "/Users/x/from-shell",
         strictPlatform: platform,
+        codexHome: platform === "codex" ? emptyCodexHome : undefined,
       });
       // No own workspace var matches (we set leaks, not the platform's own
       // value). PWD is the next tier. PI / OMP have own vars set in the

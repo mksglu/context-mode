@@ -32,15 +32,15 @@ function zod3ToV4(v: unknown, depth = 0): z.ZodType {
 
   switch (def.typeName) {
     case "ZodString":
-      result = z.string();
+      result = def.coerce === true ? z.coerce.string() : z.string();
       break;
 
     case "ZodNumber":
-      result = z.number();
+      result = def.coerce === true ? z.coerce.number() : z.number();
       break;
 
     case "ZodBoolean":
-      result = z.boolean();
+      result = def.coerce === true ? z.coerce.boolean() : z.boolean();
       break;
 
     case "ZodAny":
@@ -114,10 +114,33 @@ function zod3ToV4(v: unknown, depth = 0): z.ZodType {
       break;
     }
 
-    case "ZodEffects":
-      // Host schema only. Original Zod 3 schema still parses in execute().
-      result = zod3ToV4(def.schema, depth + 1);
+    case "ZodEffects": {
+      // Zod v3 has two patterns for coercion:
+      //
+      // 1. Native coercion (z.coerce.number()): typeName is ZodNumber
+      //    with _def.coerce=true. Handled in the ZodNumber case above.
+      //
+      // 2. Custom preprocess (z.preprocess(fn, schema)): typeName is
+      //    ZodEffects with effect.type="preprocess". The transform is
+      //    plain JS and works identically in Zod v4's z.preprocess().
+      //
+      // We never map ZodEffects→native coerce here because native
+      // coerce is already a ZodType (not ZodEffects), and custom
+      // transforms can't be safely replaced (e.g., z.coerce.boolean()
+      // in v4 converts "false"→true via Boolean(), which is wrong).
+      const effect = def.effect as Record<string, unknown> | undefined;
+      if (effect?.type === "preprocess" && typeof effect?.transform === "function") {
+        const innerSchema = zod3ToV4(def.schema, depth + 1);
+        result = z.preprocess(
+          effect.transform as (val: unknown) => unknown,
+          innerSchema,
+        );
+      } else {
+        // Refinement / transform effects — host schema only.
+        result = zod3ToV4(def.schema, depth + 1);
+      }
       break;
+    }
 
     default:
       // Never leak raw Zod 3 schemas back to a v4 host.
