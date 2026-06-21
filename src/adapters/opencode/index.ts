@@ -16,13 +16,6 @@
  *   - Session dir: ~/.config/opencode/context-mode/sessions/
  */
 
-/** Strip JSONC comments (// and /* *​/) and trailing commas for JSON.parse. */
-function stripJsonComments(str: string): string {
-  return str
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/,(\s*[}\]])/g, "$1");
-}
 import {
   readFileSync,
   writeFileSync,
@@ -35,6 +28,7 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter, resolveContextModeDataRoot } from "../base.js";
+import { stripJsonComments } from "../../util/jsonc.js";
 
 import type {
   HookAdapter,
