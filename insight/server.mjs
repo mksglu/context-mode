@@ -468,7 +468,7 @@ function apiAnalytics() {
       ROUND((julianday(MIN(se.created_at)) - julianday(sm.started_at)) * 24 * 60, 1) as minutes_to_commit
       FROM session_meta sm
       JOIN session_events se ON se.session_id = sm.session_id
-      WHERE se.type = 'git' AND se.data = 'commit'
+      WHERE (se.type = 'git_commit' OR (se.type = 'git' AND se.data = 'commit'))
       GROUP BY sm.session_id`)
   );
   const exploreExecRatio = queryAllSessionDBs(db =>
@@ -607,13 +607,13 @@ function apiAnalytics() {
       return safeAll(db, `SELECT
         sm.session_id,
         COALESCE(NULLIF(MAX(CASE WHEN se.type = 'git' THEN se.project_dir END), ''), sm.project_dir, '${UNKNOWN_PROJECT_KEY}') as project_dir,
-        SUM(CASE WHEN se.type = 'git' AND se.data = 'commit' THEN 1 ELSE 0 END) as commits
+        SUM(CASE WHEN se.type = 'git_commit' OR (se.type = 'git' AND se.data = 'commit') THEN 1 ELSE 0 END) as commits
         FROM session_meta sm
         LEFT JOIN session_events se ON se.session_id = sm.session_id
         GROUP BY sm.session_id`);
     }
     return safeAll(db, `SELECT sm.session_id, COALESCE(sm.project_dir, '${UNKNOWN_PROJECT_KEY}') as project_dir,
-      SUM(CASE WHEN se.type = 'git' AND se.data = 'commit' THEN 1 ELSE 0 END) as commits
+      SUM(CASE WHEN se.type = 'git_commit' OR (se.type = 'git' AND se.data = 'commit') THEN 1 ELSE 0 END) as commits
       FROM session_meta sm
       LEFT JOIN session_events se ON se.session_id = sm.session_id
       GROUP BY sm.session_id`);
@@ -1065,7 +1065,7 @@ function apiCategoryAnalytics() {
 
   // Productivity
   const commitSessions = queryAllSessionDBs(db =>
-    safeAll(db, `SELECT COUNT(DISTINCT session_id) as cnt FROM session_events WHERE category = 'git' AND data = 'commit'`)
+    safeAll(db, `SELECT COUNT(DISTINCT session_id) as cnt FROM session_events WHERE category = 'git' AND (type = 'git_commit' OR data = 'commit')`)
   );
   const sessionsWithCommits = commitSessions.reduce((s, r) => s + (r.cnt || 0), 0);
   const commitRate = totalSessions > 0 ? (sessionsWithCommits / totalSessions) * 100 : 0;

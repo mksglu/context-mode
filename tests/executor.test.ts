@@ -1775,6 +1775,35 @@ describe("Background Mode", () => {
     try { process.kill(pid, 0); alive = true; } catch { /* ESRCH */ }
     assert.equal(alive, false, `Process ${pid} should be dead after cleanup`);
   }, 10_000);
+
+  test("background: true keeps process alive when it writes after detach", async () => {
+    const bgExecutor = new PolyglotExecutor({ runtimes });
+    const r = await bgExecutor.execute({
+      language: "javascript",
+      code: `
+        process.stdout.write(String(process.pid));
+        // Write every 200ms after detach (timeout is 300ms)
+        const id = setInterval(() => {
+          process.stdout.write('alive\\n');
+        }, 200);
+        // Keep alive for 3 seconds total
+        setTimeout(() => { clearInterval(id); process.exit(0); }, 3000);
+      `,
+      timeout: 300,
+      background: true,
+    });
+    const pid = parseInt(r.stdout.trim(), 10);
+    assert.ok(pid > 0, `Expected valid PID, got: "${r.stdout}"`);
+
+    // Give the process time to write after detach
+    await new Promise((r) => setTimeout(r, 1000));
+
+    let alive = false;
+    try { process.kill(pid, 0); alive = true; } catch { /* ESRCH */ }
+    assert.equal(alive, true, `Process ${pid} should still be alive after detach (SIGPIPE bug?)`);
+
+    bgExecutor.cleanupBackgrounded();
+  }, 10_000);
 });
 
 describe("hardCapBytes Enforcement", () => {

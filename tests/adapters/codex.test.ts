@@ -983,11 +983,17 @@ describe("Codex userpromptsubmit hook script", () => {
 });
 
 describe("Codex stop hook script", () => {
-  it("outputs valid JSON without requesting continuation", () => {
+  it("outputs valid JSON and records turn_end without requesting continuation", async () => {
     const hookScript = resolve(__dirname, "../../hooks/codex/stop.mjs");
+    const codexHome = mkdtempSync(join(tmpdir(), "context-mode-codex-stop-home-"));
+    const projectDir = join(codexHome, "project");
+    const sessionId = "test-stop";
+    const savedCodexHome = process.env.CODEX_HOME;
+    mkdirSync(projectDir, { recursive: true });
+
     const input = JSON.stringify({
-      session_id: "test-stop",
-      cwd: "/tmp",
+      session_id: sessionId,
+      cwd: projectDir,
       hook_event_name: "Stop",
       model: "o3",
       permission_mode: "default",
@@ -997,13 +1003,41 @@ describe("Codex stop hook script", () => {
       turn_id: "t1",
     });
 
-    const stdout = execFileSync(process.execPath, [hookScript], {
-      input,
-      encoding: "utf-8",
-      timeout: 10000,
-    });
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const stdout = execFileSync(process.execPath, [hookScript], {
+        input,
+        encoding: "utf-8",
+        timeout: 10000,
+      });
 
-    expect(JSON.parse(stdout.trim())).toEqual({});
+      expect(JSON.parse(stdout.trim())).toEqual({});
+
+      const dbPath = resolveSessionDbPath({
+        projectDir,
+        sessionsDir: new CodexAdapter().getSessionDir(),
+      });
+      const Database = (await import("better-sqlite3")).default;
+      const db = new Database(dbPath, { readonly: true });
+      try {
+        const rows = db.prepare(
+          "SELECT type, data FROM session_events WHERE type IN ('turn_end', 'session_end')",
+        ).all() as Array<{ type: string; data: string }>;
+
+        expect(rows.some((row) => row.type === "turn_end")).toBe(true);
+        expect(rows.some((row) => row.type === "session_end")).toBe(false);
+
+        const payload = JSON.parse(rows.find((row) => row.type === "turn_end")?.data ?? "{}");
+        expect(payload.stop_hook_active).toBe(false);
+        expect(payload.last_assistant_message).toBe("done");
+      } finally {
+        db.close();
+      }
+    } finally {
+      if (savedCodexHome === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = savedCodexHome;
+      rmSync(codexHome, { recursive: true, force: true });
+    }
   });
 });
 
