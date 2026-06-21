@@ -1,0 +1,76 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Context Mode Insight · OG · 1200×630</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  .frame{
+    width:1200px;height:630px;
+    background:
+      radial-gradient(ellipse at 80% 25%,#e8effc 0%,transparent 55%),
+      radial-gradient(ellipse at 15% 80%,#fff5e7 0%,transparent 50%),
+      #fbfaf7;
+    padding:64px 80px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    position:relative;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .frame::after{
+    content:'';position:absolute;inset:0;
+    background-image:linear-gradient(rgba(15,20,25,.025) 1px, transparent 1px),linear-gradient(90deg, rgba(15,20,25,.025) 1px, transparent 1px);
+    background-size:32px 32px;
+    pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 30%, transparent 70%);
+  }
+  .head{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .badge{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#1a56db;
+    background:rgba(26,86,219,.08);border:1px solid rgba(26,86,219,.18);
+    padding:6px 12px;border-radius:6px;letter-spacing:.06em;text-transform:uppercase}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;box-shadow:0 0 8px rgba(16,185,129,.5)}
+  .meta{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b7a8d;letter-spacing:.06em}
+  .stack{position:relative;z-index:2}
+  .preline{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#6b7a8d;letter-spacing:.18em;text-transform:uppercase;margin-bottom:18px}
+  .preline strong{color:#1a56db}
+  .wordmark{display:inline-flex;align-items:baseline;font-weight:700;font-size:104px;line-height:.95;letter-spacing:-.045em;color:#0f1419}
+  .wordmark .italic{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400;color:#1a56db;font-size:1em;letter-spacing:-.025em;margin-left:.12em}
+  .cursor{display:inline-block;width:31px;height:96px;background:#1a56db;margin-left:14px;transform:translateY(6px)}
+  .tagline{margin-top:30px;font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400;font-size:42px;line-height:1.1;color:#1a56db;letter-spacing:-.015em;max-width:980px}
+  .sub{margin-top:14px;font-size:18px;line-height:1.5;color:#4b5c70;max-width:880px;font-weight:400}
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;position:relative;z-index:2;gap:32px}
+  .stats{display:flex;gap:32px;font-family:'IBM Plex Mono',monospace;flex-wrap:wrap}
+  .stat .val{font-size:22px;font-weight:600;color:#0f1419;letter-spacing:-.01em}
+  .stat .lbl{font-size:10.5px;color:#6b7a8d;letter-spacing:.10em;text-transform:uppercase;margin-top:2px}
+  .price{display:flex;align-items:baseline;gap:8px;padding:14px 22px;background:rgba(26,86,219,.08);border:1px solid rgba(26,86,219,.18);border-radius:8px}
+  .price .v{font-family:'IBM Plex Sans',sans-serif;font-weight:700;font-size:32px;color:#1a56db;letter-spacing:-.02em}
+  .price .l{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#6b7a8d;letter-spacing:.06em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="head">
+    <span class="badge"><span class="dot"></span>The first Solution · on Context Mode Platform</span>
+    <span class="meta">context-mode.com/insight</span>
+  </div>
+  <div class="stack">
+    <div class="preline">Context Mode <strong>Platform</strong> → <strong>Insight</strong> Solution</div>
+    <div class="wordmark">Context Mode<span class="italic">Insight</span><span class="cursor"></span></div>
+    <div class="tagline">Engineering signal for AI-assisted teams.</div>
+    <div class="sub">Per-engineer productive rate. Retry waste per team. Patterns named, actions prescribed. Role-narrowed views for CTO, EM, IC, CISO, FinOps, DevOps.</div>
+  </div>
+  <div class="foot">
+    <div class="stats">
+      <div class="stat"><div class="val">222</div><div class="lbl">patterns</div></div>
+      <div class="stat"><div class="val">13</div><div class="lbl">MCP tools</div></div>
+      <div class="stat"><div class="val">14</div><div class="lbl">AI adapters</div></div>
+      <div class="stat"><div class="val">7</div><div class="lbl">personas</div></div>
+    </div>
+    <div class="price">
+      <span class="v">$20</span>
+      <span class="l">/ seat / month</span>
+    </div>
+  </div>
+</div>
+</body></html>

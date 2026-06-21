@@ -32,6 +32,11 @@ function isWindowsWslBash(shellPath: string): boolean {
     /\\microsoft\\windowsapps\\bash\.exe$/.test(lower);
 }
 
+function isWindowsSystemCmd(shellPath: string): boolean {
+  const lower = shellPath.toLowerCase().replace(/\//g, "\\");
+  return /\\windows\\(?:system32|sysnative)\\cmd\.exe$/.test(lower);
+}
+
 export type Language =
   | "javascript"
   | "typescript"
@@ -198,8 +203,13 @@ function resolveWindowsBash(): string | null {
   }
 }
 
-function resolveWindowsShell(): string {
-  return resolveWindowsBash()
+function resolveWindowsShell(windowsBash: string | null = resolveWindowsBash()): string {
+  // Prefer Git Bash (#826) so native git keeps its MSYS path conversion.
+  // The caller passes the already-resolved windowsBash to avoid probing the
+  // filesystem twice (it also feeds the cmd.exe shellOverride guard above).
+  // Fall back through POSIX sh, then PowerShell Core (pwsh) for proper UTF-8
+  // handling, then Windows PowerShell, then cmd.exe as the last resort.
+  return windowsBash
     ?? (commandExists("sh")
       ? "sh"
       : commandExists("pwsh")
@@ -284,7 +294,17 @@ export function resolveJavascriptRuntime(
   if (JS_RUNTIMES.has(base)) {
     // Real JS runtime (node, bun, deno) — preserves #190 snap-Node fix
     // because the snap wrapper's binary is literally named `node`.
-    return execPath;
+    //
+    // Issue #800 — liveness guard: on Homebrew, process.execPath points into
+    // the versioned Cellar (/opt/homebrew/Cellar/node/26.0.0/bin/node).
+    // `brew upgrade` + `brew cleanup` deletes the old Cellar, so the path
+    // dangles for the life of the already-running MCP server.  If the path
+    // doesn't exist on disk, skip it and fall through to PATH node.
+    if (existsSync(execPath)) {
+      return execPath;
+    }
+    // Stale execPath (deleted Cellar, corrupted install, uninstall while
+    // process alive).  Fall through to PATH resolution below.
   }
 
   // Host binary (opencode/kilo/etc.) — fall back to node on PATH.
@@ -308,10 +328,15 @@ export function detectRuntimes(): RuntimeMap {
   // could redirect the executor to /usr/bin/python or any arbitrary binary.
   const userShell = process.env.SHELL;
   const isWin = process.platform === "win32";
+  const windowsBash = isWin ? resolveWindowsBash() : null;
   const shellOverride = userShell &&
     existsSync(userShell) &&
     isAllowlistedShell(userShell) &&
-    !(isWin && isWindowsWslBash(userShell))
+    !(isWin && isWindowsWslBash(userShell)) &&
+    // Windows OpenSSH can inject the system cmd.exe as ambient SHELL. When
+    // Git Bash is installed, treating that as an explicit override breaks the
+    // POSIX shell executor path restored by #36/#384/#791.
+    !(isWin && windowsBash && isWindowsSystemCmd(userShell))
     ? userShell
     : null;
 
@@ -331,7 +356,9 @@ export function detectRuntimes(): RuntimeMap {
         : runnableExists("py")
           ? "py"
           : null,
-    shell: shellOverride ?? (isWin ? resolveWindowsShell() : (commandExists("bash") ? "bash" : "sh")),
+    shell: shellOverride ?? (isWin
+      ? resolveWindowsShell(windowsBash)
+      : commandExists("bash") ? "bash" : "sh"),
     ruby: commandExists("ruby") ? "ruby" : null,
     go: commandExists("go") ? "go" : null,
     rust: commandExists("rustc") ? "rustc" : null,
