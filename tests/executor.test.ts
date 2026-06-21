@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from "vitest";
 import { strict as assert } from "node:assert";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -18,6 +18,17 @@ import {
 
 const runtimes = detectRuntimes();
 const executor = new PolyglotExecutor({ runtimes });
+
+function findWindowsGitBash(): string | null {
+  if (process.platform !== "win32") return null;
+  const candidates = [
+    "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+  ];
+  return candidates.find(p => existsSync(p)) ?? null;
+}
 
 describe("Runtime Detection", () => {
   test("detects JavaScript runtime (bun or node)", async () => {
@@ -78,6 +89,11 @@ describe("Runtime Detection", () => {
   });
 
   if (process.platform === "win32") {
+    const gitBash = findWindowsGitBash();
+    // #791 is specifically Git Bash + native git path conversion; fallback
+    // shells are covered by the runtime detection test above.
+    const gitBashTest = gitBash ? test : test.skip;
+
     test("Windows: shell is Git Bash or fallback, never WSL bash", async () => {
       const shell = runtimes.shell.toLowerCase();
       assert.ok(
@@ -87,7 +103,8 @@ describe("Runtime Detection", () => {
     });
 
     test("Windows: shell execute works with non-ASCII (Chinese) project path", async () => {
-      const { mkdirSync, rmSync } = await import("node:fs");
+      const { mkdirSync } = await import("node:fs");
+      const { rm } = await import("node:fs/promises");
       const { tmpdir } = await import("node:os");
       const chineseDir = join(tmpdir(), "测试目录");
       try { mkdirSync(chineseDir, { recursive: true }); } catch {}
@@ -95,8 +112,40 @@ describe("Runtime Detection", () => {
       const r = await chineseExecutor.execute({ language: "shell", code: 'echo "chinese path ok"' });
       assert.equal(r.exitCode, 0, `Failed with stderr: ${r.stderr}`);
       assert.ok(r.stdout.includes("chinese path ok"), `Got: ${r.stdout}`);
-      try { rmSync(chineseDir, { recursive: true, force: true }); } catch {}
+      try { await rm(chineseDir, { recursive: true, force: true }); } catch {}
     });
+
+    gitBashTest("Windows: Git Bash sees native git repos created under mktemp dirs (#791)", async () => {
+      const gitBashRuntimes: RuntimeMap = { ...runtimes, shell: gitBash! };
+      const gitBashExecutor = new PolyglotExecutor({ runtimes: gitBashRuntimes });
+      const previousNoPathConv = process.env.MSYS_NO_PATHCONV;
+      const previousArgConvExcl = process.env.MSYS2_ARG_CONV_EXCL;
+      process.env.MSYS_NO_PATHCONV = "1";
+      process.env.MSYS2_ARG_CONV_EXCL = "*";
+      try {
+        const r = await gitBashExecutor.execute({
+          language: "shell",
+          timeout: 20_000,
+          code: [
+            "set -e",
+            "T=$(mktemp -d)",
+            "git init --bare --quiet \"$T/origin.git\"",
+            "test -d \"$T/origin.git\"",
+            "git clone --quiet \"$T/origin.git\" \"$T/clone\"",
+            "test -d \"$T/clone/.git\"",
+            "echo git bash tmp path ok",
+          ].join("\n"),
+        });
+        assert.equal(r.exitCode, 0, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+        assert.ok(r.stdout.includes("git bash tmp path ok"), `Got: ${r.stdout}`);
+      } finally {
+        if (previousNoPathConv === undefined) delete process.env.MSYS_NO_PATHCONV;
+        else process.env.MSYS_NO_PATHCONV = previousNoPathConv;
+        if (previousArgConvExcl === undefined) delete process.env.MSYS2_ARG_CONV_EXCL;
+        else process.env.MSYS2_ARG_CONV_EXCL = previousArgConvExcl;
+      }
+    });
+
   }
 
   test("detects TypeScript runtime", async () => {

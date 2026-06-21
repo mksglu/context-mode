@@ -32,6 +32,11 @@ function isWindowsWslBash(shellPath: string): boolean {
     /\\microsoft\\windowsapps\\bash\.exe$/.test(lower);
 }
 
+function isWindowsSystemCmd(shellPath: string): boolean {
+  const lower = shellPath.toLowerCase().replace(/\//g, "\\");
+  return /\\windows\\(?:system32|sysnative)\\cmd\.exe$/.test(lower);
+}
+
 export type Language =
   | "javascript"
   | "typescript"
@@ -307,10 +312,15 @@ export function detectRuntimes(): RuntimeMap {
   // could redirect the executor to /usr/bin/python or any arbitrary binary.
   const userShell = process.env.SHELL;
   const isWin = process.platform === "win32";
+  const windowsBash = isWin ? resolveWindowsBash() : null;
   const shellOverride = userShell &&
     existsSync(userShell) &&
     isAllowlistedShell(userShell) &&
-    !(isWin && isWindowsWslBash(userShell))
+    !(isWin && isWindowsWslBash(userShell)) &&
+    // Windows OpenSSH can inject the system cmd.exe as ambient SHELL. When
+    // Git Bash is installed, treating that as an explicit override breaks the
+    // POSIX shell executor path restored by #36/#384/#791.
+    !(isWin && windowsBash && isWindowsSystemCmd(userShell))
     ? userShell
     : null;
 
@@ -331,7 +341,7 @@ export function detectRuntimes(): RuntimeMap {
           ? "py"
           : null,
     shell: shellOverride ?? (isWin
-      ? (resolveWindowsBash() ?? (commandExists("sh") ? "sh" : commandExists("powershell") ? "powershell" : "cmd.exe"))
+      ? (windowsBash ?? (commandExists("sh") ? "sh" : commandExists("powershell") ? "powershell" : "cmd.exe"))
       : commandExists("bash") ? "bash" : "sh"),
     ruby: commandExists("ruby") ? "ruby" : null,
     go: commandExists("go") ? "go" : null,
