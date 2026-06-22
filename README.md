@@ -1597,3 +1597,11 @@ cd context-mode && npm install && npm test
 ## License
 
 Licensed under [Elastic License 2.0](LICENSE) (source-available). You can use it, fork it, modify it, and distribute it. Two things you can't do: offer it as a hosted/managed service, or remove the licensing notices. We chose ELv2 over MIT because MIT permits repackaging the code as a competing closed-source SaaS — ELv2 prevents that while keeping the source available to everyone.
+
+---
+
+<div align="center">
+
+[![RepoStars](https://repostars.dev/api/embed?repo=mksglu%2Fcontext-mode&theme=light)](https://repostars.dev/?repos=mksglu%2Fcontext-mode&theme=light)
+
+</div>
