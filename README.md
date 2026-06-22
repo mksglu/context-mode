@@ -35,7 +35,7 @@ Every MCP tool call dumps raw data into your context window. A Playwright snapsh
 
 ### How Context Mode Solves It
 
-Context Mode is an MCP server that solves all four sides of this problem:
+Context Mode is a MCP server that solves all four sides of this problem:
 
 1. **Context Saving** — Sandbox tools keep raw data out of the context window. 315 KB becomes 5.4 KB. 98% reduction.
 2. **Session Continuity** — Every file edit, git operation, task, error, and user decision is tracked in SQLite. When the conversation compacts, context-mode doesn't dump this data back into context — it indexes events into FTS5 and retrieves only what's relevant via BM25 search. The model picks up exactly where you left off. If you don't `--continue`, previous session data is deleted immediately — a fresh session means a clean slate.
