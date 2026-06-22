@@ -382,3 +382,16 @@ if (isGlobalInstall() && !TMPDIR_UPGRADE_RE.test(pkgRoot)) {
     });
   } catch { /* best effort — never block install */ }
 }
+
+// ── 5. One-time GitHub-star nudge ────────────────────────────────────
+// After a real global install, print a single friendly star request. There is
+// no TTY during `npm install`, so this only PRINTS the message + URL — it never
+// stars an account without consent (the interactive Y/n/skip consent flow lives
+// in `context-mode doctor`). Gated to real global installs (not contributor/CI/
+// upgrade-staging) and shown at most once. Best-effort; never blocks install.
+if (isGlobalInstall() && !TMPDIR_UPGRADE_RE.test(pkgRoot)) {
+  try {
+    const { maybeStarNudge } = await import("../build/star-nudge.js");
+    await maybeStarNudge("postinstall");
+  } catch { /* best effort — never block install */ }
+}

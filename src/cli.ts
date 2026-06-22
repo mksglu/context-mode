@@ -28,6 +28,7 @@ import {
   hasBunRuntime,
   getAvailableLanguages,
 } from "./runtime.js";
+import { maybeStarNudge } from "./star-nudge.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import {
@@ -1210,6 +1211,10 @@ async function doctor(): Promise<number> {
       ? color.green("Diagnostics complete!")
       : color.yellow("Some checks need attention — see above for details"),
   );
+
+  // One-time, consent-gated GitHub-star nudge (interactive Y/n/skip on a TTY).
+  await maybeStarNudge("doctor");
+
   return 0;
 }
 
