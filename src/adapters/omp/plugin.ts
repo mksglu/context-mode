@@ -25,8 +25,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
 import { extractEvents } from "../../session/extract.js";
@@ -73,6 +74,59 @@ let _dbPath = "";
 let _sessionId = "";
 
 const _ompAdapter = new OMPAdapter();
+
+// ── MCP self-registration (issue #677) ───────────────────
+// The `omp plugin install context-mode` path wires THIS extension factory
+// (so routing hooks fire), but never creates the MCP config — so the 11
+// `ctx_*` tools stay unreachable even though curl/wget are blocked. Register
+// the server ourselves on plugin load, ONLY when absent (never clobber a
+// user's existing entry). Takes effect on the next OMP restart, same as the
+// manual mcp.json workaround the issue documents.
+const MCP_SERVER_NAME = "context-mode";
+// plugin.js ships at <pkg>/build/adapters/omp/plugin.js; the MCP server
+// bundle sits at the package root (<pkg>/server.bundle.mjs) — three up.
+const SERVER_BUNDLE_RELATIVE = "../../../server.bundle.mjs";
+
+function resolveServerBundle(): string | null {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const bundle = resolve(here, SERVER_BUNDLE_RELATIVE);
+    return existsSync(bundle) ? bundle : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ensure `~/.omp/agent/mcp.json` registers the context-mode MCP server.
+ *
+ * Uses `node <abs>/server.bundle.mjs` rather than the `context-mode` bin:
+ * under the plugin install the package lives in `~/.omp/plugins/node_modules`
+ * and its bin is NOT on PATH, so the bare command would fail to spawn (the
+ * exact symptom reported on issue #677). Best effort — never throws, never
+ * breaks plugin load.
+ */
+function ensureMcpServerRegistered(): void {
+  try {
+    const bundle = resolveServerBundle();
+    if (!bundle) return; // bundle missing → nothing safe to register
+
+    const settings = _ompAdapter.readSettings() ?? {};
+    const mcpServers =
+      (settings.mcpServers as Record<string, unknown> | undefined) ?? {};
+    if (MCP_SERVER_NAME in mcpServers) return; // already present — don't clobber
+
+    mcpServers[MCP_SERVER_NAME] = {
+      type: "stdio",
+      command: "node",
+      args: [bundle],
+    };
+    settings.mcpServers = mcpServers;
+    _ompAdapter.writeSettings(settings as Record<string, unknown>);
+  } catch {
+    // best effort — a registration failure must never break plugin load
+  }
+}
 
 function getSessionDir(): string {
   const dir = _ompAdapter.getSessionDir();
@@ -189,6 +243,11 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
   // earlier `OMP_PROJECT_DIR` read was an EM mistake — no upstream code
   // ever sets it. Drop it; fall through PI_PROJECT_DIR → cwd().
   const projectDir = process.env.PI_PROJECT_DIR || process.cwd();
+
+  // Self-register the MCP server so `ctx_*` tools are reachable under the
+  // plugin install path, not just the manual MCP-only path (issue #677).
+  ensureMcpServerRegistered();
+
   const db = getOrCreateDB(projectDir);
 
   // ── 1. session_start — initialize session row ─────────

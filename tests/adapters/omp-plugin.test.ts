@@ -447,4 +447,64 @@ describe("OMP plugin", () => {
       }
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // Slice 5: MCP self-registration (issue #677)
+  // ═══════════════════════════════════════════════════════════
+  // The `omp plugin install` path wires the extension factory (routing
+  // hooks fire) but never creates mcp.json, so the `ctx_*` tools stay
+  // unreachable. The plugin must self-register the MCP server on load.
+
+  describe("Slice 5: MCP self-registration (issue #677)", () => {
+    it("registers the context-mode MCP server in mcp.json when absent", async () => {
+      const { OMPAdapter } = await import("../../src/adapters/omp/index.js");
+      const { rmSync } = await import("node:fs");
+      const adapter = new OMPAdapter();
+      // Clean slate — drop any mcp.json a prior test in this suite wrote.
+      try {
+        rmSync(adapter.getSettingsPath(), { force: true });
+      } catch {
+        /* best effort */
+      }
+
+      await registerOmpPlugin(api);
+
+      const settings = adapter.readSettings();
+      const server = (settings?.mcpServers as Record<string, unknown> | undefined)?.[
+        "context-mode"
+      ] as { command?: string; args?: unknown[] } | undefined;
+
+      expect(
+        server,
+        "context-mode must be registered in mcp.json after plugin load",
+      ).toBeDefined();
+      // Plugin install puts the package in ~/.omp/plugins/node_modules where
+      // the `context-mode` bin is NOT on PATH — must spawn via node + bundle.
+      expect(server?.command).toBe("node");
+      expect(Array.isArray(server?.args)).toBe(true);
+      expect(String(server?.args?.[0])).toMatch(/server\.bundle\.mjs$/);
+    });
+
+    it("does NOT clobber an existing context-mode mcp.json entry", async () => {
+      const { OMPAdapter } = await import("../../src/adapters/omp/index.js");
+      const adapter = new OMPAdapter();
+      // User-supplied entry (e.g. the commenter's own working config) that
+      // must survive plugin load untouched.
+      adapter.writeSettings({
+        mcpServers: {
+          "context-mode": { command: "context-mode", args: ["--user-custom"] },
+        },
+      });
+
+      await registerOmpPlugin(api);
+
+      const settings = adapter.readSettings();
+      const server = (settings?.mcpServers as Record<string, unknown>)["context-mode"] as {
+        command?: string;
+        args?: unknown[];
+      };
+      expect(server.command).toBe("context-mode");
+      expect(server.args).toEqual(["--user-custom"]);
+    });
+  });
 });

@@ -1067,6 +1067,8 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
 
    Both should show `context-mode` as `enabled`.
 
+   > The plugin self-registers its MCP server in `~/.omp/agent/mcp.json` on first load (spawned as `node <plugin>/server.bundle.mjs`, since the plugin-install package directory is not on `PATH`), so the 11 `ctx_*` tools become reachable after the restart in step 2 — no manual `mcp.json` edit needed ([#677](https://github.com/mksglu/context-mode/issues/677)). An existing `context-mode` entry is never overwritten; remove it if you want the plugin to re-register the bundled path.
+
 **Install — manual plugin path (if `omp plugin install` is unavailable):**
 
 OMP loads anything listed under `~/.omp/plugins/package.json` `dependencies` whose own `package.json` carries an `omp` (or `pi`) field. New plugins default to enabled — the lock file at `~/.omp/plugins/omp-plugins.lock.json` is only consulted when a plugin needs to be explicitly **disabled** (loader skips `runtimeState && !runtimeState.enabled` per [`extensibility/plugins/loader.ts:89-94`](https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/src/extensibility/plugins/loader.ts)). So the manual install is two commands:
