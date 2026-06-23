@@ -9,7 +9,7 @@
  */
 
 import type { Database as DatabaseInstance } from "better-sqlite3";
-import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, healLossless, renameCorruptDB } from "./db-base.js";
+import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, reopenAfterHeal } from "./db-base.js";
 import type { PreparedStatement } from "./db-base.js";
 import { readFileSync, readdirSync, unlinkSync, existsSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -466,17 +466,10 @@ export class ContentStore {
    * write retry operates on a healthy connection.
    */
   #healAndReopen(): boolean {
-    const Database = loadDatabase();
-    try { this.#db.close(); } catch { /* already closed or damaged */ }
-
-    if (!healLossless(this.#dbPath)) {
-      renameCorruptDB(this.#dbPath);
-    }
-
-    this.#db = new Database(this.#dbPath, { timeout: 30000 });
-    applyWALPragmas(this.#db);
-    this.#initSchema();
-    this.#prepareStatements();
+    this.#db = reopenAfterHeal(this.#dbPath, this.#db, () => {
+      this.#initSchema();
+      this.#prepareStatements();
+    });
     return true;
   }
 

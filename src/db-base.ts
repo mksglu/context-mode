@@ -549,6 +549,31 @@ export function healLossless(dbPath: string): boolean {
   }
 }
 
+/**
+ * Close a held DB handle, heal (or rename) the on-disk file, and reopen
+ * with fresh schema + statements initialized via `onReopen` (#867).
+ *
+ * Extracted from `SQLiteBase` and `ContentStore` — the same heal+reopen
+ * sequence is used by both mid-session corruption paths.
+ */
+export function reopenAfterHeal(
+  dbPath: string,
+  oldDb: DatabaseInstance,
+  onReopen: (db: DatabaseInstance) => void,
+): DatabaseInstance {
+  try { oldDb.close(); } catch { /* already closed or damaged */ }
+
+  if (!healLossless(dbPath)) {
+    renameCorruptDB(dbPath);
+  }
+
+  const Database = loadDatabase();
+  const newDb = new Database(dbPath, { timeout: DB_TIMEOUT_MS });
+  applyWALPragmas(newDb);
+  onReopen(newDb);
+  return newDb;
+}
+
 // ─────────────────────────────────────────────────────────
 // Base class
 // ─────────────────────────────────────────────────────────
@@ -570,6 +595,8 @@ export function healLossless(dbPath: string): boolean {
  * re-imports within the same fork process (ESM isolate mode clears
  * module-level state but globalThis persists).
  */
+const DB_TIMEOUT_MS = 30000;
+
 // v1.0.130 — symbol name bumped because the value type reverted from
 // Map<DatabaseInstance, string> (v1.0.128 lockfile pairing) back to
 // Set<DatabaseInstance>. A persistent global slot from a v1.0.128 or
@@ -678,19 +705,12 @@ export abstract class SQLiteBase {
    * a healthy connection (#867).
    */
   #healAndReopen(): boolean {
-    const Database = loadDatabase();
     _liveDBs.delete(this.#db);
-    try { this.#db.close(); } catch { /* already closed or damaged */ }
-
-    if (!healLossless(this.#dbPath)) {
-      renameCorruptDB(this.#dbPath);
-    }
-
-    this.#db = new Database(this.#dbPath, { timeout: 30000 });
-    applyWALPragmas(this.#db);
+    this.#db = reopenAfterHeal(this.#dbPath, this.#db, () => {
+      this.initSchema();
+      this.prepareStatements();
+    });
     _liveDBs.add(this.#db);
-    this.initSchema();
-    this.prepareStatements();
     return true;
   }
 
