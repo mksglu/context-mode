@@ -546,11 +546,15 @@ export function attemptLosslessHeal(dbPath: string): boolean {
 
     // Verify healed copy before swapping — don't replace the original
     // with a broken rebuild (#867 review).
+    // Use prepare().get() instead of pragma() because adapters disagree on
+    // the return type: better-sqlite3 returns [{quick_check:"ok"}], while
+    // NodeSQLiteAdapter unwraps single-row/single-col to the scalar "ok".
+    // prepare('PRAGMA quick_check').get() always returns {quick_check:…}.
     const healed = new Database(tmpPath, { readonly: true });
     let ok = false;
     try {
-      const result = healed.pragma("quick_check") as string;
-      ok = result === "ok";
+      const row = healed.prepare("PRAGMA quick_check").get() as { quick_check: string } | undefined;
+      ok = row?.quick_check === "ok";
     } catch { /* quick_check threw — heal failed */ }
     try { healed.close(); } catch { /* ignore */ }
     if (!ok) {
