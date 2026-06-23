@@ -427,15 +427,43 @@ export function defaultDBPath(prefix: string = "context-mode"): string {
  * Catches errors containing "SQLITE_BUSY" or "database is locked" and
  * retries up to 3 times with delays: 100ms, 500ms, 2000ms.
  * If all retries fail, throws a descriptive error.
+ *
+ * When a `heal` callback is provided AND the caught error matches the
+ * SQLite-corruption predicate (SQLITE_CORRUPT / disk image is malformed /
+ * file is not a database), the callback is invoked BEFORE the retry so the
+ * caller can close the held connection, heal the on-disk file (lossless
+ * dump→rebuild→atomic swap, falling back to rename-and-recreate), and reopen.
+ * The operation is then retried exactly once. If the retry also fails, the
+ * error is surfaced. This covers mid-session corruption on a long-held handle
+ * (ContentStore, SessionDB) — the open-time guard alone missed it (#867).
+ *
  * Pass custom delays for testing (e.g., [0, 0, 0] to skip waits).
  */
-export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): T {
+export function withRetry<T>(
+  fn: () => T,
+  delays: number[] = [100, 500, 2000],
+  heal?: () => boolean,
+): T {
   let lastError: Error | undefined;
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       return fn();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (isSQLiteCorruptionError(msg) && heal) {
+        if (heal()) {
+          try {
+            return fn();
+          } catch (retryErr: unknown) {
+            const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+            throw new Error(
+              `Write failed after corruption heal: ${retryMsg}. ` +
+              `Original corruption: ${msg}`
+            );
+          }
+        }
+        // heal failed — throw original error
+      }
       if (!msg.includes("SQLITE_BUSY") && !msg.includes("database is locked")) {
         throw err;
       }
@@ -483,6 +511,44 @@ export function renameCorruptDB(dbPath: string): void {
   }
 }
 
+/**
+ * Attempt a lossless heal of a corrupt SQLite database via
+ * VACUUM INTO → atomic swap (#867).
+ *
+ * Opens a read-only connection on the corrupt file, runs
+ * `VACUUM INTO '<tmp>'` to rebuild a clean copy (data-preserving
+ * when corruption is in freelist / indexes — the common mid-session
+ * case), then atomically swaps the healed file in place.
+ *
+ * Returns `true` if the heal succeeded, `false` if the file is too
+ * damaged even for a readonly open or if VACUUM INTO throws (caller
+ * should fall back to `renameCorruptDB` → recreate-empty).
+ */
+export function healLossless(dbPath: string): boolean {
+  const Database = loadDatabase();
+  const tmpPath = `${dbPath}.heal-${Date.now()}`;
+  try {
+    const src = new Database(dbPath, { readonly: true });
+    try {
+      src.exec(`VACUUM INTO '${tmpPath.replace(/'/g, "''")}'`);
+    } finally {
+      try { src.close(); } catch { /* ignore */ }
+    }
+
+    // Atomic swap: backup old → healed takes its place
+    const backupPath = `${dbPath}.corrupt-${Date.now()}`;
+    renameSync(dbPath, backupPath);
+    renameSync(tmpPath, dbPath);
+    for (const s of ["-wal", "-shm"]) {
+      try { unlinkSync(backupPath + s); } catch { /* ignore */ }
+    }
+    return true;
+  } catch {
+    try { unlinkSync(tmpPath); } catch { /* ignore */ }
+    return false;
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // Base class
 // ─────────────────────────────────────────────────────────
@@ -526,7 +592,7 @@ const _liveDBs: Set<DatabaseInstance> = (() => {
 
 export abstract class SQLiteBase {
   readonly #dbPath: string;
-  readonly #db: DatabaseInstance;
+  #db: DatabaseInstance;
 
   /**
    * Open (or create) a SQLite DB at `dbPath`.
@@ -602,7 +668,30 @@ export abstract class SQLiteBase {
   }
 
   protected withRetry<T>(fn: () => T): T {
-    return withRetry(fn);
+    return withRetry(fn, undefined, () => this.#healAndReopen());
+  }
+
+  /**
+   * Heal a mid-session corrupt DB: close the held handle, attempt
+   * lossless recovery (backup → atomic swap), reopen, and re-init
+   * schema + prepared statements so the next write retry operates on
+   * a healthy connection (#867).
+   */
+  #healAndReopen(): boolean {
+    const Database = loadDatabase();
+    _liveDBs.delete(this.#db);
+    try { this.#db.close(); } catch { /* already closed or damaged */ }
+
+    if (!healLossless(this.#dbPath)) {
+      renameCorruptDB(this.#dbPath);
+    }
+
+    this.#db = new Database(this.#dbPath, { timeout: 30000 });
+    applyWALPragmas(this.#db);
+    _liveDBs.add(this.#db);
+    this.initSchema();
+    this.prepareStatements();
+    return true;
   }
 
   /**
