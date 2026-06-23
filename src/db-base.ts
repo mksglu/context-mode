@@ -431,11 +431,12 @@ export function defaultDBPath(prefix: string = "context-mode"): string {
  * When a `heal` callback is provided AND the caught error matches the
  * SQLite-corruption predicate (SQLITE_CORRUPT / disk image is malformed /
  * file is not a database), the callback is invoked BEFORE the retry so the
- * caller can close the held connection, heal the on-disk file (lossless
- * dump→rebuild→atomic swap, falling back to rename-and-recreate), and reopen.
- * The operation is then retried exactly once. If the retry also fails, the
- * error is surfaced. This covers mid-session corruption on a long-held handle
- * (ContentStore, SessionDB) — the open-time guard alone missed it (#867).
+ * caller can close the held connection, heal the on-disk file (best-effort
+ * lossless VACUUM INTO → atomic swap, falling back to rename-and-recreate),
+ * and reopen. The retry then passes through the full BUSY-retry loop so
+ * transient lock contention on the healed DB does not fail the operation.
+ * Covers mid-session corruption on a long-held handle (ContentStore,
+ * SessionDB) — the open-time guard alone missed it (#867).
  *
  * Pass custom delays for testing (e.g., [0, 0, 0] to skip waits).
  */
@@ -452,8 +453,13 @@ export function withRetry<T>(
       const msg = err instanceof Error ? err.message : String(err);
       if (isSQLiteCorruptionError(msg) && heal) {
         if (heal()) {
+          // Heal succeeded — retry with the full BUSY-retry loop, then
+          // re-throw with context if the retry also exhausts all attempts.
+          // This preserves the historical BUSY resilience on the healed DB
+          // instead of giving up after one shot (#867 review).
+          const busied = () => withRetry(fn, delays);
           try {
-            return fn();
+            return busied();
           } catch (retryErr: unknown) {
             const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
             throw new Error(
@@ -462,7 +468,7 @@ export function withRetry<T>(
             );
           }
         }
-        // heal failed — throw original error
+        // heal failed — throw original corruption error
       }
       if (!msg.includes("SQLITE_BUSY") && !msg.includes("database is locked")) {
         throw err;
@@ -512,19 +518,22 @@ export function renameCorruptDB(dbPath: string): void {
 }
 
 /**
- * Attempt a lossless heal of a corrupt SQLite database via
- * VACUUM INTO → atomic swap (#867).
+ * Best-effort lossless heal of a corrupt SQLite database via
+ * VACUUM INTO → integrity check → atomic swap (#867).
  *
  * Opens a read-only connection on the corrupt file, runs
  * `VACUUM INTO '<tmp>'` to rebuild a clean copy (data-preserving
  * when corruption is in freelist / indexes — the common mid-session
- * case), then atomically swaps the healed file in place.
+ * case, but not guaranteed when the b-tree itself is damaged), then
+ * verifies the result with `PRAGMA quick_check` before atomically
+ * swapping the healed file in place.
  *
- * Returns `true` if the heal succeeded, `false` if the file is too
- * damaged even for a readonly open or if VACUUM INTO throws (caller
- * should fall back to `renameCorruptDB` → recreate-empty).
+ * Returns `true` if the heal + verification succeeded, `false` if
+ * the file is too damaged even for a readonly open, VACUUM INTO
+ * throws, or quick_check does not return "ok" (caller should fall
+ * back to `renameCorruptDB` → recreate-empty).
  */
-export function healLossless(dbPath: string): boolean {
+export function attemptLosslessHeal(dbPath: string): boolean {
   const Database = loadDatabase();
   const tmpPath = `${dbPath}.heal-${Date.now()}`;
   try {
@@ -533,6 +542,20 @@ export function healLossless(dbPath: string): boolean {
       src.exec(`VACUUM INTO '${tmpPath.replace(/'/g, "''")}'`);
     } finally {
       try { src.close(); } catch { /* ignore */ }
+    }
+
+    // Verify healed copy before swapping — don't replace the original
+    // with a broken rebuild (#867 review).
+    const healed = new Database(tmpPath, { readonly: true });
+    let ok = false;
+    try {
+      const result = healed.pragma("quick_check") as string;
+      ok = result === "ok";
+    } catch { /* quick_check threw — heal failed */ }
+    try { healed.close(); } catch { /* ignore */ }
+    if (!ok) {
+      try { unlinkSync(tmpPath); } catch { /* ignore */ }
+      return false;
     }
 
     // Atomic swap: backup old → healed takes its place
@@ -563,7 +586,7 @@ export function reopenAfterHeal(
 ): DatabaseInstance {
   try { oldDb.close(); } catch { /* already closed or damaged */ }
 
-  if (!healLossless(dbPath)) {
+  if (!attemptLosslessHeal(dbPath)) {
     renameCorruptDB(dbPath);
   }
 

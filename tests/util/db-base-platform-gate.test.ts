@@ -421,8 +421,8 @@ describe("db-base corruption heal (#867)", () => {
 		expect(calls).toBe(1);
 	});
 
-	it("healLossless preserves data on a valid DB", async () => {
-		const { healLossless, loadDatabase, closeDB } = await import("../../src/db-base.js");
+	it("attemptLosslessHeal preserves data on a valid DB", async () => {
+		const { attemptLosslessHeal, loadDatabase, closeDB } = await import("../../src/db-base.js");
 		const { tmpdir } = await import("node:os");
 		const { join } = await import("node:path");
 		const { rmSync } = await import("node:fs");
@@ -434,7 +434,7 @@ describe("db-base corruption heal (#867)", () => {
 			src.exec("CREATE TABLE t(x INT)");
 			src.prepare("INSERT INTO t VALUES(?)").run(42);
 			closeDB(src);
-			const ok = healLossless(dbPath);
+			const ok = attemptLosslessHeal(dbPath);
 			expect(ok).toBe(true);
 			const healed = new Database(dbPath);
 			const row = healed.prepare("SELECT count(*) as c FROM t").get() as { c: number };
@@ -447,26 +447,68 @@ describe("db-base corruption heal (#867)", () => {
 		}
 	});
 
-	it("healLossless returns false for non-existent file", async () => {
-		const { healLossless } = await import("../../src/db-base.js");
+	it("attemptLosslessHeal returns false for non-existent file", async () => {
+		const { attemptLosslessHeal } = await import("../../src/db-base.js");
 		const { tmpdir } = await import("node:os");
 		const { join } = await import("node:path");
-		const ok = healLossless(join(tmpdir(), "no-such-db-" + Date.now() + ".db"));
+		const ok = attemptLosslessHeal(join(tmpdir(), "no-such-db-" + Date.now() + ".db"));
 		expect(ok).toBe(false);
 	});
 
-	it("healLossless returns false for file that is not a database", async () => {
-		const { healLossless } = await import("../../src/db-base.js");
+	it("attemptLosslessHeal returns false for file that is not a database", async () => {
+		const { attemptLosslessHeal } = await import("../../src/db-base.js");
 		const { tmpdir } = await import("node:os");
 		const { join } = await import("node:path");
 		const { writeFileSync, rmSync } = await import("node:fs");
 		const path = join(tmpdir(), "not-a-db-" + Date.now() + ".db");
 		writeFileSync(path, "not a sqlite database");
 		try {
-			const ok = healLossless(path);
+			const ok = attemptLosslessHeal(path);
 			expect(ok).toBe(false);
 		} finally {
 			try { rmSync(path, { force: true }); } catch {}
 		}
+	});
+
+	it("attemptLosslessHeal handles paths containing single-quote", async () => {
+		const { attemptLosslessHeal, loadDatabase, closeDB } = await import("../../src/db-base.js");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const { rmSync } = await import("node:fs");
+		const Database = loadDatabase();
+		// Path with a single-quote — VACUUM INTO literal must be escaped
+		const dbPath = join(tmpdir(), "heal-it" + "'" + "s-ok-" + Date.now() + ".db");
+		const src = new Database(dbPath);
+		try {
+			src.pragma("journal_mode=WAL");
+			src.exec("CREATE TABLE t(x INT)");
+			src.prepare("INSERT INTO t VALUES(?)").run(42);
+			closeDB(src);
+			const ok = attemptLosslessHeal(dbPath);
+			expect(ok).toBe(true);
+			const healed = new Database(dbPath);
+			const row = healed.prepare("SELECT count(*) as c FROM t").get() as { c: number };
+			expect(row.c).toBe(1);
+			closeDB(healed);
+		} finally {
+			try { rmSync(dbPath, { force: true }); } catch {}
+			try { rmSync(dbPath + "-wal", { force: true }); } catch {}
+			try { rmSync(dbPath + "-shm", { force: true }); } catch {}
+		}
+	});
+
+	it("withRetry passes post-heal retry through full BUSY loop", async () => {
+		const { withRetry } = await import("../../src/db-base.js");
+		const callOrder: string[] = [];
+		const fn = () => {
+			callOrder.push("fn");
+			if (callOrder.filter(x => x === "fn").length === 1) throw new Error("SQLITE_CORRUPT: disk image is malformed");
+			if (callOrder.filter(x => x === "fn").length === 2) throw new Error("SQLITE_BUSY: database is locked");
+			return "ok";
+		};
+		const heal = () => { callOrder.push("heal"); return true; };
+		const result = withRetry(fn, [0, 0, 0], heal);
+		expect(result).toBe("ok");
+		expect(callOrder).toEqual(["fn", "heal", "fn", "fn"]); // corrupt→heal→BUSY→success
 	});
 });
