@@ -972,15 +972,15 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
    {
      "context_servers": {
        "context-mode": {
-         "command": {
-           "path": "context-mode"
-         }
+         "command": "context-mode",
+         "args": [],
+         "env": {}
        }
      }
    }
    ```
 
-   Note: Zed uses `"context_servers"` and `"command": { "path": "..." }` syntax, not `"mcpServers"` or `"command": "..."` like other platforms.
+   Note: Zed uses `"context_servers"` instead of `"mcpServers"`. `args` and `env` are optional for context-mode, but are shown here to match Zed's custom MCP server shape.
 
 3. Copy routing instructions (Zed has no hook support):
 
