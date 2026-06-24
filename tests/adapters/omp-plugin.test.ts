@@ -20,7 +20,7 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SessionDB } from "../../src/session/db.js";
@@ -87,6 +87,7 @@ describe("OMP plugin", () => {
     }
     delete process.env.OMP_PROJECT_DIR;
     delete process.env.PI_PROJECT_DIR;
+    delete process.env.PI_CODING_AGENT_DIR;
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -266,6 +267,31 @@ describe("OMP plugin", () => {
       const sid = mod._getOmpPluginSessionIdForTests();
       // 16-hex SHA-256 prefix per deriveSessionId contract
       expect(sid).toMatch(/^[a-f0-9]{16}$/);
+    });
+
+    it("seeds SYSTEM.md routing instructions into the OMP agent dir when missing", async () => {
+      const agentDir = join(tempDir, "agent");
+      process.env.PI_CODING_AGENT_DIR = agentDir;
+
+      await registerOmpPlugin(api);
+
+      const systemPath = join(agentDir, "SYSTEM.md");
+      expect(existsSync(systemPath)).toBe(true);
+      const content = readFileSync(systemPath, "utf-8");
+      expect(content).toContain("ctx_execute");
+      expect(content).toContain("ctx_batch_execute");
+    });
+
+    it("does not overwrite an existing OMP SYSTEM.md", async () => {
+      const agentDir = join(tempDir, "agent-existing");
+      const systemPath = join(agentDir, "SYSTEM.md");
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(systemPath, "# custom OMP prompt\n", "utf-8");
+      process.env.PI_CODING_AGENT_DIR = agentDir;
+
+      await registerOmpPlugin(api);
+
+      expect(readFileSync(systemPath, "utf-8")).toBe("# custom OMP prompt\n");
     });
   });
 
