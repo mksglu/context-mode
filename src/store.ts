@@ -1062,8 +1062,15 @@ export class ContentStore {
       const now = new Date().toISOString();
       for (const chunk of chunks) {
         const ct = chunk.hasCode ? "code" : "prose";
-        this.#stmtInsertChunk.run(chunk.title, chunk.content, sourceId, ct, null, sessionIdCol, eventIdCol, now);
-        this.#stmtInsertChunkTrigram.run(chunk.title, chunk.content, sourceId, ct, null, sessionIdCol, eventIdCol, now);
+        // Defensive invariant (#878): if any format-specific chunker silently
+        // bypasses the cap in the future, hard-clip here so the FTS5 store
+        // never persists an unbounded chunk. The 4-byte slack matches the
+        // documented multibyte code-point overshoot of #byteCappedPrefix.
+        const safeContent = Buffer.byteLength(chunk.content) > MAX_CHUNK_BYTES + 4
+          ? this.#byteCappedPrefix(chunk.content, MAX_CHUNK_BYTES)
+          : chunk.content;
+        this.#stmtInsertChunk.run(chunk.title, safeContent, sourceId, ct, null, sessionIdCol, eventIdCol, now);
+        this.#stmtInsertChunkTrigram.run(chunk.title, safeContent, sourceId, ct, null, sessionIdCol, eventIdCol, now);
       }
 
       return sourceId;
@@ -1669,27 +1676,53 @@ export class ContentStore {
       let accumulator: string[] = [];
       let partIndex = 1;
 
+      const emitPart = (content: string, hasCode: boolean) => {
+        const partTitle = paragraphs.length > 1 ? `${title} (${partIndex})` : title;
+        partIndex++;
+        chunks.push({ title: partTitle, content, hasCode });
+      };
+
       const flushAccumulator = () => {
         if (accumulator.length === 0) return;
         const part = accumulator.join("\n\n").trim();
-        if (part.length === 0) return;
-        const partTitle = paragraphs.length > 1 ? `${title} (${partIndex})` : title;
-        partIndex++;
-        chunks.push({
-          title: partTitle,
-          content: part,
-          hasCode: part.includes("```"),
-        });
         accumulator = [];
+        if (part.length === 0) return;
+        emitPart(part, part.includes("```"));
+      };
+
+      // A single paragraph wider than the cap cannot be saved by paragraph
+      // boundaries (issue #878 — `ctx_batch_execute` heading-wrapped output
+      // collapses to one giant paragraph). Sub-split it by UTF-8 bytes via the
+      // shared plain-text helper so the cap holds regardless of input shape.
+      const flushOversizedSingleParagraph = (para: string) => {
+        const subChunks = this.#splitOversizedPlainChunk(
+          para.split("\n"),
+          paragraphs.length > 1 ? `${title} (${partIndex})` : title,
+          maxChunkBytes,
+        );
+        for (const sub of subChunks) {
+          chunks.push({ title: sub.title, content: sub.content, hasCode: sub.content.includes("```") });
+        }
+        // Advance partIndex past the sub-chunk batch so any subsequent paragraph
+        // parts keep monotonic numbering.
+        partIndex += Math.max(subChunks.length, 1);
       };
 
       for (const para of paragraphs) {
-        accumulator.push(para);
-        const candidate = accumulator.join("\n\n");
-        if (Buffer.byteLength(candidate) > maxChunkBytes && accumulator.length > 1) {
-          accumulator.pop();
+        const candidate = accumulator.length === 0
+          ? para
+          : accumulator.join("\n\n") + "\n\n" + para;
+        if (Buffer.byteLength(candidate) > maxChunkBytes) {
+          // Adding this paragraph would breach the cap. Flush what we've got…
           flushAccumulator();
-          accumulator = [para];
+          // …then decide how to handle the offending paragraph on its own.
+          if (Buffer.byteLength(para) > maxChunkBytes) {
+            flushOversizedSingleParagraph(para);
+          } else {
+            accumulator = [para];
+          }
+        } else {
+          accumulator.push(para);
         }
       }
       flushAccumulator();
