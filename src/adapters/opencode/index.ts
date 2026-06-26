@@ -475,17 +475,22 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   }
 
   getInstalledVersion(): string {
-    // Check ~/.cache/opencode/node_modules/ for context-mode
+    // Check the per-package cache folder where npm installs context-mode.
+    // Layout (changed in late 2024 — see PR #376 / KiloCode#9503):
+    //   POSIX  : ~/.cache/<platform>/packages/context-mode@latest/node_modules/context-mode
+    //   Windows: %LOCALAPPDATA%\<platform>\packages\context-mode@latest\node_modules\context-mode
+    const subPath = ["packages", "context-mode@latest", "node_modules", "context-mode"];
     try {
-      const pkgPath = resolve(
-        homedir(),
-        ".cache",
-        this.platform,
-        "node_modules",
-        "context-mode",
-        "package.json",
-      );
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      let cacheRoot: string;
+      if (process.platform === "win32") {
+        const localApp = process.env.LOCALAPPDATA;
+        cacheRoot = localApp
+          ? resolve(localApp, this.platform, ...subPath)
+          : resolve(homedir(), "AppData", "Local", this.platform, ...subPath);
+      } else {
+        cacheRoot = resolve(homedir(), ".cache", this.platform, ...subPath);
+      }
+      const pkg = JSON.parse(readFileSync(resolve(cacheRoot, "package.json"), "utf-8"));
       if (typeof pkg.version === "string") return pkg.version;
     } catch {
       /* not found */

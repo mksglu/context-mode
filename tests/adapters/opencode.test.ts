@@ -599,6 +599,95 @@ describe("OpenCodeAdapter", () => {
         rmSync(root, { recursive: true, force: true });
       });
     });
+
+  // ── getInstalledVersion — PR #376 cache layout ──────────
+
+  describe("getInstalledVersion — PR #376 cache layout", () => {
+    it("reads version from new packages/context-mode@latest path", () => {
+      const root = mkdtempSync(join(tmpdir(), "opencode-ver-"));
+      const home = join(root, "home");
+      const cacheDir = process.platform === "win32"
+        ? join(root, "localAppData")
+        : join(home, ".cache");
+      const pkgDir = join(cacheDir, "opencode", "packages", "context-mode@latest", "node_modules", "context-mode");
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ version: "1.0.168" }));
+
+      const prevHome = process.env.HOME;
+      const prevUserProfile = process.env.USERPROFILE;
+      const prevLocalAppData = process.env.LOCALAPPDATA;
+      Object.assign(process.env, env(home));
+      if (process.platform === "win32") process.env.LOCALAPPDATA = cacheDir;
+      try {
+        const a = new OpenCodeAdapter();
+        expect(a.getInstalledVersion()).toBe("1.0.168");
+      } finally {
+        if (prevHome !== undefined) process.env.HOME = prevHome;
+        else delete process.env.HOME;
+        if (prevUserProfile !== undefined) process.env.USERPROFILE = prevUserProfile;
+        else delete process.env.USERPROFILE;
+        if (prevLocalAppData !== undefined) process.env.LOCALAPPDATA = prevLocalAppData;
+        else delete process.env.LOCALAPPDATA;
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("returns 'not installed' when cache package.json is missing", () => {
+      const root = mkdtempSync(join(tmpdir(), "opencode-ver-"));
+      const home = join(root, "home");
+      const prevHome = process.env.HOME;
+      const prevUserProfile = process.env.USERPROFILE;
+      const prevLocalAppData = process.env.LOCALAPPDATA;
+      Object.assign(process.env, env(home));
+      if (process.platform === "win32") {
+        const cacheDir = join(root, "localAppData");
+        mkdirSync(cacheDir, { recursive: true });
+        process.env.LOCALAPPDATA = cacheDir;
+      }
+      try {
+        const a = new OpenCodeAdapter();
+        expect(a.getInstalledVersion()).toBe("not installed");
+      } finally {
+        if (prevHome !== undefined) process.env.HOME = prevHome;
+        else delete process.env.HOME;
+        if (prevUserProfile !== undefined) process.env.USERPROFILE = prevUserProfile;
+        else delete process.env.USERPROFILE;
+        if (prevLocalAppData !== undefined) process.env.LOCALAPPDATA = prevLocalAppData;
+        else delete process.env.LOCALAPPDATA;
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("reads version from kilo platform with new cache layout", () => {
+      const root = mkdtempSync(join(tmpdir(), "kilo-ver-"));
+      const home = join(root, "home");
+      const cacheDir = process.platform === "win32"
+        ? join(root, "localAppData")
+        : join(home, ".cache");
+      const pkgDir = join(cacheDir, "kilo", "packages", "context-mode@latest", "node_modules", "context-mode");
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ version: "2.0.0" }));
+
+      const prevHome = process.env.HOME;
+      const prevUserProfile = process.env.USERPROFILE;
+      const prevLocalAppData = process.env.LOCALAPPDATA;
+      Object.assign(process.env, env(home));
+      if (process.platform === "win32") process.env.LOCALAPPDATA = cacheDir;
+      try {
+        const a = new OpenCodeAdapter("kilo");
+        expect(a.getInstalledVersion()).toBe("2.0.0");
+      } finally {
+        if (prevHome !== undefined) process.env.HOME = prevHome;
+        else delete process.env.HOME;
+        if (prevUserProfile !== undefined) process.env.USERPROFILE = prevUserProfile;
+        else delete process.env.USERPROFILE;
+        if (prevLocalAppData !== undefined) process.env.LOCALAPPDATA = prevLocalAppData;
+        else delete process.env.LOCALAPPDATA;
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  });
+
   });
 });
 
