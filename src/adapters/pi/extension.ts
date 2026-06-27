@@ -889,10 +889,12 @@ export default function piExtension(pi: any): void {
     description: "Show context-mode session statistics",
     handler: async (argsOrCtx: unknown, maybeCtx: unknown) => {
       const ctx = resolveCommandContext(argsOrCtx, maybeCtx);
+      const dbPath = getDBPath(projectDir);
+      const db = _dbSingletons.get(dbPath);
       const text =
-        !_db || !_sessionId
+        !db || !_sessionId
           ? "context-mode: no active session"
-          : buildStatsText(_db, _sessionId);
+          : buildStatsText(db, _sessionId);
 
       return handleCommandText(text, ctx);
     },
@@ -914,13 +916,14 @@ export default function piExtension(pi: any): void {
         `- Project dir: \`${projectDir}\``,
       ];
 
-      if (_db && _sessionId) {
+      const db = _dbSingletons.get(dbPath);
+      if (db && _sessionId) {
         try {
-          const stats = _db.getSessionStats(_sessionId);
-          const eventCount = _db.getEventCount(_sessionId);
+          const stats = db.getSessionStats(_sessionId);
+          const eventCount = db.getEventCount(_sessionId);
           lines.push(`- Events: ${eventCount}`);
           lines.push(`- Compactions: ${stats?.compact_count ?? 0}`);
-          const resume = _db.getResume(_sessionId);
+          const resume = db.getResume(_sessionId);
           lines.push(
             `- Resume snapshot: ${resume ? (resume.consumed ? "consumed" : "available") : "none"}`,
           );
