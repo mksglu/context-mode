@@ -70,8 +70,7 @@ const BLOCKED_BASH_PATTERNS: RegExp[] = [
 // Same shape as Pi: one DB per process, session ID rebound on each
 // session_start so multi-session reuse within a long-lived plugin
 // process keeps event attribution correct.
-let _db: SessionDB | null = null;
-let _dbPath = "";
+const _dbSingletons = new Map<string, SessionDB>();
 let _sessionId = "";
 
 const _ompAdapter = new OMPAdapter();
@@ -147,19 +146,13 @@ function getDBPath(projectDir: string): string {
 }
 
 function getOrCreateDB(projectDir: string): SessionDB {
-  // Reopen the singleton if the resolved DB path changes. See the
-  // matching Pi extension comment — defensive re-keying on projectDir
-  // hash keeps tests deterministic and stops a stale singleton from
-  // pointing at an earlier projectDir's `<hash>.db`. (#645)
   const dbPath = getDBPath(projectDir);
-  if (!_db || _dbPath !== dbPath) {
-    if (_db) {
-      try { _db.close(); } catch { /* best effort */ }
-    }
-    _db = new SessionDB({ dbPath });
-    _dbPath = dbPath;
+  let db = _dbSingletons.get(dbPath);
+  if (!db) {
+    db = new SessionDB({ dbPath });
+    _dbSingletons.set(dbPath, db);
   }
-  return _db;
+  return db;
 }
 
 /**
@@ -186,11 +179,10 @@ function deriveSessionId(ctx: Record<string, unknown> | undefined): string {
 // The plugin's default export is the OMP factory; this helper is only
 // imported by tests to clear singletons between cases.
 export function _resetOmpPluginStateForTests(): void {
-  if (_db) {
-    try { _db.close(); } catch { /* best effort */ }
+  for (const db of _dbSingletons.values()) {
+    try { db.close(); } catch { /* best effort */ }
   }
-  _db = null;
-  _dbPath = "";
+  _dbSingletons.clear();
   _sessionId = "";
 }
 

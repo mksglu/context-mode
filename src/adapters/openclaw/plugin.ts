@@ -270,30 +270,20 @@ function getDBPath(projectDir: string): string {
   return resolveSessionDbPath({ projectDir, sessionsDir: getSessionDir() });
 }
 
-// ── Module-level DB singleton ─────────────────────────────
+// ── Module-level DB singletons ─────────────────────────────
 // Shared across all register() calls (one per agent session).
-// Lazy-initialized on first register() using the first projectDir seen.
 // Uses OpenClawSessionDB for session_key mapping and rename support.
-let _dbSingleton: OpenClawSessionDB | null = null;
-let _dbSingletonPath = "";
+const _dbSingletons = new Map<string, OpenClawSessionDB>();
+
 function getOrCreateDB(projectDir: string): OpenClawSessionDB {
-  // Reopen the singleton if the resolved DB path changes. Production
-  // code normally loads the plugin once per process with a single
-  // workspace, but defensive re-keying on resolved path keeps the
-  // contract honest if a host ever calls register() twice with
-  // different projectDirs, and removes a subtle test-isolation
-  // foot-gun where a stale singleton pointed at a prior test's
-  // `<hash>.db`. Mirrors the Pi/OMP fix (#645).
   const dbPath = getDBPath(projectDir);
-  if (!_dbSingleton || _dbSingletonPath !== dbPath) {
-    if (_dbSingleton) {
-      try { _dbSingleton.close(); } catch { /* best effort */ }
-    }
-    _dbSingleton = new OpenClawSessionDB({ dbPath });
-    _dbSingletonPath = dbPath;
-    _dbSingleton.cleanupOldSessions(7);
+  let db = _dbSingletons.get(dbPath);
+  if (!db) {
+    db = new OpenClawSessionDB({ dbPath });
+    db.cleanupOldSessions(7);
+    _dbSingletons.set(dbPath, db);
   }
-  return _dbSingleton;
+  return db;
 }
 
 // ── Module-level state for command handlers ───────────────
