@@ -889,7 +889,7 @@ Restart `agy`.
 { "mcpServers": { "context-mode": { "command": "context-mode" } } }
 ```
 
-**Verify:** type `ctx stats` in an agy session, or run any prompt from [Try It](#try-it) and check the savings. `context-mode doctor` confirms MCP + hook registration. Remove with `agy plugin uninstall context-mode`.
+**Verify:** type `ctx stats` in an any session, or run any prompt from [Try It](#try-it) and check the savings. `context-mode doctor` confirms MCP + hook registration. Remove with `agy plugin uninstall context-mode`.
 
 **Routing:** the routing rule and skill provide the instruction layer; bounded `PreToolUse` blocks high-flood tools and `PostToolUse` captures sessions. The bundle pins `CONTEXT_MODE_PLATFORM=antigravity-cli` so agy is detected even when Claude Code is co-installed ([#774](https://github.com/mksglu/context-mode/issues/774)).
 
