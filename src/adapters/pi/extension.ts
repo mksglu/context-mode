@@ -131,8 +131,7 @@ export function isSafeCurlWget(segment: string): boolean {
 
 // ── Module-level DB singleton ────────────────────────────
 
-let _db: SessionDB | null = null;
-let _dbPath = "";
+const _dbSingletons = new Map<string, SessionDB>();
 let _sessionId = "";
 
 // MCP bridge handle. The bridge spawns server.bundle.mjs once and
@@ -210,21 +209,13 @@ function getDBPath(projectDir: string): string {
 }
 
 function getOrCreateDB(projectDir: string): SessionDB {
-  // Reopen the singleton if the resolved DB path changes. Production code
-  // normally loads the extension once per process with a single workspace,
-  // but defensive re-keying on path keeps the contract honest if a host
-  // ever calls piExtension(pi) twice with different projectDirs, and
-  // removes a subtle test-isolation foot-gun where stale singletons
-  // pointed at a prior test's `<hash>.db`. (#645)
   const dbPath = getDBPath(projectDir);
-  if (!_db || _dbPath !== dbPath) {
-    if (_db) {
-      try { _db.close(); } catch { /* best effort */ }
-    }
-    _db = new SessionDB({ dbPath });
-    _dbPath = dbPath;
+  let db = _dbSingletons.get(dbPath);
+  if (!db) {
+    db = new SessionDB({ dbPath });
+    _dbSingletons.set(dbPath, db);
   }
-  return _db;
+  return db;
 }
 
 /** Derive a stable session ID from Pi's session file path (SHA256, 16 hex chars). */
@@ -857,11 +848,10 @@ export default function piExtension(pi: any): void {
 
   pi.on("session_shutdown", async () => {
     try {
-      if (_db) {
-        _db.cleanupOldSessions(7);
+      for (const db of _dbSingletons.values()) {
+        try { db.cleanupOldSessions(7); } catch { /* ignore */ }
       }
-      _db = null;
-      _dbPath = "";
+      _dbSingletons.clear();
       _sessionId = "";
     } catch {
       // best effort — never throw during shutdown
@@ -899,10 +889,12 @@ export default function piExtension(pi: any): void {
     description: "Show context-mode session statistics",
     handler: async (argsOrCtx: unknown, maybeCtx: unknown) => {
       const ctx = resolveCommandContext(argsOrCtx, maybeCtx);
+      const dbPath = getDBPath(projectDir);
+      const db = _dbSingletons.get(dbPath);
       const text =
-        !_db || !_sessionId
+        !db || !_sessionId
           ? "context-mode: no active session"
-          : buildStatsText(_db, _sessionId);
+          : buildStatsText(db, _sessionId);
 
       return handleCommandText(text, ctx);
     },
@@ -924,13 +916,14 @@ export default function piExtension(pi: any): void {
         `- Project dir: \`${projectDir}\``,
       ];
 
-      if (_db && _sessionId) {
+      const db = _dbSingletons.get(dbPath);
+      if (db && _sessionId) {
         try {
-          const stats = _db.getSessionStats(_sessionId);
-          const eventCount = _db.getEventCount(_sessionId);
+          const stats = db.getSessionStats(_sessionId);
+          const eventCount = db.getEventCount(_sessionId);
           lines.push(`- Events: ${eventCount}`);
           lines.push(`- Compactions: ${stats?.compact_count ?? 0}`);
-          const resume = _db.getResume(_sessionId);
+          const resume = db.getResume(_sessionId);
           lines.push(
             `- Resume snapshot: ${resume ? (resume.consumed ? "consumed" : "available") : "none"}`,
           );

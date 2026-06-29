@@ -434,8 +434,9 @@ writeFileSync(
 // snippets under /tmp when the host process exits.
 process.on("exit", () => { try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ } });
 
-// Lazy singleton — no DB overhead unless index/search is used
-let _store: ContentStore | null = null;
+// Map of dbPath -> ContentStore.
+// Lazy singletons — no DB overhead unless index/search is used
+const _stores = new Map<string, ContentStore>();
 
 /**
  * Build the FK-attribution object passed to every ContentStore.index*() call
@@ -697,24 +698,26 @@ function getStorePath(): string {
 }
 
 function getStore(): ContentStore {
+  const dbPath = getStorePath();
+  let _store = _stores.get(dbPath);
   if (!_store) {
     // Content DB cleanup on fresh start is handled by SessionStart hook.
     // Server just opens whatever DB exists (or creates new if hook deleted it).
-    const dbPath = getStorePath();
     _store = new ContentStore(dbPath);
+    _stores.set(dbPath, _store);
 
+    const boundProjectDir = getProjectDir();
     // Wire deny-policy hook: store re-checks the Read deny list before
     // re-reading any file_path during auto-refresh. Catches policy edits
     // made after a file was originally indexed. See #442 round-3.
     _store.setDenyChecker((filePath: string) => {
       try {
-        const projectDir = getProjectDir();
-        const denyGlobs = readToolDenyPatterns("Read", projectDir);
+        const denyGlobs = readToolDenyPatterns("Read", boundProjectDir);
         const r = evaluateFilePath(
           filePath,
           denyGlobs,
           process.platform === "win32",
-          projectDir,
+          boundProjectDir,
         );
         return r.denied;
       } catch {
@@ -725,7 +728,7 @@ function getStore(): ContentStore {
 
     // One-time startup cleanup: remove stale content DBs (>14 days)
     try {
-      const contentDir = dirname(getStorePath());
+      const contentDir = dirname(dbPath);
       cleanupStaleContentDBs(contentDir, 14);
       _store.cleanupStaleSources(14);
       // Also clean legacy shared dir from before platform isolation
@@ -4549,9 +4552,17 @@ EXAMPLE: ctx_purge(confirm: true, scope: "project")`,
     try {
       storePathForPurge = getStorePath();
     } catch { /* best effort — store path may be unresolvable on fresh install */ }
-    if (_store) {
-      try { _store.cleanup(); } catch { /* best effort */ }
-      _store = null;
+    if (storePathForPurge) {
+      const store = _stores.get(storePathForPurge);
+      if (store) {
+        try { store.cleanup(); } catch { /* best effort */ }
+        _stores.delete(storePathForPurge);
+      }
+    } else {
+      for (const store of _stores.values()) {
+        try { store.cleanup(); } catch { /* best effort */ }
+      }
+      _stores.clear();
     }
 
     // FTS5 store: pass contentDir so purgeSession sweeps BOTH canonical
@@ -4866,7 +4877,9 @@ async function main() {
   // Clean up own DB + backgrounded processes + preload script on shutdown
   const shutdown = () => {
     executor.cleanupBackgrounded();
-    if (_store) _store.close(); // persist DB for --continue sessions
+    for (const store of _stores.values()) {
+      try { store.close(); } catch { /* best effort */ }
+    } // persist DB for --continue sessions
     try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ }
     // Remove MCP readiness sentinel (#230)
     try { unlinkSync(mcpSentinel); } catch { /* best effort */ }
