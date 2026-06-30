@@ -126,6 +126,21 @@ describe("routePreToolUse", () => {
       );
     });
 
+    it("routes PowerShell command payloads like Bash command payloads", () => {
+      const result = routePreToolUse(
+        "PowerShell",
+        { command: "curl https://example.com" },
+        undefined,
+        "claude-code",
+        "powershell-curl",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+      expect((result!.updatedInput as Record<string, string>).command).toContain(
+        "curl/wget redirected",
+      );
+    });
+
     it("denies wget commands with modify action", () => {
       const result = routePreToolUse("Bash", {
         command: "wget https://example.com/file.tar.gz",

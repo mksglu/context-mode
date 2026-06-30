@@ -197,6 +197,19 @@ describe("CWD Events", () => {
     assert.equal(cwdEvents[0].data, "/path with spaces/dir");
   });
 
+  test("extracts cwd from PowerShell command payloads", () => {
+    const input = {
+      tool_name: "PowerShell",
+      tool_input: { command: "cd /project/from-powershell; Get-ChildItem" },
+      tool_response: "file1.ts\nfile2.ts",
+    };
+
+    const events = extractEvents(input);
+    const cwdEvents = events.filter(e => e.type === "cwd");
+    assert.equal(cwdEvents.length, 1);
+    assert.equal(cwdEvents[0].data, "/project/from-powershell");
+  });
+
   test("does not extract cwd from non-cd bash commands", () => {
     const input = {
       tool_name: "Bash",
