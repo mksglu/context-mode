@@ -62,5 +62,5 @@ try {
 
 // Codex PostToolUse requires hookEventName in hookSpecificOutput
 process.stdout.write(JSON.stringify({
-  hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: "" },
+  hookSpecificOutput: { hookEventName: "PostToolUse" },
 }) + "\n");
