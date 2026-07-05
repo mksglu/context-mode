@@ -26,7 +26,7 @@ import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 
 import { classifyNonZeroExit } from "../../src/exit-classify.js";
 import { PolyglotExecutor } from "../../src/executor.js";
@@ -6385,6 +6385,14 @@ describe("ctx_batch_execute query_scope (issue #696)", () => {
     "utf-8",
   );
 
+  // The batch scope tip is emitted once per process; reset the module-level
+  // flag before each test so the "first call" assertions are deterministic
+  // under vitest's shared fork pool.
+  beforeEach(async () => {
+    const { resetBatchFooterState } = await import("../../src/server.js");
+    resetBatchFooterState();
+  });
+
   test("schema declares query_scope enum with batch default", () => {
     expect(serverSrc).toMatch(/query_scope:\s*z\s*\.enum\(\["batch",\s*"global"\]\)/);
     expect(serverSrc).toContain('.default("batch")');
@@ -6395,14 +6403,19 @@ describe("ctx_batch_execute query_scope (issue #696)", () => {
     expect(serverSrc).toMatch(/query_scope[\s\S]{0,2000}searches the entire persistent index/i);
   });
 
-  test("formatBatchQueryResults default scope keeps batch-local tip", async () => {
+  test("formatBatchQueryResults shows the batch scope tip once per process", async () => {
     const { formatBatchQueryResults } = await import("../../src/server.js");
     const store = new ContentStore(":memory:");
     store.index({ content: "# Section A\n\nValidation of frontmatter is critical.\n", source: "batch:cmd1" });
-    const lines = formatBatchQueryResults(store, ["validation"], "batch:cmd1");
-    const text = lines.join("\n");
-    expect(text).toMatch(/Results are scoped to this batch only/);
-    expect(text).toMatch(/query_scope:\s*"global"/);
+
+    // First non-global batch call in a fresh process surfaces the tip.
+    const first = formatBatchQueryResults(store, ["validation"], "batch:cmd1").join("\n");
+    expect(first).toMatch(/Results are scoped to this batch only/);
+    expect(first).toMatch(/query_scope:\s*"global"/);
+
+    // A second call in the same process omits the now-redundant tip.
+    const second = formatBatchQueryResults(store, ["validation"], "batch:cmd1").join("\n");
+    expect(second).not.toMatch(/Results are scoped to this batch only/);
   });
 
   test("formatBatchQueryResults global scope drops batch tip and notes global scope", async () => {
@@ -6413,6 +6426,20 @@ describe("ctx_batch_execute query_scope (issue #696)", () => {
     const text = lines.join("\n");
     expect(text).toMatch(/query_scope:\s*"global"/);
     expect(text).not.toMatch(/Results are scoped to this batch only/);
+  });
+
+  test("formatBatchQueryResults reports a miss so follow-up terms stay gated", async () => {
+    const { formatBatchQueryResults } = await import("../../src/server.js");
+    const store = new ContentStore(":memory:");
+    store.index({ content: "# Section A\n\nValidation of frontmatter is critical.\n", source: "batch:cmd1" });
+
+    const allHit = { anyMiss: false };
+    formatBatchQueryResults(store, ["validation"], "batch:cmd1", undefined, "batch", allHit);
+    expect(allHit.anyMiss).toBe(false);
+
+    const withMiss = { anyMiss: false };
+    formatBatchQueryResults(store, ["nonexistent-term-xyz"], "batch:cmd1", undefined, "batch", withMiss);
+    expect(withMiss.anyMiss).toBe(true);
   });
 });
 

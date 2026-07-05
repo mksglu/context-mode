@@ -1368,12 +1368,23 @@ export function extractSnippet(
 
 export type BatchQueryScope = "batch" | "global";
 
+// The batch-scope tip is identical on every non-global ctx_batch_execute call,
+// so it is emitted once per server process (the first non-global batch) instead
+// of repeated on every call. resetBatchFooterState() restores the initial state
+// so tests are deterministic under vitest's shared fork pool.
+let batchScopeTipShown = false;
+
+export function resetBatchFooterState(): void {
+  batchScopeTipShown = false;
+}
+
 export function formatBatchQueryResults(
   store: ContentStore,
   queries: string[],
   source: string,
   maxOutput = 80 * 1024,
   scope: BatchQueryScope = "batch",
+  stats?: { anyMiss: boolean },
 ): string[] {
   const sections: string[] = [];
   let outputSize = 0;
@@ -1404,13 +1415,15 @@ export function formatBatchQueryResults(
       continue;
     }
 
+    if (stats) stats.anyMiss = true;
     sections.push("No matching sections found.");
     sections.push("");
   }
 
   if (scope === "global") {
     sections.push(`\n> **Scope:** Queries searched the entire persistent index (query_scope: "global").`);
-  } else {
+  } else if (!batchScopeTipShown) {
+    batchScopeTipShown = true;
     sections.push(`\n> **Tip:** Results are scoped to this batch only. To search across all indexed sources, use \`ctx_search(queries: [...])\` or call ctx_batch_execute with \`query_scope: "global"\`.`);
   }
 
@@ -3853,10 +3866,13 @@ EXAMPLE: ctx_batch_execute(
       // When the caller passes query_scope: "global", searches reach the entire
       // persistent index in the same round trip. Cross-source search remains
       // available via explicit ctx_search() as well.
-      const queryResults = formatBatchQueryResults(store, queries, source, undefined, query_scope);
+      const batchStats = { anyMiss: false };
+      const queryResults = formatBatchQueryResults(store, queries, source, undefined, query_scope, batchStats);
 
-      // Get searchable terms for edge cases where follow-up is needed
-      const distinctiveTerms = store.getDistinctiveTerms
+      // Searchable terms help the agent reformulate after a miss. Surface them
+      // only when at least one query returned nothing (the follow-up case),
+      // not on the common all-hit path, to keep the batch footer lean.
+      const distinctiveTerms = batchStats.anyMiss && store.getDistinctiveTerms
         ? store.getDistinctiveTerms(indexed.sourceId)
         : [];
 
