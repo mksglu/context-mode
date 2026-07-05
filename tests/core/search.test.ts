@@ -21,7 +21,7 @@ import { ContentStore } from "../../src/store.js";
 import { SessionDB, hashProjectDirCanonical } from "../../src/session/db.js";
 import { searchAllSources, type UnifiedSearchResult } from "../../src/search/unified.js";
 import { searchAutoMemory } from "../../src/search/auto-memory.js";
-import { extractSnippet, formatBatchQueryResults, positionsFromHighlight } from "../../src/server.js";
+import { dedupeAcrossQueries, extractSnippet, formatBatchQueryResults, positionsFromHighlight } from "../../src/server.js";
 
 // ─────────────────────────────────────────────────────────
 // Shared helpers
@@ -764,6 +764,33 @@ describe("Multi-source isolation (batch_execute path)", () => {
     assert.ok(!output.includes("24 hours"), "Should not leak older source content when current batch matches");
 
     store.close();
+  });
+});
+
+describe("ctx_search cross-query dedup (dedupeAcrossQueries)", () => {
+  const chunk = (content: string) => ({ source: "docs: auth", title: "JWT", content });
+
+  test("a chunk matching two queries is emitted once, first occurrence kept", () => {
+    const seen = new Set<string>();
+    const c = chunk("JWT tokens expire after 24 hours.");
+
+    const firstQuery = dedupeAcrossQueries([c], seen);
+    assert.equal(firstQuery.length, 1, "first query emits the chunk");
+
+    const secondQuery = dedupeAcrossQueries([c], seen);
+    assert.equal(secondQuery.length, 0, "same chunk under a later query is dropped");
+  });
+
+  test("distinct chunks sharing source and title are not falsely deduped", () => {
+    const seen = new Set<string>();
+    const emitted = dedupeAcrossQueries(
+      [
+        chunk("Access tokens expire after 24 hours."),
+        chunk("Refresh tokens rotate weekly."),
+      ],
+      seen,
+    );
+    assert.equal(emitted.length, 2, "different content is a different chunk");
   });
 });
 
