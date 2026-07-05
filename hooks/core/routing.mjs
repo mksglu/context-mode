@@ -808,7 +808,18 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     // These produce extremely verbose output that should stay in sandbox.
     // Word-boundary guard prevents matching `gradle-wrapper-config`, `mvnDocker`, etc.
     if (/(^|\s|&&|\||\;)(\.\/gradlew|gradlew|gradle|\.\/mvnw|mvnw|mvn|\.\/sbt|sbt)(\s|$)/i.test(stripped)) {
-      const safeCmd = command.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      // safeCmd is interpolated into a double-quoted `echo "…"`. Inside double
+      // quotes the shell still evaluates backticks and `$(…)`/`$var`, so
+      // escaping only `\` and `"` let an embedded command substitution in the
+      // original command (e.g. `mvn install \`touch pwned\``) execute when the
+      // rewritten echo runs — defeating the redirect. Escape every character
+      // that stays active inside double quotes: `\` first, then backtick, `$`,
+      // and `"`.
+      const safeCmd = command
+        .replace(/\\/g, "\\\\")
+        .replace(/`/g, "\\`")
+        .replace(/\$/g, "\\$")
+        .replace(/"/g, '\\"');
       return mcpRedirect({
         action: "modify",
         updatedInput: {

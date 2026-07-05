@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import { join } from "node:path";
+import { execSync } from "node:child_process";
 import {
   routePreToolUse,
   resetGuidanceThrottle,
@@ -516,5 +520,44 @@ describe("Issue #856: session_continuity framing is a soft hint, not a standing 
 
   it("still mentions session continuity (the hint is softened, not removed)", () => {
     expect(BLOCK).toContain("session_continuity");
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Security: build-tool redirect must not let embedded command substitution in
+// the ORIGINAL command execute when the rewritten `echo` runs. The redirect
+// interpolates the user command into a double-quoted echo, where backticks and
+// `$(…)`/`$var` stay active — so the escaper must neutralize `\`, backtick,
+// `$`, and `"`. Regression guard for the S1 command-injection fix.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("Security: build-tool redirect escapes shell metacharacters", () => {
+  const SENTINEL_DIR = fs.mkdtempSync(join(os.tmpdir(), "ctx-mcp-ready-"));
+
+  beforeEach(() => {
+    // Force isMCPReady() true so the mcpRedirect actually returns the modify
+    // decision (otherwise it passes through as null when no server is live).
+    process.env.CONTEXT_MODE_MCP_SENTINEL_DIR = SENTINEL_DIR;
+    fs.writeFileSync(join(SENTINEL_DIR, `context-mode-mcp-ready-${process.pid}`), String(process.pid));
+  });
+
+  afterEach(() => {
+    delete process.env.CONTEXT_MODE_MCP_SENTINEL_DIR;
+  });
+
+  it("neutralizes backtick and $() so no substitution survives in the echo", () => {
+    const cmd = "mvn install `touch /tmp/PWNED` $(touch /tmp/PWNED2)";
+    const decision = routePreToolUse("Bash", { command: cmd }, "/test", "claude-code", "s-inj");
+    expect(decision?.action).toBe("modify");
+    const rewritten = decision.updatedInput.command;
+    // The rewritten command is a single `echo "…"`. Every backtick and `$`
+    // from the original must be backslash-escaped so the shell treats them as
+    // literals inside the double quotes.
+    expect(rewritten).toContain("\\`touch /tmp/PWNED\\`");
+    expect(rewritten).toContain("\\$(touch /tmp/PWNED2)");
+    // Running it through a real shell must NOT create the sentinel files.
+    execSync(rewritten, { shell: "/bin/bash" });
+    expect(fs.existsSync("/tmp/PWNED")).toBe(false);
+    expect(fs.existsSync("/tmp/PWNED2")).toBe(false);
   });
 });
