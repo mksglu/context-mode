@@ -47,7 +47,10 @@ import {
 // headline forever. Convert to a file URL so Windows accepts it.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const ANALYTICS_PATH = resolve(__dirname, "..", "build", "session", "analytics.js");
+const TEST_ANALYTICS_PATH = process.env.CTX_TEST_ANALYTICS_PATH;
+const ANALYTICS_PATH = TEST_ANALYTICS_PATH
+  ? resolve(TEST_ANALYTICS_PATH)
+  : resolve(__dirname, "..", "build", "session", "analytics.js");
 const ANALYTICS_URL = pathToFileURL(ANALYTICS_PATH).href;
 
 let _analytics = null;
@@ -89,6 +92,17 @@ const green = (t) => ansi("32", t);      // healthy dot
 const yellow = (t) => ansi("33", t);     // degraded dot
 const red = (t) => ansi("31", t);        // stale dot
 const SEP = dim("·");
+const BRAND_LABEL = "context-mode";
+const EMPTY_STATE_HEADLINE = "saves ~98% of context window";
+const ANALYTICS_UNAVAILABLE_HEADLINE = "analytics unavailable; run ctx doctor";
+
+function renderEmptyState() {
+  return `${brand(BRAND_LABEL)}  ${green("●")}  ${dim(EMPTY_STATE_HEADLINE)}`;
+}
+
+function renderAnalyticsUnavailable() {
+  return `${brand(BRAND_LABEL)}  ${yellow("●")}  ${dim(ANALYTICS_UNAVAILABLE_HEADLINE)}`;
+}
 
 // ── Stdin drain ─────────────────────────────────────────────────────────
 function readStdinJson() {
@@ -234,11 +248,11 @@ async function main() {
 
   const analytics = await loadAnalytics();
 
-  // BRAND-NEW / build missing — substantiated headline only
+  // Build/install is incomplete. Do not show the normal savings headline,
+  // because that makes a broken analytics import look like real data.
   if (!analytics) {
-    process.stdout.write(
-      `${brand("context-mode")}  ${green("●")}  ${dim("saves ~98% of context window")}`,
-    );
+    warnOnce("analytics-import", ANALYTICS_UNAVAILABLE_HEADLINE);
+    process.stdout.write(renderAnalyticsUnavailable());
     return;
   }
 
@@ -250,9 +264,7 @@ async function main() {
 
   // Sessions dir doesn't exist yet — first ever launch
   if (!existsSync(sessionsDir)) {
-    process.stdout.write(
-      `${brand("context-mode")}  ${green("●")}  ${dim("saves ~98% of context window")}`,
-    );
+    process.stdout.write(renderEmptyState());
     return;
   }
 
@@ -327,9 +339,7 @@ async function main() {
 
   // BRAND-NEW: no data at all → marketing headline.
   if (lifetimeBytes === 0 && sessionBytes === 0) {
-    process.stdout.write(
-      `${brand("context-mode")}  ${green("●")}  ${dim("saves ~98% of context window")}`,
-    );
+    process.stdout.write(renderEmptyState());
     return;
   }
 
@@ -344,7 +354,7 @@ async function main() {
     }
     blocks.push(dim("preserved across compact, restart & upgrade"));
     process.stdout.write(
-      `${brand("context-mode")}  ${dot}  ${blocks.join(`  ${SEP}  `)}`,
+      `${brand(BRAND_LABEL)}  ${dot}  ${blocks.join(`  ${SEP}  `)}`,
     );
     return;
   }
@@ -363,7 +373,7 @@ async function main() {
     valueBlocks.push(`${bold(`${pct}%`)} ${dim("kept out")}`);
   }
 
-  const head = `${brand("context-mode")}  ${dot}  `;
+  const head = `${brand(BRAND_LABEL)}  ${dot}  `;
   const tail = valueBlocks.join(`  ${SEP}  `);
   process.stdout.write(head + tail);
 }
@@ -371,8 +381,6 @@ async function main() {
 main().catch(() => {
   // Last-resort fallback — a thrown error must never produce a blank statusline.
   try {
-    process.stdout.write(
-      `${brand("context-mode")}  ${green("●")}  ${dim("saves ~98% of context window")}`,
-    );
+    process.stdout.write(renderEmptyState());
   } catch { /* ignore */ }
 });

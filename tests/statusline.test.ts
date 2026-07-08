@@ -157,6 +157,19 @@ describe("statusline.mjs — render fallbacks", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  test("missing analytics module surfaces degraded state instead of savings headline", () => {
+    const result = runStatuslineFull({
+      CONTEXT_MODE_DIR: root,
+      CLAUDE_SESSION_ID: "pid-no-analytics",
+      CTX_TEST_ANALYTICS_PATH: join(root, "missing-analytics.js"),
+    });
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /context-mode/);
+    assert.match(result.stdout, /analytics unavailable/);
+    assert.doesNotMatch(result.stdout, /saves ~98% of context window/);
+  });
+
   // BRAND-NEW state: no SessionDB. Falls back to substantiated README
   // headline ("~98% of context window") — no fabricated $/dev/month copy.
   test("brand-new state: no SessionDB shows substantiated headline", () => {
