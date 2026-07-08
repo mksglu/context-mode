@@ -4177,8 +4177,8 @@ RETURNS:
 
 EXAMPLE: ctx_batch_execute(
   commands: [
-    {label: "issue 1", command: "gh issue view 1"},
-    {label: "issue 2", command: "gh issue view 2"},
+    {label: "issue 1", command: "gh issue view 1 --json number,title,body,comments"},
+    {label: "issue 2", command: "gh issue view 2 --json number,title,body,comments"},
     {label: "summarize", command: "echo done"}
   ],
   queries: ["root cause", "proposed fix"],
