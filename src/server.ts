@@ -1466,7 +1466,12 @@ export function buildBatchNodeOptionsPrefix(shellPath: string, preloadPath: stri
     return `set "NODE_OPTIONS=${option.replace(/"/g, '""')}" && `;
   }
 
-  return `NODE_OPTIONS=${quotePosixSingle(option)} `;
+  // Emit a standalone `export` statement rather than an inline `VAR=val cmd`
+  // assignment: the inline form is only valid before a *simple* command, so it
+  // breaks when the command starts with a compound construct (`if`, `for`,
+  // `(...)`, `{ ...; }`). The `; ` separator mirrors the PowerShell/cmd
+  // branches above and keeps the assignment a separate statement (#925).
+  return `export NODE_OPTIONS=${quotePosixSingle(option)}; `;
 }
 
 /**
