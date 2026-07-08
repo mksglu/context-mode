@@ -45,6 +45,12 @@ const REQUIRED_PLUGIN_RUNTIME_FILES = [
   "server.bundle.mjs",
   "cli.bundle.mjs",
 ];
+const REQUIRED_PACKAGED_SCRIPT_FILES = [
+  "scripts/postinstall.mjs",
+  "scripts/heal-better-sqlite3.mjs",
+  "scripts/heal-installed-plugins.mjs",
+  "scripts/plugin-cache-integrity.mjs",
+];
 
 interface McpJson {
   mcpServers?: Record<string, { args?: unknown[] }>;
@@ -135,6 +141,18 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
     );
   });
 
+  test("package manifest ships postinstall and doctor integrity helper scripts (#889)", () => {
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf-8")) as {
+      files?: string[];
+    };
+    expect(pkg.files).toEqual(expect.arrayContaining(REQUIRED_PACKAGED_SCRIPT_FILES));
+    for (const rel of REQUIRED_PACKAGED_SCRIPT_FILES) {
+      expect(existsSync(resolve(ROOT, rel)), `${rel} must exist in the plugin root`).toBe(
+        true,
+      );
+    }
+  });
+
   test("npm pack dry-run contains the Claude manifest, runtime bundles, start.mjs, and skills (#658)", () => {
     const r = npmPackDryRunJson();
     const spawnErr = r.error
@@ -148,6 +166,9 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
     const files = new Set(pack[0]?.files?.map((f) => f.path) ?? []);
     expect(files).toContain(".claude-plugin/plugin.json");
     for (const rel of REQUIRED_PLUGIN_RUNTIME_FILES) {
+      expect(files).toContain(rel);
+    }
+    for (const rel of REQUIRED_PACKAGED_SCRIPT_FILES) {
       expect(files).toContain(rel);
     }
     expect([...files].some((p) => p.startsWith("skills/"))).toBe(true);
@@ -247,6 +268,60 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
       expect(r.status, `asserter should fail on missing runtime files`).not.toBe(0);
       expect(r.stderr + r.stdout).toMatch(/missing plugin runtime file/);
       expect(r.stderr + r.stdout).toMatch(/start\.mjs|server\.bundle\.mjs/);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("build-chain asserter script exits non-zero when packaged helper scripts are missing (#889)", () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("node:fs") as typeof import("node:fs");
+    const { tmpdir } = require("node:os") as typeof import("node:os");
+    const { join } = require("node:path") as typeof import("node:path");
+
+    const scratch = mkdtempSync(join(tmpdir(), "packaged-scripts-missing-"));
+    try {
+      mkdirSync(join(scratch, ".claude-plugin"), { recursive: true });
+      mkdirSync(join(scratch, "skills", "context-mode"), { recursive: true });
+      writeFileSync(
+        join(scratch, ".mcp.json.example"),
+        JSON.stringify({
+          mcpServers: { "context-mode": { command: "node", args: [PLACEHOLDER] } },
+        }),
+      );
+      writeFileSync(
+        join(scratch, ".claude-plugin", "plugin.json"),
+        JSON.stringify({
+          name: "context-mode",
+          skills: SKILLS_PATH,
+          mcpServers: { "context-mode": { command: "node", args: [PLACEHOLDER] } },
+        }),
+      );
+      for (const rel of REQUIRED_PLUGIN_RUNTIME_FILES) {
+        writeFileSync(join(scratch, rel), "");
+      }
+      writeFileSync(
+        join(scratch, "package.json"),
+        JSON.stringify({
+          name: "context-mode",
+          files: [
+            ".claude-plugin",
+            "skills",
+            ...REQUIRED_PLUGIN_RUNTIME_FILES,
+            ...REQUIRED_PACKAGED_SCRIPT_FILES,
+          ],
+        }),
+      );
+
+      const r = spawnSync(
+        process.execPath,
+        [resolve(ROOT, "scripts", "assert-asymmetric-drift.mjs"), "--root", scratch],
+        { encoding: "utf-8", timeout: 10_000 },
+      );
+      expect(r.status, "asserter should fail on missing packaged scripts").not.toBe(0);
+      expect(r.stderr + r.stdout).toMatch(/missing packaged helper script/);
+      expect(r.stderr + r.stdout).toMatch(/plugin-cache-integrity\.mjs/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
