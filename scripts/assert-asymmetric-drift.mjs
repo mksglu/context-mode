@@ -49,6 +49,12 @@ const REQUIRED_PLUGIN_RUNTIME_FILES = [
   "server.bundle.mjs",
   "cli.bundle.mjs",
 ];
+const REQUIRED_PACKAGED_SCRIPT_FILES = [
+  "scripts/postinstall.mjs",
+  "scripts/heal-better-sqlite3.mjs",
+  "scripts/heal-installed-plugins.mjs",
+  "scripts/plugin-cache-integrity.mjs",
+];
 
 function parseArgs(argv) {
   const out = { root: null };
@@ -103,6 +109,7 @@ function main() {
   const exampleJsonPath = resolve(root, ".mcp.json.example");
   const pluginJsonPath = resolve(root, ".claude-plugin", "plugin.json");
   const localMcpJsonPath = resolve(root, ".mcp.json");
+  const packageJsonPath = resolve(root, "package.json");
 
   /** @type {string[]} */
   const violations = [];
@@ -110,6 +117,7 @@ function main() {
   const example = readArgs0(exampleJsonPath);
   const plg = readArgs0(pluginJsonPath);
   const pluginJson = readJson(pluginJsonPath);
+  const packageJson = readJson(packageJsonPath);
 
   if (!example.ok) violations.push(example.error);
   if (!plg.ok) violations.push(plg.error);
@@ -154,6 +162,32 @@ function main() {
     }
   }
 
+  if (packageJson.ok) {
+    const files = packageJson.value && packageJson.value.files;
+    if (!Array.isArray(files)) {
+      violations.push(`package.json files[] must be an array in ${packageJsonPath}`);
+    } else {
+      for (const rel of REQUIRED_PACKAGED_SCRIPT_FILES) {
+        if (!files.includes(rel)) {
+          violations.push(
+            `package.json files[] must include ${rel}. Without it, npm pack can omit a helper that ctx doctor/postinstall expects.`,
+          );
+        }
+      }
+    }
+  } else {
+    violations.push(packageJson.error);
+  }
+
+  for (const rel of REQUIRED_PACKAGED_SCRIPT_FILES) {
+    if (!existsSync(resolve(root, rel))) {
+      violations.push(
+        `missing packaged helper script at ${resolve(root, rel)}. ` +
+          `package.json files[] declares ${rel}, so the published tarball integrity surface depends on it.`,
+      );
+    }
+  }
+
   // Contributor's local .mcp.json (if present) — must match the template.
   // Absence is fine; the file is .gitignored after the #531 architectural untrack.
   if (existsSync(localMcpJsonPath)) {
@@ -175,7 +209,7 @@ function main() {
   }
 
   process.stdout.write(
-    `asymmetric-drift: OK (.mcp.json.example + .claude-plugin/plugin.json both pin args[0] to ${PLACEHOLDER}; plugin skills path is ${SKILLS_PATH}; runtime files present)\n`,
+    `asymmetric-drift: OK (.mcp.json.example + .claude-plugin/plugin.json both pin args[0] to ${PLACEHOLDER}; plugin skills path is ${SKILLS_PATH}; runtime files and packaged helper scripts present)\n`,
   );
 }
 
