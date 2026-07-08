@@ -754,7 +754,8 @@ async function createContextModePlugin(ctx: PluginContext) {
 // ── Exports ──────────────────────────────────────────────
 // KiloCode PluginModule: default export with { server } shape
 // OpenCode compat: named export for direct import("context-mode/plugin")
-export default { id:"context-mode", server: createContextModePlugin };
-export { createContextModePlugin as ContextModePlugin };
+import { tui } from "./tui.js";
+export default { id:"context-mode", server: createContextModePlugin, tui };
+export { createContextModePlugin as ContextModePlugin, tui };
 // Test surface — exported for unit testing the quorum substring fix (#487).
 export { systemHasRoutingInstructions, ROUTING_MARKERS };
