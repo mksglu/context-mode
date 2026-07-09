@@ -13,6 +13,7 @@ import {
   getSessionDBPath,
   getInputProjectDir,
   resolveConfigDir,
+  flushAndExit,
   CODEX_OPTS,
 } from "../session-helpers.mjs";
 import { createSessionLoaders } from "../session-loaders.mjs";
@@ -67,4 +68,4 @@ try {
 }
 
 // Codex PreCompact accepts universal hook fields only; no hookSpecificOutput.
-process.stdout.write(JSON.stringify({}) + "\n");
+flushAndExit({});

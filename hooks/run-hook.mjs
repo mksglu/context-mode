@@ -92,4 +92,10 @@ export async function runHook(handler) {
     logError(e);
     process.exit(0);
   }
+
+  // Same #22999 safety net as session-helpers.mjs::flushAndExit, inlined here
+  // to keep this wrapper dependency-free (see the header note). The handler has
+  // already written its payload; an empty write's callback fires only once the
+  // queue ahead of it has flushed, so nothing is truncated.
+  process.stdout.write("", () => process.exit(0));
 }

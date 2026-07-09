@@ -25,6 +25,7 @@ import {
   getCleanupFlagPath,
   getInputProjectDir,
   resolveConfigDir,
+  flushAndExit,
   CODEX_OPTS,
 } from "../session-helpers.mjs";
 import { createSessionLoaders } from "../session-loaders.mjs";
@@ -116,6 +117,6 @@ try {
 }
 
 // Codex SessionStart requires hookEventName in hookSpecificOutput
-process.stdout.write(JSON.stringify({
+flushAndExit({
   hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
-}) + "\n");
+});

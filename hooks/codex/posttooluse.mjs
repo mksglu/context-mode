@@ -6,7 +6,7 @@ import "../ensure-deps.mjs";
  * Codex CLI postToolUse hook — session event capture.
  */
 
-import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, CODEX_OPTS } from "../session-helpers.mjs";
+import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, flushAndExit, CODEX_OPTS } from "../session-helpers.mjs";
 import { createSessionLoaders, attributeAndInsertEvents } from "../session-loaders.mjs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,6 +61,6 @@ try {
 }
 
 // Codex PostToolUse requires hookEventName in hookSpecificOutput
-process.stdout.write(JSON.stringify({
+flushAndExit({
   hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: "" },
-}) + "\n");
+});

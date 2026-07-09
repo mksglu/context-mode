@@ -6,7 +6,7 @@ import "../ensure-deps.mjs";
  * Codex CLI UserPromptSubmit hook — capture user prompts for continuity.
  */
 
-import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, CODEX_OPTS } from "../session-helpers.mjs";
+import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, flushAndExit, CODEX_OPTS } from "../session-helpers.mjs";
 import { createSessionLoaders, attributeAndInsertEvents } from "../session-loaders.mjs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,6 @@ try {
   // Codex hooks must not block the session.
 }
 
-process.stdout.write(JSON.stringify({
+flushAndExit({
   hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: "" },
-}) + "\n");
+});

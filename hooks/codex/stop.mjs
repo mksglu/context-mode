@@ -10,7 +10,7 @@ import "../ensure-deps.mjs";
  * lifecycle events on platforms that expose one.
  */
 
-import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, CODEX_OPTS } from "../session-helpers.mjs";
+import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, flushAndExit, CODEX_OPTS } from "../session-helpers.mjs";
 import { createSessionLoaders, attributeAndInsertEvents } from "../session-loaders.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -135,4 +135,4 @@ try {
   // Codex hooks must not block the session.
 }
 
-process.stdout.write("{}\n");
+flushAndExit("{}\n");

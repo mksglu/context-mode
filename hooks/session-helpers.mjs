@@ -426,3 +426,31 @@ export function getSessionEventsPath(opts = CLAUDE_OPTS, projectDirOverride) {
 export function getCleanupFlagPath(opts = CLAUDE_OPTS, projectDirOverride) {
   return _resolveProjectFile(opts, projectDirOverride, ".cleanup");
 }
+
+/**
+ * Write the hook's response, then exit explicitly.
+ *
+ * On Windows, node intermittently fails to release the stdin handle
+ * (nodejs/node#22999 — "50% exit, 50% don't"), so the event loop never drains
+ * and the hook process outlives its parent. Windows does not reap orphaned
+ * children, so they accumulate: a four-day-old install was found holding six
+ * leaked hook processes. PR #719 documented the symptom ("orphaned hook
+ * subprocesses accumulate") but shipped no exit() safety net. This is that net;
+ * unref()/destroy() are unreliable on Windows for the same reason (#22999).
+ *
+ * The exit fires from the write callback, never before it: this payload IS the
+ * hook's decision, and process.exit() may truncate a pipe that has not flushed.
+ * A dropped `permissionDecision: "deny"` would be a silent security regression.
+ *
+ * IMPORTANT: this queues the write and RETURNS — the exit happens later, from
+ * the callback. Call it as the last statement on the path. Any code after it
+ * still runs, and a `process.exit()` there would truncate the very payload this
+ * function exists to protect. Paths that write nothing must exit on their own.
+ *
+ * @param {object|string} payload  Object is JSON-serialized with a trailing newline.
+ * @param {number} [code=0]
+ */
+export function flushAndExit(payload, code = 0) {
+  const chunk = typeof payload === "string" ? payload : JSON.stringify(payload) + "\n";
+  process.stdout.write(chunk, () => process.exit(code));
+}

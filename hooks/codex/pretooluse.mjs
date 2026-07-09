@@ -13,7 +13,7 @@ import "../suppress-stderr.mjs";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readStdin, parseStdin, getInputProjectDir, getSessionId, CODEX_OPTS } from "../session-helpers.mjs";
+import { readStdin, parseStdin, getInputProjectDir, getSessionId, flushAndExit, CODEX_OPTS } from "../session-helpers.mjs";
 import { routePreToolUse, initSecurity } from "../core/routing.mjs";
 import { formatDecision } from "../core/formatters.mjs";
 import { codexSupportsUpdatedInput } from "../core/codex-caps.mjs";
@@ -39,4 +39,4 @@ const response = formatDecision(
 const output = response ?? {
   hookSpecificOutput: { hookEventName: "PreToolUse" },
 };
-process.stdout.write(JSON.stringify(output) + "\n");
+flushAndExit(output);
