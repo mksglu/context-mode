@@ -674,14 +674,24 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
    >
    > `PreCompact` support is runtime-gated: it is present in Codex CLI 0.130.0, while the public Codex hooks docs may lag the shipped hook-event list. Older Codex builds that do not emit `PreCompact` will not create pre-compaction snapshots.
 
-4. Copy routing instructions (recommended even with hooks for full routing awareness):
+4. Copy routing instructions (recommended even with hooks for full routing awareness).
+   On macOS and Linux, copy the platform-neutral core instructions:
 
    ```bash
    CM_ROOT="$(npm root -g)/context-mode"
    cp "$CM_ROOT/configs/codex/AGENTS.md" ./AGENTS.md
    ```
 
-   For global use: `CM_ROOT="$(npm root -g)/context-mode"; cp "$CM_ROOT/configs/codex/AGENTS.md" ~/.codex/AGENTS.md`. Global applies to all projects. If both exist, Codex CLI merges them.
+   On Windows, combine the core instructions with the packaged Windows overlay:
+
+   ```bash
+   CM_ROOT="$(npm root -g)/context-mode"
+   cat "$CM_ROOT/configs/codex/AGENTS.md" "$CM_ROOT/configs/codex/AGENTS.windows.md" > ./AGENTS.md
+   ```
+
+   For global use, replace `./AGENTS.md` with `~/.codex/AGENTS.md` in the command for your platform. Global applies to all projects. If both files exist, Codex CLI merges them.
+
+   With hooks enabled, Codex SessionStart appends the Windows overlay at runtime on Windows; macOS and Linux receive only the neutral routing block. This runtime overlay never writes global or project `AGENTS.md` files. If you manually copied an older combined template, refresh it once with the commands above; SessionStart recognizes the legacy Windows block and will not inject a duplicate.
 
 5. Restart Codex CLI.
 
@@ -754,17 +764,20 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
 
    > **Note:** Kimi Code uses the same JSON stdin/stdout wire protocol as Codex, but accepts `additionalContext`, `updatedInput`, and `permissionDecision: "ask"` in PreToolUse responses (Codex rejects these). The kimi hook normalizes `ContentPart[]` prompt arrays to strings for downstream extractors.
 
-5. (Optional) Copy the routing instructions file for your project:
+5. (Optional) Copy the routing instructions file for your project. On macOS and Linux:
 
    ```bash
    cp "$(npm root -g)/context-mode/configs/codex/AGENTS.md" ./AGENTS.md
    ```
 
-   Or for global use:
+   On Windows, Kimi reuses the Codex instructions, so combine the core file with its Windows overlay:
 
    ```bash
-   CM_ROOT="$(npm root -g)/context-mode"; cp "$CM_ROOT/configs/codex/AGENTS.md" ~/.kimi-code/AGENTS.md
+   CM_ROOT="$(npm root -g)/context-mode"
+   cat "$CM_ROOT/configs/codex/AGENTS.md" "$CM_ROOT/configs/codex/AGENTS.windows.md" > ./AGENTS.md
    ```
+
+   For global use, replace `./AGENTS.md` with `~/.kimi-code/AGENTS.md` in the command for your platform. If you manually copied an older combined template, refresh it once so the platform-neutral core and packaged Windows guidance stay independently updateable.
 
 Full documentation: [`docs/adapters/kimi-code.md`](docs/adapters/kimi-code.md)
 
