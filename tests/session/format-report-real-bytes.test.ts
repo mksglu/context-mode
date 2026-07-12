@@ -109,16 +109,16 @@ describe("formatReport — Phase 8 realBytes opt", () => {
     expect(text).toMatch(/\$\d+\.\d+ of Opus 4.7 tokens/);
   });
 
-  test("8.2 realBytes lifts lifetime $ above the conservative estimate", () => {
-    // Real bytes large enough that the renderer SHOULD prefer them.
+  test("8.2 realBytes measurement is authoritative for the lifetime $", () => {
+    // Honest-savings fix: measured redirects REPLACE the events×256
+    // heuristic instead of Math.max-ing with it — capture volume
+    // (eventDataBytes, snapshotBytes) is not savings.
     const realBytes: RealBytesStats = {
-      eventDataBytes: 80_000_000,   // 80 MB of indexed event data
+      eventDataBytes: 80_000_000,   // 80 MB of indexed event data (not savings)
       bytesAvoided:  120_000_000,   // 120 MB sandbox / cache avoided
       bytesReturned:   2_000_000,   // 2 MB returned to model
-      snapshotBytes:   8_000_000,   // 8 MB rescued from compact
-      // (eventDataBytes + bytesAvoided + snapshotBytes) / 4
-      // = (80e6 + 120e6 + 8e6) / 4 = 52_000_000 tokens ≈ $780
-      totalSavedTokens: Math.floor((80_000_000 + 120_000_000 + 8_000_000) / 4),
+      snapshotBytes:   8_000_000,   // 8 MB rescued from compact (not savings)
+      totalSavedTokens: Math.floor(120_000_000 / 4),
     };
 
     const text = formatReport(baseReport(), "1.0.111", null, {
@@ -128,8 +128,11 @@ describe("formatReport — Phase 8 realBytes opt", () => {
       ...STABLE_OPTS,
     });
     const usd = extractLifetimeUsd(text);
-    // Conservative estimate produced ~$69; realBytes math must be much higher.
-    expect(usd).toBeGreaterThan(150);
+    // kept tokens = (avoided + returned)/4 − returned/4 = 30M exactly —
+    // derived ONLY from measured redirects (eventData/snapshot excluded).
+    // At the suite's $5/1M rate that is exactly $150.00; the legacy
+    // events×256 heuristic would have produced ~$23.
+    expect(usd).toBeCloseTo(150.0, 1);
   });
 
   test("8.2 realBytes also drives the conversation contribution $", () => {
