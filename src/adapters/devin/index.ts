@@ -43,6 +43,7 @@ import {
   type HookParadigm,
   type PlatformCapabilities,
   type DiagnosticResult,
+  type HealthCheck,
   type PreToolUseEvent,
   type PostToolUseEvent,
   type PreCompactEvent,
@@ -55,7 +56,7 @@ import {
   type HookRegistration,
 } from "../types.js";
 import { buildHookRuntimeCommand } from "../types.js";
-import { PRE_TOOL_USE_MATCHER_PATTERN } from "./hooks.js";
+import { PRE_TOOL_USE_MATCHER_PATTERN, HOOK_SCRIPTS } from "./hooks.js";
 
 // ─────────────────────────────────────────────────────────
 // Devin CLI raw input types
@@ -397,6 +398,43 @@ export class DevinAdapter extends BaseAdapter implements HookAdapter {
     return results;
   }
 
+  /**
+   * Adapter-defined health checks (Algo-D1) — mirrors claude-code's override
+   * at src/adapters/claude-code/index.ts:286 and gemini-cli's at
+   * src/adapters/gemini-cli/index.ts:417.
+   *
+   * For each entry in HOOK_SCRIPTS (the canonical hookType → scriptName
+   * map in hooks.ts), emit a HealthCheck that joins
+   * `pluginRoot + "hooks" + "devin" + scriptName` and probes via
+   * `existsSync`. Crucially, this NEVER parses a hook command —
+   * pluginRoot and scriptName are both in our hand, so the regex
+   * round-trip that produced the #548 doubled-path FAIL is bypassed.
+   *
+   * Devin hook scripts ship under `<pluginRoot>/hooks/devin/<scriptName>`
+   * (see HOOK_MAP in src/cli.ts and setHookPermissions below).
+   * Adding a new hook event in HOOK_SCRIPTS auto-extends doctor
+   * coverage — no parallel hardcoded list to maintain.
+   */
+  getHealthChecks(pluginRoot: string): readonly HealthCheck[] {
+    return Object.entries(HOOK_SCRIPTS).map(
+      ([hookType, scriptName]) => {
+        const absolutePath = join(pluginRoot, "hooks", "devin", scriptName);
+        return {
+          name: `Hook script: ${hookType} (${scriptName})`,
+          check: () => {
+            if (existsSync(absolutePath)) {
+              return { status: "OK" as const, detail: absolutePath };
+            }
+            return {
+              status: "FAIL" as const,
+              detail: `not found at ${absolutePath}`,
+            };
+          },
+        };
+      },
+    );
+  }
+
   checkPluginRegistration(): DiagnosticResult {
     const settings = this.readSettings();
     if (!settings) {
@@ -462,8 +500,8 @@ export class DevinAdapter extends BaseAdapter implements HookAdapter {
     // No-op on Windows; chmod on Unix
     const paths: string[] = [];
     if (process.platform === "win32") return paths;
-    for (const event of ["pretooluse", "posttooluse", "sessionstart", "precompact", "userpromptsubmit", "stop"]) {
-      const p = join(pluginRoot, "hooks", "devin", `${event}.mjs`);
+    for (const scriptName of Object.values(HOOK_SCRIPTS)) {
+      const p = join(pluginRoot, "hooks", "devin", scriptName);
       if (existsSync(p)) {
         try { chmodSync(p, 0o755); paths.push(p); } catch { /* best effort */ }
       }

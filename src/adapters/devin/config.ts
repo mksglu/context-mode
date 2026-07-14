@@ -6,4 +6,4 @@
  */
 
 export { DevinAdapter } from "./index.js";
-export { HOOK_TYPES, ROUTING_INSTRUCTIONS_PATH, PRE_TOOL_USE_MATCHER_PATTERN } from "./hooks.js";
+export { HOOK_TYPES, HOOK_SCRIPTS, ROUTING_INSTRUCTIONS_PATH, PRE_TOOL_USE_MATCHER_PATTERN } from "./hooks.js";

@@ -40,6 +40,27 @@ export const HOOK_TYPES = {
 } as const;
 
 // ─────────────────────────────────────────────────────────
+// Hook script file names
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Map of hook types to their script file names.
+ *
+ * Devin hook scripts live under `<pluginRoot>/hooks/devin/<scriptName>`
+ * (see HOOK_MAP in src/cli.ts and setHookPermissions in index.ts).
+ * This map is the single source of truth for getHealthChecks —
+ * adding a new hook event here auto-extends doctor coverage.
+ */
+export const HOOK_SCRIPTS: Record<string, string> = {
+  [HOOK_TYPES.PRE_TOOL_USE]: "pretooluse.mjs",
+  [HOOK_TYPES.POST_TOOL_USE]: "posttooluse.mjs",
+  [HOOK_TYPES.PRE_COMPACT]: "precompact.mjs",
+  [HOOK_TYPES.SESSION_START]: "sessionstart.mjs",
+  [HOOK_TYPES.USER_PROMPT_SUBMIT]: "userpromptsubmit.mjs",
+  [HOOK_TYPES.STOP]: "stop.mjs",
+};
+
+// ─────────────────────────────────────────────────────────
 // External MCP routing matcher
 // ─────────────────────────────────────────────────────────
 

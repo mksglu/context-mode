@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DevinAdapter } from "../../src/adapters/devin/index.js";
+import { HOOK_SCRIPTS } from "../../src/adapters/devin/hooks.js";
 import { resolveSessionDbPath, SessionDB } from "../../src/session/db.js";
 
 describe("DevinAdapter", () => {
@@ -340,4 +341,54 @@ describe("DevinAdapter", () => {
       expect(adapter.getInstalledVersion()).toBe("standalone");
     });
   });
+
+  // ── getHealthChecks ───────────────────────────────────
+
+  describe("getHealthChecks", () => {
+    it("returns one check per HOOK_SCRIPTS entry", () => {
+      const checks = adapter.getHealthChecks!("/tmp/plugin");
+      expect(checks.length).toBe(Object.keys(HOOK_SCRIPTS).length);
+    });
+
+    it("check names include hook type and script name", () => {
+      const checks = adapter.getHealthChecks!("/tmp/plugin");
+      for (const check of checks) {
+        expect(check.name).toMatch(/^Hook script: .+ \(.+\.mjs\)$/);
+      }
+    });
+
+    it("returns FAIL when hook script does not exist", () => {
+      const checks = adapter.getHealthChecks!("/tmp/nonexistent-plugin-root");
+      for (const check of checks) {
+        const result = check.check();
+        expect(result.status).toBe("FAIL");
+        expect(result.detail).toContain("not found at");
+      }
+    });
+
+    it("returns OK when hook script exists", () => {
+      const tmpPlugin = mkdtempSync(join(tmpdir(), "devin-health-"));
+      try {
+        const hooksDir = join(tmpPlugin, "hooks", "devin");
+        mkdirSync(hooksDir, { recursive: true });
+        for (const scriptName of Object.values(HOOK_SCRIPTS)) {
+          writeFileSync(join(hooksDir, scriptName), "#!/usr/bin/env node\n");
+        }
+        const checks = adapter.getHealthChecks!(tmpPlugin);
+        for (const check of checks) {
+          const result = check.check();
+          expect(result.status).toBe("OK");
+          expect(result.detail).toContain(scriptNamePattern(check.name));
+        }
+      } finally {
+        rmSync(tmpPlugin, { recursive: true, force: true });
+      }
+    });
+  });
 });
+
+/** Extract the .mjs filename from a health check name like "Hook script: PreToolUse (pretooluse.mjs)". */
+function scriptNamePattern(name: string): string {
+  const m = name.match(/\(([^)]+\.mjs)\)/);
+  return m ? m[1] : "";
+}
