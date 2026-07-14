@@ -2240,6 +2240,69 @@ function extractUserDecision(message: string): SessionEvent[] {
 }
 
 /**
+ * Category 6: decision (assistant-side)
+ * Decisions extracted from the model's own assistant messages at Stop time.
+ *
+ * Ported from token-optimizer's decision extraction — captures commitment
+ * statements the model makes in its reasoning, e.g. "I'll use approach X",
+ * "Let's go with the async pattern", "I've decided to refactor the parser".
+ *
+ * Unlike user decisions (which use a universal structural detector), assistant
+ * decisions need a different heuristic because:
+ *   - Assistant messages are longer and contain code blocks, explanations, etc.
+ *   - The decision is often embedded in a larger paragraph, not a standalone
+ *     message.
+ *   - We need to extract the specific sentence that commits to a decision,
+ *     not the entire message.
+ *
+ * Approach: split by sentence boundaries, then check each sentence for
+ * decision-like structure using the existing `looksLikeDecision` gate plus
+ * a commitment-cue check. Capped at 10 per session (matching token-optimizer).
+ */
+const ASSISTANT_DECISION_CAP = 10;
+const COMMITMENT_CUE_PATTERN = /\b(?:I'll|I will|I've|I have|let's|let us|we'll|we will|we should|we need to|going to|gonna|decided|choosing|switching to|opting for|settling on|the approach is|the solution is|the strategy is)\b/i;
+
+function extractAssistantDecisionsImpl(message: string): SessionEvent[] {
+  if (!message || typeof message !== "string") return [];
+  const trimmed = message.trim();
+  if (trimmed.length === 0) return [];
+
+  // Strip code blocks — decisions are in prose, not code
+  const prose = trimmed.replace(/```[\s\S]*?```/g, " ").replace(/`[^`]*`/g, " ");
+
+  // Split by sentence boundaries (ASCII `.`, `!`, newline; fullwidth `。`)
+  const sentences = prose.split(/[.!。\n]+/u).map(s => s.trim()).filter(s => s.length > 0);
+
+  const events: SessionEvent[] = [];
+  const seen = new Set<string>();
+
+  for (const sentence of sentences) {
+    if (events.length >= ASSISTANT_DECISION_CAP) break;
+
+    // Must contain a commitment cue (I'll, let's, decided, etc.)
+    if (!COMMITMENT_CUE_PATTERN.test(sentence)) continue;
+
+    // Must look like a decision structurally (not a question, has alphabetic
+    // content, within size range)
+    if (!looksLikeDecision(sentence)) continue;
+
+    // Deduplicate
+    const key = sentence.toLowerCase().slice(0, 100);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    events.push({
+      type: "decision_assistant",
+      category: "decision",
+      data: safeString(sentence),
+      priority: 2,
+    });
+  }
+
+  return events;
+}
+
+/**
  * Category 7: role
  * Persona / behavioral directive patterns.
  *
@@ -2768,6 +2831,27 @@ export function extractUserEvents(message: string): SessionEvent[] {
     events.push(...extractData(message));
 
     return events;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Extract decision events from the model's last assistant message.
+ *
+ * Called from the Stop hook (stop.mjs) to capture commitment statements
+ * the model made during its turn — e.g. "I'll use approach X", "Let's go
+ * with the async pattern". These are stored as `decision` category events
+ * and included in the resume snapshot at compaction time, ensuring
+ * decisions survive context compaction.
+ *
+ * Ported from token-optimizer's decision extraction feature.
+ *
+ * Returns an array of zero or more SessionEvents. Never throws.
+ */
+export function extractAssistantDecisions(message: string): SessionEvent[] {
+  try {
+    return extractAssistantDecisionsImpl(message);
   } catch {
     return [];
   }

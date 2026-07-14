@@ -331,6 +331,34 @@ describe("Devin CLI hooks", () => {
       expect(parsed).toEqual({});
     });
 
+    test("captures last_assistant_message without crashing", () => {
+      const result = runHook("stop.mjs", {
+        session_id: "test-devin-stop-msg",
+        cwd: tempDir,
+        stop_hook_active: false,
+        last_assistant_message: "I'll use the async pattern for the API client, it's more efficient.",
+      });
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed).toEqual({});
+    });
+
+    test("extracts decisions from last_assistant_message", () => {
+      const result = runHook("stop.mjs", {
+        session_id: "test-devin-stop-decision",
+        cwd: tempDir,
+        stop_hook_active: false,
+        last_assistant_message: "I've reviewed the options, and I'll use the async pattern for the API client.",
+      });
+
+      expect(result.exitCode).toBe(0);
+      // The hook should not crash and should output empty JSON
+      // (decision events are stored in the session DB, not in stdout)
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed).toEqual({});
+    });
+
     test("handles empty input gracefully", () => {
       const result = runHook("stop.mjs", {});
       expect(result.exitCode).toBe(0);
