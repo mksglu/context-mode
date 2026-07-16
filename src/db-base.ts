@@ -357,6 +357,23 @@ export function applyWALPragmas(db: DatabaseInstance): void {
   // See docs/adr/0001-sessiondb-multi-writer.md for the v1.0.130 ADR.
 }
 
+/** Open a database and close it if WAL initialization fails. */
+export function openDatabaseWithWAL(
+  Database: typeof DatabaseConstructor,
+  dbPath: string,
+  options: { timeout: number } = { timeout: 30000 },
+): DatabaseInstance {
+  let db: DatabaseInstance | undefined;
+  try {
+    db = new Database(dbPath, options);
+    withRetry(() => applyWALPragmas(db!));
+    return db;
+  } catch (err) {
+    if (db) closeDB(db);
+    throw err;
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // DB file helpers
 // ─────────────────────────────────────────────────────────
@@ -562,31 +579,38 @@ export abstract class SQLiteBase {
     const Database = loadDatabase();
     this.#dbPath = dbPath;
     cleanOrphanedWALFiles(dbPath);
-    let db: DatabaseInstance;
+    let db: DatabaseInstance | undefined;
     try {
-      db = new Database(dbPath, { timeout: 30000 });
-      withRetry(() => applyWALPragmas(db));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (isSQLiteCorruptionError(msg)) {
+      try {
+        db = openDatabaseWithWAL(Database, dbPath, { timeout: 30000 });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!isSQLiteCorruptionError(msg)) throw err;
+
         renameCorruptDB(dbPath);
         cleanOrphanedWALFiles(dbPath);
         try {
-          db = new Database(dbPath, { timeout: 30000 });
-          withRetry(() => applyWALPragmas(db));
+          db = openDatabaseWithWAL(Database, dbPath, { timeout: 30000 });
         } catch (retryErr) {
           throw new Error(
             `Failed to create fresh DB after renaming corrupt file: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`
           );
         }
-      } else {
-        throw err;
       }
+
+      this.#db = db;
+      _liveDBs.add(this.#db);
+      withRetry(() => this.initSchema());
+      this.prepareStatements();
+    } catch (err) {
+      // A failed constructor cannot be closed by its caller. Cover schema and
+      // prepare failures as well as any future work added after opening.
+      if (db) {
+        _liveDBs.delete(db);
+        closeDB(db);
+      }
+      throw err;
     }
-    this.#db = db;
-    _liveDBs.add(this.#db);
-    withRetry(() => this.initSchema());
-    this.prepareStatements();
   }
 
   /** Called once after WAL pragmas are applied. Subclasses run CREATE TABLE/VIRTUAL TABLE here. */

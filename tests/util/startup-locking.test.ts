@@ -11,6 +11,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  applyWALPragmas,
+  loadDatabase,
+  openDatabaseWithWAL,
+  SQLiteBase,
+} from "../../src/db-base.js";
 
 const scratchDirs: string[] = [];
 const workerPath = resolve("tests/fixtures/concurrent-db-startup-worker.ts");
@@ -145,12 +151,101 @@ describe("startup SQLITE_BUSY retry boundaries", () => {
       store.indexOf("/** Delete this session's DB files"),
     );
 
-    expect(baseCtor).toContain("withRetry(() => applyWALPragmas(db))");
+    expect(baseCtor).toContain("openDatabaseWithWAL(Database, dbPath, { timeout: 30000 })");
     expect(baseCtor).toContain("withRetry(() => this.initSchema())");
-    expect(storeCtor).toContain("withRetry(() => applyWALPragmas(db))");
+    expect(storeCtor).toContain("openDatabaseWithWAL(Database, this.#dbPath, { timeout: 30000 })");
     expect(storeCtor).toContain("withRetry(() => this.#initSchema())");
     expect(baseCtor).not.toMatch(/locking_mode\s*=\s*EXCLUSIVE/i);
     expect(storeCtor).not.toMatch(/locking_mode\s*=\s*EXCLUSIVE/i);
+  });
+
+  it("closes an opened handle when WAL initialization fails", () => {
+    let closeCalls = 0;
+    class FailingWalDatabase {
+      pragma(source: string): unknown {
+        if (source === "journal_mode = WAL") {
+          throw new Error("SQLITE_IOERR: WAL setup failed");
+        }
+        return undefined;
+      }
+      close(): void { closeCalls++; }
+    }
+
+    expect(() => openDatabaseWithWAL(
+      FailingWalDatabase as unknown as ReturnType<typeof loadDatabase>,
+      join(scratch("ctx-wal-close-"), "wal.db"),
+    )).toThrow(/WAL setup failed/);
+    expect(closeCalls).toBe(1);
+  });
+
+  it("closes ContentStore handles after schema, destructive migration, and prepare failures", async () => {
+    let failure: "schema" | "destructive migration" | "prepare" = "schema";
+    let closeCalls = 0;
+
+    class FailingDatabase {
+      pragma(): unknown { return undefined; }
+      exec(sql: string): this {
+        if (failure === "schema" && sql.includes("CREATE TABLE IF NOT EXISTS sources")) {
+          throw new Error("schema failure");
+        }
+        if (failure === "destructive migration" && sql.includes("CREATE VIRTUAL TABLE chunks USING")) {
+          throw new Error("already exists midway through destructive migration");
+        }
+        return this;
+      }
+      prepare(sql: string) {
+        if (failure === "prepare" && sql.startsWith("INSERT INTO sources")) {
+          throw new Error("prepare failure");
+        }
+        return {
+          run: () => ({ changes: 0, lastInsertRowid: 0 }),
+          get: () => undefined,
+          all: () => failure === "destructive migration" ? [{ name: "title" }] : [],
+          iterate: () => [][Symbol.iterator](),
+        };
+      }
+      transaction<T extends (...args: never[]) => unknown>(fn: T): T { return fn; }
+      close(): void { closeCalls++; }
+    }
+
+    vi.doMock("../../src/db-base.js", async () => {
+      const actual = await vi.importActual<typeof import("../../src/db-base.js")>(
+        "../../src/db-base.js",
+      );
+      return { ...actual, loadDatabase: () => FailingDatabase };
+    });
+
+    for (const phase of ["schema", "destructive migration", "prepare"] as const) {
+      failure = phase;
+      vi.resetModules();
+      const { ContentStore } = await import("../../src/store.js");
+      expect(() => new ContentStore(join(scratch(`ctx-${phase.replace(" ", "-")}-close-`), "content.db")))
+        .toThrow(new RegExp(phase));
+    }
+    expect(closeCalls).toBe(3);
+  });
+
+  it("releases SQLiteBase handles after schema and prepare failures", () => {
+    class SchemaFailureDB extends SQLiteBase {
+      protected initSchema(): void { throw new Error("schema failure"); }
+      protected prepareStatements(): void {}
+    }
+    class PrepareFailureDB extends SQLiteBase {
+      protected initSchema(): void { this.db.exec("CREATE TABLE test (id INTEGER)"); }
+      protected prepareStatements(): void { throw new Error("prepare failure"); }
+    }
+
+    for (const [name, DB] of [
+      ["schema", SchemaFailureDB],
+      ["prepare", PrepareFailureDB],
+    ] as const) {
+      const dbPath = join(scratch(`ctx-base-${name}-close-`), "base.db");
+      expect(() => new DB(dbPath)).toThrow(new RegExp(`${name} failure`));
+      // This is the Windows lock-leak regression check: removing an opened DB
+      // fails with EBUSY/EPERM if the failed constructor left its handle open.
+      rmSync(dbPath, { force: true });
+      expect(existsSync(dbPath)).toBe(false);
+    }
   });
 });
 
@@ -167,7 +262,11 @@ async function waitForReady(readyDir: string, count: number, children: ChildProc
   throw new Error(`timed out waiting for ${count} startup workers`);
 }
 
-async function runConcurrentColdStart(mode: "session" | "store" | "pi", count = 6): Promise<void> {
+async function runConcurrentColdStart(
+  mode: "session" | "store" | "pi",
+  count = 6,
+  seed?: (dbPath: string) => void,
+): Promise<string> {
   const root = scratch(`ctx-${mode}-cold-start-`);
   const readyDir = join(root, "ready");
   const startPath = join(root, "start");
@@ -175,6 +274,7 @@ async function runConcurrentColdStart(mode: "session" | "store" | "pi", count = 
   const projectDir = join(root, "project");
   mkdirSync(readyDir, { recursive: true });
   mkdirSync(projectDir, { recursive: true });
+  seed?.(dbPath);
 
   const children = Array.from({ length: count }, (_, index) =>
     spawn(
@@ -221,10 +321,63 @@ async function runConcurrentColdStart(mode: "session" | "store" | "pi", count = 
     const results = await Promise.all(completions);
     const failures = results.filter((result) => result.code !== 0);
     expect(failures, failures.map((result) => result.stderr).join("\n")).toEqual([]);
+    return dbPath;
   } finally {
     for (const child of children) {
       if (child.exitCode === null) child.kill();
     }
+  }
+}
+
+function seedLegacySessionSchema(dbPath: string): void {
+  const Database = loadDatabase();
+  const db = new Database(dbPath);
+  try {
+    applyWALPragmas(db);
+    db.exec(`
+      CREATE TABLE session_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 2,
+        data TEXT NOT NULL,
+        source_hook TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        data_hash TEXT GENERATED ALWAYS AS (data) STORED
+      );
+    `);
+  } finally {
+    db.close();
+  }
+}
+
+function seedLegacyContentSchema(dbPath: string): void {
+  const Database = loadDatabase();
+  const db = new Database(dbPath);
+  try {
+    applyWALPragmas(db);
+    db.exec(`
+      CREATE TABLE sources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label TEXT NOT NULL,
+        chunk_count INTEGER NOT NULL DEFAULT 0,
+        code_chunk_count INTEGER NOT NULL DEFAULT 0,
+        indexed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE VIRTUAL TABLE chunks USING fts5(
+        title, content, source_id UNINDEXED, content_type UNINDEXED,
+        tokenize='porter unicode61'
+      );
+      CREATE VIRTUAL TABLE chunks_trigram USING fts5(
+        title, content, source_id UNINDEXED, content_type UNINDEXED,
+        tokenize='trigram'
+      );
+      CREATE TABLE vocabulary (word TEXT PRIMARY KEY);
+      CREATE INDEX idx_sources_label ON sources(label);
+    `);
+  } finally {
+    db.close();
   }
 }
 
@@ -235,6 +388,34 @@ describe("multi-process cold-start concurrency", () => {
 
   it("opens one new ContentStore from concurrent processes", async () => {
     await runConcurrentColdStart("store");
+  }, 60_000);
+
+  it("transactionally migrates a legacy SessionDB from concurrent processes", async () => {
+    const dbPath = await runConcurrentColdStart("session", 6, seedLegacySessionSchema);
+    const Database = loadDatabase();
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const columns = db.pragma("table_xinfo(session_events)") as Array<{ name: string; hidden: number }>;
+      expect(columns.find((column) => column.name === "data_hash")?.hidden).toBe(0);
+      expect(db.prepare("SELECT COUNT(*) AS count FROM session_meta").get()).toEqual({ count: 0 });
+    } finally {
+      db.close();
+    }
+  }, 60_000);
+
+  it("transactionally migrates a legacy ContentStore from concurrent processes", async () => {
+    const dbPath = await runConcurrentColdStart("store", 6, seedLegacyContentSchema);
+    const Database = loadDatabase();
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const columns = db.prepare("SELECT name FROM pragma_table_xinfo('chunks')").all() as Array<{ name: string }>;
+      const trigramColumns = db.prepare("SELECT name FROM pragma_table_xinfo('chunks_trigram')").all() as Array<{ name: string }>;
+      expect(columns.map((column) => column.name)).toContain("source_category");
+      expect(trigramColumns.map((column) => column.name)).toContain("source_category");
+      expect(db.prepare("SELECT COUNT(*) AS count FROM sources").get()).toEqual({ count: 0 });
+    } finally {
+      db.close();
+    }
   }, 60_000);
 
   it("registers Pi concurrently against one new per-project SessionDB", async () => {

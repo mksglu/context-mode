@@ -818,18 +818,21 @@ export class SessionDB extends SQLiteBase {
   // ── Schema ──
 
   protected initSchema(): void {
-    // ── Migration: fix data_hash generated column from older schema ──
-    // Old schema had data_hash as GENERATED ALWAYS AS — new schema uses explicit INSERT.
-    // Detect and recreate table if needed (session data is ephemeral, safe to drop).
-    const colInfo = (this.db.pragma("table_xinfo(session_events)") ?? []) as Array<{ name: string; hidden: number }>;
-    const hashCol = colInfo.find((c) => c.name === "data_hash");
-    if (hashCol && hashCol.hidden !== 0) {
-      // hidden != 0 means generated column — must recreate. IF EXISTS makes
-      // this safe when another initializer wins the same migration race.
-      this.db.exec("DROP TABLE IF EXISTS session_events");
-    }
+    // Keep destructive legacy migration and replacement schema creation in
+    // one transaction. Concurrent initializers either see the legacy schema
+    // or the complete replacement; no connection can observe a missing table.
+    this.db.transaction(() => {
+      // ── Migration: fix data_hash generated column from older schema ──
+      // Old schema had data_hash as GENERATED ALWAYS AS — new schema uses explicit INSERT.
+      // Detect and recreate table if needed (session data is ephemeral, safe to drop).
+      const colInfo = (this.db.pragma("table_xinfo(session_events)") ?? []) as Array<{ name: string; hidden: number }>;
+      const hashCol = colInfo.find((c) => c.name === "data_hash");
+      if (hashCol && hashCol.hidden !== 0) {
+        // hidden != 0 means generated column — must recreate.
+        this.db.exec("DROP TABLE session_events");
+      }
 
-    this.db.exec(`
+      this.db.exec(`
       CREATE TABLE IF NOT EXISTS session_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
@@ -881,30 +884,30 @@ export class SessionDB extends SQLiteBase {
       CREATE INDEX IF NOT EXISTS idx_tool_calls_session ON tool_calls(session_id);
     `);
 
-    // Migration: add per-event attribution columns for existing DBs.
-    // Shared helper — the analytics aggregator (analytics.ts) runs the
-    // SAME migration against every historical DB it scans, so the column
-    // list lives in one place at the top of this module.
-    applyMissingSessionEventsColumns(this.db as unknown as {
-      pragma: (q: string) => Array<{ name: string }>;
-      exec: (sql: string) => void;
-    });
+      // Migration: add per-event attribution columns for existing DBs.
+      // Shared helper — the analytics aggregator (analytics.ts) runs the
+      // SAME migration against every historical DB it scans, so the column
+      // list lives in one place at the top of this module.
+      applyMissingSessionEventsColumns(this.db as unknown as {
+        pragma: (q: string) => Array<{ name: string }>;
+        exec: (sql: string) => void;
+      });
 
-    // Migration: per-session usage high-water cursor for the Stop hook's
-    // cursor-aware main-turn capture (extractTranscriptUsageSince). Stores the
-    // uuid of the last assistant turn already emitted so the next Stop forwards
-    // only NEW spend. Idempotent — guarded by a table_xinfo column check.
-    try {
-      const metaCols = this.db.pragma("table_xinfo(session_meta)") as Array<{ name: string }>;
-      if (!metaCols.some((c) => c.name === "usage_cursor")) {
-        this.db.exec("ALTER TABLE session_meta ADD COLUMN usage_cursor TEXT");
+      // Migration: per-session usage high-water cursor for the Stop hook's
+      // cursor-aware main-turn capture (extractTranscriptUsageSince). Stores the
+      // uuid of the last assistant turn already emitted so the next Stop forwards
+      // only NEW spend. Idempotent — guarded by a table_xinfo column check.
+      try {
+        const metaCols = this.db.pragma("table_xinfo(session_meta)") as Array<{ name: string }>;
+        if (!metaCols.some((c) => c.name === "usage_cursor")) {
+          this.db.exec("ALTER TABLE session_meta ADD COLUMN usage_cursor TEXT");
+        }
+      } catch (err) {
+        // Another initializer may have added the column after our PRAGMA.
+        // Ignore only that race; SQLITE_BUSY must reach the startup retry.
+        if (!isSQLiteSchemaRaceError(err)) throw err;
       }
-    } catch (err) {
-      // Another initializer may have added the column after our PRAGMA.
-      // Ignore only that race; SQLITE_BUSY must reach the startup retry.
-      if (!isSQLiteSchemaRaceError(err)) throw err;
-    }
-
+    })();
   }
 
   protected prepareStatements(): void {

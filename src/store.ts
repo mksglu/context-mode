@@ -9,7 +9,7 @@
  */
 
 import type { Database as DatabaseInstance } from "better-sqlite3";
-import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, isSQLiteSchemaRaceError } from "./db-base.js";
+import { loadDatabase, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, isSQLiteSchemaRaceError, openDatabaseWithWAL } from "./db-base.js";
 import type { PreparedStatement } from "./db-base.js";
 import { readFileSync, readdirSync, unlinkSync, existsSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -422,30 +422,34 @@ export class ContentStore {
     this.#dbPath =
       dbPath ?? join(tmpdir(), `context-mode-${process.pid}.db`);
     cleanOrphanedWALFiles(this.#dbPath);
-    let db: DatabaseInstance;
+    let db: DatabaseInstance | undefined;
     try {
-      db = new Database(this.#dbPath, { timeout: 30000 });
-      withRetry(() => applyWALPragmas(db));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (isSQLiteCorruptionError(msg)) {
+      try {
+        db = openDatabaseWithWAL(Database, this.#dbPath, { timeout: 30000 });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!isSQLiteCorruptionError(msg)) throw err;
+
         deleteDBFiles(this.#dbPath);
         cleanOrphanedWALFiles(this.#dbPath);
         try {
-          db = new Database(this.#dbPath, { timeout: 30000 });
-          withRetry(() => applyWALPragmas(db));
+          db = openDatabaseWithWAL(Database, this.#dbPath, { timeout: 30000 });
         } catch (retryErr) {
           throw new Error(
             `Failed to create fresh DB after deleting corrupt file: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`
           );
         }
-      } else {
-        throw err;
       }
+
+      this.#db = db;
+      withRetry(() => this.#initSchema());
+      this.#prepareStatements();
+    } catch (err) {
+      // A constructor that throws gives callers no object to close. Release
+      // handles for schema, migration, and statement-prepare failures here.
+      if (db) closeDB(db);
+      throw err;
     }
-    this.#db = db;
-    withRetry(() => this.#initSchema());
-    this.#prepareStatements();
   }
 
   /** Delete this session's DB files. Call on process exit. */
@@ -461,7 +465,11 @@ export class ContentStore {
   // ── Schema ──
 
   #initSchema(): void {
-    this.#db.exec(`
+    // DDL is transactional in SQLite. Keeping destructive FTS replacement
+    // and all subsequent schema setup in this transaction ensures concurrent
+    // initializers never observe missing virtual tables or a half migration.
+    this.#db.transaction(() => {
+      this.#db.exec(`
       CREATE TABLE IF NOT EXISTS sources (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         label TEXT NOT NULL,
@@ -503,20 +511,20 @@ export class ContentStore {
       CREATE INDEX IF NOT EXISTS idx_sources_label ON sources(label);
     `);
 
-    // FTS5 schema migration: old schema (4 cols) → new schema (8 cols).
-    // FTS5 virtual tables do not support ALTER TABLE ADD COLUMN, so we must
-    // DROP + re-CREATE. Detection: check for sentinel column `source_category`
-    // via pragma_table_xinfo. Three states:
-    //   1. No table          → CREATE above handled it (fresh DB)
-    //   2. Old schema (4 cols) → DROP + CREATE new
-    //   3. New schema (8 cols) → do nothing
-    try {
+      // FTS5 schema migration: old schema (4 cols) → new schema (8 cols).
+      // FTS5 virtual tables do not support ALTER TABLE ADD COLUMN, so we must
+      // DROP + re-CREATE. Detection: check for sentinel column `source_category`
+      // via pragma_table_xinfo. Three states:
+      //   1. No table          → CREATE above handled it (fresh DB)
+      //   2. Old schema (4 cols) → DROP + CREATE new
+      //   3. New schema (8 cols) → do nothing
       const cols = this.#db.prepare(
         "SELECT name FROM pragma_table_xinfo('chunks')"
       ).all() as Array<{ name: string }>;
       const colNames = new Set(cols.map(c => c.name));
       if (cols.length > 0 && !colNames.has("source_category")) {
-        // Old schema detected — drop both FTS5 tables and re-create with new columns
+        // Old schema detected — drop both FTS5 tables and re-create with new columns.
+        // Do not swallow "already exists" here: any failure rolls back both drops.
         this.#db.exec("DROP TABLE IF EXISTS chunks");
         this.#db.exec("DROP TABLE IF EXISTS chunks_trigram");
         this.#db.exec(`
@@ -544,23 +552,21 @@ export class ContentStore {
           );
         `);
       }
-    } catch (err) {
-      if (!isSQLiteSchemaRaceError(err)) throw err;
-    }
 
-    // Stale detection columns — safe for existing DBs (ALTER is O(1) in SQLite).
-    // A concurrent initializer may win between detection and ALTER; ignore only
-    // that duplicate-column race. SQLITE_BUSY must reach the outer retry loop.
-    try {
-      this.#db.exec("ALTER TABLE sources ADD COLUMN file_path TEXT");
-    } catch (err) {
-      if (!isSQLiteSchemaRaceError(err)) throw err;
-    }
-    try {
-      this.#db.exec("ALTER TABLE sources ADD COLUMN content_hash TEXT");
-    } catch (err) {
-      if (!isSQLiteSchemaRaceError(err)) throw err;
-    }
+      // Stale detection columns — safe for existing DBs (ALTER is O(1) in SQLite).
+      // Existing schemas report duplicate-column; ignore only that benign case.
+      // Lock and I/O errors must reach the outer retry/failure boundary.
+      try {
+        this.#db.exec("ALTER TABLE sources ADD COLUMN file_path TEXT");
+      } catch (err) {
+        if (!isSQLiteSchemaRaceError(err)) throw err;
+      }
+      try {
+        this.#db.exec("ALTER TABLE sources ADD COLUMN content_hash TEXT");
+      } catch (err) {
+        if (!isSQLiteSchemaRaceError(err)) throw err;
+      }
+    })();
   }
 
   #prepareStatements(): void {
