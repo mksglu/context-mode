@@ -6,7 +6,7 @@
  * the shared package.
  */
 
-import { SQLiteBase, defaultDBPath } from "../db-base.js";
+import { SQLiteBase, defaultDBPath, isSQLiteSchemaRaceError } from "../db-base.js";
 import type { PreparedStatement } from "../db-base.js";
 import type { SessionEvent } from "../types.js";
 import type { ProjectAttribution } from "./project-attribution.js";
@@ -733,8 +733,14 @@ export function applyMissingSessionEventsColumns(db: {
   let changed = false;
   for (const [name, spec] of SESSION_EVENTS_REQUIRED_COLUMNS) {
     if (!cols.has(name)) {
-      db.exec(`ALTER TABLE session_events ADD COLUMN ${name} ${spec}`);
-      changed = true;
+      try {
+        db.exec(`ALTER TABLE session_events ADD COLUMN ${name} ${spec}`);
+        changed = true;
+      } catch (err) {
+        // Another initializer may have added the column after our PRAGMA.
+        // Ignore only that race; SQLITE_BUSY must reach the startup retry.
+        if (!isSQLiteSchemaRaceError(err)) throw err;
+      }
     }
   }
   if (changed) {
@@ -815,14 +821,13 @@ export class SessionDB extends SQLiteBase {
     // ── Migration: fix data_hash generated column from older schema ──
     // Old schema had data_hash as GENERATED ALWAYS AS — new schema uses explicit INSERT.
     // Detect and recreate table if needed (session data is ephemeral, safe to drop).
-    try {
-      const colInfo = this.db.pragma("table_xinfo(session_events)") as Array<{ name: string; hidden: number }>;
-      const hashCol = colInfo.find((c) => c.name === "data_hash");
-      if (hashCol && hashCol.hidden !== 0) {
-        // hidden != 0 means generated column — must recreate
-        this.db.exec("DROP TABLE session_events");
-      }
-    } catch { /* table doesn't exist yet — fine */ }
+    const colInfo = (this.db.pragma("table_xinfo(session_events)") ?? []) as Array<{ name: string; hidden: number }>;
+    const hashCol = colInfo.find((c) => c.name === "data_hash");
+    if (hashCol && hashCol.hidden !== 0) {
+      // hidden != 0 means generated column — must recreate. IF EXISTS makes
+      // this safe when another initializer wins the same migration race.
+      this.db.exec("DROP TABLE IF EXISTS session_events");
+    }
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS session_events (
@@ -880,14 +885,10 @@ export class SessionDB extends SQLiteBase {
     // Shared helper — the analytics aggregator (analytics.ts) runs the
     // SAME migration against every historical DB it scans, so the column
     // list lives in one place at the top of this module.
-    try {
-      applyMissingSessionEventsColumns(this.db as unknown as {
-        pragma: (q: string) => Array<{ name: string }>;
-        exec: (sql: string) => void;
-      });
-    } catch {
-      // best-effort migration only
-    }
+    applyMissingSessionEventsColumns(this.db as unknown as {
+      pragma: (q: string) => Array<{ name: string }>;
+      exec: (sql: string) => void;
+    });
 
     // Migration: per-session usage high-water cursor for the Stop hook's
     // cursor-aware main-turn capture (extractTranscriptUsageSince). Stores the
@@ -898,8 +899,10 @@ export class SessionDB extends SQLiteBase {
       if (!metaCols.some((c) => c.name === "usage_cursor")) {
         this.db.exec("ALTER TABLE session_meta ADD COLUMN usage_cursor TEXT");
       }
-    } catch {
-      // best-effort migration only
+    } catch (err) {
+      // Another initializer may have added the column after our PRAGMA.
+      // Ignore only that race; SQLITE_BUSY must reach the startup retry.
+      if (!isSQLiteSchemaRaceError(err)) throw err;
     }
 
   }

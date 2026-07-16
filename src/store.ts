@@ -9,7 +9,7 @@
  */
 
 import type { Database as DatabaseInstance } from "better-sqlite3";
-import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError } from "./db-base.js";
+import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, isSQLiteSchemaRaceError } from "./db-base.js";
 import type { PreparedStatement } from "./db-base.js";
 import { readFileSync, readdirSync, unlinkSync, existsSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -425,7 +425,7 @@ export class ContentStore {
     let db: DatabaseInstance;
     try {
       db = new Database(this.#dbPath, { timeout: 30000 });
-      applyWALPragmas(db);
+      withRetry(() => applyWALPragmas(db));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (isSQLiteCorruptionError(msg)) {
@@ -433,7 +433,7 @@ export class ContentStore {
         cleanOrphanedWALFiles(this.#dbPath);
         try {
           db = new Database(this.#dbPath, { timeout: 30000 });
-          applyWALPragmas(db);
+          withRetry(() => applyWALPragmas(db));
         } catch (retryErr) {
           throw new Error(
             `Failed to create fresh DB after deleting corrupt file: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`
@@ -444,7 +444,7 @@ export class ContentStore {
       }
     }
     this.#db = db;
-    this.#initSchema();
+    withRetry(() => this.#initSchema());
     this.#prepareStatements();
   }
 
@@ -544,11 +544,23 @@ export class ContentStore {
           );
         `);
       }
-    } catch { /* pragma_table_xinfo may fail if table doesn't exist yet — safe to ignore */ }
+    } catch (err) {
+      if (!isSQLiteSchemaRaceError(err)) throw err;
+    }
 
-    // Stale detection columns — safe for existing DBs (ALTER is O(1) in SQLite)
-    try { this.#db.exec("ALTER TABLE sources ADD COLUMN file_path TEXT"); } catch { /* already exists */ }
-    try { this.#db.exec("ALTER TABLE sources ADD COLUMN content_hash TEXT"); } catch { /* already exists */ }
+    // Stale detection columns — safe for existing DBs (ALTER is O(1) in SQLite).
+    // A concurrent initializer may win between detection and ALTER; ignore only
+    // that duplicate-column race. SQLITE_BUSY must reach the outer retry loop.
+    try {
+      this.#db.exec("ALTER TABLE sources ADD COLUMN file_path TEXT");
+    } catch (err) {
+      if (!isSQLiteSchemaRaceError(err)) throw err;
+    }
+    try {
+      this.#db.exec("ALTER TABLE sources ADD COLUMN content_hash TEXT");
+    } catch (err) {
+      if (!isSQLiteSchemaRaceError(err)) throw err;
+    }
   }
 
   #prepareStatements(): void {

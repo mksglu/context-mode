@@ -471,6 +471,16 @@ export function isSQLiteCorruptionError(msg: string): boolean {
 }
 
 /**
+ * Concurrent idempotent migrations can both observe a missing schema object
+ * before one process creates it. Only that benign race may be ignored; lock
+ * errors must escape to the surrounding withRetry() startup boundary.
+ */
+export function isSQLiteSchemaRaceError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /duplicate column name|already exists/i.test(msg);
+}
+
+/**
  * Rename a corrupt DB and its WAL/SHM files so a fresh DB can be created.
  * Best-effort — individual rename failures are silently ignored.
  */
@@ -555,7 +565,7 @@ export abstract class SQLiteBase {
     let db: DatabaseInstance;
     try {
       db = new Database(dbPath, { timeout: 30000 });
-      applyWALPragmas(db);
+      withRetry(() => applyWALPragmas(db));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (isSQLiteCorruptionError(msg)) {
@@ -563,7 +573,7 @@ export abstract class SQLiteBase {
         cleanOrphanedWALFiles(dbPath);
         try {
           db = new Database(dbPath, { timeout: 30000 });
-          applyWALPragmas(db);
+          withRetry(() => applyWALPragmas(db));
         } catch (retryErr) {
           throw new Error(
             `Failed to create fresh DB after renaming corrupt file: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`
@@ -575,7 +585,7 @@ export abstract class SQLiteBase {
     }
     this.#db = db;
     _liveDBs.add(this.#db);
-    this.initSchema();
+    withRetry(() => this.initSchema());
     this.prepareStatements();
   }
 
