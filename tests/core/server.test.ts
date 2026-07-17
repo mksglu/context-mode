@@ -6628,11 +6628,14 @@ describe("parseJsonc / stripJsonComments (src/util/jsonc)", () => {
 describe("resolveExecTimeout (agy default execution timeout)", () => {
   const savedPlatform = process.env.CONTEXT_MODE_PLATFORM;
   const savedOverride = process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
+  const savedGeneric = process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS;
   afterEach(() => {
     if (savedPlatform === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
     else process.env.CONTEXT_MODE_PLATFORM = savedPlatform;
     if (savedOverride === undefined) delete process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
     else process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = savedOverride;
+    if (savedGeneric === undefined) delete process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS;
+    else process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = savedGeneric;
   });
 
   test("passes an explicit timeout through on any platform", () => {
@@ -6645,11 +6648,13 @@ describe("resolveExecTimeout (agy default execution timeout)", () => {
   test("applies the agy default ONLY under antigravity-cli when no timeout is given", () => {
     process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
     delete process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
+    delete process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS;
     expect(resolveExecTimeout(undefined)).toBe(AGY_DEFAULT_EXEC_TIMEOUT_MS);
   });
 
   test("leaves the timeout unbounded (undefined) on non-agy hosts", () => {
     process.env.CONTEXT_MODE_PLATFORM = "claude-code";
+    delete process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS;
     expect(resolveExecTimeout(undefined)).toBeUndefined();
   });
 
@@ -6657,6 +6662,42 @@ describe("resolveExecTimeout (agy default execution timeout)", () => {
     process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
     process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = "1500";
     expect(resolveExecTimeout(undefined)).toBe(1500);
+  });
+
+  // #936 — opt-in bounded default on hosts whose RPC timeout is effectively
+  // unbounded (e.g. Claude Code stdio before v2.1.203).
+  test("honors CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS on non-agy hosts (#936)", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "claude-code";
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "120000";
+    expect(resolveExecTimeout(undefined)).toBe(120000);
+  });
+
+  test("explicit timeout still wins over the generic default (#936)", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "claude-code";
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "120000";
+    expect(resolveExecTimeout(5000)).toBe(5000);
+  });
+
+  test("agy-specific override beats the generic default under agy (#936)", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
+    process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = "1500";
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "120000";
+    expect(resolveExecTimeout(undefined)).toBe(1500);
+  });
+
+  test("generic default beats the agy built-in default under agy (#936)", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
+    delete process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "90000";
+    expect(resolveExecTimeout(undefined)).toBe(90000);
+  });
+
+  test("invalid generic values are ignored (#936)", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "claude-code";
+    for (const bad of ["0", "-1", "abc", ""]) {
+      process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = bad;
+      expect(resolveExecTimeout(undefined)).toBeUndefined();
+    }
   });
 });
 

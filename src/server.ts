@@ -1489,16 +1489,30 @@ function truncateCommandForEcho(command: string): string {
  * interrupt. Every other host enforces its own RPC timeout, so we keep the
  * no-server-timer behavior there (Issue #406 — long builds need an unbounded
  * run). A caller can still pass an explicit `timeout` to override on any host.
+ *
+ * Some hosts' RPC timeouts are effectively unbounded in practice — Claude Code
+ * stdio before v2.1.203 exempted stdio MCP servers from the idle timeout, so a
+ * hung ctx_execute blocked the agent until manual interruption (#936).
+ * CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS lets users opt into a bounded default on
+ * any host; an explicit per-call `timeout` still wins, and under agy the
+ * platform-specific CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS takes precedence over it.
  */
 export const AGY_DEFAULT_EXEC_TIMEOUT_MS = 120_000;
 export function resolveExecTimeout(timeout: number | undefined): number | undefined {
   if (timeout !== undefined) return timeout;
-  // Only agy gets a default — every other host enforces its own RPC timeout, so
-  // keep the unbounded behavior there. Detected via the env the agy bundle pins
-  // (CONTEXT_MODE_PLATFORM=antigravity-cli). Tunable via CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS.
-  if (detectPlatform().platform !== "antigravity-cli") return undefined;
+  const generic = Number(process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS);
+  const genericValid = Number.isFinite(generic) && generic > 0;
+  // Only agy gets a built-in default — every other host enforces its own RPC
+  // timeout, so keep the unbounded behavior there unless the user opted in via
+  // CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS. Detected via the env the agy bundle
+  // pins (CONTEXT_MODE_PLATFORM=antigravity-cli). Tunable via CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS.
+  if (detectPlatform().platform !== "antigravity-cli") {
+    return genericValid ? generic : undefined;
+  }
   const override = Number(process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS);
-  return Number.isFinite(override) && override > 0 ? override : AGY_DEFAULT_EXEC_TIMEOUT_MS;
+  if (Number.isFinite(override) && override > 0) return override;
+  if (genericValid) return generic;
+  return AGY_DEFAULT_EXEC_TIMEOUT_MS;
 }
 
 /**
