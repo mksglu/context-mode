@@ -218,10 +218,12 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
     { name: "QWEN_PROJECT_DIR", role: "workspace" },
   ]],
   // omp (can1357/oh-my-pi). PI_CODING_AGENT_DIR is the upstream
-  // agent-dir override per `packages/utils/src/dirs.ts:193`. Listed
-  // BEFORE pi so OMP is not misclassified as Pi when both are installed.
+  // agent-dir override per `packages/utils/src/dirs.ts:193`, not a
+  // workspace root. Keep it as an identification signal only so strict
+  // project-dir resolution falls through to CONTEXT_MODE_PROJECT_DIR / cwd.
+  // Listed BEFORE pi so OMP is not misclassified as Pi when both are installed.
   ["omp", [
-    { name: "PI_CODING_AGENT_DIR", role: "workspace" },
+    { name: "PI_CODING_AGENT_DIR", role: "identification" },
   ]],
   // pi — Issue #542 marker correction. PI_PROJECT_DIR is a consumer-set
   // var (read by src/adapters/pi/extension.ts) but is NOT auto-set by

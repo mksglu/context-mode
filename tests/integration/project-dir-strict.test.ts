@@ -57,7 +57,6 @@ describe("server getProjectDir wiring — strictPlatform for all adapters (issue
     "opencode",
     "qwen-code",
     "pi",
-    "omp",
   ];
 
   // Adapters with no workspace var (rely on universal escape hatch / pwd / cwd).
@@ -70,6 +69,7 @@ describe("server getProjectDir wiring — strictPlatform for all adapters (issue
     "antigravity-cli",
     "copilot-cli",
     "openclaw",
+    "omp",
   ];
 
   for (const platform of platformsWithOwnVar) {

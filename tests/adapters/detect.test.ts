@@ -703,6 +703,9 @@ describe("PLATFORM_ENV_VARS — typed registry (issue #545 algorithmic design)",
     const codex = workspaceEnvVarsFor("codex");
     // Codex has no workspace var — id-only registry rows.
     expect(codex).toEqual([]);
+    const omp = workspaceEnvVarsFor("omp");
+    // PI_CODING_AGENT_DIR is OMP's agent-dir override, not a workspace root.
+    expect(omp).toEqual([]);
   });
 
   // Slice 2 — Pi's workspace var registry. PI_WORKSPACE_DIR (extension-set,
@@ -752,6 +755,7 @@ describe("PLATFORM_ENV_VARS — typed registry (issue #545 algorithmic design)",
     expect(banForPi.has("ZED_TERM")).toBe(true);
     expect(banForPi.has("ZED_SESSION_ID")).toBe(true);
     expect(banForPi.has("ANTIGRAVITY_CLI_ALIAS")).toBe(true);
+    expect(banForPi.has("PI_CODING_AGENT_DIR")).toBe(true);
     // Pi's OWN identification vars — MUST NOT appear in its own ban set.
     expect(banForPi.has("PI_CONFIG_DIR")).toBe(false);
     expect(banForPi.has("PI_SESSION_FILE")).toBe(false);

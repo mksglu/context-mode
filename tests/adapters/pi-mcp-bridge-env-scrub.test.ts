@@ -9,10 +9,10 @@ import "../setup-home";
  * then resolves `getProjectDir()` to the foreign workspace and Pi's sessions
  * write into the wrong project.
  *
- * Fix: on child spawn, delete every var in `foreignWorkspaceEnv("pi")` from
- * the inherited env. Pi's own workspace vars (PI_WORKSPACE_DIR,
- * PI_PROJECT_DIR) and identification vars (CLAUDE_PLUGIN_ROOT, etc.) are
- * preserved — only project-path leaks from OTHER platforms are stripped.
+ * Fix: on child spawn, delete every var in `foreignWorkspaceEnv("pi")` and
+ * `foreignIdentificationEnv("pi")` from the inherited env. Pi's own workspace
+ * vars (PI_WORKSPACE_DIR, PI_PROJECT_DIR) and own identification vars are
+ * preserved while foreign platform signals are stripped.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -101,9 +101,9 @@ describe("Pi MCPStdioClient — foreign workspace env scrub (issue #545)", () =>
   });
 
   it("scrub is symmetric: foreign vars from any other adapter are stripped (registry-driven)", () => {
-    // OMP's PI_CODING_AGENT_DIR is a foreign workspace var for Pi — derived
+    // OMP's PI_CODING_AGENT_DIR is a foreign identification var for Pi — derived
     // from the registry, NOT a hardcoded list. If a future adapter registers
-    // a workspace var, this test still passes without modification.
+    // a platform signal, this test still passes without modification.
     const env: NodeJS.ProcessEnv = {
       PI_CODING_AGENT_DIR: "/leak/from/omp",
       PI_PROJECT_DIR: "/Users/x/own",
@@ -115,7 +115,7 @@ describe("Pi MCPStdioClient — foreign workspace env scrub (issue #545)", () =>
     const spawned = client._spawnEnv;
     expect(spawned).not.toBeNull();
     if (!spawned) throw new Error("unreachable");
-    // OMP's PI_CODING_AGENT_DIR is a foreign workspace var for Pi — scrubbed.
+    // OMP's PI_CODING_AGENT_DIR is a foreign identification var for Pi — scrubbed.
     expect(spawned.PI_CODING_AGENT_DIR).toBeUndefined();
     // Pi's own var survives.
     expect(spawned.PI_PROJECT_DIR).toBe("/Users/x/own");

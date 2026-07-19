@@ -23,7 +23,15 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SessionDB } from "../../src/session/db.js";
+import Database from "better-sqlite3";
+import { ContentStore } from "../../src/store.js";
+import {
+  ensureWritableStorageDir,
+  resolveContentStorageDir,
+  resolveContentStorePath,
+  resolveSessionDbPath,
+  SessionDB,
+} from "../../src/session/db.js";
 
 // ── Mock OMP HookAPI ────────────────────────────────────────
 
@@ -79,7 +87,13 @@ describe("OMP plugin", () => {
     api = createMockOmpApi();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      const mod = await import("../../src/adapters/omp/plugin.js");
+      mod._resetOmpPluginStateForTests();
+    } catch {
+      /* best effort */
+    }
     try {
       rmSync(tempDir, { recursive: true, force: true });
     } catch {
@@ -212,6 +226,108 @@ describe("OMP plugin", () => {
       expect(events.length).toBeGreaterThan(0);
       // file_read category should appear for a Read tool
       expect(events.some((e) => e.category === "file")).toBe(true);
+    });
+
+    it("indexes and replaces large text output, recording real bytes", async () => {
+      await registerOmpPlugin(api);
+      await api._trigger("session_start", { type: "session_start" }, {});
+
+      const largeOutput = Array.from(
+        { length: 25 },
+        (_, i) => `line ${i} UNIQUE_OMP_LARGE_SENTINEL ${"x".repeat(220)}`,
+      ).join("\n");
+
+      const result = (await api._trigger("tool_result", {
+        toolName: "read",
+        toolCallId: "call-large",
+        input: { file_path: "/tmp/large.log" },
+        content: [{ type: "text", text: largeOutput }],
+      })) as { content?: Array<{ type: string; text?: string }>; isError?: boolean } | undefined;
+
+      const replacementText = result?.content?.[0]?.text ?? "";
+      expect(result?.isError).toBe(false);
+      expect(replacementText).toContain("[context-mode] OMP tool output indexed");
+      expect(replacementText).toContain('source: "omp-tool-result:Read:call-large"');
+      expect(replacementText.length).toBeLessThan(largeOutput.length);
+
+      const pluginMod = await import("../../src/adapters/omp/plugin.js");
+      pluginMod._resetOmpPluginStateForTests();
+
+      const { OMPAdapter } = await import("../../src/adapters/omp/index.js");
+      const adapter = new OMPAdapter();
+      const db = new SessionDB({
+        dbPath: resolveSessionDbPath({
+          projectDir: tempDir,
+          sessionsDir: adapter.getSessionDir(),
+        }),
+      });
+      try {
+        const row = db.db.prepare(
+          "SELECT bytes_avoided, bytes_returned FROM session_events WHERE type = ? ORDER BY id DESC LIMIT 1",
+        ).get("file_read") as { bytes_avoided: number; bytes_returned: number } | undefined;
+        expect(row?.bytes_avoided).toBeGreaterThan(0);
+        expect(row?.bytes_returned).toBeGreaterThan(0);
+      } finally {
+        db.close();
+      }
+
+      const contentDir = ensureWritableStorageDir(resolveContentStorageDir(() => adapter.getSessionDir()));
+      const storePath = resolveContentStorePath({ projectDir: tempDir, contentDir });
+      const store = new ContentStore(storePath);
+      try {
+        const matches = store.searchWithFallback(
+          "UNIQUE_OMP_LARGE_SENTINEL",
+          3,
+          "omp-tool-result:Read:call-large",
+        );
+        expect(matches.length).toBeGreaterThan(0);
+        expect(matches[0].content).toContain("UNIQUE_OMP_LARGE_SENTINEL");
+      } finally {
+        store.close();
+      }
+
+      const rawStore = new Database(storePath, { readonly: true });
+      try {
+        const rows = rawStore.prepare(
+          "SELECT DISTINCT chunks.session_id AS sessionId FROM chunks JOIN sources ON sources.id = chunks.source_id WHERE sources.label = ?",
+        ).all("omp-tool-result:Read:call-large") as Array<{ sessionId: string }>;
+        expect(rows).toEqual([{ sessionId: "" }]);
+      } finally {
+        rawStore.close();
+      }
+    });
+
+    it("does not replace or index text output when the replacement would be larger", async () => {
+      await registerOmpPlugin(api);
+      await api._trigger("session_start", { type: "session_start" }, {});
+
+      await expect(
+        api._trigger("tool_result", {
+          toolName: "read",
+          toolCallId: "call-small",
+          input: { file_path: "/tmp/x.ts" },
+          content: [{ type: "text", text: "export const x = 1;" }],
+        }),
+      ).resolves.toBeUndefined();
+
+      const pluginMod = await import("../../src/adapters/omp/plugin.js");
+      pluginMod._resetOmpPluginStateForTests();
+
+      const { OMPAdapter } = await import("../../src/adapters/omp/index.js");
+      const adapter = new OMPAdapter();
+      const contentDir = ensureWritableStorageDir(resolveContentStorageDir(() => adapter.getSessionDir()));
+      const storePath = resolveContentStorePath({ projectDir: tempDir, contentDir });
+      const store = new ContentStore(storePath);
+      try {
+        const matches = store.searchWithFallback(
+          "export const x",
+          3,
+          "omp-tool-result:Read:call-small",
+        );
+        expect(matches).toEqual([]);
+      } finally {
+        store.close();
+      }
     });
 
     it("does nothing when no session has started", async () => {
@@ -472,7 +588,12 @@ describe("OMP plugin", () => {
       const settings = adapter.readSettings();
       const server = (settings?.mcpServers as Record<string, unknown> | undefined)?.[
         "context-mode"
-      ] as { command?: string; args?: unknown[] } | undefined;
+      ] as {
+        command?: string;
+        args?: unknown[];
+        cwd?: string;
+        env?: Record<string, string>;
+      } | undefined;
 
       expect(
         server,
@@ -483,6 +604,9 @@ describe("OMP plugin", () => {
       expect(server?.command).toBe("node");
       expect(Array.isArray(server?.args)).toBe(true);
       expect(String(server?.args?.[0])).toMatch(/server\.bundle\.mjs$/);
+      expect(server?.cwd).toBe(process.cwd());
+      expect(server?.env?.CONTEXT_MODE_PLATFORM).toBe("omp");
+      expect(server?.env?.CONTEXT_MODE_PROJECT_DIR).toBe(process.cwd());
     });
 
     it("does NOT clobber an existing context-mode mcp.json entry", async () => {
@@ -505,6 +629,40 @@ describe("OMP plugin", () => {
       };
       expect(server.command).toBe("context-mode");
       expect(server.args).toEqual(["--user-custom"]);
+    });
+
+    it("adds OMP platform/project env to an existing plugin-generated mcp.json entry", async () => {
+      const { OMPAdapter } = await import("../../src/adapters/omp/index.js");
+      const adapter = new OMPAdapter();
+      const bundle = join(process.cwd(), "server.bundle.mjs");
+      adapter.writeSettings({
+        mcpServers: {
+          "context-mode": {
+            type: "stdio",
+            command: "node",
+            args: [bundle],
+            env: { EXISTING_ENV: "kept" },
+          },
+        },
+      });
+
+      await registerOmpPlugin(api);
+
+      const settings = adapter.readSettings();
+      const server = (settings?.mcpServers as Record<string, unknown>)["context-mode"] as {
+        command?: string;
+        args?: unknown[];
+        cwd?: string;
+        env?: Record<string, string>;
+      };
+      expect(server.command).toBe("node");
+      expect(server.args).toEqual([bundle]);
+      expect(server.cwd).toBe(process.cwd());
+      expect(server.env).toMatchObject({
+        EXISTING_ENV: "kept",
+        CONTEXT_MODE_PLATFORM: "omp",
+        CONTEXT_MODE_PROJECT_DIR: process.cwd(),
+      });
     });
   });
 });
