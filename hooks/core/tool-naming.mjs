@@ -14,6 +14,7 @@
  * | Kiro               | @context-mode/<tool>                                       |
  * | Zed                | mcp:context-mode:<tool>                                    |
  * | Cursor / Codex / OpenClaw / Pi | bare <tool>                                    |
+ * | Devin CLI         | bare <tool>                                                    |
  */
 
 const TOOL_PREFIXES = {
@@ -34,6 +35,7 @@ const TOOL_PREFIXES = {
   "openclaw":       (tool) => tool,
   "pi":             (tool) => tool,
   "qwen-code":      (tool) => `mcp__context-mode__${tool}`,
+  "devin":          (tool) => tool,
 };
 
 /**

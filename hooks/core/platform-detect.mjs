@@ -34,6 +34,9 @@ const PLATFORM_ENV_VARS_MIRROR = [
   ["jetbrains-copilot",  ["IDEA_INITIAL_DIRECTORY"]],
   ["qwen-code",          ["QWEN_PROJECT_DIR"]],
   ["pi",                 ["PI_PROJECT_DIR"]],
+  // devin — no auto-set process env vars (verified by env dump probe).
+  // Detection relies on CONTEXT_MODE_PLATFORM=devin override or MCP
+  // clientInfo.name from the initialize handshake. Falls through to default.
   // openclaw — no auto-set process env vars; falls through to default
   // kiro — no auto-set process env vars; falls through to default
 ];

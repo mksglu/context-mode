@@ -555,6 +555,14 @@ const TOOL_ALIASES = {
   "fs_read": "Read",
   "fs_write": "Write",
   "execute_bash": "Bash",
+  // Devin CLI native tool names
+  "exec": "Bash",
+  "read": "Read",
+  "grep": "Grep",
+  "webfetch": "WebFetch",
+  "web_search": "WebSearch",
+  "edit": "Edit",
+  "write": "Write",
 };
 
 function toolLeafName(toolName) {

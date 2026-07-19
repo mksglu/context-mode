@@ -271,6 +271,51 @@ export const formatters = {
       agent_message: additionalContext,
     }),
   },
+
+  // Devin CLI uses Claude-Code-compatible hookSpecificOutput format.
+  // updatedInput (modify) is not documented for Devin; convert modify→deny
+  // carrying the redirect guidance (same approach as Codex <0.141.0 and
+  // antigravity-cli). additionalContext is honored via hookSpecificOutput.
+  // On Windows, Devin's hook runner cannot spawn commands (confirmed bug
+  // as of Devin 2026.7.23) — these formatters are no-ops there until
+  // Cognition fixes the spawn mechanism.
+  "devin": {
+    deny: (reason) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: reason,
+      },
+    }),
+    // Devin has no "ask" concept in hook output — drop it.
+    ask: () => null,
+    // Devin does not document updatedInput. Convert modify to deny carrying
+    // the redirect guidance (mirrors codex/antigravity-cli fail-closed).
+    modify: (updatedInput) => {
+      const ui = updatedInput ?? {};
+      // Only command redirects must fail closed. Non-command rewrites
+      // (e.g. Agent prompt injection) are advisory — drop rather than block.
+      if (!("command" in ui)) return null;
+      const cmd = ui.command ?? "";
+      const m = String(cmd).match(/^echo\s+"([\s\S]*)"\s*$/);
+      const guidance = m ? m[1].replace(/\\(["\\])/g, "$1") : "";
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason:
+            guidance ||
+            "context-mode: command redirected. Use the context-mode MCP tools (ctx_execute / ctx_fetch_and_index / ctx_search) so raw output stays out of the conversation.",
+        },
+      };
+    },
+    context: (additionalContext) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        additionalContext,
+      },
+    }),
+  },
 };
 
 // Keep in sync with the identical agyContextReason in

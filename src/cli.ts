@@ -153,6 +153,14 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     sessionstart: "hooks/sessionstart.mjs",
     userpromptsubmit: "hooks/userpromptsubmit.mjs",
   },
+  "devin": {
+    pretooluse: "hooks/devin/pretooluse.mjs",
+    posttooluse: "hooks/devin/posttooluse.mjs",
+    precompact: "hooks/devin/precompact.mjs",
+    sessionstart: "hooks/devin/sessionstart.mjs",
+    userpromptsubmit: "hooks/devin/userpromptsubmit.mjs",
+    stop: "hooks/devin/stop.mjs",
+  },
 };
 
 async function hookDispatch(platform: string, event: string): Promise<void> {

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "context-mode",
+      "transport": "stdio",
+      "env": {
+        "CONTEXT_MODE_PLATFORM": "devin"
+      }
+    }
+  }
+}

@@ -223,6 +223,21 @@ export const JETBRAINS_OPTS = {
   sessionIdEnv: undefined,
 };
 
+/** Devin CLI platform options.
+ *
+ * Devin does not set any DEVIN_* env vars when spawning MCP children or
+ * hooks (verified by env dump probe). Platform detection relies on
+ * CONTEXT_MODE_PLATFORM=devin override or MCP clientInfo.name.
+ * Project dir comes from the hook stdin `cwd` field, not an env var.
+ * Session ID comes from the hook stdin `session_id` field.
+ */
+export const DEVIN_OPTS = {
+  configDir: ".devin",
+  configDirEnv: "DEVIN_HOME",
+  projectDirEnv: undefined,   // Devin passes cwd in hook stdin, no env var
+  sessionIdEnv: undefined,    // Uses session_id from hook stdin or ppid fallback
+};
+
 /**
  * Resolve the platform config directory, respecting env var overrides.
  * Platforms like Claude Code (CLAUDE_CONFIG_DIR), Gemini CLI (GEMINI_CLI_HOME),

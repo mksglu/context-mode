@@ -17,6 +17,8 @@ let agyFormat: (decision: unknown) => unknown;
 // optional capability hint ({ codexSupportsRewrite }) threaded by the hook (#845).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- loose test seams over .mjs
 let codexFormat: (decision: unknown, opts?: any) => unknown;
+// devin has no standalone formatter — central registry only (same as codex/kimi/agy).
+let devinFormat: (decision: unknown) => unknown;
 // codex capability detection helpers (#845, hooks/core/codex-caps.mjs).
 let parseCodexVersion: (raw: unknown) => number[] | null;
 let versionGte: (a: number[], b: number[]) => boolean;
@@ -43,6 +45,8 @@ beforeAll(async () => {
     coreMod.formatDecision("antigravity-cli", decision as { action: string } | null);
   codexFormat = (decision: unknown, opts?: Record<string, unknown>) =>
     coreMod.formatDecision("codex", decision as { action: string } | null, opts);
+  devinFormat = (decision: unknown) =>
+    coreMod.formatDecision("devin", decision as { action: string } | null);
 
   const capsMod = await import("../../hooks/core/codex-caps.mjs");
   parseCodexVersion = capsMod.parseCodexVersion;
@@ -497,5 +501,50 @@ describe("codexSupportsUpdatedInput (#845)", () => {
     expect(
       codexSupportsUpdatedInput({ runVersion: () => "codex-cli 0.140.0", now: () => 1000 + 2 * 60 * 60 * 1000, cachePath }),
     ).toBe(false);
+  });
+});
+
+// ─── Devin CLI formatter ───────────────────────────────────
+//
+// Devin uses Claude-Code-compatible hookSpecificOutput format.
+// updatedInput (modify) is not documented — convert modify→deny
+// carrying the redirect guidance (same as Codex <0.141.0).
+
+describe("Devin formatter", () => {
+  it("null decision → null (passthrough)", () => {
+    expect(devinFormat(null)).toBeNull();
+  });
+
+  it("deny → hookSpecificOutput with permissionDecision:deny", () => {
+    const result = devinFormat(denyDecision) as Record<string, unknown>;
+    const hso = result.hookSpecificOutput as Record<string, unknown>;
+    expect(hso.hookEventName).toBe("PreToolUse");
+    expect(hso.permissionDecision).toBe("deny");
+    expect(hso.permissionDecisionReason).toBe(denyDecision.reason);
+  });
+
+  it("ask → null (Devin has no ask concept)", () => {
+    expect(devinFormat(askDecision)).toBeNull();
+  });
+
+  it("modify with command → deny carrying redirect guidance (fail-closed)", () => {
+    const result = devinFormat(modifyDecision) as Record<string, unknown>;
+    const hso = result.hookSpecificOutput as Record<string, unknown>;
+    expect(hso.hookEventName).toBe("PreToolUse");
+    expect(hso.permissionDecision).toBe("deny");
+    expect(typeof hso.permissionDecisionReason).toBe("string");
+    expect((hso.permissionDecisionReason as string).length).toBeGreaterThan(0);
+  });
+
+  it("modify without command → null (advisory, not blocked)", () => {
+    const result = devinFormat({ action: "modify", updatedInput: { prompt: "injection" } });
+    expect(result).toBeNull();
+  });
+
+  it("context → hookSpecificOutput with additionalContext", () => {
+    const result = devinFormat(contextDecision) as Record<string, unknown>;
+    const hso = result.hookSpecificOutput as Record<string, unknown>;
+    expect(hso.hookEventName).toBe("PreToolUse");
+    expect(hso.additionalContext).toBe(contextDecision.additionalContext);
   });
 });

@@ -350,6 +350,7 @@ export function getSessionDirSegments(platform: string): string[] | null {
     case "omp":              return [".omp"];
     case "qwen-code":        return [".qwen"];
     case "kimi":             return [".kimi-code"];
+    case "devin":            return [".devin"];
     case "kilo":             return [".config", "kilo"];
     case "opencode":         return [".config", "opencode"];
     case "zed":              return [".config", "zed"];
@@ -390,7 +391,7 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
   if (platformOverride) {
     const validPlatforms: PlatformId[] = [
       "claude-code", "gemini-cli", "kilo", "opencode", "codex",
-      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
+      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi", "devin",
     ];
     if (validPlatforms.includes(platformOverride as PlatformId)) {
       return {
@@ -572,6 +573,14 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
     };
   }
 
+  if (existsSync(resolve(home, ".devin"))) {
+    return {
+      platform: "devin",
+      confidence: "medium",
+      reason: "~/.devin/ directory exists",
+    };
+  }
+
   if (existsSync(resolve(home, ".openclaw"))) {
     return {
       platform: "openclaw",
@@ -725,6 +734,11 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "kimi": {
       const { KimiAdapter } = await import("./kimi/index.js");
       return new KimiAdapter();
+    }
+
+    case "devin": {
+      const { DevinAdapter } = await import("./devin/index.js");
+      return new DevinAdapter();
     }
 
     default: {

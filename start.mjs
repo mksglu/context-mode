@@ -59,6 +59,25 @@ if (!process.env.CONTEXT_MODE_PROJECT_DIR && safeOriginalCwd) {
 //   - Non-hook platforms: server.ts writeRoutingInstructions() on MCP connect
 //   - Future: explicit `context-mode init` command
 
+// ── Platform gate: skip Claude-Code-specific self-heal for other platforms ──
+// When CONTEXT_MODE_PLATFORM is set to a non-claude-code value (e.g. "devin",
+// "codex", "gemini-cli"), the Claude-Code self-heal layers below (Layers 1, 3,
+// 4, 5) operate on ~/.claude/ paths that don't belong to the current platform.
+// This can cause silent exits on Windows (file lock conflicts with Claude Code
+// sessions) and writes to the wrong platform's config. Gate them out.
+//
+// Layer 1 (plugin cache symlink heal) is also gated by a path regex that
+// matches .claude/plugins/cache/ — it's a no-op for non-CC installs anyway,
+// but we skip it here for clarity and to avoid the readdirSync overhead.
+//
+// Issue # Devin-adapter: Devin does not set any DEVIN_* env vars, so detection
+// relies on CONTEXT_MODE_PLATFORM=devin (set by the user in the MCP server
+// config's env block). Without this gate, context-mode running under Devin
+// with the default fallback (claude-code) would write to ~/.claude/settings.json
+// and ~/.claude/plugins/installed_plugins.json — causing silent exits.
+const PLATFORM = process.env.CONTEXT_MODE_PLATFORM || "claude-code";
+const isClaudeCodePlatform = PLATFORM === "claude-code";
+
 // ── Linux: re-exec with Bun to avoid better-sqlite3 SIGSEGV (#564) ──
 // server.bundle.mjs has two SQLite paths: bun:sqlite (safe) or better-sqlite3
 // (SIGSEGV on Linux under Node's V8). When invoked via node on Linux, detect
@@ -137,7 +156,8 @@ if (typeof globalThis.Bun === "undefined" && process.platform === "linux") {
 // ── Self-heal Layer 1: Fix registry → symlink mismatches (anthropics/claude-code#46915) ──
 // Claude Code auto-update can leave installed_plugins.json pointing to a non-existent
 // directory. We detect this and create symlinks so hooks find the right path.
-const cacheMatch = __dirname.match(
+// SKIPPED for non-Claude-Code platforms (see platform gate above).
+const cacheMatch = isClaudeCodePlatform && __dirname.match(
   /^(.*[\/\\]plugins[\/\\]cache[\/\\][^\/\\]+[\/\\][^\/\\]+[\/\\])([^\/\\]+)$/,
 );
 if (cacheMatch) {
@@ -237,7 +257,8 @@ if (cacheMatch) {
 // Logic is shared verbatim with scripts/postinstall.mjs (single source of
 // truth) so users who fix themselves via `npm install -g context-mode`
 // follow the exact same code path. Best-effort, never blocks MCP boot.
-try {
+// SKIPPED for non-Claude-Code platforms (see platform gate above).
+if (isClaudeCodePlatform) try {
   const { healInstalledPlugins, healSettingsEnabledPlugins, healPluginJsonMcpServers, sweepStaleMcpJson } =
     await import("./scripts/heal-installed-plugins.mjs");
   const pluginKey = "context-mode@context-mode";
@@ -293,6 +314,7 @@ try {
 // even when the plugin cache is completely broken. It creates symlinks for any
 // missing plugin cache directories on every session start.
 // Pure Node.js — no bash dependency. Works on Windows, macOS (SIP), Linux.
+// SKIPPED for non-Claude-Code platforms (see platform gate above).
 //
 // Brew node upgrade resilience:
 //   - On Unix we register the hook command as the bare script path. The script
@@ -301,7 +323,7 @@ try {
 //   - On Windows there is no shebang; we fall back to "<execPath>" "<scriptPath>".
 //   - On every boot we self-heal stale "/opt/homebrew/Cellar/node/<ver>/..." paths
 //     left behind by older versions of this code.
-try {
+if (isClaudeCodePlatform) try {
   const { buildHookCommand, selfHealCacheHealHook, ensureShebangAndExecBit } =
     await import("./hooks/cache-heal-utils.mjs");
 
@@ -434,11 +456,12 @@ try{
 // Rewrites placeholders to absolute paths using process.execPath (Datadog
 // model). Idempotent — only writes when needed. Survives upgrades because
 // it runs at every MCP boot.
+// SKIPPED for non-Claude-Code platforms (see platform gate above).
 //
 // Skip under vitest: server.test.ts spawns this script from the repo root,
 // and a mutated .claude-plugin/plugin.json poisons sibling tests that read
 // the file (cli.test.ts). VITEST is inherited by spawned subprocesses.
-if (!process.env.VITEST) {
+if (isClaudeCodePlatform && !process.env.VITEST) {
   try {
     const { normalizeHooksOnStartup } = await import("./hooks/normalize-hooks.mjs");
     // #738: probe for Bun ≥1.0 and pass the resolved path so the static
