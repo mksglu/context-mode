@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import Database from "better-sqlite3";
 import { ContentStore } from "../../src/store.js";
 import { SessionDB, hashProjectDirCanonical } from "../../src/session/db.js";
 import { searchAllSources, type UnifiedSearchResult } from "../../src/search/unified.js";
@@ -32,6 +33,53 @@ function createStore(): ContentStore {
     tmpdir(),
     `context-mode-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
   );
+  return new ContentStore(path);
+}
+
+type LegacySearchRow = {
+  title: string;
+  source: string;
+  content: string;
+  sessionId?: string;
+};
+
+function createStoreWithLegacyOversizedRows(rows: LegacySearchRow[]): ContentStore {
+  const path = join(
+    tmpdir(),
+    `context-mode-legacy-search-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
+  );
+  const initializer = new ContentStore(path);
+  initializer.close();
+
+  const db = new Database(path);
+  const insertSource = db.prepare(
+    "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, 0)",
+  );
+  const insertChunk = (table: "chunks" | "chunks_trigram") => db.prepare(`
+    INSERT INTO ${table}
+      (title, content, source_id, content_type, source_category, session_id, event_id, timestamp)
+    VALUES (?, ?, ?, 'prose', '', ?, '', '2026-07-16T00:00:00Z')
+  `);
+  const porterInsert = insertChunk("chunks");
+  const trigramInsert = insertChunk("chunks_trigram");
+
+  const grouped = new Map<string, LegacySearchRow[]>();
+  for (const row of rows) {
+    const sourceRows = grouped.get(row.source) ?? [];
+    sourceRows.push(row);
+    grouped.set(row.source, sourceRows);
+  }
+
+  for (const [source, sourceRows] of grouped) {
+    const sourceId = Number(insertSource.run(source, sourceRows.length).lastInsertRowid);
+    for (const row of sourceRows) {
+      const params = [row.title, row.content, sourceId, row.sessionId ?? ""] as const;
+      porterInsert.run(...params);
+      trigramInsert.run(...params);
+    }
+  }
+  db.close();
+
   return new ContentStore(path);
 }
 
@@ -1987,6 +2035,46 @@ describe("Store integration: highlighted field", () => {
     }
   });
 
+  test("hydrates each ranked porter and trigram candidate by its own rowid", () => {
+    const store = new ContentStore(":memory:");
+    try {
+      store.index({
+        source: "test-highlight-multiple-rows",
+        content: [
+          "# Alpha",
+          "shared needle alpha unique-one",
+          "# Beta",
+          "shared needle beta unique-two",
+          "# Gamma",
+          "shared needle gamma unique-three",
+        ].join("\n\n"),
+      });
+
+      const assertDistinctCandidates = (
+        results: Array<{ content: string }>,
+        index: "porter" | "trigram",
+      ) => {
+        assert.equal(results.length, 3, `Expected three ${index} candidates`);
+        assert.equal(
+          new Set(results.map((result) => result.content)).size,
+          3,
+          `${index} hydration must not repeat the first MATCH row`,
+        );
+        for (const marker of ["unique-one", "unique-two", "unique-three"]) {
+          assert.ok(
+            results.some((result) => result.content.includes(marker)),
+            `Expected ${index} results to retain ${marker}`,
+          );
+        }
+      };
+
+      assertDistinctCandidates(store.search("shared needle", 10), "porter");
+      assertDistinctCandidates(store.searchTrigram("shared needle", 10), "trigram");
+    } finally {
+      store.close();
+    }
+  });
+
   test("extractSnippet with store-produced highlighted finds stemmed region", () => {
     const store = new ContentStore(":memory:");
     try {
@@ -2009,6 +2097,123 @@ describe("Store integration: highlighted field", () => {
       );
     } finally {
       store.close();
+    }
+  });
+});
+
+describe("Bounded FTS result hydration for legacy oversized rows", () => {
+  const oversizedContent = (needle: string, fill = "x") =>
+    `prefix ${fill.repeat(1_200_000)} ${needle} tail`;
+
+  function assertBoundedMatch(
+    result: { content: string; highlighted?: string },
+    needle: string,
+  ): void {
+    assert.ok(result.content.includes(needle), "bounded window should include the match");
+    assert.ok(
+      result.content.length < 5_000,
+      `result content must be bounded, got ${result.content.length} chars`,
+    );
+    assert.ok(
+      (result.highlighted?.length ?? 0) < 5_000,
+      `highlight payload must be bounded, got ${result.highlighted?.length} chars`,
+    );
+    assert.ok(
+      !result.content.startsWith("prefix "),
+      "result generation should not return the full oversized row before truncation",
+    );
+  }
+
+  test("porter search returns a bounded match window instead of full-row highlight", () => {
+    const store = createStoreWithLegacyOversizedRows([{
+      title: "Legacy porter row",
+      source: "legacy-porter",
+      content: oversizedContent("authentication"),
+      sessionId: "session-porter",
+    }]);
+
+    try {
+      const results = store.search(
+        "authenticate",
+        1,
+        "legacy-porter",
+        "AND",
+        undefined,
+        "exact",
+      );
+      assert.equal(results.length, 1);
+      assertBoundedMatch(results[0], "authentication");
+      assert.ok(
+        results[0].highlighted?.includes("\x02authentication\x03"),
+        "porter fallback should preserve a marker around the stemmed token",
+      );
+    } finally {
+      store.cleanup();
+    }
+  });
+
+  test("trigram search returns a bounded match window instead of full-row highlight", () => {
+    const store = createStoreWithLegacyOversizedRows([{
+      title: "Legacy trigram row",
+      source: "legacy-trigram",
+      content: oversizedContent("responseBodyParser"),
+      sessionId: "session-trigram",
+    }]);
+
+    try {
+      const results = store.searchTrigram(
+        "responseBody",
+        1,
+        "legacy-trigram",
+        "AND",
+        undefined,
+        "exact",
+      );
+      assert.equal(results.length, 1);
+      assertBoundedMatch(results[0], "responseBody");
+    } finally {
+      store.cleanup();
+    }
+  });
+
+  test("bounded search preserves exact source and session filters", () => {
+    const store = createStoreWithLegacyOversizedRows([
+      {
+        title: "Allowed oversized row",
+        source: "filtered-source",
+        content: oversizedContent("filterNeedle", "a"),
+        sessionId: "allowed-session",
+      },
+      {
+        title: "Blocked session row",
+        source: "filtered-source",
+        content: oversizedContent("filterNeedle", "b"),
+        sessionId: "blocked-session",
+      },
+      {
+        title: "Wrong source row",
+        source: "other-source",
+        content: oversizedContent("filterNeedle", "c"),
+        sessionId: "allowed-session",
+      },
+    ]);
+
+    try {
+      const results = store.searchWithFallback(
+        "filterNeedle",
+        10,
+        "filtered-source",
+        undefined,
+        "exact",
+        new Set(["allowed-session"]),
+      );
+
+      assert.deepEqual(results.map((r) => r.title), ["Allowed oversized row"]);
+      assertBoundedMatch(results[0], "filterNeedle");
+      assert.equal(results[0].sessionId, "allowed-session");
+      assert.equal(results[0].source, "filtered-source");
+    } finally {
+      store.cleanup();
     }
   });
 });

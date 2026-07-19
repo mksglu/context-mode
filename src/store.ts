@@ -28,17 +28,31 @@ interface Chunk {
 }
 
 type SourceMatchMode = "like" | "exact";
+type SearchIndex = "porter" | "trigram";
 
 type SearchRow = {
+  rowid: number;
   title: string;
-  content: string;
   content_type: string;
   timestamp: string | null;
   label: string;
   rank: number;
-  highlighted: string;
   /** Attribution session_id (empty string for legacy unattributed chunks). */
   session_id: string;
+};
+
+type SearchContentRow = {
+  content: string;
+  highlighted: string;
+};
+
+type SearchLocationRow = {
+  content_chars: number;
+  match_pos: number;
+};
+
+type SearchWindowRow = {
+  content: string;
 };
 
 import type { IndexResult, SearchResult, StoreStats } from "./types.js";
@@ -151,6 +165,13 @@ function maxEditDistance(wordLength: number): number {
 // length normalization and produce unwieldy search results. Split at paragraph
 // boundaries when a chunk exceeds this cap.
 const MAX_CHUNK_BYTES = 4096;
+
+// Search ranking never materializes chunk content. After rowids are ranked,
+// normal capped chunks retain the historical full-content/highlight result,
+// while legacy oversized rows are hydrated as a bounded match window.
+const SEARCH_RESULT_MAX_CHARS = 3000;
+const SEARCH_RESULT_CONTEXT_CHARS = 300;
+const SEARCH_LOCATION_PREFIX_CHARS = 6;
 
 // Blank-line sectioning is used only for output that is *naturally* sectioned:
 // at least a few sections, not an unbounded explosion, and no single section so
@@ -389,6 +410,12 @@ export class ContentStore {
   #stmtSearchTrigramContentType!: PreparedStatement;
   #stmtSearchTrigramFilteredContentType!: PreparedStatement;
   #stmtSearchTrigramExactContentType!: PreparedStatement;
+  #stmtHydratePorter!: PreparedStatement;
+  #stmtHydrateTrigram!: PreparedStatement;
+  #stmtLocatePorter!: PreparedStatement;
+  #stmtLocateTrigram!: PreparedStatement;
+  #stmtWindowPorter!: PreparedStatement;
+  #stmtWindowTrigram!: PreparedStatement;
 
   // Read path
   #stmtListSources!: PreparedStatement;
@@ -584,13 +611,12 @@ export class ContentStore {
     // Search path (hot)
     this.#stmtSearchPorter = this.#db.prepare(`
       SELECT
+        chunks.rowid AS rowid,
         chunks.title,
-        chunks.content,
         chunks.content_type,
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -600,13 +626,12 @@ export class ContentStore {
     `);
     this.#stmtSearchPorterFiltered = this.#db.prepare(`
       SELECT
+        chunks.rowid AS rowid,
         chunks.title,
-        chunks.content,
         chunks.content_type,
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -616,13 +641,12 @@ export class ContentStore {
     `);
     this.#stmtSearchPorterExact = this.#db.prepare(`
       SELECT
+        chunks.rowid AS rowid,
         chunks.title,
-        chunks.content,
         chunks.content_type,
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -632,13 +656,12 @@ export class ContentStore {
     `);
     this.#stmtSearchTrigram = this.#db.prepare(`
       SELECT
+        chunks_trigram.rowid AS rowid,
         chunks_trigram.title,
-        chunks_trigram.content,
         chunks_trigram.content_type,
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -648,13 +671,12 @@ export class ContentStore {
     `);
     this.#stmtSearchTrigramFiltered = this.#db.prepare(`
       SELECT
+        chunks_trigram.rowid AS rowid,
         chunks_trigram.title,
-        chunks_trigram.content,
         chunks_trigram.content_type,
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -664,13 +686,12 @@ export class ContentStore {
     `);
     this.#stmtSearchTrigramExact = this.#db.prepare(`
       SELECT
+        chunks_trigram.rowid AS rowid,
         chunks_trigram.title,
-        chunks_trigram.content,
         chunks_trigram.content_type,
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -682,13 +703,12 @@ export class ContentStore {
     // Content-type filtered variants
     this.#stmtSearchPorterContentType = this.#db.prepare(`
       SELECT
+        chunks.rowid AS rowid,
         chunks.title,
-        chunks.content,
         chunks.content_type,
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -698,13 +718,12 @@ export class ContentStore {
     `);
     this.#stmtSearchPorterFilteredContentType = this.#db.prepare(`
       SELECT
+        chunks.rowid AS rowid,
         chunks.title,
-        chunks.content,
         chunks.content_type,
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -714,13 +733,12 @@ export class ContentStore {
     `);
     this.#stmtSearchPorterExactContentType = this.#db.prepare(`
       SELECT
+        chunks.rowid AS rowid,
         chunks.title,
-        chunks.content,
         chunks.content_type,
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -730,13 +748,12 @@ export class ContentStore {
     `);
     this.#stmtSearchTrigramContentType = this.#db.prepare(`
       SELECT
+        chunks_trigram.rowid AS rowid,
         chunks_trigram.title,
-        chunks_trigram.content,
         chunks_trigram.content_type,
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -746,13 +763,12 @@ export class ContentStore {
     `);
     this.#stmtSearchTrigramFilteredContentType = this.#db.prepare(`
       SELECT
+        chunks_trigram.rowid AS rowid,
         chunks_trigram.title,
-        chunks_trigram.content,
         chunks_trigram.content_type,
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -762,13 +778,12 @@ export class ContentStore {
     `);
     this.#stmtSearchTrigramExactContentType = this.#db.prepare(`
       SELECT
+        chunks_trigram.rowid AS rowid,
         chunks_trigram.title,
-        chunks_trigram.content,
         chunks_trigram.content_type,
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -776,6 +791,53 @@ export class ContentStore {
       ORDER BY rank
       LIMIT ?
     `);
+
+    // Second-stage result hydration. Ranking queries above return metadata only.
+    // highlight() is retained for normal capped rows, but is guarded by the
+    // persisted byte invariant so legacy oversized rows cannot reach it.
+    this.#stmtHydratePorter = this.#db.prepare(`
+      SELECT
+        chunks.content,
+        highlight(chunks, 1, char(2), char(3)) AS highlighted
+      FROM chunks
+      WHERE chunks MATCH ?
+        -- better-sqlite3's older SQLite can ignore a scalar rowid equality
+        -- alongside MATCH; an IN subquery preserves the ranked candidate.
+        AND chunks.rowid IN (SELECT ?)
+        AND length(CAST(chunks.content AS BLOB)) <= ?
+    `);
+    this.#stmtHydrateTrigram = this.#db.prepare(`
+      SELECT
+        chunks_trigram.content,
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted
+      FROM chunks_trigram
+      WHERE chunks_trigram MATCH ?
+        AND chunks_trigram.rowid IN (SELECT ?)
+        AND length(CAST(chunks_trigram.content AS BLOB)) <= ?
+    `);
+
+    // Legacy oversized rows use scalar position lookup followed by substr().
+    // Only integer metadata and the bounded window cross the SQLite/JS boundary.
+    this.#stmtLocatePorter = this.#db.prepare(`
+      SELECT
+        length(chunks.content) AS content_chars,
+        instr(lower(chunks.content), ?) AS match_pos
+      FROM chunks
+      WHERE chunks.rowid = ?
+    `);
+    this.#stmtLocateTrigram = this.#db.prepare(`
+      SELECT
+        length(chunks_trigram.content) AS content_chars,
+        instr(lower(chunks_trigram.content), ?) AS match_pos
+      FROM chunks_trigram
+      WHERE chunks_trigram.rowid = ?
+    `);
+    this.#stmtWindowPorter = this.#db.prepare(
+      "SELECT substr(content, ?, ?) AS content FROM chunks WHERE rowid = ?",
+    );
+    this.#stmtWindowTrigram = this.#db.prepare(
+      "SELECT substr(content, ?, ?) AS content FROM chunks_trigram WHERE rowid = ?",
+    );
 
     // Fuzzy path
     this.#stmtFuzzyVocab = this.#db.prepare(
@@ -1091,17 +1153,147 @@ export class ContentStore {
 
   // ── Search ──
 
-  #mapSearchRows(rows: SearchRow[]): SearchResult[] {
-    return rows.map((r) => ({
-      title: r.title,
-      content: r.content,
-      source: r.label,
-      rank: r.rank,
-      contentType: r.content_type as "code" | "prose",
-      highlighted: r.highlighted,
-      timestamp: r.timestamp ?? undefined,
-      sessionId: r.session_id ?? "",
-    }));
+  #searchLocationNeedles(query: string): { exact: string; prefix: string } {
+    const words = dedupeTokens(
+      query
+        .replace(/['"(){}[\]*:^~]/g, " ")
+        .split(/\s+/)
+        .filter(
+          (word) =>
+            word.length > 0 &&
+            !["AND", "OR", "NOT", "NEAR"].includes(word.toUpperCase()),
+        ),
+    );
+    const meaningful = words.filter((word) => !STOPWORDS.has(word.toLowerCase()));
+    const exact = (meaningful[0] ?? words[0] ?? "").toLowerCase();
+    const exactChars = Array.from(exact);
+    const prefix = exactChars.length > SEARCH_LOCATION_PREFIX_CHARS
+      ? exactChars.slice(0, SEARCH_LOCATION_PREFIX_CHARS).join("")
+      : exact;
+    return { exact, prefix };
+  }
+
+  #markBoundedMatch(
+    content: string,
+    matchOffset: number,
+    matchLength: number,
+    expandToken: boolean,
+  ): string {
+    const chars = Array.from(content);
+    let start = Math.max(0, matchOffset);
+    let end = Math.min(chars.length, start + matchLength);
+
+    if (expandToken) {
+      const isTokenChar = (char: string) => /[\p{L}\p{N}_]/u.test(char);
+      while (start > 0 && isTokenChar(chars[start - 1])) start--;
+      while (end < chars.length && isTokenChar(chars[end])) end++;
+    }
+
+    return chars.slice(0, start).join("")
+      + "\x02"
+      + chars.slice(start, end).join("")
+      + "\x03"
+      + chars.slice(end).join("");
+  }
+
+  #hydrateSearchRow(
+    row: SearchRow,
+    query: string,
+    ftsQuery: string,
+    index: SearchIndex,
+  ): SearchResult {
+    const hydrateStmt = index === "porter"
+      ? this.#stmtHydratePorter
+      : this.#stmtHydrateTrigram;
+    const locateStmt = index === "porter"
+      ? this.#stmtLocatePorter
+      : this.#stmtLocateTrigram;
+    const windowStmt = index === "porter"
+      ? this.#stmtWindowPorter
+      : this.#stmtWindowTrigram;
+
+    const normal = hydrateStmt.get(
+      ftsQuery,
+      row.rowid,
+      MAX_CHUNK_BYTES,
+    ) as SearchContentRow | undefined;
+
+    let content: string;
+    let highlighted: string;
+    if (normal) {
+      content = normal.content;
+      highlighted = normal.highlighted;
+    } else {
+      const needles = this.#searchLocationNeedles(query);
+      let location = locateStmt.get(
+        needles.exact,
+        row.rowid,
+      ) as SearchLocationRow | undefined;
+      let matchPos = location?.match_pos ?? 0;
+      let matchedNeedle = needles.exact;
+      let expandToken = false;
+
+      if (matchPos === 0 && needles.prefix !== needles.exact) {
+        location = locateStmt.get(
+          needles.prefix,
+          row.rowid,
+        ) as SearchLocationRow | undefined;
+        matchPos = location?.match_pos ?? 0;
+        matchedNeedle = needles.prefix;
+        expandToken = matchPos > 0;
+      }
+
+      const matchLength = matchPos > 0 ? Array.from(matchedNeedle).length : 0;
+      const windowStart = Math.max(
+        1,
+        (matchPos > 0 ? matchPos : 1) - SEARCH_RESULT_CONTEXT_CHARS,
+      );
+      const window = windowStmt.get(
+        windowStart,
+        SEARCH_RESULT_MAX_CHARS,
+        row.rowid,
+      ) as SearchWindowRow | undefined;
+
+      content = window?.content ?? "";
+      highlighted = matchPos > 0 && matchLength > 0
+        ? this.#markBoundedMatch(
+            content,
+            matchPos - windowStart,
+            matchLength,
+            expandToken,
+          )
+        : content;
+
+      const windowChars = Array.from(content).length;
+      if (windowStart > 1) {
+        content = "…" + content;
+        highlighted = "…" + highlighted;
+      }
+      if (location && windowStart - 1 + windowChars < location.content_chars) {
+        content += "…";
+        highlighted += "…";
+      }
+    }
+
+    return {
+      title: row.title,
+      content,
+      source: row.label,
+      rank: row.rank,
+      contentType: row.content_type as "code" | "prose",
+      highlighted,
+      timestamp: row.timestamp ?? undefined,
+      sessionId: row.session_id ?? "",
+    };
+  }
+
+  #mapSearchRows(
+    rows: SearchRow[],
+    query: string,
+    ftsQuery: string,
+    index: SearchIndex,
+  ): SearchResult[] {
+    return rows.map((row) => this.#hydrateSearchRow(row, query, ftsQuery, index));
   }
 
   #sourceFilterParam(source: string, sourceMatchMode: SourceMatchMode): string {
@@ -1150,7 +1342,12 @@ export class ContentStore {
       params = [sanitized, limit];
     }
 
-    return withRetry(() => this.#mapSearchRows(stmt.all(...params) as SearchRow[]));
+    return withRetry(() => this.#mapSearchRows(
+      stmt.all(...params) as SearchRow[],
+      query,
+      sanitized,
+      "porter",
+    ));
   }
 
   // ── Trigram Search (Layer 2) ──
@@ -1187,7 +1384,12 @@ export class ContentStore {
       params = [sanitized, limit];
     }
 
-    return withRetry(() => this.#mapSearchRows(stmt.all(...params) as SearchRow[]));
+    return withRetry(() => this.#mapSearchRows(
+      stmt.all(...params) as SearchRow[],
+      query,
+      sanitized,
+      "trigram",
+    ));
   }
 
   // ── Fuzzy Correction (Layer 3) ──
