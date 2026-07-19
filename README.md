@@ -483,7 +483,17 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
    The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — OpenCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
 
-2. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness:
+2. *(Optional)* To enable the `/ctx` slash command (Context Stats) in the UI, add it to your `tui.json` (`~/.config/opencode/tui.json`):
+
+   ```json
+   {
+     "plugin": [
+       "context-mode/tui"
+     ]
+   }
+   ```
+
+3. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness:
 
    ```bash
    cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
@@ -491,7 +501,7 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
    This tells the model which tools to use and which commands are blocked. Without it, hooks still enforce routing — but the model won't know *why* a command was denied.
 
-3. Restart OpenCode.
+4. Restart OpenCode.
 
 **Verify:** In the OpenCode session, type `ctx stats`. Context-mode tools should appear and respond.
 
@@ -523,13 +533,23 @@ Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json)
 
    The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — KiloCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
 
-2. *(Optional)* Copy the routing rules file. KiloCode shares the OpenCode plugin architecture, so the model needs an `AGENTS.md` file for routing awareness:
+2. *(Optional)* To enable the `/ctx` slash command (Context Stats) in the UI, add it to your `tui.json` (`~/.config/kilo/tui.json`):
+
+   ```json
+   {
+     "plugin": [
+       "context-mode/tui"
+     ]
+   }
+   ```
+
+3. *(Optional)* Copy the routing rules file. KiloCode shares the OpenCode plugin architecture, so the model needs an `AGENTS.md` file for routing awareness:
 
    ```bash
    cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
    ```
 
-3. Restart KiloCode.
+4. Restart KiloCode.
 
 **Verify:** In the KiloCode session, type `ctx stats`. Context-mode tools should appear and respond.
 
