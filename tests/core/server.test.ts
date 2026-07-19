@@ -46,6 +46,7 @@ import {
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
 import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
+import { resolveProjectDir } from "../../src/util/project-dir.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
 const runtimes = detectRuntimes();
@@ -1734,6 +1735,28 @@ describe("ctx_insight: execFile migration source guard (#441)", () => {
     expect(serverSrc).toMatch(/export function killProcessOnPort\b/);
     expect(serverSrc).toMatch(/export type BrowserOpenResult\b/);
     expect(serverSrc).toMatch(/export type KillResult\b/);
+  });
+});
+
+describe("start.mjs: server process does not chdir", () => {
+  const startMjs = readFileSync(
+    resolve(__dirname, "../../start.mjs"),
+    "utf-8",
+  );
+
+  test("start.mjs never calls process.chdir", () => {
+    // A chdir moves the server cwd into the plugin dir, where tools read it.
+    expect(startMjs).not.toMatch(/process\.chdir\s*\(/);
+  });
+
+  test("project-dir resolution is immune to a plugin-install-path cwd", () => {
+    // Removing the chdir is safe: resolution ignores a plugin-path cwd.
+    const resolved = resolveProjectDir({
+      env: { CONTEXT_MODE_PROJECT_DIR: "/home/user/project" },
+      cwd: "/home/user/.claude/plugins/cache/context-mode/context-mode/1.0.0",
+      pwd: undefined,
+    });
+    expect(resolved).toBe("/home/user/project");
   });
 });
 
