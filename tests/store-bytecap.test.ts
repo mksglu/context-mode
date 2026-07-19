@@ -38,6 +38,15 @@ function storedChunkSizes(dbPath: string): number[] {
   }
 }
 
+function assertAllChunksCapped(dbPath: string): number[] {
+  const sizes = storedChunkSizes(dbPath);
+  assert.ok(sizes.length >= 1, "expected at least one chunk");
+  for (const bytes of sizes) {
+    assert.ok(bytes <= MAX_CHUNK_BYTES, `chunk of ${bytes}B exceeds cap ${MAX_CHUNK_BYTES}`);
+  }
+  return sizes;
+}
+
 describe("#chunkPlainText byte cap (#781)", () => {
   test("a single huge line is split into byte-capped chunks", () => {
     const dbPath = tmpDbPath("line");
@@ -115,5 +124,78 @@ describe("#chunkPlainText byte cap (#781)", () => {
     for (const bytes of sizes) {
       assert.ok(bytes <= MAX_CHUNK_BYTES, `chunk of ${bytes}B exceeds cap ${MAX_CHUNK_BYTES}`);
     }
+  });
+});
+
+describe("#chunkMarkdown byte cap (#878)", () => {
+  test("an oversized Markdown paragraph under a heading is split below the cap", () => {
+    const dbPath = tmpDbPath("markdown-paragraph");
+    const store = new ContentStore(dbPath);
+    store.index({
+      content: `# Synthetic oversized paragraph\n\n${"a".repeat(MAX_CHUNK_BYTES * 3)} needleXYZ`,
+      source: "markdown-paragraph",
+    });
+    store.close();
+
+    const sizes = assertAllChunksCapped(dbPath);
+    assert.ok(sizes.length >= 2, `expected the oversized paragraph to split, got ${sizes.length} chunk(s)`);
+  });
+
+  test("an oversized Markdown line is split below the cap", () => {
+    const dbPath = tmpDbPath("markdown-line");
+    const store = new ContentStore(dbPath);
+    store.index({
+      content: `# Synthetic oversized line\n${"b".repeat(MAX_CHUNK_BYTES * 3)} needleXYZ`,
+      source: "markdown-line",
+    });
+    store.close();
+
+    const sizes = assertAllChunksCapped(dbPath);
+    assert.ok(sizes.length >= 2, `expected the oversized line to split, got ${sizes.length} chunk(s)`);
+  });
+
+  test("an oversized fenced code block is split below the cap", () => {
+    const dbPath = tmpDbPath("markdown-code");
+    const store = new ContentStore(dbPath);
+    store.index({
+      content: [
+        "# Synthetic oversized code",
+        "",
+        "```js",
+        `const payload = "${"c".repeat(MAX_CHUNK_BYTES * 3)}";`,
+        "```",
+      ].join("\n"),
+      source: "markdown-code",
+    });
+    store.close();
+
+    const sizes = assertAllChunksCapped(dbPath);
+    assert.ok(sizes.length >= 2, `expected the oversized code block to split, got ${sizes.length} chunk(s)`);
+  });
+
+  test("a long multibyte Markdown paragraph is split by UTF-8 bytes", () => {
+    const dbPath = tmpDbPath("markdown-cjk");
+    const store = new ContentStore(dbPath);
+    store.index({
+      content: `# Synthetic CJK\n\n${"你".repeat(MAX_CHUNK_BYTES)}`,
+      source: "markdown-cjk",
+    });
+    store.close();
+
+    const sizes = assertAllChunksCapped(dbPath);
+    assert.ok(sizes.length >= 2, `expected the CJK paragraph to split, got ${sizes.length} chunk(s)`);
+  });
+
+  test("ctx_batch_execute-style heading wrapper cannot persist a 1.2MB chunk", () => {
+    const dbPath = tmpDbPath("markdown-batch");
+    const store = new ContentStore(dbPath);
+    store.index({
+      content: `# Synthetic oversized line\n\n${"a".repeat(1_200_000)} needleXYZ`,
+      source: "batch:Synthetic oversized line",
+    });
+    store.close();
+
+    const sizes = assertAllChunksCapped(dbPath);
+    assert.ok(sizes.length > 100, `expected the 1.2MB payload to split heavily, got ${sizes.length} chunk(s)`);
   });
 });

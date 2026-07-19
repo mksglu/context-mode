@@ -1669,21 +1669,37 @@ export class ContentStore {
       let accumulator: string[] = [];
       let partIndex = 1;
 
+      const emitPart = (part: string) => {
+        const trimmed = part.trim();
+        if (trimmed.length === 0) return;
+        const subChunks = Buffer.byteLength(trimmed) > maxChunkBytes
+          ? this.#splitOversizedPlainChunk(trimmed.split("\n"), title, maxChunkBytes)
+          : [{ title, content: trimmed }];
+        const shouldNumber = paragraphs.length > 1 || subChunks.length > 1 || partIndex > 1;
+        for (const subChunk of subChunks) {
+          const partTitle = shouldNumber ? `${title} (${partIndex})` : title;
+          partIndex++;
+          chunks.push({
+            title: partTitle,
+            content: subChunk.content,
+            hasCode: hasCode || subChunk.content.includes("```"),
+          });
+        }
+      };
+
       const flushAccumulator = () => {
         if (accumulator.length === 0) return;
         const part = accumulator.join("\n\n").trim();
-        if (part.length === 0) return;
-        const partTitle = paragraphs.length > 1 ? `${title} (${partIndex})` : title;
-        partIndex++;
-        chunks.push({
-          title: partTitle,
-          content: part,
-          hasCode: part.includes("```"),
-        });
+        emitPart(part);
         accumulator = [];
       };
 
       for (const para of paragraphs) {
+        if (Buffer.byteLength(para) > maxChunkBytes) {
+          flushAccumulator();
+          emitPart(para);
+          continue;
+        }
         accumulator.push(para);
         const candidate = accumulator.join("\n\n");
         if (Buffer.byteLength(candidate) > maxChunkBytes && accumulator.length > 1) {
