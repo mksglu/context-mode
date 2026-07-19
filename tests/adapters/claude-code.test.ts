@@ -785,6 +785,19 @@ describe("ClaudeCodeAdapter", () => {
       expect(PRE_TOOL_USE_MATCHERS).toContain("Agent");
     });
 
+    it("Claude Code hook matchers include PowerShell for Windows shell routing", () => {
+      expect(PRE_TOOL_USE_MATCHERS).toContain("PowerShell");
+      expect(POST_TOOL_USE_MATCHERS).toContain("PowerShell");
+      expect(POST_TOOL_USE_MATCHER_PATTERN).toContain("PowerShell");
+
+      const config = adapter.generateHookConfig("/some/plugin/root") as Record<
+        string,
+        Array<{ matcher: string }>
+      >;
+      const preMatchers = config.PreToolUse.map((entry) => entry.matcher);
+      expect(preMatchers).toContain("PowerShell");
+    });
+
     // ── External MCP routing (#529) ─────────────────────
     it("PRE_TOOL_USE_MATCHERS contains EXTERNAL_MCP_MATCHER_PATTERN (#529)", () => {
       expect(PRE_TOOL_USE_MATCHERS).toContain(EXTERNAL_MCP_MATCHER_PATTERN);

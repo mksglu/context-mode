@@ -307,14 +307,14 @@ function extractFileAndRule(input: HookInput): SessionEvent[] {
 
 /**
  * Category 4: cwd
- * Matches the first `cd <path>` in a Bash command (handles quoted paths).
+ * Matches the first `cd <path>` in a shell command (handles quoted paths).
  */
 function extractCwd(input: HookInput): SessionEvent[] {
   if (input.tool_name !== "Bash") return [];
 
   const cmd = String(input.tool_input["command"] ?? "");
   // Match: cd "path" | cd 'path' | cd path
-  const cdMatch = cmd.match(/\bcd\s+("([^"]+)"|'([^']+)'|(\S+))/);
+  const cdMatch = cmd.match(/\bcd\s+("([^"]+)"|'([^']+)'|([^\s;&|]+))/);
   if (!cdMatch) return [];
 
   const dir = cdMatch[2] ?? cdMatch[3] ?? cdMatch[4] ?? "";
@@ -2685,6 +2685,8 @@ const TOOL_NAME_NORMALIZE: Record<string, string> = {
   "container.exec": "Bash",
   local_shell: "Bash",
   grep_files: "Grep",
+  // Claude Code on Windows
+  PowerShell: "Bash",
   // Antigravity CLI (`agy`) native names. Keep in sync with the two other agy
   // maps: hooks/antigravity-cli/payload.mjs (normalizeAgyToolName) and
   // hooks/core/routing.mjs (TOOL_ALIASES).

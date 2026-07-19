@@ -56,6 +56,7 @@ export const EXTERNAL_MCP_MATCHER_PATTERN = "mcp__";
 /** Tools that context-mode's PreToolUse hook intercepts. */
 export const PRE_TOOL_USE_MATCHERS = [
   "Bash",
+  "PowerShell",
   "WebFetch",
   "Read",
   "Grep",
@@ -83,6 +84,7 @@ export const PRE_TOOL_USE_MATCHER_PATTERN = PRE_TOOL_USE_MATCHERS.join("|");
  */
 export const POST_TOOL_USE_MATCHERS = [
   "Bash",
+  "PowerShell",
   "Read",
   "Write",
   "Edit",

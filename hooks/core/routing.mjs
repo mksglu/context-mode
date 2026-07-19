@@ -549,6 +549,8 @@ const TOOL_ALIASES = {
   "mcp_web_fetch": "WebFetch",
   "mcp_fetch_tool": "WebFetch",
   "Shell": "Bash",
+  // Claude Code on Windows
+  "PowerShell": "Bash",
   // VS Code Copilot
   "run_in_terminal": "Bash",
   // Kiro CLI (https://kiro.dev/docs/cli/hooks/)
