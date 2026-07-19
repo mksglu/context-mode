@@ -24,7 +24,8 @@
 
 import { existsSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
+import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, test } from "vitest";
 import { SessionDB } from "../../src/session/db.js";
@@ -125,7 +126,9 @@ describe("Slice 2.1 — enumerateAdapterDirs()", () => {
 
   test("each entry exposes sessionsDir and contentDir under <home>/<segments>/context-mode/", () => {
     const home = "/HOME";
-    const dirs = enumerateAdapterDirs({ home });
+    // Pin claudeConfigDir so the claude-code entry stays under <home>/.claude
+    // regardless of the runner's $CLAUDE_CONFIG_DIR (#865).
+    const dirs = enumerateAdapterDirs({ home, claudeConfigDir: join(home, ".claude") });
     // Use path.join() so the expected prefix/suffix match the platform's
     // separator. enumerateAdapterDirs uses node:path.join under the hood,
     // which emits backslashes on Windows AND converts the leading "/" of
@@ -145,7 +148,9 @@ describe("Slice 2.1 — enumerateAdapterDirs()", () => {
 
   test("uses the same segment map as src/adapters/detect.ts:92-111 (claude-code under .claude, kilo under .config/kilo, pi under .pi)", () => {
     const home = "/HOME";
-    const dirs = enumerateAdapterDirs({ home });
+    // Pin claudeConfigDir so claude-code asserts deterministically under
+    // <home>/.claude regardless of the runner's $CLAUDE_CONFIG_DIR (#865).
+    const dirs = enumerateAdapterDirs({ home, claudeConfigDir: join(home, ".claude") });
     const byName = Object.fromEntries(dirs.map((d) => [d.name, d]));
     // Build expectations through path.join so backslashes on Windows match.
     expect(byName["claude-code"].sessionsDir).toBe(join(home, ".claude", "context-mode", "sessions"));
@@ -160,6 +165,61 @@ describe("Slice 2.1 — enumerateAdapterDirs()", () => {
     expect(dirs.length).toBe(17);
     const expectedSuffix = sep + join("context-mode", "sessions");
     expect(dirs.every((d) => d.sessionsDir.includes(expectedSuffix))).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Slice 2.1b — enumerateAdapterDirs honors $CLAUDE_CONFIG_DIR (#865)
+// ─────────────────────────────────────────────────────────
+
+describe("Slice 2.1b — enumerateAdapterDirs CLAUDE_CONFIG_DIR (#865)", () => {
+  test("claude-code entry honors claudeConfigDir override; other adapters stay under home", () => {
+    const home = "/HOME";
+    const customCfg = "/custom/claude-cfg";
+    const dirs = enumerateAdapterDirs({ home, claudeConfigDir: customCfg });
+    const byName = Object.fromEntries(dirs.map((d) => [d.name, d]));
+    expect(byName["claude-code"].sessionsDir).toBe(
+      join(customCfg, "context-mode", "sessions"),
+    );
+    expect(byName["codex"].sessionsDir).toBe(
+      join(home, ".codex", "context-mode", "sessions"),
+    );
+  });
+
+  test("claude-code uses resolveClaudeConfigDir() when no override (env unset → ~/.claude)", () => {
+    const saved = process.env.CLAUDE_CONFIG_DIR;
+    delete process.env.CLAUDE_CONFIG_DIR;
+    try {
+      const dirs = enumerateAdapterDirs({ home: "/HOME" });
+      const byName = Object.fromEntries(dirs.map((d) => [d.name, d]));
+      expect(byName["claude-code"].sessionsDir).toBe(
+        join(resolve(homedir(), ".claude"), "context-mode", "sessions"),
+      );
+    } finally {
+      if (saved === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = saved;
+    }
+  });
+
+  test("claude-code reflects $CLAUDE_CONFIG_DIR at runtime (no opt override)", () => {
+    const saved = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = "/tmp/custom-claude-cfg";
+    try {
+      const dirs = enumerateAdapterDirs({ home: "/HOME" });
+      const byName = Object.fromEntries(dirs.map((d) => [d.name, d]));
+      // resolveClaudeConfigDir() applies resolve() to $CLAUDE_CONFIG_DIR, which on
+      // Windows prepends the current drive (e.g. D:\tmp\...). Mirror that here so the
+      // expectation matches on every platform (no-op on POSIX). (#866 Windows CI)
+      expect(byName["claude-code"].sessionsDir).toBe(
+        join(resolve("/tmp/custom-claude-cfg"), "context-mode", "sessions"),
+      );
+      expect(byName["codex"].sessionsDir).toBe(
+        join("/HOME", ".codex", "context-mode", "sessions"),
+      );
+    } finally {
+      if (saved === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = saved;
+    }
   });
 });
 
@@ -181,7 +241,7 @@ describe("Slice 2.2 — getMultiAdapterLifetimeStats()", () => {
       { type: "tool_use", category: "file", data: "src/c.ts", projectDir: "/p/cdx" },
     ]);
 
-    const r = getMultiAdapterLifetimeStats({ home });
+    const r = getMultiAdapterLifetimeStats({ home, claudeConfigDir: join(home, ".claude") });
 
     expect(r.totalEvents).toBe(3);
     expect(r.totalSessions).toBe(2);
@@ -205,7 +265,7 @@ describe("Slice 2.2 — getMultiAdapterLifetimeStats()", () => {
       { type: "tool_use", category: "file", data: "x", projectDir: "/p/x" },
     ], [{ snapshot: "Z".repeat(2_000) }]);
 
-    const r = getMultiAdapterLifetimeStats({ home });
+    const r = getMultiAdapterLifetimeStats({ home, claudeConfigDir: join(home, ".claude") });
     const cc = r.perAdapter.find((a) => a.name === "claude-code")!;
     expect(cc).toBeDefined();
     expect(typeof cc.eventCount).toBe("number");
@@ -220,7 +280,7 @@ describe("Slice 2.2 — getMultiAdapterLifetimeStats()", () => {
 
   test("skips adapter dirs that don't exist on disk (no throw, just absent from perAdapter)", () => {
     const home = tmpHome(); // empty home — no adapter dirs created
-    const r = getMultiAdapterLifetimeStats({ home });
+    const r = getMultiAdapterLifetimeStats({ home, claudeConfigDir: join(home, ".claude") });
     expect(r.totalEvents).toBe(0);
     expect(r.totalSessions).toBe(0);
     expect(r.perAdapter).toEqual([]);
@@ -243,7 +303,7 @@ describe("Slice 2.3 — isReal filter (eventCount>=100 && distinctProjects>=5 &&
       { type: "t", category: "file", data: "d", projectDir: "/p" },
       { type: "t", category: "file", data: "e", projectDir: "/p" },
     ]);
-    const r = getMultiAdapterLifetimeStats({ home });
+    const r = getMultiAdapterLifetimeStats({ home, claudeConfigDir: join(home, ".claude") });
     const cc = r.perAdapter.find((a) => a.name === "claude-code")!;
     expect(cc.isReal).toBe(false);
   });
@@ -258,7 +318,7 @@ describe("Slice 2.3 — isReal filter (eventCount>=100 && distinctProjects>=5 &&
       events.push({ type: "t", category: "file", data: "x", projectDir: `/p/${i % 6}` });
     }
     seed(dbPathFor(sessionsDir, "tinyrowstinyrows"), `tiny-${randomUUID()}`, events);
-    const r = getMultiAdapterLifetimeStats({ home });
+    const r = getMultiAdapterLifetimeStats({ home, claudeConfigDir: join(home, ".claude") });
     const cc = r.perAdapter.find((a) => a.name === "claude-code")!;
     expect(cc.eventCount).toBeGreaterThanOrEqual(100);
     expect(cc.isReal).toBe(false); // avgBytes too low
@@ -274,7 +334,7 @@ describe("Slice 2.3 — isReal filter (eventCount>=100 && distinctProjects>=5 &&
       events.push({ type: "t", category: "file", data: fat, projectDir: `/p/${i % 6}` });
     }
     seed(dbPathFor(sessionsDir, "realdatasrealdat"), `real-${randomUUID()}`, events);
-    const r = getMultiAdapterLifetimeStats({ home });
+    const r = getMultiAdapterLifetimeStats({ home, claudeConfigDir: join(home, ".claude") });
     const cc = r.perAdapter.find((a) => a.name === "claude-code")!;
     expect(cc.eventCount).toBeGreaterThanOrEqual(100);
     expect(cc.projectDirs.length).toBeGreaterThanOrEqual(5);
@@ -299,7 +359,7 @@ describe("Slice 2.4 — getMultiAdapterRealBytesStats()", () => {
       { type: "x", category: "sandbox", data: "q", bytesAvoided: 3_000 },
     ]);
 
-    const r = getMultiAdapterRealBytesStats({ home });
+    const r = getMultiAdapterRealBytesStats({ home, claudeConfigDir: join(home, ".claude") });
     expect(r.bytesAvoided).toBe(5_000);
     expect(r.bytesReturned).toBe(1_000);
     expect(r.totalSavedTokens).toBeGreaterThan(0);
@@ -324,7 +384,7 @@ describe("Slice 2.4 — getMultiAdapterRealBytesStats()", () => {
       { type: "x", category: "sandbox", data: "q", bytesAvoided: 9_999 },
     ]);
 
-    const r = getMultiAdapterRealBytesStats({ home, sessionId: target });
+    const r = getMultiAdapterRealBytesStats({ home, claudeConfigDir: join(home, ".claude"), sessionId: target });
     expect(r.bytesAvoided).toBe(7_000); // ONLY the matching session_id
   });
 
@@ -343,13 +403,13 @@ describe("Slice 2.4 — getMultiAdapterRealBytesStats()", () => {
       { type: "x", category: "sandbox", data: "r", bytesReturned: 99_999 },
     ]);
 
-    const r = getMultiAdapterRealBytesStats({ home, worktreeHash: "60303a5b5b31fb98" });
+    const r = getMultiAdapterRealBytesStats({ home, claudeConfigDir: join(home, ".claude"), worktreeHash: "60303a5b5b31fb98" });
     expect(r.bytesReturned).toBe(11_000); // 7_000 + 4_000, NOT 99_999
   });
 
   test("returns zeroes when no adapter dir exists", () => {
     const home = tmpHome();
-    const r = getMultiAdapterRealBytesStats({ home });
+    const r = getMultiAdapterRealBytesStats({ home, claudeConfigDir: join(home, ".claude") });
     expect(r.eventDataBytes).toBe(0);
     expect(r.bytesAvoided).toBe(0);
     expect(r.bytesReturned).toBe(0);

@@ -386,6 +386,10 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
       // statusline must use HOME for multi-adapter walk
       HOME: home,
       USERPROFILE: home,
+      // Override the isolated baseline's CLAUDE_CONFIG_DIR to this test's HOME
+      // so resolveClaudeConfigDir finds the seeded .claude adapter, not the
+      // empty fake-home one.
+      CLAUDE_CONFIG_DIR: join(home, ".claude"),
       // active adapter dir is the claude one (matches getSessionDir() default)
       CLAUDE_SESSION_ID: "any-session-id",
     });
@@ -405,6 +409,7 @@ describe("statusline.mjs — multi-adapter aggregation", () => {
     const { stdout } = runStatusline({
       HOME: home,
       USERPROFILE: home,
+      CLAUDE_CONFIG_DIR: join(home, ".claude"),
       CLAUDE_SESSION_ID: "any-session-id",
     });
 

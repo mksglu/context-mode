@@ -460,7 +460,9 @@ describe("getRealBytesStats (Phase 8 renderer source-of-truth)", () => {
       b.indexPlainText("Y".repeat(11_000), "src/y.ts", 20);
     } finally { b.close(); }
 
-    const r = getMultiAdapterRealBytesStats({ home });
+    // Pin claudeConfigDir so claude-code resolves under <home>/.claude
+    // regardless of the runner's $CLAUDE_CONFIG_DIR (#865).
+    const r = getMultiAdapterRealBytesStats({ home, claudeConfigDir: join(home, ".claude") });
 
     // 7_000 + 11_000 = 18_000 bytes of body across both adapter content
     // DBs (plus tiny title overhead). If the impl only reads the first

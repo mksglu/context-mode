@@ -114,9 +114,12 @@ function seedDb(opts: {
 // concurrently-running tests (or the developer's real adapter dirs) into
 // render decisions. Crucially we set APPDATA/LOCALAPPDATA/XDG_* alongside
 // HOME/USERPROFILE — on Windows the latter alone was insufficient and PR
-// #515's BRAND_NEW assertion fell through. Tests that intentionally seed a
-// multi-adapter homedir pass their own HOME/USERPROFILE in `env` to override
-// this baseline (last spread in spawn `env` wins).
+// #515's BRAND_NEW assertion fell through. buildIsolatedEnvObject() also
+// redirects CLAUDE_CONFIG_DIR (Phase 03: resolveClaudeConfigDir now honors it),
+// so the empty-state fallback tests below see an empty config dir instead of
+// the developer's real ~/.claude session data. Tests that intentionally seed a
+// multi-adapter homedir pass their own HOME/USERPROFILE/CLAUDE_CONFIG_DIR in
+// `env` to override this baseline (last spread in spawn `env` wins).
 function isolatedHomeEnv(): Record<string, string> {
   return buildIsolatedEnvObject().env;
 }
