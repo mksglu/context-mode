@@ -13,6 +13,15 @@ import { z } from "zod";
 import { PolyglotExecutor } from "./executor.js";
 import { runPool, type PoolJob } from "./runPool.js";
 import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, type SearchResult, type IndexResult } from "./store.js";
+import {
+  DEFAULT_BATCH_INGESTION_LIMITS,
+  batchIngestionStructuredContent,
+  formatBatchIngestionSummary,
+  formatBatchSectionInventory,
+  planBatchIngestion,
+  resolveBatchIngestionPolicy,
+  type BatchCapturedCommand,
+} from "./batch-ingestion.js";
 import { composeFetchCacheKey } from "./fetch-cache.js";
 import {
   readBashPolicies,
@@ -757,6 +766,7 @@ const sessionStats = {
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 };
 
@@ -1425,6 +1435,7 @@ export interface BatchCommand { label: string; command: string; }
 
 export interface BatchRunResult {
   outputs: string[];
+  commands: BatchCapturedCommand[];
   timedOut: boolean;
 }
 
@@ -1439,10 +1450,17 @@ export interface BatchRunOptions {
   nodeOptsPrefix: string;
   cwd?: string;
   onFsBytes?: (bytes: number) => void;
+  /** Preserve the legacy display-Markdown output array for existing callers. */
+  includeDisplayOutputs?: boolean;
 }
 
 interface BatchExecutor {
-  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{ stdout: string; timedOut?: boolean }>;
+  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{
+    stdout: string;
+    stderr?: string;
+    exitCode?: number;
+    timedOut?: boolean;
+  }>;
 }
 
 function quotePosixSingle(value: string): string {
@@ -1526,20 +1544,16 @@ function buildExecuteEcho(language: string, code: string, path?: string): string
   return `${header}${fenced}\n\n`;
 }
 
-function formatCommandOutput(label: string, command: string, raw: string, onFsBytes?: (bytes: number) => void): string {
-  let output = raw || "(no output)";
+function stripBatchFsMarkers(raw: string, onFsBytes?: (bytes: number) => void): string {
+  let output = raw || "";
   const fsMatches = output.matchAll(/__CM_FS__:(\d+)/g);
   let cmdFsBytes = 0;
-  for (const m of fsMatches) cmdFsBytes += parseInt(m[1]);
+  for (const match of fsMatches) cmdFsBytes += parseInt(match[1]);
   if (cmdFsBytes > 0) {
     onFsBytes?.(cmdFsBytes);
     output = output.replace(/__CM_FS__:\d+\n?/g, "");
   }
-  // Echo the executed command below the section heading so per-chunk
-  // indexed content retains provenance for later ctx_search hits
-  // (Issues #717 + #736).
-  const echoed = truncateCommandForEcho(command);
-  return `# ${label}\n\n$ ${echoed}\n\n${output}\n`;
+  return output;
 }
 
 function combineExecOutput(result: { stdout?: string; stderr?: string }): string {
@@ -1548,6 +1562,71 @@ function combineExecOutput(result: { stdout?: string; stderr?: string }): string
   if (!stderr) return stdout;
   if (!stdout) return stderr;
   return `${stdout}${stdout.endsWith("\n") ? "" : "\n"}${stderr}`;
+}
+
+function captureBatchCommand(
+  command: BatchCommand,
+  result: { stdout?: string; stderr?: string; exitCode?: number; timedOut?: boolean },
+  durationMs: number,
+  onFsBytes?: (bytes: number) => void,
+): BatchCapturedCommand {
+  return {
+    label: command.label,
+    command: command.command,
+    stdout: stripBatchFsMarkers(result.stdout || "", onFsBytes),
+    stderr: stripBatchFsMarkers(result.stderr || "", onFsBytes),
+    exitCode: result.exitCode ?? (result.timedOut ? 1 : 0),
+    durationMs,
+    timedOut: result.timedOut === true,
+  };
+}
+
+function formatCapturedCommandOutput(command: BatchCapturedCommand): string {
+  const output = combineExecOutput(command) || "(no output)";
+  const echoed = truncateCommandForEcho(command.command);
+  return `# ${command.label}\n\n$ ${echoed}\n\n${output}\n`;
+}
+
+function skippedBatchCommand(command: BatchCommand): BatchCapturedCommand {
+  return {
+    label: command.label,
+    command: command.command,
+    stdout: "",
+    stderr: "(skipped — batch timeout exceeded)",
+    exitCode: 1,
+    durationMs: 0,
+    timedOut: true,
+    skipped: true,
+  };
+}
+
+function countOutputLines(text: string): number {
+  if (text.length === 0) return 0;
+  let lines = 1;
+  let offset = 0;
+  while ((offset = text.indexOf("\n", offset)) >= 0) {
+    lines += 1;
+    offset += 1;
+  }
+  return lines;
+}
+
+function countBatchOutputLines(commands: readonly BatchCapturedCommand[]): number {
+  let lines = 0;
+  for (const command of commands) {
+    lines += countOutputLines(command.stdout);
+    lines += countOutputLines(command.stderr);
+  }
+  return lines;
+}
+
+function buildBatchSource(commands: readonly BatchCommand[]): string {
+  let source = "batch:";
+  for (let index = 0; index < commands.length && source.length < 80; index++) {
+    const prefix = index === 0 ? "" : ",";
+    source += `${prefix}${commands[index].label}`.slice(0, 80 - source.length);
+  }
+  return source;
 }
 
 /**
@@ -1562,13 +1641,18 @@ export async function runBatchCommands(
   opts: BatchRunOptions,
   executor: BatchExecutor,
 ): Promise<BatchRunResult> {
-  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes } = opts;
+  const {
+    timeout,
+    concurrency,
+    nodeOptsPrefix,
+    cwd,
+    onFsBytes,
+    includeDisplayOutputs = true,
+  } = opts;
 
   if (concurrency <= 1) {
-    // Serial path — shared timeout budget, cascading skip on timeout.
-    // When `timeout` is undefined, no shared budget is enforced; each
-    // command runs to completion (Issue #406).
     const outputs: string[] = [];
+    const capturedCommands: BatchCapturedCommand[] = [];
     const startTime = Date.now();
     let timedOut = false;
     for (let i = 0; i < commands.length; i++) {
@@ -1578,66 +1662,92 @@ export async function runBatchCommands(
         const elapsed = Date.now() - startTime;
         const remaining = timeout - elapsed;
         if (remaining <= 0) {
-          outputs.push(`# ${cmd.label}\n\n(skipped — batch timeout exceeded)\n`);
+          const skipped = skippedBatchCommand(cmd);
+          capturedCommands.push(skipped);
+          if (includeDisplayOutputs) outputs.push(formatCapturedCommandOutput(skipped));
           timedOut = true;
           continue;
         }
         perCmdTimeout = remaining;
       }
+      const commandStart = Date.now();
       const result = await executor.execute({
         language: "shell",
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout: perCmdTimeout,
         cwd,
       });
-      outputs.push(formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes));
-      if (result.timedOut) {
+      const captured = captureBatchCommand(
+        cmd,
+        result,
+        Date.now() - commandStart,
+        onFsBytes,
+      );
+      capturedCommands.push(captured);
+      if (includeDisplayOutputs) outputs.push(formatCapturedCommandOutput(captured));
+      if (captured.timedOut) {
         timedOut = true;
         for (let j = i + 1; j < commands.length; j++) {
-          outputs.push(`# ${commands[j].label}\n\n(skipped — batch timeout exceeded)\n`);
+          const skipped = skippedBatchCommand(commands[j]);
+          capturedCommands.push(skipped);
+          if (includeDisplayOutputs) outputs.push(formatCapturedCommandOutput(skipped));
         }
         break;
       }
     }
-    return { outputs, timedOut };
+    return { outputs, commands: capturedCommands, timedOut };
   }
 
-  // Parallel path — delegated to the shared runPool primitive.
-  // Each job returns { output, timedOut }; runPool handles in-flight cap,
-  // throw isolation (Promise.allSettled semantics), and order preservation.
-  const jobs: PoolJob<{ output: string; timedOut: boolean }>[] = commands.map((cmd) => ({
+  const jobs: PoolJob<BatchCapturedCommand>[] = commands.map((cmd) => ({
     run: async () => {
+      const commandStart = Date.now();
       const result = await executor.execute({
         language: "shell",
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout,
         cwd,
       });
-      // Always route partial output through formatCommandOutput so __CM_FS__
-      // markers are stripped + counted, even when the command timed out.
-      const formatted = formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes);
-      const output = result.timedOut
-        ? formatted.replace(/\n$/, "") + `\n(timed out after ${timeout ?? "?"}ms)\n`
-        : formatted;
-      return { output, timedOut: !!result.timedOut };
+      return captureBatchCommand(
+        cmd,
+        result,
+        Date.now() - commandStart,
+        onFsBytes,
+      );
     },
   }));
 
   const { settled } = await runPool(jobs, { concurrency });
-  const outputs: string[] = new Array(commands.length);
+  const outputs: string[] = includeDisplayOutputs ? new Array(commands.length) : [];
+  const capturedCommands: BatchCapturedCommand[] = new Array(commands.length);
   let timedOut = false;
   for (let i = 0; i < settled.length; i++) {
-    const r = settled[i];
-    if (r.status === "fulfilled") {
-      outputs[i] = r.value.output;
-      if (r.value.timedOut) timedOut = true;
+    const result = settled[i];
+    let captured: BatchCapturedCommand;
+    if (result.status === "fulfilled") {
+      captured = result.value;
     } else {
-      // Isolated executor throw (spawn EAGAIN, ENOMEM, EMFILE, …) — siblings keep running.
-      const message = r.reason instanceof Error ? r.reason.message : String(r.reason);
-      outputs[i] = `# ${commands[i].label}\n\n(executor error: ${message})\n`;
+      const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      captured = {
+        label: commands[i].label,
+        command: commands[i].command,
+        stdout: "",
+        stderr: `(executor error: ${message})`,
+        exitCode: 1,
+        durationMs: 0,
+        timedOut: false,
+        executorError: true,
+      };
+    }
+    capturedCommands[i] = captured;
+    if (captured.timedOut) timedOut = true;
+    if (includeDisplayOutputs) {
+      const formatted = formatCapturedCommandOutput(captured);
+      outputs[i] = captured.timedOut
+        ? formatted.replace(/\n$/, "") + `\n(timed out after ${timeout ?? "?"}ms)\n`
+        : formatted;
     }
   }
-  return { outputs, timedOut };
+  return { outputs, commands: capturedCommands, timedOut };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -3703,6 +3813,9 @@ WHEN NOT:
 RETURNS:
   Auto-indexed section list per command label, plus top matches per query (when \`queries\` is passed). Raw output is NOT echoed in full — only the matched windows. Concurrency>1 switches each command to its own per-command timeout (no shared budget); concurrency=1 preserves the legacy shared-budget cascading-skip-on-timeout path. Use 4-8 for I/O-bound batches; keep at 1 for CPU work or shared-state commands; lower the value when target hosts enforce per-IP rate limits.
 
+Indexing budgets:
+  UTF-8 stdout/stderr body bytes are bounded before indexing. Defaults are 8 MiB per command, 16 MiB per batch, and 4,608 generated chunks. Larger limits require allow_large_ingestion=true. Partial or rejected ingestion is explicit in both Markdown and structured metrics; display Markdown is not used as indexed input.
+
 EXAMPLE: ctx_batch_execute(
   commands: [
     {label: "issue 1", command: "gh issue view 1"},
@@ -3757,6 +3870,29 @@ EXAMPLE: ctx_batch_execute(
           ">1 switches to per-command timeouts (no shared budget) and " +
           "individual `(timed out)` blocks instead of cascading skip.",
         ),
+      max_bytes_per_command: z
+        .coerce.number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Maximum UTF-8 stdout+stderr body bytes indexed for each command. Values above the default require allow_large_ingestion=true."),
+      max_total_indexed_bytes: z
+        .coerce.number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Maximum UTF-8 stdout+stderr body bytes indexed across the batch. Values above the default require allow_large_ingestion=true."),
+      max_generated_chunks: z
+        .coerce.number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Maximum prepared chunks generated for the batch. Values above the default require allow_large_ingestion=true."),
+      allow_large_ingestion: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Explicit opt-in required before requested byte or chunk limits may exceed defaults."),
       cwd: z
         .string()
         .optional()
@@ -3775,23 +3911,36 @@ EXAMPLE: ctx_batch_execute(
         ),
     }),
   },
-  async ({ commands, queries, timeout, concurrency, cwd, query_scope }) => {
-    // Security: check each command against deny patterns
+async ({
+    commands,
+    queries,
+    timeout,
+    concurrency,
+    cwd,
+    query_scope,
+    max_bytes_per_command,
+    max_total_indexed_bytes,
+    max_generated_chunks,
+    allow_large_ingestion,
+  }) => {
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
       if (denied) return denied;
     }
 
     try {
-      // Inject NODE_OPTIONS for FS read tracking in spawned Node processes.
-      // The executor denies NODE_OPTIONS in its env (security), so we set it
-      // as an inline shell prefix. This only affects child `node` invocations.
+      const policy = resolveBatchIngestionPolicy(
+        {
+          maxBytesPerCommand: max_bytes_per_command,
+          maxTotalIndexedBytes: max_total_indexed_bytes,
+          maxGeneratedChunks: max_generated_chunks,
+          allowLargeIngestion: allow_large_ingestion,
+        },
+        DEFAULT_BATCH_INGESTION_LIMITS,
+      );
       const nodeOptsPrefix = buildBatchNodeOptionsPrefix(runtimes.shell, CM_FS_PRELOAD);
-
-      // Full stdout is preserved per-command and indexed into FTS5 (Issue #61, #197).
-      // Concurrency>1 switches to a worker pool with per-command timeouts.
       const effTimeout = resolveExecTimeout(timeout);
-      const { outputs: perCommandOutputs, timedOut } = await runBatchCommands(
+      const { commands: capturedCommands, timedOut } = await runBatchCommands(
         commands,
         {
           timeout: effTimeout,
@@ -3799,15 +3948,12 @@ EXAMPLE: ctx_batch_execute(
           nodeOptsPrefix,
           cwd,
           onFsBytes: (bytes) => { sessionStats.bytesSandboxed += bytes; },
+          includeDisplayOutputs: false,
         },
         executor,
       );
 
-      const stdout = perCommandOutputs.join("\n");
-      const totalBytes = Buffer.byteLength(stdout);
-      const totalLines = stdout.split("\n").length;
-
-      if (timedOut && perCommandOutputs.length === 0) {
+      if (timedOut && capturedCommands.length === 0) {
         return trackResponse("ctx_batch_execute", {
           content: [
             {
@@ -3819,52 +3965,53 @@ EXAMPLE: ctx_batch_execute(
         });
       }
 
-      // Track indexed bytes (raw data that stays in sandbox)
-      trackIndexed(totalBytes);
-
-      // Index into knowledge base — markdown heading chunking splits by # labels
+      const totalLines = countBatchOutputLines(capturedCommands);
+      const plan = planBatchIngestion(capturedCommands, policy);
       const store = getStore();
-      const source = `batch:${commands
-        .map((c) => c.label)
-        .join(",")
-        .slice(0, 80)}`;
-      const indexed = store.index({ content: stdout, source, attribution: currentAttribution() });
+      const source = buildBatchSource(commands);
+      const indexed = store.indexPreparedChunks(
+        plan.chunks,
+        source,
+        currentAttribution(),
+      );
+      trackIndexed(plan.storedBytes, source);
 
-      // Commands inventory — list what the agent actually ran so the
-      // response itself documents intent, not just per-section echoes.
-      // Placed before "## Indexed Sections" so it scans top-down with
-      // the human asking "what just happened" (Issues #717 + #736).
+      for (const command of capturedCommands) {
+        command.stdout = "";
+        command.stderr = "";
+      }
+
       const commandsInventory: string[] = ["## Commands", ""];
-      for (const c of commands) {
-        commandsInventory.push(`- ${c.label}: \`${truncateCommandForEcho(c.command)}\``);
+      for (let index = 0; index < commands.length; index++) {
+        const command = commands[index];
+        const metrics = plan.commands[index];
+        commandsInventory.push(
+          `- ${command.label}: \`${truncateCommandForEcho(command.command)}\` ` +
+          `(exit=${metrics.exitCode}, duration=${Math.max(0, Math.round(metrics.durationMs))}ms, indexing=${metrics.status})`,
+        );
       }
 
-      // Build section inventory — direct query by source_id (no FTS5 MATCH needed)
-      const allSections = store.getChunksBySource(indexed.sourceId);
-      const inventory: string[] = ["## Indexed Sections", ""];
-      const sectionTitles: string[] = [];
-      for (const s of allSections) {
-        const bytes = Buffer.byteLength(s.content);
-        inventory.push(`- ${s.title} (${(bytes / 1024).toFixed(1)}KB)`);
-        sectionTitles.push(s.title);
-      }
+      const inventory = formatBatchSectionInventory(plan.chunks, indexed.totalChunks);
 
-      // Run all search queries — default scope is batch-local (legacy behavior).
-      // When the caller passes query_scope: "global", searches reach the entire
-      // persistent index in the same round trip. Cross-source search remains
-      // available via explicit ctx_search() as well.
-      const queryResults = formatBatchQueryResults(store, queries, source, undefined, query_scope);
-
-      // Get searchable terms for edge cases where follow-up is needed
+      const queryResults = formatBatchQueryResults(
+        store,
+        queries,
+        source,
+        undefined,
+        query_scope,
+      );
       const distinctiveTerms = store.getDistinctiveTerms
         ? store.getDistinctiveTerms(indexed.sourceId)
         : [];
 
       const output = [
-        `Executed ${commands.length} commands (${totalLines} lines, ${(totalBytes / 1024).toFixed(1)}KB). ` +
-          `Indexed ${indexed.totalChunks} sections. Searched ${queries.length} queries.`,
+        `Executed ${commands.length} commands (${totalLines} lines, ${(plan.capturedBytes / 1024).toFixed(1)}KB captured). ` +
+          `Indexed ${indexed.totalChunks} sections; ${plan.indexedBytes} body bytes indexed, ${plan.droppedBytes} dropped. ` +
+          `Searched ${queries.length} queries.`,
         "",
         ...commandsInventory,
+        "",
+        ...formatBatchIngestionSummary(plan),
         "",
         ...inventory,
         "",
@@ -3876,6 +4023,7 @@ EXAMPLE: ctx_batch_execute(
 
       return trackResponse("ctx_batch_execute", {
         content: [{ type: "text" as const, text: output }],
+        structuredContent: batchIngestionStructuredContent(plan),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

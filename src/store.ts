@@ -21,6 +21,12 @@ import { walkDirectoryDetailed, type WalkOptions } from "./store-directory.js";
 // Types
 // ─────────────────────────────────────────────────────────
 
+export interface PreparedIndexChunkInput {
+  title: string;
+  content: string;
+  hasCode?: boolean;
+}
+
 interface Chunk {
   title: string;
   content: string;
@@ -986,6 +992,45 @@ export class ContentStore {
     ));
   }
 
+  /**
+   * Persist chunks that were already bounded and structured by a caller.
+   * Batch ingestion uses this path so display Markdown never becomes the
+   * indexed body and so chunk-count decisions happen before any FTS5 write.
+   */
+  indexPreparedChunks(
+    chunks: readonly PreparedIndexChunkInput[],
+    source: string,
+    attribution?: { sessionId?: string; eventId?: string },
+  ): IndexResult {
+    const normalized: Chunk[] = chunks.map((chunk) => ({
+      title: chunk.title,
+      content: chunk.content,
+      hasCode: chunk.hasCode === true,
+    }));
+
+    for (const chunk of normalized) {
+      const bytes = Buffer.byteLength(chunk.content, "utf8");
+      if (bytes > MAX_CHUNK_BYTES) {
+        throw new Error(
+          `Prepared index chunk "${chunk.title}" is ${bytes} bytes; maximum is ${MAX_CHUNK_BYTES}`,
+        );
+      }
+    }
+
+    return withRetry(() => {
+      const result = this.#insertChunks(
+        normalized,
+        source,
+        "",
+        undefined,
+        undefined,
+        attribution,
+      );
+      this.#extractAndStoreVocabularyContents(normalized.map((chunk) => chunk.content));
+      return result;
+    });
+  }
+
   // ── Index JSON ──
 
   /**
@@ -1620,12 +1665,19 @@ export class ContentStore {
   // ── Vocabulary Extraction ──
 
   #extractAndStoreVocabulary(content: string): void {
-    const words = content
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}_-]+/u)
-      .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
+    this.#extractAndStoreVocabularyContents([content]);
+  }
 
-    const unique = [...new Set(words)];
+  #extractAndStoreVocabularyContents(contents: Iterable<string>): void {
+    const unique = new Set<string>();
+    for (const content of contents) {
+      const words = content
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}_-]+/u);
+      for (const word of words) {
+        if (word.length >= 3 && !STOPWORDS.has(word)) unique.add(word);
+      }
+    }
 
     let inserted = 0;
     this.#db.transaction(() => {
