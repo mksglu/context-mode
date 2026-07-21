@@ -141,18 +141,18 @@ function ensureMcpServerRegistered(): void {
 }
 
 /**
- * Seed OMP's native system-prompt file with context-mode routing rules.
+ * Append context-mode routing rules to OMP's native system prompt.
  *
- * OMP discovers `~/.omp/agent/SYSTEM.md` on startup, but `omp plugin install`
- * only installs the npm package. Copy the packaged instructions lazily and
- * never overwrite a user's existing system prompt.
+ * OMP discovers `~/.omp/agent/APPEND_SYSTEM.md` on startup and keeps its
+ * built-in tool guidance intact. Copy the packaged instructions lazily and
+ * never overwrite a user's existing append prompt.
  */
 function ensureSystemInstructionsSeeded(): void {
   try {
     const source = resolveOmpSystemInstructions();
     if (!source) return;
 
-    const target = join(_ompAdapter.getConfigDir(), "SYSTEM.md");
+    const target = join(_ompAdapter.getConfigDir(), "APPEND_SYSTEM.md");
     if (existsSync(target)) return;
 
     mkdirSync(dirname(target), { recursive: true });
@@ -296,7 +296,7 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
   ensureMcpServerRegistered();
 
   // Seed OMP's native routing file so the model learns to use those tools
-  // without requiring the manual SYSTEM.md copy workaround (issue #873).
+  // without replacing OMP's built-in tool guidance (issue #873).
   ensureSystemInstructionsSeeded();
 
   const db = getOrCreateDB(projectDir);

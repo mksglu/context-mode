@@ -269,29 +269,30 @@ describe("OMP plugin", () => {
       expect(sid).toMatch(/^[a-f0-9]{16}$/);
     });
 
-    it("seeds SYSTEM.md routing instructions into the OMP agent dir when missing", async () => {
+    it("seeds APPEND_SYSTEM.md routing instructions into the OMP agent dir when missing", async () => {
       const agentDir = join(tempDir, "agent");
       process.env.PI_CODING_AGENT_DIR = agentDir;
 
       await registerOmpPlugin(api);
 
-      const systemPath = join(agentDir, "SYSTEM.md");
-      expect(existsSync(systemPath)).toBe(true);
-      const content = readFileSync(systemPath, "utf-8");
+      const appendSystemPath = join(agentDir, "APPEND_SYSTEM.md");
+      expect(existsSync(appendSystemPath)).toBe(true);
+      expect(existsSync(join(agentDir, "SYSTEM.md"))).toBe(false);
+      const content = readFileSync(appendSystemPath, "utf-8");
       expect(content).toContain("ctx_execute");
       expect(content).toContain("ctx_batch_execute");
     });
 
-    it("does not overwrite an existing OMP SYSTEM.md", async () => {
+    it("does not overwrite an existing OMP APPEND_SYSTEM.md", async () => {
       const agentDir = join(tempDir, "agent-existing");
-      const systemPath = join(agentDir, "SYSTEM.md");
+      const appendSystemPath = join(agentDir, "APPEND_SYSTEM.md");
       mkdirSync(agentDir, { recursive: true });
-      writeFileSync(systemPath, "# custom OMP prompt\n", "utf-8");
+      writeFileSync(appendSystemPath, "# custom OMP prompt\n", "utf-8");
       process.env.PI_CODING_AGENT_DIR = agentDir;
 
       await registerOmpPlugin(api);
 
-      expect(readFileSync(systemPath, "utf-8")).toBe("# custom OMP prompt\n");
+      expect(readFileSync(appendSystemPath, "utf-8")).toBe("# custom OMP prompt\n");
     });
   });
 
