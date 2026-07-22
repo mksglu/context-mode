@@ -61,6 +61,32 @@ export interface IsParentAliveDeps {
   getPpid?: () => number;
   /** Read the grandparent ppid. Default: ps-based POSIX probe, NaN on Windows. */
   readGrandparentPpid?: () => number;
+  /**
+   * Positive existence probe for a PID. Default: {@link defaultIsPidAlive}
+   * (signal-0 via `process.kill`). This is the only parent-death signal that
+   * works on Windows, where an orphaned child keeps its original ppid (#982).
+   */
+  isPidAlive?: (pid: number) => boolean;
+}
+
+/**
+ * Cross-platform "does this PID still exist?" probe. Node maps signal 0 to an
+ * existence/permission check without delivering a signal: it throws `ESRCH`
+ * when the process is gone and `EPERM` when it exists but can't be signalled
+ * (treated as alive). Any other error is treated as alive to avoid a spurious
+ * reap. Unlike the ppid-equality and grandparent checks, this fires on Windows,
+ * where a parent's death does NOT reparent the child or change its ppid — so
+ * without this probe the guard's `isParentAlive()` returned `true` forever and
+ * the orphaned server never shut down (#982).
+ */
+export function defaultIsPidAlive(pid: number): boolean {
+  if (!pid || pid <= 1) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 /**
@@ -81,6 +107,7 @@ export interface IsParentAliveDeps {
 export function makeDefaultIsParentAlive(deps: IsParentAliveDeps = {}): () => boolean {
   const getPpid = deps.getPpid ?? (() => process.ppid);
   const readGp = deps.readGrandparentPpid ?? readGrandparentPpidImpl;
+  const isPidAlive = deps.isPidAlive ?? defaultIsPidAlive;
   const originalPpid = getPpid();
   const originalGrandparentPpid = readGp();
 
@@ -88,6 +115,13 @@ export function makeDefaultIsParentAlive(deps: IsParentAliveDeps = {}): () => bo
     const ppid = getPpid();
     if (ppid !== originalPpid) return false;
     if (ppid === 0 || ppid === 1) return false;
+
+    // Positive existence probe (#982): on Windows an orphaned child keeps its
+    // original ppid (no reparent-to-init) and the POSIX grandparent probe is
+    // unavailable, so both checks above/below stay green after the parent dies.
+    // Directly test whether the parent PID still exists — the one death signal
+    // that works cross-platform.
+    if (!isPidAlive(originalPpid)) return false;
 
     // Grandparent orphan check (#311): npm-exec wrappers stay alive past the
     // session owner. If our grandparent is now PID 1 but wasn't at startup,
