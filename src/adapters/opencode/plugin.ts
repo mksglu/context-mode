@@ -700,13 +700,23 @@ async function createContextModePlugin(ctx: PluginContext) {
       if (Array.isArray(output?.system)) {
         if (!systemHasRoutingInstructions(output.system)) {
           try {
-            output.system.splice(1, 0, routingBlock);
+            // Concatena al último system en vez de splice(1, 0). OpenCode
+            // serializa system[] como mensajes role:system separados para
+            // providers OpenAI-compatibles estrictos (NaN, etc.) que solo
+            // aceptan UN system message en index 0. Ver PR #XXX.
+            // El cache-fold (system[0] invariante) se sacrifica a favor de
+            // compatibilidad entre providers.
+            if (output.system.length > 0) {
+              output.system[output.system.length - 1] += "\n\n" + routingBlock;
+            } else {
+              output.system.push(routingBlock);
+            }
           } catch {
             // Never break the chat turn on routing-block injection failure.
           }
 
           if (process.env.OPENCODE_DEBUG) {
-            await safeLog(output.system[1], {sessionId, source: 'on routing block injection'});
+            await safeLog(routingBlock, {sessionId, source: 'on routing block injection (appended to system[last])'});
           }
         } else if (process.env.OPENCODE_DEBUG) {
           await safeLog(`routing block skipped — system prompt already contains context-mode instructions`, {sessionId, source: 'on routing block injection'});
@@ -728,20 +738,17 @@ async function createContextModePlugin(ctx: PluginContext) {
         }
 
         if (Array.isArray(output?.system)) {
-          // Insert at index 1 (after the header) — NOT unshift.
-          // OpenCode's llm.ts:117-128 saves `header = system[0]` BEFORE this
-          // hook runs and then folds the rest into a 2-part structure
-          // `[header, body]` only if `system[0] === header` after the hook.
-          // Prepending via unshift replaces system[0] with the snapshot,
-          // making the equality check fail → cache-fold is skipped → every
-          // system block is sent as a separate `role: "system"` message →
-          // provider prompt cache is invalidated on every resume injection.
-          // Inserting at index 1 keeps the header invariant and lets the
-          // snapshot ride along inside the cached body block.
-          output.system.splice(1, 0, row.snapshot);
-          // Mark consumed only AFTER successful splice so failed paths can retry
+          // Concatena al último system en vez de splice(1, 0).
+          // Mismo principio que el routing block: compatibilidad con
+          // providers OpenAI-compatibles estrictos.
+          if (output.system.length > 0) {
+            output.system[output.system.length - 1] += "\n\n" + row.snapshot;
+          } else {
+            output.system.push(row.snapshot);
+          }
+          // Mark consumed only AFTER successful injection so failed paths can retry
           if (process.env.OPENCODE_DEBUG) {
-            await safeLog(output.system[1], { sessionId, source: "on resume" });
+            await safeLog(row.snapshot, { sessionId, source: "on resume (appended to system[last])" });
           }
         }
       } catch {
