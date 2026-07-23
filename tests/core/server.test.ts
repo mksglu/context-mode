@@ -544,6 +544,87 @@ describe("Large Output Auto-Indexing", () => {
     assert.ok(r.stdout.includes("hello world"));
     assert.ok(!r.stdout.includes("Indexed"), "Small output should NOT be indexed pointer");
   });
+
+  // Regression for the mid-size gap: without `intent`, output between
+  // INTENT_SEARCH_THRESHOLD (5KB) and LARGE_OUTPUT_THRESHOLD (100KB) used to
+  // return raw stdout WITHOUT indexing it, so a later ctx_search could never
+  // find it. Fix: index as a side effect while still returning raw inline.
+  test("mid-size no-intent ctx_execute output: returned raw inline AND ctx_search-able", async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "ctx-exec-midsize-"));
+    const marker = `midsize-marker-${process.pid}-${Date.now()}`;
+    const proc = startMcpServer({ CONTEXT_MODE_PROJECT_DIR: projectDir });
+
+    // Local waiter that does NOT kill the process on resolve — unlike
+    // collectRpcResponses (designed for a single final batch), this test
+    // needs two sequential round trips on the same live process.
+    function awaitOne(id: number, timeoutMs = 15_000): Promise<DoctorJsonRpcResponse | undefined> {
+      return new Promise((res) => {
+        let buffer = "";
+        const onData = (d: Buffer) => {
+          buffer += d.toString();
+          let idx: number;
+          while ((idx = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 1);
+            if (!line) continue;
+            try {
+              const parsed = JSON.parse(line) as DoctorJsonRpcResponse;
+              if (parsed.id === id) {
+                proc.stdout!.off("data", onData);
+                clearTimeout(timer);
+                res(parsed);
+                return;
+              }
+            } catch { /* ignore */ }
+          }
+        };
+        const timer = setTimeout(() => {
+          proc.stdout!.off("data", onData);
+          res(undefined);
+        }, timeoutMs);
+        proc.stdout!.on("data", onData);
+      });
+    }
+
+    try {
+      sendRpc(proc, {
+        jsonrpc: "2.0", id: 1, method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ctx-exec-midsize", version: "1.0" } },
+      });
+      sendRpc(proc, { jsonrpc: "2.0", method: "notifications/initialized" });
+      sendRpc(proc, {
+        jsonrpc: "2.0", id: 200, method: "tools/call",
+        params: {
+          name: "ctx_execute",
+          arguments: {
+            language: "javascript",
+            // ~6KB stdout, no `intent` — must land in the 5KB-100KB gap.
+            code: `console.log(${JSON.stringify(marker)} + " " + "x".repeat(6000));`,
+          },
+        },
+      });
+      const execResp = await awaitOne(200);
+
+      expect(execResp?.result?.isError ?? false).toBe(false);
+      const execText = execResp?.result?.content?.[0]?.text ?? "";
+      assert.ok(execText.includes(marker), "Raw stdout (with marker) should be returned inline");
+      assert.ok(execText.includes("x".repeat(6000)), "Full stdout should be returned inline, not truncated");
+      assert.ok(!execText.includes("Indexed"), "Mid-size output must stay inline, not switch to pointer mode");
+
+      sendRpc(proc, {
+        jsonrpc: "2.0", id: 201, method: "tools/call",
+        params: { name: "ctx_search", arguments: { queries: [marker] } },
+      });
+      const searchResp = await awaitOne(201);
+
+      expect(searchResp?.result?.isError ?? false).toBe(false);
+      const searchText = searchResp?.result?.content?.[0]?.text ?? "";
+      assert.ok(searchText.includes(marker), "Mid-size output must have been indexed and be ctx_search-able");
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 describe("Cross-Language Cap", () => {
