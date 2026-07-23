@@ -700,12 +700,12 @@ async function createContextModePlugin(ctx: PluginContext) {
       if (Array.isArray(output?.system)) {
         if (!systemHasRoutingInstructions(output.system)) {
           try {
-            // Concatena al último system en vez de splice(1, 0). OpenCode
-            // serializa system[] como mensajes role:system separados para
-            // providers OpenAI-compatibles estrictos (NaN, etc.) que solo
-            // aceptan UN system message en index 0. Ver PR #XXX.
-            // El cache-fold (system[0] invariante) se sacrifica a favor de
-            // compatibilidad entre providers.
+            // Append to last system entry instead of splice(1, 0). OpenCode
+            // serializes system[] as separate role:system messages for strict
+            // OpenAI-compatible providers (NaN, etc.) that only accept ONE
+            // system message at index 0. See PR #XXX.
+            // Cache-fold (system[0] invariant) is traded off for cross-provider
+            // compatibility. Anthropic/Moonshot are unaffected. (PR #XXX)
             if (output.system.length > 0) {
               output.system[output.system.length - 1] += "\n\n" + routingBlock;
             } else {
@@ -738,9 +738,9 @@ async function createContextModePlugin(ctx: PluginContext) {
         }
 
         if (Array.isArray(output?.system)) {
-          // Concatena al último system en vez de splice(1, 0).
-          // Mismo principio que el routing block: compatibilidad con
-          // providers OpenAI-compatibles estrictos.
+          // Append to last system entry instead of splice(1, 0).
+          // Same principle as the routing block: compatibility with
+          // strict OpenAI-compatible providers.
           if (output.system.length > 0) {
             output.system[output.system.length - 1] += "\n\n" + row.snapshot;
           } else {
