@@ -8,6 +8,7 @@ import { join, dirname, resolve, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir, tmpdir, cpus, platform } from "node:os";
 import { request as httpsRequest } from "node:https";
+import { createHash } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { PolyglotExecutor } from "./executor.js";
@@ -1880,11 +1881,12 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
         const { isError, output } = classifyNonZeroExit({
           language, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr,
         });
+        const errorSource = `execute:${language}${isError ? ":error" : ""}:${shortHash(code)}`;
         if (intent && intent.trim().length > 0 && Buffer.byteLength(output) > INTENT_SEARCH_THRESHOLD) {
           trackIndexed(Buffer.byteLength(output));
           return trackResponse("ctx_execute", {
             content: [
-              { type: "text" as const, text: `${echo}${intentSearch(output, intent, isError ? `execute:${language}:error` : `execute:${language}`)}` },
+              { type: "text" as const, text: `${echo}${intentSearch(output, intent, errorSource)}` },
             ],
             isError,
           });
@@ -1894,10 +1896,14 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
           trackIndexed(Buffer.byteLength(output));
           return trackResponse("ctx_execute", {
             content: [
-              { type: "text" as const, text: `${echo}${intentSearch(output, "errors failures exceptions", isError ? `execute:${language}:error` : `execute:${language}`)}` },
+              { type: "text" as const, text: `${echo}${intentSearch(output, "errors failures exceptions", errorSource)}` },
             ],
             isError,
           });
+        }
+        // mid-size: index for later ctx_search, still return inline
+        if (Buffer.byteLength(output) > INTENT_SEARCH_THRESHOLD) {
+          indexForSearch(output, errorSource);
         }
         return trackResponse("ctx_execute", {
           content: [
@@ -1908,20 +1914,21 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
       }
 
       const stdout = result.stdout || "(no output)";
+      const source = `execute:${language}:${shortHash(code)}`;
 
       // Intent-driven search: if intent provided and output is large enough
       if (intent && intent.trim().length > 0 && Buffer.byteLength(stdout) > INTENT_SEARCH_THRESHOLD) {
         trackIndexed(Buffer.byteLength(stdout));
         return trackResponse("ctx_execute", {
           content: [
-            { type: "text" as const, text: `${echo}${intentSearch(stdout, intent, `execute:${language}`)}` },
+            { type: "text" as const, text: `${echo}${intentSearch(stdout, intent, source)}` },
           ],
         });
       }
 
       // Auto-index large stdout into FTS5 — return pointer, not raw content
       if (Buffer.byteLength(stdout) > LARGE_OUTPUT_THRESHOLD) {
-        const indexed = indexStdout(stdout, `execute:${language}`);
+        const indexed = indexStdout(stdout, source);
         // Prepend echo to the first text content so provenance still surfaces
         const echoed = {
           ...indexed,
@@ -1932,6 +1939,11 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
           ),
         };
         return trackResponse("ctx_execute", echoed);
+      }
+
+      // mid-size: index for later ctx_search, still return inline
+      if (Buffer.byteLength(stdout) > INTENT_SEARCH_THRESHOLD) {
+        indexForSearch(stdout, source);
       }
 
       return trackResponse("ctx_execute", {
@@ -1950,6 +1962,17 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
     }
   },
 );
+
+// short deterministic hash → distinct per-call source labels (avoid clobber)
+function shortHash(input: string): string {
+  return createHash("sha256").update(input).digest("hex").slice(0, 8);
+}
+
+// index into FTS5 as a side effect; does not change what's returned
+function indexForSearch(content: string, source: string): void {
+  const store = getStore();
+  store.index({ content, source, attribution: currentAttribution() });
+}
 
 // ─────────────────────────────────────────────────────────
 // Helper: index stdout into FTS5 knowledge base
@@ -2160,11 +2183,12 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         const { isError, output } = classifyNonZeroExit({
           language, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr,
         });
+        const errorSource = `file:${path}${isError ? ":error" : ""}:${shortHash(code)}`;
         if (intent && intent.trim().length > 0 && Buffer.byteLength(output) > INTENT_SEARCH_THRESHOLD) {
           trackIndexed(Buffer.byteLength(output));
           return trackResponse("ctx_execute_file", {
             content: [
-              { type: "text" as const, text: `${echo}${intentSearch(output, intent, isError ? `file:${path}:error` : `file:${path}`)}` },
+              { type: "text" as const, text: `${echo}${intentSearch(output, intent, errorSource)}` },
             ],
             isError,
           });
@@ -2174,10 +2198,14 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
           trackIndexed(Buffer.byteLength(output));
           return trackResponse("ctx_execute_file", {
             content: [
-              { type: "text" as const, text: `${echo}${intentSearch(output, "errors failures exceptions", isError ? `file:${path}:error` : `file:${path}`)}` },
+              { type: "text" as const, text: `${echo}${intentSearch(output, "errors failures exceptions", errorSource)}` },
             ],
             isError,
           });
+        }
+        // mid-size: index for later ctx_search, still return inline
+        if (Buffer.byteLength(output) > INTENT_SEARCH_THRESHOLD) {
+          indexForSearch(output, errorSource);
         }
         return trackResponse("ctx_execute_file", {
           content: [
@@ -2188,19 +2216,20 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
       }
 
       const stdout = result.stdout || "(no output)";
+      const source = `file:${path}:${shortHash(code)}`;
 
       if (intent && intent.trim().length > 0 && Buffer.byteLength(stdout) > INTENT_SEARCH_THRESHOLD) {
         trackIndexed(Buffer.byteLength(stdout));
         return trackResponse("ctx_execute_file", {
           content: [
-            { type: "text" as const, text: `${echo}${intentSearch(stdout, intent, `file:${path}`)}` },
+            { type: "text" as const, text: `${echo}${intentSearch(stdout, intent, source)}` },
           ],
         });
       }
 
       // Auto-index large stdout into FTS5 — return pointer, not raw content
       if (Buffer.byteLength(stdout) > LARGE_OUTPUT_THRESHOLD) {
-        const indexed = indexStdout(stdout, `file:${path}`);
+        const indexed = indexStdout(stdout, source);
         const echoed = {
           ...indexed,
           content: indexed.content.map((c, i) =>
@@ -2210,6 +2239,11 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
           ),
         };
         return trackResponse("ctx_execute_file", echoed);
+      }
+
+      // mid-size: index for later ctx_search, still return inline
+      if (Buffer.byteLength(stdout) > INTENT_SEARCH_THRESHOLD) {
+        indexForSearch(stdout, source);
       }
 
       return trackResponse("ctx_execute_file", {
