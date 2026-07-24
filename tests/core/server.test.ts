@@ -6684,6 +6684,7 @@ describe("ctx_* MCP tool annotations (#846)", () => {
     ctx_upgrade:         { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  openWorldHint: false },
     ctx_purge:           { readOnlyHint: false, destructiveHint: true,  idempotentHint: true,  openWorldHint: false },
     ctx_insight:         { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  openWorldHint: true  },
+    ctx_set_model:       { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  openWorldHint: false },
   };
   const tools = REGISTERED_CTX_TOOLS as Array<{ name: string; config: { annotations?: Hints } }>;
   const find = (name: string) => tools.find((t) => t.name === name);
