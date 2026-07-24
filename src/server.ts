@@ -29,6 +29,7 @@ import {
   getAvailableLanguages,
   hasBunRuntime,
 } from "./runtime.js";
+import { refreshPricingCacheInBackground, updatePricingCache } from "./session/analytics.js";
 import { classifyNonZeroExit } from "./exit-classify.js";
 import { startLifecycleGuard, noteMcpActivity, noteRequestStart, noteRequestEnd, attachMcpActivityTap } from "./lifecycle.js";
 import { charSafePrefix } from "./truncate.js";
@@ -3934,6 +3935,31 @@ function createMinimalDb(): import("./session/analytics.js").DatabaseAdapter {
 }
 
 server.registerTool(
+  "ctx_set_model",
+  {
+    title: "Set Tracking Model",
+    description: "Update the active language model used for calculating context savings.",
+    inputSchema: z.object({
+      modelName: z.string().describe("The name of the new model (e.g., 'Gemini 3.1 Pro (Low)')."),
+    }),
+  },
+  async (args: { modelName: string }) => {
+    try {
+      const modelName = String(args.modelName);
+      const result = await updatePricingCache(modelName);
+      return trackResponse("ctx_set_model", {
+        content: [{ type: "text", text: result }],
+      });
+    } catch (e: any) {
+      return trackResponse("ctx_set_model", {
+        content: [{ type: "text", text: `Failed to update model: ${e.message}` }],
+        isError: true,
+      });
+    }
+  }
+);
+
+server.registerTool(
   "ctx_stats",
   {
     title: "Session Statistics",
@@ -4965,6 +4991,9 @@ async function main() {
   // even though the server is alive. Heartbeat refreshes updated_at every 60s;
   // statusline staleness threshold is 30min (cliff is 30 missed ticks away).
   setInterval(() => persistStats(), 60_000).unref();
+
+  // Fire-and-forget background pricing fetch to ensure the cache stays fresh
+  refreshPricingCacheInBackground();
 
   if (process.stdin.isTTY) {
     console.error(`Context Mode MCP server v${VERSION} running on stdio`);

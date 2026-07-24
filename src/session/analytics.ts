@@ -2479,6 +2479,23 @@ function fmtNum(n: number): string {
 // Pricing (Bug #6) — Anthropic Opus input rate
 // ─────────────────────────────────────────────────────────
 
+import { resolveSessionStorageDir, resolveDefaultSessionDir } from "./db.js";
+import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { request as httpsRequest } from "node:https";
+
+function getPricingCache() {
+  try {
+    const cachePath = join(resolveSessionStorageDir(() => resolveDefaultSessionDir({ configDir: resolveClaudeConfigDir() })).path, "pricing-cache.json");
+    if (existsSync(cachePath)) {
+      const data = JSON.parse(readFileSync(cachePath, "utf8"));
+      return data;
+    }
+  } catch (e) {
+    // Ignore cache read errors
+  }
+  return null;
+}
+
 // ── Pricing (Bug #6) — per-token USD rate ─────────────────
 // Reads PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN when set by a Pi host;
 // falls back to the Opus 4.7/4.8 input rate ($5/1M) for all other adapters.
@@ -2499,12 +2516,107 @@ function fmtNum(n: number): string {
  * ($5 per 1M tokens) otherwise.
  */
 export function pricePerToken(): number {
-  const env = process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN;
+  const env = process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN || process.env.CONTEXT_MODE_PRICE_PER_TOKEN;
   if (env !== undefined && env !== "") {
     const parsed = Number(env);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
+  
+  const cache = getPricingCache();
+  if (cache && typeof cache.pricePerToken === 'number') {
+    return cache.pricePerToken;
+  }
+  
   return 5 / 1_000_000; // Opus 4.7/4.8 input fallback
+}
+
+/**
+ * Returns the model name for pricing labels.
+ */
+export function pricingModelName(): string {
+  if (process.env.CONTEXT_MODE_MODEL_NAME) return process.env.CONTEXT_MODE_MODEL_NAME;
+  if (process.env.PI_CONTEXT_MODE_PRICE_OUTPUT_PER_TOKEN || process.env.CONTEXT_MODE_PRICE_PER_TOKEN) return "Custom";
+  
+  const cache = getPricingCache();
+  if (cache && typeof cache.modelName === 'string') {
+    return cache.modelName;
+  }
+  
+  return "Opus";
+}
+
+/**
+ * Core async function to fetch pricing and update cache.
+ * Returns a confirmation string.
+ */
+export function updatePricingCache(modelNameOverride?: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // 1. Determine model name to search for
+    const cache = getPricingCache();
+    // Use override > env var > existing cache model > fallback
+    let modelName = modelNameOverride || process.env.CONTEXT_MODE_MODEL_NAME;
+    if (!modelName && cache && cache.modelName) {
+      modelName = cache.modelName;
+    }
+    
+    if (!modelName) {
+      return reject(new Error("No model name configured"));
+    }
+
+    // Fuzzy matching logic: strip (Low), (High), etc.
+    const cleanName = modelName.replace(/\s*\([^)]*\)/g, '').toLowerCase().trim();
+
+    const req = httpsRequest("https://llmpricingapi.com/api/models", (res) => {
+      let data = "";
+      res.on("data", (chunk) => data += chunk);
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (!parsed.models || !Array.isArray(parsed.models)) {
+            return reject(new Error("Invalid API response format"));
+          }
+          
+          // Fuzzy match against API
+          const match = parsed.models.find((m: any) => 
+            m.name && m.name.toLowerCase().includes(cleanName)
+          );
+          
+          if (match && typeof match.input_price === "number") {
+            const cacheData = {
+              modelName: match.name, // Use the API's clean name in the cache
+              pricePerToken: match.input_price / 1_000_000
+            };
+            
+            const dir = resolveSessionStorageDir(() => resolveDefaultSessionDir({ configDir: resolveClaudeConfigDir() })).path;
+            const cachePath = join(dir, "pricing-cache.json");
+            const tempPath = cachePath + ".tmp";
+            
+            writeFileSync(tempPath, JSON.stringify(cacheData));
+            renameSync(tempPath, cachePath);
+            
+            resolve(`Successfully updated tracking to ${match.name} ($${match.input_price} / 1M tokens).`);
+          } else {
+            reject(new Error(`Model '${modelName}' (fuzzy: '${cleanName}') not found in pricing API.`));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    
+    req.on("error", (err) => reject(err));
+    req.end();
+  });
+}
+
+/**
+ * Asynchronously fetches pricing from llmpricingapi.com and updates the local cache.
+ * Designed to be fired-and-forget during server startup.
+ */
+export function refreshPricingCacheInBackground(): void {
+  updatePricingCache().catch(() => {
+    // silently fail for background fetch
+  });
 }
 
 /**
@@ -2988,9 +3100,9 @@ export function formatReport(
   // ── Active session: visual savings dashboard ──
 
   // Line 1: Hero metric — the screenshottable number
-  // Bug #6: include Opus pricing on the hero line for credibility.
+  // Bug #6: include pricing on the hero line for credibility.
   lines.push(
-    `${fmtNum(tokensSaved)} tokens saved  ·  ${savingsPct.toFixed(1)}% reduction  ·  ${duration}  ·  ~${tokensToUsd(tokensSaved)} saved (Opus)`,
+    `${fmtNum(tokensSaved)} tokens saved  ·  ${savingsPct.toFixed(1)}% reduction  ·  ${duration}  ·  ~${tokensToUsd(tokensSaved)} saved (${pricingModelName()})`,
   );
   lines.push("");
 
