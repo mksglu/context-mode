@@ -17,6 +17,13 @@
  */
 
 import { describe, test, beforeEach, afterEach, expect, vi } from "vitest";
+
+const activeDBs: Array<{ close?: () => void }> = [];
+afterEach(() => {
+  for (const db of activeDBs) { try { db.close?.(); } catch {} }
+  activeDBs.length = 0;
+});
+
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
@@ -102,7 +109,8 @@ describe("cross-project attribution — Bug 7 repro", () => {
   });
 
   test("tracer: cwd=projA but file_edit on projB/foo.ts → body.project resolves to projB's canonical id", async () => {
-    const db = new SessionDB({ dbPath: join(fakeHome, "test.db") });
+    const db = new SessionDB({ dbPath:   join(fakeHome, "test.db")   });
+      activeDBs.push(db as any);
     const sid = "cross-proj-" + Date.now();
     db.ensureSession(sid, projA);
 
@@ -145,7 +153,8 @@ describe("cross-project attribution — Bug 7 repro", () => {
   });
 
   test("batched events split across projA + projB → each attributes to its own repo", async () => {
-    const db = new SessionDB({ dbPath: join(fakeHome, "test.db") });
+    const db = new SessionDB({ dbPath:   join(fakeHome, "test.db")   });
+      activeDBs.push(db as any);
     const sid = "cross-proj-batch-" + Date.now();
     db.ensureSession(sid, projA);
 
@@ -172,7 +181,8 @@ describe("cross-project attribution — Bug 7 repro", () => {
   });
 
   test("Bug 8 — Bash 'git -C /projB status' via real extractEvents → project=projB", async () => {
-    const db = new SessionDB({ dbPath: join(fakeHome, "test.db") });
+    const db = new SessionDB({ dbPath:   join(fakeHome, "test.db")   });
+      activeDBs.push(db as any);
     const sid = "bash-c-" + Date.now();
     db.ensureSession(sid, projA);
 
@@ -212,7 +222,8 @@ describe("cross-project attribution — Bug 7 repro", () => {
   });
 
   test("Bug 8 — Bash 'cd /projB && npm test' → project=projB", async () => {
-    const db = new SessionDB({ dbPath: join(fakeHome, "test.db") });
+    const db = new SessionDB({ dbPath:   join(fakeHome, "test.db")   });
+      activeDBs.push(db as any);
     const sid = "bash-cd-" + Date.now();
     db.ensureSession(sid, projA);
 
@@ -242,7 +253,8 @@ describe("cross-project attribution — Bug 7 repro", () => {
   });
 
   test("Bash without any path indicator → falls back to cwd (projA) — expected behavior", async () => {
-    const db = new SessionDB({ dbPath: join(fakeHome, "test.db") });
+    const db = new SessionDB({ dbPath:   join(fakeHome, "test.db")   });
+      activeDBs.push(db as any);
     const sid = "bash-no-path-" + Date.now();
     db.ensureSession(sid, projA);
 
