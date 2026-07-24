@@ -12,6 +12,13 @@
  */
 
 import { describe, test, beforeEach, afterEach, expect, vi } from "vitest";
+
+const activeDBs: Array<{ close?: () => void }> = [];
+afterEach(() => {
+  for (const db of activeDBs) { try { db.close?.(); } catch {} }
+  activeDBs.length = 0;
+});
+
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
@@ -78,6 +85,7 @@ describe("session-loaders — Bug 2 repro: commit_message symmetric stamp", () =
 
   test("session with 1 commit + 3 file edits — every body MUST carry commit_message alongside has_commit", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sid = "commit-msg-symmetry-" + Date.now();
     db.ensureSession(sid, fakeHome);
 
