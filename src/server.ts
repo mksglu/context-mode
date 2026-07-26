@@ -55,7 +55,7 @@ import {
 } from "./session/event-emit.js";
 import { persistToolCallCounter, restoreSessionStats } from "./session/persist-tool-calls.js";
 import { appendRetrievalBytes } from "./session/retrieval-marker.js";
-import { searchAllSources } from "./search/unified.js";
+import { searchAllSources, type UnifiedSearchResult } from "./search/unified.js";
 import {
   buildCtxSearchInputSchema,
   CTX_SEARCH_SHARED_MODE,
@@ -1417,6 +1417,27 @@ export function formatBatchQueryResults(
   return sections;
 }
 
+/**
+ * Cross-query dedup for a multi-query ctx_search call. A chunk that matches
+ * more than one query would otherwise print verbatim under each query's
+ * section. Results carry no stable chunk id (see SearchResult /
+ * UnifiedSearchResult), so identity is the query-independent
+ * `source\0title\0content` tuple; the emitted snippet is windowed per query
+ * and cannot be used as a key. `seen` is shared across the call's queries and
+ * mutated in place, so the first occurrence of a chunk is kept and later
+ * repeats are dropped.
+ */
+export function dedupeAcrossQueries<
+  T extends { source: string; title: string; content: string },
+>(results: T[], seen: Set<string>): T[] {
+  return results.filter((r) => {
+    const key = [r.source, r.title, r.content].join("\u0000");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ─────────────────────────────────────────────────────────
 // batch_execute runner — used by ctx_batch_execute handler
 // ─────────────────────────────────────────────────────────
@@ -2703,6 +2724,11 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
 
       const configDir = _detectedAdapter?.getConfigDir() ?? resolveClaudeConfigDir();
 
+      // Track chunks already emitted by an earlier query so a chunk matching
+      // multiple queries prints once (multi-query calls only; see
+      // dedupeAcrossQueries).
+      const seenChunks = new Set<string>();
+
       try {
       for (const q of queryList) {
         if (totalSize > MAX_TOTAL) {
@@ -2741,7 +2767,19 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
           continue;
         }
 
-        const formatted = results
+        // For multi-query calls, drop chunks already shown under an earlier
+        // query so the same chunk never prints twice. Single-query output is
+        // left byte-identical.
+        let emitResults: Array<SearchResult | UnifiedSearchResult> = results;
+        if (queryList.length > 1) {
+          emitResults = dedupeAcrossQueries<SearchResult | UnifiedSearchResult>(results, seenChunks);
+          if (emitResults.length === 0) {
+            sections.push(`## ${q}\n(all matches already shown above)`);
+            continue;
+          }
+        }
+
+        const formatted = emitResults
           .map((r, i) => {
             const origin = (r as any).origin || "current-session";
             const ts = (r as any).timestamp ? (r as any).timestamp.slice(0, 16).replace("T", " ") : "";
