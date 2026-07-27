@@ -593,15 +593,13 @@ describe("Pi Extension", () => {
         { sessionManager: { getSessionFile: () => sessionFile } }, // ctx (2nd arg)
       );
 
-      // Verify the session was initialised with the file-derived ID by checking
-      // that before_agent_start doesn't blow up (it needs a valid _sessionId).
-      // In the new behavior, before_agent_start no longer returns systemPrompt;
-      // it stores context in _pendingContext for the context hook to inject.
+      // Verify the session was initialised with the file-derived ID and that
+      // routing instructions use Pi's model-only system boundary.
       const result = await api._trigger("before_agent_start", {
         systemPrompt: "Base.",
       });
-      // before_agent_start may or may not return a value — the key is it doesn't throw
-      expect(result?.systemPrompt ?? null).toBe(null); // systemPrompt is no longer returned
+      expect(result?.systemPrompt).toContain("Base.");
+      expect(result?.systemPrompt).toContain("context-mode active");
     });
 
     it("handles session lifecycle in correct order", async () => {
@@ -637,7 +635,7 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 5: Resume injection", () => {
-    it("delivers resume snapshot through context hook, not systemPrompt", async () => {
+    it("delivers resume snapshot through the model-only system prompt", async () => {
       await registerPiExtension(api);
 
       // Build up session state: capture events → compact → build resume
@@ -662,32 +660,16 @@ describe("Pi Extension", () => {
       await api._trigger("session_before_compact", {});
       await api._trigger("session_compact", {});
 
-      // before_agent_start should prepare context without mutating systemPrompt
+      // before_agent_start should deliver the resume at the model-only system boundary.
       const result = await api._trigger("before_agent_start", {
         systemPrompt: "You are a helpful assistant.",
       });
-      expect(result?.systemPrompt ?? null).toBe(null);
 
-      // The context hook should deliver the resume as hidden model context.
-      const messages = [{ role: "system", content: "You are a helpful assistant." }];
-      const ctxResult = await api._trigger("context", { messages });
-
-      expect(ctxResult?.messages).toBe(messages);
-      expect(messages).toHaveLength(2);
-      expect(messages[0]).toEqual({
-        role: "system",
-        content: "You are a helpful assistant.",
-      });
-      expect(messages[1]).toMatchObject({
-        role: "custom",
-        customType: "context-mode",
-        display: false,
-      });
-      expect(String(messages[1].content)).toContain("session_resume");
-      expect(String(messages[1].content)).not.toContain("You are a helpful assistant.");
+      expect(result?.systemPrompt).toContain("You are a helpful assistant.");
+      expect(result?.systemPrompt).toContain("session_resume");
     });
 
-    it("appends resume and active context after existing messages", async () => {
+    it("appends resume and active context after the existing system prompt", async () => {
       await registerPiExtension(api);
 
       await api._trigger("session_start", {
@@ -714,29 +696,11 @@ describe("Pi Extension", () => {
         systemPrompt: "Stable system prompt.",
         prompt: "Continue with the refactor and avoid lodash.",
       });
-      expect(result?.systemPrompt ?? null).toBe(null);
 
-      const messages = [
-        { role: "system", content: "Stable system prompt." },
-        { role: "user", content: "Continue with the refactor." },
-      ];
-      const ctxResult = await api._trigger("context", { messages });
-
-      expect(ctxResult?.messages).toBe(messages);
-      expect(messages).toHaveLength(3);
-      expect(messages[0]).toEqual({ role: "system", content: "Stable system prompt." });
-      expect(messages[1]).toEqual({ role: "user", content: "Continue with the refactor." });
-      expect(messages[2]).toMatchObject({
-        role: "custom",
-        customType: "context-mode",
-        display: false,
-      });
-
-      const trailing = String(messages[2].content);
-      expect(trailing).toContain("context-mode active");
-      expect(trailing).toContain("session_resume");
-      expect(trailing).toContain("how_to_search");
-      expect(trailing).not.toContain("Stable system prompt.");
+      expect(result?.systemPrompt).toContain("Stable system prompt.");
+      expect(result?.systemPrompt).toContain("context-mode active");
+      expect(result?.systemPrompt).toContain("session_resume");
+      expect(result?.systemPrompt).toContain("how_to_search");
     });
 
     it("returns nothing when no resume exists", async () => {
@@ -909,34 +873,23 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 7: Routing block injection", () => {
-    it("injects lightweight routing anchor via context hook on first before_agent_start", async () => {
+    it("injects lightweight routing anchor at the model-only system boundary", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
         sessionManager: { getSessionFile: () => `routing-1-${Date.now()}-${Math.random()}` },
       });
 
-      // before_agent_start sets _pendingContext (was previously modifying systemPrompt)
-      await api._trigger("before_agent_start", {
+      const result = await api._trigger("before_agent_start", {
         systemPrompt: "Base prompt.",
       });
 
-      // context hook injects model-visible context without rendering it as user-authored chat
-      const messages: any[] = [];
-      const ctxResult = await api._trigger("context", { messages });
-
-      expect(ctxResult?.messages).toBeDefined();
-      expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0]).toMatchObject({
-        role: "custom",
-        customType: "context-mode",
-        display: false,
-        details: { kind: "runtime_context" },
-      });
-      expect(ctxResult.messages[0].content).toContain("context-mode active");
-      expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
+      expect(result?.systemPrompt).toContain("Base prompt.");
+      expect(result?.systemPrompt).toContain("context-mode active");
+      expect(result?.systemPrompt).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
+      expect(api._handlers.context).toBeUndefined();
     });
 
-    it("re-injects the anchor via context hook on every subsequent call", async () => {
+    it("re-injects the anchor on every subsequent call", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
         sessionManager: { getSessionFile: () => `routing-2-${Date.now()}-${Math.random()}` },
@@ -948,10 +901,10 @@ describe("Pi Extension", () => {
       const ANCHOR = "context-mode active";
 
       for (let call = 0; call < 3; call++) {
-        await api._trigger("before_agent_start", { systemPrompt: "Base." });
-        const ctxResult = await api._trigger("context", { messages: [] });
-        expect(ctxResult?.messages).toBeDefined();
-        expect(ctxResult.messages[0]?.content).toContain(ANCHOR);
+        const result = await api._trigger("before_agent_start", {
+          systemPrompt: "Base.",
+        });
+        expect(result?.systemPrompt).toContain(ANCHOR);
       }
     });
   });
@@ -997,7 +950,7 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 9: active_memory injection", () => {
-    it("injects context every turn via context hook even when compact_count is 0", async () => {
+    it("injects context every turn even when compact_count is 0", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {
         sessionManager: { getSessionFile: () => `active-mem-1-${Date.now()}-${Math.random()}` },
@@ -1010,29 +963,19 @@ describe("Pi Extension", () => {
       });
 
       // Second call rebuilds context (always-on, not just post-compaction).
-      await api._trigger("before_agent_start", {
+      const result = await api._trigger("before_agent_start", {
         systemPrompt: "Base 2.",
       });
 
-      // context hook injects hidden custom context that Pi still sends to the model
-      const ctxResult = await api._trigger("context", { messages: [] });
-
-      expect(ctxResult?.messages).toBeDefined();
-      expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0]).toMatchObject({
-        role: "custom",
-        customType: "context-mode",
-        display: false,
-      });
       // The always-on injection path fires every turn — the routing anchor
       // proves context reaches the model even with compact_count 0.
-      const content = String(ctxResult.messages[0].content);
+      const content = String(result?.systemPrompt ?? "");
       expect(content).toContain("context-mode active");
       // Issue #856 — the role MUST NOT be pinned as a standing directive.
       expect(content).not.toContain("<behavioral_directive>");
     });
 
-    it("caps active_memory at ≤ 2000 characters (via context hook)", async () => {
+    it("caps active_memory at ≤ 2000 characters", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {
         sessionManager: { getSessionFile: () => `active-mem-2-${Date.now()}-${Math.random()}` },
@@ -1047,12 +990,11 @@ describe("Pi Extension", () => {
         });
       }
 
-      await api._trigger("before_agent_start", {
+      const result = await api._trigger("before_agent_start", {
         systemPrompt: "Base final.",
       });
 
-      const ctxResult = await api._trigger("context", { messages: [] });
-      const content = String(ctxResult?.messages?.[0]?.content ?? "");
+      const content = String(result?.systemPrompt ?? "");
       // Issue #856 — flooding with role prompts must NOT accumulate any
       // behavioral_directive, and the per-turn injection must stay bounded
       // (it is now just the routing anchor; roles are filtered out entirely).
@@ -1085,9 +1027,10 @@ describe("Pi Extension", () => {
       });
 
       // Subsequent turn rebuilds context.
-      await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
-      const ctxResult = await api._trigger("context", { messages: [] });
-      const content = String(ctxResult?.messages?.[0]?.content ?? "");
+      const result = await api._trigger("before_agent_start", {
+        systemPrompt: "Base 2.",
+      });
+      const content = String(result?.systemPrompt ?? "");
 
       // The stale role must NOT be pinned as a standing behavioral_directive.
       expect(content).not.toContain("<behavioral_directive>");
@@ -1104,9 +1047,10 @@ describe("Pi Extension", () => {
         prompt: "You are a senior staff engineer reviewing this codebase.",
         systemPrompt: "Base.",
       });
-      await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
-      const ctxResult = await api._trigger("context", { messages: [] });
-      const content = String(ctxResult?.messages?.[0]?.content ?? "");
+      const result = await api._trigger("before_agent_start", {
+        systemPrompt: "Base 2.",
+      });
+      const content = String(result?.systemPrompt ?? "");
 
       // Role filtered out…
       expect(content).not.toContain("<behavioral_directive>");
