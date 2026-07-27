@@ -743,8 +743,11 @@ export default function piExtension(pi: any): void {
       const ctx = _pendingContext;
       _pendingContext = "";
       event.messages.push({
-        role: "user",
+        role: "custom",
+        customType: "context-mode",
         content: ctx,
+        display: false,
+        details: { kind: "runtime_context" },
       });
       return { messages: event.messages };
     } catch {

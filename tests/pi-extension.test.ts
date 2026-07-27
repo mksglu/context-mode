@@ -668,7 +668,7 @@ describe("Pi Extension", () => {
       });
       expect(result?.systemPrompt ?? null).toBe(null);
 
-      // The context hook should deliver the resume as a trailing user message.
+      // The context hook should deliver the resume as hidden model context.
       const messages = [{ role: "system", content: "You are a helpful assistant." }];
       const ctxResult = await api._trigger("context", { messages });
 
@@ -678,7 +678,11 @@ describe("Pi Extension", () => {
         role: "system",
         content: "You are a helpful assistant.",
       });
-      expect(messages[1].role).toBe("user");
+      expect(messages[1]).toMatchObject({
+        role: "custom",
+        customType: "context-mode",
+        display: false,
+      });
       expect(String(messages[1].content)).toContain("session_resume");
       expect(String(messages[1].content)).not.toContain("You are a helpful assistant.");
     });
@@ -722,7 +726,11 @@ describe("Pi Extension", () => {
       expect(messages).toHaveLength(3);
       expect(messages[0]).toEqual({ role: "system", content: "Stable system prompt." });
       expect(messages[1]).toEqual({ role: "user", content: "Continue with the refactor." });
-      expect(messages[2].role).toBe("user");
+      expect(messages[2]).toMatchObject({
+        role: "custom",
+        customType: "context-mode",
+        display: false,
+      });
 
       const trailing = String(messages[2].content);
       expect(trailing).toContain("context-mode active");
@@ -912,13 +920,18 @@ describe("Pi Extension", () => {
         systemPrompt: "Base prompt.",
       });
 
-      // context hook now injects the routing anchor as a user message at message end
+      // context hook injects model-visible context without rendering it as user-authored chat
       const messages: any[] = [];
       const ctxResult = await api._trigger("context", { messages });
 
       expect(ctxResult?.messages).toBeDefined();
       expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0].role).toBe("user");
+      expect(ctxResult.messages[0]).toMatchObject({
+        role: "custom",
+        customType: "context-mode",
+        display: false,
+        details: { kind: "runtime_context" },
+      });
       expect(ctxResult.messages[0].content).toContain("context-mode active");
       expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
     });
@@ -1001,12 +1014,16 @@ describe("Pi Extension", () => {
         systemPrompt: "Base 2.",
       });
 
-      // context hook injects the pending context as a user message
+      // context hook injects hidden custom context that Pi still sends to the model
       const ctxResult = await api._trigger("context", { messages: [] });
 
       expect(ctxResult?.messages).toBeDefined();
       expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0].role).toBe("user");
+      expect(ctxResult.messages[0]).toMatchObject({
+        role: "custom",
+        customType: "context-mode",
+        display: false,
+      });
       // The always-on injection path fires every turn — the routing anchor
       // proves context reaches the model even with compact_count 0.
       const content = String(ctxResult.messages[0].content);
