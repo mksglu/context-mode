@@ -1047,6 +1047,111 @@ describe("Pi Extension", () => {
   });
 
   // ═══════════════════════════════════════════════════════════
+  // Issue #1007: active_memory injection must not repeat unchanged
+  // content on every turn (prompt-cache regression). The 'context' hook
+  // pushes _pendingContext as a transient, never-persisted message, so
+  // rebuilding it from the SAME session events on every turn creates a
+  // brand-new never-before-cached prefix each time — a cache-miss rewrite
+  // instead of a cache-read. Only genuinely NEW events (since the last time
+  // active_memory was shown) should trigger a re-injection.
+  // ═══════════════════════════════════════════════════════════
+
+  describe("Issue #1007: active_memory dedupe across turns", () => {
+    // Helper: derive the same session id the extension computes internally
+    // (sha256(sessionFile).slice(0,16)) and open the SAME SessionDB file the
+    // extension writes to, so the test can seed priority>=3 events directly
+    // without depending on the user-prompt text extractors (which also emit
+    // an incidental 'intent' event on nearly every non-question prompt).
+    async function openExtensionDb(sessionFile: string, projectDir: string) {
+      const { resolveSessionDbPath } = await import("../src/session/db.js");
+      const sessionsDir = join(process.env.HOME!, ".pi", "context-mode", "sessions");
+      const dbPath = resolveSessionDbPath({ projectDir, sessionsDir });
+      const sessionId = createHash("sha256").update(sessionFile).digest("hex").slice(0, 16);
+      return { db: new SessionDB({ dbPath }), sessionId };
+    }
+
+    it("does NOT re-inject the same active_memory content on a turn with no new qualifying events", async () => {
+      await registerPiExtension(api);
+      const sessionFile = `dedupe-1007-${Date.now()}-${Math.random()}`;
+      await api._trigger(
+        "session_start",
+        {},
+        { sessionManager: { getSessionFile: () => sessionFile } },
+      );
+
+      const { db, sessionId } = await openExtensionDb(sessionFile, tempDir);
+      db.insertEvent(sessionId, {
+        type: "external_ref",
+        category: "external-ref",
+        data: "https://example.com/ticket-1",
+        priority: 3,
+      });
+
+      // First turn: the event above qualifies (priority >= 3, category != role)
+      // and is injected as active_memory.
+      await api._trigger("before_agent_start", { systemPrompt: "Base." });
+      const firstCtx = await api._trigger("context", { messages: [] });
+      const firstContent = String(firstCtx?.messages?.[0]?.content ?? "");
+      expect(firstContent).toContain("https://example.com/ticket-1");
+
+      // Second turn: no new event was recorded since the first injection.
+      // Pre-#1007-fix, db.getEvents(...) would return the SAME event and
+      // _pendingContext would be unconditionally rebuilt from it — a
+      // never-before-seen-in-this-exact-form message that breaks prompt
+      // cache every such turn.
+      await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
+      const secondCtx = await api._trigger("context", { messages: [] });
+      const secondContent = String(secondCtx?.messages?.[0]?.content ?? "");
+
+      // The always-on routing anchor (Pi-1) is out of scope for #1007 and
+      // still fires every turn — but the active_memory block built from the
+      // SAME already-shown event must NOT be rebuilt/re-injected again.
+      expect(secondContent).not.toContain("https://example.com/ticket-1");
+    });
+
+    it("injects only the NEW qualifying event(s) when the active-memory set grows between turns", async () => {
+      await registerPiExtension(api);
+      const sessionFile = `dedupe-1007-grow-${Date.now()}-${Math.random()}`;
+      await api._trigger(
+        "session_start",
+        {},
+        { sessionManager: { getSessionFile: () => sessionFile } },
+      );
+
+      const { db, sessionId } = await openExtensionDb(sessionFile, tempDir);
+      db.insertEvent(sessionId, {
+        type: "external_ref",
+        category: "external-ref",
+        data: "https://example.com/ticket-1",
+        priority: 3,
+      });
+
+      await api._trigger("before_agent_start", { systemPrompt: "Base." });
+      const firstCtx = await api._trigger("context", { messages: [] });
+      expect(String(firstCtx?.messages?.[0]?.content ?? "")).toContain(
+        "https://example.com/ticket-1",
+      );
+
+      // A genuinely NEW priority>=3 event lands before the next turn.
+      db.insertEvent(sessionId, {
+        type: "external_ref",
+        category: "external-ref",
+        data: "https://example.com/ticket-2",
+        priority: 3,
+      });
+
+      await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
+      const secondCtx = await api._trigger("context", { messages: [] });
+      const secondContent = String(secondCtx?.messages?.[0]?.content ?? "");
+
+      // The new event is present...
+      expect(secondContent).toContain("https://example.com/ticket-2");
+      // ...but the already-shown event is NOT repeated.
+      expect(secondContent).not.toContain("https://example.com/ticket-1");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
   // Slice 9b (#856): role is NOT re-injected as a standing
   // behavioral_directive every turn (do-nothing-loop fix)
   // ═══════════════════════════════════════════════════════════

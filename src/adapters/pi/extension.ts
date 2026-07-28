@@ -164,6 +164,24 @@ let _buildAutoInjection:
 // which breaks prefix prompt cache on DeepSeek/Anthropic/OpenAI).
 // See: https://github.com/mksglu/context-mode/issues/598
 let _pendingContext = "";
+
+// High-water mark (max session_events.id already shown as active_memory) for
+// the CURRENT session. session_events.id is an AUTOINCREMENT primary key, so
+// it is a stable, monotonically increasing "newness" cursor per event.
+//
+// Issue #1007 — before this, every before_agent_start turn where
+// db.getEvents(..., { minPriority: 3, limit: 50 }) returned ANY rows
+// unconditionally rebuilt _pendingContext from that full set, even when it
+// was identical to what was already injected on a prior turn. The 'context'
+// hook pushes _pendingContext as a transient message that is never persisted
+// into context.messages, so a repeated (but never-before-seen-in-this-exact-
+// form) message lands right where Anthropic's cache_control breakpoint sits —
+// a full cache-miss rewrite instead of a cache-read on every such turn. This
+// mirrors the existing `resume.consumed` / db.markResumeConsumed() pattern
+// (below), which already solves the identical problem for resume snapshots
+// by showing them exactly once. Module-level state matches this file's
+// existing single-session-per-process assumption (_sessionId, _pendingContext).
+let _lastShownActiveMemoryEventId = 0;
 async function getAutoInjection(
   pluginRoot: string,
 ): Promise<((events: Array<{ category: string; data: string }>) => string) | null> {
@@ -467,6 +485,7 @@ export default function piExtension(pi: any): void {
   pi.on("session_start", (_event: any, ctx: any) => {
     try {
       _sessionId = deriveSessionId(ctx ?? {});
+      _lastShownActiveMemoryEventId = 0; // fresh session — no active_memory shown yet
       db.ensureSession(_sessionId, projectDir);
       db.cleanupOldSessions(7);
     } catch {
@@ -681,12 +700,21 @@ export default function piExtension(pi: any): void {
           limit: 50,
         })
         .filter((e: any) => String(e.category ?? "") !== "role");
-      if (activeEvents.length > 0) {
+
+      // Issue #1007 — only consider events that are NEW since the last time
+      // active_memory was injected in this session. If nothing qualifies,
+      // leave _pendingContext untouched by this block (no re-injection, no
+      // cache-miss cost) instead of unconditionally rebuilding the same
+      // content every turn a priority>=3 event happens to still exist.
+      const newActiveEvents = activeEvents.filter(
+          (e: any) => Number(e.id ?? 0) > _lastShownActiveMemoryEventId,
+        );
+      if (newActiveEvents.length > 0) {
         const buildAuto = await getAutoInjection(pluginRoot);
         let memoryContext = "";
         if (buildAuto) {
           memoryContext = buildAuto(
-            activeEvents.map((e: any) => ({
+            newActiveEvents.map((e: any) => ({
               category: String(e.category ?? ""),
               data: String(e.data ?? ""),
             })),
@@ -696,7 +724,7 @@ export default function piExtension(pi: any): void {
         if (!memoryContext) {
           const memoryLines: string[] = ["<active_memory>"];
           let budget = 2000; // ~500 tokens at 4 chars/token
-          for (const ev of activeEvents) {
+          for (const ev of newActiveEvents) {
             const line = `  <event type="${ev.type}" category="${ev.category}">${ev.data}</event>`;
             if (line.length > budget) break;
             memoryLines.push(line);
@@ -705,7 +733,17 @@ export default function piExtension(pi: any): void {
           memoryLines.push("</active_memory>");
           if (memoryLines.length > 2) memoryContext = memoryLines.join("\n");
         }
-        if (memoryContext) parts.push(memoryContext);
+        if (memoryContext) {
+          parts.push(memoryContext);
+          // Advance the high-water mark past every new event we just considered
+          // (whether or not each individual one made it into the capped output —
+          // same one-shot-then-move-on semantics as db.markResumeConsumed below),
+          // so this exact content is never rebuilt/re-injected on a later turn.
+          for (const ev of newActiveEvents) {
+            const id = Number(ev.id ?? 0);
+            if (id > _lastShownActiveMemoryEventId) _lastShownActiveMemoryEventId = id;
+          }
+        }
       }
 
       // Resume snapshot (only when present and unconsumed).
@@ -863,6 +901,7 @@ export default function piExtension(pi: any): void {
       _db = null;
       _dbPath = "";
       _sessionId = "";
+      _lastShownActiveMemoryEventId = 0;
     } catch {
       // best effort — never throw during shutdown
     }
