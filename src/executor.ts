@@ -112,6 +112,13 @@ const OS_TMPDIR = (() => {
 })();
 
 /**
+ * Grace window (ms) after an abort's tree kill before the execution settles
+ * deterministically — see the abort handler in #spawn. Bounds abort latency
+ * when `close` is held up by inherited stdio handles (Windows).
+ */
+const ABORT_SETTLE_GRACE_MS = 1500;
+
+/**
  * Pure helper — exported for unit testing. Issue #782.
  *
  * On Windows, the sandbox shell runtime is Git Bash. A bare `mvn` invocation
@@ -284,6 +291,21 @@ export class PolyglotExecutor {
 
   async execute(opts: ExecuteOptions): Promise<ExecResult> {
     const { language, code, timeout, background = false, cwd: cwdOverride, signal } = opts;
+
+    // Deterministic pre-abort path: never spawn a process for a request that
+    // is already cancelled. Spawn-then-kill-immediately races on Windows
+    // (taskkill can miss a just-created process; even on a clean kill `close`
+    // can stall on inherited pipe handles), so resolve synchronously instead.
+    // No temp dir created → nothing to clean up, no listener to remove.
+    if (signal?.aborted) {
+      return {
+        stdout: "",
+        stderr: "Execution aborted before start",
+        exitCode: 1,
+        timedOut: false,
+      };
+    }
+
     const tmpDir = mkdtempSync(join(OS_TMPDIR, ".ctx-mode-"));
 
     try {
@@ -487,10 +509,33 @@ export class PolyglotExecutor {
 
       let timedOut = false;
       let resolved = false;
+      let abortSettleTimer: NodeJS.Timeout | undefined;
       const abort = () => {
         // Exact spawned root only: killTree uses its dedicated process group or
         // taskkill /T, never a broad name/port sweep.
-        if (!resolved) killTree(proc);
+        if (resolved) return;
+        killTree(proc);
+        // Deterministic settle: after the tree kill we do NOT wait forever for
+        // `close`. Descendants that die slowly (or briefly survive) keep
+        // inherited stdio pipe handles open — on Windows that can delay the
+        // root's `close` well past the actual kill. Give real output a short
+        // grace window, then settle with whatever we captured.
+        abortSettleTimer = setTimeout(() => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", abort);
+          proc.stdout?.removeAllListeners("data");
+          proc.stderr?.removeAllListeners("data");
+          try { proc.kill("SIGKILL"); } catch { /* already gone */ }
+          res({
+            stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+            stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+            exitCode: 1,
+            timedOut: false,
+          });
+        }, ABORT_SETTLE_GRACE_MS);
+        abortSettleTimer.unref?.();
       };
       if (signal?.aborted) abort();
       else signal?.addEventListener("abort", abort, { once: true });
@@ -565,6 +610,7 @@ export class PolyglotExecutor {
 
       proc.on("close", (exitCode) => {
         clearTimeout(timer);
+        if (abortSettleTimer) clearTimeout(abortSettleTimer);
         signal?.removeEventListener("abort", abort);
         if (resolved) return; // Already resolved by background timeout
         const rawStdout = Buffer.concat(stdoutChunks).toString("utf-8");
@@ -587,6 +633,7 @@ export class PolyglotExecutor {
 
       proc.on("error", (err) => {
         clearTimeout(timer);
+        if (abortSettleTimer) clearTimeout(abortSettleTimer);
         signal?.removeEventListener("abort", abort);
         if (resolved) return; // Already resolved by background timeout
         res({

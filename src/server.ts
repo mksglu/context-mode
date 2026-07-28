@@ -279,7 +279,7 @@ const originalRegisterTool = server.registerTool.bind(server);
   const [name, config, handler] = args as [
     string,
     Record<string, unknown>,
-    (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
+    (toolArgs: Record<string, unknown>, extra?: unknown) => Promise<unknown> | unknown,
   ];
   if (suppressMcpToolsForNativePluginHost) {
     emitSuppressionDiagnostic();
@@ -293,15 +293,19 @@ const originalRegisterTool = server.registerTool.bind(server);
 
 function wrapToolHandler(
   name: string,
-  handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
-): (toolArgs: Record<string, unknown>) => Promise<unknown> {
-  return async (toolArgs: Record<string, unknown>) => {
+  handler: (toolArgs: Record<string, unknown>, extra?: unknown) => Promise<unknown> | unknown,
+): (toolArgs: Record<string, unknown>, extra?: unknown) => Promise<unknown> {
+  return async (toolArgs: Record<string, unknown>, extra?: unknown) => {
     // #854: mark a tool call in-flight so the bridge-child idle reaper never
     // shuts the server down mid-execution during a long ctx_execute/batch that
     // emits no further inbound messages. Symmetric end in finally (success+error).
     noteRequestStart();
     try {
-      return await handler(toolArgs);
+      // The MCP SDK invokes registered tool handlers with (args, extra), where
+      // extra.signal carries request cancellation from the host. Forward it —
+      // dropping it silently disabled the executor-level abort wiring (#83aefee):
+      // every handler saw extra === {} so no running execution could be cancelled.
+      return await handler(toolArgs, extra);
     } catch (err) {
       const result = storageErrorResult(err);
       if (result) {
@@ -2111,7 +2115,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         ),
     }),
   },
-  async ({ path, language, code, timeout, intent }) => {
+  async ({ path, language, code, timeout, intent }, extra: { signal?: AbortSignal } = {}) => {
     // Security (#852): confine the processed file to the project root so
     // ctx_execute_file cannot be used to escape the host's sandbox/permission
     // controls. Runs before the deny-glob check — boundary first, then policy.
@@ -2138,6 +2142,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         language,
         code,
         timeout: effTimeout,
+        signal: extra.signal,
       });
 
       // Echo path + executed source code before stdout for audit/debug
