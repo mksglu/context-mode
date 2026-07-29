@@ -44,6 +44,7 @@ describe("detectPlatform", () => {
     delete process.env.GEMINI_CLI;
     delete process.env.KILO;
     delete process.env.KILO_PID;
+    delete process.env.OPENCODE_PROJECT_DIR;
     delete process.env.OPENCODE;
     delete process.env.OPENCODE_PID;
     delete process.env.OPENCODE_CLIENT;
@@ -55,10 +56,15 @@ describe("detectPlatform", () => {
     delete process.env.CURSOR_CWD;
     delete process.env.CURSOR_SESSION_ID;
     delete process.env.CURSOR_TRACE_ID;
+    delete process.env.CURSOR_CLI;
     delete process.env.VSCODE_PID;
     delete process.env.VSCODE_CWD;
     delete process.env.QWEN_PROJECT_DIR;
     delete process.env.PI_CODING_AGENT_DIR;
+    delete process.env.ZED_TERM;
+    delete process.env.ZED_SESSION_ID;
+    delete process.env.ANTIGRAVITY_CLI_ALIAS;
+    delete process.env.PI_WORKSPACE_DIR;
     // Issue #542 — Pi-runtime markers (PI_CONFIG_DIR, PI_SESSION_FILE,
     // PI_COMPILED) replace the stale PI_PROJECT_DIR detection signal.
     delete process.env.PI_CONFIG_DIR;
