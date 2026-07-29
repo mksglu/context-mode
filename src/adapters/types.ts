@@ -2,11 +2,12 @@
  * adapters/types — Platform adapter interface for multi-platform hook support.
  *
  * Defines the contract that each platform adapter must implement.
- * Three paradigms exist across supported platforms:
+ * Four paradigms exist across supported platforms:
  *   A) JSON stdin/stdout — Claude Code, Gemini/Qwen family CLIs, Copilot/Codex/Kimi,
  *      Cursor, Kiro, Antigravity CLI (`agy`)
  *   B) TS Plugin Functions — OpenCode, KiloCode, OpenClaw
- *   C) MCP-only (no hooks) — Antigravity IDE, Zed, Pi/OMP MCP-only paths
+ *   C) Python Plugin + JSON hook bridge — Hermes Agent
+ *   D) MCP-only (no hooks) — Antigravity IDE, Zed, Pi/OMP MCP-only paths
  *
  * The MCP server layer is 100% portable and needs no adapter.
  * Only the hook layer requires platform-specific adapters.
@@ -18,7 +19,7 @@
 
 import { resolveHookRuntime } from "../runtime.js";
 
-export type HookParadigm = "json-stdio" | "ts-plugin" | "mcp-only";
+export type HookParadigm = "json-stdio" | "ts-plugin" | "python-plugin" | "mcp-only";
 
 // ─────────────────────────────────────────────────────────
 // Platform capabilities
@@ -472,6 +473,7 @@ export function isInProcessPluginPlatform(p: string | undefined): boolean {
 
 /** Supported platform identifiers. */
 export type PlatformId =
+  | "hermes"
   | "claude-code"
   | "gemini-cli"
   | "opencode"

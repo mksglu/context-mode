@@ -31,6 +31,8 @@ describe("detectPlatform", () => {
 
   beforeEach(() => {
     savedEnv = { ...process.env };
+    delete process.env.HERMES_HOME;
+    delete process.env.HERMES_SESSION_ID;
     // Clear all platform-specific env vars to get a clean slate
     delete process.env.CLAUDE_PROJECT_DIR;
     delete process.env.CLAUDE_SESSION_ID;
@@ -83,6 +85,7 @@ describe("detectPlatform", () => {
   });
 
   // ── Claude Code ────────────────────────────────────────
+
 
   it("returns claude-code when CLAUDE_PROJECT_DIR is set", () => {
     process.env.CLAUDE_PROJECT_DIR = "/some/project";

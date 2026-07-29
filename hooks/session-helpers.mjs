@@ -135,6 +135,16 @@ const CLAUDE_OPTS = {
   sessionIdEnv: "CLAUDE_SESSION_ID",
 };
 
+/** Hermes uses the same generic hook scripts but keeps all state under its home. */
+export const HERMES_OPTS = {
+  configDir: ".hermes",
+  configDirEnv: "HERMES_HOME",
+  projectDirEnv: undefined,
+  sessionIdEnv: undefined,
+};
+
+const DEFAULT_OPTS = process.env.CONTEXT_MODE_PLATFORM === "hermes" ? HERMES_OPTS : CLAUDE_OPTS;
+
 /** Gemini CLI platform options. */
 export const GEMINI_OPTS = {
   configDir: ".gemini",
@@ -229,7 +239,7 @@ export const JETBRAINS_OPTS = {
  * and Codex CLI (CODEX_HOME) allow users to customize the config location.
  * Falls back to ~/<configDir> when no env var is set.
  */
-export function resolveConfigDir(opts = CLAUDE_OPTS) {
+export function resolveConfigDir(opts = DEFAULT_OPTS) {
   if (opts.configDirEnv) {
     const envVal = process.env[opts.configDirEnv];
     if (envVal) {
@@ -339,7 +349,7 @@ export function readStdin() {
  * Get the project directory for the current platform.
  * Uses the platform-specific env var, falls back to cwd.
  */
-export function getProjectDir(opts = CLAUDE_OPTS) {
+export function getProjectDir(opts = DEFAULT_OPTS) {
   return process.env[opts.projectDirEnv] || process.cwd();
 }
 
@@ -347,7 +357,7 @@ export function getProjectDir(opts = CLAUDE_OPTS) {
  * Get the project directory from hook input when available.
  * Falls back to the platform env var and finally process.cwd().
  */
-export function getInputProjectDir(input, opts = CLAUDE_OPTS) {
+export function getInputProjectDir(input, opts = DEFAULT_OPTS) {
   if (typeof input?.cwd === "string" && input.cwd.length > 0) {
     return input.cwd;
   }
@@ -361,7 +371,7 @@ export function getInputProjectDir(input, opts = CLAUDE_OPTS) {
  * Derive session ID from hook input.
  * Priority: transcript_path UUID > sessionId (camelCase) > session_id > env var > ppid fallback.
  */
-export function getSessionId(input, opts = CLAUDE_OPTS) {
+export function getSessionId(input, opts = DEFAULT_OPTS) {
   if (input.transcript_path) {
     const match = input.transcript_path.match(/([a-f0-9-]{36})\.jsonl$/);
     if (match) return match[1];
@@ -405,7 +415,7 @@ function _resolveProjectFile(opts, projectDirOverride, ext) {
  * Creates the directory if it doesn't exist.
  * Path: ~/<configDir>/context-mode/sessions/<canonicalHash><suffix>.db
  */
-export function getSessionDBPath(opts = CLAUDE_OPTS, projectDirOverride) {
+export function getSessionDBPath(opts = DEFAULT_OPTS, projectDirOverride) {
   return _resolveProjectFile(opts, projectDirOverride, ".db");
 }
 
@@ -414,7 +424,7 @@ export function getSessionDBPath(opts = CLAUDE_OPTS, projectDirOverride) {
  * Used by sessionstart hook (write) and MCP server (read + auto-index).
  * Path: ~/<configDir>/context-mode/sessions/<canonicalHash><suffix>-events.md
  */
-export function getSessionEventsPath(opts = CLAUDE_OPTS, projectDirOverride) {
+export function getSessionEventsPath(opts = DEFAULT_OPTS, projectDirOverride) {
   return _resolveProjectFile(opts, projectDirOverride, "-events.md");
 }
 
@@ -423,6 +433,6 @@ export function getSessionEventsPath(opts = CLAUDE_OPTS, projectDirOverride) {
  * Used to detect true fresh starts vs --continue (which fires startup+resume).
  * Path: ~/<configDir>/context-mode/sessions/<canonicalHash><suffix>.cleanup
  */
-export function getCleanupFlagPath(opts = CLAUDE_OPTS, projectDirOverride) {
+export function getCleanupFlagPath(opts = DEFAULT_OPTS, projectDirOverride) {
   return _resolveProjectFile(opts, projectDirOverride, ".cleanup");
 }
