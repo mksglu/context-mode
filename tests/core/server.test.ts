@@ -3041,10 +3041,15 @@ import {
 interface MockResult { stdout: string; stderr?: string; timedOut?: boolean; }
 
 function mkMockExecutor(
-  handler: (code: string, timeout: number | undefined, cwd: string | undefined) => Promise<MockResult> | MockResult,
-): { execute: (input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }) => Promise<MockResult> } {
+  handler: (
+    code: string,
+    timeout: number | undefined,
+    cwd: string | undefined,
+    signal: AbortSignal | undefined,
+  ) => Promise<MockResult> | MockResult,
+): { execute: (input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string; signal?: AbortSignal }) => Promise<MockResult> } {
   return {
-    execute: async ({ code, timeout, cwd }) => Promise.resolve(handler(code, timeout, cwd)),
+    execute: async ({ code, timeout, cwd, signal }) => Promise.resolve(handler(code, timeout, cwd, signal)),
   };
 }
 
@@ -3101,6 +3106,28 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     );
 
     expect(seenCwds).toEqual(["/worktree/repo"]);
+  });
+
+  test("forwards the MCP cancellation signal to serial shell executions (#959)", async () => {
+    const controller = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const exec = mkMockExecutor((_code, _timeout, _cwd, signal) => {
+      seenSignals.push(signal);
+      return { stdout: "ok" };
+    });
+
+    await runBatchCommands(
+      [{ label: "signal", command: "echo ok" }],
+      {
+        timeout: undefined,
+        concurrency: 1,
+        nodeOptsPrefix: NOOP_PREFIX,
+        signal: controller.signal,
+      },
+      exec,
+    );
+
+    expect(seenSignals).toEqual([controller.signal]);
   });
 
   test("cascading skip: timeout in first cmd skips the rest", async () => {
@@ -6714,5 +6741,23 @@ describe("ctx_* MCP tool annotations (#846)", () => {
     ]) {
       expect(find(name)!.config.annotations!.readOnlyHint).toBe(false);
     }
+  });
+});
+
+// ─── MCP cancellation reaches execution handlers (#959) ───────────────────
+describe("ctx_execute cancellation (#959)", () => {
+  test("the registration wrapper preserves the MCP request signal", async () => {
+    const tool = REGISTERED_CTX_TOOLS.find((entry) => entry.name === "ctx_execute");
+    expect(tool).toBeDefined();
+    const controller = new AbortController();
+    controller.abort(new Error("user cancelled"));
+
+    const result = await tool!.handler(
+      { language: "javascript", code: "setInterval(() => {}, 1000);" },
+      { signal: controller.signal },
+    ) as { content?: Array<{ text?: string }>; isError?: boolean };
+
+    expect(result.isError).toBe(true);
+    expect(result.content?.[0]?.text).toMatch(/user cancelled/i);
   });
 });

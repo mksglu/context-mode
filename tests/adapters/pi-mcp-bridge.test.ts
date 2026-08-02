@@ -619,10 +619,9 @@ describe("MCPStdioClient — request() respawns for any method after idle exit (
 // Mert's directive (no env var, no hardcode bump): REMOVE the timeout
 // for `tools/call` entirely. Preserve the 60s bound on
 // initialize/tools-list (bootstrap hang detection — legit timeout case).
-// The trade-off (a deliberately hung MCP child during tools/call hangs
-// the call indefinitely) is accepted: it belongs to the executor /
-// child layer, not to the bridge. Background mode and Pi-level cancel
-// remain the user-facing escape hatches.
+// A deliberately long tools/call remains unbounded at the bridge layer;
+// the executor owns explicit timeouts and Pi cancellation is forwarded as
+// an MCP notifications/cancelled message (#959).
 //
 // These tests pin the contract behaviorally via fake timers — advancing
 // >120s while a `tools/call` is in flight MUST NOT reject it. The
@@ -684,6 +683,36 @@ describe("MCPStdioClient — callTool has no bridge-imposed timeout (#643)", () 
     }
   });
 
+  it("callTool sends MCP cancellation and rejects when Pi aborts", async () => {
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient("/unused/server.mjs");
+    const frames: Array<Record<string, unknown>> = [];
+    const stdin = {
+      destroyed: false,
+      writableEnded: false,
+      closed: false,
+      write: (data: string, cb?: (err?: Error) => void) => {
+        frames.push(JSON.parse(data));
+        cb?.();
+        return true;
+      },
+    };
+    (client as unknown as { child: unknown }).child = { stdin };
+
+    const controller = new AbortController();
+    const inFlight = client.callTool("ping", {}, controller.signal);
+    controller.abort(new Error("user cancelled"));
+
+    await expect(inFlight).rejects.toThrow(/user cancelled/i);
+    expect(frames).toHaveLength(2);
+    expect(frames[0]).toMatchObject({ method: "tools/call" });
+    expect(frames[1]).toMatchObject({
+      method: "notifications/cancelled",
+      params: { requestId: frames[0].id, reason: "Error: user cancelled" },
+    });
+    expect((client as unknown as { pending: Map<number, unknown> }).pending.size).toBe(0);
+  });
+
   it("initialize still rejects at the 60s default timeout (regression guard)", async () => {
     const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
     const client = new MCPStdioClient("/unused/server.mjs");
@@ -711,6 +740,53 @@ describe("MCPStdioClient — callTool has no bridge-imposed timeout (#643)", () 
       expect(String(err)).toMatch(/MCP request timeout after 60000ms: initialize/);
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+// ── Slice 8b — Pi abort signal reaches tools/call (#959) ──
+describe("bootstrapMCPTools — Pi cancellation (#959)", () => {
+  it("forwards the registered tool execute signal to callTool", async () => {
+    const { bootstrapMCPTools, MCPStdioClient } = await import(
+      "../../src/adapters/pi/mcp-bridge.js"
+    );
+    const start = vi.spyOn(MCPStdioClient.prototype, "start").mockImplementation(() => {});
+    const initialize = vi.spyOn(MCPStdioClient.prototype, "initialize").mockResolvedValue();
+    const listTools = vi.spyOn(MCPStdioClient.prototype, "listTools").mockResolvedValue([
+      { name: "ping", description: "p", inputSchema: { type: "object" } },
+    ]);
+    const callTool = vi.spyOn(MCPStdioClient.prototype, "callTool").mockResolvedValue({
+      content: [{ type: "text", text: "pong" }],
+    });
+    let registered: {
+      execute: (
+        id: string,
+        params: Record<string, unknown>,
+        signal?: AbortSignal,
+      ) => Promise<unknown>;
+    } | undefined;
+
+    try {
+      const handle = await bootstrapMCPTools(
+        {
+          registerTool: (tool) => {
+            registered = tool;
+          },
+        },
+        "/unused/server.mjs",
+        { _resolveJsRuntime: () => process.execPath },
+      );
+      const controller = new AbortController();
+
+      await registered!.execute("call-1", {}, controller.signal);
+
+      expect(callTool).toHaveBeenCalledWith("ping", {}, controller.signal);
+      handle.shutdown();
+    } finally {
+      start.mockRestore();
+      initialize.mockRestore();
+      listTools.mockRestore();
+      callTool.mockRestore();
     }
   });
 });

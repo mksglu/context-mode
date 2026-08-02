@@ -222,6 +222,8 @@ interface ExecuteOptions {
    * a non-project cwd (e.g. $HOME).
    */
   cwd?: string;
+  /** Cancel the running process tree when the host aborts the tool call. */
+  signal?: AbortSignal;
 }
 
 interface ExecuteFileOptions extends ExecuteOptions {
@@ -280,7 +282,8 @@ export class PolyglotExecutor {
   }
 
   async execute(opts: ExecuteOptions): Promise<ExecResult> {
-    const { language, code, timeout, background = false, cwd: cwdOverride } = opts;
+    const { language, code, timeout, background = false, cwd: cwdOverride, signal } = opts;
+    signal?.throwIfAborted();
     const tmpDir = mkdtempSync(join(OS_TMPDIR, ".ctx-mode-"));
 
     try {
@@ -289,7 +292,7 @@ export class PolyglotExecutor {
 
       // Rust: compile then run
       if (cmd[0] === "__rust_compile_run__") {
-        return await this.#compileAndRun(filePath, tmpDir, timeout);
+        return await this.#compileAndRun(filePath, tmpDir, timeout, signal);
       }
 
       // Every language runs in the project directory so git, relative paths,
@@ -304,7 +307,7 @@ export class PolyglotExecutor {
       // Issue #45 — `cwdOverride` lets per-call sites (Codex MCP handlers) pin
       // cwd without mutating process-wide state.
       const cwd = cwdOverride ?? this.#projectRoot;
-      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background);
+      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background, signal);
 
       // Skip tmpDir cleanup if process was backgrounded — it may still need files
       if (!result.backgrounded) {
@@ -319,14 +322,14 @@ export class PolyglotExecutor {
   }
 
   async executeFile(opts: ExecuteFileOptions): Promise<ExecResult> {
-    const { path: filePath, language, code, timeout } = opts;
+    const { path: filePath, language, code, timeout, signal } = opts;
     const absolutePath = resolve(this.#projectRoot, filePath);
     const wrappedCode = this.#wrapWithFileContent(
       absolutePath,
       language,
       code,
     );
-    return this.execute({ language, code: wrappedCode, timeout });
+    return this.execute({ language, code: wrappedCode, timeout, signal });
   }
 
   #writeScript(tmpDir: string, code: string, language: Language): string {
@@ -378,6 +381,7 @@ export class PolyglotExecutor {
     srcPath: string,
     cwd: string,
     timeout: number | undefined,
+    signal?: AbortSignal,
   ): Promise<ExecResult> {
     const binSuffix = isWin ? ".exe" : "";
     const binPath = srcPath.replace(/\.rs$/, "") + binSuffix;
@@ -402,8 +406,10 @@ export class PolyglotExecutor {
       };
     }
 
-    // Run
-    return this.#spawn([binPath], cwd, cwd, timeout);
+    // Run. rustc is synchronously capped above; honor an abort that arrived
+    // during compilation before starting the compiled binary.
+    signal?.throwIfAborted();
+    return this.#spawn([binPath], cwd, cwd, timeout, false, signal);
   }
 
   async #spawn(
@@ -412,6 +418,7 @@ export class PolyglotExecutor {
     sandboxTmpDir: string,
     timeout: number | undefined,
     background = false,
+    signal?: AbortSignal,
   ): Promise<ExecResult> {
     return new Promise((res) => {
       // Only .cmd/.bat shims need shell on Windows; real executables don't.
@@ -467,6 +474,13 @@ export class PolyglotExecutor {
 
       let timedOut = false;
       let resolved = false;
+      // Host cancellation (for example Pi Esc) must stop the same process tree
+      // as an explicit timeout; otherwise the MCP request ends but its child leaks.
+      const onAbort = () => {
+        if (!resolved) killTree(proc);
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
       // Issue #406 — if the caller didn't pass a timeout we don't fire one.
       // Timeout policy belongs to the MCP host/client (Claude Code, VSCode,
       // JetBrains all enforce their own RPC timeouts); imposing a second
@@ -477,6 +491,7 @@ export class PolyglotExecutor {
         if (background) {
           // Background mode: detach process, return partial output, keep running
           resolved = true;
+          signal?.removeEventListener("abort", onAbort);
           if (proc.pid) this.#backgroundedPids.add(proc.pid);
           proc.unref();
           // Do NOT destroy stdout/stderr — closing the read end of the pipe
@@ -538,6 +553,7 @@ export class PolyglotExecutor {
 
       proc.on("close", (exitCode) => {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         if (resolved) return; // Already resolved by background timeout
         const rawStdout = Buffer.concat(stdoutChunks).toString("utf-8");
         let rawStderr = Buffer.concat(stderrChunks).toString("utf-8");
@@ -559,6 +575,7 @@ export class PolyglotExecutor {
 
       proc.on("error", (err) => {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         if (resolved) return; // Already resolved by background timeout
         res({
           stdout: "",
