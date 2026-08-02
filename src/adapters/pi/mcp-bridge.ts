@@ -552,6 +552,7 @@ export class MCPStdioClient {
     method: string,
     params: unknown,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+    signal?: AbortSignal,
   ): Promise<T> {
     // Respawn-on-idle-exit (#583, #583-followup).
     //
@@ -567,6 +568,7 @@ export class MCPStdioClient {
     // because by the time we re-enter, `exited` is false again. We use a
     // single-flight `respawnPromise` so concurrent callers share the same
     // respawn (orphan-child guard, see field comment).
+    signal?.throwIfAborted();
     if (this.exited) {
       if (!this.respawnPromise) {
         this.respawnPromise = this.respawn().finally(() => {
@@ -576,31 +578,58 @@ export class MCPStdioClient {
       await this.respawnPromise;
     }
     if (!this.child) throw new Error("MCP client not started");
+    signal?.throwIfAborted();
     const id = ++this.requestId;
     return new Promise<T>((resolve, reject) => {
+      let timer: NodeJS.Timeout | null = null;
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+      };
+      const onAbort = () => {
+        const handler = this.pending.get(id);
+        if (!handler) return;
+        this.pending.delete(id);
+        try {
+          this.notify("notifications/cancelled", {
+            requestId: id,
+            reason: String(signal?.reason ?? "cancelled"),
+          });
+        } catch {
+          // Best effort: local rejection must still release Pi if the pipe broke.
+        }
+        const reason = signal?.reason;
+        handler.reject(reason instanceof Error ? reason : new Error(String(reason ?? "MCP request cancelled")));
+      };
       // Gate the timer on a finite ms value so callers can pass
       // `Number.POSITIVE_INFINITY` to mean "no bridge ceiling" (#643).
       // Node coerces both `undefined` and `Infinity` to a 1ms delay
       // (TimeoutOverflowWarning), so we can't just pass them through —
       // we must skip the setTimeout entirely. tools/call uses this path
       // because long-running ctx_execute must not be bounded here.
-      const timer = Number.isFinite(timeoutMs)
+      timer = Number.isFinite(timeoutMs)
         ? setTimeout(() => {
-            if (!this.pending.has(id)) return;
+            const handler = this.pending.get(id);
+            if (!handler) return;
             this.pending.delete(id);
-            reject(new Error(`MCP request timeout after ${timeoutMs}ms: ${method}`));
+            handler.reject(new Error(`MCP request timeout after ${timeoutMs}ms: ${method}`));
           }, timeoutMs)
         : null;
       this.pending.set(id, {
         resolve: (v) => {
-          if (timer) clearTimeout(timer);
+          cleanup();
           resolve(v as T);
         },
         reject: (e) => {
-          if (timer) clearTimeout(timer);
+          cleanup();
           reject(e);
         },
       });
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
       const frame = JSON.stringify({ jsonrpc: "2.0", id, method, params });
       const rejectWrite = (err: Error) => {
         const handler = this.pending.get(id);
@@ -609,6 +638,7 @@ export class MCPStdioClient {
           handler.reject(err);
           return;
         }
+        cleanup();
         reject(err);
       };
       this.writeFrame(frame, rejectWrite);
@@ -679,7 +709,7 @@ export class MCPStdioClient {
     return Array.isArray(result.tools) ? result.tools : [];
   }
 
-  async callTool(name: string, args: unknown): Promise<MCPCallResult> {
+  async callTool(name: string, args: unknown, signal?: AbortSignal): Promise<MCPCallResult> {
     // Respawn-on-idle-exit is now handled centrally in `request()`
     // (#583 follow-up). Originally patched here in #583 — moving it up
     // one layer covers `listTools` / `initialize` paths too, with a
@@ -690,13 +720,15 @@ export class MCPStdioClient {
     // 120s ceiling rejected legitimate long-running ctx_execute calls
     // (test suites, builds, large `cargo test`) even though the
     // executor child would have finished. Bounding belongs to the
-    // executor layer (per-tool timeout / background mode / Pi cancel),
-    // not the transport. `Number.POSITIVE_INFINITY` instructs
+    // executor layer (per-tool timeout / background mode), not the transport.
+    // Pi cancellation is forwarded separately through the AbortSignal (#959).
+    // `Number.POSITIVE_INFINITY` instructs
     // `request()` to skip the setTimeout entirely — see the gate there.
     return this.request<MCPCallResult>(
       "tools/call",
       { name, arguments: args ?? {} },
       Number.POSITIVE_INFINITY,
+      signal,
     );
   }
 
@@ -784,6 +816,7 @@ export interface PiToolRegistration {
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
+    signal?: AbortSignal,
   ) => Promise<{
     content: Array<{ type: "text"; text: string }>;
     details: Record<string, unknown>;
@@ -1031,8 +1064,8 @@ export async function bootstrapMCPTools(
       parameters: tool.inputSchema ?? { type: "object", properties: {} },
       renderCall: createContextModeCallRenderer(tool.name),
       renderResult: createContextModeResultRenderer(tool.name),
-      async execute(_toolCallId, params) {
-        const result = await client.callTool(tool.name, params ?? {});
+      async execute(_toolCallId, params, signal) {
+        const result = await client.callTool(tool.name, params ?? {}, signal);
         const text = (result.content ?? [])
           .filter((c) => c?.type === "text" && typeof c.text === "string")
           .map((c) => c.text as string)

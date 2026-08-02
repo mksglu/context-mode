@@ -887,6 +887,27 @@ describe("Timeout Handling", () => {
     assert.equal(r.stdout.trim(), "done");
   });
 
+  test("JS: abort signal kills an unbounded process", async () => {
+    const controller = new AbortController();
+    const inFlight = executor.execute({
+      language: "javascript",
+      code: `process.stdout.write(String(process.pid)); setInterval(() => {}, 1000);`,
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(new Error("user cancelled")), 1000);
+
+    const r = await inFlight;
+    const pid = parseInt(r.stdout.trim(), 10);
+    assert.ok(pid > 0, `Expected valid PID in stdout, got: "${r.stdout}"`);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    let alive = false;
+    try {
+      process.kill(pid, 0);
+      alive = true;
+    } catch { /* ESRCH = not found = good */ }
+    assert.equal(alive, false, `Process ${pid} should be dead after abort`);
+  }, 10_000);
+
   test("JS: infinite loop leaves no orphaned process after kill", async () => {
     // Spawn a process that writes its PID then loops forever
     const r = await executor.execute({
