@@ -1466,7 +1466,7 @@ export function buildBatchNodeOptionsPrefix(shellPath: string, preloadPath: stri
     return `set "NODE_OPTIONS=${option.replace(/"/g, '""')}" && `;
   }
 
-  return `NODE_OPTIONS=${quotePosixSingle(option)} `;
+  return `export NODE_OPTIONS=${quotePosixSingle(option)}; `;
 }
 
 /**

@@ -3353,9 +3353,20 @@ describe("runBatchCommands edge cases", () => {
     expect(seen[0]).toBe('NODE_OPTIONS="--require /tmp/x" echo hi');
   });
 
-  test("buildBatchNodeOptionsPrefix formats POSIX shell assignment", () => {
+  test("buildBatchNodeOptionsPrefix formats POSIX shell export", () => {
     const prefix = buildBatchNodeOptionsPrefix("bash", "/tmp/cm fs'preload.js");
-    expect(prefix).toBe("NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js' ");
+    expect(prefix).toBe("export NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js'; ");
+  });
+
+  test("POSIX node options prefix permits compound shell commands", () => {
+    const prefix = buildBatchNodeOptionsPrefix("bash", "/tmp/cm-fs-preload.js");
+    const result = spawnSync("bash", ["-c", `${prefix}for value in one two; do printf '%s\\n' "$value"; done`], {
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toBe("one\ntwo\n");
   });
 
   test("buildBatchNodeOptionsPrefix formats PowerShell assignment", () => {
