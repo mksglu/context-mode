@@ -99,6 +99,15 @@ describe("VSCodeCopilotAdapter", () => {
       expect(event.projectDir).toBe("/vscode/workspace");
     });
 
+    it("skips VSCODE_CWD when it points at the VS Code install path", () => {
+      delete process.env.CLAUDE_PROJECT_DIR;
+      process.env.VSCODE_CWD = "C:\\Users\\{userName}\\AppData\\Local\\Programs\\Microsoft VS Code";
+      const event = adapter.parsePreToolUseInput({
+        tool_name: "readFile",
+      });
+      expect(event.projectDir).toBe(process.cwd());
+    });
+
     it("CLAUDE_PROJECT_DIR still wins over VSCODE_CWD when both are set (cascade order)", () => {
       // Cascade order is locked: CLAUDE_PROJECT_DIR remains the top priority
       // for users running VS Code under Claude Code's CLI; VSCODE_CWD is the

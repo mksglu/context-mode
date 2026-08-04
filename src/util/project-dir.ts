@@ -68,6 +68,23 @@ export function isPluginInstallPath(p: string): boolean {
 }
 
 /**
+ * Detect whether a path is VS Code's own application install directory
+ * rather than a real workspace folder.
+ *
+ * VS Code exports its launch cwd as VSCODE_CWD to spawned children. When the
+ * UI is launched from a shortcut and the workspace is remote, that cwd can
+ * be the local VS Code installation directory rather than the remote project.
+ */
+export function isVSCodeInstallPath(p: string): boolean {
+  if (!p) return false;
+  return (
+    /[/\\]Microsoft VS Code(?: - Insiders)?(?:[/\\]|$)/i.test(p) ||
+    /[/\\]Visual Studio Code(?: - Insiders)?(?:\.app)?(?:[/\\]|$)/i.test(p) ||
+    /[/\\](?:usr[/\\]share|opt)[/\\]code(?:-insiders)?(?:[/\\]|$)/i.test(p)
+  );
+}
+
+/**
  * Read the per-session project dir from Claude Code's transcript files.
  *
  * Claude Code writes session transcripts under

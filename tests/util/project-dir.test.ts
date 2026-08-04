@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   isPluginInstallPath,
+  isVSCodeInstallPath,
   resolveProjectDir,
   resolveProjectDirFromTranscript,
 } from "../../src/util/project-dir.js";
@@ -94,6 +95,30 @@ describe("isPluginInstallPath", () => {
   it("returns false for empty / null-ish inputs", () => {
     expect(isPluginInstallPath("")).toBe(false);
     expect(isPluginInstallPath("/")).toBe(false);
+  });
+});
+
+describe("isVSCodeInstallPath", () => {
+  it("matches Windows stable and Insiders install paths", () => {
+    expect(isVSCodeInstallPath("C:\\Users\\{userName}\\AppData\\Local\\Programs\\Microsoft VS Code")).toBe(true);
+    expect(isVSCodeInstallPath("C:\\Users\\{userName}\\AppData\\Local\\Programs\\Microsoft VS Code - Insiders")).toBe(true);
+  });
+
+  it("matches macOS app bundles", () => {
+    expect(isVSCodeInstallPath("/Applications/Visual Studio Code.app/Contents/Resources/app")).toBe(true);
+    expect(isVSCodeInstallPath("/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app")).toBe(true);
+  });
+
+  it("matches Linux stable and Insiders install paths", () => {
+    expect(isVSCodeInstallPath("/usr/share/code")).toBe(true);
+    expect(isVSCodeInstallPath("/usr/share/code-insiders")).toBe(true);
+    expect(isVSCodeInstallPath("/opt/code")).toBe(true);
+    expect(isVSCodeInstallPath("/opt/code-insiders")).toBe(true);
+  });
+
+  it("does not match an ordinary project containing code as a substring", () => {
+    expect(isVSCodeInstallPath("/home/{userName}/source/code-project")).toBe(false);
+    expect(isVSCodeInstallPath("C:\\Users\\{userName}\\workspace\\vscode-tools")).toBe(false);
   });
 });
 
