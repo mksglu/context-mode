@@ -12,6 +12,13 @@
  */
 
 import { describe, test, beforeEach, afterEach, expect, vi } from "vitest";
+
+const activeDBs: Array<{ close?: () => void }> = [];
+afterEach(() => {
+  for (const db of activeDBs) { try { db.close?.(); } catch {} }
+  activeDBs.length = 0;
+});
+
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -132,6 +139,7 @@ describe("seed-parity coverage gate", () => {
 
   test("every outgoing event carries all 21 universal seed-parity columns", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sessionId = "parity-session-" + Date.now();
     db.ensureSession(sessionId, fakeHome);
 
@@ -181,6 +189,7 @@ describe("seed-parity coverage gate", () => {
 
   test("variant columns populate by category", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sessionId = "parity-variants-" + Date.now();
     db.ensureSession(sessionId, fakeHome);
 
@@ -224,6 +233,7 @@ describe("seed-parity coverage gate", () => {
 
   test("rollup snapshot reflects session-wide aggregates", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sessionId = "parity-rollup-" + Date.now();
     db.ensureSession(sessionId, fakeHome);
 
@@ -263,6 +273,7 @@ describe("seed-parity coverage gate", () => {
 
   test("Bash metadata: command_type/command_tool/exit_code derived algorithmically", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sid = "bash-meta-" + Date.now();
     db.ensureSession(sid, fakeHome);
 
@@ -301,6 +312,7 @@ describe("seed-parity coverage gate", () => {
 
   test("blocker_status: derived from canonical event type, not regex", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sid = "blocker-" + Date.now();
     db.ensureSession(sid, fakeHome);
 
@@ -328,6 +340,7 @@ describe("seed-parity coverage gate", () => {
 
   test("latency_ms: read from PreToolUse marker, duration_bucket derived", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sid = "latency-" + Date.now();
     db.ensureSession(sid, fakeHome);
 
@@ -358,6 +371,7 @@ describe("seed-parity coverage gate", () => {
 
   test("variant matrix — coverage report", async () => {
     const db = new SessionDB({ dbPath });
+      activeDBs.push(db as any);
     const sessionId = "parity-matrix-" + Date.now();
     db.ensureSession(sessionId, fakeHome);
 

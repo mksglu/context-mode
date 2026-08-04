@@ -20,6 +20,13 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
+const activeDBs: Array<{ close?: () => void }> = [];
+afterEach(() => {
+  for (const db of activeDBs) { try { db.close?.(); } catch {} }
+  activeDBs.length = 0;
+});
+
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -206,6 +213,7 @@ describe("OMP plugin", () => {
           sessionsDir: adapter.getSessionDir(),
         }),
       });
+      activeDBs.push(db as any);
       const latest = db.getLatestSessionId();
       expect(latest).not.toBeNull();
       const events = db.getEvents(latest as string);
@@ -252,6 +260,7 @@ describe("OMP plugin", () => {
           sessionsDir: adapter.getSessionDir(),
         }),
       });
+      activeDBs.push(db as any);
       const latest = db.getLatestSessionId();
       expect(latest).not.toBeNull();
     });
@@ -309,6 +318,7 @@ describe("OMP plugin", () => {
           sessionsDir: adapter.getSessionDir(),
         }),
       });
+      activeDBs.push(db as any);
       const resume = db.getResume(sid);
       expect(resume).not.toBeNull();
       expect(resume?.snapshot.length).toBeGreaterThan(0);
@@ -357,7 +367,10 @@ describe("OMP plugin", () => {
         expect(fileExists(canonicalPath)).toBe(true);
 
         // Verify the canonical file is the one with our session_start row.
-        const db = new SessionDB({ dbPath: canonicalPath });
+        const db = new SessionDB({ dbPath:   canonicalPath   });
+      activeDBs.push(db as any);
+      activeDBs.push(db as any);
+      activeDBs.push(db as any);
         try {
           const latest = db.getLatestSessionId();
           expect(latest).not.toBeNull();

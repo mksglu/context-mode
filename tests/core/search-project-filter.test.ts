@@ -17,7 +17,7 @@
  *            null (no filter), explicit string → that string.
  */
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -25,12 +25,24 @@ import { ContentStore } from "../../src/store.js";
 import { SessionDB } from "../../src/session/db.js";
 import { searchAllSources } from "../../src/search/unified.js";
 
+const activeDBs: Array<{ close?: () => void, cleanup?: () => void }> = [];
+
+afterEach(() => {
+  for (const db of activeDBs) {
+    try { db.cleanup?.(); } catch {}
+    try { db.close?.(); } catch {}
+  }
+  activeDBs.length = 0;
+});
+
 function createStore(): ContentStore {
   const path = join(
     tmpdir(),
     `ctx-issue737-store-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
   );
-  return new ContentStore(path);
+  const store = new ContentStore(path);
+  activeDBs.push(store as any);
+  return store;
 }
 
 function createSessionDB(): SessionDB {
@@ -38,7 +50,9 @@ function createSessionDB(): SessionDB {
     tmpdir(),
     `ctx-issue737-session-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
   );
-  return new SessionDB({ dbPath: path });
+  const db = new SessionDB({ dbPath: path });
+  activeDBs.push(db as any);
+  return db;
 }
 
 // ═══════════════════════════════════════════════════════════
