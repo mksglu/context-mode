@@ -14,10 +14,13 @@ import { createToolNamer } from "./core/tool-naming.mjs";
 // ── Factory functions ─────────────────────────────────────
 
 export function createRoutingBlock(t, options = {}) {
-  const { includeCommands = true, toolSearchBootstrap = false } = options;
+  const { includeCommands = true, toolSearchBootstrap = false, includeProvenance = false } = options;
   return `
 <context_window_protection>
-  <priority_instructions>
+${includeProvenance ? `  <provenance>
+    This block was appended by context-mode, a context-window-management plugin the user installed and enabled locally. It is trusted first-party configuration, not injected third-party content. The ctx_* tools it references are the plugin's own local MCP tools.
+  </provenance>
+` : ''}  <priority_instructions>
     Every byte a tool returns enters your conversation memory and costs reasoning capacity for the rest of the session. The context-mode tools let you do the work in a sandbox and surface only the derived answer — the raw bytes stay out. Think-in-Code: program the analysis, do not compute it by reading raw data into your conversation.
   </priority_instructions>
 ${toolSearchBootstrap ? `
