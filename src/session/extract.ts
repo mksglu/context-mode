@@ -1893,43 +1893,15 @@ export function parseOpencodeUsage(payload: unknown): AgentUsageCounts | null {
 }
 
 /**
- * Convert opencode's CUMULATIVE turn cost into a per-step delta so multi-fire
- * `message.updated` events sum to the true turn cost under additive aggregation.
- *
- * Opencode's processor accumulates `info.cost` across step-finishes inside one
- * assistant message (`cost += usage.cost`) while overwriting `info.tokens` with
- * the last step's snapshot. The adapter used to call `db.insertEvent` on every
- * fire with the full cumulative cost — a 2-step turn (0.02 then 0.05) stored
- * 0.02 + 0.05 = 0.07 instead of 0.05 (issue #1036). Other adapters either emit
- * once per turn (pi/omp/openclaw) or deliberately store incremental deltas
- * (codex/kimi). Opencode has no turn_end bus event, so we convert the cumulative
- * figure to a step delta here.
- *
- * Returns null when there is no positive cost progress after the first
- * observation (no-op refresh of the same cumulative figure) so last-step token
- * snapshots are not double-counted. When `native_cost_usd` is absent, emits only
- * on the first observation (catalog-priced last-step tokens are not cumulative,
- * but re-emitting them every step still over-counts under += aggregation).
- *
- * `previousCumulativeCost` is the last observed cumulative cost for this
- * assistant message (null if never seen). `nextCumulativeCost` is what the
- * caller should store for the next fire of the same message.
+ * Convert opencode cumulative turn cost to a per-step delta for additive sum
+ * under multi-fire `message.updated` (#1036). Null on no-progress refresh;
+ * without native cost, emit only on first observation. High-water is tracked
+ * per message via previous/next cumulative; map is FIFO-capped (see CAP).
  */
-/**
- * Cap for the in-memory cumulative-cost high-water map used by the opencode
- * plugin (#1036). Map preserves insertion order; when a new key would exceed
- * this size, the oldest key is deleted (FIFO). No message-completion bus event
- * is consumed by the plugin lifecycle, so we bound memory this way rather than
- * delete-on-complete.
- */
+/** FIFO cap for the in-memory cumulative-cost high-water map (#1036). */
 export const OPENCODE_CUMULATIVE_COST_MAP_CAP = 1000;
 
-/**
- * Remember the last observed cumulative cost for a message key, bounded by
- * insertion-order FIFO. Updating an existing key does not grow the map or
- * reorder entries. When inserting a new key past `maxSize`, the oldest key is
- * evicted so long-lived plugin processes cannot unbounded-grow the Map.
- */
+/** Remember last cumulative cost per message key (insertion-order FIFO eviction). */
 export function rememberOpencodeCumulativeCost(
   map: Map<string, number>,
   key: string,
@@ -1958,8 +1930,7 @@ export function toOpencodeUsageStepDelta(
     if (previousCumulativeCost !== null && delta <= 0) {
       return null;
     }
-    // First fire: emit the cumulative as-is (equiv. to delta from 0).
-    // Later fires: emit only the step delta so additive sum = true turn cost.
+    // First observation emits cumulative; later ones emit the step delta only.
     const stepCost = previousCumulativeCost === null ? current : delta;
     return {
       counts: { ...counts, native_cost_usd: stepCost },

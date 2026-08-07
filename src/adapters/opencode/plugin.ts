@@ -557,26 +557,11 @@ async function createContextModePlugin(ctx: PluginContext) {
     },
 
     // ── event: per-turn token + cost capture (paid-observability) ───
-    // The generic bus `event` hook (refs/platforms/opencode/packages/plugin/
-    // src/index.ts:224) delivers every Event; we filter `message.updated`
-    // (published on each assistant-message update incl. step-finish —
-    // session.ts:673) and read tokens/cost/modelID off properties.info
-    // (assistant filter via role; refs stream.transport.ts:214-216).
-    //
-    // CAVEAT (refs processor.ts:717-718): message-level `.tokens` is the LAST
-    // step's snapshot (overwritten per step-finish), while `.cost` is
-    // cumulative for the turn. parseOpencodeUsage passes `.cost` through as
-    // native_cost_usd. Because `message.updated` fires once per step-finish
-    // and `db.insertEvent` always APPENDs (there is no cost-column upsert),
-    // re-emitting the cumulative figure over-counts under additive aggregation
-    // (issue #1036: 0.02 then 0.05 stored as 0.07). We convert to a per-step
-    // delta via toOpencodeUsageStepDelta — same incremental shape codex/kimi
-    // use — so summing rows yields the true turn cost. Last-step token
-    // snapshots remain best-effort per-step telemetry (sum ≈ turn total).
-    // db.insertEvent both persists locally AND forwards to the platform (the
-    // TS-plugin equivalent of the .mjs attributeAndInsertEvents path).
-    // lastCumulativeCostByMessage (declared above) tracks per-message cumulative
-    // high-water so step deltas sum to the true turn cost.
+    // Filter bus `message.updated` (fires per step-finish). Opencode `.cost`
+    // is cumulative for the turn while `.tokens` is last-step; re-emitting the
+    // cumulative figure over-counts under additive aggregation (#1036). Convert
+    // via toOpencodeUsageStepDelta so summed rows equal the true turn cost.
+    // lastCumulativeCostByMessage tracks per-message high-water (FIFO-capped).
     event: async (input: EventHookInput) => {
       try {
         const ev = input?.event;

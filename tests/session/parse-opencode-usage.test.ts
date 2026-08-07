@@ -174,11 +174,7 @@ describe("parseOpencodeUsage", () => {
 });
 
 /**
- * #1036 — multi-step turn over-count: message.updated fires once per step-finish
- * with CUMULATIVE cost. Without a step-delta conversion, two inserts (0.02 then
- * 0.05) sum to 0.07 under additive aggregation instead of the true turn cost 0.05.
- * PoC shape from the issue comment (re-derived; not pasted): parse → delta → build
- * for each step, assert summed cost_usd === final cumulative.
+ * #1036 — multi-step cumulative cost must become deltas that sum to the final cost.
  */
 describe("toOpencodeUsageStepDelta (#1036 cumulative multi-step)", () => {
   it("converts a 2-step cumulative turn (0.02 then 0.05) into deltas that sum to 0.05", () => {
