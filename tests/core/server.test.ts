@@ -3830,17 +3830,56 @@ import { buildFetchCode } from "../../src/server.js";
 describe("buildFetchCode — embedded SSRF guard contract", () => {
   const generated = buildFetchCode("https://example.com/x", "/tmp/x");
 
-  test("strips proxy env vars (HTTP_PROXY / HTTPS_PROXY / ALL_PROXY)", () => {
+  test("strips proxy env vars (HTTP_PROXY / HTTPS_PROXY / ALL_PROXY) by default (#476 pinning)", () => {
     // A configured outbound proxy would route fetch through an arbitrary
     // target; DNS resolution would happen at the proxy and the in-subprocess
-    // DNS guard would never see the rebound IP. The generated subprocess
-    // source must delete every proxy env var before any fetch can run.
-    expect(generated).toMatch(/delete process\.env\.HTTP_PROXY/);
-    expect(generated).toMatch(/delete process\.env\.HTTPS_PROXY/);
-    expect(generated).toMatch(/delete process\.env\.ALL_PROXY/);
-    expect(generated).toMatch(/delete process\.env\.http_proxy/);
-    expect(generated).toMatch(/delete process\.env\.https_proxy/);
-    expect(generated).toMatch(/delete process\.env\.all_proxy/);
+    // DNS guard would never see the rebound IP. Default must delete every
+    // proxy env var before any fetch can run (CWE-918/441 control from #476).
+    const prev = process.env.CTX_FETCH_ALLOW_PROXY;
+    delete process.env.CTX_FETCH_ALLOW_PROXY;
+    try {
+      const src = buildFetchCode("https://example.com/x", "/tmp/x");
+      expect(src).toMatch(/delete process\.env\.HTTP_PROXY/);
+      expect(src).toMatch(/delete process\.env\.HTTPS_PROXY/);
+      expect(src).toMatch(/delete process\.env\.ALL_PROXY/);
+      expect(src).toMatch(/delete process\.env\.http_proxy/);
+      expect(src).toMatch(/delete process\.env\.https_proxy/);
+      expect(src).toMatch(/delete process\.env\.all_proxy/);
+      expect(src).toMatch(/delete process\.env\.npm_config_proxy/);
+      expect(src).toMatch(/delete process\.env\.npm_config_https_proxy/);
+    } finally {
+      if (prev === undefined) delete process.env.CTX_FETCH_ALLOW_PROXY;
+      else process.env.CTX_FETCH_ALLOW_PROXY = prev;
+    }
+  });
+
+  test("preserves proxy env vars when CTX_FETCH_ALLOW_PROXY=1 (#1039 opt-in)", () => {
+    // Corporate/audited networks need operator-consented proxy egress.
+    // With CTX_FETCH_ALLOW_PROXY=1 the generated subprocess must NOT
+    // delete proxy env vars — undici EnvHttpProxyAgent honors them.
+    // Parent ssrfGuard still pre-flights; connect-time DNS patches cover
+    // the no-proxy case only.
+    const prev = process.env.CTX_FETCH_ALLOW_PROXY;
+    process.env.CTX_FETCH_ALLOW_PROXY = "1";
+    try {
+      const src = buildFetchCode("https://example.com/x", "/tmp/x");
+      expect(src).not.toMatch(/delete process\.env\.HTTP_PROXY/);
+      expect(src).not.toMatch(/delete process\.env\.HTTPS_PROXY/);
+      expect(src).not.toMatch(/delete process\.env\.ALL_PROXY/);
+      expect(src).not.toMatch(/delete process\.env\.http_proxy/);
+      expect(src).not.toMatch(/delete process\.env\.https_proxy/);
+      expect(src).not.toMatch(/delete process\.env\.all_proxy/);
+      expect(src).not.toMatch(/delete process\.env\.npm_config_proxy/);
+      expect(src).not.toMatch(/delete process\.env\.npm_config_https_proxy/);
+      expect(src).not.toMatch(/delete process\.env\[[^\]]*PROXY/i);
+      expect(src).not.toMatch(
+        /process\.env\.(HTTP|HTTPS|ALL)_?PROXY\s*=\s*(undefined|null|['"]{2})/i,
+      );
+      expect(src).toMatch(/CTX_FETCH_ALLOW_PROXY=1/);
+    } finally {
+      if (prev === undefined) delete process.env.CTX_FETCH_ALLOW_PROXY;
+      else process.env.CTX_FETCH_ALLOW_PROXY = prev;
+    }
   });
 
   test("embedded SSRF classifier is callable as `classifyIp` even when bundler renames the export (#bug-v1.0.133)", () => {
