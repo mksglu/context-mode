@@ -1591,6 +1591,18 @@ export CTX_FETCH_STRICT=1
 
 That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. Useful when context-mode runs as a shared service, not on a developer's own machine.
 
+#### Corporate proxies
+
+The fetch subprocess strips `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` (both cases) and the `npm_config_*_proxy` pair before it runs, because a proxy resolves DNS on its own side and the in-subprocess rebinding check above would never see the address it actually connected to.
+
+If you need to egress through a proxy, opt out explicitly:
+
+```bash
+export CTX_FETCH_ALLOW_PROXY=1
+```
+
+Only the exact value `1` enables it. **Read the trade-off before setting it:** with the proxy in place the target's IP is resolved at the proxy, so the in-subprocess DNS-rebinding defense no longer applies to that fetch. The scheme and metadata-IP checks on the requested URL still run in the parent, and every other guard on this page still applies — but the rebinding defense specifically does not.
+
 `tool_input` for any `mcp__*` tool call is also redacted before persistence — the regex matcher in `hooks/posttooluse.mjs` masks `authorization`, `auth_token`, `access_token`, `refresh_token`, `bearer`, `token`, `secret`, `password`, `passwd`, `pwd`, `api_key` / `apikey` / `x_api_key`, `cookie` / `set-cookie`, `signature`, `private_key`, and `client_secret` (case-insensitive, hyphen/underscore-insensitive) to `[REDACTED]` so credentials in MCP arguments don't end up in the session DB.
 
 ### Storage environment variables
