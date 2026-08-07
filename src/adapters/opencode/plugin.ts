@@ -32,6 +32,7 @@ import {
   parseOpencodeUsage,
   buildAgentUsageEvent,
   toOpencodeUsageStepDelta,
+  rememberOpencodeCumulativeCost,
 } from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
 import { buildResumeSnapshot } from "../../session/snapshot.js";
@@ -325,6 +326,9 @@ async function createContextModePlugin(ctx: PluginContext) {
   // Per-assistant-message high-water for opencode cumulative cost → step delta
   // (issue #1036). Key: `${sessionId}:${messageId}` (or sessionId alone when
   // info.id is absent). Value: last observed cumulative `info.cost`.
+  // Bounded via rememberOpencodeCumulativeCost (insertion-order FIFO ~1000);
+  // the plugin lifecycle only consumes `message.updated` (no completion event
+  // to delete-on-finish).
   const lastCumulativeCostByMessage = new Map<string, number>();
 
   /**
@@ -593,7 +597,11 @@ async function createContextModePlugin(ctx: PluginContext) {
         const stepped = toOpencodeUsageStepDelta(counts, prev);
         if (!stepped) return;
         if (typeof stepped.nextCumulativeCost === "number") {
-          lastCumulativeCostByMessage.set(messageKey, stepped.nextCumulativeCost);
+          rememberOpencodeCumulativeCost(
+            lastCumulativeCostByMessage,
+            messageKey,
+            stepped.nextCumulativeCost,
+          );
         }
 
         const usageEvent = buildAgentUsageEvent(stepped.counts);

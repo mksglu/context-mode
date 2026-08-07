@@ -25,6 +25,8 @@ import {
   parseOpencodeUsage,
   buildAgentUsageEvent,
   toOpencodeUsageStepDelta,
+  rememberOpencodeCumulativeCost,
+  OPENCODE_CUMULATIVE_COST_MAP_CAP,
 } from "../../src/session/extract.js";
 
 /** Minimal opencode `message.updated` bus-event fixture. */
@@ -239,5 +241,51 @@ describe("toOpencodeUsageStepDelta (#1036 cumulative multi-step)", () => {
     expect(d1).not.toBeNull();
     const d2 = toOpencodeUsageStepDelta(b!, d1!.nextCumulativeCost);
     expect(d2).toBeNull();
+  });
+});
+
+/**
+ * #1036 follow-up — bound lastCumulativeCostByMessage so a long-lived plugin
+ * process cannot unbounded-grow the in-memory Map. Plugin lifecycle has no
+ * message-completion event to delete-on-finish; insertion-order FIFO cap.
+ */
+describe("rememberOpencodeCumulativeCost (#1036 map eviction)", () => {
+  it("evicts the oldest key when inserting past maxSize (insertion-order FIFO)", () => {
+    const map = new Map<string, number>();
+    const maxSize = 3;
+    rememberOpencodeCumulativeCost(map, "a", 0.01, maxSize);
+    rememberOpencodeCumulativeCost(map, "b", 0.02, maxSize);
+    rememberOpencodeCumulativeCost(map, "c", 0.03, maxSize);
+    expect(map.size).toBe(3);
+    expect([...map.keys()]).toEqual(["a", "b", "c"]);
+
+    rememberOpencodeCumulativeCost(map, "d", 0.04, maxSize);
+    expect(map.size).toBe(3);
+    expect(map.has("a")).toBe(false);
+    expect([...map.keys()]).toEqual(["b", "c", "d"]);
+    expect(map.get("d")).toBe(0.04);
+  });
+
+  it("updating an existing key does not grow the map or evict others", () => {
+    const map = new Map<string, number>();
+    const maxSize = 2;
+    rememberOpencodeCumulativeCost(map, "a", 0.01, maxSize);
+    rememberOpencodeCumulativeCost(map, "b", 0.02, maxSize);
+    rememberOpencodeCumulativeCost(map, "a", 0.05, maxSize);
+    expect(map.size).toBe(2);
+    expect(map.get("a")).toBe(0.05);
+    expect(map.has("b")).toBe(true);
+  });
+
+  it(`defaults maxSize to OPENCODE_CUMULATIVE_COST_MAP_CAP (${OPENCODE_CUMULATIVE_COST_MAP_CAP})`, () => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < OPENCODE_CUMULATIVE_COST_MAP_CAP; i++) {
+      rememberOpencodeCumulativeCost(map, `k${i}`, i);
+    }
+    expect(map.size).toBe(OPENCODE_CUMULATIVE_COST_MAP_CAP);
+    rememberOpencodeCumulativeCost(map, "overflow", 1);
+    expect(map.size).toBe(OPENCODE_CUMULATIVE_COST_MAP_CAP);
+    expect(map.has("k0")).toBe(false);
+    expect(map.has("overflow")).toBe(true);
   });
 });

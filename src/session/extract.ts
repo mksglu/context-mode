@@ -1915,6 +1915,34 @@ export function parseOpencodeUsage(payload: unknown): AgentUsageCounts | null {
  * assistant message (null if never seen). `nextCumulativeCost` is what the
  * caller should store for the next fire of the same message.
  */
+/**
+ * Cap for the in-memory cumulative-cost high-water map used by the opencode
+ * plugin (#1036). Map preserves insertion order; when a new key would exceed
+ * this size, the oldest key is deleted (FIFO). No message-completion bus event
+ * is consumed by the plugin lifecycle, so we bound memory this way rather than
+ * delete-on-complete.
+ */
+export const OPENCODE_CUMULATIVE_COST_MAP_CAP = 1000;
+
+/**
+ * Remember the last observed cumulative cost for a message key, bounded by
+ * insertion-order FIFO. Updating an existing key does not grow the map or
+ * reorder entries. When inserting a new key past `maxSize`, the oldest key is
+ * evicted so long-lived plugin processes cannot unbounded-grow the Map.
+ */
+export function rememberOpencodeCumulativeCost(
+  map: Map<string, number>,
+  key: string,
+  cost: number,
+  maxSize: number = OPENCODE_CUMULATIVE_COST_MAP_CAP,
+): void {
+  if (!map.has(key) && map.size >= maxSize) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, cost);
+}
+
 export function toOpencodeUsageStepDelta(
   counts: AgentUsageCounts,
   previousCumulativeCost: number | null,
