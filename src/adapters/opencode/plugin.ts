@@ -26,7 +26,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
-import { extractEvents, extractUserEvents, parseOpencodeUsage, buildAgentUsageEvent } from "../../session/extract.js";
+import {
+  extractEvents,
+  extractUserEvents,
+  parseOpencodeUsage,
+  buildAgentUsageEvent,
+  toOpencodeUsageStepDelta,
+} from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
 import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
@@ -316,6 +322,11 @@ async function createContextModePlugin(ctx: PluginContext) {
   // lived plugin process still gets per-session capture exactly once.
   const agentsMdCaptured = new Set<string>();
 
+  // Per-assistant-message high-water for opencode cumulative cost → step delta
+  // (issue #1036). Key: `${sessionId}:${messageId}` (or sessionId alone when
+  // info.id is absent). Value: last observed cumulative `info.cost`.
+  const lastCumulativeCostByMessage = new Map<string, number>();
+
   /**
    * OC-4: Read AGENTS.md (with CLAUDE.md / CONTEXT.md fallbacks) from the
    * project directory and persist as `rule` + `rule_content` events. Mirrors
@@ -551,24 +562,41 @@ async function createContextModePlugin(ctx: PluginContext) {
     // CAVEAT (refs processor.ts:717-718): message-level `.tokens` is the LAST
     // step's snapshot (overwritten per step-finish), while `.cost` is
     // cumulative for the turn. parseOpencodeUsage passes `.cost` through as
-    // native_cost_usd so the billed $ stays exact despite the token snapshot
-    // being last-step only. `message.updated` fires multiple times per turn;
-    // because tokens are a terminal snapshot and cost is cumulative, the last
-    // event for a message carries the final figures — re-emitting on each
-    // update is idempotent at the cost column and merely refreshes the
-    // last-step token telemetry. db.insertEvent both persists locally AND
-    // forwards to the platform (the TS-plugin equivalent of the .mjs
-    // attributeAndInsertEvents path).
+    // native_cost_usd. Because `message.updated` fires once per step-finish
+    // and `db.insertEvent` always APPENDs (there is no cost-column upsert),
+    // re-emitting the cumulative figure over-counts under additive aggregation
+    // (issue #1036: 0.02 then 0.05 stored as 0.07). We convert to a per-step
+    // delta via toOpencodeUsageStepDelta — same incremental shape codex/kimi
+    // use — so summing rows yields the true turn cost. Last-step token
+    // snapshots remain best-effort per-step telemetry (sum ≈ turn total).
+    // db.insertEvent both persists locally AND forwards to the platform (the
+    // TS-plugin equivalent of the .mjs attributeAndInsertEvents path).
+    // lastCumulativeCostByMessage (declared above) tracks per-message cumulative
+    // high-water so step deltas sum to the true turn cost.
     event: async (input: EventHookInput) => {
       try {
         const ev = input?.event;
         if (!ev || ev.type !== "message.updated") return;
-        const sessionId = ev.properties?.info?.sessionID;
+        const info = ev.properties?.info;
+        const sessionId = info?.sessionID;
         if (!sessionId || typeof sessionId !== "string") return;
 
         const counts = parseOpencodeUsage(ev);
         if (!counts) return;
-        const usageEvent = buildAgentUsageEvent(counts);
+
+        const messageId = typeof info?.id === "string" && info.id.length > 0 ? info.id : "";
+        const messageKey = messageId.length > 0 ? `${sessionId}:${messageId}` : sessionId;
+        const prev =
+          lastCumulativeCostByMessage.has(messageKey)
+            ? (lastCumulativeCostByMessage.get(messageKey) as number)
+            : null;
+        const stepped = toOpencodeUsageStepDelta(counts, prev);
+        if (!stepped) return;
+        if (typeof stepped.nextCumulativeCost === "number") {
+          lastCumulativeCostByMessage.set(messageKey, stepped.nextCumulativeCost);
+        }
+
+        const usageEvent = buildAgentUsageEvent(stepped.counts);
         if (!usageEvent) return;
 
         db.ensureSession(sessionId, projectDir);

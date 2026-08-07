@@ -24,6 +24,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseOpencodeUsage,
   buildAgentUsageEvent,
+  toOpencodeUsageStepDelta,
 } from "../../src/session/extract.js";
 
 /** Minimal opencode `message.updated` bus-event fixture. */
@@ -167,5 +168,76 @@ describe("parseOpencodeUsage", () => {
     expect(event?.cache_creation_tokens).toBe(80);
     expect(event?.model_id).toBe("anthropic/claude-sonnet-4");
     expect(event?.data).toContain("cost_usd:");
+  });
+});
+
+/**
+ * #1036 — multi-step turn over-count: message.updated fires once per step-finish
+ * with CUMULATIVE cost. Without a step-delta conversion, two inserts (0.02 then
+ * 0.05) sum to 0.07 under additive aggregation instead of the true turn cost 0.05.
+ * PoC shape from the issue comment (re-derived; not pasted): parse → delta → build
+ * for each step, assert summed cost_usd === final cumulative.
+ */
+describe("toOpencodeUsageStepDelta (#1036 cumulative multi-step)", () => {
+  it("converts a 2-step cumulative turn (0.02 then 0.05) into deltas that sum to 0.05", () => {
+    const step1 = parseOpencodeUsage(
+      busEvent({
+        cost: 0.02,
+        tokens: { input: 100, output: 20, cache: { read: 0, write: 0 } },
+      }),
+    );
+    const step2 = parseOpencodeUsage(
+      busEvent({
+        cost: 0.05,
+        tokens: { input: 200, output: 40, cache: { read: 0, write: 0 } },
+      }),
+    );
+    expect(step1).not.toBeNull();
+    expect(step2).not.toBeNull();
+
+    // Without delta: naive sum of native costs over-counts (the bug).
+    expect((step1!.native_cost_usd ?? 0) + (step2!.native_cost_usd ?? 0)).toBeCloseTo(0.07, 10);
+
+    const d1 = toOpencodeUsageStepDelta(step1!, null);
+    expect(d1).not.toBeNull();
+    expect(d1!.counts.native_cost_usd).toBeCloseTo(0.02, 10);
+    expect(d1!.nextCumulativeCost).toBeCloseTo(0.02, 10);
+
+    const d2 = toOpencodeUsageStepDelta(step2!, d1!.nextCumulativeCost);
+    expect(d2).not.toBeNull();
+    expect(d2!.counts.native_cost_usd).toBeCloseTo(0.03, 10);
+    expect(d2!.nextCumulativeCost).toBeCloseTo(0.05, 10);
+
+    const e1 = buildAgentUsageEvent(d1!.counts);
+    const e2 = buildAgentUsageEvent(d2!.counts);
+    expect(e1?.cost_usd).toBeCloseTo(0.02, 10);
+    expect(e2?.cost_usd).toBeCloseTo(0.03, 10);
+    // Additive aggregation across step rows equals the true turn cost.
+    expect((e1!.cost_usd ?? 0) + (e2!.cost_usd ?? 0)).toBeCloseTo(0.05, 10);
+  });
+
+  it("skips a no-op refresh when cumulative cost does not advance", () => {
+    const first = parseOpencodeUsage(busEvent({ cost: 0.05 }));
+    const same = parseOpencodeUsage(busEvent({ cost: 0.05 }));
+    expect(first).not.toBeNull();
+    expect(same).not.toBeNull();
+
+    const d1 = toOpencodeUsageStepDelta(first!, null);
+    expect(d1).not.toBeNull();
+    const d2 = toOpencodeUsageStepDelta(same!, d1!.nextCumulativeCost);
+    expect(d2).toBeNull();
+  });
+
+  it("emits catalog-priced rows only once when native cost is absent", () => {
+    const a = parseOpencodeUsage(busEvent({ cost: undefined }));
+    const b = parseOpencodeUsage(busEvent({ cost: undefined }));
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a!.native_cost_usd).toBeNull();
+
+    const d1 = toOpencodeUsageStepDelta(a!, null);
+    expect(d1).not.toBeNull();
+    const d2 = toOpencodeUsageStepDelta(b!, d1!.nextCumulativeCost);
+    expect(d2).toBeNull();
   });
 });

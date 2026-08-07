@@ -1893,6 +1893,64 @@ export function parseOpencodeUsage(payload: unknown): AgentUsageCounts | null {
 }
 
 /**
+ * Convert opencode's CUMULATIVE turn cost into a per-step delta so multi-fire
+ * `message.updated` events sum to the true turn cost under additive aggregation.
+ *
+ * Opencode's processor accumulates `info.cost` across step-finishes inside one
+ * assistant message (`cost += usage.cost`) while overwriting `info.tokens` with
+ * the last step's snapshot. The adapter used to call `db.insertEvent` on every
+ * fire with the full cumulative cost — a 2-step turn (0.02 then 0.05) stored
+ * 0.02 + 0.05 = 0.07 instead of 0.05 (issue #1036). Other adapters either emit
+ * once per turn (pi/omp/openclaw) or deliberately store incremental deltas
+ * (codex/kimi). Opencode has no turn_end bus event, so we convert the cumulative
+ * figure to a step delta here.
+ *
+ * Returns null when there is no positive cost progress after the first
+ * observation (no-op refresh of the same cumulative figure) so last-step token
+ * snapshots are not double-counted. When `native_cost_usd` is absent, emits only
+ * on the first observation (catalog-priced last-step tokens are not cumulative,
+ * but re-emitting them every step still over-counts under += aggregation).
+ *
+ * `previousCumulativeCost` is the last observed cumulative cost for this
+ * assistant message (null if never seen). `nextCumulativeCost` is what the
+ * caller should store for the next fire of the same message.
+ */
+export function toOpencodeUsageStepDelta(
+  counts: AgentUsageCounts,
+  previousCumulativeCost: number | null,
+): { counts: AgentUsageCounts; nextCumulativeCost: number | null } | null {
+  const current = counts.native_cost_usd;
+  if (typeof current === "number" && Number.isFinite(current)) {
+    const prev =
+      typeof previousCumulativeCost === "number" && Number.isFinite(previousCumulativeCost)
+        ? previousCumulativeCost
+        : 0;
+    const delta = current - prev;
+    // Same (or lower) cumulative after we've already emitted → no-op refresh.
+    if (previousCumulativeCost !== null && delta <= 0) {
+      return null;
+    }
+    // First fire: emit the cumulative as-is (equiv. to delta from 0).
+    // Later fires: emit only the step delta so additive sum = true turn cost.
+    const stepCost = previousCumulativeCost === null ? current : delta;
+    return {
+      counts: { ...counts, native_cost_usd: stepCost },
+      nextCumulativeCost: current,
+    };
+  }
+
+  // No native cost → emit once per message (first observation only).
+  if (previousCumulativeCost !== null) {
+    return null;
+  }
+  return {
+    counts,
+    // Sentinel "seen" marker so subsequent fires without native cost are skipped.
+    nextCumulativeCost: 0,
+  };
+}
+
+/**
  * Build a structured `agent_usage` event from summed per-model token counts.
  * Emits the colon-string `data` (human/debug + back-compat) AND the structured
  * top-level fields the forward envelope spreads to the platform. cost_usd via
