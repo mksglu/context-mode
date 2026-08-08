@@ -271,6 +271,21 @@ export const formatters = {
       agent_message: additionalContext,
     }),
   },
+
+  "mistral-vibe": {
+    deny: (reason) => ({
+      decision: "deny",
+      reason: reason ?? "Blocked by context-mode hook",
+    }),
+    ask: () => null,
+    modify: (updatedInput) => ({
+      hook_specific_output: { tool_input: updatedInput ?? {} },
+      system_message: "context-mode: routed to sandbox",
+    }),
+    context: (additionalContext) => ({
+      system_message: `context-mode: ${additionalContext}`,
+    }),
+  },
 };
 
 // Keep in sync with the identical agyContextReason in

@@ -771,6 +771,72 @@ Full documentation: [`docs/adapters/kimi-code.md`](docs/adapters/kimi-code.md)
 </details>
 
 <details>
+<summary><strong>Mistral Vibe</strong> — MCP + hooks (TOML config, native <code>[[hooks]]</code> array tables)</summary>
+
+**Prerequisites:** Python 3.12+, [Mistral Vibe](https://github.com/mistralai/mistral-vibe) installed (`uv tool install mistral-vibe`), Node.js >= 22.5 (or Bun).
+
+1. Install context-mode:
+
+   ```bash
+   npm install -g context-mode
+   ```
+
+2. Add context-mode as an MCP server. Add to `~/.vibe/config.toml` (or `$VIBE_HOME/config.toml`):
+
+   ```toml
+   [[mcp_servers]]
+   name = "context-mode"
+   transport = "stdio"
+   command = "context-mode"
+   ```
+
+3. Add hooks to `~/.vibe/hooks.toml` (or `$VIBE_HOME/hooks.toml`):
+
+   ```toml
+   [[hooks]]
+   name = "context-mode-pretool"
+   type = "pre_tool"
+   match = "bash"
+   command = "context-mode hook mistral-vibe pretooluse"
+   timeout = 30.0
+   strict = false
+   description = "Route bash commands through context-mode sandbox"
+
+   [[hooks]]
+   name = "context-mode-posttool"
+   type = "post_tool"
+   command = "context-mode hook mistral-vibe posttooluse"
+   timeout = 30.0
+   strict = false
+   description = "Capture session events for context-mode"
+   ```
+
+   Or run `context-mode upgrade` (with `CONTEXT_MODE_PLATFORM=mistral-vibe`) to have context-mode manage the `hooks.toml` entries for you. The upgrade flow preserves any non-managed hooks (e.g. a user-installed `rtk-rewrite`).
+
+4. Restart Vibe and verify MCP with `ctx stats`.
+
+5. (Optional) Copy the routing instructions file for your project:
+
+   ```bash
+   cp "$(npm root -g)/context-mode/configs/mistral-vibe/AGENTS.md" ./AGENTS.md
+   ```
+
+   Vibe reads `AGENTS.md` from the project root by default.
+
+**Verify:** In a Vibe session, type `ctx stats`. Context-mode tools (namespaced as `context-mode_ctx_*`) should appear and respond.
+
+**Routing:** `pre_tool` intercepts bash and rewrites `curl`/`wget`/inline HTTP to sandbox tools. `post_tool` captures session events. Auto-detected via `$VIBE_HOME` env var or the presence of `~/.vibe/`. MCP `clientInfo.name` is NOT reliable — Vibe uses the MCP SDK default `"mcp"` because it does not override `client_info`; detection relies on env/config-dir signals instead.
+
+**Known limitations:**
+- Vibe only exposes `pre_tool`, `post_tool`, and `post_agent`. There is no `PreCompact`, `SessionStart`, `UserPromptSubmit`, or `Stop` equivalent — full session-continuity across compactions is not available; the routing block in `AGENTS.md` provides model-side memory queries as a workaround.
+- The `pre_tool` `match` field is one string per `[[hooks]]` block. context-mode installs a single `bash`-scoped hook; register additional blocks pointing at the same `pretooluse` command if you need broader tool coverage.
+- Coexists with `rtk`: keep `context-mode-pretool` first in `hooks.toml` declaration order so redirected commands never reach rtk.
+
+Full documentation: [`docs/platform-support.md#mistral-vibe`](docs/platform-support.md#mistral-vibe)
+
+</details>
+
+<details>
 <summary><strong>Qwen Code</strong> — MCP + hooks (identical wire protocol to Claude Code)</summary>
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Qwen Code installed (`npm install -g @qwen-code/qwen-code`).

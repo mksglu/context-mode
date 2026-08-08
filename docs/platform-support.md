@@ -4,11 +4,11 @@ This document provides a comprehensive comparison of all platforms supported by 
 
 ## Overview
 
-context-mode supports 17 client platforms, plus the OpenClaw gateway integration, across three hook paradigms:
+context-mode supports 18 client platforms, plus the OpenClaw gateway integration, across three hook paradigms:
 
 | Paradigm | Platforms |
 |----------|-----------|
-| **JSON stdin/stdout** | Claude Code, Gemini CLI, VS Code Copilot, JetBrains Copilot, GitHub Copilot CLI, Cursor, Codex CLI, Qwen Code, Kimi Code, Antigravity CLI (`agy`), Kiro |
+| **JSON stdin/stdout** | Claude Code, Gemini CLI, VS Code Copilot, JetBrains Copilot, GitHub Copilot CLI, Cursor, Codex CLI, Qwen Code, Kimi Code, Mistral Vibe, Antigravity CLI (`agy`), Kiro |
 | **TS Plugin** | OpenCode, KiloCode, OpenClaw |
 | **MCP-only** | Antigravity, Zed, Pi, OMP (Oh My Pi) |
 
@@ -298,6 +298,82 @@ context-mode hook kimi stop
 **Known Issues / Caveats:**
 - `UserPromptSubmit` sends `prompt` as a `ContentPart[]` array; the kimi hook normalizes this to a string for downstream extractors.
 - SessionStart `additionalContext` injection is emitted but acceptance by the host is not documented in Kimi Code CLI docs (fails-open if unsupported).
+
+---
+
+### Mistral Vibe
+
+**Status:** Supported (JSON stdin/stdout hooks + MCP)
+
+**Hook Paradigm:** JSON stdin/stdout (`[[hooks]]` array tables in TOML)
+
+Mistral Vibe is Mistral AI's official open-source coding CLI ([mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe), package `mistral-vibe` on PyPI, command `vibe`). It exposes three lifecycle hooks (`pre_tool`, `post_tool`, `post_agent`) as subprocesses with JSON payloads on stdin, and full MCP support via stdio/HTTP/streamable-http transports declared under `[[mcp_servers]]` in `config.toml`.
+
+Compared to Claude Code / Kimi, Vibe has a narrower hook surface: no `PreCompact`, `SessionStart`, `UserPromptSubmit`, or `Stop` equivalents. Session-restore-after-compaction relies on model-side memory queries (see `configs/mistral-vibe/AGENTS.md`) rather than a hook-driven snapshot pipeline. All other context-mode features (routing enforcement, sandbox tools, session-event capture) work end-to-end.
+
+**Hook Names:**
+- `pre_tool` — fires before a tool call; supports rewrite via `hook_specific_output.tool_input` and deny via `decision: "deny"`
+- `post_tool` — fires after tool completion; supports append-only text via `hook_specific_output.additional_context`
+- `post_agent` — fires after each agent turn (not used by context-mode today)
+
+**Blocking:** `{"decision":"deny","reason":"..."}` on stdout, exit 0
+
+**Arg Modification:** `{"hook_specific_output":{"tool_input":{...}}}` on stdout, exit 0
+
+**Output Modification:** Append-only via `hook_specific_output.additional_context` in `post_tool` (no full-output rewrite surface)
+
+**Context Injection:** Not supported (`system_message` is a UI banner, not model-visible context)
+
+**Configuration:**
+- MCP: `~/.vibe/config.toml` `[[mcp_servers]]` (or `$VIBE_HOME/config.toml`)
+- Hooks: `~/.vibe/hooks.toml` `[[hooks]]` (or `$VIBE_HOME/hooks.toml`)
+- Sessions: `~/.vibe/context-mode/sessions/`
+- Instruction file: project-root `AGENTS.md` (Vibe's default)
+
+**Hook Commands:**
+```
+context-mode hook mistral-vibe pretooluse
+context-mode hook mistral-vibe posttooluse
+```
+
+**Example `hooks.toml`:**
+```toml
+[[hooks]]
+name = "context-mode-pretool"
+type = "pre_tool"
+match = "bash"
+command = "context-mode hook mistral-vibe pretooluse"
+timeout = 30.0
+strict = false
+description = "Route bash commands through context-mode sandbox"
+
+[[hooks]]
+name = "context-mode-posttool"
+type = "post_tool"
+command = "context-mode hook mistral-vibe posttooluse"
+timeout = 30.0
+strict = false
+description = "Capture session events for context-mode"
+```
+
+**Example `config.toml` MCP entry:**
+```toml
+[[mcp_servers]]
+name = "context-mode"
+transport = "stdio"
+command = "context-mode"
+```
+
+**Detection:**
+- `$VIBE_HOME` env var (consumer-set — `detect: false` so an unrelated shell does not misclassify a non-Vibe host as Vibe)
+- `~/.vibe/` directory presence (medium confidence)
+- MCP `clientInfo.name` is NOT reliable: Vibe uses the MCP SDK's default `Implementation(name="mcp", version="0.1.0")` because it does not pass a `client_info` argument to `ClientSession` (see `vibe/core/tools/mcp/tools.py`). The `client-map.ts` entries for `"mistral-vibe"` / `"Mistral Vibe"` / `"vibe"` are placeholders that will match if Vibe ever ships a proper client_info.
+
+**Known Issues / Caveats:**
+- No `PreCompact`, `SessionStart`, `UserPromptSubmit`, or `Stop` hook — full session continuity across compactions is not available; the routing block in `AGENTS.md` provides model-side memory queries as a workaround.
+- `pre_tool` `match` is a single string per `[[hooks]]` block. context-mode installs one bash-scoped hook to minimize overhead on lightweight tools. If you need broader tool coverage, register additional `[[hooks]]` blocks pointing at the same `pretooluse` command with different `match` values.
+- Coexistence with `rtk` (which also registers a `pre_tool bash` hook): Vibe runs hooks in TOML declaration order. Keep `context-mode-pretool` first in `hooks.toml` so redirected commands never reach rtk. Both can coexist; context-mode's redirect is a no-op passthrough when it doesn't apply.
+- Session id is delivered in the hook stdin JSON payload (`session_id`) rather than an env var — the adapter falls back to `vibe-ppid-<pid>` when the payload lacks one.
 
 ---
 
