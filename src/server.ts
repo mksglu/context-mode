@@ -1015,6 +1015,45 @@ function getStatsFilePath(): string {
   return join(statsDir, `stats-${sessionId}.json`);
 }
 
+/**
+ * Derive the persisted savings figures from the raw session counters.
+ *
+ * Bytes returned to the model were already counted when their source was
+ * indexed, so adding them again to the kept-out total counted the same
+ * universe twice — inflating total_processed and, worse, letting
+ * tokens_saved claim bytes the agent actually received (#1025). Netting
+ * them out makes total_processed the real universe and leaves tokens_saved
+ * counting only bytes that never reached the model.
+ *
+ * Exported so the formula is directly testable. The alternative — asserting
+ * on the source text — passes no matter what the arithmetic does.
+ */
+export function computeSavings(counters: {
+  bytesIndexed: number;
+  bytesSandboxed: number;
+  cacheBytesSaved: number;
+  bytesReturned: number;
+}): {
+  keptOut: number;
+  totalProcessed: number;
+  reductionPct: number;
+  tokensSaved: number;
+} {
+  const universe =
+    counters.bytesIndexed + counters.bytesSandboxed + counters.cacheBytesSaved;
+  const keptOut = Math.max(0, universe - counters.bytesReturned);
+  const totalProcessed = keptOut + counters.bytesReturned;
+  return {
+    keptOut,
+    totalProcessed,
+    reductionPct:
+      totalProcessed > 0
+        ? Math.round((1 - counters.bytesReturned / totalProcessed) * 100)
+        : 0,
+    tokensSaved: Math.round(keptOut / 4),
+  };
+}
+
 function persistStats(): void {
   const now = Date.now();
   if (now - _lastStatsPersist < STATS_PERSIST_THROTTLE_MS) return;
@@ -1029,16 +1068,12 @@ function persistStats(): void {
       (a, b) => a + b,
       0,
     );
-    const keptOut =
-      sessionStats.bytesIndexed +
-      sessionStats.bytesSandboxed +
-      sessionStats.cacheBytesSaved;
-    const totalProcessed = keptOut + totalReturned;
-    const reductionPct =
-      totalProcessed > 0
-        ? Math.round((1 - totalReturned / totalProcessed) * 100)
-        : 0;
-    const tokensSaved = Math.round(keptOut / 4);
+    const { keptOut, totalProcessed, reductionPct, tokensSaved } = computeSavings({
+      bytesIndexed: sessionStats.bytesIndexed,
+      bytesSandboxed: sessionStats.bytesSandboxed,
+      cacheBytesSaved: sessionStats.cacheBytesSaved,
+      bytesReturned: totalReturned,
+    });
 
     // Lifetime savings — cached separately because getLifetimeStats() scans
     // disk (per-project SessionDBs + auto-memory dirs) and is too expensive
