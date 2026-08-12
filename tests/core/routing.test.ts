@@ -7,13 +7,14 @@ import {
 import { createRoutingBlock } from "../../hooks/routing-block.mjs";
 import { createToolNamer } from "../../hooks/core/tool-naming.mjs";
 
-// Subagent routing uses createRoutingBlock(t, { includeCommands: false }).
+// Subagent routing uses createRoutingBlock(t, { includeCommands: false, includeProvenance: true }).
 // For claude-code (incl. the default when platform is unset) it also enables the
 // ToolSearch bootstrap so deferred ctx_* tools are loadable by the subagent (#724).
 const _t = createToolNamer("claude-code");
 const SUBAGENT_BLOCK = createRoutingBlock(_t, {
   includeCommands: false,
   toolSearchBootstrap: true,
+  includeProvenance: true,
 });
 
 describe("Routing: Subagents (Agent only — Task removed per #241)", () => {
