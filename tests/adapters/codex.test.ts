@@ -1103,6 +1103,98 @@ describe("Codex precompact hook script", () => {
 });
 
 describe("Codex sessionstart hook script", () => {
+  const sharedInstructionsPath = resolve(__dirname, "../../configs/codex/AGENTS.md");
+  const windowsOverlayPath = resolve(__dirname, "../../configs/codex/AGENTS.windows.md");
+
+  it("keeps the shared Codex instructions platform-neutral", () => {
+    const instructions = readFileSync(sharedInstructionsPath, "utf8");
+
+    expect(instructions).not.toContain("## Windows notes");
+    expect(instructions).not.toContain("pwsh -NoProfile");
+    expect(instructions).not.toContain("/mnt/<letter>/");
+    expect(instructions).not.toContain("Always double-quote");
+  });
+
+  it("ships all Windows-specific guidance in the platform overlay", () => {
+    const overlay = readFileSync(windowsOverlayPath, "utf8");
+
+    expect(overlay).toContain("## Windows notes");
+    expect(overlay).toContain("**PowerShell cmdlets**");
+    expect(overlay).toContain("**Relative paths**");
+    expect(overlay).toContain("**Windows drive letters**");
+    expect(overlay).toContain("**Quote paths**");
+  });
+
+  it("loads the Windows overlay only for win32", async () => {
+    const { getCodexPlatformOverlay } = await import("../../hooks/codex/platform-overlay.mjs");
+    const overlay = readFileSync(windowsOverlayPath, "utf8").trim();
+
+    for (const platform of ["darwin", "linux", "freebsd"]) {
+      expect(getCodexPlatformOverlay({ platform })).toBe("");
+    }
+
+    const windowsResult = getCodexPlatformOverlay({ platform: "win32" });
+    expect(windowsResult).toBe(overlay);
+    expect(windowsResult.match(/^## Windows notes$/gm)).toHaveLength(1);
+  });
+
+  it("does not duplicate legacy Windows guidance copied into AGENTS.md", async () => {
+    const { getCodexPlatformOverlay } = await import("../../hooks/codex/platform-overlay.mjs");
+    const legacyInstructions = [
+      "# Project instructions",
+      "## Windows notes",
+      "**PowerShell cmdlets** — wrap commands with pwsh.",
+      "**Windows drive letters** — never emit /mnt/<letter>/.",
+    ].join("\r\n");
+
+    expect(getCodexPlatformOverlay({
+      platform: "win32",
+      existingInstructionContents: [legacyInstructions],
+    })).toBe("");
+  });
+
+  it("fails open when the Windows overlay cannot be read", async () => {
+    const { getCodexPlatformOverlay } = await import("../../hooks/codex/platform-overlay.mjs");
+
+    expect(getCodexPlatformOverlay({
+      platform: "win32",
+      overlayPath: join(tmpdir(), "context-mode-missing-windows-overlay.md"),
+    })).toBe("");
+  });
+
+  it("applies the current-platform overlay consistently to every SessionStart source", () => {
+    const hookScript = resolve(__dirname, "../../hooks/codex/sessionstart.mjs");
+    const codexHome = mkdtempSync(join(tmpdir(), "context-mode-codex-overlay-"));
+    const projectDir = join(codexHome, "project");
+
+    mkdirSync(projectDir, { recursive: true });
+
+    try {
+      for (const source of ["startup", "clear", "compact", "resume"]) {
+        const stdout = execFileSync(process.execPath, [hookScript], {
+          input: JSON.stringify({
+            session_id: `test-sessionstart-overlay-${source}`,
+            cwd: projectDir,
+            hook_event_name: "SessionStart",
+            source,
+          }),
+          encoding: "utf-8",
+          timeout: 10000,
+          env: { ...process.env, CODEX_HOME: codexHome },
+        });
+        const parsed = JSON.parse(stdout.trim());
+        const context = parsed.hookSpecificOutput.additionalContext as string;
+        const windowsHeadings = context.match(/^## Windows notes$/gm) ?? [];
+
+        expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
+        expect(context).toContain("context-mode");
+        expect(windowsHeadings).toHaveLength(process.platform === "win32" ? 1 : 0);
+      }
+    } finally {
+      try { rmSync(codexHome, { recursive: true, force: true }); } catch { /* Windows may release SQLite handles late */ }
+    }
+  });
+
   it("injects a compact resume snapshot before marking it consumed", () => {
     const hookScript = resolve(__dirname, "../../hooks/codex/sessionstart.mjs");
     const codexHome = mkdtempSync(join(tmpdir(), "context-mode-codex-home-"));

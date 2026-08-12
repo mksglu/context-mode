@@ -8,6 +8,7 @@ import "../ensure-deps.mjs";
 
 import { createRoutingBlock } from "../routing-block.mjs";
 import { createToolNamer } from "../core/tool-naming.mjs";
+import { getCodexPlatformOverlay } from "./platform-overlay.mjs";
 
 const toolNamer = createToolNamer("codex");
 const ROUTING_BLOCK = createRoutingBlock(toolNamer);
@@ -38,22 +39,31 @@ const OPTS = CODEX_OPTS;
 
 let additionalContext = ROUTING_BLOCK;
 
-function captureCodexInstructionRules(db, sessionId, projectDir) {
+function readCodexInstructionRules(projectDir) {
   const paths = [];
   for (const baseDir of [resolveConfigDir(OPTS), projectDir]) {
     paths.push(join(baseDir, "AGENTS.md"));
     paths.push(join(baseDir, "AGENTS.override.md"));
   }
 
+  const rules = [];
   for (const p of [...new Set(paths)]) {
     try {
       if (!existsSync(p)) continue;
       const content = readFileSync(p, "utf8");
-      db.insertEvent(sessionId, { type: "rule", category: "rule", data: p, priority: 1 });
-      db.insertEvent(sessionId, { type: "rule_content", category: "rule", data: content, priority: 1 });
+      rules.push({ path: p, content });
     } catch {
       // Missing or unreadable rule files should never break SessionStart.
     }
+  }
+
+  return rules;
+}
+
+function captureCodexInstructionRules(db, sessionId, rules) {
+  for (const { path, content } of rules) {
+    db.insertEvent(sessionId, { type: "rule", category: "rule", data: path, priority: 1 });
+    db.insertEvent(sessionId, { type: "rule_content", category: "rule", data: content, priority: 1 });
   }
 }
 
@@ -62,6 +72,11 @@ try {
   const input = parseStdin(raw);
   const source = input.source ?? "startup";
   const projectDir = getInputProjectDir(input, CODEX_OPTS);
+  const instructionRules = readCodexInstructionRules(projectDir);
+  const platformOverlay = getCodexPlatformOverlay({
+    existingInstructionContents: instructionRules.map(({ content }) => content),
+  });
+  if (platformOverlay) additionalContext += `\n\n${platformOverlay}`;
 
   if (source === "compact" || source === "resume") {
     const { SessionDB } = await loadSessionDB();
@@ -106,7 +121,7 @@ try {
 
     const sessionId = getSessionId(input, OPTS);
     db.ensureSession(sessionId, projectDir);
-    captureCodexInstructionRules(db, sessionId, projectDir);
+    captureCodexInstructionRules(db, sessionId, instructionRules);
 
     db.close();
   }
