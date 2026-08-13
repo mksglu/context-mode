@@ -303,6 +303,15 @@ describe("CodexAdapter", () => {
       expect(adapter.getSessionDir()).toContain("sessions");
     });
 
+    it("documents JavaScript as the default rather than the exclusive runtime", () => {
+      const instructions = adapter.getRoutingInstructions();
+
+      expect(instructions).toContain("Use JavaScript by default for sandbox analysis.");
+      expect(instructions).toContain("Use another supported runtime when materially better.");
+      expect(instructions).toContain("Prefer standard libraries.");
+      expect(instructions).not.toContain("Pure JavaScript — Node.js built-ins only");
+    });
+
     it("honors CODEX_HOME for settings, hooks, and session paths", () => {
       const savedCodexHome = process.env.CODEX_HOME;
       const codexHome = join(homedir(), "custom-codex-home");
