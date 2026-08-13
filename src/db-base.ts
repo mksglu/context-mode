@@ -423,10 +423,32 @@ export function defaultDBPath(prefix: string = "context-mode"): string {
 // ─────────────────────────────────────────────────────────
 
 /**
- * Retry a DB operation with exponential backoff on SQLITE_BUSY errors.
- * Catches errors containing "SQLITE_BUSY" or "database is locked" and
- * retries up to 3 times with delays: 100ms, 500ms, 2000ms.
- * If all retries fail, throws a descriptive error.
+ * Error substrings that indicate a *transient* SQLite failure — one worth
+ * retrying rather than surfacing to the caller.
+ *
+ * SQLITE_IOERR is included deliberately. On macOS it is most often transient
+ * (filesystem pressure, Spotlight/iCloud touching the DB mid-write, a WAL
+ * hiccup) rather than a damaged file. Before this list existed, IOERR fell
+ * into a gap: not matched here so it got zero retries, and not matched by
+ * isSQLiteCorruptionError() either, so no recovery ran. A single blip
+ * hard-failed the caller — e.g. ctx_fetch_and_index aborting a page index.
+ *
+ * IOERR must NOT be added to isSQLiteCorruptionError(): that path renames or
+ * deletes the DB file, which would destroy a healthy knowledge base over a
+ * momentary I/O stall. Retry here; recover there.
+ */
+const TRANSIENT_ERROR_PATTERNS = [
+  "SQLITE_BUSY",
+  "database is locked",
+  "SQLITE_IOERR",
+  "disk I/O error",
+];
+
+/**
+ * Retry a DB operation with exponential backoff on transient SQLite errors.
+ * Catches SQLITE_BUSY / "database is locked" and SQLITE_IOERR / "disk I/O
+ * error" and retries up to 3 times with delays: 100ms, 500ms, 2000ms.
+ * If all retries fail, throws a descriptive error naming the actual cause.
  * Pass custom delays for testing (e.g., [0, 0, 0] to skip waits).
  */
 export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): T {
@@ -436,7 +458,7 @@ export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): 
       return fn();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes("SQLITE_BUSY") && !msg.includes("database is locked")) {
+      if (!TRANSIENT_ERROR_PATTERNS.some((p) => msg.includes(p))) {
         throw err;
       }
       lastError = err instanceof Error ? err : new Error(msg);
@@ -447,8 +469,15 @@ export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): 
       }
     }
   }
+  // Name the class we actually exhausted on — reporting "database is locked"
+  // for an I/O failure sends the caller after the wrong root cause.
+  const failure = lastError?.message ?? "";
+  const cause =
+    failure.includes("SQLITE_IOERR") || failure.includes("disk I/O error")
+      ? "SQLITE_IOERR: disk I/O error"
+      : "SQLITE_BUSY: database is locked";
   throw new Error(
-    `SQLITE_BUSY: database is locked after ${delays.length} retries. ` +
+    `${cause} after ${delays.length} retries. ` +
     `Original error: ${lastError?.message}`
   );
 }

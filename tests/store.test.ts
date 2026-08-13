@@ -1575,6 +1575,56 @@ describe("SQLITE_BUSY retry logic", () => {
     }).toThrow("UNIQUE constraint failed");
     expect(attempts).toBe(1);
   });
+
+  // A transient SQLITE_IOERR previously got zero retries: it matched neither
+  // the busy-retry check nor isSQLiteCorruptionError(), so one filesystem
+  // blip hard-failed the write (e.g. ctx_fetch_and_index mid-index).
+  test("withRetry retries on SQLITE_IOERR and succeeds", () => {
+    let attempts = 0;
+    const result = withRetry(() => {
+      attempts++;
+      if (attempts < 3) {
+        throw new Error("SQLITE_IOERR: disk I/O error");
+      }
+      return "recovered";
+    }, [0, 0, 0]);
+    expect(result).toBe("recovered");
+    expect(attempts).toBe(3);
+  });
+
+  test("withRetry retries on bare 'disk I/O error' without the SQLITE_IOERR code", () => {
+    let attempts = 0;
+    const result = withRetry(() => {
+      attempts++;
+      if (attempts < 2) {
+        throw new Error("disk I/O error");
+      }
+      return "ok";
+    }, [0, 0, 0]);
+    expect(result).toBe("ok");
+    expect(attempts).toBe(2);
+  });
+
+  test("withRetry reports SQLITE_IOERR — not BUSY — when I/O retries are exhausted", () => {
+    expect(() => {
+      withRetry(() => {
+        throw new Error("SQLITE_IOERR: disk I/O error");
+      }, [0, 0, 0]);
+    }).toThrow(/SQLITE_IOERR.*3 retries/);
+  });
+
+  // Guard the boundary: SQLITE_CORRUPT says "disk image malformed", which must
+  // not be mistaken for the retryable "disk I/O error".
+  test("withRetry still rethrows SQLITE_CORRUPT immediately", () => {
+    let attempts = 0;
+    expect(() => {
+      withRetry(() => {
+        attempts++;
+        throw new Error("SQLITE_CORRUPT: database disk image is malformed");
+      }, [0, 0, 0]);
+    }).toThrow(/SQLITE_CORRUPT/);
+    expect(attempts).toBe(1);
+  });
 });
 
 // ── withRetry coverage for all write/read paths ──
