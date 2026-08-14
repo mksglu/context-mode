@@ -25,8 +25,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
@@ -87,12 +87,23 @@ const MCP_SERVER_NAME = "context-mode";
 // plugin.js ships at <pkg>/build/adapters/omp/plugin.js; the MCP server
 // bundle sits at the package root (<pkg>/server.bundle.mjs) — three up.
 const SERVER_BUNDLE_RELATIVE = "../../../server.bundle.mjs";
+const OMP_SYSTEM_MD_RELATIVE = "../../../configs/omp/SYSTEM.md";
 
 function resolveServerBundle(): string | null {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
     const bundle = resolve(here, SERVER_BUNDLE_RELATIVE);
     return existsSync(bundle) ? bundle : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveOmpSystemInstructions(): string | null {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = resolve(here, OMP_SYSTEM_MD_RELATIVE);
+    return existsSync(source) ? source : null;
   } catch {
     return null;
   }
@@ -126,6 +137,28 @@ function ensureMcpServerRegistered(): void {
     _ompAdapter.writeSettings(settings as Record<string, unknown>);
   } catch {
     // best effort — a registration failure must never break plugin load
+  }
+}
+
+/**
+ * Append context-mode routing rules to OMP's native system prompt.
+ *
+ * OMP discovers `~/.omp/agent/APPEND_SYSTEM.md` on startup and keeps its
+ * built-in tool guidance intact. Copy the packaged instructions lazily and
+ * never overwrite a user's existing append prompt.
+ */
+function ensureSystemInstructionsSeeded(): void {
+  try {
+    const source = resolveOmpSystemInstructions();
+    if (!source) return;
+
+    const target = join(_ompAdapter.getConfigDir(), "APPEND_SYSTEM.md");
+    if (existsSync(target)) return;
+
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(source, target);
+  } catch {
+    // best effort — a prompt-seeding failure must never break plugin load
   }
 }
 
@@ -261,6 +294,10 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
   // Self-register the MCP server so `ctx_*` tools are reachable under the
   // plugin install path, not just the manual MCP-only path (issue #677).
   ensureMcpServerRegistered();
+
+  // Seed OMP's native routing file so the model learns to use those tools
+  // without replacing OMP's built-in tool guidance (issue #873).
+  ensureSystemInstructionsSeeded();
 
   const db = getOrCreateDB(projectDir);
 
