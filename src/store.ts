@@ -9,7 +9,7 @@
  */
 
 import type { Database as DatabaseInstance } from "better-sqlite3";
-import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError } from "./db-base.js";
+import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, reopenAfterHeal } from "./db-base.js";
 import type { PreparedStatement } from "./db-base.js";
 import { readFileSync, readdirSync, unlinkSync, existsSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -458,6 +458,30 @@ export class ContentStore {
     }
   }
 
+  /**
+   * Heal a mid-session corrupt content DB (#867).
+   * Closes the held handle, attempts lossless backup→atomic-swap
+   * recovery (falling back to rename-and-recreate-empty), reopens,
+   * and re-initializes schema + prepared statements so the next
+   * write retry operates on a healthy connection.
+   */
+  #healAndReopen(): boolean {
+    this.#db = reopenAfterHeal(this.#dbPath, this.#db, () => {
+      this.#initSchema();
+      this.#prepareStatements();
+    });
+    return true;
+  }
+
+  /**
+   * withRetry wrapper that passes a heal callback so mid-session
+   * SQLITE_CORRUPT on a long-held handle triggers a lossless recovery
+   * + retry instead of surfacing the same error on every write (#867).
+   */
+  #withRetry<T>(fn: () => T): T {
+    return withRetry(fn, undefined, () => this.#healAndReopen());
+  }
+
   // ── Schema ──
 
   #initSchema(): void {
@@ -889,7 +913,7 @@ export class ContentStore {
     const filePath = path ?? undefined;
     const contentHash = filePath ? createHash("sha256").update(text).digest("hex") : undefined;
 
-    return withRetry(() => this.#insertChunks(chunks, label, text, filePath, contentHash, attribution));
+    return this.#withRetry(() => this.#insertChunks(chunks, label, text, filePath, contentHash, attribution));
   }
 
   // ── Index Directory (#687) ──
@@ -976,7 +1000,7 @@ export class ContentStore {
 
     const chunks = this.#chunkPlainText(content, linesPerChunk, maxChunkBytes);
 
-    return withRetry(() => this.#insertChunks(
+    return this.#withRetry(() => this.#insertChunks(
       chunks.map((c) => ({ ...c, hasCode: false })),
       source,
       content,
@@ -1019,7 +1043,7 @@ export class ContentStore {
       return this.indexPlainText(content, source, undefined, attribution, maxChunkBytes);
     }
 
-    return withRetry(() => this.#insertChunks(chunks, source, content, undefined, undefined, attribution));
+    return this.#withRetry(() => this.#insertChunks(chunks, source, content, undefined, undefined, attribution));
   }
 
   // ── Shared DB Insertion ──
