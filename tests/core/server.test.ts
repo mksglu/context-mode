@@ -21,6 +21,7 @@ import {
   rmSync,
   readFileSync,
   existsSync,
+  unlinkSync,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -3034,6 +3035,7 @@ describe("batch_execute FS read tracking", () => {
 
 import {
   buildBatchNodeOptionsPrefix,
+  ensureFsPreload,
   runBatchCommands,
   type BatchCommand,
 } from "../../src/server.js";
@@ -3372,6 +3374,23 @@ describe("runBatchCommands edge cases", () => {
       "C:\\Temp\\cm-fs-preload.js",
     );
     expect(prefix).toBe('set "NODE_OPTIONS=--require C:\\Temp\\cm-fs-preload.js" && ');
+  });
+
+  // #951 — OS temp cleaners can remove the preload file while the server is
+  // still alive; injection must re-create it rather than point node children
+  // at a missing --require target.
+  test("ensureFsPreload re-creates the preload file after external deletion (#951)", () => {
+    const p = ensureFsPreload();
+    expect(existsSync(p)).toBe(true);
+
+    unlinkSync(p);
+    expect(existsSync(p)).toBe(false);
+
+    const p2 = ensureFsPreload();
+    expect(p2).toBe(p);
+    expect(existsSync(p)).toBe(true);
+    // Restored file must be the real tracker, not an empty placeholder.
+    expect(readFileSync(p, "utf-8")).toContain("__CM_FS__");
   });
 });
 
