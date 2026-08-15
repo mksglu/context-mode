@@ -136,7 +136,7 @@ This gives you all 11 MCP tools without automatic routing. The model can still u
    npm install -g context-mode
    ```
 
-2. Add the following to `~/.gemini/settings.json`. This single file registers the MCP server and all four hooks:
+2. Add the following to `~/.gemini/settings.json`. This single file registers the MCP server and four hooks (`BeforeTool`, `AfterTool`, `PreCompress`, `SessionStart`). The adapter additionally wires `BeforeAgent` (a UserPromptSubmit-equivalent that fires on prompt submit) when you run `context-mode upgrade`:
 
    ```json
    {
@@ -190,7 +190,7 @@ You should see `context-mode: ... - Connected`.
 cp node_modules/context-mode/configs/gemini-cli/GEMINI.md ./GEMINI.md
 ```
 
-> **Why the BeforeTool matcher?** It targets only tools that produce large output (`run_shell_command`, `read_file`, `read_many_files`, `grep_search`, `search_file_content`, `web_fetch`, `activate_skill`) plus context-mode's own tools (`mcp__plugin_context-mode`). This avoids unnecessary hook overhead on lightweight tools while intercepting every tool that could flood your context window.
+> **Why the BeforeTool matcher?** It targets only tools that produce large output (`run_shell_command`, `read_file`, `read_many_files`, `grep_search`, `search_file_content`, `web_fetch`, `activate_skill`), context-mode's own tools (`mcp__plugin_context-mode`, `mcp__context-mode`), and an external-MCP catch-all (`mcp__(?!.*context-mode)`) so any other MCP server's large payloads are intercepted too. This avoids unnecessary hook overhead on lightweight tools while intercepting every tool that could flood your context window.
 
 Full config reference: [`configs/gemini-cli/settings.json`](configs/gemini-cli/settings.json)
 
@@ -241,7 +241,7 @@ Full config reference: [`configs/gemini-cli/settings.json`](configs/gemini-cli/s
 
 4. Restart VS Code.
 
-**Verify:** Open Copilot Chat and type `ctx stats`. Context-mode tools should appear and respond.
+**Verify:** Open Copilot Chat and type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` reports the context-window tokens saved this session. Run `context-mode doctor` (or `ctx doctor` in Copilot Chat) to confirm the hooks in `.github/hooks/context-mode.json` and the MCP server in `.vscode/mcp.json` are registered; a missing entry reports a `fail` with the fix `context-mode upgrade`.
 
 **Routing:** Automatic via SessionStart hook. Optionally copy routing instructions for full model awareness:
 
@@ -266,9 +266,9 @@ Full hook config including PreCompact: [`configs/vscode-copilot/hooks.json`](con
    npm install -g context-mode
    ```
 
-2. Add MCP server via Settings UI: **Settings > Tools > AI Assistant > Model Context Protocol (MCP) > Add Server**:
+2. Add MCP server via Settings UI: **Settings > Tools > GitHub Copilot > MCP > Configure**:
    - **Name:** `context-mode`
-   - **Command:** `context-mode`
+   - **Command:** `context-mode` (matches the shipped `configs/jetbrains-copilot/mcp.json`; use `npx -y context-mode` only if you skipped the global install)
 
 3. Create `.github/hooks/context-mode.json`:
 
@@ -290,7 +290,7 @@ Full hook config including PreCompact: [`configs/vscode-copilot/hooks.json`](con
 
 4. Restart the JetBrains IDE.
 
-**Verify:** Open Copilot Chat and type `ctx stats`. Context-mode tools should appear and respond.
+**Verify:** Open Copilot Chat and type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` reports the context-window tokens saved this session. Run `context-mode doctor` (or `ctx doctor` in Copilot Chat) to confirm the hooks in `.github/hooks/context-mode.json`; note the MCP-registration check intentionally reports `WARN` on JetBrains because MCP servers are registered in the IDE Settings UI (not CLI-inspectable) — confirm the context-mode server shows under **Settings > Tools > GitHub Copilot > MCP**.
 
 **Routing:** Automatic via SessionStart hook. Optionally copy routing instructions for full model awareness:
 
@@ -427,7 +427,7 @@ Restart Cursor. The plugin appears in **Settings → Plugins** as "Context Mode 
        "preToolUse": [
          {
            "command": "context-mode hook cursor pretooluse",
-           "matcher": "Shell|Read|Grep|WebFetch|Task|MCP:ctx_execute|MCP:ctx_execute_file|MCP:ctx_batch_execute"
+           "matcher": "Shell|Read|Grep|WebFetch|mcp_web_fetch|mcp_fetch_tool|Task|MCP:ctx_execute|MCP:ctx_execute_file|MCP:ctx_batch_execute|MCP:(?!ctx_)"
          }
        ],
        "postToolUse": [
@@ -444,9 +444,9 @@ Restart Cursor. The plugin appears in **Settings → Plugins** as "Context Mode 
    }
    ```
 
-   The `preToolUse` matcher is optional — without it, the hook fires on all tools. The `stop` hook fires when the agent turn ends and can send a followup message to continue the loop. `afterAgentResponse` is also available (fire-and-forget, receives full response text).
+   The `preToolUse` matcher is optional — without it, the hook fires on all tools. The `stop` hook fires when the agent turn ends and can send a followup message to continue the loop. Two more events are available: `sessionStart` (Cursor v1 ships native `sessionStart`; context-mode wires `context-mode hook cursor sessionstart` and registers it on `context-mode upgrade`) and `afterAgentResponse` (fire-and-forget, receives full response text).
 
-4. Copy the routing rules file. Cursor lacks a SessionStart hook, so the model needs a rules file for routing awareness:
+4. Copy the routing rules file for full model awareness at session start (belt-and-braces alongside the `sessionStart` hook):
 
    ```bash
    mkdir -p .cursor/rules
@@ -455,13 +455,13 @@ Restart Cursor. The plugin appears in **Settings → Plugins** as "Context Mode 
 
 5. Restart Cursor or open a new agent session.
 
-**Verify:** Open Cursor Settings > MCP and confirm "context-mode" shows as connected. In agent chat, type `ctx stats`.
+**Verify:** Open Cursor Settings > MCP and confirm "context-mode" shows as connected. In agent chat, type `ctx stats` to confirm the context-window savings for the session (savings ratio + per-tool token breakdown). Run `context-mode doctor` to validate the native hooks in `.cursor/hooks.json` — it flags plugin/native duplicate firing (each event fires twice; remove one config) and warns about enterprise/Claude-compat hook configs.
 
-**Routing:** Hooks enforce routing programmatically via `preToolUse`/`postToolUse`/`stop`. The `.cursor/rules/context-mode.mdc` file provides routing instructions at session start since Cursor's `sessionStart` hook is currently rejected by their validator ([forum report](https://forum.cursor.com/t/unknown-hook-type-sessionstart/149566)). Project `.cursor/hooks.json` overrides `~/.cursor/hooks.json`.
+**Routing:** Hooks enforce routing programmatically via `preToolUse`/`postToolUse`/`sessionStart`/`stop`. Cursor v1 ships native `sessionStart`, so context-mode registers it as the SessionStart equivalent (state restore after compaction). The `.cursor/rules/context-mode.mdc` rules file additionally provides routing instructions for model awareness. Project `.cursor/hooks.json` overrides `~/.cursor/hooks.json`.
 
 **Known limitation:** Cursor accepts `additional_context` in hook responses but does not surface it to the model ([forum #155689](https://forum.cursor.com/t/native-posttooluse-hooks-accept-and-log-additional-context-successfully-but-the-injected-context-is-not-surfaced-to-the-model/155689)). Routing relies on the `.mdc` rules file instead of hook context injection.
 
-Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`configs/cursor/mcp.json`](configs/cursor/mcp.json) | [`configs/cursor/context-mode.mdc`](configs/cursor/context-mode.mdc)
+Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) (manual-install reference) | [`configs/cursor/mcp.json`](configs/cursor/mcp.json) | [`configs/cursor/context-mode.mdc`](configs/cursor/context-mode.mdc). The Marketplace/local-folder **plugin** loads [`hooks/cursor/hooks.json`](hooks/cursor/hooks.json) instead (via `.cursor-plugin/plugin.json`), which registers all five events (`preToolUse`, `postToolUse`, `sessionStart`, `afterAgentResponse`, `stop`) using `npx -y context-mode …` so no global install is required; the manual `configs/cursor/hooks.json` above uses bare `context-mode …` (needs `npm install -g context-mode`).
 
 </details>
 
@@ -483,9 +483,10 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
    The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — OpenCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
 
-2. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness:
+2. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness. OpenCode resolves the `"context-mode"` plugin from npm into its own per-package cache (not a project-local `node_modules/`), so install the package first if you want a local copy to copy from — or download `AGENTS.md` from the repo:
 
    ```bash
+   npm install context-mode    # creates ./node_modules/context-mode for the cp below
    cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
    ```
 
@@ -493,7 +494,7 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
 3. Restart OpenCode.
 
-**Verify:** In the OpenCode session, type `ctx stats`. Context-mode tools should appear and respond.
+**Verify:** In the OpenCode session, type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` shows the context-window savings ratio / per-tool token breakdown for the session. Run `context-mode doctor` to confirm `context-mode` is in the `plugin` array of `opencode.json`; if it is missing, zero `ctx_*` tools register — fix with `context-mode upgrade`.
 
 **Upgrade note:** If an existing config has BOTH `plugin: ["context-mode"]` AND `mcp.context-mode`, OpenCode will register zero `ctx_*` tools — the plugin path correctly suppresses MCP duplicates, but the legacy MCP entry confuses the loader. Run `context-mode upgrade` to remove the legacy `mcp.context-mode` entry; your other MCP servers are preserved. v1.0.140+ emits a stderr diagnostic with the same guidance when this happens.
 
@@ -512,7 +513,7 @@ Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json)
 
 **Install:**
 
-1. Add to `kilo.json` in your project root (or `~/.config/kilo/kilo.json` for global):
+1. Add to `kilo.json` in your project root (or `~/.config/kilo/kilo.json` for global). `kilo.jsonc` and the `.kilo/` and `.kilocode/` project subdirectories are also valid config locations that context-mode discovers and writes:
 
    ```json
    {
@@ -523,15 +524,16 @@ Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json)
 
    The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — KiloCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
 
-2. *(Optional)* Copy the routing rules file. KiloCode shares the OpenCode plugin architecture, so the model needs an `AGENTS.md` file for routing awareness:
+2. *(Optional)* Copy the routing rules file. KiloCode shares the OpenCode plugin architecture, so the model needs an `AGENTS.md` file for routing awareness. KiloCode resolves the `"context-mode"` plugin from npm into its own per-package cache (not a project-local `node_modules/`), so install the package first to get a local copy — and use the KiloCode-specific routing file:
 
    ```bash
-   cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
+   npm install context-mode    # creates ./node_modules/context-mode for the cp below
+   cp node_modules/context-mode/configs/kilo/AGENTS.md AGENTS.md
    ```
 
 3. Restart KiloCode.
 
-**Verify:** In the KiloCode session, type `ctx stats`. Context-mode tools should appear and respond.
+**Verify:** In the KiloCode session, type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` shows the context-window savings ratio for the session. Run `context-mode doctor` to confirm `context-mode` is in the `plugin` array of `kilo.json` (or `kilo.jsonc`); if it is missing, zero `ctx_*` tools register — fix with `context-mode upgrade`.
 
 **Upgrade note:** If an existing config has BOTH `plugin: ["context-mode"]` AND `mcp.context-mode`, KiloCode will register zero `ctx_*` tools — the plugin path correctly suppresses MCP duplicates, but the legacy MCP entry confuses the loader. Run `context-mode upgrade` to remove the legacy `mcp.context-mode` entry; your other MCP servers are preserved. v1.0.140+ emits a stderr diagnostic with the same guidance when this happens.
 
@@ -546,7 +548,7 @@ Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json)
 
 **Prerequisites:** OpenClaw gateway running ([>2026.1.29](https://github.com/openclaw/openclaw/pull/9761)), Node.js 22+.
 
-context-mode runs as a native [OpenClaw](https://github.com/openclaw) gateway plugin, targeting **Pi Agent** sessions (Read/Write/Edit/Bash tools). Unlike other platforms, there's no separate MCP server — the plugin registers directly into the gateway runtime via OpenClaw's [plugin API](https://docs.openclaw.ai/tools/plugin).
+context-mode runs as a native [OpenClaw](https://github.com/openclaw) gateway plugin, targeting **Pi Agent** sessions (Read/Write/Edit/Bash tools). The plugin registers routing/lifecycle hooks in-process via OpenClaw's [plugin API](https://docs.openclaw.ai/tools/plugin), AND the installer registers a separate MCP sidecar (`mcp.servers.context-mode` → `node server.bundle.mjs`) so the agent-callable `ctx_*` tools appear in Pi Agent's tool list. Both are needed — without the sidecar the `ctx_*` tools are missing.
 
 **Install:**
 
@@ -570,7 +572,7 @@ context-mode runs as a native [OpenClaw](https://github.com/openclaw) gateway pl
 
 2. Open a Pi Agent session.
 
-**Verify:** The plugin registers 8 hooks via [`api.on()`](https://docs.openclaw.ai/tools/plugin) (lifecycle) and [`api.registerHook()`](https://docs.openclaw.ai/tools/plugin) (commands). Type `ctx stats` to confirm tools are loaded.
+**Verify:** The plugin registers lifecycle/tool hooks via [`api.on()`](https://docs.openclaw.ai/tools/plugin) (`before_tool_call`, `after_tool_call`, `session_start`, `before_compaction`, `after_compaction`, `before_model_resolve`, `before_prompt_build`, `session_end`, `subagent_spawning`), command hooks via [`api.registerHook()`](https://docs.openclaw.ai/tools/plugin) (`command:new/reset/stop`), and a context engine via `api.registerContextEngine()`. Type `ctx stats` to confirm tools are loaded and to read the context-saved ratio (it should climb toward ~98% after a few routed tool calls). Run `context-mode doctor` to confirm the plugin is registered in `plugins.entries`, is enabled, and owns compaction (`plugins.slots.contextEngine = context-mode`); a failed check prints the fix `context-mode upgrade`.
 
 **Routing:** Automatic. All tool interception, session tracking, and compaction recovery hooks activate automatically — no manual hook configuration or routing file needed.
 
@@ -670,7 +672,7 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
 
    `PreToolUse` enforces deny/block routing today and is prepared for input rewrites once Codex supports them. `PostToolUse` captures session events. `PreCompact` builds the resume snapshot before compaction. `SessionStart` restores state after compaction. `UserPromptSubmit` captures user decisions and corrections. `Stop` records turn-end state.
 
-   > **Note:** Codex PreToolUse routing currently supports deny rules only (blocks dangerous commands). It still needs upstream `updatedInput` support before context-mode can rewrite tool input; track [openai/codex#18491](https://github.com/openai/codex/issues/18491). Context injection (`additionalContext`) is not supported in Codex PreToolUse — it works via PostToolUse and SessionStart instead. This is handled automatically.
+   > **Note:** Codex PreToolUse deny routing (blocks dangerous commands) works on all builds. On codex-cli >= 0.141.0 ([#845](https://github.com/mksglu/context-mode/issues/845)) context-mode additionally performs command rewrites (`updatedInput`) and PreToolUse context injection (`additionalContext`), detected at runtime via `codex --version`; older builds fail closed (a redirect becomes a deny). The earlier upstream blocker [openai/codex#18491](https://github.com/openai/codex/issues/18491) is therefore resolved for modern builds. This is handled automatically.
    >
    > `PreCompact` support is runtime-gated: it is present in Codex CLI 0.130.0, while the public Codex hooks docs may lag the shipped hook-event list. Older Codex builds that do not emit `PreCompact` will not create pre-compaction snapshots.
 
@@ -685,7 +687,7 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
 
 5. Restart Codex CLI.
 
-**Verify:** Start a session and type `ctx stats` to verify MCP. To verify hook routing, confirm Codex lists/trusts the context-mode plugin hooks, then run a command that matches the routing rules.
+**Verify:** Start a session and type `ctx stats` — it confirms the MCP server is reachable and shows how much context window context-mode has saved this session (savings ratio + per-tool breakdown). Run `ctx doctor` (or `context-mode doctor`) to confirm the `codex` binary is on PATH, `[features].hooks = true`, MCP registration, and that each hook event is configured. To verify hook routing, confirm Codex lists/trusts the context-mode plugin hooks, then run a command that matches the routing rules.
 
 **Routing:** MCP tools work after plugin install. Plugin hook routing is active only when `hooks` and `plugin_hooks` are enabled and Codex trusts the plugin hook commands. Manual hook routing is active when `$CODEX_HOME/hooks.json` or `~/.codex/hooks.json` is configured. The `AGENTS.md` file provides routing instructions for model awareness.
 
@@ -748,13 +750,18 @@ The Codex plugin manifest provides MCP via `.codex-plugin/mcp.json`, skills via
    event = "Stop"
    command = "context-mode hook kimi stop"
    timeout = 30
+
+   [[hooks]]
+   event = "SessionEnd"
+   command = "context-mode hook kimi sessionend"
+   timeout = 30
    ```
 
-4. Restart Kimi Code CLI and verify MCP with `ctx stats`.
+4. Restart Kimi Code CLI. Type `ctx stats` to verify MCP and to see how much context window context-mode saved this session (savings ratio + per-tool token breakdown). Run `ctx doctor` (or `context-mode doctor`) to confirm the `kimi` binary is on PATH, the `[[hooks]]` entries are present in `config.toml`, and `context-mode` is registered in `~/.kimi-code/mcp.json`.
 
-   > **Note:** Kimi Code uses the same JSON stdin/stdout wire protocol as Codex, but accepts `additionalContext`, `updatedInput`, and `permissionDecision: "ask"` in PreToolUse responses (Codex rejects these). The kimi hook normalizes `ContentPart[]` prompt arrays to strings for downstream extractors.
+   > **Note:** Kimi Code uses the same JSON stdin/stdout wire protocol as Codex. PreToolUse is **deny-only** on Kimi: `updatedInput`, `additionalContext`, and `permissionDecision: "ask"` are silently dropped by Kimi's host runner (same as Codex), so context-mode uses PreToolUse only to block dangerous commands. The kimi hook normalizes `ContentPart[]` prompt arrays to strings for downstream extractors.
 
-5. (Optional) Copy the routing instructions file for your project:
+5. (Optional) Copy the routing instructions file for your project. Kimi reuses the Codex `AGENTS.md` by design — there is no separate `configs/kimi/AGENTS.md`:
 
    ```bash
    cp "$(npm root -g)/context-mode/configs/codex/AGENTS.md" ./AGENTS.md
@@ -818,9 +825,11 @@ Full documentation: [`docs/adapters/kimi-code.md`](docs/adapters/kimi-code.md)
 
 5. Restart Qwen Code.
 
-**Verify:** Start a session and type `ctx stats`. Context-mode tools should appear and respond.
+> **Per-turn token capture (Stop hook):** context-mode also wires a 6th hook — `Stop` — to capture per-turn token cost (token usage is unreachable through hook stdin, so the Stop script tails the Qwen chat log). The dispatcher form `context-mode hook qwen-code stop` is **not** wired in the CLI yet, so do **not** hand-add it to `settings.json` (it would silently no-op). Instead run `context-mode upgrade`, which writes all 6 hooks — including `Stop` as a direct node-script command (`hooks/qwen-code/stop.mjs`) that fires correctly. The 5 events above cover routing + session continuity even without it.
 
-**Note:** Qwen Code uses the same hook wire protocol as Claude Code (JSON stdin/stdout, same event names). Auto-detected via MCP clientInfo (`qwen-cli-mcp-client-*`) or `QWEN_PROJECT_DIR` env var.
+**Verify:** Start a session and type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` reports the context-window tokens saved this session (per-tool breakdown). Run `context-mode doctor` to confirm the hooks and MCP server are registered in `~/.qwen/settings.json` (it reports each hook pass/fail and `context-mode found in mcpServers`).
+
+**Note:** Qwen Code uses the same hook wire protocol as Claude Code (JSON stdin/stdout, same event names). Auto-detected via MCP clientInfo (`qwen-cli-mcp-client-*`), `QWEN_PROJECT_DIR` env var, or the `~/.qwen/` config dir; force with `CONTEXT_MODE_PLATFORM=qwen-code`.
 
 </details>
 
@@ -859,7 +868,7 @@ Full documentation: [`docs/adapters/kimi-code.md`](docs/adapters/kimi-code.md)
 
 4. Restart Antigravity.
 
-**Verify:** In an Antigravity session, type `ctx stats`. Context-mode tools should appear and respond.
+**Verify:** In an Antigravity session, type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` reports the context tokens saved this session. Because Antigravity is MCP-only (no hooks), savings depend on the model honoring `GEMINI.md` routing, so confirm `GEMINI.md` is at the project root and re-check `ctx stats` after a few data-heavy operations. Run `context-mode doctor` to confirm context-mode is registered in `~/.gemini/antigravity/mcp_config.json` (it reports MCP registration pass/fail and warns that Antigravity has no hook support).
 
 **Routing:** Manual. The `GEMINI.md` file is the only enforcement method (~60% compliance). There is no programmatic interception. Auto-detected via MCP protocol handshake (`clientInfo.name`) — no manual platform configuration needed.
 
@@ -883,10 +892,10 @@ agy plugin install https://github.com/mksglu/context-mode/tree/main/configs/anti
 
 Restart `agy`.
 
-**MCP-only (no plugin, no hooks):** if you only want the `ctx_*` tools, skip the plugin and add context-mode to agy's global MCP profile `~/.gemini/config/mcp_config.json` (distinct from the Antigravity IDE's `~/.gemini/antigravity/` path), then restart `agy`:
+**MCP-only (no plugin, no hooks):** if you only want the `ctx_*` tools, skip the plugin and add context-mode to agy's global MCP profile `~/.gemini/config/mcp_config.json` (distinct from the Antigravity IDE's `~/.gemini/antigravity/` path), then restart `agy`. The `env` pin matches the shipped config and guarantees agy is detected even when Claude Code is co-installed:
 
 ```json
-{ "mcpServers": { "context-mode": { "command": "context-mode" } } }
+{ "mcpServers": { "context-mode": { "command": "context-mode", "env": { "CONTEXT_MODE_PLATFORM": "antigravity-cli" } } } }
 ```
 
 **Verify:** type `ctx stats` in an agy session, or run any prompt from [Try It](#try-it) and check the savings. `context-mode doctor` confirms MCP + hook registration. Remove with `agy plugin uninstall context-mode`.
@@ -920,24 +929,15 @@ Restart `agy`.
    }
    ```
 
-3. Create `.kiro/hooks/context-mode.json`:
+3. Configure the hooks. Kiro reads hooks from the **agent config** at `~/.kiro/agents/default.json` under a top-level `hooks` key — *not* from a `.kiro/hooks/` file. The reliable way to write them in the correct place is:
 
-   ```json
-   {
-     "name": "context-mode",
-     "description": "Context-mode hooks for context window protection",
-     "hooks": {
-       "preToolUse": [
-         { "matcher": "execute_bash|fs_read|@context-mode/ctx_execute|@context-mode/ctx_execute_file|@context-mode/ctx_batch_execute|@(?!context-mode/)", "command": "context-mode hook kiro pretooluse" }
-       ],
-       "postToolUse": [
-         { "matcher": "*", "command": "context-mode hook kiro posttooluse" }
-       ]
-     }
-   }
+   ```bash
+   context-mode upgrade
    ```
 
-4. Copy routing instructions. Kiro's `agentSpawn` (SessionStart) is not yet implemented, so the model needs a routing file at session start:
+   This wires the `preToolUse`, `postToolUse`, `agentSpawn`, and `userPromptSubmit` hooks into `~/.kiro/agents/default.json`. (The matcher context-mode uses is `execute_bash|fs_read|@context-mode/ctx_execute|@context-mode/ctx_execute_file|@context-mode/ctx_batch_execute|@(?!context-mode/)`.)
+
+4. *(Optional)* Copy routing instructions for full model awareness at session start. `agentSpawn` (the Kiro SessionStart equivalent) already injects the routing block, so this is a belt-and-braces step:
 
    ```bash
    cp node_modules/context-mode/configs/kiro/KIRO.md ./KIRO.md
@@ -945,9 +945,9 @@ Restart `agy`.
 
 5. Restart Kiro.
 
-**Verify:** Open the Kiro panel > MCP Servers tab and confirm "context-mode" shows a green status indicator. In chat, type `ctx stats`.
+**Verify:** Open the Kiro panel > MCP Servers tab and confirm "context-mode" shows a green status indicator. In chat, type `ctx stats` to see the context-window tokens saved this session. Run `context-mode doctor` to confirm MCP registration (`~/.kiro/settings/mcp.json`) and the hooks in `~/.kiro/agents/default.json`; a missing hook prints the fix `context-mode upgrade`. Note that `context-mode doctor` validates only the **global** `~/.kiro/settings/mcp.json` even if you registered MCP at the project level.
 
-**Routing:** Hooks enforce routing programmatically via `preToolUse`/`postToolUse`. The `KIRO.md` file provides routing instructions since `agentSpawn` (SessionStart equivalent) is not yet wired. Tool names appear as `@context-mode/ctx_batch_execute`, `@context-mode/ctx_search`, etc. Auto-detected via MCP protocol handshake.
+**Routing:** Hooks enforce routing programmatically via `preToolUse`/`postToolUse`, and `agentSpawn` injects session context as the SessionStart equivalent (state restore after compaction). The `KIRO.md` file optionally adds routing instructions for model awareness. Tool names appear as `@context-mode/ctx_batch_execute`, `@context-mode/ctx_search`, etc. Auto-detected via MCP protocol handshake.
 
 Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/agent.json`](configs/kiro/agent.json) | [`configs/kiro/KIRO.md`](configs/kiro/KIRO.md)
 
@@ -990,9 +990,9 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
 
 4. Restart Zed (or save `settings.json` — Zed auto-restarts context servers on config change).
 
-**Verify:** Open the Agent Panel (`Cmd+Shift+A`), go to settings, and check the indicator dot next to "context-mode" — green means active. Type `ctx stats` in the agent chat.
+**Verify:** Open the Agent Panel (`Cmd+Shift+A`), go to settings, and check the indicator dot next to "context-mode" — green means active. Because Zed has no hooks, routing is enforced only by `AGENTS.md` (~60% compliance), so type `ctx stats` in the agent chat to see the actual context-saved ratio for the session and confirm routing is happening. Run `context-mode doctor` to confirm context-mode is registered under `context_servers` in `~/.config/zed/settings.json` — a fail prints the exact fix; expect one `warn` that Zed is MCP-only (no hooks), which is normal. Note: `context-mode doctor` checks `~/.config/zed/settings.json` even on Windows; if you edited `%APPDATA%\Zed\settings.json` the MCP server still works but the doctor cannot verify it.
 
-**Routing:** Manual. The `AGENTS.md` file is the only enforcement method (~60% compliance). There is no programmatic interception. Tool names appear as `mcp:context-mode:ctx_batch_execute`, `mcp:context-mode:ctx_search`, etc. Auto-detected via MCP protocol handshake.
+**Routing:** Manual. The `AGENTS.md` file is the only enforcement method (~60% compliance). There is no programmatic interception. Tool names appear as `mcp:context-mode:ctx_batch_execute`, `mcp:context-mode:ctx_search`, etc. Detection: auto via MCP `clientInfo` handshake or presence of `~/.config/zed/`; force with `CONTEXT_MODE_PLATFORM=zed`.
 
 </details>
 
@@ -1009,35 +1009,19 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
    npm install -g context-mode
    ```
 
-2. Install the package into Pi:
+2. Install the Pi extension:
 
    ```bash
-   pi install npm:context-mode
+   context-mode upgrade
    ```
 
-   Alternative — add it manually to `~/.pi/agent/settings.json` (or `.pi/settings.json` for project-level):
+   The Pi integration ships as an **extension** at `~/.pi/extensions/context-mode/`; `context-mode upgrade` copies/syncs it there. There is no `pi install npm:` / `packages[]` mechanism, and no `~/.pi/agent/settings.json` — Pi's config root is `~/.pi/`.
 
-   ```json
-   {
-     "packages": ["npm:context-mode"]
-   }
-   ```
-
-3. Add to `~/.pi/agent/mcp.json` (or `.pi/mcp.json` for project-level):
-
-   ```json
-   {
-     "mcpServers": {
-       "context-mode": {
-         "command": "context-mode"
-       }
-     }
-   }
-   ```
+3. The extension auto-bridges the MCP tools into Pi (via `pi.registerTool()` on `before_agent_start`), because Pi has no native MCP support. **No `mcp.json` edit is needed or honored** — do not create `~/.pi/agent/mcp.json`.
 
 4. Restart Pi.
 
-**Verify:** In a Pi session, type `ctx stats`. Context-mode tools should appear and respond.
+**Verify:** In a Pi session, type `ctx stats` — context-mode tools should appear and respond, and `ctx stats` shows the tokens saved / savings ratio for this Pi session (backed by the per-session DB). Run `context-mode doctor` to validate the extension at `~/.pi/extensions/context-mode/` and the MCP bridge; if the bridge fails the `ctx_*` tools won't appear and stderr shows `[context-mode] WARNING: failed to bridge MCP tools to Pi` — fix with `context-mode upgrade`.
 
 **Routing:** Automatic. The extension registers all key lifecycle events (`tool_call`, `tool_result`, `session_start`, `session_before_compact`), providing full session continuity and routing enforcement.
 
@@ -1110,7 +1094,7 @@ Then restart OMP. No lock file edit, no version pin — version is read from the
 
 4. Restart OMP.
 
-**Verify (any path):** In an OMP session, type `ctx stats`. Context-mode tools should appear and respond.
+**Verify (any path):** In an OMP session, type `ctx stats` — context-mode tools should appear and respond, and after some work `ctx stats` shows the tokens-saved / savings ratio (OMP additionally records real per-turn token + provider cost via the `turn_end` hook, so the ~98% figure is user-verifiable). Run `context-mode doctor` as a complementary check — it verifies the `context-mode` entry in `~/.omp/agent/mcp.json`; if that entry is absent the `ctx_*` tools won't appear until OMP is restarted (the plugin self-registers on load).
 
 **Routing:** Plugin path — programmatic enforcement via four `pi.on(...)` handlers (`tool_call` returns `{ block: true, reason }` for `curl`/`wget`/inline-fetch per upstream [`hooks/types.ts:566`](https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/src/extensibility/hooks/types.ts), `tool_result` captures session events, `session_start` initializes the per-session DB row, `session_before_compact` persists a resume snapshot). ~98% compliance, parity with Claude Code hooks. MCP-only path — rule-based via `SYSTEM.md`, ~60% compliance. Auto-detected via `PI_CODING_AGENT_DIR` env var or presence of `~/.omp/`. Storage roots at `~/.omp/context-mode/` so OMP and Pi installs never share session DBs, content indices, or stats files.
 
@@ -1244,13 +1228,13 @@ Session continuity requires 5 hooks working together:
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **PreToolUse** | Enforces sandbox routing before tool execution | Yes | -- | -- | -- | Yes | Yes | -- | -- | -- | Yes | -- | Bounded | Yes | -- | ✓ (via tool_call event) | ✓ (via tool_call event) |
 | **PostToolUse** | Captures events after each tool call | Yes | Yes | Yes | Yes | Yes | Yes | Plugin | Plugin | Plugin | Yes | -- | Yes (capture-only) | Yes | -- | ✓ (via tool_result event) | ✓ (via tool_result event) |
-| **UserPromptSubmit** | Captures user decisions and corrections | Yes | -- | -- | -- | Yes | -- | Plugin (via chat.message) | Plugin (via chat.message) | -- | Yes | -- | -- | -- | -- | -- | -- |
+| **UserPromptSubmit** | Captures user decisions and corrections | Yes | Yes (via BeforeAgent) | -- | -- | Yes | -- | Plugin (via chat.message) | Plugin (via chat.message) | -- | Yes | -- | -- | -- | -- | -- | -- |
 | **Stop** | Captures assistant turn-end state | Yes | -- | -- | -- | Yes | Yes | -- | -- | -- | Yes | -- | Best-effort | -- | -- | -- | -- |
 | **PreCompact** | Builds snapshot before compaction | Yes | Yes | Yes | Yes | Yes | -- | Plugin | Plugin | Plugin | Yes | -- | -- | -- | -- | ✓ (via session_before_compact) | ✓ (via session_before_compact) |
-| **SessionStart** | Restores state after compaction or resume | Yes | Yes | Yes | Yes | Yes | -- | ✓ (via experimental.chat.system.transform) | ✓ (via experimental.chat.system.transform) | Plugin | Yes | -- | -- | -- | -- | ✓ (via session_start event) | ✓ (via session_start event) |
-| | **Session completeness** | **Full** | **High** | **High** | **High** | **High** | **Partial** | **Full** | **Full** | **High** | **Partial** | **--** | **Partial** | **Partial** | **--** | **High** | **High** |
+| **SessionStart** | Restores state after compaction or resume | Yes | Yes | Yes | Yes | Yes | Yes (native sessionStart) | ✓ (via experimental.chat.system.transform) | ✓ (via experimental.chat.system.transform) | Plugin | Yes | -- | -- | Yes (via agentSpawn) | -- | ✓ (via session_start event) | ✓ (via session_start event) |
+| | **Session completeness** | **Full** | **High** | **High** | **High** | **High** | **High** | **Full** | **Full** | **High** | **Partial** | **--** | **Partial** | **High** | **--** | **High** | **High** |
 
-> **Note:** Full session continuity (capture + snapshot + restore) works on **Claude Code**, **Gemini CLI**, **VS Code Copilot**, **JetBrains Copilot**, **OpenCode**, and **KiloCode**. **GitHub Copilot CLI** uses its own camelCase hook config keys (`preToolUse`, `postToolUse`, `preCompact`, `sessionStart`, `userPromptSubmitted`, `agentStop`) and top-level hook responses; it captures prompt, tool, compaction, session-start, and stop events when the plugin hooks are installed. **OpenCode** and **KiloCode** use `experimental.chat.system.transform` as a SessionStart surrogate to inject the routing block and restore prior sessions, plus `chat.message` for user-prompt capture; full SessionStart hook support is not yet available ([#14808](https://github.com/sst/opencode/issues/14808), [#5409](https://github.com/sst/opencode/issues/5409)), but prior-session continuity and user-decision capture work fully. **Cursor** captures tool events via `preToolUse`/`postToolUse`, but `sessionStart` is currently rejected by Cursor's validator ([forum report](https://forum.cursor.com/t/unknown-hook-type-sessionstart/149566)), so session restore after compaction is not available yet. **OpenClaw** uses native gateway plugin hooks (`api.on()`) for full session continuity. **Pi Coding Agent** provides high session continuity via extension hooks (`tool_call`, `tool_result`, `session_start`, `session_before_compact`). **Codex CLI** provides partial hook-based session tracking through PreToolUse, PostToolUse, PreCompact, SessionStart, UserPromptSubmit, and Stop; MCP tools work. **Antigravity IDE** and **Zed** have no hook support in the current release, so session tracking is not available there. **Antigravity CLI (`agy`)** is separate from the IDE and supports bounded `PreToolUse`, capture-only `PostToolUse`, and best-effort `Stop` through its plugin hooks. **Kiro** captures tool events via native `preToolUse`/`postToolUse` hooks, but its SessionStart equivalent (`agentSpawn`) is not yet wired, so session restore after compaction is unavailable. **OMP** (Oh My Pi) ships full plugin-based hook support — `omp plugin install context-mode` registers `tool_call`, `tool_result`, `session_start`, and `session_before_compact` handlers and storage roots cleanly under `~/.omp/context-mode/` so OMP and Pi installs never share state.
+> **Note:** Full session continuity (capture + snapshot + restore) works on **Claude Code**, **Gemini CLI**, **VS Code Copilot**, **JetBrains Copilot**, **OpenCode**, and **KiloCode**. **GitHub Copilot CLI** uses its own camelCase hook config keys (`preToolUse`, `postToolUse`, `preCompact`, `sessionStart`, `userPromptSubmitted`, `agentStop`) and top-level hook responses; it captures prompt, tool, compaction, session-start, and stop events when the plugin hooks are installed. **OpenCode** and **KiloCode** use `experimental.chat.system.transform` as a SessionStart surrogate to inject the routing block and restore prior sessions, plus `chat.message` for user-prompt capture; full SessionStart hook support is not yet available ([#14808](https://github.com/sst/opencode/issues/14808), [#5409](https://github.com/sst/opencode/issues/5409)), but prior-session continuity and user-decision capture work fully. **Cursor** captures tool events via `preToolUse`/`postToolUse`, and Cursor v1's native `sessionStart` hook is registered (state restore after compaction); `afterAgentResponse` is also wired. **OpenClaw** uses native gateway plugin hooks (`api.on()`) for full session continuity. **Pi Coding Agent** provides high session continuity via extension hooks (`tool_call`, `tool_result`, `session_start`, `session_before_compact`). **Codex CLI** provides partial hook-based session tracking through PreToolUse, PostToolUse, PreCompact, SessionStart, UserPromptSubmit, and Stop; MCP tools work. **Antigravity IDE** and **Zed** have no hook support in the current release, so session tracking is not available there. **Antigravity CLI (`agy`)** is separate from the IDE and supports bounded `PreToolUse`, capture-only `PostToolUse`, and best-effort `Stop` through its plugin hooks. **Kiro** captures tool events via native `preToolUse`/`postToolUse` hooks, and its SessionStart equivalent (`agentSpawn`) is wired (injects session context via JSON stdout for state restore after compaction), plus `userPromptSubmit`. **OMP** (Oh My Pi) ships full plugin-based hook support — `omp plugin install context-mode` registers `tool_call`, `tool_result`, `session_start`, and `session_before_compact` handlers and storage roots cleanly under `~/.omp/context-mode/` so OMP and Pi installs never share state.
 
 <details>
 <summary><strong>What gets captured</strong></summary>
@@ -1335,7 +1319,7 @@ Detailed event data is also indexed into FTS5 for on-demand retrieval via `ctx_s
 
 **Claude Code** — Full session support. All 5 hook types fire, capturing tool events, user decisions, building compaction snapshots, and restoring state after compaction, `--continue`, `--resume`, or `/resume`.
 
-**Gemini CLI** — High coverage. PostToolUse (AfterTool), PreCompact (PreCompress), and SessionStart all fire. Missing UserPromptSubmit, so user decisions and corrections aren't captured — but file edits, git ops, errors, and tasks are fully tracked.
+**Gemini CLI** — High coverage. PostToolUse (AfterTool), PreCompact (PreCompress), and SessionStart all fire, and user prompts/decisions ARE captured via the `BeforeAgent` hook (Gemini's UserPromptSubmit equivalent, fires on prompt submit) when wired by `context-mode upgrade`. File edits, git ops, errors, and tasks are fully tracked.
 
 **VS Code Copilot** — High coverage. Same as Gemini CLI — PostToolUse, PreCompact, and SessionStart all fire. User decisions aren't captured but all tool-level events are.
 
@@ -1343,7 +1327,7 @@ Detailed event data is also indexed into FTS5 for on-demand retrieval via `ctx_s
 
 **GitHub Copilot CLI** — High coverage. Native plugin hooks use camelCase config keys (`preToolUse`, `postToolUse`, `preCompact`, `sessionStart`, `userPromptSubmitted`, `agentStop`) and top-level hook response fields. The plugin captures user prompts, tool events, compaction snapshots, session start restore, and stop events.
 
-**Cursor** — Partial coverage. Native `preToolUse` and `postToolUse` hooks capture tool events. `sessionStart` is documented by Cursor but currently rejected by their validator, so session restore is not available. Routing instructions are delivered via MCP server startup instead.
+**Cursor** — High coverage. Native `preToolUse` and `postToolUse` hooks capture tool events, and Cursor v1's native `sessionStart` hook is registered as the SessionStart equivalent, so session restore after compaction works; `afterAgentResponse` is also wired. The `.cursor/rules/context-mode.mdc` rules file additionally provides routing instructions for model awareness.
 
 **OpenCode** — Full session support. The TypeScript plugin captures PostToolUse events via `tool.execute.after`, user prompts and decisions via `chat.message`, builds compaction snapshots via `experimental.session.compacting`, and restores prior sessions via `experimental.chat.system.transform` (SessionStart surrogate). Routing block is injected on first `chat.system.transform` per session. AGENTS.md/CLAUDE.md/CONTEXT.md rules are captured automatically on first hook fire.
 
@@ -1351,7 +1335,7 @@ Detailed event data is also indexed into FTS5 for on-demand retrieval via `ctx_s
 
 **OpenClaw / Pi Agent** — High coverage. All tool lifecycle hooks (`after_tool_call`, `before_compaction`, `session_start`) fire via the native gateway plugin. User decisions aren't captured but file edits, git ops, errors, and tasks are fully tracked. Falls back to DB snapshot reconstruction if compaction hooks fail on older gateway versions. See [`docs/adapters/openclaw.md`](docs/adapters/openclaw.md).
 
-**Codex CLI** — MCP active, hooks require `[features].hooks = true`. Hook scripts (PreToolUse, PostToolUse, PreCompact, SessionStart, UserPromptSubmit, Stop) are implemented and tested; `PreCompact` remains runtime-gated on Codex builds that emit the event. PreToolUse deny routing works; input rewriting still depends on upstream `updatedInput` support ([openai/codex#18491](https://github.com/openai/codex/issues/18491)).
+**Codex CLI** — MCP active, hooks require `[features].hooks = true`. Hook scripts (PreToolUse, PostToolUse, PreCompact, SessionStart, UserPromptSubmit, Stop) are implemented and tested; `PreCompact` remains runtime-gated on Codex builds that emit the event. PreToolUse deny routing works on all builds; on codex-cli >= 0.141.0 ([#845](https://github.com/mksglu/context-mode/issues/845)) context-mode also performs command rewrites (`updatedInput`) and PreToolUse context injection (`additionalContext`), detected at runtime via `codex --version`; older builds fail closed (a redirect becomes a deny). The earlier upstream blocker [openai/codex#18491](https://github.com/openai/codex/issues/18491) is resolved for modern builds.
 
 **Antigravity** — No session support. No hooks, no event capture. Requires manually copying `GEMINI.md` to your project root. Auto-detected via MCP protocol handshake (`clientInfo.name`).
 
@@ -1359,7 +1343,7 @@ Detailed event data is also indexed into FTS5 for on-demand retrieval via `ctx_s
 
 **Zed** — No session support. No hooks, no event capture. Requires manually copying `AGENTS.md` to your project root. Auto-detected via MCP protocol handshake (`clientInfo.name`).
 
-**Kiro** — Partial coverage. Native `preToolUse` and `postToolUse` hooks capture tool events and enforce sandbox routing. `agentSpawn` (the Kiro equivalent of SessionStart) is not yet implemented, so session restore after compaction is not available. Requires manually copying `KIRO.md` to your project root. Auto-detected via MCP protocol handshake (`clientInfo.name`).
+**Kiro** — High coverage. Native `preToolUse` and `postToolUse` hooks capture tool events and enforce sandbox routing, `agentSpawn` (the Kiro equivalent of SessionStart) is wired and injects session context via JSON stdout so session restore after compaction works, and `userPromptSubmit` captures user decisions. `KIRO.md` is an optional belt-and-braces routing file. Auto-detected via MCP protocol handshake (`clientInfo.name`).
 
 **Pi Coding Agent** — High coverage. The extension registers all key lifecycle events: `tool_call` (PreToolUse), `tool_result` (PostToolUse), `session_start` (SessionStart), and `session_before_compact` (PreCompact). File edits, git ops, errors, and tasks are fully tracked. Session restore after compaction works via the extension's event hooks.
 Tool call output can be collapsed/expanded with the default Pi's default keybinding (Ctrl+O)
@@ -1375,9 +1359,9 @@ Tool call output can be collapsed/expanded with the default Pi's default keybind
 | MCP Server / Native Tools | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Native plugin | Native plugin | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | PreToolUse Hook | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Plugin | Plugin | Plugin | Yes | Yes | -- | Bounded | Yes | -- | Yes (extension) | Plugin |
 | PostToolUse Hook | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Plugin | Plugin | Plugin | Yes | Yes | -- | Yes (capture-only) | Yes | -- | Yes (extension) | Plugin |
-| SessionStart Hook | Yes | Yes | Yes | Yes | Yes | Yes | -- | ✓ (via experimental.chat.system.transform) | ✓ (via experimental.chat.system.transform) | Plugin | Yes | Yes | -- | -- | -- | -- | Yes (extension) | Plugin |
+| SessionStart Hook | Yes | Yes | Yes | Yes | Yes | Yes | Yes | ✓ (via experimental.chat.system.transform) | ✓ (via experimental.chat.system.transform) | Plugin | Yes | Yes | -- | -- | Yes (agentSpawn) | -- | Yes (extension) | Plugin |
 | PreCompact Hook | Yes | Yes | Yes | Yes | Yes | Yes | -- | Plugin | Plugin | Plugin | Yes | Yes | -- | -- | -- | -- | Yes (extension) | Plugin |
-| Can Modify Args | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Plugin | Plugin | Plugin | -- | Yes | -- | -- | -- | -- | Yes (extension) | -- |
+| Can Modify Args | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Plugin | Plugin | Plugin | Runtime (codex-cli >= 0.141.0) | -- | -- | -- | -- | -- | Yes (extension) | -- |
 | Can Block Tools | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Plugin | Plugin | Plugin | Yes | Yes | -- | Bounded | Yes | -- | Yes (extension) | Plugin |
 | Utility Commands (ctx) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes (/ctx-stats, /ctx-doctor) | Yes |
 | Slash Commands | Yes | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
@@ -1389,11 +1373,11 @@ Tool call output can be collapsed/expanded with the default Pi's default keybind
 >
 > **OpenClaw** runs context-mode as a native gateway plugin targeting Pi Agent sessions. Hooks register via `api.on()` (tool/lifecycle) and `api.registerHook()` (commands). All tool interception and compaction hooks are supported. See [`docs/adapters/openclaw.md`](docs/adapters/openclaw.md).
 >
-> **Codex CLI** hooks require `[features].hooks = true`. MCP tools work, and hook scripts activate through `$CODEX_HOME/hooks.json` or `~/.codex/hooks.json`. PreToolUse supports `permissionDecision: "deny"` only; input modification still needs upstream `updatedInput` support ([openai/codex#18491](https://github.com/openai/codex/issues/18491)). `additionalContext` is not supported in PreToolUse (context injection works via PostToolUse and SessionStart instead; the codex formatter handles this automatically). PreCompact stores resume snapshots before compaction on Codex builds that emit the event, SessionStart restores them, and UserPromptSubmit/Stop capture prompt and turn-end continuity events. See the Codex install section for setup. **Antigravity** and **Zed** do not support hooks. They rely solely on manually-copied routing instruction files (`AGENTS.md` / `GEMINI.md`) for enforcement (~60% compliance). See each platform's install section for copy instructions. Antigravity and Zed are auto-detected via MCP protocol handshake — no manual platform configuration needed.
+> **Codex CLI** hooks require `[features].hooks = true`. MCP tools work, and hook scripts activate through `$CODEX_HOME/hooks.json` or `~/.codex/hooks.json`. PreToolUse `permissionDecision: "deny"` works on all builds; on codex-cli >= 0.141.0 ([#845](https://github.com/mksglu/context-mode/issues/845)) context-mode also performs command rewrites (`updatedInput`) and PreToolUse context injection (`additionalContext`), detected at runtime via `codex --version`; older builds fail closed (a redirect becomes a deny). The earlier upstream blocker [openai/codex#18491](https://github.com/openai/codex/issues/18491) is resolved for modern builds. PreCompact stores resume snapshots before compaction on Codex builds that emit the event, SessionStart restores them, and UserPromptSubmit/Stop capture prompt and turn-end continuity events. See the Codex install section for setup. **Antigravity** and **Zed** do not support hooks. They rely solely on manually-copied routing instruction files (`AGENTS.md` / `GEMINI.md`) for enforcement (~60% compliance). See each platform's install section for copy instructions. Antigravity and Zed are auto-detected via MCP protocol handshake — no manual platform configuration needed.
 >
 > **Antigravity CLI (`agy`)** supports bounded `PreToolUse` blocking for mapped Bash/Read/Grep/WebFetch surfaces, plus `PostToolUse` capture and best-effort `Stop` capture through its plugin `hooks.json`. The routing rule and routing skill remain the broader instruction layer; `PreInvocation`/`PostInvocation` are not wired until their payload/response semantics are verified.
 >
-> **Kiro** supports native `preToolUse` and `postToolUse` hooks for routing enforcement and tool event capture. `agentSpawn` (SessionStart equivalent) and `stop` are not yet wired. Requires manually copying `KIRO.md` to your project root. Kiro is auto-detected via MCP protocol handshake (`clientInfo.name`).
+> **Kiro** supports native `preToolUse` and `postToolUse` hooks for routing enforcement and tool event capture, plus `agentSpawn` (the SessionStart equivalent, injects session context via JSON stdout) and `userPromptSubmit`. `stop` is not wired. `KIRO.md` is an optional routing file (`agentSpawn` already injects the routing block). Kiro is auto-detected via MCP protocol handshake (`clientInfo.name`).
 >
 > **Pi Coding Agent** runs context-mode as an extension with full hook support. The extension registers `tool_call`, `tool_result`, `session_start`, and `session_before_compact` events, providing high session continuity coverage. The MCP server provides all 11 MCP tools.
 >
@@ -1598,6 +1582,7 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 | Variable | Default | Purpose |
 |---|---|---|
 | `CONTEXT_MODE_DIR` | Adapter default, for example `~/.codex/context-mode` or `~/.claude/context-mode` | Since v1.0.147. Absolute writable root for context-mode storage. Sessions and stats use `<root>/sessions`; indexed content uses `<root>/content`. Empty or whitespace-only values are treated as unset and shown by `ctx_doctor`; non-empty values must be absolute. `~` is not expanded. |
+| `CONTEXT_MODE_DATA_DIR` | Adapter default | Universal storage override ([#649](https://github.com/mksglu/context-mode/issues/649)) that relocates the adapter-level `sessionDir` and `memoryDir`. Distinct from `CONTEXT_MODE_DIR` (the storage root for sessions/stats/content): a Codex user who sets only `CONTEXT_MODE_DIR` will not relocate the adapter-level sessions/memories governed by `CONTEXT_MODE_DATA_DIR`. Set both if you are relocating all storage. |
 
 ### Routing-guidance environment variables
 

@@ -18,8 +18,10 @@ This registers:
   rules that keep raw bytes out of the context window.
 - **Capture hooks** (`hooks.json`) — `preToolUse`, `postToolUse`,
   `sessionStart`, `userPromptSubmitted`, `agentStop`, `preCompact` (Copilot
-  CLI's camelCase event names — verified against the `@github/copilot` 1.0.60
-  binary; PascalCase keys are silently ignored and never fire), each dispatching
+  CLI's native camelCase event names — verified against the `@github/copilot`
+  1.0.60 binary; PascalCase event names are ALSO accepted and fire, so the
+  casing is not load-bearing — context-mode uses camelCase because it is the
+  CLI's native naming, not because PascalCase would fail), each dispatching
   `context-mode hook copilot-cli <event>`. Byte-equivalent to what
   `context-mode upgrade` writes to `~/.copilot/hooks/`, so the plugin registers
   them with no `upgrade` / agent call.
@@ -45,3 +47,30 @@ Then, to also install the capture hooks, run the upgrade **from inside Copilot**
 ```sh
 copilot -p "Use the context-mode ctx_upgrade tool to install context-mode's hooks." --allow-all
 ```
+
+## Verify / Troubleshoot
+
+Run the diagnostic:
+
+```sh
+context-mode doctor
+```
+
+Under the plugin, the doctor validates the bundle's `hooks.json` and the MCP
+registration. When something is missing it prints the exact fix:
+
+- **Plugin path** (`CONTEXT_MODE_COPILOT_PLUGIN=1`) — the suggested fix is
+  `copilot plugin install mksglu/context-mode:configs/copilot-cli`.
+- **Standalone path** — the MCP fix is
+  `copilot mcp add context-mode -- context-mode` and the hooks fix is
+  `context-mode upgrade`.
+
+Hooks fail open: if a stale global `context-mode` is on PATH, routing goes inert
+rather than blocking your tools — so a misconfiguration shows up as *no
+redirection*, not as errors.
+
+## Confirm savings
+
+In a Copilot CLI session, type `ctx stats` (or call the `ctx_stats` MCP tool) to
+see the context-window tokens saved this session — savings ratio plus a per-tool
+breakdown.
