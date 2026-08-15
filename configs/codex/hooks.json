@@ -4,42 +4,42 @@
       {
         "matcher": "local_shell|shell|shell_command|exec_command|Bash|Shell|apply_patch|Edit|Write|grep_files|ctx_execute|ctx_execute_file|ctx_batch_execute|ctx_fetch_and_index|ctx_search|ctx_index|mcp__",
         "hooks": [
-          { "type": "command", "command": "context-mode hook codex pretooluse" }
+          { "type": "command", "command": "context-mode hook codex pretooluse", "timeout": 2 }
         ]
       }
     ],
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "context-mode hook codex posttooluse" }
+          { "type": "command", "command": "context-mode hook codex posttooluse", "timeout": 3 }
         ]
       }
     ],
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "context-mode hook codex sessionstart" }
+          { "type": "command", "command": "context-mode hook codex sessionstart", "timeout": 5 }
         ]
       }
     ],
     "PreCompact": [
       {
         "hooks": [
-          { "type": "command", "command": "context-mode hook codex precompact" }
+          { "type": "command", "command": "context-mode hook codex precompact", "timeout": 5 }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "context-mode hook codex userpromptsubmit" }
+          { "type": "command", "command": "context-mode hook codex userpromptsubmit", "timeout": 1 }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "context-mode hook codex stop" }
+          { "type": "command", "command": "context-mode hook codex stop", "timeout": 1 }
         ]
       }
     ]

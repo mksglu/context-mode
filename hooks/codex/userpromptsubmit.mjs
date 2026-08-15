@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import "./platform.mjs";
 import "../suppress-stderr.mjs";
-import "../ensure-deps.mjs";
 /**
  * Codex CLI UserPromptSubmit hook — capture user prompts for continuity.
  */
