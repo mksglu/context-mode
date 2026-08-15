@@ -342,12 +342,21 @@ export function loadDatabase(): typeof DatabaseConstructor {
 export function applyWALPragmas(db: DatabaseInstance): void {
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
-  // Memory-map the DB file for read-heavy FTS5 search workloads.
-  // Eliminates read() syscalls — the kernel serves pages directly from
-  // the page cache. 256MB is a safe upper bound (SQLite only maps up to
-  // the actual file size). Falls back gracefully on platforms where mmap
-  // is unavailable or restricted.
-  try { db.pragma("mmap_size = 268435456"); } catch { /* unsupported runtime */ }
+  // mmap_size is opt-in (CONTEXT_MODE_MMAP_SIZE=<bytes>), default off.
+  // This helper is shared by ContentStore and SessionDB, both multi-writer
+  // by contract (ADR 0001): sibling server processes rename/delete/recreate
+  // these files on corruption recovery and stale cleanup (renameCorruptDB,
+  // deleteDBFiles), and the DB itself may be truncated by a sibling's
+  // checkpoint. Under mmap, a fault on a replaced or truncated mapping
+  // cannot be handled by SQLite — it surfaces as an uncatchable signal
+  // rather than a catchable error (https://sqlite.org/mmap.html,
+  // disadvantage 1) — and Windows cannot truncate a memory-mapped file at
+  // all (disadvantage 4). Set CONTEXT_MODE_MMAP_SIZE to re-enable the
+  // read() bypass of #267 for single-process, read-heavy workloads.
+  const mmapSize = Number(process.env.CONTEXT_MODE_MMAP_SIZE ?? "0");
+  if (Number.isFinite(mmapSize) && mmapSize > 0) {
+    try { db.pragma(`mmap_size = ${mmapSize}`); } catch { /* unsupported runtime */ }
+  }
   // NOTE: `locking_mode = EXCLUSIVE` is intentionally NOT applied here.
   // ALL DBs built on this helper — ContentStore (FTS5 shared knowledge
   // base) AND SessionDB (per-project events) — are multi-writer-safe by
@@ -392,12 +401,20 @@ export function deleteDBFiles(dbPath: string): void {
 /**
  * Safely close a database connection. Swallows errors so callers can
  * always call this in a finally/cleanup path without try/catch.
+ *
+ * No manual wal_checkpoint(TRUNCATE) is issued. On the multi-writer DBs
+ * this helper serves (ADR 0001), every per-session server close used to
+ * TRUNCATE the shared WAL and reset the wal-index while sibling server
+ * processes held live connections — a cross-process file mutation that
+ * is implicated in permanent SQLITE_IOERR wedges (#880, #992, #905). It
+ * was also redundant: SQLite auto-checkpoints whenever the WAL reaches
+ * 1000 pages, and when the LAST connection closes it runs its own
+ * checkpoint and deletes the -wal/-shm files
+ * (https://sqlite.org/wal.html sections 3.1 and 6). WAL bounding on
+ * hard-exit paths (where the last close never happens) is covered by the
+ * periodic PASSIVE checkpoint timer proposed in #988.
  */
 export function closeDB(db: DatabaseInstance): void {
-  try {
-    // Checkpoint WAL before close to prevent contention on restart (#103)
-    db.pragma("wal_checkpoint(TRUNCATE)");
-  } catch { /* WAL may not be active */ }
   try {
     db.close();
   } catch {
