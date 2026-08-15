@@ -578,3 +578,39 @@ describe("ensure-deps: better-sqlite3 binding self-heal (#408)", () => {
     expect(branch).not.toContain("binding present");
   });
 });
+
+// ── #861 follow-up: cwd-safe better-sqlite3 install (Windows npm.cmd cwd-drop) ──
+// e918eac (#861) fixed start.mjs's turndown installs by running npm's own CLI via
+// node (shell:false honors cwd) instead of `npm.cmd` + shell:true (which DROPS
+// cwd on Windows → `mkdir C:\Windows\node_modules` → EPERM). The same npm.cmd
+// cwd-drop hit this native-dep install path (reporter listed better-sqlite3 among
+// the EPERMs); this guard pins the absorbed fix in the install branch.
+describe("ensure-deps: cwd-safe native install (#861 follow-up)", () => {
+  const SRC = readFileSync(
+    resolvePath(fileURLToPath(import.meta.url), "..", "..", "..", "hooks", "ensure-deps.mjs"),
+    "utf-8",
+  );
+  // Scope to the "package not installed at all" install branch (before the
+  // missing-binary else-if) so the assertions can't be satisfied by the
+  // unrelated rebuild paths.
+  const installBranch = SRC.slice(
+    SRC.indexOf("Package not installed at all"),
+    SRC.indexOf("} else if (!existsSync(resolve(pkgDir"),
+  )
+    // Strip comments so assertions check the CODE, not the explanatory text
+    // (which intentionally names the old `execSync("npm.cmd … install")` pattern).
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+  test("runs npm's own CLI via node (shell:false honors cwd), not npm.cmd+shell:true", () => {
+    expect(installBranch.length).toBeGreaterThan(0);
+    expect(installBranch).toContain("npm-cli.js");
+    expect(installBranch).toMatch(/execFileSync\(\s*process\.execPath/);
+    // the primary path must NOT be the cwd-dropping npm.cmd + shell:true execSync
+    expect(installBranch).not.toMatch(/execSync\([^)]*npm\.cmd[^)]*install/);
+  });
+
+  test("surfaces install failures instead of swallowing them silently", () => {
+    expect(installBranch).toMatch(/ensure-deps install of \$\{pkg\} failed/);
+  });
+});
