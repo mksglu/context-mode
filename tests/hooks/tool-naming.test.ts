@@ -70,10 +70,29 @@ afterEach(() => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("getToolName", () => {
-  it("returns correct name for claude-code", () => {
-    expect(getToolName("claude-code", "ctx_fetch_and_index")).toBe(
-      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
-    );
+  it("returns plugin-namespaced name for claude-code when CLAUDE_PLUGIN_ROOT is set", () => {
+    const prev = process.env.CLAUDE_PLUGIN_ROOT;
+    process.env.CLAUDE_PLUGIN_ROOT = "/tmp/fake-plugin-root";
+    try {
+      expect(getToolName("claude-code", "ctx_fetch_and_index")).toBe(
+        "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
+      );
+    } finally {
+      if (prev === undefined) delete process.env.CLAUDE_PLUGIN_ROOT;
+      else process.env.CLAUDE_PLUGIN_ROOT = prev;
+    }
+  });
+
+  it("returns standalone-namespaced name for claude-code when CLAUDE_PLUGIN_ROOT is absent", () => {
+    const prev = process.env.CLAUDE_PLUGIN_ROOT;
+    delete process.env.CLAUDE_PLUGIN_ROOT;
+    try {
+      expect(getToolName("claude-code", "ctx_fetch_and_index")).toBe(
+        "mcp__context-mode__ctx_fetch_and_index",
+      );
+    } finally {
+      if (prev !== undefined) process.env.CLAUDE_PLUGIN_ROOT = prev;
+    }
   });
 
   it("returns correct name for gemini-cli", () => {
@@ -136,10 +155,16 @@ describe("getToolName", () => {
     expect(getToolName("pi", "ctx_batch_execute")).toBe("ctx_batch_execute");
   });
 
-  it("falls back to claude-code for unknown platforms", () => {
-    expect(getToolName("unknown-platform", "ctx_search")).toBe(
-      "mcp__plugin_context-mode_context-mode__ctx_search",
-    );
+  it("falls back to claude-code for unknown platforms (standalone)", () => {
+    const prev = process.env.CLAUDE_PLUGIN_ROOT;
+    delete process.env.CLAUDE_PLUGIN_ROOT;
+    try {
+      expect(getToolName("unknown-platform", "ctx_search")).toBe(
+        "mcp__context-mode__ctx_search",
+      );
+    } finally {
+      if (prev !== undefined) process.env.CLAUDE_PLUGIN_ROOT = prev;
+    }
   });
 });
 
@@ -262,46 +287,33 @@ describe("createExternalMcpGuidance (#529)", () => {
 // Backward Compat — Static Exports
 // ═══════════════════════════════════════════════════════════════════
 
+// Static exports default to claude-code naming. The exact prefix depends on
+// CLAUDE_PLUGIN_ROOT at module load time: set → plugin prefix, absent → standalone prefix.
+// Tests run without CLAUDE_PLUGIN_ROOT so they assert the standalone prefix.
 describe("backward compat static exports", () => {
-  it("ROUTING_BLOCK uses claude-code naming", () => {
-    expect(ROUTING_BLOCK).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
-    );
-    expect(ROUTING_BLOCK).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_search",
-    );
+  it("ROUTING_BLOCK uses claude-code standalone naming", () => {
+    expect(ROUTING_BLOCK).toContain("mcp__context-mode__ctx_batch_execute");
+    expect(ROUTING_BLOCK).toContain("mcp__context-mode__ctx_search");
+    expect(ROUTING_BLOCK).not.toContain("mcp__plugin_context-mode_context-mode__");
   });
 
-  it("READ_GUIDANCE uses claude-code naming", () => {
-    expect(READ_GUIDANCE).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_execute_file",
-    );
+  it("READ_GUIDANCE uses claude-code standalone naming", () => {
+    expect(READ_GUIDANCE).toContain("mcp__context-mode__ctx_execute_file");
   });
 
-  it("GREP_GUIDANCE uses claude-code naming", () => {
-    expect(GREP_GUIDANCE).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_execute",
-    );
+  it("GREP_GUIDANCE uses claude-code standalone naming", () => {
+    expect(GREP_GUIDANCE).toContain("mcp__context-mode__ctx_execute");
   });
 
-  it("BASH_GUIDANCE uses claude-code naming", () => {
-    expect(BASH_GUIDANCE).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
-    );
+  it("BASH_GUIDANCE uses claude-code standalone naming", () => {
+    expect(BASH_GUIDANCE).toContain("mcp__context-mode__ctx_batch_execute");
   });
 
-  it("EXTERNAL_MCP_GUIDANCE uses claude-code naming and matches the factory (#529)", () => {
-    expect(EXTERNAL_MCP_GUIDANCE).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_execute",
-    );
-    expect(EXTERNAL_MCP_GUIDANCE).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
-    );
-    expect(EXTERNAL_MCP_GUIDANCE).toContain(
-      "mcp__plugin_context-mode_context-mode__ctx_search",
-    );
-    // Drift guard: the static export must equal the factory output with the
-    // default (claude-code) namer — they share a single template.
+  it("EXTERNAL_MCP_GUIDANCE uses claude-code standalone naming and matches the factory (#529)", () => {
+    expect(EXTERNAL_MCP_GUIDANCE).toContain("mcp__context-mode__ctx_execute");
+    expect(EXTERNAL_MCP_GUIDANCE).toContain("mcp__context-mode__ctx_fetch_and_index");
+    expect(EXTERNAL_MCP_GUIDANCE).toContain("mcp__context-mode__ctx_search");
+    // Drift guard: static export must equal factory output with default (claude-code) namer.
     const claudeCodeT = createToolNamer("claude-code");
     expect(EXTERNAL_MCP_GUIDANCE).toBe(createExternalMcpGuidance(claudeCodeT));
   });
@@ -322,11 +334,13 @@ describe("routePreToolUse with platform parameter", () => {
     expect(cmd).not.toContain("mcp__plugin_context-mode_context-mode__");
   });
 
-  it("curl block message uses claude-code tool names when platform is omitted", () => {
+  it("curl block message uses claude-code standalone tool names when platform is omitted", () => {
+    // No CLAUDE_PLUGIN_ROOT in test env → standalone prefix mcp__context-mode__.
     const result = routePreToolUse("Bash", { command: "curl https://example.com" }, "/tmp");
     expect(result).not.toBeNull();
     const cmd = (result!.updatedInput as Record<string, string>).command;
-    expect(cmd).toContain("mcp__plugin_context-mode_context-mode__ctx_fetch_and_index");
+    expect(cmd).toContain("mcp__context-mode__ctx_fetch_and_index");
+    expect(cmd).not.toContain("mcp__plugin_context-mode_context-mode__");
   });
 
   it("inline HTTP block uses cursor bare names when platform=cursor", () => {
