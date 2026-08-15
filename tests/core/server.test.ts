@@ -3355,7 +3355,23 @@ describe("runBatchCommands edge cases", () => {
 
   test("buildBatchNodeOptionsPrefix formats POSIX shell assignment", () => {
     const prefix = buildBatchNodeOptionsPrefix("bash", "/tmp/cm fs'preload.js");
-    expect(prefix).toBe("NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js' ");
+    expect(prefix).toBe("export NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js'; ");
+  });
+
+  test("buildBatchNodeOptionsPrefix stays valid before a POSIX compound command (#925)", () => {
+    // The inline `VAR=val cmd` form breaks before `if`/`for`/`(...)`; a
+    // standalone `export ...; ` statement composes with any command.
+    const prefix = buildBatchNodeOptionsPrefix("/bin/bash", "/tmp/preload.js");
+    for (const command of [
+      "if command -v example-tool >/dev/null; then example-tool --version; fi",
+      "for x in /tmp/example/*; do [ -x \"$x\" ] && \"$x\" --version; done",
+      '(printf "one\\n"; printf "two\\n") | sed -n "1,10p"',
+    ]) {
+      const script = `${prefix}${command}`;
+      expect(script.startsWith("export NODE_OPTIONS='--require /tmp/preload.js'; ")).toBe(true);
+      // No bare `VAR=val <keyword>` left that a POSIX shell would reject.
+      expect(script).not.toMatch(/^NODE_OPTIONS=\S+ (if|for|while|case|\(|\{)/);
+    }
   });
 
   test("buildBatchNodeOptionsPrefix formats PowerShell assignment", () => {
