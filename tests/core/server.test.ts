@@ -3515,11 +3515,12 @@ describe("runPool primitive", () => {
     expect(capped).toBe(false);
   });
 
-  test("auto-clamp to job count when concurrency > jobs.length", async () => {
+  test("auto-clamp to job count when concurrency > jobs.length is not a cap", async () => {
     const jobs: PoolJob<number>[] = [{ run: async () => 1 }, { run: async () => 2 }];
     const { effectiveConcurrency, capped } = await runPool(jobs, { concurrency: 8 });
     expect(effectiveConcurrency).toBe(2);
-    expect(capped).toBe(true);
+    // A pool larger than its workload is not a CPU/explicit cap (#915).
+    expect(capped).toBe(false);
   });
 
   test("capByCpuCount caps by os.cpus().length", async () => {
