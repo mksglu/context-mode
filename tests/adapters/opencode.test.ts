@@ -599,6 +599,83 @@ describe("OpenCodeAdapter", () => {
         rmSync(root, { recursive: true, force: true });
       });
     });
+
+  // ── getInstalledVersion — PR #376 cache layout ──────────
+
+  describe("getInstalledVersion — PR #376 cache layout", () => {
+    it("reads version from new packages/context-mode@latest path", () => {
+      const root = mkdtempSync(join(tmpdir(), "opencode-ver-"));
+      const home = join(root, "home");
+      const cacheDir = join(home, ".cache");
+      const pkgDir = join(cacheDir, "opencode", "packages", "context-mode@latest", "node_modules", "context-mode");
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ version: "1.0.168" }));
+
+      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+      const run = spawnSync(
+        process.execPath,
+        [
+          tsx,
+          "-e",
+          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(a.getInstalledVersion())`,
+        ],
+        { cwd: root, env: { ...env(home), LOCALAPPDATA: cacheDir }, encoding: "utf-8" },
+      );
+
+      expect(run.status).toBe(0);
+      expect(run.stdout.trim()).toBe("1.0.168");
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    it("returns 'not installed' when cache package.json is missing", () => {
+      const root = mkdtempSync(join(tmpdir(), "opencode-ver-"));
+      const home = join(root, "home");
+      mkdirSync(home, { recursive: true });
+
+      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+      const run = spawnSync(
+        process.execPath,
+        [
+          tsx,
+          "-e",
+          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(a.getInstalledVersion())`,
+        ],
+        { cwd: root, env: { ...env(home), LOCALAPPDATA: join(root, "localAppData") }, encoding: "utf-8" },
+      );
+
+      expect(run.status).toBe(0);
+      expect(run.stdout.trim()).toBe("not installed");
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    it("reads version from kilo platform with new cache layout", () => {
+      const root = mkdtempSync(join(tmpdir(), "kilo-ver-"));
+      const home = join(root, "home");
+      const cacheDir = join(home, ".cache");
+      const pkgDir = join(cacheDir, "kilo", "packages", "context-mode@latest", "node_modules", "context-mode");
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ version: "2.0.0" }));
+
+      const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+      const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+      const run = spawnSync(
+        process.execPath,
+        [
+          tsx,
+          "-e",
+          `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter("kilo");console.log(a.getInstalledVersion())`,
+        ],
+        { cwd: root, env: { ...env(home), LOCALAPPDATA: cacheDir }, encoding: "utf-8" },
+      );
+
+      expect(run.status).toBe(0);
+      expect(run.stdout.trim()).toBe("2.0.0");
+      rmSync(root, { recursive: true, force: true });
+    });
+  });
+
   });
 });
 
