@@ -625,9 +625,9 @@ describe("ContextModePlugin", () => {
         { sessionID: "fresh-session", model: {} } as any,
         out,
       );
-      expect(out.system[0]).toBe("HEADER"); // header preserved
-      expect(out.system.length).toBe(2); // header + routing block (no resume)
-      expect(out.system[1]).toContain("<context_window_protection>");
+      expect(out.system[0]).toContain("HEADER"); // header exists + routing appended
+      expect(out.system.length).toBe(1); // HEADER concatenated (routing appended)
+      expect(out.system[0]).toContain("<context_window_protection>");
       expect(out.system.join("\n")).not.toContain("session_resume");
     });
 
@@ -654,8 +654,8 @@ describe("ContextModePlugin", () => {
         { sessionID: "new-session", model: {} } as any,
         out,
       );
-      expect(out.system[0]).toBe("HEADER");
-      expect(out.system.length).toBe(3); // HEADER + routing + snapshot
+      expect(out.system[0]).toContain("HEADER");
+      expect(out.system.length).toBe(1); // HEADER with routing + snapshot appended
       expect(out.system.some((s) => s.includes("session_resume"))).toBe(true);
       expect(out.system.some((s) => s.includes("<context_window_protection>"))).toBe(true);
     });
@@ -691,12 +691,12 @@ describe("ContextModePlugin", () => {
       );
       // The snapshot was inserted, but header at index 0 is preserved
       // exactly as OpenCode saw it before the hook.
-      expect(out.system[0]).toBe(HEADER);
-      expect(out.system[out.system.length - 1]).toBe(BODY);
-      expect(out.system.length).toBe(4); // HEADER + routing + snapshot + BODY
-      const middle = out.system.slice(1, -1).join("\n");
-      expect(middle).toContain("session_resume");
-      expect(middle).toContain("<context_window_protection>");
+      expect(out.system[0]).toContain(HEADER);
+      expect(out.system[out.system.length - 1]).toContain(BODY);
+      expect(out.system.length).toBe(2); // HEADER + BODY, routing & snapshot appended to BODY
+      const joined = out.system.join("\n");
+      expect(joined).toContain("session_resume");
+      expect(joined).toContain("<context_window_protection>");
     });
 
     it("does NOT re-inject resume snapshot on second call with the same sessionID (multi-turn)", async () => {
@@ -719,7 +719,7 @@ describe("ContextModePlugin", () => {
         out1,
       );
       // First turn: HEADER + routing + snapshot
-      expect(out1.system.length).toBe(3);
+      expect(out1.system.length).toBe(1);
 
       const out2 = { system: ["HEADER"] };
       await plugin["experimental.chat.system.transform"](
@@ -727,8 +727,8 @@ describe("ContextModePlugin", () => {
         out2,
       );
       // Same session — resume snapshot consumed from DB. Routing block re-injects (no dedup).
-      expect(out2.system.length).toBe(2); // HEADER + routing block
-      expect(out2.system[1]).toContain("<context_window_protection>");
+      expect(out2.system.length).toBe(1); // HEADER with routing appended
+      expect(out2.system[0]).toContain("<context_window_protection>");
       expect(out2.system.join("\n")).not.toContain("session_resume");
     });
 
@@ -757,9 +757,9 @@ describe("ContextModePlugin", () => {
         out,
       );
       // No resume snapshot for B (self-inject guard) but routing block lands.
-      expect(out.system.length).toBe(3);
-      expect(out.system[0]).toBe("HEADER");
-      expect(out.system[2]).toBe("BODY");
+      expect(out.system.length).toBe(2); // HEADER + BODY with routing appended to BODY
+      expect(out.system[0]).toContain("HEADER");
+      expect(out.system[1]).toContain("BODY");
       expect(out.system.join("\n")).not.toContain("session_resume");
       expect(out.system[1]).toContain("<context_window_protection>");
     });
@@ -777,7 +777,7 @@ describe("ContextModePlugin", () => {
         { sessionID: "C", model: {} } as any,
         out1,
       );
-      expect(out1.system.length).toBe(2); // HEADER + routing block
+      expect(out1.system.length).toBe(1); // HEADER with routing appended
       expect(out1.system.join("\n")).not.toContain("session_resume");
 
       // Now a different session compacts and produces a snapshot
@@ -797,9 +797,9 @@ describe("ContextModePlugin", () => {
         { sessionID: "C", model: {} } as any,
         out2,
       );
-      expect(out2.system.length).toBe(3); // HEADER + snapshot + routing
-      expect(out2.system[1]).toContain("session_resume");
-      expect(out2.system[2]).toContain("<context_window_protection>");
+      expect(out2.system.length).toBe(1); // HEADER with snapshot + routing appended
+      expect(out2.system[0]).toContain("session_resume");
+      expect(out2.system[0]).toContain("<context_window_protection>");
     });
 
     // v1.0.106 — prefer next session over self-injection
@@ -823,9 +823,9 @@ describe("ContextModePlugin", () => {
         { sessionID: "B", model: {} } as any,
         outB,
       );
-      expect(outB.system.length).toBe(2);
+      expect(outB.system.length).toBe(1);
       expect(outB.system.join("\n")).not.toContain("session_resume");
-      expect(outB.system[1]).toContain("<context_window_protection>");
+      expect(outB.system[0]).toContain("<context_window_protection>");
 
       // C asks — gets B's snapshot AND routing block (both first-fire for C)
       const outC = { system: ["HEADER"] };
@@ -833,7 +833,7 @@ describe("ContextModePlugin", () => {
         { sessionID: "C", model: {} } as any,
         outC,
       );
-      expect(outC.system.length).toBe(3); // HEADER + routing
+      expect(outC.system.length).toBe(1); // HEADER with routing + snapshot appended
       expect(outC.system.some((s) => s.includes("session_resume"))).toBe(true);
     });
 
@@ -856,7 +856,7 @@ describe("ContextModePlugin", () => {
         out,
       );
       // v1.0.107 — out.system is [HEADER, routing-block]
-      expect(out.system.length).toBe(3);
+      expect(out.system.length).toBe(1); // HEADER with routing + snapshot
       const snapshotEntry = out.system.find((s) => s.includes("session_resume"));
       expect(snapshotEntry).toBeDefined();
     });
@@ -903,9 +903,9 @@ describe("ContextModePlugin", () => {
         { sessionID: "oc1-fresh", model: {} } as any,
         out,
       );
-      // header preserved at index 0 (cache-fold invariant)
-      expect(out.system[0]).toBe("HEADER");
-      // routing block spliced at index 1
+      // header preserved via concatenation (content merged into existing entries)
+      expect(out.system[0]).toContain("HEADER");
+      // routing block appended to last system entry
       const joined = out.system.join("\n");
       expect(joined).toContain("<context_window_protection>");
       expect(joined).toContain("<priority_instructions>");
@@ -929,7 +929,7 @@ describe("ContextModePlugin", () => {
       );
       // Routing block injects every turn for reliability (no dedup set).
       expect(out2.system.join("\n")).toContain("<context_window_protection>");
-      expect(out2.system.length).toBe(2);
+      expect(out2.system.length).toBe(1);
     });
 
     it("OC-1: skips routing block when system prompt already contains context-mode instructions", async () => {
@@ -953,7 +953,7 @@ describe("ContextModePlugin", () => {
       // itself contains <context_window_protection>, so we assert by structure
       // (no new entry spliced in) rather than substring absence.
       expect(out.system.length).toBe(2);
-      expect(out.system[0]).toBe("HEADER");
+      expect(out.system[0]).toContain("HEADER");
       expect(out.system[1]).toBe(agentsContent);
     });
 
@@ -968,7 +968,7 @@ describe("ContextModePlugin", () => {
         { sessionID: "oc1-quorum-sess", model: {} } as any,
         out,
       );
-      expect(out.system.length).toBe(3); // HEADER + routing + partialContent
+      expect(out.system.length).toBe(2); // HEADER + partialContent with routing appended
       expect(out.system[1]).toContain("<context_window_protection>");
     });
   });
@@ -1298,7 +1298,7 @@ describe("ContextModePlugin", () => {
       ).resolves.not.toThrow();
 
       // Routing block still spliced at index 1 (turn-break would skip this)
-      expect(out.system[0]).toBe("HEADER");
+      expect(out.system[0]).toContain("HEADER");
       expect(out.system.join("\n")).toContain("<context_window_protection>");
     });
 
