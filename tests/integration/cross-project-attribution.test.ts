@@ -36,7 +36,7 @@ function platformConfigFile(fakeHome: string): string {
   return join(fakeHome, ".context-mode", "platform.json");
 }
 
-const gitSetupShell = process.platform === "win32" ? undefined : "/bin/bash";
+const gitSetupShell = process.platform === "win32" ? undefined : "bash";
 
 function shellPath(path: string): string {
   return path.replace(/\\/g, "/");
