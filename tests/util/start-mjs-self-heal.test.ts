@@ -226,26 +226,28 @@ describe("start.mjs — Issue #577 CLAUDE_CONFIG_DIR honoring", () => {
     );
   });
 
-  test("auto-deployed heal script template honors CLAUDE_CONFIG_DIR at its own runtime", () => {
-    // The embedded `healScript` template literal becomes
-    // $CLAUDE_CONFIG_DIR/hooks/context-mode-cache-heal.mjs. Its OWN runtime
-    // — i.e. when Claude Code spawns it on SessionStart — must also honor
-    // CLAUDE_CONFIG_DIR. So the template literal itself has to embed the
-    // env-var read; baking the value at start.mjs render time would freeze
-    // the heal script to whatever CLAUDE_CONFIG_DIR was set to at install.
-    const startOfTpl = startSrc.indexOf("const healScript = `");
-    expect(startOfTpl).toBeGreaterThan(-1);
-    const endMarker = "writeFileSync(healHookPath, healScript";
-    const endIdx = startSrc.indexOf(endMarker, startOfTpl);
-    expect(endIdx).toBeGreaterThan(startOfTpl);
-    const tpl = startSrc.slice(startOfTpl, endIdx);
+  test("auto-deployed heal script honors CLAUDE_CONFIG_DIR at its own runtime", () => {
+    // The heal body is deployed verbatim to
+    // $CLAUDE_CONFIG_DIR/hooks/context-mode-cache-heal.mjs. Its OWN runtime —
+    // i.e. when Claude Code spawns it on SessionStart — must also honor
+    // CLAUDE_CONFIG_DIR, so the body must embed the env-var read rather than
+    // bake a value at deploy time. The body is the standalone hooks/cache-heal.mjs
+    // (start.mjs reads it verbatim), not an inline template literal.
+    const healSrc = readFileSync(
+      resolve(ROOT, "hooks", "cache-heal.mjs"),
+      "utf-8",
+    );
 
-    expect(tpl).toContain("CLAUDE_CONFIG_DIR");
+    // start.mjs must load the body from the standalone file (single source of truth).
+    expect(startSrc).toMatch(
+      /readFileSync\(\s*resolve\(__dirname,\s*["']hooks["'],\s*["']cache-heal\.mjs["']\)/,
+    );
 
-    // Embedded resolve() calls inside the template must NOT be the
-    // hardcoded ~/.claude form.
-    const tplBadForm =
+    expect(healSrc).toContain("CLAUDE_CONFIG_DIR");
+
+    // resolve() calls inside the body must NOT be the hardcoded ~/.claude form.
+    const badForm =
       /resolve\(\s*homedir\(\)\s*,\s*["']\.claude["']\s*,\s*["']plugins["']/;
-    expect(tpl).not.toMatch(tplBadForm);
+    expect(healSrc).not.toMatch(badForm);
   });
 });
