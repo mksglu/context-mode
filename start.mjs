@@ -7,7 +7,6 @@ import { homedir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const originalCwd = process.cwd();
-process.chdir(__dirname);
 
 // Resolve the Claude Code config dir, honoring $CLAUDE_CONFIG_DIR (incl. leading ~).
 // Mirrors hooks/session-helpers.mjs::resolveConfigDir and hooks/run-hook.mjs (#453).
