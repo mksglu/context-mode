@@ -53,7 +53,7 @@ Before writing, read these files and use ONLY verified numbers:
 | Adapter count | `tests/adapters/` (count test files) |
 | GitHub stars | `gh api repos/mksglu/context-mode --jq '.stargazers_count'` |
 | GitHub forks | `gh api repos/mksglu/context-mode --jq '.forks_count'` |
-| Open issues | `gh issue list --state open --json number --jq 'length'` |
+| Open issues | `gh api 'search/issues?q=repo:mksglu/context-mode+is:issue+is:open' --jq '.total_count'` |
 | Recent release | `gh release list --limit 1` |
 
 If you cannot verify a number, do not use it.
