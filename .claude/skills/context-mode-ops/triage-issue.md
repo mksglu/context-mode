@@ -12,8 +12,8 @@ Use `ctx_batch_execute` to gather everything in ONE call:
 
 ```javascript
 commands: [
-  { label: "issue-body", command: "gh issue view {N} --json title,body,labels,state,comments,author,createdAt" },
-  { label: "issue-comments", command: "gh issue view {N} --comments" },
+  { label: "issue-body", command: "gh issue view {N} --json number,title,body,labels,state,comments,author,createdAt" },
+  { label: "issue-comments", command: "gh issue view {N} --json number,comments" },
   { label: "recent-related-prs", command: "gh pr list --state all --limit 10 --json number,title,state,headRefName" },
   { label: "source-tree", command: "find src -type f -name '*.ts' | sort" },
   { label: "test-tree", command: "find tests -type f -name '*.test.ts' | sort" },

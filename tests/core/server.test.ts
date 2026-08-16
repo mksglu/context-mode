@@ -3028,6 +3028,29 @@ describe("batch_execute FS read tracking", () => {
   });
 });
 
+describe("ctx_batch_execute GitHub issue examples", () => {
+  const ISSUE_GUIDANCE_SOURCE_PATHS = [
+    resolve(__dirname, "../../src/server.ts"),
+    resolve(__dirname, "../../.claude/skills/context-mode-ops/triage-issue.md"),
+  ];
+  const DEPRECATED_PROJECT_CARDS_ERROR = "repository.issue.projectCards";
+  const BARE_ISSUE_VIEW_COMMAND = /gh issue view \d+(?![^\"]*--json)/;
+  const SAFE_ISSUE_VIEW_COMMAND =
+    /gh issue view \d+ --json number,title,body,comments/;
+
+  test("avoid bare gh issue view commands that request deprecated projectCards", () => {
+    const source = ISSUE_GUIDANCE_SOURCE_PATHS.map((sourcePath) =>
+      readFileSync(sourcePath, "utf-8"),
+    ).join("\n");
+
+    expect(
+      BARE_ISSUE_VIEW_COMMAND.test(source),
+      `Bare gh issue view can fail with ${DEPRECATED_PROJECT_CARDS_ERROR}`,
+    ).toBe(false);
+    expect(source).toMatch(SAFE_ISSUE_VIEW_COMMAND);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // runBatchCommands — concurrency, ordering, timeout semantics
 // ═══════════════════════════════════════════════════════════════════════════
