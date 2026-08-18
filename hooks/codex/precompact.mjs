@@ -16,6 +16,7 @@ import {
   CODEX_OPTS,
 } from "../session-helpers.mjs";
 import { createSessionLoaders } from "../session-loaders.mjs";
+import { createToolNamer } from "../core/tool-naming.mjs";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +44,7 @@ try {
     const stats = db.getSessionStats(sessionId);
     const snapshot = buildResumeSnapshot(events, {
       compactCount: (stats?.compact_count ?? 0) + 1,
+      searchTool: createToolNamer("codex")("ctx_search"),
     });
 
     db.upsertResume(sessionId, snapshot, events.length);
