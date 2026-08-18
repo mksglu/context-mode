@@ -835,6 +835,33 @@ describe("v1.0.148 Bug G — Section 1 bar uses strict-compression formula", () 
     expect(pct).toBeGreaterThan(99);
     expect(pct).toBeLessThan(100);
   });
+
+  it("byte ratio uses accurate wording, not time-language (#1023)", () => {
+    const { conversation, report } = makeNarrativeContext();
+    const conversationRealBytes = {
+      eventDataBytes: 0,
+      bytesAvoided: 100_000,
+      bytesReturned: 100,
+      snapshotBytes: 0,
+      contentBytes: 0,
+      totalSavedTokens: Math.floor(100_100 / 4),
+    };
+
+    const output = formatReport(report, "1.0.169", null, {
+      conversation: conversation as any,
+      realBytes: { conversation: conversationRealBytes as any },
+    });
+
+    const ratioLine = output
+      .split("\n")
+      .find((l) => l.includes("kept out of context") && l.includes("%"));
+    expect(ratioLine, `bar summary line missing in:\n${output}`).toBeDefined();
+    // Must NOT use time/longevity language for a byte ratio
+    expect(ratioLine!).not.toContain("ran");
+    expect(ratioLine!).not.toContain("longer");
+    // Must still show the multiplier in an accurate form
+    expect(ratioLine!).toMatch(/\d+×/);
+  });
 });
 
 // ─────────────────────────────────────────────────────────
