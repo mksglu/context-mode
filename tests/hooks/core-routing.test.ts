@@ -490,6 +490,22 @@ describe("routePreToolUse", () => {
       expect(subagent.status).toBe(0);
       expect(subagent.stdout).toBe("");
     });
+
+    it("treats opencode webfetch as WebFetch and blocks it (#1052)", () => {
+      const url = "https://example.com";
+      const result = routePreToolUse(
+        "webfetch",
+        { url },
+        undefined,
+        "opencode",
+        "opencode-webfetch",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("deny");
+      expect(result!.reason).toContain("WebFetch redirected");
+      expect(result!.reason).toContain("fetch_and_index");
+      expect(result!.reason).toContain("ctx_search");
+    });
   });
 
   // ─── MCP readiness: all redirects degrade gracefully (#230) ───
