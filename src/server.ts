@@ -418,23 +418,6 @@ const executor = new PolyglotExecutor({
   projectRoot: () => getProjectDir(),
 });
 
-// ─────────────────────────────────────────────────────────
-// FS read tracking preload for ctx_batch_execute
-// ─────────────────────────────────────────────────────────
-// NODE_OPTIONS is denied by the executor's #buildSafeEnv (security).
-// Instead, we inject it as an inline shell env prefix in each batch command.
-// This temp file is loaded via --require when batch commands spawn Node processes.
-const CM_FS_PRELOAD = join(tmpdir(), `cm-fs-preload-${process.pid}.js`);
-writeFileSync(
-  CM_FS_PRELOAD,
-  `(function(){var __cm_fs=0;process.on('exit',function(){if(__cm_fs>0)try{process.stderr.write('__CM_FS__:'+__cm_fs+'\\n')}catch(e){}});try{var f=require('fs');var ors=f.readFileSync;f.readFileSync=function(){var r=ors.apply(this,arguments);if(Buffer.isBuffer(r))__cm_fs+=r.length;else if(typeof r==='string')__cm_fs+=Buffer.byteLength(r);return r;};}catch(e){}})();\n`,
-);
-// In the stdio MCP path, main() also removes this file during graceful
-// shutdown. Plugin-native OpenCode/Kilo imports skip main() (#574), so
-// register a top-level best-effort cleanup too to avoid leaking preload
-// snippets under /tmp when the host process exits.
-process.on("exit", () => { try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ } });
-
 // Lazy singleton — no DB overhead unless index/search is used
 let _store: ContentStore | null = null;
 
@@ -1426,37 +1409,11 @@ export interface BatchRunOptions {
    */
   timeout: number | undefined;
   concurrency: number;
-  nodeOptsPrefix: string;
   cwd?: string;
-  onFsBytes?: (bytes: number) => void;
 }
 
 interface BatchExecutor {
-  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{ stdout: string; timedOut?: boolean }>;
-}
-
-function quotePosixSingle(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
-function quotePowerShellSingle(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
-export function buildBatchNodeOptionsPrefix(shellPath: string, preloadPath: string): string {
-  const option = `--require ${preloadPath}`;
-  const shell = shellPath.toLowerCase();
-  const base = shell.split(/[\\/]/).pop() ?? shell;
-
-  if (shell.includes("powershell") || shell.includes("pwsh")) {
-    return `$env:NODE_OPTIONS=${quotePowerShellSingle(option)}; `;
-  }
-
-  if (base === "cmd" || base === "cmd.exe") {
-    return `set "NODE_OPTIONS=${option.replace(/"/g, '""')}" && `;
-  }
-
-  return `NODE_OPTIONS=${quotePosixSingle(option)} `;
+  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{ stdout: string; stderr?: string; timedOut?: boolean }>;
 }
 
 /**
@@ -1516,15 +1473,8 @@ function buildExecuteEcho(language: string, code: string, path?: string): string
   return `${header}${fenced}\n\n`;
 }
 
-function formatCommandOutput(label: string, command: string, raw: string, onFsBytes?: (bytes: number) => void): string {
-  let output = raw || "(no output)";
-  const fsMatches = output.matchAll(/__CM_FS__:(\d+)/g);
-  let cmdFsBytes = 0;
-  for (const m of fsMatches) cmdFsBytes += parseInt(m[1]);
-  if (cmdFsBytes > 0) {
-    onFsBytes?.(cmdFsBytes);
-    output = output.replace(/__CM_FS__:\d+\n?/g, "");
-  }
+function formatCommandOutput(label: string, command: string, raw: string): string {
+  const output = raw || "(no output)";
   // Echo the executed command below the section heading so per-chunk
   // indexed content retains provenance for later ctx_search hits
   // (Issues #717 + #736).
@@ -1552,7 +1502,7 @@ export async function runBatchCommands(
   opts: BatchRunOptions,
   executor: BatchExecutor,
 ): Promise<BatchRunResult> {
-  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes } = opts;
+  const { timeout, concurrency, cwd } = opts;
 
   if (concurrency <= 1) {
     // Serial path — shared timeout budget, cascading skip on timeout.
@@ -1576,11 +1526,11 @@ export async function runBatchCommands(
       }
       const result = await executor.execute({
         language: "shell",
-        code: `${nodeOptsPrefix}${cmd.command}`,
+        code: cmd.command,
         timeout: perCmdTimeout,
         cwd,
       });
-      outputs.push(formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes));
+      outputs.push(formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result)));
       if (result.timedOut) {
         timedOut = true;
         for (let j = i + 1; j < commands.length; j++) {
@@ -1599,13 +1549,11 @@ export async function runBatchCommands(
     run: async () => {
       const result = await executor.execute({
         language: "shell",
-        code: `${nodeOptsPrefix}${cmd.command}`,
+        code: cmd.command,
         timeout,
         cwd,
       });
-      // Always route partial output through formatCommandOutput so __CM_FS__
-      // markers are stripped + counted, even when the command timed out.
-      const formatted = formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes);
+      const formatted = formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result));
       const output = result.timedOut
         ? formatted.replace(/\n$/, "") + `\n(timed out after ${timeout ?? "?"}ms)\n`
         : formatted;
@@ -4255,11 +4203,6 @@ EXAMPLE: ctx_batch_execute(
     }
 
     try {
-      // Inject NODE_OPTIONS for FS read tracking in spawned Node processes.
-      // The executor denies NODE_OPTIONS in its env (security), so we set it
-      // as an inline shell prefix. This only affects child `node` invocations.
-      const nodeOptsPrefix = buildBatchNodeOptionsPrefix(runtimes.shell, CM_FS_PRELOAD);
-
       // Full stdout is preserved per-command and indexed into FTS5 (Issue #61, #197).
       // Concurrency>1 switches to a worker pool with per-command timeouts.
       const effTimeout = resolveExecTimeout(timeout);
@@ -4268,9 +4211,7 @@ EXAMPLE: ctx_batch_execute(
         {
           timeout: effTimeout,
           concurrency,
-          nodeOptsPrefix,
           cwd,
-          onFsBytes: (bytes) => { sessionStats.bytesSandboxed += bytes; },
         },
         executor,
       );
@@ -5325,11 +5266,10 @@ async function main() {
   // #844: handle to the periodic sentinel refresh timer (started after connect).
   let sentinelRefresh: ReturnType<typeof setInterval> | undefined;
 
-  // Clean up own DB + backgrounded processes + preload script on shutdown
+  // Clean up own DB + backgrounded processes on shutdown
   const shutdown = () => {
     executor.cleanupBackgrounded();
     if (_store) _store.close(); // persist DB for --continue sessions
-    try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ }
     // Remove MCP readiness sentinel (#230)
     try { unlinkSync(mcpSentinel); } catch { /* best effort */ }
     // #844: stop refreshing the sentinel mtime on shutdown.

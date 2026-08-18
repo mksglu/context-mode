@@ -49,8 +49,6 @@ function mkMockExecutor(
   };
 }
 
-const NOOP_PREFIX = "";
-
 // ════════════════════════════════════════════════════════════════════════════
 // Behaviour 1 — runBatchCommands echoes `$ <command>` in each section
 // ════════════════════════════════════════════════════════════════════════════
@@ -64,7 +62,7 @@ describe("issue #736 — ctx_batch_execute echoes the ran command per section", 
     const exec = mkMockExecutor(() => ({ stdout: "ok\n" }));
     const { outputs } = await runBatchCommands(
       cmds,
-      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: 5000, concurrency: 1 },
       exec,
     );
 
@@ -84,7 +82,7 @@ describe("issue #736 — ctx_batch_execute echoes the ran command per section", 
     const exec = mkMockExecutor(() => ({ stdout: "ok\n" }));
     const { outputs } = await runBatchCommands(
       cmds,
-      { timeout: 5000, concurrency: 3, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: 5000, concurrency: 3 },
       exec,
     );
     for (let i = 0; i < cmds.length; i++) {
@@ -104,7 +102,7 @@ describe("issue #736 — pathological heredoc commands truncate cleanly", () => 
     const exec = mkMockExecutor(() => ({ stdout: "ok\n" }));
     const { outputs } = await runBatchCommands(
       [{ label: "heredoc", command: heredoc }],
-      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: 5000, concurrency: 1 },
       exec,
     );
     const section = outputs[0];
@@ -229,8 +227,27 @@ describe("issue #717 — ctx_execute echoes the language + code it ran", () => {
 // ════════════════════════════════════════════════════════════════════════════
 describe("issue #736 — ctx_batch_execute summary includes a Commands inventory", () => {
   let projectDir: string;
+  let nestedProcessScript: string;
   beforeAll(() => {
     projectDir = mkdtempSync(join(tmpdir(), "echo-batch-"));
+    const fixturePath = join(projectDir, "nested-process-fixture.txt");
+    nestedProcessScript = join(projectDir, "inspect-nested-stderr.mjs");
+    writeFileSync(fixturePath, "fixture data", "utf-8");
+    const childSource = `require("node:fs").readFileSync(${JSON.stringify(fixturePath)}); process.stdout.write(JSON.stringify(process.env.NODE_OPTIONS ?? null)); process.stderr.write("expected-child-stderr\\n");`;
+    writeFileSync(
+      nestedProcessScript,
+      [
+        'import { spawnSync } from "node:child_process";',
+        `const child = spawnSync(process.execPath, ["-e", ${JSON.stringify(childSource)}], { encoding: "utf8" });`,
+        'if (process.env.NODE_OPTIONS === undefined && child.stdout === "null" && child.stderr === "expected-child-stderr\\n") {',
+        '  process.stdout.write("nested-stderr-clean\\n");',
+        '} else {',
+        '  process.stdout.write(`contaminated=${JSON.stringify({ parentNodeOptions: process.env.NODE_OPTIONS, childNodeOptions: child.stdout, childStderr: child.stderr })}\\n`);',
+        '  process.exitCode = 1;',
+        '}',
+      ].join("\n"),
+      "utf-8",
+    );
   });
   afterAll(() => {
     rmSync(projectDir, { recursive: true, force: true });
@@ -268,6 +285,31 @@ describe("issue #736 — ctx_batch_execute summary includes a Commands inventory
       expect(cmdIdx).toBeGreaterThan(-1);
       expect(secIdx).toBeGreaterThan(-1);
       expect(cmdIdx).toBeLessThan(secIdx);
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+    }
+  }, 30_000);
+
+  test("does not inject NODE_OPTIONS or alter nested process stderr", async () => {
+    const proc = spawnServer({ CLAUDE_PROJECT_DIR: projectDir });
+    try {
+      await initServer(proc);
+      const command = `node "${nestedProcessScript.replace(/\\/g, "/")}"`;
+      const resp = await awaitRpc(proc, 103, {
+        jsonrpc: "2.0", id: 103, method: "tools/call",
+        params: {
+          name: "ctx_batch_execute",
+          arguments: {
+            commands: [{ label: "nested stderr", command }],
+            queries: ["nested stderr clean contaminated"],
+            cwd: projectDir,
+          },
+        },
+      });
+      expect(resp?.error).toBeUndefined();
+      const text = resp?.result?.content?.[0]?.text ?? "";
+      expect(text).toContain("nested-stderr-clean");
+      expect(text).not.toContain("contaminated=");
     } finally {
       try { proc.kill("SIGTERM"); } catch { /* best effort */ }
     }

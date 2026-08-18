@@ -2967,41 +2967,14 @@ describe("FS read instrumentation", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// batch_execute FS read tracking via NODE_OPTIONS preload
+// batch_execute configuration
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("batch_execute FS read tracking", () => {
+describe("batch_execute configuration", () => {
   const serverSrc = readFileSync(
     resolve(__dirname, "../../src/server.ts"),
     "utf-8",
   );
-
-  test("creates CM_FS_PRELOAD temp file with FS tracking script", () => {
-    expect(serverSrc).toContain("CM_FS_PRELOAD");
-    expect(serverSrc).toContain("cm-fs-preload-");
-    // Preload script must write __CM_FS__ marker to stderr on exit
-    expect(serverSrc).toMatch(/writeFileSync\(\s*CM_FS_PRELOAD/);
-  });
-
-  test("sets NODE_OPTIONS with --require for batch commands", () => {
-    expect(serverSrc).toContain("buildBatchNodeOptionsPrefix");
-    expect(serverSrc).toContain("nodeOptsPrefix");
-  });
-
-  test("parses __CM_FS__ from batch output and updates bytesSandboxed", () => {
-    expect(serverSrc).toContain("/__CM_FS__:(\\d+)/g");
-    // Handler wires the FS-bytes callback to sessionStats; the runner strips/parses.
-    expect(serverSrc).toContain("sessionStats.bytesSandboxed += bytes");
-    expect(serverSrc).toContain("onFsBytes?.(cmdFsBytes)");
-  });
-
-  test("strips __CM_FS__ markers from batch command output", () => {
-    expect(serverSrc).toContain('output.replace(/__CM_FS__:\\d+\\n?/g, "")');
-  });
-
-  test("cleans up preload file on shutdown", () => {
-    expect(serverSrc).toContain("unlinkSync(CM_FS_PRELOAD)");
-  });
 
   test("handler accepts concurrency input field with min/max bounds", () => {
     expect(serverSrc).toContain("concurrency: z");
@@ -3033,7 +3006,6 @@ describe("batch_execute FS read tracking", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
-  buildBatchNodeOptionsPrefix,
   runBatchCommands,
   type BatchCommand,
 } from "../../src/server.js";
@@ -3048,8 +3020,6 @@ function mkMockExecutor(
   };
 }
 
-const NOOP_PREFIX = ""; // tests don't need NODE_OPTIONS prefix
-
 describe("runBatchCommands serial path (concurrency=1)", () => {
   test("happy path: outputs in input order, no timeout cascade", async () => {
     const cmds: BatchCommand[] = [
@@ -3058,7 +3028,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
       { label: "C", command: "echo c" },
     ];
     const exec = mkMockExecutor((code) => ({ stdout: code.includes("echo a") ? "a" : code.includes("echo b") ? "b" : "c" }));
-    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 1 }, exec);
     expect(timedOut).toBe(false);
     expect(outputs).toHaveLength(3);
     expect(outputs[0]).toContain("# A");
@@ -3076,7 +3046,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     });
     const { outputs, timedOut } = await runBatchCommands(
       [{ label: "heredoc", command: heredoc }],
-      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: 5000, concurrency: 1 },
       exec,
     );
 
@@ -3096,7 +3066,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
 
     await runBatchCommands(
       [{ label: "cwd", command: "pwd" }],
-      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX, cwd: "/worktree/repo" },
+      { timeout: 5000, concurrency: 1, cwd: "/worktree/repo" },
       exec,
     );
 
@@ -3114,7 +3084,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
       { label: "next", command: "echo next" },
       { label: "after", command: "echo after" },
     ];
-    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 100, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 100, concurrency: 1 }, exec);
     expect(callCount).toBe(1); // only slow command executed
     expect(timedOut).toBe(true);
     expect(outputs[0]).toContain("# slow");
@@ -3134,7 +3104,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
       { label: "B", command: "x" },
       { label: "C", command: "x" }, // by here, elapsed > 100ms
     ];
-    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 100, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 100, concurrency: 1 }, exec);
     expect(callCount).toBeLessThan(3);
     expect(timedOut).toBe(true);
     expect(outputs.some((o) => o.includes("(skipped — batch timeout exceeded)"))).toBe(true);
@@ -3154,7 +3124,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     ];
     const { outputs, timedOut } = await runBatchCommands(
       cmds,
-      { timeout: undefined, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: undefined, concurrency: 1 },
       exec,
     );
     expect(timedOut).toBe(false);
@@ -3176,7 +3146,7 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     ];
     await runBatchCommands(
       cmds,
-      { timeout: undefined, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: undefined, concurrency: 1 },
       exec,
     );
     expect(seenTimeouts).toEqual([undefined, undefined]);
@@ -3195,7 +3165,7 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       { label: "C", command: "z" },
     ];
     const start = Date.now();
-    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 3, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 3 }, exec);
     const elapsed = Date.now() - start;
     expect(timedOut).toBe(false);
     expect(outputs).toHaveLength(3);
@@ -3212,7 +3182,7 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       { label: "ONE", command: "node - <<'NODE'\nconsole.log('one')\nNODE" },
       { label: "TWO", command: "python3 - <<'PY'\nprint('two')\nPY" },
     ];
-    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 2 }, exec);
 
     expect(timedOut).toBe(false);
     expect(seenCodes).toEqual(cmds.map((cmd) => cmd.command));
@@ -3236,7 +3206,7 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
 
     await runBatchCommands(
       cmds,
-      { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX, cwd: "/worktree/repo" },
+      { timeout: 5000, concurrency: 2, cwd: "/worktree/repo" },
       exec,
     );
 
@@ -3255,7 +3225,7 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       { label: "SECOND", command: "echo second" },
       { label: "THIRD", command: "echo third" },
     ];
-    const { outputs } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 3, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs } = await runBatchCommands(cmds, { timeout: 5000, concurrency: 3 }, exec);
     expect(outputs[0]).toContain("# FIRST");
     expect(outputs[1]).toContain("# SECOND");
     expect(outputs[2]).toContain("# THIRD");
@@ -3272,7 +3242,7 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       return { stdout: "ok" };
     });
     const cmds: BatchCommand[] = Array.from({ length: 6 }, (_, i) => ({ label: `C${i}`, command: "x" }));
-    await runBatchCommands(cmds, { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    await runBatchCommands(cmds, { timeout: 5000, concurrency: 2 }, exec);
     expect(maxInFlight).toBeLessThanOrEqual(2);
     expect(maxInFlight).toBeGreaterThanOrEqual(2);
   });
@@ -3286,7 +3256,7 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       { label: "slow", command: "sleep slow" },
       { label: "fast", command: "echo fast" },
     ];
-    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 100, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands(cmds, { timeout: 100, concurrency: 2 }, exec);
     expect(timedOut).toBe(true);
     expect(outputs[0]).toContain("(timed out after 100ms)");
     expect(outputs[1]).toContain("ok");
@@ -3303,11 +3273,11 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       return { stdout: "ok" };
     });
     const cmds: BatchCommand[] = [{ label: "A", command: "x" }, { label: "B", command: "y" }];
-    await runBatchCommands(cmds, { timeout: 5000, concurrency: 8, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    await runBatchCommands(cmds, { timeout: 5000, concurrency: 8 }, exec);
     expect(maxInFlight).toBeLessThanOrEqual(2);
   });
 
-  test("FS bytes callback fires per-command in parallel branch", async () => {
+  test("preserves marker-shaped command output", async () => {
     const exec = mkMockExecutor((code) => ({
       stdout: code.includes("a") ? "out a\n__CM_FS__:100\n" : "out b\n__CM_FS__:200\n",
     }));
@@ -3315,22 +3285,20 @@ describe("runBatchCommands parallel path (concurrency>1)", () => {
       { label: "A", command: "echo a" },
       { label: "B", command: "echo b" },
     ];
-    let totalBytes = 0;
     const { outputs } = await runBatchCommands(
       cmds,
-      { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX, onFsBytes: (b) => { totalBytes += b; } },
+      { timeout: 5000, concurrency: 2 },
       exec,
     );
-    expect(totalBytes).toBe(300);
-    // markers stripped from output
-    expect(outputs.join("")).not.toContain("__CM_FS__");
+    expect(outputs.join("")).toContain("__CM_FS__:100");
+    expect(outputs.join("")).toContain("__CM_FS__:200");
   });
 });
 
 describe("runBatchCommands edge cases", () => {
   test("empty commands array returns empty outputs", async () => {
     const exec = mkMockExecutor(() => ({ stdout: "" }));
-    const { outputs, timedOut } = await runBatchCommands([], { timeout: 1000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs, timedOut } = await runBatchCommands([], { timeout: 1000, concurrency: 1 }, exec);
     expect(outputs).toHaveLength(0);
     expect(timedOut).toBe(false);
   });
@@ -3338,40 +3306,8 @@ describe("runBatchCommands edge cases", () => {
   test("empty stdout becomes (no output) sentinel", async () => {
     const exec = mkMockExecutor(() => ({ stdout: "" }));
     const cmds: BatchCommand[] = [{ label: "A", command: "x" }];
-    const { outputs } = await runBatchCommands(cmds, { timeout: 1000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX }, exec);
+    const { outputs } = await runBatchCommands(cmds, { timeout: 1000, concurrency: 1 }, exec);
     expect(outputs[0]).toContain("(no output)");
-  });
-
-  test("nodeOptsPrefix is prepended to each command", async () => {
-    const seen: string[] = [];
-    const exec = mkMockExecutor((code) => {
-      seen.push(code);
-      return { stdout: "ok" };
-    });
-    const cmds: BatchCommand[] = [{ label: "A", command: "echo hi" }];
-    await runBatchCommands(cmds, { timeout: 1000, concurrency: 1, nodeOptsPrefix: 'NODE_OPTIONS="--require /tmp/x" ' }, exec);
-    expect(seen[0]).toBe('NODE_OPTIONS="--require /tmp/x" echo hi');
-  });
-
-  test("buildBatchNodeOptionsPrefix formats POSIX shell assignment", () => {
-    const prefix = buildBatchNodeOptionsPrefix("bash", "/tmp/cm fs'preload.js");
-    expect(prefix).toBe("NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js' ");
-  });
-
-  test("buildBatchNodeOptionsPrefix formats PowerShell assignment", () => {
-    const prefix = buildBatchNodeOptionsPrefix(
-      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-      "C:\\Temp\\cm ' fs.js",
-    );
-    expect(prefix).toBe("$env:NODE_OPTIONS='--require C:\\Temp\\cm '' fs.js'; ");
-  });
-
-  test("buildBatchNodeOptionsPrefix formats cmd assignment", () => {
-    const prefix = buildBatchNodeOptionsPrefix(
-      "C:\\Windows\\System32\\cmd.exe",
-      "C:\\Temp\\cm-fs-preload.js",
-    );
-    expect(prefix).toBe('set "NODE_OPTIONS=--require C:\\Temp\\cm-fs-preload.js" && ');
   });
 });
 
@@ -3396,7 +3332,7 @@ describe("runBatchCommands P0 hardening", () => {
     ];
     const { outputs } = await runBatchCommands(
       cmds,
-      { timeout: 5000, concurrency: 4, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: 5000, concurrency: 4 },
       exec,
     );
     expect(outputs).toHaveLength(4);
@@ -3410,26 +3346,20 @@ describe("runBatchCommands P0 hardening", () => {
     expect(outputs.every((o) => typeof o === "string" && o.length > 0)).toBe(true);
   });
 
-  test("finding B: timed-out parallel command still strips __CM_FS__ markers + counts bytes", async () => {
-    // Real subprocess timeouts often return partial stdout *with* the marker.
-    // Pre-fix the parallel branch wrote the (timed out) sentinel directly,
-    // bypassing formatCommandOutput → markers leaked into context, bytes uncounted.
+  test("finding B: timed-out parallel command preserves partial output", async () => {
     const exec = mkMockExecutor(() => ({
-      stdout: "partial line 1\n__CM_FS__:512\npartial line 2\n",
+      stdout: "partial line 1\npartial line 2\n",
       timedOut: true,
     }));
-    let totalBytes = 0;
     const { outputs, timedOut } = await runBatchCommands(
       [{ label: "SLOW", command: "x" }],
-      { timeout: 100, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX, onFsBytes: (b) => { totalBytes += b; } },
+      { timeout: 100, concurrency: 2 },
       exec,
     );
     expect(timedOut).toBe(true);
-    expect(totalBytes).toBe(512); // marker counted
-    expect(outputs[0]).not.toContain("__CM_FS__"); // marker stripped
     expect(outputs[0]).toContain("partial line 1");
     expect(outputs[0]).toContain("partial line 2");
-    expect(outputs[0]).toContain("(timed out after 100ms)"); // sentinel still appended
+    expect(outputs[0]).toContain("(timed out after 100ms)");
   });
 
   test("finding D: timing-regression — 5 cmds × 100ms at concurrency=5 finishes in <200ms", async () => {
@@ -3446,7 +3376,7 @@ describe("runBatchCommands P0 hardening", () => {
     const start = Date.now();
     const { outputs, timedOut } = await runBatchCommands(
       cmds,
-      { timeout: 5000, concurrency: 5, nodeOptsPrefix: NOOP_PREFIX },
+      { timeout: 5000, concurrency: 5 },
       exec,
     );
     const elapsed = Date.now() - start;
