@@ -469,6 +469,53 @@ describe("OpenClawPlugin", () => {
       ).resolves.toBeUndefined();
     });
 
+    it("preserves TweetClaw results for session continuity", async () => {
+      const insertSpy = vi.spyOn(OpenClawSessionDB.prototype, "insertEvent");
+      try {
+        const mock = await createTestPlugin(join(tempDir, "after-tweetclaw"));
+        const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
+        const result = {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                tweets: [{ id: "1900000000000000000", text: "Example public X result" }],
+              }),
+            },
+          ],
+        };
+        insertSpy.mockClear();
+
+        await afterHook!.handler({
+          toolName: "tweetclaw",
+          params: {
+            method: "GET",
+            path: "/api/v1/x/tweets/search",
+            query: { q: "open source agents" },
+          },
+          result,
+          durationMs: 12,
+        });
+
+        const inserted = insertSpy.mock.calls.find(
+          ([, event]) => (event as { category?: string }).category === "openclaw",
+        );
+        expect(inserted).toBeDefined();
+        expect(JSON.parse((inserted![1] as { data: string }).data)).toEqual({
+          tool: "tweetclaw",
+          params: {
+            method: "GET",
+            path: "/api/v1/x/tweets/search",
+            query: { q: "open source agents" },
+          },
+          result,
+          durationMs: 12,
+        });
+      } finally {
+        insertSpy.mockRestore();
+      }
+    });
+
     it("handles empty input gracefully", async () => {
       const mock = await createTestPlugin(join(tempDir, "after-empty"));
       const afterHook = mock.lifecycle.find((h) => h.event === "after_tool_call");
