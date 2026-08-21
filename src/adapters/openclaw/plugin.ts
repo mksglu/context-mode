@@ -536,6 +536,7 @@ export default {
             const data = JSON.stringify({
               tool: rawToolName,
               params: e.params,
+              result: rawResult,
               durationMs: e.durationMs,
             });
             db.insertEvent(
