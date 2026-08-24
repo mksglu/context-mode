@@ -16,6 +16,7 @@ import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, type SearchResul
 import { composeFetchCacheKey } from "./fetch-cache.js";
 import { PageStore } from "./fetch/page-store.js";
 import { extractAndStore, routeSkipsExtraction, type FetchRoute, type Relabelled } from "./fetch/extract.js";
+import { isContextModeToolEnabled, readContextModeToolsAllowlist } from "./util/tools-allowlist.js";
 import {
   readBashPolicies,
   evaluateCommandDenyOnly,
@@ -284,6 +285,9 @@ const originalRegisterTool = server.registerTool.bind(server);
   ];
   if (suppressMcpToolsForNativePluginHost) {
     emitSuppressionDiagnostic();
+    return undefined;
+  }
+  if (!isContextModeToolEnabled(name, readContextModeToolsAllowlist())) {
     return undefined;
   }
   const wrappedHandler = wrapToolHandler(name, handler);
