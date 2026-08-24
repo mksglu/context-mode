@@ -210,6 +210,7 @@ function killTree(proc: ReturnType<typeof spawn>): void {
 interface ExecuteOptions {
   language: Language;
   code: string;
+  /** Wall-clock deadline in milliseconds. Undefined means no server-side timer. */
   timeout?: number;
   /** Keep process running after timeout instead of killing it. */
   background?: boolean;
