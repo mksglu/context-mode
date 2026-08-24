@@ -920,7 +920,39 @@ Restart `agy`.
    }
    ```
 
-3. Create `.kiro/hooks/context-mode.json`:
+3. Create `.kiro/hooks/context-mode.json`.
+
+   **Kiro 1.0 (current)** — top-level `version: "v1"`, `hooks` as an array, each entry needs `name` + PascalCase `trigger` + `action: { type, command }`:
+
+   ```json
+   {
+     "version": "v1",
+     "hooks": [
+       {
+         "name": "context-mode-pretooluse",
+         "description": "Context-mode context-window protection (pre tool use)",
+         "trigger": "PreToolUse",
+         "matcher": "execute_bash|fs_read|@context-mode/ctx_execute|@context-mode/ctx_execute_file|@context-mode/ctx_batch_execute|@(?!context-mode/)",
+         "action": {
+           "type": "command",
+           "command": "context-mode hook kiro pretooluse"
+         }
+       },
+       {
+         "name": "context-mode-posttooluse",
+         "description": "Context-mode context-window protection (post tool use)",
+         "trigger": "PostToolUse",
+         "matcher": "*",
+         "action": {
+           "type": "command",
+           "command": "context-mode hook kiro posttooluse"
+         }
+       }
+     ]
+   }
+   ```
+
+   **Kiro 0.x (legacy)** — the old `.kiro.hook` style with `hooks` as an object and camelCase `preToolUse`/`postToolUse`. Kiro 1.0 silently ignores this format, so the Agent Hooks panel shows nothing. Use only if you are still on a 0.x build:
 
    ```json
    {
