@@ -14,6 +14,8 @@ description: |
   "find TODOs", "count lines", "codebase statistics", "security audit",
   "outdated packages", "dependency tree", "cloud resources", "CI/CD output".
   Also triggers on ANY MCP tool output that may exceed 20 lines.
+  For intentional reads outside the project root, use authorized host read with
+  offset/limit; do not widen permissions merely to bypass confinement.
   Subagent routing is handled automatically via PreToolUse hook.
 ---
 
@@ -38,6 +40,8 @@ Bash whitelist (safe to run directly):
 **Everything else → `ctx_execute` or `ctx_execute_file`.** Any command that reads, queries, fetches, lists, logs, tests, builds, diffs, inspects, or calls an external service. This includes ALL CLIs (gh, aws, kubectl, docker, terraform, wrangler, fly, heroku, gcloud, etc.) — there are thousands and we cannot list them all.
 
 **When uncertain, use context-mode.** Every KB of unnecessary context reduces the quality and speed of the entire session.
+
+**Workspace-boundary fallback:** `ctx_execute_file` is confined to the current project root. If an intentional file read outside that root is needed and the host `read` tool is authorized, use `read` with `offset`/`limit`; do not change permissions or use shell `cat` merely to bypass the boundary.
 
 ## Decision Tree
 
