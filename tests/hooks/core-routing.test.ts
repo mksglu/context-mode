@@ -27,7 +27,7 @@ let routePreToolUse: (
   projectDir?: string,
   platform?: string,
   sessionId?: string,
-  options?: { mcpToolsAvailable?: boolean },
+  options?: { mcpToolsAvailable?: boolean; isSubagentContext?: boolean },
 ) => {
   action: string;
   reason?: string;
@@ -328,6 +328,169 @@ describe("routePreToolUse", () => {
     });
   });
 
+  describe("Codex home search routing", () => {
+    beforeAll(async () => {
+      expect(await initSecurity(resolve(process.cwd(), "build"))).toBe(true);
+    });
+
+    it("redirects the recursive root search from the reported incident", () => {
+      const result = routePreToolUse(
+        "exec_command",
+        { cmd: "rg -n model ~/.codex -g '*.json*'" },
+        "/workspace",
+        "codex",
+        "codex-home-search-root",
+      );
+
+      expect(result?.action).toBe("deny");
+      expect(result?.reason?.startsWith(
+        "context-mode: redirected to ctx_execute for a bounded Codex home search.",
+      )).toBe(true);
+      expect(result?.reason?.endsWith(
+        "Retry the same search on a transient filesystem error (EBUSY, EMFILE, ENFILE).",
+      )).toBe(true);
+    });
+
+    it.each([
+      "grep -R model ~/.codex",
+      "find ~/.codex -name '*.json*'",
+      "/usr/bin/rg -n model ~/.codex/",
+      "/usr/bin/env rg -n model ~/.codex",
+      "time -f %E rg -n model ~/.codex",
+      "command rg -n model \"$HOME/.codex\"",
+      "LC_ALL=C rg -n model ${CODEX_HOME}",
+      "find -L ~/.codex -name '*.json*'",
+      "find -O3 ~/.codex -name '*.json*'",
+      "find -- ~/.codex -name '*.json*'",
+      "rg --files ~/.codex",
+      "rg -f patterns.txt ~/.codex",
+    ])("redirects a broad Codex home search: %s", (command) => {
+      const result = routePreToolUse(
+        "exec_command",
+        { cmd: command },
+        "/workspace",
+        "codex",
+        "codex-home-search-reader",
+      );
+      expect(result?.action).toBe("deny");
+    });
+
+    it("uses the effective relocated CODEX_HOME", () => {
+      const previous = process.env.CODEX_HOME;
+      const relocatedHome = join(tmpdir(), "custom-codex-home");
+      process.env.CODEX_HOME = relocatedHome;
+      try {
+        const relocated = routePreToolUse(
+          "exec_command",
+          { cmd: `rg -n model "${relocatedHome}"` },
+          "/workspace",
+          "codex",
+          "codex-home-search-relocated",
+        );
+        const inactiveDefault = routePreToolUse(
+          "exec_command",
+          { cmd: "rg -n model ~/.codex" },
+          "/workspace",
+          "codex",
+          "codex-home-search-inactive-default",
+        );
+        expect(relocated?.action).toBe("deny");
+        expect(inactiveDefault?.action).not.toBe("deny");
+      } finally {
+        if (previous == null) delete process.env.CODEX_HOME;
+        else process.env.CODEX_HOME = previous;
+      }
+    });
+
+    it("normalizes Windows CODEX_HOME identity case-insensitively", () => {
+      const previous = process.env.CODEX_HOME;
+      process.env.CODEX_HOME = "C:\\Users\\Tester\\.codex";
+      try {
+        const result = routePreToolUse(
+          "exec_command",
+          { cmd: "rg -n model c:\\users\\tester\\.codex" },
+          "C:\\workspace",
+          "codex",
+          "codex-home-search-windows",
+        );
+        expect(result?.action).toBe("deny");
+      } finally {
+        if (previous == null) delete process.env.CODEX_HOME;
+        else process.env.CODEX_HOME = previous;
+      }
+    });
+
+    it("preserves non-root paths, other platforms, and child contexts", () => {
+      const cases = [
+        routePreToolUse(
+          "exec_command",
+          { cmd: "rg -n model ~/.codex/config.toml" },
+          "/workspace",
+          "codex",
+          "codex-home-search-config",
+        ),
+        routePreToolUse(
+          "exec_command",
+          { cmd: "rg -n model ~/.codex -g '*.json*'" },
+          "/workspace",
+          "claude-code",
+          "codex-home-search-other-platform",
+        ),
+        routePreToolUse(
+          "exec_command",
+          { cmd: "rg -n model ~/.codex -g '*.json*'" },
+          "/workspace",
+          "codex",
+          "codex-home-search-child",
+          { isSubagentContext: true },
+        ),
+        routePreToolUse(
+          "exec_command",
+          {
+            cmd:
+              "gh issue create --body " +
+              "\"Repro: rg -n model ~/.codex -g '*.json*'\"",
+          },
+          "/workspace",
+          "codex",
+          "codex-home-search-evidence",
+        ),
+      ];
+
+      for (const result of cases) expect(result?.action).not.toBe("deny");
+    });
+
+    it("Codex hook redirects root searches but preserves child exploration", async () => {
+      const root = await spawnPreToolUseHook(
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "exec_command",
+          tool_input: { cmd: "rg -n model ~/.codex -g '*.json*'" },
+          session_id: "codex-home-search-hook-root",
+          agent_type: "default",
+        },
+        {},
+        "hooks/codex/pretooluse.mjs",
+      );
+      expect(root.status).toBe(0);
+      expect(root.parsed?.hookSpecificOutput?.permissionDecision).toBe("deny");
+
+      const child = await spawnPreToolUseHook(
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "exec_command",
+          tool_input: { cmd: "rg -n model ~/.codex -g '*.json*'" },
+          session_id: "codex-home-search-hook-child",
+          agent_id: "child-agent",
+        },
+        {},
+        "hooks/codex/pretooluse.mjs",
+      );
+      expect(child.status).toBe(0);
+      expect(child.parsed?.hookSpecificOutput?.permissionDecision).toBeUndefined();
+    });
+  });
+
   // ─── Read routing ──────────────────────────────────────
 
   describe("Read tool", () => {
@@ -510,6 +673,18 @@ describe("routePreToolUse", () => {
     it("allows build tools when MCP server not ready", () => {
       try { unlinkSync(mcpSentinel); } catch {}
       const result = routePreToolUse("Bash", { command: "./gradlew build" });
+      expect(result).toBeNull();
+    });
+
+    it("allows Codex home search when MCP tools are unavailable", () => {
+      try { unlinkSync(mcpSentinel); } catch {}
+      const result = routePreToolUse(
+        "exec_command",
+        { cmd: "rg -n model ~/.codex -g '*.json*'" },
+        "/workspace",
+        "codex",
+        "codex-home-search-no-mcp",
+      );
       expect(result).toBeNull();
     });
 
@@ -1315,10 +1490,11 @@ async function spawnRoutingProbe(
 async function spawnPreToolUseHook(
   input: Record<string, unknown>,
   env: Record<string, string> = {},
+  scriptPath = "hooks/pretooluse.mjs",
 ): Promise<{ status: number | null; stdout: string; parsed: any }> {
   const { spawnSync } = await import("node:child_process");
   const repoRoot = resolve(SLICE4_DIRNAME, "..", "..");
-  const r = spawnSync(process.execPath, ["hooks/pretooluse.mjs"], {
+  const r = spawnSync(process.execPath, [scriptPath], {
     cwd: repoRoot,
     input: JSON.stringify(input),
     encoding: "utf-8",
