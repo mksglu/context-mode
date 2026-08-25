@@ -31,7 +31,7 @@ function mcpRedirect(result, mcpToolsAvailable = true) {
   return result;
 }
 import { homedir, tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { resolve, posix as posixPath, win32 as win32Path } from "node:path";
 
 // Guidance throttle: show each advisory type at most once per session.
 // Hybrid approach:
@@ -624,6 +624,302 @@ function getShellCommand(toolInput) {
   return "";
 }
 
+const CODEX_HOME_SEARCH_READERS = new Set(["rg", "grep", "find"]);
+const CODEX_HOME_SEARCH_WRAPPERS = new Set(["command", "exec"]);
+const ENV_OPTIONS_WITH_VALUES = new Set([
+  "-u",
+  "--unset",
+  "-C",
+  "--chdir",
+  "-S",
+  "--split-string",
+]);
+const TIME_OPTIONS_WITH_VALUES = new Set([
+  "-f",
+  "--format",
+  "-o",
+  "--output",
+]);
+const CODEX_SEARCH_OPTIONS_WITH_VALUES = new Set([
+  "-e",
+  "--regexp",
+  "-f",
+  "--file",
+  "-g",
+  "--glob",
+  "--iglob",
+  "--include",
+  "--exclude",
+  "-t",
+  "--type",
+  "--type-add",
+  "-m",
+  "--max-count",
+  "-A",
+  "--after-context",
+  "-B",
+  "--before-context",
+  "-C",
+  "--context",
+  "--replace",
+]);
+
+function isWindowsAbsolutePath(value) {
+  return (
+    value.length >= 3 &&
+    value[1] === ":" &&
+    (value[2] === "/" || value[2] === "\\") &&
+    (
+      (value.charCodeAt(0) >= 65 && value.charCodeAt(0) <= 90) ||
+      (value.charCodeAt(0) >= 97 && value.charCodeAt(0) <= 122)
+    )
+  );
+}
+
+function normalizeCodexPath(value) {
+  let normalized = String(value ?? "").split("\\").join("/");
+  normalized = isWindowsAbsolutePath(normalized)
+    ? win32Path.normalize(normalized).split("\\").join("/")
+    : posixPath.normalize(normalized);
+  while (normalized.length > 1 && normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+function effectiveCodexHomePath() {
+  let configured = normalizeCodexPath(process.env.CODEX_HOME?.trim() ?? "");
+  if (configured === "~") configured = normalizeCodexPath(homedir());
+  else if (configured.startsWith("~/")) {
+    configured = normalizeCodexPath(homedir() + configured.slice(1));
+  }
+  if (configured.startsWith("/") || isWindowsAbsolutePath(configured)) {
+    return configured;
+  }
+  return normalizeCodexPath(resolve(homedir(), ".codex"));
+}
+
+function hasConfiguredCodexHome() {
+  return (process.env.CODEX_HOME?.trim() ?? "") !== "";
+}
+
+function replaceCodexHomeAlias(value, alias, root) {
+  if (value === alias) return root;
+  if (value.startsWith(alias + "/")) return root + value.slice(alias.length);
+  return value;
+}
+
+function resolveCodexHomeOperand(value) {
+  const root = effectiveCodexHomePath();
+  const defaultRoot = normalizeCodexPath(resolve(homedir(), ".codex"));
+  let normalized = normalizeCodexPath(value);
+  for (const alias of [
+    "${CODEX_HOME}",
+    "$CODEX_HOME",
+    "$env:CODEX_HOME",
+    "%CODEX_HOME%",
+  ]) {
+    normalized = replaceCodexHomeAlias(normalized, alias, root);
+  }
+  for (const alias of [
+    "${HOME}/.codex",
+    "$HOME/.codex",
+    "$env:USERPROFILE/.codex",
+    "%USERPROFILE%/.codex",
+    "~/.codex",
+  ]) {
+    normalized = replaceCodexHomeAlias(normalized, alias, defaultRoot);
+  }
+  return normalized;
+}
+
+function pathIdentity(value, reference) {
+  const caseInsensitive =
+    process.platform === "win32" ||
+    process.platform === "darwin" ||
+    isWindowsAbsolutePath(reference);
+  return caseInsensitive ? value.toLowerCase() : value;
+}
+
+function isCodexHomeRootOperand(value) {
+  const root = effectiveCodexHomePath();
+  const defaultRoot = normalizeCodexPath(resolve(homedir(), ".codex"));
+  const resolved = resolveCodexHomeOperand(value);
+  const candidates = hasConfiguredCodexHome() ? [root] : [root, defaultRoot];
+  return candidates.some(
+    (candidate) =>
+      pathIdentity(resolved, candidate) === pathIdentity(candidate, candidate),
+  );
+}
+
+function commandName(value) {
+  const normalized = normalizeCodexPath(value).toLowerCase();
+  const separator = normalized.lastIndexOf("/");
+  let name = separator === -1 ? normalized : normalized.slice(separator + 1);
+  for (const suffix of [".exe", ".cmd", ".bat"]) {
+    if (name.endsWith(suffix)) {
+      name = name.slice(0, -suffix.length);
+      break;
+    }
+  }
+  return name;
+}
+
+function isEnvironmentAssignment(value) {
+  const separator = value.indexOf("=");
+  return separator > 0 && !value.slice(0, separator).includes("/");
+}
+
+function hasOnlyAsciiDigits(value) {
+  if (value.length === 0) return false;
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code < 48 || code > 57) return false;
+  }
+  return true;
+}
+
+function resolveSearchReader(tokens) {
+  let index = 0;
+  while (index < tokens.length) {
+    if (isEnvironmentAssignment(tokens[index])) {
+      index++;
+      continue;
+    }
+    const name = commandName(tokens[index]);
+    if (CODEX_HOME_SEARCH_WRAPPERS.has(name)) {
+      index++;
+      while (index < tokens.length && tokens[index].startsWith("-")) index++;
+      continue;
+    }
+    if (name === "env") {
+      index++;
+      while (index < tokens.length) {
+        if (isEnvironmentAssignment(tokens[index])) {
+          index++;
+          continue;
+        }
+        if (ENV_OPTIONS_WITH_VALUES.has(tokens[index])) {
+          index += 2;
+          continue;
+        }
+        if (tokens[index].startsWith("-")) {
+          index++;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    if (name === "time") {
+      index++;
+      while (index < tokens.length) {
+        if (TIME_OPTIONS_WITH_VALUES.has(tokens[index])) {
+          index += 2;
+          continue;
+        }
+        if (!tokens[index].startsWith("-")) break;
+        index++;
+      }
+      continue;
+    }
+    return CODEX_HOME_SEARCH_READERS.has(name) ? { name, index } : null;
+  }
+  return null;
+}
+
+function searchPathOperands(tokens, reader) {
+  if (reader.name === "find") {
+    const operands = [];
+    let index = reader.index + 1;
+    while (index < tokens.length) {
+      const token = tokens[index];
+      if (token === "-H" || token === "-L" || token === "-P" || token === "--") {
+        index++;
+        continue;
+      }
+      if (token === "-D") {
+        index += 2;
+        continue;
+      }
+      if (token.startsWith("-O") && hasOnlyAsciiDigits(token.slice(2))) {
+        index++;
+        continue;
+      }
+      break;
+    }
+    for (; index < tokens.length; index++) {
+      if (tokens[index].startsWith("-")) break;
+      operands.push(tokens[index]);
+    }
+    return operands;
+  }
+
+  const operands = [];
+  let filesMode = false;
+  let patternProvidedByOption = false;
+  let patternConsumed = false;
+  let skipNext = false;
+  for (let index = reader.index + 1; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
+    if (token === "--files") {
+      filesMode = true;
+      continue;
+    }
+    if (CODEX_SEARCH_OPTIONS_WITH_VALUES.has(token)) {
+      if (
+        token === "-e" ||
+        token === "--regexp" ||
+        token === "-f" ||
+        token === "--file"
+      ) {
+        patternProvidedByOption = true;
+      }
+      skipNext = true;
+      continue;
+    }
+    if (
+      token.startsWith("--regexp=") ||
+      token.startsWith("--file=") ||
+      (token.startsWith("-e") && token.length > 2) ||
+      (token.startsWith("-f") && token.length > 2)
+    ) {
+      patternProvidedByOption = true;
+      continue;
+    }
+    if (token.startsWith("-")) continue;
+    if (!filesMode && !patternProvidedByOption && !patternConsumed) {
+      patternConsumed = true;
+      continue;
+    }
+    operands.push(token);
+  }
+  return operands;
+}
+
+function targetsCodexHomeSearch(command) {
+  if (!security?.tokenizeShellWords) return false;
+  const tokens = security.tokenizeShellWords(String(command ?? ""));
+  const reader = resolveSearchReader(tokens);
+  if (!reader) return false;
+  return searchPathOperands(tokens, reader).some(isCodexHomeRootOperand);
+}
+
+function codexHomeSearchRedirect(toolNamer, mcpToolsAvailable) {
+  return mcpRedirect({
+    action: "deny",
+    reason:
+      `context-mode: redirected to ${toolNamer("ctx_execute")} for a bounded Codex home search. ` +
+      `${toolNamer("ctx_execute")} has full filesystem access within the host permission model and can inspect Codex state while only selected output enters the conversation. ` +
+      `Call ${toolNamer("ctx_execute")}(language, code) and print only the required aggregates, hashes, or redacted paths. ` +
+      `Retry the same search on a transient filesystem error (EBUSY, EMFILE, ENFILE).`,
+  }, mcpToolsAvailable);
+}
+
 function getReadFilePath(toolInput) {
   if (!toolInput || typeof toolInput !== "object") return "";
   if (typeof toolInput.file_path === "string") return toolInput.file_path;
@@ -666,9 +962,12 @@ function getPlatformSettingsPath(platform) {
  * @param {boolean} [options.mcpToolsAvailable=true] - False when the current
  *   caller context cannot invoke ctx_* MCP tools even though an MCP server is
  *   live on the machine (Claude Code fixed-tool subagents — #794).
+ * @param {boolean} [options.isSubagentContext=false] - True when the platform
+ *   identifies this call as child-context exploration.
  */
 export function routePreToolUse(toolName, toolInput, projectDir, platform, sessionId, options = {}) {
   const mcpToolsAvailable = options.mcpToolsAvailable !== false;
+  const isSubagentContext = options.isSubagentContext === true;
 
   // ─── Opt-in fail-closed gate (#468 follow-up) ───
   // Default behavior on security-module load failure is fail-OPEN (a stderr
@@ -723,6 +1022,14 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     }
 
     // Stage 2: Context-mode routing (existing behavior)
+
+    if (
+      platform === "codex" &&
+      !isSubagentContext &&
+      targetsCodexHomeSearch(command)
+    ) {
+      return codexHomeSearchRedirect(t, mcpToolsAvailable);
+    }
 
     // curl/wget detection: strip quoted content first to avoid false positives
     // like `gh issue edit --body "text with curl in it"` (Issue #63).

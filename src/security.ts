@@ -313,6 +313,71 @@ function collectCommandElements(command: string): string[] {
   return elements;
 }
 
+/**
+ * Tokenize one shell command into argv-like words while preserving path
+ * separators that are not escaping whitespace or quotes.
+ */
+export function tokenizeShellWords(command: string): string[] {
+  const tokens: string[] = [];
+  let index = 0;
+  while (index < command.length) {
+    while (
+      index < command.length &&
+      (command[index] === " " || command[index] === "\t")
+    ) {
+      index++;
+    }
+    if (index >= command.length) break;
+
+    let token = "";
+    while (
+      index < command.length &&
+      command[index] !== " " &&
+      command[index] !== "\t"
+    ) {
+      const character = command[index];
+      if (character === '"' || character === "'") {
+        const quote = character;
+        index++;
+        while (index < command.length && command[index] !== quote) {
+          const quotedCharacter = command[index];
+          const escapedCharacter = command[index + 1];
+          if (
+            quotedCharacter === "\\" &&
+            escapedCharacter != null &&
+            (escapedCharacter === quote || escapedCharacter === "\\")
+          ) {
+            token += escapedCharacter;
+            index += 2;
+          } else {
+            token += quotedCharacter;
+            index++;
+          }
+        }
+        if (index < command.length) index++;
+      } else if (
+        character === "\\" &&
+        index + 1 < command.length &&
+        (
+          command[index + 1] === " " ||
+          command[index + 1] === "\t" ||
+          command[index + 1] === '"' ||
+          command[index + 1] === "'" ||
+          command[index + 1] === "\\"
+        )
+      ) {
+        token += command[index + 1];
+        index += 2;
+      } else {
+        token += character;
+        index++;
+      }
+    }
+    tokens.push(token);
+  }
+  return tokens;
+}
+
 // ==============================================================================
 // Settings Reader
 // ==============================================================================

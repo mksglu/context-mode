@@ -127,6 +127,21 @@ least one `ctx_*` alternative, MUST NOT contain `"NOT a network"`,
 MUST NOT contain `"Do NOT retry"`, MUST NOT contain
 `"for context-window efficiency"` (or sibling org-rationale prefaces).
 
+## Local I/O amendment
+
+CASE A also covers redirects whose operation is local filesystem analysis
+rather than network access. Those reasons follow the same action-first
+structure with capability and retry language adapted to the real operation:
+
+- open with `"redirected to <ctx_tool>"`;
+- affirm the tool's filesystem capability within the host permission model;
+- specify the alternative tool call as a positive imperative;
+- end with a positive retry instruction naming relevant transient filesystem
+  failures instead of unrelated DNS failures.
+
+This amendment does not weaken the network rubric. Network redirects still
+affirm full network access and retain the DNS retry instruction above.
+
 ## Consequences
 
 - PR #654's wording fix (`"blocked"` → `"redirected"`) becomes formal
