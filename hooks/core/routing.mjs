@@ -233,11 +233,62 @@ function stripHeredocs(cmd) {
  * Strip ALL quoted content from a shell command so regex only matches command tokens.
  * Removes heredocs, single-quoted strings, and double-quoted strings.
  * This prevents false positives like: gh issue edit --body "text with curl in it"
+ *
+ * Scans left to right and lets whichever quote opens first own everything up to its
+ * partner, the way a shell does. The previous version ran two independent global
+ * replaces -- every '...' pair first, then every "..." pair -- which is only correct
+ * when the two kinds never interleave. An apostrophe inside a double-quoted string
+ * breaks that: in
+ *
+ *   git tag -m "... curl for the header file ... the linter's fixtures ..." && \
+ *     echo "created: $(git tag -l 'modx-tools/v1.27.2')"
+ *
+ * the apostrophe in "linter's" paired with the ' opening 'modx-tools/v1.27.2', so a
+ * span straddling the closing " collapsed to ''. That desynchronised the double-quote
+ * pass, left the middle of the message looking like bare shell, and the command was
+ * redirected as a curl invocation. Apostrophes in prose ("don't", "it's", "linter's")
+ * make commit and tag messages hit this constantly.
  */
 function stripQuotedContent(cmd) {
-  return stripHeredocs(cmd)
-    .replace(/'[^']*'/g, "''")                    // single-quoted strings
-    .replace(/"[^"]*"/g, '""');                   // double-quoted strings
+  const src = stripHeredocs(cmd);
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+
+    // An escape outside quotes consumes its target, so \" and \' cannot open a string.
+    if (ch === "\\" && i + 1 < src.length) {
+      out += ch + src[i + 1];
+      i += 2;
+      continue;
+    }
+
+    if (ch === "'" || ch === '"') {
+      const quote = ch;
+      let j = i + 1;
+      while (j < src.length) {
+        // Backslash escapes apply inside double quotes; inside single quotes a POSIX
+        // shell treats every character literally until the closing quote.
+        if (quote === '"' && src[j] === "\\" && j + 1 < src.length) { j += 2; continue; }
+        if (src[j] === quote) break;
+        j++;
+      }
+      if (j >= src.length) {
+        // Unterminated: this was never a string, just an apostrophe in prose. Emit it
+        // and keep scanning, so a genuine curl later in the command is still seen.
+        out += ch;
+        i++;
+        continue;
+      }
+      out += quote + quote;
+      i = j + 1;
+      continue;
+    }
+
+    out += ch;
+    i++;
+  }
+  return out;
 }
 
 /**
