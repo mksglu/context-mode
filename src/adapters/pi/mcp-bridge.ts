@@ -321,18 +321,172 @@ interface PiRenderContext {
   lastComponent?: unknown;
 }
 
-function createContextModeCallRenderer(toolName: string) {
-  return (_args: unknown, theme: PiRenderTheme, context: PiRenderContext) => {
+/** Max preview lines shown for code/content arguments in the call renderer. */
+const CALL_PREVIEW_MAX_LINES = 8;
+/** Max visible width per preview line (Pi's TUI does not wrap tool rows). */
+const CALL_PREVIEW_MAX_LINE_WIDTH = 110;
+
+function truncatePreviewLine(line: string): string {
+  return line.length <= CALL_PREVIEW_MAX_LINE_WIDTH
+    ? line
+    : line.slice(0, CALL_PREVIEW_MAX_LINE_WIDTH - 1) + "\u2026";
+}
+
+function pushCodePreviewLines(lines: string[], code: string): void {
+  const sourceLines = code.split(/\r?\n/);
+  for (const raw of sourceLines.slice(0, CALL_PREVIEW_MAX_LINES)) {
+    lines.push(truncatePreviewLine(raw.replace(/\s+$/, "")));
+  }
+  if (sourceLines.length > CALL_PREVIEW_MAX_LINES) {
+    lines.push(`\u2026 ${sourceLines.length - CALL_PREVIEW_MAX_LINES} more lines`);
+  }
+}
+
+/**
+ * Per-tool preview of a ctx_* tool call's arguments, rendered UNDER the
+ * tool title by the Pi TUI while the tool is streaming/running.
+ *
+ * Pi re-runs the call renderer on every partial-argument update, so this
+ * shows the code/command being executed in real time — matching how Pi's
+ * built-in tools (bash, read, edit) render their arguments. Returns an
+ * empty list when there is nothing meaningful to show. Safe on partial
+ * args (mid-stream JSON) and non-object args.
+ */
+export function formatCtxCallPreview(toolName: string, args: unknown): string[] {
+  const a: Record<string, unknown> =
+    args && typeof args === "object" && !Array.isArray(args)
+      ? (args as Record<string, unknown>)
+      : {};
+  const lines: string[] = [];
+  switch (toolName) {
+    case "ctx_execute": {
+      if (typeof a.language === "string" && a.language) {
+        lines.push(`language: ${a.language}`);
+      }
+      if (typeof a.code === "string" && a.code.length > 0) {
+        pushCodePreviewLines(lines, a.code);
+      }
+      break;
+    }
+    case "ctx_execute_file": {
+      if (typeof a.path === "string" && a.path) {
+        lines.push(`file: ${a.path}`);
+      }
+      if (typeof a.code === "string" && a.code.length > 0) {
+        pushCodePreviewLines(lines, a.code);
+      }
+      break;
+    }
+    case "ctx_batch_execute": {
+      if (Array.isArray(a.commands)) {
+        const commands = a.commands as Array<{
+          label?: unknown;
+          command?: unknown;
+        } | null | undefined>;
+        for (const entry of commands.slice(0, 10)) {
+          if (!entry || typeof entry.command !== "string" || !entry.command) {
+            continue;
+          }
+          const label =
+            typeof entry.label === "string" && entry.label ? `[${entry.label}] ` : "";
+          const first = entry.command.split(/\r?\n/)[0];
+          lines.push(label + truncatePreviewLine(first));
+        }
+        if (commands.length > 10) {
+          lines.push(`\u2026 ${commands.length - 10} more commands`);
+        }
+      }
+      break;
+    }
+    case "ctx_search": {
+      if (Array.isArray(a.queries) && a.queries.length > 0) {
+        const q = (a.queries as unknown[])
+          .filter((x): x is string => typeof x === "string")
+          .join(" | ");
+        if (q) lines.push(truncatePreviewLine(`queries: ${q}`));
+      }
+      break;
+    }
+    case "ctx_fetch_and_index": {
+      const urls = Array.isArray(a.requests) && a.requests.length > 0
+        ? (a.requests as Array<{ url?: unknown } | null | undefined>)
+            .map((r) => (r && typeof r.url === "string" ? r.url : ""))
+            .filter(Boolean)
+        : typeof a.url === "string" && a.url
+          ? [a.url]
+          : [];
+      for (const u of urls.slice(0, 6)) {
+        lines.push(truncatePreviewLine(u));
+      }
+      if (urls.length > 6) {
+        lines.push(`\u2026 ${urls.length - 6} more urls`);
+      }
+      break;
+    }
+    case "ctx_index": {
+      if (typeof a.path === "string" && a.path) {
+        lines.push(`path: ${a.path}`);
+      }
+      if (typeof a.source === "string" && a.source) {
+        lines.push(`source: ${a.source}`);
+      }
+      if (typeof a.content === "string" && a.content.length > 0) {
+        pushCodePreviewLines(lines, a.content);
+      }
+      break;
+    }
+    default: {
+      // Generic fallback so no ctx_* tool call is ever a mystery.
+      try {
+        const json = JSON.stringify(a);
+        if (json && json !== "{}") {
+          lines.push(truncatePreviewLine(json.replace(/\s+/g, " ")));
+        }
+      } catch {
+        // Partial args while streaming — nothing safe to show yet.
+      }
+    }
+  }
+  return lines;
+}
+
+export function createContextModeCallRenderer(toolName: string) {
+  return (args: unknown, theme: PiRenderTheme, context: PiRenderContext) => {
     const text =
       context.lastComponent instanceof PiTextComponent
         ? context.lastComponent
         : new PiTextComponent();
-    text.setText(theme.fg("toolTitle", theme.bold(toolName)));
+    let out = theme.fg("toolTitle", theme.bold(toolName));
+    for (const line of formatCtxCallPreview(toolName, args)) {
+      out += `\n  ${theme.fg("toolOutput", line)}`;
+    }
+    text.setText(out);
     return text;
   };
 }
 
-function createContextModeResultRenderer(toolName: string) {
+/** Max lines shown in the collapsed result row (matches Pi's bash tool). */
+const RESULT_PREVIEW_LINES = 5;
+
+/**
+ * Collapsed preview of a finished ctx_* tool result: the last few output
+ * lines, like Pi's built-in bash tool shows the tail of command output.
+ * The full output stays available via the expand keybinding (ctrl+o).
+ * Exported for unit tests.
+ */
+export function formatCtxResultPreview(toolName: string, output: string): string {
+  const nonEmpty = output.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (nonEmpty.length === 0) return `${toolName} completed`;
+  const shown = nonEmpty.slice(-RESULT_PREVIEW_LINES);
+  const skipped = nonEmpty.length - shown.length;
+  const body = shown.join("\n");
+  if (skipped > 0) {
+    return `... (${skipped} earlier line${skipped === 1 ? "" : "s"}, ctrl+o to expand)\n${body}`;
+  }
+  return body;
+}
+
+export function createContextModeResultRenderer(toolName: string) {
   return (
     result: MCPCallResult,
     { expanded, isPartial }: { expanded: boolean; isPartial: boolean },
@@ -355,15 +509,7 @@ function createContextModeResultRenderer(toolName: string) {
       text.setText(theme.fg("toolOutput", output));
       return text;
     }
-    const firstLine = output
-      .split(/\r?\n/)
-      .find((line) => line.trim().length > 0)
-      ?.trim();
-    const status =
-      firstLine && firstLine.length <= 180
-        ? firstLine
-        : `${toolName} completed`;
-    text.setText(theme.fg("toolOutput", status));
+    text.setText(theme.fg("toolOutput", formatCtxResultPreview(toolName, output)));
     return text;
   };
 }
