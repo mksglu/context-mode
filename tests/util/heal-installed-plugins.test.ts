@@ -29,6 +29,8 @@ import { join, resolve } from "node:path";
 import {
   healInstalledPlugins,
   // @ts-expect-error — JS module, no TS declarations
+  resolveContextModePluginKey,
+  // @ts-expect-error — JS module, no TS declarations
   healSettingsEnabledPlugins,
   // @ts-expect-error — JS module, no TS declarations
   healPluginJsonMcpServers,
@@ -120,6 +122,19 @@ function readRegistry(p: string): Record<string, unknown> {
 }
 
 const KEY = "context-mode@context-mode";
+
+describe("resolveContextModePluginKey", () => {
+  it("finds context-mode under a custom marketplace name", () => {
+    expect(resolveContextModePluginKey({
+      "other@marketplace": [],
+      "context-mode@claude-context-mode": [],
+    })).toBe("context-mode@claude-context-mode");
+  });
+
+  it("falls back to the legacy key when the registry is missing", () => {
+    expect(resolveContextModePluginKey(undefined)).toBe(KEY);
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────
 // Slice 1 — HEAL 3: per-plugin entry.version syncs from cache plugin.json

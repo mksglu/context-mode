@@ -554,7 +554,7 @@ describe("sweepStaleMcpJson", () => {
     versionDirs: string[];
   } {
     const dir = makeTmp("ctx-sweep-");
-    // Match the real cache layout: <cacheRoot>/<owner>/<plugin>/<version>/
+    // Match the real cache layout: <cacheRoot>/<marketplace>/<plugin>/<version>/
     const pluginCacheRoot = join(dir, "cache");
     const pluginKey = "context-mode@context-mode";
     const ownerDir = join(pluginCacheRoot, "context-mode", "context-mode");
@@ -602,6 +602,24 @@ describe("sweepStaleMcpJson", () => {
     for (const removedPath of result.removed) {
       expect(removedPath).toContain(".mcp.json");
     }
+  });
+
+  test("maps plugin@marketplace keys to marketplace/plugin cache paths", () => {
+    const dir = makeTmp("ctx-sweep-marketplace-");
+    const pluginCacheRoot = join(dir, "cache");
+    const versionDir = makeDir(
+      join(pluginCacheRoot, "claude-context-mode", "context-mode", "1.0.169"),
+    );
+    const mcpJsonPath = join(versionDir, ".mcp.json");
+    writeFileSync(mcpJsonPath, "{}", "utf-8");
+
+    const result = sweepStaleMcpJson({
+      pluginCacheRoot,
+      pluginKey: "context-mode@claude-context-mode",
+    });
+
+    expect(result.removed).toEqual([mcpJsonPath]);
+    expect(existsSync(mcpJsonPath)).toBe(false);
   });
 
   test("no-op when no .mcp.json files exist in any version dir", () => {

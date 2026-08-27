@@ -91,6 +91,7 @@ interface FakeHome {
   home: string;
   registryPath: string;
   cacheDir: string;
+  pluginKey: string;
 }
 
 /**
@@ -101,10 +102,13 @@ function buildFakeHome(opts: {
   entryVersion: string;
   cacheVersion: string;
   enabledPlugins?: unknown;
+  marketplace?: string;
 }): FakeHome {
   const home = makeTmp("ctx-postinstall-home-");
   const pluginsRoot = resolve(home, ".claude", "plugins");
-  const cacheDir = resolve(pluginsRoot, "cache", "context-mode", "context-mode", opts.cacheVersion);
+  const marketplace = opts.marketplace ?? "context-mode";
+  const pluginKey = `context-mode@${marketplace}`;
+  const cacheDir = resolve(pluginsRoot, "cache", marketplace, "context-mode", opts.cacheVersion);
   mkdirSync(resolve(cacheDir, ".claude-plugin"), { recursive: true });
   writeFileSync(
     resolve(cacheDir, ".claude-plugin", "plugin.json"),
@@ -113,7 +117,7 @@ function buildFakeHome(opts: {
   const registry: Record<string, unknown> = {
     version: 2,
     plugins: {
-      [KEY]: [
+      [pluginKey]: [
         {
           scope: "user",
           installPath: cacheDir,
@@ -127,7 +131,7 @@ function buildFakeHome(opts: {
   if (opts.enabledPlugins !== undefined) registry.enabledPlugins = opts.enabledPlugins;
   const registryPath = resolve(pluginsRoot, "installed_plugins.json");
   writeFileSync(registryPath, JSON.stringify(registry, null, 2) + "\n");
-  return { home, registryPath, cacheDir };
+  return { home, registryPath, cacheDir, pluginKey };
 }
 
 /**
@@ -215,6 +219,25 @@ describe("postinstall — global install with poisoned registry", () => {
     expect(healLines.length).toBe(1);
     // No emoji / ANSI noise — line should be plain ASCII summary.
     expect(healLines[0]).toMatch(/^context-mode:/);
+  });
+
+  it("repairs a registry installed from a custom marketplace", { timeout: 90_000 }, () => {
+    const fake = buildFakeHome({
+      entryVersion: "1.0.99",
+      cacheVersion: "1.0.169",
+      enabledPlugins: {},
+      marketplace: "claude-context-mode",
+    });
+
+    const r = runPostinstall({ home: fake.home, global: true });
+    expect(r.status === 0 || r.status === null).toBe(true);
+
+    const after = readRegistry(fake.registryPath) as {
+      plugins: Record<string, Array<{ version: string }>>;
+      enabledPlugins: Record<string, unknown>;
+    };
+    expect(after.plugins[fake.pluginKey][0].version).toBe("1.0.169");
+    expect(after.enabledPlugins[fake.pluginKey]).toBe(true);
   });
 });
 

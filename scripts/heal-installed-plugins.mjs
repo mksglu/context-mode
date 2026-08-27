@@ -20,6 +20,14 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
+export function resolveContextModePluginKey(plugins) {
+  if (!plugins || typeof plugins !== "object" || Array.isArray(plugins)) {
+    return "context-mode@context-mode";
+  }
+  return Object.keys(plugins).find((key) => key.startsWith("context-mode@"))
+    ?? "context-mode@context-mode";
+}
+
 /**
  * @typedef {Object} HealResult
  * @property {string[]} healed - one of: "entry-version", "enabled-plugins"
@@ -525,10 +533,10 @@ export function healClaudeJsonMcpArgs({ dotClaudeJsonPath, pluginCacheParent, ne
 
 /**
  * Remove every `.mcp.json` from per-version directories under
- * `<pluginCacheRoot>/<owner>/<plugin>/<X.Y.Z>/`.
+ * `<pluginCacheRoot>/<marketplace>/<plugin>/<X.Y.Z>/`.
  *
  * @param {{ pluginCacheRoot: string, pluginKey: string }} opts
- *   pluginKey is the "<owner>@<plugin>" form (e.g. "context-mode@context-mode").
+ *   pluginKey is the "<plugin>@<marketplace>" registry form.
  * @returns {SweepResult}
  */
 export function sweepStaleMcpJson({ pluginCacheRoot, pluginKey }) {
@@ -544,9 +552,9 @@ export function sweepStaleMcpJson({ pluginCacheRoot, pluginKey }) {
     return { removed, skipped: "no-cache-root" };
   }
 
-  // pluginKey shape: "<owner>@<plugin>"
-  const [ownerSegment, pluginSegment] = pluginKey.split("@");
-  if (!ownerSegment || !pluginSegment) {
+  // Registry key shape: "<plugin>@<marketplace>"; cache path reverses it.
+  const [pluginSegment, marketplaceSegment] = pluginKey.split("@");
+  if (!pluginSegment || !marketplaceSegment) {
     return { removed, skipped: "bad-plugin-key" };
   }
 
@@ -554,29 +562,29 @@ export function sweepStaleMcpJson({ pluginCacheRoot, pluginKey }) {
   // even if pluginKey contains `..` segments. Per Mert's standing Windows
   // safety rule, resolve normalizes both `/` and `\` so the guard fires
   // on either separator.
-  const ownerDir = resolve(resolvedCacheRoot, ownerSegment, pluginSegment);
+  const pluginDir = resolve(resolvedCacheRoot, marketplaceSegment, pluginSegment);
   const cacheRootWithSep = resolvedCacheRoot + sep;
-  if (!ownerDir.startsWith(cacheRootWithSep)) {
+  if (!pluginDir.startsWith(cacheRootWithSep)) {
     return { removed, skipped: "outside-cache-root" };
   }
 
-  if (!existsSync(ownerDir)) {
+  if (!existsSync(pluginDir)) {
     return { removed, skipped: "no-plugin-dir" };
   }
 
   /** @type {string[]} */
   let versionEntries = [];
   try {
-    versionEntries = readdirSync(ownerDir);
+    versionEntries = readdirSync(pluginDir);
   } catch {
     return { removed, skipped: "readdir-failed" };
   }
 
   for (const versionEntry of versionEntries) {
-    const versionDir = resolve(ownerDir, versionEntry);
+    const versionDir = resolve(pluginDir, versionEntry);
     // Per-version guard: only enter directories whose resolved path stays
     // under the owner dir. Belt-and-braces against weird FS entries.
-    if (!versionDir.startsWith(ownerDir + sep)) continue;
+    if (!versionDir.startsWith(pluginDir + sep)) continue;
     try {
       const stat = statSync(versionDir);
       if (!stat.isDirectory()) continue;
