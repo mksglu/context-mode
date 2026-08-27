@@ -478,6 +478,7 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
           "export function healSettingsEnabledPlugins() { return { healed: [] }; }",
           "export function healPluginJsonMcpServers() { return { healed: [] }; }",
           "export function healMcpJsonArgs() { return { healed: [] }; }",
+          "export function resolveContextModePluginKey() { return 'context-mode@context-mode'; }",
           // Issue #609 — sweepStaleMcpJson replaced per-entry healMcpJsonArgs.
           // Stubbed alongside healMcpJsonArgs for backwards compatibility with
           // any in-flight callers that still import it.

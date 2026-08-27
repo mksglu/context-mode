@@ -46,7 +46,7 @@ import { discoverSiblingMcpPids, killSiblingMcpServers } from "./util/sibling-mc
 // v1.0.119 — Issue #523 Layer 5 heal: post-bump assertion on .claude-plugin/plugin.json
 // mcpServers args. Single source of truth shared with start.mjs HEAL block + postinstall.
 // @ts-expect-error — JS module, no TS declarations
-import { healPluginJsonMcpServers, sweepStaleMcpJson } from "../scripts/heal-installed-plugins.mjs";
+import { healPluginJsonMcpServers, resolveContextModePluginKey, sweepStaleMcpJson } from "../scripts/heal-installed-plugins.mjs";
 // @ts-expect-error — JS module, no TS declarations
 import { detectWindowsVsYear } from "../scripts/heal-better-sqlite3.mjs";
 // Private 16-LOC copy of browserOpenArgv. Canonical version lives in src/server.ts;
@@ -1541,6 +1541,7 @@ async function upgrade(opts?: { platform?: string }) {
       // Fix registry — adapter-aware
       adapter.updatePluginRegistry(pluginRoot, newVersion);
       p.log.info(color.dim("  Registry synced to " + pluginRoot));
+      let pluginKey = "context-mode@context-mode";
 
       // v1.0.114 hotfix — post-write assertion: re-read installed_plugins.json
       // and verify installPath/.claude-plugin/plugin.json's version matches
@@ -1550,7 +1551,8 @@ async function upgrade(opts?: { platform?: string }) {
         const ipPath = resolve(resolveClaudeConfigDir(), "plugins", "installed_plugins.json");
         if (existsSync(ipPath)) {
           const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
-          const entries = ip?.plugins?.["context-mode@context-mode"];
+          pluginKey = resolveContextModePluginKey(ip?.plugins);
+          const entries = ip?.plugins?.[pluginKey];
           if (Array.isArray(entries)) {
             for (const entry of entries) {
               const ip2 = entry?.installPath;
@@ -1586,7 +1588,6 @@ async function upgrade(opts?: { platform?: string }) {
       // truth shared with start.mjs HEAL block + postinstall.
       try {
         const pluginCacheRoot = resolve(resolveClaudeConfigDir(), "plugins", "cache");
-        const pluginKey = "context-mode@context-mode";
         const firstPass = healPluginJsonMcpServers({ pluginRoot, pluginCacheRoot, pluginKey });
         if (firstPass && firstPass.error) {
           throw new Error(firstPass.error);
@@ -1616,7 +1617,6 @@ async function upgrade(opts?: { platform?: string }) {
       // block + postinstall.
       try {
         const pluginCacheRoot = resolve(resolveClaudeConfigDir(), "plugins", "cache");
-        const pluginKey = "context-mode@context-mode";
         const firstSweep = sweepStaleMcpJson({ pluginCacheRoot, pluginKey });
         if (firstSweep && firstSweep.removed && firstSweep.removed.length > 0) {
           p.log.info(color.dim(`  Swept ${firstSweep.removed.length} stale .mcp.json file(s) from cache`));
@@ -1798,7 +1798,7 @@ async function upgrade(opts?: { platform?: string }) {
           // The lexical resolve+startsWith check rejects ".."-escapes and
           // absolute paths outside cacheRoot, but path.resolve doesn't
           // dereference symlinks. A same-uid actor who can plant a symlink
-          // AT <cacheRoot>/<owner>/<plugin>/<version> targeting an attacker
+          // AT <cacheRoot>/<marketplace>/<plugin>/<version> targeting an attacker
           // dir gets past the lexical guard, then cpSync follows the link at
           // FS-write time. Re-check via realpathSync so a planted symlink
           // anchor fails the gate.
@@ -1808,7 +1808,8 @@ async function upgrade(opts?: { platform?: string }) {
           catch { cacheRootCanon = cacheRoot; }
           const cacheRootWithSep = cacheRootCanon + sep;
           const registry = JSON.parse(readFileSync(registryPath, "utf-8"));
-          const entries = registry?.plugins?.["context-mode@context-mode"];
+          const pluginKey = resolveContextModePluginKey(registry?.plugins);
+          const entries = registry?.plugins?.[pluginKey];
           if (Array.isArray(entries)) {
             for (const entry of entries) {
               const installPath = entry?.installPath;
@@ -1999,7 +2000,7 @@ function statuslineForward(): void {
       // on the user's behalf.
       //
       // path.resolve is purely lexical, so a same-uid actor who can plant
-      // a symlink at <cacheRoot>/<owner>/<plugin>/<version> targeting an
+      // a symlink at <cacheRoot>/<marketplace>/<plugin>/<version> targeting an
       // attacker dir would pass the lexical gate. Re-check via
       // realpathSync so the dynamic-import target's actual on-disk
       // location also stays under cacheRoot.
@@ -2009,7 +2010,8 @@ function statuslineForward(): void {
       catch { cacheRootCanon = cacheRoot; }
       const cacheRootWithSep = cacheRootCanon + sep;
       const registry = JSON.parse(readFileSync(registryPath, "utf-8"));
-      const entries = registry?.plugins?.["context-mode@context-mode"];
+      const pluginKey = resolveContextModePluginKey(registry?.plugins);
+      const entries = registry?.plugins?.[pluginKey];
       if (Array.isArray(entries)) {
         for (const entry of entries) {
           const installPath = entry?.installPath;

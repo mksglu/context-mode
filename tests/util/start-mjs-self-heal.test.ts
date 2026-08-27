@@ -136,6 +136,23 @@ describe("start.mjs — Issue #609 sweep stale .mcp.json", () => {
   });
 });
 
+describe("start.mjs — Issue #1078 marketplace-derived registry key", () => {
+  test("all cache-heal gates match the plugin segment, not a marketplace literal", () => {
+    expect(startSrc).not.toContain('key !== "context-mode@context-mode"');
+    expect(startSrc).not.toContain('k!=="context-mode@context-mode"');
+    expect(
+      (startSrc.match(/\.startsWith\("context-mode@"\)/g) ?? []).length,
+    ).toBeGreaterThanOrEqual(3);
+  });
+
+  test("HEAL 3+4 derives pluginKey from installed_plugins.json", () => {
+    const heal34Idx = startSrc.indexOf("HEAL 3");
+    const layer4Idx = startSrc.indexOf("Self-heal Layer 4");
+    const block = startSrc.slice(heal34Idx, layer4Idx);
+    expect(block).toContain("resolveContextModePluginKey(ip.plugins)");
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // Issue #577 — start.mjs cache-heal layer MUST honor CLAUDE_CONFIG_DIR.
 //
