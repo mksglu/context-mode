@@ -2581,6 +2581,21 @@ describe("Project dir hash consistency", () => {
     // statusline contract at src/server.ts:540).
     expect(body).toMatch(/getLifetimeStats\(\s*\{\s*sessionsDir:\s*getSessionDir\(\)/);
   });
+
+  test("stats heartbeat reads the shared lifetime snapshot instead of scanning SessionDBs", () => {
+    const persistStats = serverSrc.match(/function persistStats\([\s\S]*?^}/m);
+    expect(persistStats).not.toBeNull();
+    expect(persistStats![0]).toContain("readLifetimeTokenSnapshot");
+    expect(persistStats![0]).not.toContain("getLifetimeStats(");
+  });
+
+  test("ctx_stats publishes the explicitly requested lifetime aggregation", () => {
+    const statsMatch = serverSrc.match(
+      /server\.registerTool\(\s*"ctx_stats"[\s\S]*?^\);/m,
+    );
+    expect(statsMatch).not.toBeNull();
+    expect(statsMatch![0]).toContain("publishLifetimeTokenSnapshot");
+  });
 });
 
 // ─── Purge deleted array honesty ─────────────────────────────────────────────
