@@ -243,6 +243,20 @@ describe("detectPlatform — config directory branches", () => {
     expect(signal.platform).toBe(expected);
     expect(signal.confidence).toBe("medium");
   });
+
+  // Dedicated CLI agents (.omp/.pi/.kiro) MUST outrank generic ~/.claude,
+  // same #542/#774 pattern as Cursor. A machine with both ~/.claude and
+  // ~/.omp otherwise mis-detects OMP MCP as Claude Code.
+  it("agent dir ~/.omp beats ~/.claude when both exist", () => {
+    existsSyncMock.mockImplementation(
+      ((p: unknown) =>
+        p === resolve(home, ".omp") ||
+        p === resolve(home, ".claude")) as typeof fs.existsSync,
+    );
+    const signal = detectPlatform();
+    expect(signal.platform).toBe("omp");
+    expect(signal.confidence).toBe("medium");
+  });
 });
 
 describe("detectPlatform — env var priority chain", () => {

@@ -76,13 +76,13 @@ describe("detectPlatform — all-pairs ambiguity matrix (issue #542)", () => {
     // ── Pi → OMP rebrand collision: OMP wins (more specific) ──
     ["pi + omp       → omp",     [".pi"],     [".omp"],     "omp"],
 
-    // ── Two-agent collision: priority is documented in detect.ts ──
-    // claude > gemini > codex > kiro > omp > pi > qwen > openclaw > cursor
-    // (issue #542 reorder — agents-first, then editors).
-    ["kiro + gemini  → gemini",  [".kiro"],   [".gemini"],  "gemini-cli"],
-    ["kiro + claude  → claude",  [".kiro"],   [".claude"],  "claude-code"],
-    ["pi + claude    → claude",  [".pi"],     [".claude"],  "claude-code"],
-    ["omp + claude   → claude",  [".omp"],    [".claude"],  "claude-code"],
+    // ── Two-agent collision: dedicated CLI dirs beat generic ~/.claude ──
+    // kiro/omp/pi > claude/gemini > editors (issue #542 agents-first, plus
+    // OMP MCP mis-detect when ~/.claude also exists).
+    ["kiro + gemini  → kiro",    [".kiro"],   [".gemini"],  "kiro"],
+    ["kiro + claude  → kiro",    [".kiro"],   [".claude"],  "kiro"],
+    ["pi + claude    → pi",      [".pi"],     [".claude"],  "pi"],
+    ["omp + claude   → omp",     [".omp"],    [".claude"],  "omp"],
 
     // ── Regressions: bare single-dir resolutions still work ──
     ["cursor only    → cursor",  [".cursor"], [".cursor"],  "cursor"],
