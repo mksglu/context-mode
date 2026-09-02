@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { sep, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   detectPlatform,
   getAdapter,
@@ -775,5 +777,27 @@ describe("PLATFORM_ENV_VARS — typed registry (issue #545 algorithmic design)",
         }
       }
     }
+  });
+});
+
+describe("main() defers adapter detect until initialize handshake", () => {
+  const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const serverSrc = readFileSync(resolve(ROOT, "src", "server.ts"), "utf-8");
+  const mainIdx = serverSrc.indexOf("async function main()");
+  const mainBody = serverSrc.slice(mainIdx);
+
+  it("does not call getClientVersion immediately after connect", () => {
+    const connectIdx = mainBody.indexOf("await server.connect(transport)");
+    expect(connectIdx).toBeGreaterThan(-1);
+    const afterConnect = mainBody.slice(connectIdx, connectIdx + 2500);
+    expect(afterConnect.includes("getClientVersion()")).toBe(false);
+  });
+
+  it("detects from oninitialized after handshake", () => {
+    expect(mainBody.includes("server.server.oninitialized")).toBe(true);
+    const initIdx = mainBody.indexOf("server.server.oninitialized");
+    const window = mainBody.slice(initIdx, initIdx + 1200);
+    expect(window.includes("getClientVersion()")).toBe(true);
+    expect(window.includes("detectPlatform(")).toBe(true);
   });
 });
