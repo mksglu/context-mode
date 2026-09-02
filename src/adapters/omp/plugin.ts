@@ -27,7 +27,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
 import { extractEvents, buildAgentUsageEvent } from "../../session/extract.js";
@@ -75,6 +75,47 @@ let _dbPath = "";
 let _sessionId = "";
 
 const _ompAdapter = new OMPAdapter();
+
+const OMP_TASK_MARKER = "context-mode: omp task routing";
+const _pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+let _taskBlock: string | null = null;
+
+async function ompTaskRoutingBlock(): Promise<string> {
+  if (_taskBlock) return _taskBlock;
+  const { createRoutingBlock } = await import(
+    pathToFileURL(resolve(_pluginRoot, "hooks/routing-block.mjs")).href
+  ) as { createRoutingBlock: (t: (tool: string) => string, opts?: { includeCommands?: boolean }) => string };
+  // OMP MCP tools are bare ctx_*. Identity namer, independent of TOOL_PREFIXES.
+  _taskBlock = createRoutingBlock((tool) => tool, { includeCommands: false });
+  return _taskBlock;
+}
+
+async function injectOmpTaskRouting(
+  toolInput: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const already = (s: unknown) => typeof s === "string" && s.includes(OMP_TASK_MARKER);
+  const tasks = toolInput.tasks;
+  const taskAlready = (item: unknown) => {
+    if (!item || typeof item !== "object" || !("task" in item)) return false;
+    return already(item.task);
+  };
+  if (already(toolInput.context) && (!Array.isArray(tasks) || tasks.every(taskAlready))) {
+    return toolInput;
+  }
+  const block = "\n\n<!-- " + OMP_TASK_MARKER + " -->\n" + (await ompTaskRoutingBlock()) + "\n";
+  const next: Record<string, unknown> = { ...toolInput };
+  if (typeof next.context === "string" && !already(next.context)) {
+    next.context = next.context + block;
+  }
+  if (Array.isArray(tasks)) {
+    next.tasks = tasks.map((item) => {
+      if (!item || typeof item !== "object" || !("task" in item)) return item;
+      if (typeof item.task !== "string" || already(item.task)) return item;
+      return { ...item, task: item.task + block };
+    });
+  }
+  return next;
+}
 
 // ── MCP self-registration (issue #677) ───────────────────
 // The `omp plugin install context-mode` path wires THIS extension factory
@@ -192,6 +233,7 @@ export function _resetOmpPluginStateForTests(): void {
   _db = null;
   _dbPath = "";
   _sessionId = "";
+  _taskBlock = null;
 }
 
 /**
@@ -218,7 +260,7 @@ type ToolResultEvent = {
   content?: Array<{ type: string; text?: string }>;
   isError?: boolean;
 };
-type ToolCallEventResult = { block?: boolean; reason?: string };
+type ToolCallEventResult = { block?: boolean; reason?: string; input?: Record<string, unknown> };
 // turn_end / agent_end usage-bearing event. Shape is intentionally loose — the
 // pure parseOmpUsage() (usage.ts) does the null-safe field extraction. Refs:
 // AssistantMessage (refs/platforms/omp/packages/ai/src/types.ts:505-541),
@@ -283,9 +325,18 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
   // Returning `{block: true, reason}` per
   // refs/.../hooks/types.ts:566 (ToolCallEventResult) terminates the
   // tool call with the reason surfaced to the LLM.
-  pi.on("tool_call", (event) => {
+  // `{input}` rewrites args. Used so OMP `task` children get the same
+  // routing block Claude Agent prepends — otherwise they never hear ctx_*.
+  pi.on("tool_call", async (event) => {
     try {
       const toolName = String(event?.toolName ?? "").toLowerCase();
+      if (toolName === "task") {
+        const raw = event?.input;
+        const input = (raw && typeof raw === "object") ? raw : {};
+        const next = await injectOmpTaskRouting(input);
+        if (next !== input) return { input: next };
+        return undefined;
+      }
       if (toolName !== "bash") return undefined;
 
       const command = String((event?.input as { command?: unknown } | undefined)?.command ?? "");
