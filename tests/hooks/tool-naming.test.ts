@@ -136,6 +136,10 @@ describe("getToolName", () => {
     expect(getToolName("pi", "ctx_batch_execute")).toBe("ctx_batch_execute");
   });
 
+  it("returns bare name for omp", () => {
+    expect(getToolName("omp", "ctx_execute")).toBe("ctx_execute");
+  });
+
   it("falls back to claude-code for unknown platforms", () => {
     expect(getToolName("unknown-platform", "ctx_search")).toBe(
       "mcp__plugin_context-mode_context-mode__ctx_search",
@@ -166,6 +170,7 @@ describe("KNOWN_PLATFORMS", () => {
     expect(KNOWN_PLATFORMS).toContain("codex");
     expect(KNOWN_PLATFORMS).toContain("openclaw");
     expect(KNOWN_PLATFORMS).toContain("pi");
+    expect(KNOWN_PLATFORMS).toContain("omp");
     expect(KNOWN_PLATFORMS).toContain("qwen-code");
     expect(KNOWN_PLATFORMS.length).toBeGreaterThanOrEqual(14);
   });

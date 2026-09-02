@@ -13,7 +13,7 @@
  * | VS Code Copilot    | context-mode_<tool>                                        |
  * | Kiro               | @context-mode/<tool>                                       |
  * | Zed                | mcp:context-mode:<tool>                                    |
- * | Cursor / Codex / OpenClaw / Pi | bare <tool>                                    |
+ * | Cursor / Codex / OpenClaw / Pi / OMP | bare <tool>                          |
  */
 
 const TOOL_PREFIXES = {
@@ -33,6 +33,7 @@ const TOOL_PREFIXES = {
   "kimi":           (tool) => `mcp__context-mode__${tool}`,
   "openclaw":       (tool) => tool,
   "pi":             (tool) => tool,
+  "omp":            (tool) => tool,
   "qwen-code":      (tool) => `mcp__context-mode__${tool}`,
 };
 
