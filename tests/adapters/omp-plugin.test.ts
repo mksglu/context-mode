@@ -171,6 +171,31 @@ describe("OMP plugin", () => {
       await expect(api._trigger("tool_call", {})).resolves.toBeUndefined();
       await expect(api._trigger("tool_call", { toolName: "bash" })).resolves.toBeUndefined();
     });
+
+    it("injects routing block into task context so children hear ctx_*", async () => {
+      await registerOmpPlugin(api);
+      const result = (await api._trigger("tool_call", {
+        toolName: "task",
+        input: { context: "Review the branch.", tasks: [{ task: "Find the bug." }] },
+      })) as { input?: { context?: string; tasks?: Array<{ task?: string }> } } | undefined;
+      expect(result?.input?.context).toMatch(/ctx_execute/);
+      expect(result?.input?.tasks?.[0]?.task).toMatch(/ctx_execute/);
+      expect(result?.block).toBeUndefined();
+    });
+
+    it("does not double-inject routing into task", async () => {
+      await registerOmpPlugin(api);
+      const first = (await api._trigger("tool_call", {
+        toolName: "task",
+        input: { context: "Review.", tasks: [{ task: "Look." }] },
+      })) as { input?: { context?: string } } | undefined;
+      expect(first?.input?.context).toMatch(/context-mode: omp task routing/);
+      const second = await api._trigger("tool_call", {
+        toolName: "task",
+        input: first?.input,
+      });
+      expect(second).toBeUndefined();
+    });
   });
 
   // ═══════════════════════════════════════════════════════════
