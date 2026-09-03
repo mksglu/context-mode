@@ -63,27 +63,59 @@ export class BunSQLiteAdapter {
 
   exec(sql: string): any {
     // bun:sqlite .exec() is single-statement only.
-    // Split multi-statement SQL respecting string literals (don't split on ; inside quotes).
+    // Split multi-statement SQL respecting string literals and comments — a
+    // `;`, `'` or `"` inside a comment must neither split the statement nor
+    // open a literal.
     let current = "";
     let inString: string | null = null;
+    let inLineComment = false;
+    let inBlockComment = false;
+    // Whether `current` holds SQL outside comments. Neither bun:sqlite nor
+    // better-sqlite3 can prepare a comment-only statement, so skip those.
+    let hasCode = false;
+    const flush = (): void => {
+      const trimmed = current.trim();
+      if (hasCode && trimmed) this.#raw.prepare(trimmed).run();
+      current = "";
+      hasCode = false;
+    };
     for (let i = 0; i < sql.length; i++) {
       const ch = sql[i];
-      if (inString) {
+      const next = sql[i + 1];
+      if (inLineComment) {
+        current += ch;
+        if (ch === "\n" || ch === "\r") inLineComment = false;
+      } else if (inBlockComment) {
+        current += ch;
+        if (ch === "*" && next === "/") {
+          current += next;
+          i++;
+          inBlockComment = false;
+        }
+      } else if (inString) {
         current += ch;
         if (ch === inString) inString = null;
       } else if (ch === "'" || ch === '"') {
         current += ch;
         inString = ch;
+        hasCode = true;
+      } else if (ch === "-" && next === "-") {
+        current += ch + next;
+        i++;
+        inLineComment = true;
+      } else if (ch === "/" && next === "*") {
+        current += ch + next;
+        i++;
+        inBlockComment = true;
       } else if (ch === ";") {
-        const trimmed = current.trim();
-        if (trimmed) this.#raw.prepare(trimmed).run();
-        current = "";
+        flush();
       } else {
         current += ch;
+        // Every SQL whitespace character is at or below U+0020.
+        if (ch.charCodeAt(0) > 32) hasCode = true;
       }
     }
-    const trimmed = current.trim();
-    if (trimmed) this.#raw.prepare(trimmed).run();
+    flush();
     return this;
   }
 
