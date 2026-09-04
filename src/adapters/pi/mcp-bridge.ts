@@ -32,6 +32,11 @@ interface PendingRequest {
   reject: (reason: unknown) => void;
 }
 
+interface MCPProgressNotification {
+  method?: string;
+  params?: { progressToken?: string | number; message?: string };
+}
+
 // ── Fork-bomb prevention (#516) ──────────────────────────────────────
 //
 // Original bug: `spawn(process.execPath, [serverScript])` recursively
@@ -321,18 +326,39 @@ interface PiRenderContext {
   lastComponent?: unknown;
 }
 
-function createContextModeCallRenderer(toolName: string) {
-  return (_args: unknown, theme: PiRenderTheme, context: PiRenderContext) => {
+export function createContextModeCallRenderer(toolName: string) {
+  return (args: unknown, theme: PiRenderTheme, context: PiRenderContext) => {
     const text =
       context.lastComponent instanceof PiTextComponent
         ? context.lastComponent
         : new PiTextComponent();
-    text.setText(theme.fg("toolTitle", theme.bold(toolName)));
+    let input: string;
+    try {
+      input = JSON.stringify(args, null, 2) ?? String(args);
+    } catch {
+      input = String(args);
+    }
+    const preview = input.split(/\r?\n/).map((line) => theme.fg("muted", line)).join("\n");
+    text.setText(`${theme.fg("toolTitle", theme.bold(toolName))}\n${preview}`);
     return text;
   };
 }
 
-function createContextModeResultRenderer(toolName: string) {
+export function stripContextModeAuditEcho(toolName: string, output: string): string {
+  if (toolName !== "ctx_execute" && toolName !== "ctx_execute_file") return output;
+  const lines = output.split(/\r?\n/);
+  if (!lines[0]?.startsWith("```")) return output;
+  const end = lines.findIndex((line, index) => index > 0 && line === "```");
+  return end > 0 ? lines.slice(end + 1).join("\n").replace(/^\n+/, "") : output;
+}
+
+function formatCtxOutput(theme: PiRenderTheme, output: string): string {
+  const content = output || "waiting…";
+  const rendered = content.split(/\r?\n/).map((line) => theme.fg("text", line)).join("\n");
+  return `\n${theme.fg("toolTitle", theme.bold("output"))}\n${rendered}`;
+}
+
+export function createContextModeResultRenderer(toolName: string) {
   return (
     result: MCPCallResult,
     { expanded, isPartial }: { expanded: boolean; isPartial: boolean },
@@ -343,27 +369,29 @@ function createContextModeResultRenderer(toolName: string) {
       context.lastComponent instanceof PiTextComponent
         ? context.lastComponent
         : new PiTextComponent();
-    if (isPartial) {
-      text.setText(theme.fg("warning", "indexing/searching..."));
-      return text;
-    }
     const output = (result.content ?? [])
       .filter((c) => c?.type === "text" && typeof c.text === "string")
       .map((c) => c.text as string)
       .join("\n");
-    if (expanded) {
-      text.setText(theme.fg("toolOutput", output));
+    if (isPartial) {
+      text.setText(formatCtxOutput(theme, output));
       return text;
     }
-    const firstLine = output
+    const display = stripContextModeAuditEcho(toolName, output);
+    if (expanded) {
+      text.setText(formatCtxOutput(theme, display));
+      return text;
+    }
+    const lastLine = display
       .split(/\r?\n/)
+      .reverse()
       .find((line) => line.trim().length > 0)
       ?.trim();
     const status =
-      firstLine && firstLine.length <= 180
-        ? firstLine
+      lastLine && lastLine.length <= 180
+        ? lastLine
         : `${toolName} completed`;
-    text.setText(theme.fg("toolOutput", status));
+    text.setText(formatCtxOutput(theme, status));
     return text;
   };
 }
@@ -384,6 +412,8 @@ export class MCPStdioClient {
   private child: ChildProcess | null = null;
   private requestId = 0;
   private readonly pending = new Map<number, PendingRequest>();
+  private readonly progressHandlers = new Map<string | number, (message: string) => void>();
+  private progressToken = 0;
   private buffer = "";
   private initialized = false;
   private exited = false;
@@ -534,11 +564,19 @@ export class MCPStdioClient {
       const line = this.buffer.slice(0, idx).trim();
       this.buffer = this.buffer.slice(idx + 1);
       if (!line) continue;
-      let msg: { id?: number; result?: unknown; error?: unknown };
+      let msg: MCPProgressNotification & { id?: number; result?: unknown; error?: unknown };
       try {
         msg = JSON.parse(line);
       } catch {
         continue; // skip non-JSON noise (e.g. stray log lines)
+      }
+      if (msg.method === "notifications/progress") {
+        const token = msg.params?.progressToken;
+        const message = msg.params?.message;
+        if ((typeof token === "string" || typeof token === "number") && typeof message === "string") {
+          this.progressHandlers.get(token)?.(message);
+        }
+        continue;
       }
       if (typeof msg.id !== "number" || !this.pending.has(msg.id)) continue;
       const handler = this.pending.get(msg.id)!;
@@ -679,7 +717,7 @@ export class MCPStdioClient {
     return Array.isArray(result.tools) ? result.tools : [];
   }
 
-  async callTool(name: string, args: unknown): Promise<MCPCallResult> {
+  async callTool(name: string, args: unknown, onProgress?: (message: string) => void): Promise<MCPCallResult> {
     // Respawn-on-idle-exit is now handled centrally in `request()`
     // (#583 follow-up). Originally patched here in #583 — moving it up
     // one layer covers `listTools` / `initialize` paths too, with a
@@ -693,11 +731,17 @@ export class MCPStdioClient {
     // executor layer (per-tool timeout / background mode / Pi cancel),
     // not the transport. `Number.POSITIVE_INFINITY` instructs
     // `request()` to skip the setTimeout entirely — see the gate there.
-    return this.request<MCPCallResult>(
-      "tools/call",
-      { name, arguments: args ?? {} },
-      Number.POSITIVE_INFINITY,
-    );
+    const progressToken = onProgress ? `ctx-progress-${++this.progressToken}` : undefined;
+    if (progressToken && onProgress) this.progressHandlers.set(progressToken, onProgress);
+    try {
+      return await this.request<MCPCallResult>(
+        "tools/call",
+        { name, arguments: args ?? {}, ...(progressToken ? { _meta: { progressToken } } : {}) },
+        Number.POSITIVE_INFINITY,
+      );
+    } finally {
+      if (progressToken) this.progressHandlers.delete(progressToken);
+    }
   }
 
   /**
@@ -784,6 +828,8 @@ export interface PiToolRegistration {
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
+    signal?: AbortSignal,
+    onUpdate?: (result: { content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }) => void,
   ) => Promise<{
     content: Array<{ type: "text"; text: string }>;
     details: Record<string, unknown>;
@@ -1031,8 +1077,14 @@ export async function bootstrapMCPTools(
       parameters: tool.inputSchema ?? { type: "object", properties: {} },
       renderCall: createContextModeCallRenderer(tool.name),
       renderResult: createContextModeResultRenderer(tool.name),
-      async execute(_toolCallId, params) {
-        const result = await client.callTool(tool.name, params ?? {});
+      async execute(_toolCallId, params, _signal, onUpdate) {
+        let partialOutput = "";
+        const result = await client.callTool(tool.name, params ?? {}, onUpdate
+          ? (chunk) => {
+              partialOutput += chunk;
+              onUpdate({ content: [{ type: "text", text: partialOutput }], details: {} });
+            }
+          : undefined);
         const text = (result.content ?? [])
           .filter((c) => c?.type === "text" && typeof c.text === "string")
           .map((c) => c.text as string)

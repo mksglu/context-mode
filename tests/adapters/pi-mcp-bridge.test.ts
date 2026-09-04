@@ -44,6 +44,54 @@ afterEach(() => {
   delete process.env.CONTEXT_MODE_BRIDGE_DEPTH;
 });
 
+
+describe("createContextModeCallRenderer", () => {
+  it("shows ctx_execute arguments, including its command", async () => {
+    const { createContextModeCallRenderer } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const component = createContextModeCallRenderer("ctx_execute")(
+      { language: "shell", code: "printf done", cwd: "/tmp" },
+      { bold: (value: string) => value, fg: (color: string, value: string) => `[${color}]${value}` },
+      {},
+    ) as { render: (width: number) => string[] };
+
+    expect(component.render(200)).toEqual([
+      "[toolTitle]ctx_execute",
+      "[muted]{",
+      '[muted]  "language": "shell",',
+      '[muted]  "code": "printf done",',
+      '[muted]  "cwd": "/tmp"',
+      "[muted]}",
+    ]);
+  });
+});
+
+describe("createContextModeResultRenderer", () => {
+  it("keeps the output heading and uses the final line when collapsed", async () => {
+    const { createContextModeResultRenderer } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const render = createContextModeResultRenderer("ctx_execute");
+    const theme = { bold: (value: string) => `*${value}*`, fg: (color: string, value: string) => `[${color}]${value}` };
+    const result = { content: [{ type: "text", text: "first line\nfinal line" }] };
+    const heading = ["", "[toolTitle]*output*"];
+
+    for (const [options, expected] of [
+      [{ expanded: false, isPartial: true }, [...heading, "[text]first line", "[text]final line"]],
+      [{ expanded: false, isPartial: false }, [...heading, "[text]final line"]],
+      [{ expanded: true, isPartial: false }, [...heading, "[text]first line", "[text]final line"]],
+    ] as const) {
+      const component = render(result, options, theme, {}) as { render: (width: number) => string[] };
+      expect(component.render(200)).toEqual(expected);
+    }
+  });
+});
+
+describe("stripContextModeAuditEcho", () => {
+  it("shows execute errors instead of their echoed command", async () => {
+    const { stripContextModeAuditEcho } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const output = "```shell\nprintf failing\n```\n\nExit code: 1\n\nstdout:\npartial stdout\n\nstderr:\nintentional stderr";
+    expect(stripContextModeAuditEcho("ctx_execute", output)).toBe("Exit code: 1\n\nstdout:\npartial stdout\n\nstderr:\nintentional stderr");
+  });
+});
+
 // Slice 1 — runtime name guard
 describe("resolveJsRuntimeForBridge — Pi fork-bomb guard (#516)", () => {
   it("rejects a pi-named binary returned by detectRuntimes and falls back to PATH node/bun", async () => {
@@ -627,6 +675,41 @@ describe("MCPStdioClient — request() respawns for any method after idle exit (
 // These tests pin the contract behaviorally via fake timers — advancing
 // >120s while a `tools/call` is in flight MUST NOT reject it. The
 // initialize path still rejects at 60s by default (regression guard).
+describe("MCPStdioClient — progress notifications", () => {
+  it("forwards matching progress messages before the final tool result", async () => {
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient("/unused/server.mjs");
+    const writes: string[] = [];
+    const stdin = {
+      destroyed: false,
+      writableEnded: false,
+      closed: false,
+      write: (data: string, cb?: (err?: Error) => void) => {
+        writes.push(data);
+        cb?.();
+        return true;
+      },
+    };
+    (client as unknown as { child: unknown }).child = { stdin };
+    const updates: string[] = [];
+    const pending = client.callTool("ctx_execute", {}, message => updates.push(message));
+    const request = JSON.parse(writes[0]!);
+    const token = request.params._meta.progressToken;
+    (client as unknown as { onData: (chunk: Buffer) => void }).onData(Buffer.from(`${JSON.stringify({
+      jsonrpc: "2.0",
+      method: "notifications/progress",
+      params: { progressToken: token, progress: 1, message: "first line\n" },
+    })}\n`, "utf-8"));
+    expect(updates.join("")).toBe("first line\n");
+    (client as unknown as { onData: (chunk: Buffer) => void }).onData(Buffer.from(`${JSON.stringify({
+      jsonrpc: "2.0",
+      id: request.id,
+      result: { content: [{ type: "text", text: "final" }] },
+    })}\n`, "utf-8"));
+    await expect(pending).resolves.toMatchObject({ content: [{ type: "text", text: "final" }] });
+  });
+});
+
 describe("MCPStdioClient — callTool has no bridge-imposed timeout (#643)", () => {
   it("callTool does not reject when bridge clock advances past the old 120s ceiling", async () => {
     const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
