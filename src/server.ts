@@ -149,7 +149,7 @@ export const server = new McpServer({
 export interface RegisteredCtxTool {
   name: string;
   config: Record<string, unknown>;
-  handler: (args: Record<string, unknown>) => Promise<unknown> | unknown;
+  handler: (args: Record<string, unknown>, extra?: unknown) => Promise<unknown> | unknown;
 }
 
 export const REGISTERED_CTX_TOOLS: RegisteredCtxTool[] = [];
@@ -280,7 +280,7 @@ const originalRegisterTool = server.registerTool.bind(server);
   const [name, config, handler] = args as [
     string,
     Record<string, unknown>,
-    (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
+    (toolArgs: Record<string, unknown>, extra?: unknown) => Promise<unknown> | unknown,
   ];
   if (suppressMcpToolsForNativePluginHost) {
     emitSuppressionDiagnostic();
@@ -294,15 +294,15 @@ const originalRegisterTool = server.registerTool.bind(server);
 
 function wrapToolHandler(
   name: string,
-  handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
-): (toolArgs: Record<string, unknown>) => Promise<unknown> {
-  return async (toolArgs: Record<string, unknown>) => {
+  handler: (toolArgs: Record<string, unknown>, extra?: unknown) => Promise<unknown> | unknown,
+): (toolArgs: Record<string, unknown>, extra?: unknown) => Promise<unknown> {
+  return async (toolArgs: Record<string, unknown>, extra?: unknown) => {
     // #854: mark a tool call in-flight so the bridge-child idle reaper never
     // shuts the server down mid-execution during a long ctx_execute/batch that
     // emits no further inbound messages. Symmetric end in finally (success+error).
     noteRequestStart();
     try {
-      return await handler(toolArgs);
+      return await handler(toolArgs, extra);
     } catch (err) {
       const result = storageErrorResult(err);
       if (result) {
@@ -1634,6 +1634,37 @@ export async function runBatchCommands(
 // Tool: execute
 // ─────────────────────────────────────────────────────────
 
+function createProgressReporter(
+  progressToken: string | number | undefined,
+  send: (progressToken: string | number, message: string, progress: number) => Promise<void>,
+): { report: (chunk: string) => void; flush: () => Promise<void> } {
+  if (typeof progressToken !== "string" && typeof progressToken !== "number") {
+    return { report: () => {}, flush: async () => {} };
+  }
+  let buffered = "";
+  let progress = 0;
+  let timer: NodeJS.Timeout | undefined;
+  const flush = async () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    if (!buffered) return;
+    const message = buffered;
+    buffered = "";
+    try {
+      await send(progressToken, message, ++progress);
+    } catch {}
+  };
+  return {
+    report: (chunk) => {
+      buffered += chunk;
+      if (!timer) timer = setTimeout(() => { void flush(); }, 100);
+    },
+    flush,
+  };
+}
+
 server.registerTool(
   "ctx_execute",
   {
@@ -1730,7 +1761,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         ),
     }),
   },
-  async ({ language, code, timeout, background, cwd, intent }) => {
+  async ({ language, code, timeout, background, cwd, intent }, extra) => {
     // Security: deny-only firewall
     if (language === "shell") {
       const denied = checkDenyPolicy(code, "execute");
@@ -1809,7 +1840,16 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
 })(typeof require!=='undefined'?require:null);`;
       }
       const effTimeout = resolveExecTimeout(timeout);
-      const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd });
+      const progressToken = extra._meta?.progressToken;
+      const progress = createProgressReporter(
+        progressToken,
+        (token, message, value) => extra.sendNotification({
+          method: "notifications/progress",
+          params: { progressToken: token, progress: value, message },
+        }),
+      );
+      const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd, onOutput: progress.report });
+      await progress.flush();
 
       // Echo the executed source code before stdout so users can audit
       // and tooling can block command patterns (Issues #717 + #736).
@@ -1933,7 +1973,7 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
       const message = err instanceof Error ? err.message : String(err);
       return trackResponse("ctx_execute", {
         content: [
-          { type: "text" as const, text: `Runtime error: ${message}` },
+          { type: "text" as const, text: `${buildExecuteEcho(language, code)}Runtime error: ${message}` },
         ],
         isError: true,
       });
@@ -2101,7 +2141,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         ),
     }),
   },
-  async ({ path, language, code, timeout, intent }) => {
+  async ({ path, language, code, timeout, intent }, extra) => {
     // Security (#852): confine the processed file to the project root so
     // ctx_execute_file cannot be used to escape the host's sandbox/permission
     // controls. Runs before the deny-glob check — boundary first, then policy.
@@ -2123,12 +2163,22 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
 
     try {
       const effTimeout = resolveExecTimeout(timeout);
+      const progressToken = extra._meta?.progressToken;
+      const progress = createProgressReporter(
+        progressToken,
+        (token, message, value) => extra.sendNotification({
+          method: "notifications/progress",
+          params: { progressToken: token, progress: value, message },
+        }),
+      );
       const result = await executor.executeFile({
         path,
         language,
         code,
         timeout: effTimeout,
+        onOutput: progress.report,
       });
+      await progress.flush();
 
       // Echo path + executed source code before stdout for audit/debug
       // (Issues #717 + #736).
@@ -2211,7 +2261,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
       const message = err instanceof Error ? err.message : String(err);
       return trackResponse("ctx_execute_file", {
         content: [
-          { type: "text" as const, text: `Runtime error: ${message}` },
+          { type: "text" as const, text: `${buildExecuteEcho(language, code, path)}Runtime error: ${message}` },
         ],
         isError: true,
       });
