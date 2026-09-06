@@ -1,5 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
+import { homedir } from "node:os";
+import { join, relative, resolve, sep } from "node:path";
 
 import { resolveAdapterGlobalSettingsPaths } from "./util/claude-config.js";
 
@@ -592,6 +593,29 @@ export function evaluateCommandDenyOnly(
 // ==============================================================================
 
 /**
+ * Expand the two path anchors Claude Code documents for permission patterns
+ * (issue #1075). A pattern body reaches the matcher exactly as the user typed
+ * it inside `Read(...)`, so these two forms never matched anything:
+ *
+ *   - `//abs/path` — an absolute path from the filesystem root
+ *   - `~/rel/path` — a path relative to the user's home directory
+ *
+ * Only the bare `/path` form matched, and that is the one form Claude Code
+ * does *not* resolve against the filesystem root. The consequences ran both
+ * ways: a `deny` rule written with either anchor silently failed open, and an
+ * `allow` rule written with either anchor failed to unblock the path it named.
+ *
+ * The expansion is additive — the raw glob stays in the returned list — so no
+ * rule that matched before stops matching now.
+ */
+export function expandGlobAnchors(glob: string): string[] {
+  if (glob.startsWith("//")) return [glob, glob.slice(1)];
+  if (glob === "~") return [glob, homedir()];
+  if (glob.startsWith("~/")) return [glob, join(homedir(), glob.slice(2))];
+  return [glob];
+}
+
+/**
  * Check if a file path should be denied based on deny globs.
  *
  * Normalizes backslashes to forward slashes before matching so that
@@ -639,14 +663,18 @@ export function evaluateFilePath(
 
   for (const globs of denyGlobs) {
     for (const glob of globs) {
-      // Normalize the glob's path separators the same way candidates were
+      // Expand `//` and `~/` anchors (issue #1075) before matching, then
+      // normalize the glob's path separators the same way candidates were
       // normalized — otherwise a Windows absolute deny rule like
       // `Read(C:\Users\...\secret.env)` parses with literal backslashes that
       // never match a forward-slash candidate.
-      const regex = fileGlobToRegex(toForward(glob), caseInsensitive);
-      for (const candidate of candidates) {
-        if (regex.test(candidate)) {
-          return { denied: true, matchedPattern: glob };
+      for (const variant of expandGlobAnchors(glob)) {
+        const regex = fileGlobToRegex(toForward(variant), caseInsensitive);
+        for (const candidate of candidates) {
+          if (regex.test(candidate)) {
+            // Report the pattern as the user wrote it, not the expansion.
+            return { denied: true, matchedPattern: glob };
+          }
         }
       }
     }
