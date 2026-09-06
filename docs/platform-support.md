@@ -4,15 +4,20 @@ This document provides a comprehensive comparison of all platforms supported by 
 
 ## Overview
 
-context-mode supports 17 client platforms, plus the OpenClaw gateway integration, across three hook paradigms:
+context-mode supports 18 client platforms, plus the OpenClaw gateway integration, across four hook paradigms:
 
 | Paradigm | Platforms |
 |----------|-----------|
 | **JSON stdin/stdout** | Claude Code, Gemini CLI, VS Code Copilot, JetBrains Copilot, GitHub Copilot CLI, Cursor, Codex CLI, Qwen Code, Kimi Code, Antigravity CLI (`agy`), Kiro |
 | **TS Plugin** | OpenCode, KiloCode, OpenClaw |
 | **MCP-only** | Antigravity, Zed, Pi, OMP (Oh My Pi) |
+| **Python Plugin** | Hermes Agent |
 
 The MCP server layer is 100% portable and needs no adapter. Only the hook layer requires platform-specific adapters.
+
+Hermes is packaged separately from the TypeScript adapter abstraction because
+its public plugin runtime is Python. The plugin communicates only through
+documented Hermes hooks and Context Mode's ordinary MCP server.
 
 ## Prerequisites
 
@@ -743,6 +748,46 @@ OpenClaw is an OpenAI-stack agent gateway. context-mode ships as a native gatewa
 
 ---
 
+### Hermes Agent
+
+**Status:** Supported through a Python plugin and MCP
+
+**Hook Paradigm:** Python plugin (`register(ctx)` and public lifecycle hooks)
+
+Hermes loads Context Mode's standard-library-only Python plugin for proactive
+routing and bounded output fallback. Context Mode itself remains an ordinary
+MCP server registered under `context-mode`; Hermes exposes its tools as
+`mcp__context_mode__ctx_*`.
+
+**Hook Support:**
+- PreToolUse: `pre_tool_call`
+- PostToolUse: `transform_tool_result`
+- PreCompact: --
+- SessionStart: `on_session_start`
+- Stop: -- (`on_session_finalize` is session teardown, not a tool-stop hook)
+- Can modify args: --
+- Can modify output: Yes, for eligible native results over 3 KiB
+- Can inject session context: Yes, through `pre_llm_call`
+- Can block tools: Yes, with `{"action":"block","message":"..."}`
+
+**Lifecycle:**
+- `on_session_end` is a per-turn boundary in current Hermes and persists a
+  snapshot without releasing state.
+- `on_session_finalize` is the actual CLI/gateway teardown boundary and releases
+  plugin state.
+- First-turn guidance state is concurrency-safe and capped at exactly 1,000
+  sessions with oldest-entry eviction.
+
+**Notes / Caveats:**
+- The plugin uses only documented Hermes interfaces and does not patch Hermes.
+- The plugin does not duplicate Context Mode's execution, indexing, search, or
+  session database. Those remain MCP responsibilities.
+- Full Context Mode session extraction and pre-compaction continuity are not
+  claimed for Hermes; the verified integration covers routing, output bounding,
+  local metrics, and normal MCP execution.
+
+---
+
 ### Zed
 
 **Status:** MCP-only (no hooks)
@@ -824,18 +869,18 @@ The hook adapter exists only to satisfy the interface contract — every parser 
 
 ## Capability Matrix (Quick Reference)
 
-| Capability | Claude Code | Qwen Code | Gemini CLI | VS Code Copilot | JetBrains Copilot | GitHub Copilot CLI | Cursor | OpenCode | KiloCode | OpenClaw | Codex CLI | Kimi Code | Antigravity | Antigravity CLI (`agy`) | Kiro | Zed | Pi | OMP |
-|-----------|:-----------:|:---------:|:----------:|:---------------:|:-----------------:|:------------------:|:------:|:--------:|:--------:|:--------:|:---------:|:---------:|:-----------:|:-----------------------:|:----:|:---:|:--:|:---:|
-| PreToolUse | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes*** | Yes | -- | Bounded | Yes | -- | -- | -- |
-| PostToolUse | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | Yes (capture-only) | Yes | -- | -- | -- |
-| PreCompact | Yes | Yes | Yes | Yes | Yes | Yes | -- | Yes* | Yes* | Yes | Yes**** | Yes | -- | -- | -- | -- | -- | -- |
-| SessionStart | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | -- | Yes | Yes | Yes | -- | -- | -- | -- | -- | -- |
-| Stop | -- | -- | -- | Yes | Yes | Yes | Yes | -- | -- | -- | Yes | Yes | -- | Best-effort capture | -- | -- | -- | -- |
-| Modify Args | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | Yes | -- | -- | -- | -- | -- | -- |
-| Modify Output | Yes | Yes | Yes | Yes | Yes | No | No | Yes** | Yes** | No | -- | Yes | -- | -- | -- | -- | -- | -- |
-| Inject Context | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | -- | Yes | Yes | Yes | -- | -- | -- | -- | -- | -- |
-| Block Tools | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | Bounded | Yes | -- | -- | -- |
-| MCP/native tool support | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Native plugin | Native plugin | Native plugin | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Capability | Claude Code | Qwen Code | Gemini CLI | VS Code Copilot | JetBrains Copilot | GitHub Copilot CLI | Cursor | OpenCode | KiloCode | OpenClaw | Codex CLI | Kimi Code | Antigravity | Antigravity CLI (`agy`) | Kiro | Hermes | Zed | Pi | OMP |
+|-----------|:-----------:|:---------:|:----------:|:---------------:|:-----------------:|:------------------:|:------:|:--------:|:--------:|:--------:|:---------:|:---------:|:-----------:|:-----------------------:|:----:|:------:|:---:|:--:|:---:|
+| PreToolUse | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes*** | Yes | -- | Bounded | Yes | Yes | -- | -- | -- |
+| PostToolUse | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | Yes (capture-only) | Yes | Yes | -- | -- | -- |
+| PreCompact | Yes | Yes | Yes | Yes | Yes | Yes | -- | Yes* | Yes* | Yes | Yes**** | Yes | -- | -- | -- | -- | -- | -- | -- |
+| SessionStart | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | -- | Yes | Yes | Yes | -- | -- | -- | Yes | -- | -- | -- |
+| Stop | -- | -- | -- | Yes | Yes | Yes | Yes | -- | -- | -- | Yes | Yes | -- | Best-effort capture | -- | -- | -- | -- | -- |
+| Modify Args | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | Yes | -- | -- | -- | -- | -- | -- | -- |
+| Modify Output | Yes | Yes | Yes | Yes | Yes | No | No | Yes** | Yes** | No | -- | Yes | -- | -- | -- | Bounded | -- | -- | -- |
+| Inject Context | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | -- | Yes | Yes | Yes | -- | -- | -- | Yes | -- | -- | -- |
+| Block Tools | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | -- | Bounded | Yes | Yes | -- | -- | -- |
+| MCP/native tool support | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Native plugin | Native plugin | Native plugin | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
 \* OpenCode `experimental.session.compacting` is experimental
 \*\* OpenCode has a TUI rendering bug for bash tool output (#13575)
@@ -858,6 +903,7 @@ The hook adapter exists only to satisfy the interface contract — every parser 
 | OpenCode | `throw new Error("...")` |
 | Codex CLI | `{ "hookSpecificOutput": { "permissionDecision": "deny" } }` or exit code 2 |
 | Kimi Code | `{ "hookSpecificOutput": { "permissionDecision": "deny" } }` or exit code 2 |
+| Hermes Agent | `{ "action": "block", "message": "..." }` |
 
 ### Modifying Tool Input
 

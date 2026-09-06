@@ -39,7 +39,7 @@ Context Mode is an MCP server that solves all four sides of this problem:
 
 1. **Context Saving** — Sandbox tools keep raw data out of the context window. 315 KB becomes 5.4 KB. 98% reduction.
 2. **Session Continuity** — Every file edit, git operation, task, error, and user decision is tracked in SQLite. When the conversation compacts, context-mode doesn't dump this data back into context — it indexes events into FTS5 and retrieves only what's relevant via BM25 search. The model picks up exactly where you left off. If you don't `--continue`, previous session data is deleted immediately — a fresh session means a clean slate.
-3. **Think in Code** — The LLM should program the analysis, not compute it. Instead of reading 50 files into context to count functions, the agent writes a script that does the counting and `console.log()`s only the result. One script replaces ten tool calls and saves 100x context. This is a mandatory paradigm across all 17 supported clients, plus the OpenClaw gateway integration: stop treating the LLM as a data processor, treat it as a code generator.
+3. **Think in Code** — The LLM should program the analysis, not compute it. Instead of reading 50 files into context to count functions, the agent writes a script that does the counting and `console.log()`s only the result. One script replaces ten tool calls and saves 100x context. This is a mandatory paradigm across all 18 supported clients, plus the OpenClaw gateway integration: stop treating the LLM as a data processor, treat it as a code generator.
 
    ```js
    // Before: 47 × Read() = 700 KB.  After: 1 × ctx_execute() = 3.6 KB.
@@ -954,6 +954,44 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
 </details>
 
 <details>
+<summary><strong>Hermes Agent</strong> — Python plugin + MCP</summary>
+
+**Prerequisites:** Node.js >= 22.5 (or Bun), [Hermes Agent](https://github.com/NousResearch/hermes-agent) installed.
+
+Hermes uses Context Mode as an MCP server and loads a standard-library-only Python plugin for proactive routing. The integration follows Hermes' public [plugin](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins), [hook](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks), and [MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp) contracts.
+
+1. Register Context Mode under the stable server name `context-mode`:
+
+   ```bash
+   hermes mcp add context-mode --command npx --args -y context-mode
+   ```
+
+2. Copy the plugin:
+
+   ```bash
+   mkdir -p ~/.hermes/plugins/hermes-context-mode
+   cp .hermes-plugin/plugin.yaml .hermes-plugin/__init__.py ~/.hermes/plugins/hermes-context-mode/
+   ```
+
+3. Enable it in `~/.hermes/config.yaml`:
+
+   ```yaml
+   plugins:
+     enabled:
+       - hermes-context-mode
+   ```
+
+4. Restart Hermes. For gateway deployments, restart the gateway process.
+
+**Verify:** Run `hermes mcp test context-mode`, then ask Hermes for `ctx stats`.
+
+**Routing:** Automatic. `pre_tool_call` blocks known high-output terminal work, `pre_llm_call` injects current `mcp__context_mode__ctx_*` names once per session, and `transform_tool_result` bounds eligible native output over 3 KiB. Current Hermes treats `on_session_end` as a per-turn boundary, so metrics are retained until `on_session_finalize` performs actual teardown.
+
+Full documentation: [`.hermes-plugin/README.md`](.hermes-plugin/README.md) | [`docs/adapters/hermes-agent.md`](docs/adapters/hermes-agent.md) | fallback instructions: [`configs/hermes/AGENTS.md`](configs/hermes/AGENTS.md)
+
+</details>
+
+<details>
 <summary><strong>Zed</strong> — MCP-only, no hooks</summary>
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Zed installed.
@@ -1422,6 +1460,7 @@ Hooks intercept tool calls programmatically — they can block dangerous command
 | Zed | -- | [`AGENTS.md`](configs/zed/AGENTS.md) | -- | ~60% saved |
 | Pi | ✓ | [`AGENTS.md`](configs/pi/AGENTS.md) | **~98% saved** | ~60% saved |
 | OMP | Plugin | [`SYSTEM.md`](configs/omp/SYSTEM.md) | **~98% saved** | ~60% saved |
+| Hermes Agent | Python plugin | [`AGENTS.md`](configs/hermes/AGENTS.md) | Hook-enforced routing | ~60% saved |
 
 Without hooks, one unrouted `curl` or Playwright snapshot can dump 56 KB into context — wiping out an entire session's worth of savings.
 

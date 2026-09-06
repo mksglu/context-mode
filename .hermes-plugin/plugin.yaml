@@ -1,0 +1,10 @@
+name: hermes-context-mode
+version: "2.0.0"
+description: Context Mode routing protection and bounded output sandboxing for Hermes Agent.
+hooks:
+  - pre_tool_call
+  - transform_tool_result
+  - pre_llm_call
+  - on_session_start
+  - on_session_end
+  - on_session_finalize

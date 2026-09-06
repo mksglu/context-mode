@@ -69,6 +69,7 @@
     ".claude-plugin",
     ".codex-plugin",
     ".openclaw-plugin",
+    ".hermes-plugin",
     "openclaw.plugin.json",
     "start.mjs",
     "scripts/postinstall.mjs",
