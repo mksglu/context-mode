@@ -725,7 +725,7 @@ describe("Pi Extension", () => {
       expect(messages[2].role).toBe("user");
 
       const trailing = String(messages[2].content);
-      expect(trailing).toContain("context-mode active");
+      expect(trailing).not.toContain("context-mode active");
       expect(trailing).toContain("session_resume");
       expect(trailing).toContain("how_to_search");
       expect(trailing).not.toContain("Stable system prompt.");
@@ -900,45 +900,59 @@ describe("Pi Extension", () => {
   // Slice 7: Pi-1 lightweight routing anchor injection
   // ═══════════════════════════════════════════════════════════
 
-  describe("Slice 7: Routing block injection", () => {
-    it("injects lightweight routing anchor via context hook on first before_agent_start", async () => {
+  describe("Slice 7: Routing availability claims", () => {
+    for (const scenario of [
+      { name: "failed bootstrap", fail: true, tools: [] },
+      { name: "an empty tool list", fail: false, tools: [] },
+      { name: "tool names without host admission evidence", fail: false, tools: ["ctx_execute"] },
+    ]) {
+      it(`does not announce availability after ${scenario.name}`, async () => {
+        const bridgeMod = await import("../src/adapters/pi/mcp-bridge.js");
+        const bootstrap = vi.spyOn(bridgeMod, "bootstrapMCPTools").mockImplementation(async () => {
+          if (scenario.fail) throw new Error("fixture bootstrap failure");
+          return { tools: scenario.tools, shutdown: vi.fn() } as any;
+        });
+        const diagnostic = vi.fn();
+        const diagnostics = vi.spyOn(bridgeMod, "makeBridgeDiag").mockReturnValue(diagnostic);
+        try {
+          await registerPiExtension(api);
+          await api._trigger("session_start", {}, {
+            sessionManager: { getSessionFile: () => join(tempDir, "routing-availability.jsonl") },
+          });
+          const result = await api._trigger("before_agent_start", { systemPrompt: "Base prompt." });
+          expect(result).toBeUndefined();
+          expect(bootstrap).toHaveBeenCalledTimes(1);
+          if (scenario.fail) expect(diagnostic).toHaveBeenCalledTimes(1);
+
+          const messages = [{ role: "system", content: "Base prompt." }];
+          const ctxResult = await api._trigger("context", { messages });
+          expect(ctxResult).toBeUndefined();
+          expect(messages).toEqual([{ role: "system", content: "Base prompt." }]);
+        } finally {
+          try {
+            await api._trigger("session_shutdown", {});
+          } finally {
+            bootstrap.mockRestore();
+            diagnostics.mockRestore();
+          }
+        }
+      });
+    }
+
+    it("does not add availability-only context on later turns", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
-        sessionManager: { getSessionFile: () => `routing-1-${Date.now()}-${Math.random()}` },
+        sessionManager: { getSessionFile: () => join(tempDir, "routing-later-turns.jsonl") },
       });
-
-      // before_agent_start sets _pendingContext (was previously modifying systemPrompt)
-      await api._trigger("before_agent_start", {
-        systemPrompt: "Base prompt.",
-      });
-
-      // context hook now injects the routing anchor as a user message at message end
-      const messages: any[] = [];
-      const ctxResult = await api._trigger("context", { messages });
-
-      expect(ctxResult?.messages).toBeDefined();
-      expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0].role).toBe("user");
-      expect(ctxResult.messages[0].content).toContain("context-mode active");
-      expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
-    });
-
-    it("re-injects the anchor via context hook on every subsequent call", async () => {
-      await registerPiExtension(api);
-      await api._trigger("session_start", {}, {
-        sessionManager: { getSessionFile: () => `routing-2-${Date.now()}-${Math.random()}` },
-      });
-
-      // Unlike Claude Code where the SessionStart hook persists context for the whole
-      // session, Pi rebuilds context fresh every turn. The anchor must reach the LLM
-      // on every call or the LLM loses MCP tool awareness after turn 1.
-      const ANCHOR = "context-mode active";
-
-      for (let call = 0; call < 3; call++) {
-        await api._trigger("before_agent_start", { systemPrompt: "Base." });
-        const ctxResult = await api._trigger("context", { messages: [] });
-        expect(ctxResult?.messages).toBeDefined();
-        expect(ctxResult.messages[0]?.content).toContain(ANCHOR);
+      try {
+        for (let call = 0; call < 3; call++) {
+          await api._trigger("before_agent_start", { systemPrompt: "Base." });
+          const messages: any[] = [];
+          expect(await api._trigger("context", { messages })).toBeUndefined();
+          expect(messages).toEqual([]);
+        }
+      } finally {
+        await api._trigger("session_shutdown", {});
       }
     });
   });
@@ -984,65 +998,53 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 9: active_memory injection", () => {
-    it("injects context every turn via context hook even when compact_count is 0", async () => {
+    it("injects active memory on later turns even when compact_count is 0", async () => {
       await registerPiExtension(api);
-      await api._trigger("session_start", {
-        sessionManager: { getSessionFile: () => `active-mem-1-${Date.now()}-${Math.random()}` },
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => join(tempDir, "active-memory.jsonl") },
       });
-
-      // Seed user prompt with role pattern (priority 3).
-      await api._trigger("before_agent_start", {
-        prompt: "You are a senior staff engineer reviewing this codebase.",
-        systemPrompt: "Base.",
-      });
-
-      // Second call rebuilds context (always-on, not just post-compaction).
-      await api._trigger("before_agent_start", {
-        systemPrompt: "Base 2.",
-      });
-
-      // context hook injects the pending context as a user message
-      const ctxResult = await api._trigger("context", { messages: [] });
-
-      expect(ctxResult?.messages).toBeDefined();
-      expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0].role).toBe("user");
-      // The always-on injection path fires every turn — the routing anchor
-      // proves context reaches the model even with compact_count 0.
-      const content = String(ctxResult.messages[0].content);
-      expect(content).toContain("context-mode active");
-      // Issue #856 — the role MUST NOT be pinned as a standing directive.
-      expect(content).not.toContain("<behavioral_directive>");
+      const events = vi.spyOn(SessionDB.prototype, "getEvents").mockReturnValue([
+        { type: "decision", category: "decision", data: "MEMORY_MARKER", priority: 4 },
+      ] as any);
+      try {
+        for (let turn = 0; turn < 2; turn++) {
+          await api._trigger("before_agent_start", { systemPrompt: "Base." });
+          const ctxResult = await api._trigger("context", { messages: [] });
+          expect(ctxResult?.messages).toHaveLength(1);
+          expect(ctxResult.messages[0].role).toBe("user");
+          const content = String(ctxResult.messages[0].content);
+          expect(content).toContain("MEMORY_MARKER");
+          expect(content).not.toContain("context-mode active");
+          expect(content).not.toContain("<behavioral_directive>");
+        }
+      } finally {
+        events.mockRestore();
+      }
     });
 
-    it("caps active_memory at ≤ 2000 characters (via context hook)", async () => {
+    it("keeps active-memory output bounded with real memory content", async () => {
       await registerPiExtension(api);
-      await api._trigger("session_start", {
-        sessionManager: { getSessionFile: () => `active-mem-2-${Date.now()}-${Math.random()}` },
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => join(tempDir, "bounded-memory.jsonl") },
       });
-
-      // Flood with very long role-pattern prompts (priority 3).
-      const longText = "You are a senior staff engineer. " + "x".repeat(500);
-      for (let i = 0; i < 20; i++) {
-        await api._trigger("before_agent_start", {
-          prompt: `${longText} #${i}`,
-          systemPrompt: "Base.",
-        });
+      // Use decision rows, not filtered role rows or the routing anchor, to
+      // exercise the existing memory budget and prevent a vacuous size check.
+      const events = vi.spyOn(SessionDB.prototype, "getEvents").mockReturnValue(
+        Array.from({ length: 20 }, (_, i) => ({
+          type: "decision", category: "decision", priority: 4,
+          data: `BUDGET_MARKER_${i} ` + "x".repeat(500),
+        })) as any,
+      );
+      try {
+        await api._trigger("before_agent_start", { systemPrompt: "Base." });
+        const ctxResult = await api._trigger("context", { messages: [] });
+        const content = String(ctxResult?.messages?.[0]?.content ?? "");
+        expect(content).toContain("BUDGET_MARKER_");
+        expect(content).not.toContain("<behavioral_directive>");
+        expect(content.length).toBeLessThanOrEqual(2200);
+      } finally {
+        events.mockRestore();
       }
-
-      await api._trigger("before_agent_start", {
-        systemPrompt: "Base final.",
-      });
-
-      const ctxResult = await api._trigger("context", { messages: [] });
-      const content = String(ctxResult?.messages?.[0]?.content ?? "");
-      // Issue #856 — flooding with role prompts must NOT accumulate any
-      // behavioral_directive, and the per-turn injection must stay bounded
-      // (it is now just the routing anchor; roles are filtered out entirely).
-      expect(content).not.toContain("<behavioral_directive>");
-      // Bounded: the anchor block is small and fixed — 20 × 500-char role
-      // prompts cannot blow the per-turn injection past the cap.
-      expect(content.length).toBeLessThanOrEqual(2200);
     });
   });
 
@@ -1076,27 +1078,25 @@ describe("Pi Extension", () => {
       expect(content).not.toContain("<behavioral_directive>");
     });
 
-    it("is surgical: drops the role directive but keeps the rest of the injection (routing anchor)", async () => {
+    it("drops stored roles while preserving decision memory", async () => {
       await registerPiExtension(api);
-      const sessionFile = `role-filter-surgical-${Date.now()}-${Math.random()}`;
-      await api._trigger("session_start", {
-        sessionManager: { getSessionFile: () => sessionFile },
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => join(tempDir, "role-filter-surgical.jsonl") },
       });
-
-      await api._trigger("before_agent_start", {
-        prompt: "You are a senior staff engineer reviewing this codebase.",
-        systemPrompt: "Base.",
-      });
-      await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
-      const ctxResult = await api._trigger("context", { messages: [] });
-      const content = String(ctxResult?.messages?.[0]?.content ?? "");
-
-      // Role filtered out…
-      expect(content).not.toContain("<behavioral_directive>");
-      // …but injection itself is NOT disabled — the always-on routing anchor
-      // still reaches the model every turn (filter is role-specific, not a
-      // blanket drop of the whole context injection).
-      expect(content).toContain("context-mode active");
+      const events = vi.spyOn(SessionDB.prototype, "getEvents").mockReturnValue([
+        { type: "role", category: "role", data: "EXCLUDED_ROLE_MARKER", priority: 3 },
+        { type: "decision", category: "decision", data: "PRESERVED_DECISION_MARKER", priority: 4 },
+      ] as any);
+      try {
+        await api._trigger("before_agent_start", { systemPrompt: "Base." });
+        const ctxResult = await api._trigger("context", { messages: [] });
+        const content = String(ctxResult?.messages?.[0]?.content ?? "");
+        expect(content).not.toContain("<behavioral_directive>");
+        expect(content).not.toContain("EXCLUDED_ROLE_MARKER");
+        expect(content).toContain("PRESERVED_DECISION_MARKER");
+      } finally {
+        events.mockRestore();
+      }
     });
   });
 

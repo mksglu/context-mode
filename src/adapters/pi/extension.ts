@@ -602,7 +602,7 @@ export default function piExtension(pi: any): void {
     }
   });
 
-  // ── 4. before_agent_start — Routing + active_memory + resume injection ─
+  // ── 4. before_agent_start — active_memory + resume injection ─
 
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
@@ -649,18 +649,6 @@ export default function piExtension(pi: any): void {
       const existingPrompt = String(event?.systemPrompt ?? "");
       const parts: string[] = [];
       if (existingPrompt) parts.push(existingPrompt);
-
-      // Pi-1: Lightweight routing anchor — 7KB routing block is too heavy
-      // for Pi's context budget. Tool descriptions from pi.registerTool()
-      // already tell the model what each tool does. This anchor gives the
-      // deliberate choice (which tool for which scenario) without the full
-      // block/redirect/memory/tool-selection hierarchy.
-      parts.push(
-        "context-mode active. Hierarchy: ctx_batch_execute > ctx_execute > ctx_execute_file > ctx_search. " +
-        "Read/edit files → ctx_execute_file. Multi-command research → ctx_batch_execute. " +
-        "Web pages → ctx_fetch_and_index then ctx_search. Index docs → ctx_index. " +
-        "Stats → ctx_stats. Doctor → ctx_doctor. Upgrade → ctx_upgrade. Purge → ctx_purge."
-      );
 
       // Pi-3 + Pi-4: Always build active_memory (not just post-compact),
       // capped at 500 tokens via buildAutoInjection. Falls back to inline
@@ -715,7 +703,7 @@ export default function piExtension(pi: any): void {
         db.markResumeConsumed(_sessionId);
       }
 
-      // Store extra context (routing anchor, active_memory, resume, behavioralDirective)
+      // Store extra context (active_memory and resume)
       // for injection via the 'context' hook as a message, NOT as a systemPrompt
       // modification. Mutating systemPrompt breaks prefix prompt caching on
       // DeepSeek/Anthropic/OpenAI because the system message sits at messages[0]
@@ -733,7 +721,7 @@ export default function piExtension(pi: any): void {
     }
   });
 
-  // ── 4a2. context — Inject active_memory + resume + behavioralDirective as message ──
+  // ── 4a2. context — Inject active_memory + resume as message ──
   // Uses the 'context' hook (like hindsight does) to append context at the END of
   // messages rather than mutating systemPrompt at the beginning. This preserves
   // prefix prompt cache for DeepSeek, Anthropic, and OpenAI.
