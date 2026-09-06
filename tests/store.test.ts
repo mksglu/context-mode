@@ -1191,6 +1191,76 @@ describe("DB Cleanup", () => {
   });
 });
 
+describe("Legacy oversized FTS rows", () => {
+  test("searches legacy rows without highlighting or destructive migration", () => {
+    const dbPath = join(
+      tmpdir(),
+      `context-mode-legacy-highlight-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
+    );
+    const store = new ContentStore(dbPath);
+    const legacyContent = "prefix ".repeat(800) + "legacyneedle alpha beta";
+    const Database = loadDatabase();
+    const rawDb = new Database(dbPath);
+    let sourceId: number;
+    try {
+      rawDb.prepare(
+        "INSERT INTO sources (label, chunk_count, code_chunk_count) VALUES (?, ?, ?)",
+      ).run("legacy-source", 1, 0);
+      sourceId = Number((rawDb.prepare("SELECT id FROM sources WHERE label = ?").get("legacy-source") as { id: number }).id);
+      const insertSql =
+        "INSERT INTO chunks (title, content, source_id, content_type, source_category, session_id, event_id, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+      const insertTrigramSql = insertSql.replace("INTO chunks ", "INTO chunks_trigram ");
+      const params = ["legacy row", legacyContent, sourceId, "prose", null, "", "", "2026-01-01T00:00:00.000Z"];
+      rawDb.prepare(insertSql).run(...params);
+      rawDb.prepare(insertTrigramSql).run(...params);
+    } finally {
+      rawDb.close();
+    }
+
+    try {
+      const queries = [
+        // Porter: unfiltered, source LIKE, source exact, content type,
+        // source LIKE + content type, and source exact + content type.
+        () => store.search("legacyneedle", 1),
+        () => store.search("legacyneedle", 1, "legacy", "AND"),
+        () => store.search("legacyneedle", 1, "legacy-source", "AND", undefined, "exact"),
+        () => store.search("legacyneedle", 1, undefined, "AND", "prose"),
+        () => store.search("legacyneedle", 1, "legacy", "AND", "prose"),
+        () => store.search("legacyneedle", 1, "legacy-source", "AND", "prose", "exact"),
+        // Trigram: exercise the same six prepared-statement variants.
+        () => store.searchTrigram("legacyneedle", 1),
+        () => store.searchTrigram("legacyneedle", 1, "legacy", "AND"),
+        () => store.searchTrigram("legacyneedle", 1, "legacy-source", "AND", undefined, "exact"),
+        () => store.searchTrigram("legacyneedle", 1, undefined, "AND", "prose"),
+        () => store.searchTrigram("legacyneedle", 1, "legacy", "AND", "prose"),
+        () => store.searchTrigram("legacyneedle", 1, "legacy-source", "AND", "prose", "exact"),
+      ];
+      for (const search of queries) {
+        const results = search();
+        assert.equal(results.length, 1, "legacy row should remain searchable");
+        assert.equal(results[0].highlighted, "", "legacy row must skip FTS5 highlight()");
+      }
+
+      const fused = store.searchWithFallback("legacyneedle alpha", 1, "legacy-source", "prose", "exact");
+      assert.equal(fused.length, 1, "legacy row should survive RRF search");
+      assert.equal(fused[0].highlighted, "", "RRF result must preserve the legacy sentinel");
+
+      const verifyDb = new Database(dbPath, { readonly: true });
+      try {
+        const row = verifyDb.prepare("SELECT content FROM chunks WHERE source_id = ?").get(sourceId) as { content: string };
+        assert.equal(row.content, legacyContent, "opening/searching must not rewrite the legacy row");
+      } finally {
+        verifyDb.close();
+      }
+    } finally {
+      store.close();
+      for (const suffix of ["", "-wal", "-shm"]) {
+        try { unlinkSync(dbPath + suffix); } catch { /* ignore */ }
+      }
+    }
+  });
+});
+
 describe("Max Chunk Size", () => {
   test("splits oversized markdown chunk at paragraph boundaries", () => {
     const store = createStore();
