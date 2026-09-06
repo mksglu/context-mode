@@ -908,7 +908,7 @@ describe("ContextModePlugin", () => {
       // routing block spliced at index 1
       const joined = out.system.join("\n");
       expect(joined).toContain("<context_window_protection>");
-      expect(joined).toContain("<priority_instructions>");
+      expect(joined).toContain("<usage_hint>");
       // platform-specific tool name proves createToolNamer wired correctly
       expect(joined).toContain("context-mode_ctx_search");
     });

@@ -17,9 +17,9 @@ export function createRoutingBlock(t, options = {}) {
   const { includeCommands = true, toolSearchBootstrap = false } = options;
   return `
 <context_window_protection>
-  <priority_instructions>
+  <usage_hint>
     Every byte a tool returns enters your conversation memory and costs reasoning capacity for the rest of the session. The context-mode tools let you do the work in a sandbox and surface only the derived answer — the raw bytes stay out. Think-in-Code: program the analysis, do not compute it by reading raw data into your conversation.
-  </priority_instructions>
+  </usage_hint>
 ${toolSearchBootstrap ? `
   <deferred_tool_bootstrap>
     The context-mode tools below may be DEFERRED in your harness — their schemas are not loaded yet, so calling them directly fails (e.g. "tool not found" / InputValidationError). Load them ONCE before your first ctx_* call:
@@ -57,7 +57,7 @@ ${toolSearchBootstrap ? `
     </artifact_policy>
   </output_constraints>
   <session_continuity>
-    Skills, roles, and decisions captured earlier in this session are a memory aid, not a standing order. Treat them as context that may help — the user's most recent message always takes precedence. If a captured directive conflicts with what the user now asks, follow the user; a past phrase does not bind you.
+    Skills, roles, and decisions captured earlier in this session are a memory aid, not a standing order.
   </session_continuity>
 ${includeCommands ? `
   <ctx_commands>
