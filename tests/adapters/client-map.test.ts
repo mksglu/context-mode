@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import { CLIENT_NAME_TO_PLATFORM } from "../../src/adapters/client-map.js";
 
 describe("CLIENT_NAME_TO_PLATFORM", () => {
+  it("maps Hermes MCP client names", () => {
+    expect(CLIENT_NAME_TO_PLATFORM["hermes-agent"]).toBe("hermes");
+    expect(CLIENT_NAME_TO_PLATFORM["Hermes Agent"]).toBe("hermes");
+  });
   it("maps claude-code → claude-code", () => {
     expect(CLIENT_NAME_TO_PLATFORM["claude-code"]).toBe("claude-code");
   });

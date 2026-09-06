@@ -31,6 +31,7 @@ import type { PlatformId } from "../../src/adapters/types.js";
 // have no env vars — kiro, openclaw, antigravity-via-mcp-only, zed,
 // copilot-cli, antigravity-cli.)
 const ALL_PLATFORMS: ReadonlyArray<PlatformId> = [
+  "hermes",
   "claude-code",
   "gemini-cli",
   "cursor",
