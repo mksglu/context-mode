@@ -251,6 +251,15 @@ const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly Platf
   // openclaw — removed (runtime never sets OPENCLAW_HOME or OPENCLAW_CLI;
   // detection falls through to ~/.openclaw/ config-dir tier below).
   // kiro — not listed (no auto-set process env vars; ~/.kiro/ config-dir tier).
+  // mistral-vibe — VIBE_HOME is the documented config-dir override, checked
+  // in the config-dir tier of detectPlatform() below since Vibe does not
+  // export any identification-only env var into hook subprocesses (the
+  // session_id is delivered inside the hook JSON payload). VIBE_HOME is
+  // consumer-set (detect: false) so an unrelated shell with the var set
+  // does not misclassify a non-Vibe host as Vibe.
+  ["mistral-vibe", [
+    { name: "VIBE_HOME", role: "workspace", detect: false },
+  ]],
 ];
 
 export const PLATFORM_ENV_VARS: ReadonlyMap<PlatformId, readonly PlatformEnvEntry[]> = new Map(
@@ -350,6 +359,7 @@ export function getSessionDirSegments(platform: string): string[] | null {
     case "omp":              return [".omp"];
     case "qwen-code":        return [".qwen"];
     case "kimi":             return [".kimi-code"];
+    case "mistral-vibe":     return [".vibe"];
     case "kilo":             return [".config", "kilo"];
     case "opencode":         return [".config", "opencode"];
     case "zed":              return [".config", "zed"];
@@ -390,7 +400,7 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
   if (platformOverride) {
     const validPlatforms: PlatformId[] = [
       "claude-code", "gemini-cli", "kilo", "opencode", "codex",
-      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
+      "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi", "mistral-vibe",
     ];
     if (validPlatforms.includes(platformOverride as PlatformId)) {
       return {
@@ -572,6 +582,18 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
     };
   }
 
+  // Mistral Vibe — honors $VIBE_HOME override if set.
+  const vibeHome = process.env.VIBE_HOME ?? resolve(home, ".vibe");
+  if (existsSync(vibeHome)) {
+    return {
+      platform: "mistral-vibe",
+      confidence: "medium",
+      reason: process.env.VIBE_HOME
+        ? `$VIBE_HOME=${vibeHome} directory exists`
+        : "~/.vibe/ directory exists",
+    };
+  }
+
   if (existsSync(resolve(home, ".openclaw"))) {
     return {
       platform: "openclaw",
@@ -725,6 +747,11 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "kimi": {
       const { KimiAdapter } = await import("./kimi/index.js");
       return new KimiAdapter();
+    }
+
+    case "mistral-vibe": {
+      const { MistralVibeAdapter } = await import("./mistral-vibe/index.js");
+      return new MistralVibeAdapter();
     }
 
     default: {
