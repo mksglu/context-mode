@@ -731,8 +731,10 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     // curl/wget — allow silent file-output downloads, block stdout floods (#166).
     // Algorithm: split chained commands, evaluate each segment independently.
     if (/(^|\s|&&|\||\;)(curl|wget)\s/i.test(stripped)) {
-      // Split on chain operators (&&, ||, ;) to evaluate each segment
-      const segments = stripped.split(/\s*(?:&&|\|\||;)\s*/);
+      // Split on chain operators (&&, ||, ;, newline) and normalize escaped newlines first.
+      const segments = stripped
+        .replace(/\\\r?\n/g, " ")
+        .split(/\s*(?:&&|\|\||;|\r?\n)\s*/);
       const hasDangerousSegment = segments.some(seg => {
         const s = seg.trim();
         // Only evaluate segments that contain curl or wget
@@ -740,6 +742,17 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
 
         const isCurl = /\bcurl\b/i.test(s);
         const isWget = /\bwget\b/i.test(s);
+
+        // Pipe targets can be bounded by command substitutions such as head/jq/grep/wc.
+        const pipeStages = s.split("|").slice(1).map(x => x.trim()).filter(Boolean);
+        const isPassThroughPipeSink = stage => /^(cat|tee|less|more)\b/.test(stage);
+        const boundedByPipe = pipeStages.length > 0 && !pipeStages.every(isPassThroughPipeSink);
+
+        // Verbose/trace flags flood stderr even if piped.
+        if (/\s(-v|--verbose|--trace|-D\s+-)\b/.test(s)) return true;
+
+        // Bounded by a non-pass-through pipeline stage → allow through.
+        if (boundedByPipe) return false;
 
         // Check for file output flags
         const hasFileOutput = isCurl
@@ -751,9 +764,6 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         // Stdout aliases: -o -, -o /dev/stdout, -O -
         if (isCurl && /\s(-o|--output)\s+(-|\/dev\/stdout)(\s|$)/.test(s)) return true;
         if (isWget && /\s(-O|--output-document)\s+(-|\/dev\/stdout)(\s|$)/.test(s)) return true;
-
-        // Verbose/trace flags flood stderr → context
-        if (/\s(-v|--verbose|--trace|-D\s+-)\b/.test(s)) return true;
 
         // Must be silent (curl: -s/--silent, wget: -q/--quiet) to prevent progress bar stderr flood
         const isSilent = isCurl
