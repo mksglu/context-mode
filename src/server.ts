@@ -1463,13 +1463,33 @@ export function buildBatchNodeOptionsPrefix(shellPath: string, preloadPath: stri
  * Per-section budget for the echoed `$ <command>` line so a 50KB heredoc
  * payload cannot dominate the response body. The full command always reaches
  * the executor — only the echo is clipped (Issues #717 + #736).
+ *
+ * Tunable via CONTEXT_MODE_COMMAND_ECHO_MAX. Hosts that already render the
+ * tool input alongside the result show the command twice, so `0` drops the
+ * echo for them; every other host keeps the default.
  */
-const COMMAND_ECHO_MAX = 500;
+export const DEFAULT_COMMAND_ECHO_MAX = 500;
 
-function truncateCommandForEcho(command: string): string {
+/**
+ * Read an echo budget from the environment. Unlike readPositiveEnv, `0` is a
+ * meaningful value (echo suppressed), so only negative and non-numeric input
+ * falls back to the default.
+ */
+function resolveEchoBudget(name: string, defaultValue: number): number {
+  const raw = process.env[name];
+  if (!raw) return defaultValue;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : defaultValue;
+}
+
+export function commandEchoBudget(): number {
+  return resolveEchoBudget("CONTEXT_MODE_COMMAND_ECHO_MAX", DEFAULT_COMMAND_ECHO_MAX);
+}
+
+function truncateCommandForEcho(command: string, budget = commandEchoBudget()): string {
   const cleaned = command.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= COMMAND_ECHO_MAX) return cleaned;
-  return cleaned.slice(0, COMMAND_ECHO_MAX) + "…";
+  if (cleaned.length <= budget) return cleaned;
+  return cleaned.slice(0, budget) + "…";
 }
 
 /**
@@ -1497,22 +1517,31 @@ export function resolveExecTimeout(timeout: number | undefined): number | undefi
  * sandbox — only the echo is clipped so massive payloads don't dominate
  * the response. Multi-line preserved (unlike command echo) so the user
  * sees the actual program shape.
+ *
+ * Tunable via CONTEXT_MODE_CODE_ECHO_MAX — see DEFAULT_COMMAND_ECHO_MAX.
  */
-const CODE_ECHO_MAX = 2000;
+export const DEFAULT_CODE_ECHO_MAX = 2000;
 
-function truncateCodeForEcho(code: string): string {
-  if (code.length <= CODE_ECHO_MAX) return code;
-  return code.slice(0, CODE_ECHO_MAX) + "\n… (truncated)";
+export function codeEchoBudget(): number {
+  return resolveEchoBudget("CONTEXT_MODE_CODE_ECHO_MAX", DEFAULT_CODE_ECHO_MAX);
+}
+
+function truncateCodeForEcho(code: string, budget: number): string {
+  if (code.length <= budget) return code;
+  return code.slice(0, budget) + "\n… (truncated)";
 }
 
 /**
  * Build the source-code preamble surfaced before tool stdout. Provenance
  * survives in indexed chunks (FTS5 sees the fenced block) so later
- * ctx_search hits remember what ran.
+ * ctx_search hits remember what ran. A zero budget drops the preamble for
+ * hosts that already render the tool input.
  */
 function buildExecuteEcho(language: string, code: string, path?: string): string {
+  const budget = codeEchoBudget();
+  if (budget === 0) return "";
   const header = path ? `path=${path}\n` : "";
-  const fenced = `\`\`\`${language}\n${truncateCodeForEcho(code)}\n\`\`\``;
+  const fenced = `\`\`\`${language}\n${truncateCodeForEcho(code, budget)}\n\`\`\``;
   return `${header}${fenced}\n\n`;
 }
 
@@ -1528,8 +1557,9 @@ function formatCommandOutput(label: string, command: string, raw: string, onFsBy
   // Echo the executed command below the section heading so per-chunk
   // indexed content retains provenance for later ctx_search hits
   // (Issues #717 + #736).
-  const echoed = truncateCommandForEcho(command);
-  return `# ${label}\n\n$ ${echoed}\n\n${output}\n`;
+  const budget = commandEchoBudget();
+  const echo = budget === 0 ? "" : `$ ${truncateCommandForEcho(command, budget)}\n\n`;
+  return `# ${label}\n\n${echo}${output}\n`;
 }
 
 function combineExecOutput(result: { stdout?: string; stderr?: string }): string {
@@ -4306,9 +4336,14 @@ EXAMPLE: ctx_batch_execute(
       // response itself documents intent, not just per-section echoes.
       // Placed before "## Indexed Sections" so it scans top-down with
       // the human asking "what just happened" (Issues #717 + #736).
-      const commandsInventory: string[] = ["## Commands", ""];
-      for (const c of commands) {
-        commandsInventory.push(`- ${c.label}: \`${truncateCommandForEcho(c.command)}\``);
+      const commandEchoMax = commandEchoBudget();
+      const commandsInventory: string[] = [];
+      if (commandEchoMax > 0) {
+        commandsInventory.push("## Commands", "");
+        for (const c of commands) {
+          commandsInventory.push(`- ${c.label}: \`${truncateCommandForEcho(c.command, commandEchoMax)}\``);
+        }
+        commandsInventory.push("");
       }
 
       // Build section inventory — direct query by source_id (no FTS5 MATCH needed)
@@ -4337,7 +4372,6 @@ EXAMPLE: ctx_batch_execute(
           `Indexed ${indexed.totalChunks} sections. Searched ${queries.length} queries.`,
         "",
         ...commandsInventory,
-        "",
         ...inventory,
         "",
         ...queryResults,
