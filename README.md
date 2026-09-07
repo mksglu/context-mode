@@ -1605,6 +1605,15 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 |---|---|---|
 | `CONTEXT_MODE_EXTERNAL_MCP_NUDGE_EVERY` | `10` | Cadence (in tool calls) at which the PreToolUse hook re-injects the "wrap large external-MCP payloads in `ctx_execute`" guidance. The original implementation ([#529](https://github.com/mksglu/context-mode/pull/529)) fired only once per session, which got lost after context compaction in MCP-heavy sessions (e.g. 50+ Jira/Slack/Notion calls — see [#567](https://github.com/mksglu/context-mode/issues/567) follow-up). The default re-fires every 10th matching call, keeping the guidance in the model's recent window. Range `[1, 100]`; invalid values fall back to `10`. Set to `1` for "every call" (most aggressive — adds ~250 tokens/call) or to a larger value for less frequent reminders. |
 
+### Command and code echo environment variables
+
+`ctx_execute` / `ctx_execute_file` prepend the source code they ran, and `ctx_batch_execute` echoes each `$ <command>` plus a `## Commands` inventory ([#717](https://github.com/mksglu/context-mode/issues/717), [#736](https://github.com/mksglu/context-mode/issues/736)). Hosts whose UI does not render the MCP tool input need that echo to see what the agent ran. Hosts that do render it carry the payload twice. These variables let the latter trim or drop the echo. Unset, output is unchanged on every host.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTEXT_MODE_CODE_ECHO_MAX` | `2000` | Character budget for the fenced source block from `ctx_execute` / `ctx_execute_file`. `0` suppresses it. Non-integer and negative values keep the default. The full code always reaches the sandbox; only the echo is clipped. |
+| `CONTEXT_MODE_COMMAND_ECHO_MAX` | `500` | Character budget for the `$ <command>` line in each `ctx_batch_execute` section and each `## Commands` entry. `0` suppresses both. Non-integer and negative values keep the default. |
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and TDD guidelines.
