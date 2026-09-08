@@ -6,18 +6,16 @@ context-mode MCP tools available. Rules protect context window from flooding. On
 
 Analyze/count/filter/compare/search/parse/transform data: **write code** via `ctx_execute(language, code)`, `console.log()` only the answer. Do NOT read raw data into context. PROGRAM the analysis, not COMPUTE it. Pure JavaScript — Node.js built-ins only (`fs`, `path`, `child_process`). `try/catch`, handle `null`/`undefined`. One script replaces ten tool calls.
 
-## BLOCKED — do NOT attempt
+## Prefer sandbox routing for network access
 
-### curl / wget — BLOCKED
-Intercepted and replaced with error. Do NOT retry.
-Use: `ctx_fetch_and_index(url, source)` or `ctx_execute(language: "javascript", code: "const r = await fetch(...)")`
+### curl / wget
+Prefer `ctx_fetch_and_index(url, source)` or `ctx_execute(language: "javascript", code: "const r = await fetch(...)")` so large responses stay out of the context window. Use direct `curl` or `wget` when you need the exact bytes or the sandbox cannot provide the required behavior.
 
-### Inline HTTP — BLOCKED
-`fetch('http`, `requests.get(`, `requests.post(`, `http.get(`, `http.request(` — intercepted. Do NOT retry.
-Use: `ctx_execute(language, code)` — only stdout enters context
+### Inline HTTP
+Prefer `ctx_execute(language, code)` for `fetch('http`, `requests.get(`, `requests.post(`, `http.get(`, or `http.request(` so only the needed result enters context.
 
-### WebFetch — BLOCKED
-Use: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)`
+### WebFetch
+Prefer `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` for searchable content; use WebFetch directly when you need its exact response.
 
 ## REDIRECTED — use sandbox
 
