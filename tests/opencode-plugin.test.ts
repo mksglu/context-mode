@@ -566,6 +566,9 @@ describe("ContextModePlugin", () => {
       expect(snapshot).toContain("session_resume");
       expect(snapshot).toContain("<files");
       expect(snapshot).toContain("index.ts");
+      // #1028: opencode uses prefixed tool name, not bare ctx_search
+      expect(snapshot).toContain("context-mode_ctx_search(");
+      expect(snapshot).not.toMatch(/\bctx_search\(/);
     });
 
     it("can be called multiple times (increments compact count)", async () => {
