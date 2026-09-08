@@ -36,6 +36,10 @@ const PLATFORM_ENV_VARS_MIRROR = [
   ["pi",                 ["PI_PROJECT_DIR"]],
   // openclaw — no auto-set process env vars; falls through to default
   // kiro — no auto-set process env vars; falls through to default
+  // mistral-vibe — VIBE_HOME is consumer-set; detection at MCP layer uses
+  // the ~/.vibe/ config-dir tier. Listed here only so hook scripts pick
+  // it up when a user explicitly points VIBE_HOME at a relocated install.
+  ["mistral-vibe",       ["VIBE_HOME"]],
 ];
 
 export function detectPlatformFromEnv(env = process.env) {

@@ -42,4 +42,15 @@ export const CLIENT_NAME_TO_PLATFORM: Record<string, PlatformId> = {
   "kimi-code": "kimi",
   "kimi": "kimi",
   "Kimi Code": "kimi",
+  // Mistral Vibe (https://github.com/mistralai/mistral-vibe) does not
+  // override the MCP SDK's DEFAULT_CLIENT_INFO — its ClientSession is
+  // created without a client_info argument (vibe/core/tools/mcp/tools.py),
+  // so the wire clientInfo.name is the SDK's default "mcp". That name is
+  // too generic to safely map to a platform, so Vibe detection relies on
+  // $VIBE_HOME env var or ~/.vibe/ directory instead (see detect.ts).
+  // These entries are placeholders that will match if Vibe ever ships a
+  // proper client_info; harmless today because the wire value is "mcp".
+  "mistral-vibe": "mistral-vibe",
+  "Mistral Vibe": "mistral-vibe",
+  "vibe": "mistral-vibe",
 };
