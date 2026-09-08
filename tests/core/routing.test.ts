@@ -518,3 +518,27 @@ describe("Issue #856: session_continuity framing is a soft hint, not a standing 
     expect(BLOCK).toContain("session_continuity");
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Issue #911 — the routing block must not read as prompt injection to a
+// permission classifier. Two concrete triggers: a tag named
+// <priority_instructions> claiming elevated authority over the rest of the
+// prompt, and a "the user's most recent message always takes precedence...
+// a past phrase does not bind you" clause instructing the model to discount
+// prior directives. Both are the injected block riding along on every Agent
+// dispatch (#233), not something the user authored or asked for per-call.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("Issue #911: routing block does not read as prompt injection", () => {
+  const BLOCK = createRoutingBlock(_t, { includeCommands: false });
+
+  it("does not use a tag name claiming elevated authority over the prompt", () => {
+    expect(BLOCK).not.toContain("<priority_instructions>");
+    expect(BLOCK).toContain("<usage_hint>");
+  });
+
+  it("does not instruct the model to discount prior captured directives", () => {
+    expect(BLOCK).not.toContain("a past phrase does not bind you");
+    expect(BLOCK).not.toContain("the user's most recent message always takes precedence");
+  });
+});
