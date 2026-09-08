@@ -20,11 +20,11 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SessionDB } from "../../src/session/db.js";
-
+import { MAX_RESULT_BYTES, TRUNCATION_MARKER } from "../../src/adapters/omp/routing-guard.js";
 // ── Mock OMP HookAPI ────────────────────────────────────────
 
 type HandlerFn = (...args: unknown[]) => unknown | Promise<unknown>;
@@ -171,6 +171,79 @@ describe("OMP plugin", () => {
       await expect(api._trigger("tool_call", {})).resolves.toBeUndefined();
       await expect(api._trigger("tool_call", { toolName: "bash" })).resolves.toBeUndefined();
     });
+    it("blocks npm test and points to ctx_execute", async () => {
+      await registerOmpPlugin(api);
+      const result = (await api._trigger("tool_call", {
+        toolName: "bash",
+        input: { command: "npm test" },
+      })) as { block?: boolean; reason?: string } | undefined;
+
+      expect(result?.block).toBe(true);
+      expect(result?.reason).toMatch(/ctx_execute/);
+    });
+
+    it("blocks broad grep but allows a scoped grep", async () => {
+      await registerOmpPlugin(api);
+      const broad = await api._trigger("tool_call", {
+        toolName: "grep",
+        input: { pattern: "TODO", path: "." },
+      });
+      const scoped = await api._trigger("tool_call", {
+        toolName: "grep",
+        input: { pattern: "TODO", path: "src/file.ts" },
+      });
+
+      expect((broad as { block?: boolean } | undefined)?.block).toBe(true);
+      expect(scoped).toBeUndefined();
+    });
+
+    it("blocks a large local read but allows a line-selected read", async () => {
+      writeFileSync(join(tempDir, "large.txt"), "x".repeat(32 * 1024 + 1));
+      await registerOmpPlugin(api);
+
+      const large = await api._trigger("tool_call", {
+        toolName: "read",
+        input: { path: "large.txt" },
+      });
+      const selected = await api._trigger("tool_call", {
+        toolName: "read",
+        input: { path: "large.txt:10-30" },
+      });
+
+      expect((large as { block?: boolean } | undefined)?.block).toBe(true);
+      expect(selected).toBeUndefined();
+    });
+
+    it("allows scoped glob and context-mode tools", async () => {
+      await registerOmpPlugin(api);
+      const scopedGlob = await api._trigger("tool_call", {
+        toolName: "glob",
+        input: { path: "src/**/*.ts", limit: 50 },
+      });
+      const broadGlob = await api._trigger("tool_call", {
+        toolName: "glob",
+        input: { path: "**/*" },
+      });
+      const contextMode = await api._trigger("tool_call", {
+        toolName: "mcp__context_mode_ctx_execute",
+        input: { language: "javascript", code: "console.log(1)" },
+      });
+
+      expect(scopedGlob).toBeUndefined();
+      expect((broadGlob as { block?: boolean } | undefined)?.block).toBe(true);
+      expect(contextMode).toBeUndefined();
+    });
+
+    it("blocks a direct read URL and points to ctx_fetch_and_index", async () => {
+      await registerOmpPlugin(api);
+      const result = (await api._trigger("tool_call", {
+        toolName: "read",
+        input: { path: "https://example.com/docs" },
+      })) as { block?: boolean; reason?: string } | undefined;
+
+      expect(result?.block).toBe(true);
+      expect(result?.reason).toMatch(/ctx_fetch_and_index/);
+    });
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -224,6 +297,34 @@ describe("OMP plugin", () => {
           content: [{ type: "text", text: "x" }],
         }),
       ).resolves.toBeUndefined();
+    });
+    it("bounds oversized direct results and preserves isError", async () => {
+      await registerOmpPlugin(api);
+      const result = (await api._trigger("tool_result", {
+        toolName: "read",
+        content: [{ type: "text", text: "x".repeat(MAX_RESULT_BYTES + 100) }],
+        isError: true,
+      })) as { content?: Array<{ type?: string; text?: string }>; isError?: boolean } | undefined;
+      const text = result?.content?.[0]?.text ?? "";
+
+      expect(text).toContain(TRUNCATION_MARKER);
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+      expect(result?.isError).toBe(true);
+    });
+
+    it("does not alter small or context-mode results", async () => {
+      await registerOmpPlugin(api);
+      const small = await api._trigger("tool_result", {
+        toolName: "read",
+        content: [{ type: "text", text: "small" }],
+      });
+      const contextMode = await api._trigger("tool_result", {
+        toolName: "mcp__context_mode_ctx_execute",
+        content: [{ type: "text", text: "x".repeat(MAX_RESULT_BYTES + 100) }],
+      });
+
+      expect(small).toBeUndefined();
+      expect(contextMode).toBeUndefined();
     });
   });
 
