@@ -137,6 +137,27 @@ describe("routePreToolUse", () => {
       );
     });
 
+    it("does not redirect curl/wget when they are arguments, not commands", () => {
+      for (const command of [
+        "which curl",
+        "which curl --all",
+        "echo wget",
+        "type curl --verbose",
+        "which -a wget --help",
+        "command -v wget --help",
+      ]) {
+        const result = routePreToolUse("Bash", { command });
+        expect(result?.action).not.toBe("modify");
+      }
+    });
+
+    it("does not treat a safe curl command's later argument as another command", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s -o /tmp/file.tar.gz https://example.com && which curl --all",
+      });
+      expect(result).toBeNull();
+    });
+
     // ─── curl/wget file-output allow-list (#166) ────────────
 
     it("allows curl -sLo file (silent + file output)", () => {

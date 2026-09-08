@@ -240,6 +240,10 @@ function stripQuotedContent(cmd) {
     .replace(/"[^"]*"/g, '""');                   // double-quoted strings
 }
 
+// Match curl/wget only when they are the command at the start of a shell
+// segment or pipeline stage, not an unquoted argument to another command.
+const CURL_WGET_COMMAND = /(?:^|(?:&&|\|\||;|\|&?|[\r\n])\s*)(curl|wget)(?=\s|$)/i;
+
 /**
  * Built-in allowlist of structurally-bounded Bash commands (#463).
  *
@@ -730,16 +734,17 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
 
     // curl/wget — allow silent file-output downloads, block stdout floods (#166).
     // Algorithm: split chained commands, evaluate each segment independently.
-    if (/(^|\s|&&|\||\;)(curl|wget)\s/i.test(stripped)) {
+    if (CURL_WGET_COMMAND.test(stripped)) {
       // Split on chain operators (&&, ||, ;) to evaluate each segment
       const segments = stripped.split(/\s*(?:&&|\|\||;)\s*/);
       const hasDangerousSegment = segments.some(seg => {
         const s = seg.trim();
-        // Only evaluate segments that contain curl or wget
-        if (!/(^|\s)(curl|wget)\s/i.test(s)) return false;
+        // Only evaluate segments whose command is curl or wget
+        const commandMatch = CURL_WGET_COMMAND.exec(s);
+        if (!commandMatch) return false;
 
-        const isCurl = /\bcurl\b/i.test(s);
-        const isWget = /\bwget\b/i.test(s);
+        const isCurl = commandMatch[1].toLowerCase() === "curl";
+        const isWget = !isCurl;
 
         // Check for file output flags
         const hasFileOutput = isCurl
