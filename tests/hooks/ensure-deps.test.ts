@@ -12,7 +12,14 @@
 
 import { describe, test, expect, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -276,6 +283,83 @@ describe("ensure-deps: ABI cache validation (#148 follow-up)", () => {
     expect(actions).toEqual(["probe-fail", "rebuilt", "cached"]);
   });
 
+  test("ABI rebuild uses npm from the running Node installation instead of ambient PATH", () => {
+    const root = createTempRoot();
+    const fakeBin = join(root, "fake-bin");
+    const marker = join(root, "wrong-npm-ran");
+    const releaseDir = join(root, "node_modules", "better-sqlite3", "build", "Release");
+    mkdirSync(fakeBin, { recursive: true });
+    mkdirSync(releaseDir, { recursive: true });
+    writeFileSync(join(releaseDir, "better_sqlite3.node"), "not-a-native-binary");
+
+    const fakeNpm = join(fakeBin, process.platform === "win32" ? "npm.cmd" : "npm");
+    const fakeNpmSource = process.platform === "win32"
+      ? "@echo off\r\n> \"%FAKE_NPM_MARKER%\" echo called\r\nexit /b 0\r\n"
+      : "#!/bin/sh\nprintf called > \"$FAKE_NPM_MARKER\"\nexit 0\n";
+    writeFileSync(fakeNpm, fakeNpmSource, "utf-8");
+    if (process.platform !== "win32") chmodSync(fakeNpm, 0o755);
+
+    const harness = `
+import { existsSync } from "node:fs";
+import { ensureNativeCompat } from ${JSON.stringify("file://" + ensureDepsAbsPath.replace(/\\/g, "/"))};
+process.env.PATH = ${JSON.stringify(fakeBin)};
+process.env.FAKE_NPM_MARKER = ${JSON.stringify(marker)};
+ensureNativeCompat(${JSON.stringify(root)});
+console.log(JSON.stringify({ wrongNpmRan: existsSync(${JSON.stringify(marker)}) }));
+`;
+    const harnessPath = join(root, "_runtime-pinned-rebuild.mjs");
+    writeFileSync(harnessPath, harness, "utf-8");
+
+    const result = spawnSync(process.execPath, [harnessPath], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      cwd: join(fileURLToPath(import.meta.url), "..", ".."),
+    });
+    if (result.error) throw result.error;
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.trim())).toEqual({ wrongNpmRan: false });
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  test("ABI probe uses the running Node executable instead of ambient PATH", () => {
+    const root = createTempRoot();
+    const fakeBin = join(root, "fake-bin");
+    const marker = join(root, "wrong-node-ran");
+    const releaseDir = join(root, "node_modules", "better-sqlite3", "build", "Release");
+    mkdirSync(fakeBin, { recursive: true });
+    mkdirSync(releaseDir, { recursive: true });
+    writeFileSync(join(releaseDir, "better_sqlite3.node"), "not-a-native-binary");
+
+    const fakeNode = join(fakeBin, process.platform === "win32" ? "node.cmd" : "node");
+    const fakeNodeSource = process.platform === "win32"
+      ? "@echo off\r\n> \"%FAKE_NODE_MARKER%\" echo called\r\nexit /b 0\r\n"
+      : "#!/bin/sh\nprintf called > \"$FAKE_NODE_MARKER\"\nexit 0\n";
+    writeFileSync(fakeNode, fakeNodeSource, "utf-8");
+    if (process.platform !== "win32") chmodSync(fakeNode, 0o755);
+
+    const harness = `
+import { existsSync } from "node:fs";
+const { ensureNativeCompat } = await import(${JSON.stringify("file://" + ensureDepsAbsPath.replace(/\\/g, "/"))});
+Object.defineProperty(process.versions, "node", { value: "20.0.0" });
+process.env.PATH = ${JSON.stringify(fakeBin)};
+process.env.FAKE_NODE_MARKER = ${JSON.stringify(marker)};
+ensureNativeCompat(${JSON.stringify(root)});
+console.log(JSON.stringify({ wrongNodeRan: existsSync(${JSON.stringify(marker)}) }));
+`;
+    const harnessPath = join(root, "_runtime-pinned-probe.mjs");
+    writeFileSync(harnessPath, harness, "utf-8");
+
+    const result = spawnSync(process.execPath, [harnessPath], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      cwd: join(fileURLToPath(import.meta.url), "..", ".."),
+    });
+    if (result.error) throw result.error;
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.trim())).toEqual({ wrongNodeRan: false });
+    expect(existsSync(marker)).toBe(false);
+  });
+
   test("corrupted cache with missing binary: early return after cache swap fails", () => {
     const root = createTempRoot();
     const releaseDir = join(root, "node_modules", "better-sqlite3", "build", "Release");
@@ -536,7 +620,7 @@ describe("ensure-deps: better-sqlite3 binding self-heal (#408)", () => {
       "!existsSync(resolve(pkgDir, ...NATIVE_BINARIES[pkg]))",
     );
     expect(anchor).toBeGreaterThan(-1);
-    const end = ENSURE_DEPS_SRC.indexOf("\nexport function ensureNativeCompat", anchor);
+    const end = ENSURE_DEPS_SRC.indexOf("\n/**\n * Probe-load better-sqlite3", anchor);
     const branch = ENSURE_DEPS_SRC.slice(anchor, end === -1 ? ENSURE_DEPS_SRC.length : end);
     expect(/healBetterSqlite3Binding\s*\(/.test(branch)).toBe(true);
 
