@@ -206,7 +206,7 @@ await runHook(async () => {
         additionalContext += buildSessionDirective("compact", eventMeta, toolNamer);
 
         // Auto-inject behavioral state on compaction (role, decisions, skills, intent)
-        const autoInjection = buildAutoInjection(events);
+        const autoInjection = buildAutoInjection(events, "compaction");
         if (autoInjection) {
           additionalContext += "\n\n" + autoInjection;
         }
