@@ -1029,10 +1029,13 @@ function persistStats(): void {
       (a, b) => a + b,
       0,
     );
-    const keptOut =
+    const rawKeptOut =
       sessionStats.bytesIndexed +
       sessionStats.bytesSandboxed +
       sessionStats.cacheBytesSaved;
+    // Indexed content returned as query snippets was counted in both keptOut
+    // and totalReturned, inflating total_processed and tokens_saved (#1025).
+    const keptOut = Math.max(0, rawKeptOut - totalReturned);
     const totalProcessed = keptOut + totalReturned;
     const reductionPct =
       totalProcessed > 0
