@@ -371,6 +371,7 @@ describe("CodexAdapter", () => {
       expect(config.PreToolUse[0]?.matcher).toContain("apply_patch");
       expect(config.PreToolUse[0]?.matcher).toContain("Edit");
       expect(config.PreToolUse[0]?.matcher).toContain("Write");
+      expect(config.PreToolUse[0]?.matcher.split("|")).toContain("exec");
       // #547 hotfix: matcher is now charset-clean (no `.*` regex syntax) so
       // the bare `ctx_*` names cover context-mode's own MCP tools and the
       // literal `mcp__` segment exists for parity with hooks/hooks.json.
