@@ -3087,6 +3087,25 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     expect(outputs[0]).toContain("stderr");
   });
 
+  test("passes AbortSignal to serial shell executions", async () => {
+    const controller = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const exec = {
+      execute: async (input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string; signal?: AbortSignal }) => {
+        seenSignals.push(input.signal);
+        return { stdout: "ok" };
+      },
+    };
+
+    await runBatchCommands(
+      [{ label: "signal", command: "echo ok" }],
+      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX, signal: controller.signal },
+      exec,
+    );
+
+    expect(seenSignals).toEqual([controller.signal]);
+  });
+
   test("passes cwd override to serial shell executions (#756)", async () => {
     const seenCwds: Array<string | undefined> = [];
     const exec = mkMockExecutor((_code, _timeout, cwd) => {
@@ -3184,6 +3203,28 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
 });
 
 describe("runBatchCommands parallel path (concurrency>1)", () => {
+  test("passes AbortSignal to parallel shell executions", async () => {
+    const controller = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const exec = {
+      execute: async (input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string; signal?: AbortSignal }) => {
+        seenSignals.push(input.signal);
+        return { stdout: input.code };
+      },
+    };
+
+    await runBatchCommands(
+      [
+        { label: "A", command: "echo a" },
+        { label: "B", command: "echo b" },
+      ],
+      { timeout: 5000, concurrency: 2, nodeOptsPrefix: NOOP_PREFIX, signal: controller.signal },
+      exec,
+    );
+
+    expect(seenSignals).toEqual([controller.signal, controller.signal]);
+  });
+
   test("happy path: 3 cmds at concurrency=3 finish in parallel", async () => {
     const exec = mkMockExecutor(async () => {
       await new Promise((r) => setTimeout(r, 100));
@@ -3585,8 +3626,8 @@ describe("ctx_fetch_and_index batch refactor", () => {
     expect(block).toContain("ttl: z");
     expect(block).toContain("Override the cache freshness window");
     expect(block).toContain("`ttl: 0` bypasses the cache like `force: true`");
-    expect(block).toContain("async ({ url, source, requests, concurrency, force, ttl })");
-    expect(block).toContain("fetchOneUrl(req.url, req.source, force, ttl)");
+    expect(block).toContain("async ({ url, source, requests, concurrency, force, ttl }, extra)");
+    expect(block).toContain("fetchOneUrl(req.url, req.source, force, ttl, extra?.signal)");
   });
 
   test("fetchOneUrl applies ttl override and treats ttl=0 as cache bypass (#648)", () => {
