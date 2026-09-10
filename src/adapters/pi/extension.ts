@@ -164,6 +164,9 @@ let _buildAutoInjection:
 // which breaks prefix prompt cache on DeepSeek/Anthropic/OpenAI).
 // See: https://github.com/mksglu/context-mode/issues/598
 let _pendingContext = "";
+// Routing anchor should be injected once per session, not every turn — it is
+// static guidance and repeating it each turn burns tokens without new signal.
+let _routingAnchorSent = false;
 async function getAutoInjection(
   pluginRoot: string,
 ): Promise<((events: Array<{ category: string; data: string }>) => string) | null> {
@@ -655,12 +658,17 @@ export default function piExtension(pi: any): void {
       // already tell the model what each tool does. This anchor gives the
       // deliberate choice (which tool for which scenario) without the full
       // block/redirect/memory/tool-selection hierarchy.
-      parts.push(
-        "context-mode active. Hierarchy: ctx_batch_execute > ctx_execute > ctx_execute_file > ctx_search. " +
-        "Read/edit files → ctx_execute_file. Multi-command research → ctx_batch_execute. " +
-        "Web pages → ctx_fetch_and_index then ctx_search. Index docs → ctx_index. " +
-        "Stats → ctx_stats. Doctor → ctx_doctor. Upgrade → ctx_upgrade. Purge → ctx_purge."
-      );
+      // Injected only on the first turn of the session: the anchor is static,
+      // so repeating it every turn is pure token overhead (~82 tokens/turn).
+      if (!_routingAnchorSent) {
+        _routingAnchorSent = true;
+        parts.push(
+          "context-mode active. Hierarchy: ctx_batch_execute > ctx_execute > ctx_execute_file > ctx_search. " +
+          "Read/edit files → ctx_execute_file. Multi-command research → ctx_batch_execute. " +
+          "Web pages → ctx_fetch_and_index then ctx_search. Index docs → ctx_index. " +
+          "Stats → ctx_stats. Doctor → ctx_doctor. Upgrade → ctx_upgrade. Purge → ctx_purge."
+        );
+      }
 
       // Pi-3 + Pi-4: Always build active_memory (not just post-compact),
       // capped at 500 tokens via buildAutoInjection. Falls back to inline
