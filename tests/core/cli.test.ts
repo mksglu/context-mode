@@ -1437,6 +1437,85 @@ describe("start.mjs CLI self-heal", () => {
     }
   });
 
+  // ── Issue #1072 — start.mjs is not a Claude-only entry point ──
+  //
+  // .codex-plugin/mcp.json launches `node ./start.mjs` with
+  // CONTEXT_MODE_PLATFORM=codex. Self-heal Layer 4 exists only to repair
+  // Claude Code's plugin cache and writes into ~/.claude/hooks/ and
+  // ~/.claude/settings.json, so an unguarded deploy creates ~/.claude/ for
+  // users who never installed Claude Code. The healer's skip-logger was the
+  // second Claude-only side effect on that same path.
+  test(
+    "Issue #1072 — a declared non-Claude launch does not create ~/.claude",
+    () => {
+      const home = mkdtempSync(join(tmpdir(), "ctx-1072-nonclaude-"));
+      try {
+        const oldHook = join(home, ".claude", "hooks", "context-mode-cache-heal.sh");
+        mkdirSync(dirname(oldHook), { recursive: true });
+        writeFileSync(oldHook, "keep this Claude state\n");
+        const res = spawnSync(process.execPath, [resolve(ROOT, "start.mjs")], {
+          cwd: ROOT,
+          input: "",
+          timeout: 60_000,
+          env: {
+            ...process.env,
+            HOME: home,
+            USERPROFILE: home, // os.homedir() reads USERPROFILE on win32
+            CONTEXT_MODE_PLATFORM: "codex",
+            CLAUDE_CONFIG_DIR: "",
+          },
+        });
+        expect(res.status).toBe(0);
+        // The Codex state dir is the correct target — it must still appear.
+        expect(existsSync(join(home, ".codex"))).toBe(true);
+        // ...and an existing Claude config tree must not be modified either.
+        expect(readFileSync(oldHook, "utf-8")).toBe("keep this Claude state\n");
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    },
+    90_000,
+  );
+
+  test(
+    "Issue #1072 — an undeclared (Claude) launch still deploys the heal hook",
+    () => {
+      const home = mkdtempSync(join(tmpdir(), "ctx-1072-claude-"));
+      try {
+        mkdirSync(join(home, ".claude"), { recursive: true });
+        writeFileSync(join(home, ".claude", "settings.json"), "{}\n");
+        const env: NodeJS.ProcessEnv = {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          CLAUDE_CONFIG_DIR: "",
+        };
+        // Positive control for the gate: an unset platform means Claude Code,
+        // so the npm-global / dev-checkout self-heal must keep working.
+        delete env.CONTEXT_MODE_PLATFORM;
+        const res = spawnSync(process.execPath, [resolve(ROOT, "start.mjs")], {
+          cwd: ROOT,
+          input: "",
+          timeout: 60_000,
+          env,
+        });
+        expect(res.status).toBe(0);
+        expect(
+          existsSync(
+            join(home, ".claude", "hooks", "context-mode-cache-heal.mjs"),
+          ),
+        ).toBe(true);
+        const settings = JSON.parse(
+          readFileSync(join(home, ".claude", "settings.json"), "utf-8"),
+        );
+        expect(JSON.stringify(settings)).toContain("context-mode-cache-heal");
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    },
+    90_000,
+  );
+
   // ── hooks/heal-partial-install.mjs (partial-install auto-recovery) ──
   //
   // Claude Code's native plugin manager occasionally produces a partial
@@ -1785,6 +1864,80 @@ describe("start.mjs CLI self-heal", () => {
       expect(result.skipped).toBeUndefined();
       expect(result.pkgSource).toBe("marketplace");
       expect(result.healed).toContain("package.json");
+    });
+
+    // ── Issue #1072 — the healer must not create Claude state off-platform ──
+    //
+    // The not-claude-code skip fires exactly when the pluginRoot is not a CC
+    // cache layout — i.e. the caller is Codex/OpenCode/an npm-global install.
+    // Logging that skip into ~/.claude/context-mode/heal-partial-install.log
+    // CREATED ~/.claude for users who never installed Claude Code.
+    //
+    // $HOME is the isolation boundary below, so it has to be moved for the
+    // duration of the call. os.homedir() reads USERPROFILE on win32 and HOME
+    // elsewhere, hence both.
+    const withIsolatedHome = <T,>(home: string, fn: () => T): T => {
+      const saved = {
+        HOME: process.env.HOME,
+        USERPROFILE: process.env.USERPROFILE,
+        CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+      };
+      process.env.HOME = home;
+      process.env.USERPROFILE = home;
+      delete process.env.CLAUDE_CONFIG_DIR;
+      try {
+        return fn();
+      } finally {
+        for (const [k, v] of Object.entries(saved)) {
+          if (v === undefined) delete process.env[k];
+          else process.env[k] = v;
+        }
+      }
+    };
+
+    it("Issue #1072 — a non-Claude pluginRoot does not create the Claude config dir", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const home = makeTmp("ctx-heal-nonclaude-");
+      const result = withIsolatedHome(home, () =>
+        healPartialInstallFromMarketplace({
+          // npm-global / Codex / dev-checkout shape — not a CC cache layout.
+          pluginRoot: resolve(home, "node_modules", "context-mode"),
+        }),
+      );
+      expect(result.skipped).toBe("not-claude-code");
+      expect(existsSync(resolve(home, ".claude"))).toBe(false);
+    });
+
+    it("Issue #1072 — a missing pluginRoot does not create the Claude config dir", async () => {
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const home = makeTmp("ctx-heal-no-root-");
+      const result = withIsolatedHome(home, () =>
+        healPartialInstallFromMarketplace({}),
+      );
+      expect(result.skipped).toBe("no-plugin-root");
+      expect(existsSync(resolve(home, ".claude"))).toBe(false);
+    });
+
+    it("Issue #1072 — a real Claude Code install still logs the heal result", async () => {
+      // Positive control: the gate keys off "is this Claude Code", it does not
+      // switch the logger off wholesale.
+      const { healPartialInstallFromMarketplace } = await import(
+        "../../hooks/heal-partial-install.mjs"
+      );
+      const home = makeTmp("ctx-heal-still-logs-");
+      const { pluginRoot, marketplaceClonePath } = buildFakeLayout();
+      withIsolatedHome(home, () =>
+        healPartialInstallFromMarketplace({ pluginRoot, marketplaceClonePath }),
+      );
+      expect(
+        existsSync(
+          resolve(home, ".claude", "context-mode", "heal-partial-install.log"),
+        ),
+      ).toBe(true);
     });
 
     it("healPartialInstallFromMarketplace rewrites carry-forward stale args[0] in plugin.json", async () => {
