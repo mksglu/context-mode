@@ -744,8 +744,9 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         const isWget = /\bwget\b/i.test(s);
 
         // Pipe targets can be bounded by command substitutions such as head/jq/grep/wc.
-        const pipeStages = s.split("|").slice(1).map(x => x.trim()).filter(Boolean);
-        const isPassThroughPipeSink = stage => /^(cat|tee|less|more)\b/.test(stage);
+        const pipeStages = s.split(/\|&?/).slice(1).map(x => x.trim()).filter(Boolean);
+        const isPassThroughPipeSink = stage =>
+          /^(?:&\s*)?(?:(?:command|builtin)\s+)?(?:\/?[^\s/]+\/)*(?:cat|tee|less|more)\b/.test(stage);
         const boundedByPipe = pipeStages.length > 0 && !pipeStages.every(isPassThroughPipeSink);
 
         // Verbose/trace flags flood stderr even if piped.

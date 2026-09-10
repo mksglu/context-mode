@@ -203,6 +203,30 @@ describe("routePreToolUse", () => {
       expect(result!.action).toBe("modify");
     });
 
+    it("blocks curl |& cat because it is still unbounded", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com |& cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("blocks curl piped to an absolute-path cat", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | /bin/cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("blocks curl piped to cat through the shell builtin", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | command cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
     it("allows backslash-continued piped curl command", () => {
       const result = routePreToolUse("Bash", {
         command: "curl -s https://example.com \\\n  | jq -r .name",
