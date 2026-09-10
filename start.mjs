@@ -305,6 +305,19 @@ try {
   const { buildHookCommand, selfHealCacheHealHook, ensureShebangAndExecBit } =
     await import("./hooks/cache-heal-utils.mjs");
 
+  // #1072: Layer 4 exists only to repair Claude Code's own plugin cache, and
+  // every write below lands in Claude Code's config tree (~/.claude/hooks/ +
+  // ~/.claude/settings.json). start.mjs is NOT Claude-only — the Codex plugin
+  // launches it too (.codex-plugin/mcp.json sets CONTEXT_MODE_PLATFORM=codex),
+  // so an unguarded deploy creates ~/.claude/ for users who never installed
+  // Claude Code. A launcher that explicitly declares a non-Claude platform is
+  // therefore skipped entirely. Unset/unknown platforms keep the old behavior:
+  // Claude Code never sets CONTEXT_MODE_PLATFORM, so it always reaches this
+  // layer, and npm-global users who do run Claude Code keep their self-heal.
+  const declaredPlatform = (process.env.CONTEXT_MODE_PLATFORM || "").trim();
+  const isClaudeLaunch =
+    declaredPlatform === "" || declaredPlatform === "claude-code";
+
   // #577: honor $CLAUDE_CONFIG_DIR — without this, Claude Code spawns hooks
   // from $CLAUDE_CONFIG_DIR/settings.json but we deploy them to ~/.claude/hooks/
   // and register them in ~/.claude/settings.json. The mismatch silently
@@ -314,10 +327,10 @@ try {
   const healHookPath = resolve(globalHooksDir, "context-mode-cache-heal.mjs");
   // Clean up old bash version if it exists
   const oldBashHook = resolve(globalHooksDir, "context-mode-cache-heal.sh");
-  if (existsSync(oldBashHook)) {
+  if (isClaudeLaunch && existsSync(oldBashHook)) {
     try { unlinkSync(oldBashHook); } catch {}
   }
-  if (!existsSync(globalHooksDir)) mkdirSync(globalHooksDir, { recursive: true });
+  if (isClaudeLaunch && !existsSync(globalHooksDir)) mkdirSync(globalHooksDir, { recursive: true });
   const healScript = `#!/usr/bin/env node
 // context-mode plugin cache self-heal (auto-deployed)
 // Fixes anthropics/claude-code#46915: auto-update breaks CLAUDE_PLUGIN_ROOT
@@ -370,8 +383,9 @@ try{
 `;
   // Deploy or update the heal hook when content changes (not just when missing).
   // Allows new heal logic (e.g. #727 path normalization) to propagate on next boot.
-  let needsWrite = !existsSync(healHookPath);
-  if (!needsWrite) {
+  // #1072: skipped for declared non-Claude launches — see isClaudeLaunch above.
+  let needsWrite = isClaudeLaunch && !existsSync(healHookPath);
+  if (isClaudeLaunch && !needsWrite) {
     try { needsWrite = readFileSync(healHookPath, "utf-8") !== healScript; } catch { needsWrite = true; }
   }
   if (needsWrite) {
@@ -380,14 +394,14 @@ try{
 
   // Always re-assert shebang + chmod +x on Unix so the bare-script hook
   // command is spawnable even if the file was created without exec bit.
-  if (process.platform !== "win32") {
+  if (isClaudeLaunch && process.platform !== "win32") {
     try { ensureShebangAndExecBit(healHookPath); } catch { /* best effort */ }
   }
 
   // Register the hook in $CLAUDE_CONFIG_DIR/settings.json (Claude Code doesn't auto-discover hook files).
   // #577: must follow the same dir resolution as globalHooksDir above.
   const settingsPath = resolve(claudeConfigDir, "settings.json");
-  if (existsSync(settingsPath)) {
+  if (isClaudeLaunch && existsSync(settingsPath)) {
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
     const hooks = settings.hooks ?? {};
     const sessionStart = hooks.SessionStart ?? [];
