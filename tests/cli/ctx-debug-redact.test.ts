@@ -98,7 +98,7 @@ describe("redactConfigContent on non-JSON text", () => {
     );
     expect(out).toContain(`xoxb-1234${REDACTED}`);
     expect(out).toContain(`AKIAIOSF${REDACTED}`);
-    expect(out).toContain(`eyJh${REDACTED}`);
+    expect(out).toContain(`eyJhbGc${REDACTED}`);
     expect(out).toContain(`https://me:${REDACTED}@host/`);
   });
 });
