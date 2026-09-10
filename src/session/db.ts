@@ -1093,8 +1093,14 @@ export class SessionDB extends SQLiteBase {
        LIMIT ?`);
 
     // ── Cleanup ──
+    // TTL keys off last activity, not creation: `started_at` is set once by
+    // the INSERT OR IGNORE in ensureSession and never refreshed, so keying
+    // cleanup on it evicts sessions that have been continuously active via
+    // --continue/--resume (#1140). `last_event_at` is bumped by
+    // updateMetaLastEvent on every event insert; `started_at` remains the
+    // fallback for sessions that have not recorded an event yet.
     p(S.getOldSessions,
-      `SELECT session_id FROM session_meta WHERE started_at < datetime('now', ? || ' days')`);
+      `SELECT session_id FROM session_meta WHERE COALESCE(last_event_at, started_at) < datetime('now', ? || ' days')`);
 
     // ── Tool calls (persistent counter) ──
     p(S.incrementToolCall,
