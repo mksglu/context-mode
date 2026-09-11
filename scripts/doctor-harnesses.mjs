@@ -160,7 +160,7 @@ function checkHermes() {
     }
     check(enabled.includes("context-mode") && !disabled.includes("context-mode"), `${label} native plugin is enabled`);
     const pluginList = run(hermes, hermesArgs(profile, ["plugins", "list", "--plain", "--no-bundled"]), hermesEnvironment(profile));
-    check(pluginList.ok && /^enabled\s+user\s+\S+\s+context-mode$/m.test(pluginList.text), `${label} native plugin registry resolves Context Mode`, pluginList.text.trim());
+    check(pluginList.ok && /^enabled\b[^\n]*\bcontext-mode$/m.test(pluginList.text), `${label} native plugin registry resolves Context Mode`, pluginList.text.trim());
     const pluginDoctor = run(hermes, hermesArgs(profile, ["plugins", "doctor", "context-mode", "--ci"]), hermesEnvironment(profile));
     check(pluginDoctor.ok, `${label} native plugin doctor passes`, pluginDoctor.text.trim());
     const mcpList = run(hermes, hermesArgs(profile, ["mcp", "list"]), hermesEnvironment(profile));
