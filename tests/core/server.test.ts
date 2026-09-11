@@ -26,7 +26,7 @@ import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 
 import { classifyNonZeroExit } from "../../src/exit-classify.js";
 import { PolyglotExecutor } from "../../src/executor.js";
@@ -44,7 +44,7 @@ import {
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
-import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
+import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, PI_DEFAULT_EXEC_TIMEOUT_MS, HOST_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
@@ -3181,6 +3181,54 @@ describe("runBatchCommands serial path (concurrency=1)", () => {
     );
     expect(seenTimeouts).toEqual([undefined, undefined]);
   });
+
+  // A budget that came only from HOST_DEFAULT_EXEC_TIMEOUT_MS is a per-command
+  // backstop against one hung command, not a deadline for the whole batch.
+  // Spending it across commands would silently truncate a long batch that
+  // nobody put a deadline on — the parallel path already treats it per-command.
+  test("host-default budget: applied per command, no shared-budget cascade", async () => {
+    const seenTimeouts: Array<number | undefined> = [];
+    const exec = mkMockExecutor(async (_code, timeout) => {
+      seenTimeouts.push(timeout);
+      await new Promise((r) => setTimeout(r, 60)); // each call burns 60ms
+      return { stdout: "ok" };
+    });
+    const cmds: BatchCommand[] = [
+      { label: "A", command: "x" },
+      { label: "B", command: "y" },
+      { label: "C", command: "z" }, // elapsed > 100ms by here
+    ];
+    const { outputs, timedOut } = await runBatchCommands(
+      cmds,
+      { timeout: 100, callerBudget: false, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      exec,
+    );
+    expect(seenTimeouts).toEqual([100, 100, 100]);
+    expect(timedOut).toBe(false);
+    expect(outputs.every((o) => !o.includes("skipped"))).toBe(true);
+  });
+
+  test("caller budget stays shared across commands (unchanged default)", async () => {
+    let callCount = 0;
+    const exec = mkMockExecutor(async () => {
+      callCount++;
+      await new Promise((r) => setTimeout(r, 60));
+      return { stdout: "ok" };
+    });
+    const cmds: BatchCommand[] = [
+      { label: "A", command: "x" },
+      { label: "B", command: "y" },
+      { label: "C", command: "z" },
+    ];
+    const { timedOut } = await runBatchCommands(
+      cmds,
+      { timeout: 100, callerBudget: true, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      exec,
+    );
+    expect(callCount).toBeLessThan(3);
+    expect(timedOut).toBe(true);
+  });
+
 });
 
 describe("runBatchCommands parallel path (concurrency>1)", () => {
@@ -6625,14 +6673,22 @@ describe("parseJsonc / stripJsonComments (src/util/jsonc)", () => {
   });
 });
 
-describe("resolveExecTimeout (agy default execution timeout)", () => {
+describe("resolveExecTimeout (host default execution timeout)", () => {
   const savedPlatform = process.env.CONTEXT_MODE_PLATFORM;
-  const savedOverride = process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
+  const savedOverride = process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS;
+  const savedAgyOverride = process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
+  const restore = (key: string, value: string | undefined) => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  };
   afterEach(() => {
-    if (savedPlatform === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
-    else process.env.CONTEXT_MODE_PLATFORM = savedPlatform;
-    if (savedOverride === undefined) delete process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
-    else process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = savedOverride;
+    restore("CONTEXT_MODE_PLATFORM", savedPlatform);
+    restore("CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS", savedOverride);
+    restore("CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS", savedAgyOverride);
+  });
+  beforeEach(() => {
+    delete process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS;
+    delete process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
   });
 
   test("passes an explicit timeout through on any platform", () => {
@@ -6640,23 +6696,101 @@ describe("resolveExecTimeout (agy default execution timeout)", () => {
     expect(resolveExecTimeout(5000)).toBe(5000);
     process.env.CONTEXT_MODE_PLATFORM = "claude-code";
     expect(resolveExecTimeout(5000)).toBe(5000);
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    expect(resolveExecTimeout(5000)).toBe(5000);
   });
 
-  test("applies the agy default ONLY under antigravity-cli when no timeout is given", () => {
+  test("applies the agy default under antigravity-cli when no timeout is given", () => {
     process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
-    delete process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS;
     expect(resolveExecTimeout(undefined)).toBe(AGY_DEFAULT_EXEC_TIMEOUT_MS);
   });
 
-  test("leaves the timeout unbounded (undefined) on non-agy hosts", () => {
+  // #959 — Pi's bridge forwards tools/call with Number.POSITIVE_INFINITY, so a
+  // ctx_execute with no `timeout` had no bound at ANY layer: measured a 75-minute
+  // hang that only ended when the user killed the session.
+  test("applies the pi default under pi when no timeout is given", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    expect(resolveExecTimeout(undefined)).toBe(PI_DEFAULT_EXEC_TIMEOUT_MS);
+  });
+
+  test("leaves the timeout unbounded (undefined) on hosts that bound the call themselves", () => {
     process.env.CONTEXT_MODE_PLATFORM = "claude-code";
+    expect(resolveExecTimeout(undefined)).toBeUndefined();
+    process.env.CONTEXT_MODE_PLATFORM = "opencode";
     expect(resolveExecTimeout(undefined)).toBeUndefined();
   });
 
-  test("honors CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS override under agy", () => {
+  test("honors CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS on every defaulted host", () => {
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "1500";
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    expect(resolveExecTimeout(undefined)).toBe(1500);
+    process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
+    expect(resolveExecTimeout(undefined)).toBe(1500);
+  });
+
+  test("still honors the legacy CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS override", () => {
     process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
     process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = "1500";
     expect(resolveExecTimeout(undefined)).toBe(1500);
+  });
+
+  test("prefers the generic override over the legacy agy one", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
+    process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = "1500";
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "2500";
+    expect(resolveExecTimeout(undefined)).toBe(2500);
+  });
+
+  // An unusable override must fall back to the host default, never to
+  // "unbounded" — a bad env value must not resurrect the hang.
+  test("falls back to the host default when the override is unusable", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    for (const bad of ["0", "-1", "abc", "", "NaN", "Infinity"]) {
+      process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = bad;
+      expect(resolveExecTimeout(undefined)).toBe(PI_DEFAULT_EXEC_TIMEOUT_MS);
+    }
+  });
+
+  // An unusable generic override must not mask a usable legacy one: `??` falls
+  // through only on null/undefined, so a blank CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS
+  // used to discard a valid CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS and silently change
+  // agy's budget. The cascade takes the first USABLE value.
+  test("an unusable generic override does not mask a usable legacy one", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
+    process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS = "1500";
+    for (const bad of ["", " ", "0", "-1", "abc", "NaN", "Infinity", "1_000", "1e400"]) {
+      process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = bad;
+      expect(resolveExecTimeout(undefined)).toBe(1500);
+    }
+  });
+
+  // setTimeout wraps anything above 2^31-1 back to ~1ms, so a "bigger" budget
+  // used to produce the harshest possible behavior: every exec killed at once.
+  test("rejects budgets Node's timer cannot represent", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    for (const bad of ["2147483648", "3000000000", "1.5", "1e400"]) {
+      process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = bad;
+      expect(resolveExecTimeout(undefined)).toBe(PI_DEFAULT_EXEC_TIMEOUT_MS);
+    }
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "2147483647";
+    expect(resolveExecTimeout(undefined)).toBe(2147483647);
+  });
+
+  test("tolerates surrounding whitespace in an otherwise usable override", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS = "  2500  ";
+    expect(resolveExecTimeout(undefined)).toBe(2500);
+  });
+
+  test("every defaulted host resolves to a finite positive budget", () => {
+    for (const platform of Object.keys(HOST_DEFAULT_EXEC_TIMEOUT_MS)) {
+      process.env.CONTEXT_MODE_PLATFORM = platform;
+      const resolved = resolveExecTimeout(undefined);
+      expect(typeof resolved).toBe("number");
+      expect(Number.isFinite(resolved)).toBe(true);
+      expect(resolved as number).toBeGreaterThan(0);
+      expect(resolved as number).toBeLessThanOrEqual(2_147_483_647);
+    }
   });
 });
 

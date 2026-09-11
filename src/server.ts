@@ -1421,10 +1421,20 @@ export interface BatchRunResult {
 export interface BatchRunOptions {
   /**
    * Total budget (concurrency=1, shared) or per-command (concurrency>1).
-   * When `undefined`, no server-side timer fires — the MCP host's RPC
-   * timeout governs (Issue #406).
+   * When `undefined`, no server-side timer fires and the host is left to
+   * bound the call (Issue #406) — which not every host does, see
+   * {@link HOST_DEFAULT_EXEC_TIMEOUT_MS}.
    */
   timeout: number | undefined;
+  /**
+   * Whether `timeout` is a budget the CALLER asked for. A budget that only
+   * came from {@link HOST_DEFAULT_EXEC_TIMEOUT_MS} is a per-command backstop
+   * against one hung command, not a promise about total batch duration, so
+   * spending it across commands would silently truncate a long batch nobody
+   * put a deadline on. Defaults to true, preserving the historical shared
+   * budget for an explicit `timeout`.
+   */
+  callerBudget?: boolean;
   concurrency: number;
   nodeOptsPrefix: string;
   cwd?: string;
@@ -1473,22 +1483,100 @@ function truncateCommandForEcho(command: string): string {
 }
 
 /**
- * Default execution timeout (ms) applied ONLY under Antigravity CLI (`agy`).
- * agy does not enforce an MCP RPC timeout, so a ctx_execute with a runaway or
- * blocking script hangs forever — the host never kills it and the user must
- * interrupt. Every other host enforces its own RPC timeout, so we keep the
- * no-server-timer behavior there (Issue #406 — long builds need an unbounded
- * run). A caller can still pass an explicit `timeout` to override on any host.
+ * Default execution timeout (ms) under Antigravity CLI (`agy`) — see
+ * {@link HOST_DEFAULT_EXEC_TIMEOUT_MS}. agy does not enforce an MCP RPC
+ * timeout, so a ctx_execute with a runaway or blocking script hangs forever
+ * and the user must interrupt.
  */
 export const AGY_DEFAULT_EXEC_TIMEOUT_MS = 120_000;
+
+/**
+ * Default execution timeout (ms) under Pi (Issue #959).
+ *
+ * Pi's bridge deliberately forwards `tools/call` with
+ * `Number.POSITIVE_INFINITY` (#643, so long builds are not cut off at the
+ * transport), and its registered-tool callback does not yet propagate Pi's
+ * AbortSignal — so with no server-side timer a hung child is unbounded at
+ * EVERY layer and Esc cannot clear it. Measured: a `grep -rn` over a large
+ * tree ran 75 minutes on Pi 0.84.x and only ended when the session was killed;
+ * independently reported on macOS, Linux and Windows in #959.
+ *
+ * Deliberately far more generous than the agy budget: #643 removed the
+ * bridge's 120s ceiling precisely because real ctx_execute calls (test
+ * suites, `npm run build`, `cargo test`) legitimately run 2–5 minutes. 10
+ * minutes clears those by a wide margin while still bounding a true hang.
+ * Longer jobs remain expressible with an explicit `timeout`, or with
+ * `background: true` to detach instead of being killed.
+ */
+export const PI_DEFAULT_EXEC_TIMEOUT_MS = 600_000;
+
+/**
+ * Per-host fallback execution budget, applied only when the caller passes no
+ * explicit `timeout`.
+ *
+ * A host belongs here when nothing outside the executor bounds an in-flight
+ * tool call, so "no timeout" means "hang until the user intervenes".
+ *
+ * Hosts absent from this table keep today's unbounded behavior. #406 asked for
+ * a server-enforced default everywhere and was declined because "server-side
+ * timeout enforcement is the wrong layer — every MCP host already enforces its
+ * own RPC timeout". That reasoning holds wherever the premise does; this table
+ * is only for the hosts where it does not.
+ *
+ * Not listed, and why:
+ * - `omp` does not route through Pi's bridge (`bootstrapMCPTools` is called
+ *   only from `src/adapters/pi/extension.ts`), so it lacks the measured
+ *   POSITIVE_INFINITY path. Whether its own MCP client bounds a call is
+ *   untested here. Note an OMP session with no `~/.omp` marker can still
+ *   detect as `pi` and pick up this budget.
+ * - `claude-code` is reported unbounded in practice too (#936: MCP_TOOL_TIMEOUT
+ *   defaults to ~28h and stdio servers were exempt from the idle timeout before
+ *   v2.1.203). That is a much larger blast radius than this fix, so it is left
+ *   for the maintainer to decide separately.
+ */
+export const HOST_DEFAULT_EXEC_TIMEOUT_MS: Readonly<Partial<Record<PlatformId, number>>> = Object.freeze({
+  "antigravity-cli": AGY_DEFAULT_EXEC_TIMEOUT_MS,
+  pi: PI_DEFAULT_EXEC_TIMEOUT_MS,
+});
+
+/**
+ * Largest delay `setTimeout` represents (2^31-1 ms, ~24.8 days). Node wraps
+ * anything larger back to a 1ms delay with a TimeoutOverflowWarning, so a
+ * value above this fires almost immediately — a bigger number producing
+ * harsher behavior. Such a value is treated as unusable rather than honored.
+ */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/**
+ * Parse an env-supplied execution budget, returning `undefined` when the value
+ * cannot be honored as written: unset, blank, non-numeric, non-integer, zero,
+ * negative, or beyond {@link MAX_TIMER_DELAY_MS}. Callers fall back to the host
+ * default, so neither a typo nor an over-large "effectively unlimited" value
+ * can resurrect the hang or collapse the budget to ~1ms.
+ */
+function parseExecTimeoutEnv(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  const value = Number(trimmed);
+  if (!Number.isInteger(value)) return undefined;
+  if (value <= 0 || value > MAX_TIMER_DELAY_MS) return undefined;
+  return value;
+}
+
 export function resolveExecTimeout(timeout: number | undefined): number | undefined {
   if (timeout !== undefined) return timeout;
-  // Only agy gets a default — every other host enforces its own RPC timeout, so
-  // keep the unbounded behavior there. Detected via the env the agy bundle pins
-  // (CONTEXT_MODE_PLATFORM=antigravity-cli). Tunable via CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS.
-  if (detectPlatform().platform !== "antigravity-cli") return undefined;
-  const override = Number(process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS);
-  return Number.isFinite(override) && override > 0 ? override : AGY_DEFAULT_EXEC_TIMEOUT_MS;
+  // Hosts that bound the call themselves stay unbounded here (#406).
+  const hostDefault = HOST_DEFAULT_EXEC_TIMEOUT_MS[detectPlatform().platform];
+  if (hostDefault === undefined) return undefined;
+  // CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS tunes any defaulted host;
+  // CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS is kept as the pre-#959 alias. The cascade
+  // takes the first USABLE value, not the first one that happens to be set —
+  // an empty or malformed generic var must not mask a valid legacy one.
+  const override =
+    parseExecTimeoutEnv(process.env.CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS) ??
+    parseExecTimeoutEnv(process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS);
+  return override ?? hostDefault;
 }
 
 /**
@@ -1552,7 +1640,10 @@ export async function runBatchCommands(
   opts: BatchRunOptions,
   executor: BatchExecutor,
 ): Promise<BatchRunResult> {
-  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes } = opts;
+  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes, callerBudget = true } = opts;
+  // A host-default budget applies per command (like the parallel path below);
+  // only a caller-supplied budget is shared across the batch.
+  const sharedBudget = callerBudget ? timeout : undefined;
 
   if (concurrency <= 1) {
     // Serial path — shared timeout budget, cascading skip on timeout.
@@ -1563,10 +1654,10 @@ export async function runBatchCommands(
     let timedOut = false;
     for (let i = 0; i < commands.length; i++) {
       const cmd = commands[i];
-      let perCmdTimeout: number | undefined;
-      if (timeout !== undefined) {
+      let perCmdTimeout: number | undefined = timeout;
+      if (sharedBudget !== undefined) {
         const elapsed = Date.now() - startTime;
-        const remaining = timeout - elapsed;
+        const remaining = sharedBudget - elapsed;
         if (remaining <= 0) {
           outputs.push(`# ${cmd.label}\n\n(skipped — batch timeout exceeded)\n`);
           timedOut = true;
@@ -1704,7 +1795,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
       timeout: z
         .coerce.number()
         .optional()
-        .describe("Max execution time in ms. When omitted, no server-side timer fires — the MCP host's RPC timeout governs (which is the right layer for this policy). Pass an explicit value for long-running builds (Gradle/Maven/SBT)."),
+        .describe("Max execution time in ms. When omitted, the host's own RPC timeout governs where it has one; on hosts that do not bound a call (Pi, Antigravity CLI) a generous server-side default applies instead. Pass an explicit value for long-running builds (Gradle/Maven/SBT), or background: true to detach."),
       // background: wrapped in coerceBoolean preprocessor so the literal
       // strings "true"/"false" arriving from OpenCode's native plugin
       // bridge (and several LLM providers' tool-call JSON) parse as the
@@ -2091,7 +2182,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
       timeout: z
         .coerce.number()
         .optional()
-        .describe("Max execution time in ms. When omitted, no server-side timer fires — the MCP host's RPC timeout governs."),
+        .describe("Max execution time in ms. When omitted, the host's own RPC timeout governs where it has one; on hosts that do not bound a call (Pi, Antigravity CLI) a generous server-side default applies instead."),
       intent: z
         .string()
         .optional()
@@ -4214,7 +4305,7 @@ EXAMPLE: ctx_batch_execute(
       timeout: z
         .coerce.number()
         .optional()
-        .describe("Max execution time in ms. When omitted, no server-side timer fires — the MCP host's RPC timeout governs. With concurrency=1, the value (when set) is a shared budget across commands; with concurrency>1, it is applied per-command."),
+        .describe("Max execution time in ms. When omitted, the host's own RPC timeout governs where it has one; on hosts that do not bound a call (Pi, Antigravity CLI) a generous server-side default applies per command. With concurrency=1, a value you pass is a shared budget across commands; with concurrency>1, it is applied per-command."),
       concurrency: z
         .coerce.number()
         .int()
@@ -4267,6 +4358,7 @@ EXAMPLE: ctx_batch_execute(
         commands,
         {
           timeout: effTimeout,
+          callerBudget: timeout !== undefined,
           concurrency,
           nodeOptsPrefix,
           cwd,
@@ -4332,9 +4424,16 @@ EXAMPLE: ctx_batch_execute(
         ? store.getDistinctiveTerms(indexed.sourceId)
         : [];
 
+      // A cut batch must not read like a complete one: `timedOut` was
+      // previously surfaced only when NOTHING ran, so a killed or skipped
+      // command in the middle looked like a command with no output.
+      const cutNotice = timedOut
+        ? ` Cut short: at least one command hit the ${effTimeout}ms limit — sections marked ` +
+          `"(timed out …)" or "(skipped …)" are incomplete.`
+        : "";
       const output = [
         `Executed ${commands.length} commands (${totalLines} lines, ${(totalBytes / 1024).toFixed(1)}KB). ` +
-          `Indexed ${indexed.totalChunks} sections. Searched ${queries.length} queries.`,
+          `Indexed ${indexed.totalChunks} sections. Searched ${queries.length} queries.${cutNotice}`,
         "",
         ...commandsInventory,
         "",
