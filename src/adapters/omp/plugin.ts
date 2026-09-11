@@ -121,6 +121,10 @@ function ensureMcpServerRegistered(): void {
       type: "stdio",
       command: "node",
       args: [bundle],
+      env: {
+        CONTEXT_MODE_PLATFORM: "omp",
+        CONTEXT_MODE_TRUSTED_HOST_EXECUTION: "1",
+      },
     };
     settings.mcpServers = mcpServers;
     _ompAdapter.writeSettings(settings as Record<string, unknown>);

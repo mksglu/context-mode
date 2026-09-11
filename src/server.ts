@@ -140,6 +140,12 @@ if (process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS !== "1") {
 
 const runtimes = detectRuntimes();
 const available = getAvailableLanguages(runtimes);
+export function trustedHostExecutionEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env.CONTEXT_MODE_TRUSTED_HOST_EXECUTION === "1";
+}
+const trustedHostExecution = trustedHostExecutionEnabled();
 export const server = new McpServer({
   name: "context-mode",
   version: VERSION,
@@ -1245,6 +1251,12 @@ const langList = available.join(", ");
 const bunNote = hasBunRuntime()
   ? " (Bun detected — JS/TS runs 3-5x faster)"
   : "";
+const executionTitle = trustedHostExecution
+  ? "Run code on the approved host (executes the supplied code)"
+  : "Run code in a sandbox (executes the supplied code)";
+const executionScope = trustedHostExecution
+  ? "an approved host subprocess"
+  : "a sandboxed subprocess";
 
 // ─────────────────────────────────────────────────────────
 // Helper: smart snippet extraction — returns windows around
@@ -1649,7 +1661,7 @@ server.registerTool(
   {
     // #852: surface code execution in the host approval prompt's title (the
     // only server-controlled field the MCP permission UI renders besides args).
-    title: "Run code in a sandbox (executes the supplied code)",
+    title: executionTitle,
     // #846: runs arbitrary code in a sandbox with full network access.
     annotations: {
       readOnlyHint: false,
@@ -1657,9 +1669,9 @@ server.registerTool(
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: `Run code in a sandboxed subprocess.${bunNote} Languages: ${langList}.
+    description: `Run code in ${executionScope}.${bunNote} Languages: ${langList}.
 
-Think-in-Code — the core philosophy: the bytes your code processes never enter your conversation memory; only what you console.log() does. Reading a 700 KB log directly means 700 KB of your remaining reasoning capacity gets spent on raw bytes. Running code over that same log in this sandbox and printing a 3 KB summary leaves you with 697 KB of capacity for the actual work.
+Think-in-Code — the core philosophy: the bytes your code processes never enter your conversation memory; only what you console.log() does. Reading a 700 KB log directly means 700 KB of your remaining reasoning capacity gets spent on raw bytes. Running code over that same log in the subprocess and printing a 3 KB summary leaves you with 697 KB of capacity for the actual work.
 
 Concrete shape — analyze 47 source files without reading any of them:
   ctx_execute(language: "javascript", code: \`
@@ -1728,7 +1740,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
       cwd: z
         .string()
         .optional()
-        .describe("Optional working directory for shell commands. Non-shell languages still execute from their sandbox temp directory."),
+        .describe("Optional working directory for shell commands. Non-shell languages execute from a temporary working directory with normal process access."),
       intent: z
         .string()
         .optional()
@@ -1741,13 +1753,16 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
     }),
   },
   async ({ language, code, timeout, background, cwd, intent }) => {
-    // Security: deny-only firewall
-    if (language === "shell") {
-      const denied = checkDenyPolicy(code, "execute");
-      if (denied) return denied;
-    } else {
-      const denied = checkNonShellDenyPolicy(code, language, "execute");
-      if (denied) return denied;
+    // Owner-installed OMP/Hermes servers may delegate execution policy to the
+    // host's own approval layer. Every other client retains upstream guards.
+    if (!trustedHostExecution) {
+      if (language === "shell") {
+        const denied = checkDenyPolicy(code, "execute");
+        if (denied) return denied;
+      } else {
+        const denied = checkNonShellDenyPolicy(code, language, "execute");
+        if (denied) return denied;
+      }
     }
 
     try {
@@ -2053,7 +2068,7 @@ server.registerTool(
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: `Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what you console.log() enters your conversation — the file bytes stay in the sandbox.
+    description: `Read a file into a FILE_CONTENT variable in ${executionScope} and run code over it. Only what you console.log() enters your conversation — the file bytes stay in the subprocess.
 
 Think-in-Code applied to file-level analysis: Reading the whole file means every byte enters your conversation memory and costs reasoning capacity for the rest of the session. Running code over it here lets you keep the raw bytes out and only the derived answer in. Same principle as ctx_execute, scoped to one named file via the FILE_CONTENT variable.
 
@@ -2069,7 +2084,7 @@ WHEN NOT:
   - The file is small AND you will consume all of it for understanding/editing — Read directly
 
 RETURNS:
-  Only what your code prints. The FILE_CONTENT variable holds the raw bytes inside the sandbox; nothing else leaves. When \`intent\` is set and output exceeds the auto-index threshold, the response carries searchable section titles + previews instead of the raw stdout.
+  Only what your code prints. The FILE_CONTENT variable holds the raw bytes inside the subprocess; nothing else leaves. When \`intent\` is set and output exceeds the auto-index threshold, the response carries searchable section titles + previews instead of the raw stdout.
 
 EXAMPLE: ctx_execute_file(path: "huge.log", language: "javascript", code: "const errs = FILE_CONTENT.split('\\\\n').filter(l => /ERROR|FATAL/.test(l)); console.log(\`\${errs.length} error lines\`); console.log(errs.slice(-5).join('\\\\n'))")
 EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const rows = FILE_CONTENT.split('\\\\n'); console.log(\`rows: \${rows.length - 1}, header: \${rows[0]}\`)")`,
@@ -2112,23 +2127,22 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
     }),
   },
   async ({ path, language, code, timeout, intent }) => {
-    // Security (#852): confine the processed file to the project root so
-    // ctx_execute_file cannot be used to escape the host's sandbox/permission
-    // controls. Runs before the deny-glob check — boundary first, then policy.
-    const boundaryDenied = checkProjectBoundary(path, "ctx_execute_file");
-    if (boundaryDenied) return boundaryDenied;
+    if (!trustedHostExecution) {
+      // Security (#852): confine the processed file to the project root so
+      // ctx_execute_file cannot bypass the host's permission controls.
+      const boundaryDenied = checkProjectBoundary(path, "ctx_execute_file");
+      if (boundaryDenied) return boundaryDenied;
 
-    // Security: check file path against Read deny patterns
-    const pathDenied = checkFilePathDenyPolicy(path, "ctx_execute_file");
-    if (pathDenied) return pathDenied;
+      const pathDenied = checkFilePathDenyPolicy(path, "ctx_execute_file");
+      if (pathDenied) return pathDenied;
 
-    // Security: check code parameter against Bash deny patterns
-    if (language === "shell") {
-      const codeDenied = checkDenyPolicy(code, "execute_file");
-      if (codeDenied) return codeDenied;
-    } else {
-      const codeDenied = checkNonShellDenyPolicy(code, language, "execute_file");
-      if (codeDenied) return codeDenied;
+      if (language === "shell") {
+        const codeDenied = checkDenyPolicy(code, "execute_file");
+        if (codeDenied) return codeDenied;
+      } else {
+        const codeDenied = checkNonShellDenyPolicy(code, language, "execute_file");
+        if (codeDenied) return codeDenied;
+      }
     }
 
     try {
@@ -2574,7 +2588,7 @@ WHEN:
 
 WHEN NOT:
   - The data you want to query has never been stored in the knowledge base AND no session memory has accumulated around it — capture first (run a gather-and-index call), then come back here to query
-  - You have one ad-hoc question against data that is not in the knowledge base — answer it inline by running code in the sandbox tool; one round-trip instead of capture-then-query
+  - You have one ad-hoc question against data that is not in the knowledge base — answer it inline with ctx_execute; one round-trip instead of capture-then-query
 
 RETURNS:
   Per-query ranked sections with window-extracted snippets. Use 2-4 specific technical terms per query. Common session-memory source labels: \`decision\` (user corrections / preferences), \`error\` and \`error-resolution\` (past failures + their fixes), \`blocker\`, \`plan\`, \`user-prompt\`, \`rejected-approach\`, \`compaction\` (post-compact session guide). See ctx_stats for live category counts. Each response carries a throttle counter (call #N/M in the rolling time window); results taper toward the soft cap and calls block after the hard cap. Tune via CONTEXT_MODE_SEARCH_WINDOW_MS, CONTEXT_MODE_SEARCH_MAX_RESULTS_AFTER, CONTEXT_MODE_SEARCH_BLOCK_AFTER.
@@ -3688,7 +3702,7 @@ server.registerTool(
     },
     description: `Run multiple commands in ONE call. Every command's output is auto-indexed into the knowledge base; if you also pass \`queries\`, the matching sections come back in the same round trip so a follow-up search call is not needed.
 
-Concurrency parallelizes the FETCH phase (run-the-commands). The DERIVATION phase — turning raw output into an answer — still belongs in code: add a processing command that consumes the indexed output and prints only the answer, so the raw bytes never enter your conversation (Think-in-Code, same principle as the sandbox tool).
+Concurrency parallelizes the FETCH phase (run-the-commands). The DERIVATION phase — turning raw output into an answer — still belongs in code: add a processing command that consumes the indexed output and prints only the answer, so the raw bytes never enter your conversation (Think-in-Code, same principle as ctx_execute).
 
 WHEN:
   - You have 3+ related commands you would otherwise run sequentially (multi-issue lookups, git log + git diff + git blame, multi-file reads, multi-region cloud queries)
@@ -3697,7 +3711,7 @@ WHEN:
   - The combined output is large enough that piping it through ctx_search later would itself be expensive — let auto-index + inline queries do both in one shot
 
 WHEN NOT:
-  - Single command with no follow-up query — run it in the sandbox tool directly
+  - Single command with no follow-up query — run it in ctx_execute directly
   - CPU-bound or stateful commands — keep concurrency at 1 (npm test, build, lint, port-binding servers, lock-file holders, anything that races on the same resource)
 
 RETURNS:
@@ -3776,10 +3790,11 @@ EXAMPLE: ctx_batch_execute(
     }),
   },
   async ({ commands, queries, timeout, concurrency, cwd, query_scope }) => {
-    // Security: check each command against deny patterns
-    for (const cmd of commands) {
-      const denied = checkDenyPolicy(cmd.command, "batch_execute");
-      if (denied) return denied;
+    if (!trustedHostExecution) {
+      for (const cmd of commands) {
+        const denied = checkDenyPolicy(cmd.command, "batch_execute");
+        if (denied) return denied;
+      }
     }
 
     try {

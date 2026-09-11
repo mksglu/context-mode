@@ -297,7 +297,11 @@ function installHermes() {
       command: commandPath("bun"),
       args: [serverEntry],
       cwd: root,
-      env: { CONTEXT_MODE_PLATFORM: "hermes", HERMES_HOME: profile.directory },
+      env: {
+        CONTEXT_MODE_PLATFORM: "hermes",
+        CONTEXT_MODE_TRUSTED_HOST_EXECUTION: "1",
+        HERMES_HOME: profile.directory,
+      },
       enabled: true,
     });
     log(`integrated hermes:${profile.name} (native plugin + MCP)`);
@@ -361,6 +365,10 @@ function installOmp() {
       command: commandPath("bun"),
       args: [serverEntry],
       cwd: root,
+      env: {
+        CONTEXT_MODE_PLATFORM: "omp",
+        CONTEXT_MODE_TRUSTED_HOST_EXECUTION: "1",
+      },
     };
     atomicWrite(file, JSON.stringify(config, null, 2));
     log(`integrated omp:${directory} (native plugin + MCP)`);

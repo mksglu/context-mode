@@ -595,6 +595,11 @@ reconciles every ordinary Hermes profile:
 ./doctor.sh --target hermes
 ```
 
+The maintained Hermes entry sets `CONTEXT_MODE_TRUSTED_HOST_EXECUTION=1`.
+`ctx_execute`, `ctx_execute_file`, and `ctx_batch_execute` then rely on Hermes's
+normal tool approval instead of applying a second Context Mode deny list or
+project boundary. Other Context Mode clients retain the upstream guards.
+
 Profiles reserved for an isolated worker are detected from their private MCP
 entry and deliberately left without the general Context Mode plugin, MCP, or
 routing skill. `./update.sh --target hermes` performs a fast-forward-only pull
@@ -1107,6 +1112,11 @@ checks both registrations without starting an agent session:
 ./integrate.sh --target omp
 ./doctor.sh --target omp
 ```
+
+The maintained OMP entry sets `CONTEXT_MODE_TRUSTED_HOST_EXECUTION=1`.
+`ctx_execute`, `ctx_execute_file`, and `ctx_batch_execute` then rely on OMP's
+normal tool approval instead of applying a second Context Mode deny list or
+project boundary. Other Context Mode clients retain the upstream guards.
 
 **Install — plugin path (recommended):**
 

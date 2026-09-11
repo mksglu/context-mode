@@ -152,7 +152,12 @@ function checkHermes() {
     check(mcp?.command === commandPath("bun"), `${label} uses Bun/Sandwich for the MCP`);
     check(Array.isArray(mcp?.args) && mcp.args.length === 1 && path.resolve(mcp.args[0]) === serverEntry, `${label} pins the checked-out MCP bundle`);
     check(mcp?.cwd === root && mcp?.enabled === true, `${label} MCP is enabled from the checked-out repository`);
-    check(mcp?.env?.CONTEXT_MODE_PLATFORM === "hermes" && path.resolve(mcp?.env?.HERMES_HOME || "") === profile.directory, `${label} MCP has profile-correct environment`);
+    check(
+      mcp?.env?.CONTEXT_MODE_PLATFORM === "hermes" &&
+        mcp?.env?.CONTEXT_MODE_TRUSTED_HOST_EXECUTION === "1" &&
+        path.resolve(mcp?.env?.HERMES_HOME || "") === profile.directory,
+      `${label} MCP delegates execution policy to the host approval layer`,
+    );
     check(existsSync(pluginDir), `${label} native plugin is installed`);
     if (existsSync(pluginDir)) {
       check(sha256(path.join(pluginDir, "__init__.py")) === sha256(path.join(pluginSource, "__init__.py")), `${label} plugin control plane matches source`);
@@ -207,6 +212,11 @@ function checkOmp() {
     check(mcp?.type === "stdio" && mcp?.command === commandPath("bun"), `${label} uses Bun/Sandwich stdio`);
     check(Array.isArray(mcp?.args) && mcp.args.length === 1 && path.resolve(mcp.args[0]) === serverEntry, `${label} pins the checked-out MCP bundle`);
     check(mcp?.cwd === root, `${label} runs from the checked-out repository`);
+    check(
+      mcp?.env?.CONTEXT_MODE_PLATFORM === "omp" &&
+        mcp?.env?.CONTEXT_MODE_TRUSTED_HOST_EXECUTION === "1",
+      `${label} delegates execution policy to the host approval layer`,
+    );
   }
 }
 
