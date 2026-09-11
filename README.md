@@ -1599,6 +1599,13 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 |---|---|---|
 | `CONTEXT_MODE_DIR` | Adapter default, for example `~/.codex/context-mode` or `~/.claude/context-mode` | Since v1.0.147. Absolute writable root for context-mode storage. Sessions and stats use `<root>/sessions`; indexed content uses `<root>/content`. Empty or whitespace-only values are treated as unset and shown by `ctx_doctor`; non-empty values must be absolute. `~` is not expanded. |
 
+### Execution-timeout environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS` | `120000` under Antigravity CLI, `600000` under Pi | Fallback budget for `ctx_execute` / `ctx_execute_file` / `ctx_batch_execute` when the call itself passes no `timeout`. Applies only on hosts that do not bound an in-flight MCP tool call themselves — Antigravity CLI, and Pi, whose bridge forwards `tools/call` unbounded by design ([#643](https://github.com/mksglu/context-mode/issues/643), [#959](https://github.com/mksglu/context-mode/issues/959)). Every other host keeps no server-side timer ([#406](https://github.com/mksglu/context-mode/issues/406)). Must be a positive integer no greater than `2147483647` (the largest delay a timer can represent); anything else — blank, fractional, negative, or larger — falls back to the host default rather than to "unbounded". Prefer an explicit per-call `timeout`, or `background: true`, for jobs that legitimately run longer. |
+| `CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS` | unset | Pre-#959 alias for the above, honored only when `CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS` is unset or unusable. |
+
 ### Routing-guidance environment variables
 
 | Variable | Default | Purpose |
