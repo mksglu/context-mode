@@ -38,11 +38,15 @@ describe("Hermes native adapter", () => {
 
   it("loads as a real Python plugin, registers public hooks/commands, and fails open", () => {
     const binDir = mkdtempSync(resolve(tmpdir(), "context-mode-hermes-"));
-    const stub = resolve(binDir, "context-mode");
-    writeFileSync(stub, `#!/bin/sh
+    const windows = process.platform === "win32";
+    const stub = resolve(binDir, windows ? "context-mode.cmd" : "context-mode");
+    writeFileSync(stub, windows ? `@echo off\r
+<nul set /p ={"hookSpecificOutput":{"additionalContext":"continuity"}}\r
+exit /b 0\r
+` : `#!/bin/sh
 printf '%s' '{"hookSpecificOutput":{"additionalContext":"continuity"}}'
 `);
-    chmodSync(stub, 0o755);
+    if (!windows) chmodSync(stub, 0o755);
     const harness = String.raw`
 import importlib.util, json, pathlib, time
 root=pathlib.Path(${JSON.stringify(ROOT)})
