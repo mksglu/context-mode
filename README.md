@@ -585,6 +585,21 @@ Full documentation: [`docs/adapters/openclaw.md`](docs/adapters/openclaw.md)
 
 **Prerequisites:** Node.js >= 22.5 and the published CLI (`npm install -g context-mode`).
 
+For the maintained source checkout, one command builds Context Mode, installs
+its native Hermes plugin through `hermes plugins install`, registers the MCP
+server through `hermes config`, removes superseded routing-skill copies, and
+reconciles every ordinary Hermes profile:
+
+```bash
+./integrate.sh --target hermes
+./doctor.sh --target hermes
+```
+
+Profiles reserved for an isolated worker are detected from their private MCP
+entry and deliberately left without the general Context Mode plugin, MCP, or
+routing skill. `./update.sh --target hermes` performs a fast-forward-only pull
+and re-applies the same checked-in integration.
+
 ```bash
 hermes plugins install mksglu/context-mode --enable
 ```
@@ -1083,6 +1098,15 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
 <summary><strong>OMP (Oh My Pi)</strong> — plugin with full hook support</summary>
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Oh My Pi installed.
+
+For the maintained source checkout, use the same repeatable contract. It calls
+OMP's native plugin linker, points the MCP entry at the checked-out bundle, and
+checks both registrations without starting an agent session:
+
+```bash
+./integrate.sh --target omp
+./doctor.sh --target omp
+```
 
 **Install — plugin path (recommended):**
 
