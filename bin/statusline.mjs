@@ -35,10 +35,16 @@ import {
   resolveSessionStorageDir,
 } from "../hooks/session-db.bundle.mjs";
 
-// ── Analytics import — resolved relative to this script ─────────────────
-// statusline.mjs ships in `bin/`; the compiled analytics module lives in
-// `build/session/analytics.js`. Import lazily so a missing build doesn't
-// crash the renderer — degrade to the substantiated headline instead.
+// ── Analytics import — bundle-first, build/ fallback ─────────────────────
+// Same pattern as hooks/session-helpers.mjs's loadSessionDbModule(): CI
+// bundles analytics.bundle.mjs co-located with this file (git add -f'd by
+// bundle.yml, same as the session-db/extract/snapshot bundles). A git-clone
+// marketplace install (Claude Code plugin marketplace, or any adapter that
+// installs by cloning the repo rather than via `npm install` — build/ is
+// gitignored and only produced by `tsc`, which only runs for npm/CI installs)
+// never gets a build/ directory, so the bundle is the only thing that
+// resolves there. Import lazily so a missing target doesn't crash the
+// renderer — degrade to the substantiated headline instead.
 //
 // The dynamic import target MUST be a `file://` URL on Windows. Node's
 // ESM loader rejects absolute drive-letter paths (`C:\...`) with
@@ -47,14 +53,15 @@ import {
 // headline forever. Convert to a file URL so Windows accepts it.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const ANALYTICS_PATH = resolve(__dirname, "..", "build", "session", "analytics.js");
-const ANALYTICS_URL = pathToFileURL(ANALYTICS_PATH).href;
+const ANALYTICS_BUNDLE_PATH = resolve(__dirname, "analytics.bundle.mjs");
+const ANALYTICS_BUILD_PATH = resolve(__dirname, "..", "build", "session", "analytics.js");
 
 let _analytics = null;
 async function loadAnalytics() {
   if (_analytics) return _analytics;
   try {
-    _analytics = await import(ANALYTICS_URL);
+    const target = existsSync(ANALYTICS_BUNDLE_PATH) ? ANALYTICS_BUNDLE_PATH : ANALYTICS_BUILD_PATH;
+    _analytics = await import(pathToFileURL(target).href);
   } catch {
     _analytics = null;
   }
