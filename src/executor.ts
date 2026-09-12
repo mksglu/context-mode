@@ -1,7 +1,8 @@
 import { spawn, execSync, execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync, realpathSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { createHash, randomBytes } from "node:crypto";
 import {
   detectRuntimes,
   buildCommand,
@@ -109,6 +110,13 @@ const OS_TMPDIR = (() => {
   } catch { /* fall through */ }
   return "/tmp";
 })();
+
+/**
+ * Grace window (ms) after an abort's tree kill before the execution settles
+ * deterministically — see the abort handler in #spawn. Bounds abort latency
+ * when `close` is held up by inherited stdio handles (Windows).
+ */
+const ABORT_SETTLE_GRACE_MS = 1500;
 
 /**
  * Pure helper — exported for unit testing. Issue #782.
@@ -222,6 +230,8 @@ interface ExecuteOptions {
    * a non-project cwd (e.g. $HOME).
    */
   cwd?: string;
+  /** Request-scoped cancellation. Never cancels other executions. */
+  signal?: AbortSignal;
 }
 
 interface ExecuteFileOptions extends ExecuteOptions {
@@ -280,11 +290,27 @@ export class PolyglotExecutor {
   }
 
   async execute(opts: ExecuteOptions): Promise<ExecResult> {
-    const { language, code, timeout, background = false, cwd: cwdOverride } = opts;
+    const { language, code, timeout, background = false, cwd: cwdOverride, signal } = opts;
+
+    // Deterministic pre-abort path: never spawn a process for a request that
+    // is already cancelled. Spawn-then-kill-immediately races on Windows
+    // (taskkill can miss a just-created process; even on a clean kill `close`
+    // can stall on inherited pipe handles), so resolve synchronously instead.
+    // No temp dir created → nothing to clean up, no listener to remove.
+    if (signal?.aborted) {
+      return {
+        stdout: "",
+        stderr: "Execution aborted before start",
+        exitCode: 1,
+        timedOut: false,
+      };
+    }
+
     const tmpDir = mkdtempSync(join(OS_TMPDIR, ".ctx-mode-"));
 
     try {
       const filePath = this.#writeScript(tmpDir, code, language);
+      this.#writeOwnershipManifest(tmpDir, filePath, language);
       const cmd = buildCommand(this.#runtimes, language, filePath);
 
       // Rust: compile then run
@@ -304,7 +330,7 @@ export class PolyglotExecutor {
       // Issue #45 — `cwdOverride` lets per-call sites (Codex MCP handlers) pin
       // cwd without mutating process-wide state.
       const cwd = cwdOverride ?? this.#projectRoot;
-      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background);
+      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background, signal);
 
       // Skip tmpDir cleanup if process was backgrounded — it may still need files
       if (!result.backgrounded) {
@@ -319,14 +345,29 @@ export class PolyglotExecutor {
   }
 
   async executeFile(opts: ExecuteFileOptions): Promise<ExecResult> {
-    const { path: filePath, language, code, timeout } = opts;
+    const { path: filePath, language, code, timeout, signal } = opts;
     const absolutePath = resolve(this.#projectRoot, filePath);
     const wrappedCode = this.#wrapWithFileContent(
       absolutePath,
       language,
       code,
     );
-    return this.execute({ language, code: wrappedCode, timeout });
+    return this.execute({ language, code: wrappedCode, timeout, signal });
+  }
+
+  #writeOwnershipManifest(tmpDir: string, scriptPath: string, language: Language): void {
+    // Sidecar intentionally excludes code, command, cwd, and environment so it
+    // remains safe to retain for a future ownership-verified orphan reaper.
+    writeFileSync(join(tmpDir, "ownership.json"), JSON.stringify({
+      version: 1,
+      nonce: randomBytes(16).toString("hex"),
+      scriptPath: realpathSync(scriptPath),
+      scriptSha256: createHash("sha256").update(readFileSync(scriptPath)).digest("hex"),
+      createdAt: new Date().toISOString(),
+      executorPid: process.pid,
+      parentPid: process.ppid,
+      language,
+    }) + "\n", { encoding: "utf-8", mode: 0o600 });
   }
 
   #writeScript(tmpDir: string, code: string, language: Language): string {
@@ -412,6 +453,7 @@ export class PolyglotExecutor {
     sandboxTmpDir: string,
     timeout: number | undefined,
     background = false,
+    signal?: AbortSignal,
   ): Promise<ExecResult> {
     return new Promise((res) => {
       // Only .cmd/.bat shims need shell on Windows; real executables don't.
@@ -467,6 +509,36 @@ export class PolyglotExecutor {
 
       let timedOut = false;
       let resolved = false;
+      let abortSettleTimer: NodeJS.Timeout | undefined;
+      const abort = () => {
+        // Exact spawned root only: killTree uses its dedicated process group or
+        // taskkill /T, never a broad name/port sweep.
+        if (resolved) return;
+        killTree(proc);
+        // Deterministic settle: after the tree kill we do NOT wait forever for
+        // `close`. Descendants that die slowly (or briefly survive) keep
+        // inherited stdio pipe handles open — on Windows that can delay the
+        // root's `close` well past the actual kill. Give real output a short
+        // grace window, then settle with whatever we captured.
+        abortSettleTimer = setTimeout(() => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", abort);
+          proc.stdout?.removeAllListeners("data");
+          proc.stderr?.removeAllListeners("data");
+          try { proc.kill("SIGKILL"); } catch { /* already gone */ }
+          res({
+            stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+            stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+            exitCode: 1,
+            timedOut: false,
+          });
+        }, ABORT_SETTLE_GRACE_MS);
+        abortSettleTimer.unref?.();
+      };
+      if (signal?.aborted) abort();
+      else signal?.addEventListener("abort", abort, { once: true });
       // Issue #406 — if the caller didn't pass a timeout we don't fire one.
       // Timeout policy belongs to the MCP host/client (Claude Code, VSCode,
       // JetBrains all enforce their own RPC timeouts); imposing a second
@@ -538,6 +610,8 @@ export class PolyglotExecutor {
 
       proc.on("close", (exitCode) => {
         clearTimeout(timer);
+        if (abortSettleTimer) clearTimeout(abortSettleTimer);
+        signal?.removeEventListener("abort", abort);
         if (resolved) return; // Already resolved by background timeout
         const rawStdout = Buffer.concat(stdoutChunks).toString("utf-8");
         let rawStderr = Buffer.concat(stderrChunks).toString("utf-8");
@@ -559,6 +633,8 @@ export class PolyglotExecutor {
 
       proc.on("error", (err) => {
         clearTimeout(timer);
+        if (abortSettleTimer) clearTimeout(abortSettleTimer);
+        signal?.removeEventListener("abort", abort);
         if (resolved) return; // Already resolved by background timeout
         res({
           stdout: "",
