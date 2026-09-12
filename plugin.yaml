@@ -1,0 +1,12 @@
+name: context-mode
+version: "1.0.169"
+description: Native Hermes Agent control plane for the context-mode MCP data plane
+author: Mert Koseoglu
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - pre_llm_call
+  - on_session_end
+  - on_session_finalize
+  - on_session_reset
+  - transform_tool_result

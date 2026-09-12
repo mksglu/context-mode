@@ -73,6 +73,19 @@ function syncManifests() {
     }
   }
 
+  // Hermes requires a root YAML manifest. Keep it in release lockstep without
+  // adding a YAML dependency to this release script.
+  try {
+    const file = "plugin.yaml";
+    const raw = readFileSync(file, "utf8");
+    if (!/^version:\s*["']?[^\n"']+["']?\s*$/m.test(raw)) throw new Error("version field missing");
+    writeFileSync(file, raw.replace(/^version:\s*.*$/m, `version: "${version}"`));
+    console.log(`  ✓ ${file}`);
+  } catch (e) {
+    console.error(`  ✗ plugin.yaml — ${e.message}`);
+    failures.push("plugin.yaml");
+  }
+
   if (failures.length > 0) {
     console.error(
       `version-sync: FAIL — ${failures.length} manifest(s) could not be synced: ${failures.join(", ")}`,
