@@ -1089,6 +1089,9 @@ describe("ContextModePlugin", () => {
         { sessionID: "oc3-sess" } as any,
         output,
       );
+      const snapshot = output.context.find((c) => c.startsWith("<session_resume"));
+      expect(snapshot).toBeDefined();
+      expect(Buffer.byteLength(snapshot ?? "", "utf8")).toBeLessThanOrEqual(2048);
       // The compacting handler still pushes the raw resume snapshot (existing
       // contract). It MUST also push a separate auto-injection block whose
       // length ≤ 2000 chars (~500 token budget per auto-injection.mjs).

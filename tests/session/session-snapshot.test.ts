@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, test } from "vitest";
 import {
   buildResumeSnapshot,
+  RESUME_SNAPSHOT_MAX_BYTES,
   renderTaskState,
   type StoredEvent,
 } from "../../src/session/snapshot.js";
@@ -323,6 +324,35 @@ describe("Slice 12: No Truncation", () => {
     const xml = buildResumeSnapshot(events);
     // Must NOT contain truncation ellipsis
     assert.ok(!xml.includes("..."), `output should contain no ellipsis, but found "..." in output`);
+  });
+});
+
+describe("Slice 12b: Bounded Snapshot", () => {
+  test("bounds output while preserving critical state and closed XML", () => {
+    const events: StoredEvent[] = [
+      makeEvent({ type: "goal", category: "goal", data: "GOAL_SENTINEL: finish the compaction fix", priority: 4 }),
+      makeEvent({ type: "user_prompt", category: "user-prompt", data: "PROMPT_SENTINEL: continue the implementation", priority: 1 }),
+      makeEvent({ type: "rule_content", category: "rule", data: `RULE_SENTINEL ${"r".repeat(3_000)}`, priority: 1 }),
+      makeEvent({ type: "error_tool", category: "error", data: `ERROR_SENTINEL ${"e".repeat(3_000)}`, priority: 2 }),
+    ];
+
+    const xml = buildResumeSnapshot(events, { maxBytes: RESUME_SNAPSHOT_MAX_BYTES });
+
+    assert.ok(Buffer.byteLength(xml, "utf8") <= RESUME_SNAPSHOT_MAX_BYTES);
+    assert.ok(xml.startsWith("<session_resume"));
+    assert.ok(xml.endsWith("</session_resume>"));
+    assert.ok(xml.includes("GOAL_SENTINEL"));
+    assert.ok(xml.includes("PROMPT_SENTINEL"));
+    assert.ok(xml.includes("<snapshot_truncated/>"));
+    assert.ok(!xml.includes("RULE_SENTINEL"));
+    assert.ok(!xml.includes("ERROR_SENTINEL"));
+  });
+
+  test("rejects a non-positive snapshot budget", () => {
+    assert.throws(
+      () => buildResumeSnapshot([], { maxBytes: 0 }),
+      RangeError,
+    );
   });
 });
 
