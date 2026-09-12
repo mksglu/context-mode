@@ -20,7 +20,7 @@ if [[ "$dry_run" == 0 ]]; then
   "$bun_bin" run build
   mkdir -p -- "$HOME/.local/bin"
   ln -sfn -- "$root/cli.bundle.mjs" "$HOME/.local/bin/context-mode"
-  chmod +x -- "$root/integrate.sh" "$root/doctor.sh" "$root/update.sh" \
+  chmod +x -- "$root/audit.sh" "$root/integrate.sh" "$root/doctor.sh" "$root/update.sh" \
     "$root/scripts/configure-harnesses.mjs" "$root/scripts/doctor-harnesses.mjs"
 fi
 

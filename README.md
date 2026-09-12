@@ -591,6 +591,7 @@ server through `hermes config`, removes superseded routing-skill copies, and
 reconciles every ordinary Hermes profile:
 
 ```bash
+./audit.sh --target hermes
 ./integrate.sh --target hermes
 ./doctor.sh --target hermes
 ```
@@ -602,8 +603,12 @@ project boundary. Other Context Mode clients retain the upstream guards.
 
 Profiles reserved for an isolated worker are detected from their private MCP
 entry and deliberately left without the general Context Mode plugin, MCP, or
-routing skill. `./update.sh --target hermes` performs a fast-forward-only pull
-and re-applies the same checked-in integration.
+routing skill. `./audit.sh --target hermes` reports the named source/fork and
+scoped Bun state without changing the worktree. `./update.sh --target hermes`
+uses Sandwich's shared repository engine to reconcile the source branch,
+re-apply the checked-in integration, prepare any verified local maintenance
+commit, and print the exact force-with-lease command for the maintained fork.
+It never pushes.
 
 ```bash
 hermes plugins install mksglu/context-mode --enable
