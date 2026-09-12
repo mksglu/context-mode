@@ -923,6 +923,35 @@ describe("Pi Extension", () => {
       expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
     });
 
+    it("keeps first-turn injected messages valid for pi-messages gateways", async () => {
+      await registerPiExtension(api);
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => join(tempDir, "gateway-session.jsonl") },
+      });
+      await api._trigger("before_agent_start", {
+        prompt: "hi",
+        systemPrompt: "Base prompt.",
+      });
+
+      const userMessage = { role: "user", content: "hi", timestamp: Date.now() };
+      const beforeInjection = Date.now();
+      const result = await api._trigger("context", { messages: [userMessage] });
+      const afterInjection = Date.now();
+      // Gateways such as Radius validate the serialized Pi message envelope.
+      const payload = JSON.parse(JSON.stringify({ context: result }));
+      expect(payload.context.messages).toHaveLength(2);
+      expect(payload.context.messages[0]).toEqual(userMessage);
+      const injected = payload.context.messages[1];
+      expect(injected.role).toBe("user");
+      expect(injected.content).toContain("context-mode active");
+      expect(
+        Number.isFinite(injected.timestamp),
+        "context.messages[1].timestamp must be a finite number",
+      ).toBe(true);
+      expect(injected.timestamp).toBeGreaterThanOrEqual(beforeInjection);
+      expect(injected.timestamp).toBeLessThanOrEqual(afterInjection);
+    });
+
     it("re-injects the anchor via context hook on every subsequent call", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
