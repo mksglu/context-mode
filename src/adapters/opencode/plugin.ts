@@ -26,7 +26,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
-import { extractEvents, extractUserEvents, parseOpencodeUsage, buildAgentUsageEvent } from "../../session/extract.js";
+import {
+  extractEvents,
+  extractUserEvents,
+  parseOpencodeUsage,
+  buildAgentUsageEvent,
+  toOpencodeUsageStepDelta,
+  rememberOpencodeCumulativeCost,
+} from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
 import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
@@ -316,6 +323,14 @@ async function createContextModePlugin(ctx: PluginContext) {
   // lived plugin process still gets per-session capture exactly once.
   const agentsMdCaptured = new Set<string>();
 
+  // Per-assistant-message high-water for opencode cumulative cost → step delta
+  // (issue #1036). Key: `${sessionId}:${messageId}` (or sessionId alone when
+  // info.id is absent). Value: last observed cumulative `info.cost`.
+  // Bounded via rememberOpencodeCumulativeCost (insertion-order FIFO ~1000);
+  // the plugin lifecycle only consumes `message.updated` (no completion event
+  // to delete-on-finish).
+  const lastCumulativeCostByMessage = new Map<string, number>();
+
   /**
    * OC-4: Read AGENTS.md (with CLAUDE.md / CONTEXT.md fallbacks) from the
    * project directory and persist as `rule` + `rule_content` events. Mirrors
@@ -542,33 +557,39 @@ async function createContextModePlugin(ctx: PluginContext) {
     },
 
     // ── event: per-turn token + cost capture (paid-observability) ───
-    // The generic bus `event` hook (refs/platforms/opencode/packages/plugin/
-    // src/index.ts:224) delivers every Event; we filter `message.updated`
-    // (published on each assistant-message update incl. step-finish —
-    // session.ts:673) and read tokens/cost/modelID off properties.info
-    // (assistant filter via role; refs stream.transport.ts:214-216).
-    //
-    // CAVEAT (refs processor.ts:717-718): message-level `.tokens` is the LAST
-    // step's snapshot (overwritten per step-finish), while `.cost` is
-    // cumulative for the turn. parseOpencodeUsage passes `.cost` through as
-    // native_cost_usd so the billed $ stays exact despite the token snapshot
-    // being last-step only. `message.updated` fires multiple times per turn;
-    // because tokens are a terminal snapshot and cost is cumulative, the last
-    // event for a message carries the final figures — re-emitting on each
-    // update is idempotent at the cost column and merely refreshes the
-    // last-step token telemetry. db.insertEvent both persists locally AND
-    // forwards to the platform (the TS-plugin equivalent of the .mjs
-    // attributeAndInsertEvents path).
+    // Filter bus `message.updated` (fires per step-finish). Opencode `.cost`
+    // is cumulative for the turn while `.tokens` is last-step; re-emitting the
+    // cumulative figure over-counts under additive aggregation (#1036). Convert
+    // via toOpencodeUsageStepDelta so summed rows equal the true turn cost.
+    // lastCumulativeCostByMessage tracks per-message high-water (FIFO-capped).
     event: async (input: EventHookInput) => {
       try {
         const ev = input?.event;
         if (!ev || ev.type !== "message.updated") return;
-        const sessionId = ev.properties?.info?.sessionID;
+        const info = ev.properties?.info;
+        const sessionId = info?.sessionID;
         if (!sessionId || typeof sessionId !== "string") return;
 
         const counts = parseOpencodeUsage(ev);
         if (!counts) return;
-        const usageEvent = buildAgentUsageEvent(counts);
+
+        const messageId = typeof info?.id === "string" && info.id.length > 0 ? info.id : "";
+        const messageKey = messageId.length > 0 ? `${sessionId}:${messageId}` : sessionId;
+        const prev =
+          lastCumulativeCostByMessage.has(messageKey)
+            ? (lastCumulativeCostByMessage.get(messageKey) as number)
+            : null;
+        const stepped = toOpencodeUsageStepDelta(counts, prev);
+        if (!stepped) return;
+        if (typeof stepped.nextCumulativeCost === "number") {
+          rememberOpencodeCumulativeCost(
+            lastCumulativeCostByMessage,
+            messageKey,
+            stepped.nextCumulativeCost,
+          );
+        }
+
+        const usageEvent = buildAgentUsageEvent(stepped.counts);
         if (!usageEvent) return;
 
         db.ensureSession(sessionId, projectDir);

@@ -1893,6 +1893,63 @@ export function parseOpencodeUsage(payload: unknown): AgentUsageCounts | null {
 }
 
 /**
+ * Convert opencode cumulative turn cost to a per-step delta for additive sum
+ * under multi-fire `message.updated` (#1036). Null on no-progress refresh;
+ * without native cost, emit only on first observation. High-water is tracked
+ * per message via previous/next cumulative; map is FIFO-capped (see CAP).
+ */
+/** FIFO cap for the in-memory cumulative-cost high-water map (#1036). */
+export const OPENCODE_CUMULATIVE_COST_MAP_CAP = 1000;
+
+/** Remember last cumulative cost per message key (insertion-order FIFO eviction). */
+export function rememberOpencodeCumulativeCost(
+  map: Map<string, number>,
+  key: string,
+  cost: number,
+  maxSize: number = OPENCODE_CUMULATIVE_COST_MAP_CAP,
+): void {
+  if (!map.has(key) && map.size >= maxSize) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, cost);
+}
+
+export function toOpencodeUsageStepDelta(
+  counts: AgentUsageCounts,
+  previousCumulativeCost: number | null,
+): { counts: AgentUsageCounts; nextCumulativeCost: number | null } | null {
+  const current = counts.native_cost_usd;
+  if (typeof current === "number" && Number.isFinite(current)) {
+    const prev =
+      typeof previousCumulativeCost === "number" && Number.isFinite(previousCumulativeCost)
+        ? previousCumulativeCost
+        : 0;
+    const delta = current - prev;
+    // Same (or lower) cumulative after we've already emitted → no-op refresh.
+    if (previousCumulativeCost !== null && delta <= 0) {
+      return null;
+    }
+    // First observation emits cumulative; later ones emit the step delta only.
+    const stepCost = previousCumulativeCost === null ? current : delta;
+    return {
+      counts: { ...counts, native_cost_usd: stepCost },
+      nextCumulativeCost: current,
+    };
+  }
+
+  // No native cost → emit once per message (first observation only).
+  if (previousCumulativeCost !== null) {
+    return null;
+  }
+  return {
+    counts,
+    // Sentinel "seen" marker so subsequent fires without native cost are skipped.
+    nextCumulativeCost: 0,
+  };
+}
+
+/**
  * Build a structured `agent_usage` event from summed per-model token counts.
  * Emits the colon-string `data` (human/debug + back-compat) AND the structured
  * top-level fields the forward envelope spreads to the platform. cost_usd via
