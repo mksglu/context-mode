@@ -42,7 +42,7 @@
   },
   "omp": {
     "name": "context-mode",
-    "description": "Save 98% of your context window in OMP — sandboxed code execution, FTS5 search, hard-block curl/wget, session continuity across compaction.",
+    "description": "Save 98% of your context window in OMP — approved host execution, FTS5 search, web routing, and session continuity across compaction.",
     "extensions": [
       "./build/adapters/omp/plugin.js"
     ]
@@ -61,6 +61,8 @@
   "files": [
     "build",
     "hooks",
+    "plugin.yaml",
+    "__init__.py",
     "configs",
     "server.bundle.mjs",
     "cli.bundle.mjs",
@@ -79,16 +81,19 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && node -e \"if(process.platform!=='win32'){require('fs').chmodSync('build/cli.js',0o755)}\" && npm run bundle && npm run assert-bundle && npm run assert-asymmetric-drift",
+    "build": "npm run assert-hermes-plugin-copy && tsc && node -e \"if(process.platform!=='win32'){require('fs').chmodSync('build/cli.js',0o755)}\" && npm run bundle && npm run assert-bundle && npm run assert-asymmetric-drift",
     "assert-bundle": "node scripts/assert-bundle.mjs server.bundle.mjs cli.bundle.mjs hooks/session-extract.bundle.mjs hooks/session-snapshot.bundle.mjs hooks/session-db.bundle.mjs hooks/security.bundle.mjs",
     "assert-asymmetric-drift": "node scripts/assert-asymmetric-drift.mjs",
+    "assert-hermes-plugin-copy": "node scripts/assert-hermes-plugin-copy.mjs",
     "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=esm --outfile=server.bundle.mjs --external:better-sqlite3 --external:turndown --external:turndown-plugin-gfm --external:@mixmark-io/domino --minify && esbuild src/cli.ts --bundle --platform=node --target=node18 --format=esm --outfile=cli.bundle.mjs --external:better-sqlite3 --minify && esbuild src/session/extract.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/session-extract.bundle.mjs --minify && esbuild src/session/snapshot.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/session-snapshot.bundle.mjs --minify && esbuild src/session/db.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/session-db.bundle.mjs --external:better-sqlite3 --minify && esbuild src/security.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/security.bundle.mjs --minify",
     "version-sync": "node scripts/version-sync.mjs",
-    "version": "node scripts/version-sync.mjs && git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .cursor-plugin/plugin.json .codex-plugin/plugin.json .openclaw-plugin/openclaw.plugin.json .openclaw-plugin/package.json openclaw.plugin.json .pi/extensions/context-mode/package.json configs/antigravity-cli/plugin.json configs/copilot-cli/.github/plugin/plugin.json",
+    "version": "node scripts/version-sync.mjs && git add package.json plugin.yaml integrations/hermes-plugin/plugin.yaml .claude-plugin/plugin.json .claude-plugin/marketplace.json .cursor-plugin/plugin.json .codex-plugin/plugin.json .openclaw-plugin/openclaw.plugin.json .openclaw-plugin/package.json openclaw.plugin.json .pi/extensions/context-mode/package.json configs/antigravity-cli/plugin.json configs/copilot-cli/.github/plugin/plugin.json",
     "prepublishOnly": "npm run build",
     "dev": "npx tsx src/server.ts",
     "setup": "npx tsx src/cli.ts setup",
     "doctor": "npx tsx src/cli.ts doctor",
+    "integrate:harnesses": "bash integrate.sh",
+    "doctor:harnesses": "bash doctor.sh",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
     "test": "vitest run",
@@ -101,26 +106,40 @@
     "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.1",
+    "@clack/prompts": "^1.8.0",
     "@mixmark-io/domino": "^2.2.0",
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "better-sqlite3": "^12.6.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^12.11.1",
     "picocolors": "^1.1.1",
-    "turndown": "^7.2.0",
+    "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2",
-    "zod": "^3.25.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.19.11",
-    "@types/turndown": "^5.0.5",
-    "esbuild": "^0.27.3",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.0",
-    "vitest": "^4.0.18"
+    "@types/node": "^22.20.1",
+    "@types/turndown": "^5.0.6",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b",
   "engines": {
     "node": ">=22.5.0"
+  },
+  "overrides": {
+    "@hono/node-server": ">=2.0.5",
+    "body-parser": ">=2.3.0",
+    "esbuild": ">=0.28.1",
+    "express-rate-limit": ">=8.2.2",
+    "fast-uri": ">=4.1.3",
+    "hono": ">=4.13.5",
+    "ip-address": ">10.3.0",
+    "path-to-regexp": ">=8.4.0",
+    "postcss": ">8.5.22",
+    "qs": ">=6.16.0",
+    "vite": ">8.0.15",
+    "nanoid": ">=3.3.18"
   }
 }

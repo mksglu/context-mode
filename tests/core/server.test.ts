@@ -44,7 +44,7 @@ import {
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
-import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
+import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS, trustedHostExecutionEnabled } from "../../src/server.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
@@ -1468,6 +1468,42 @@ describe("ctx_index: Read deny-policy enforcement (#442)", () => {
   function killProc(proc: ChildProcess): void {
     try { proc.kill("SIGTERM"); } catch { /* best effort */ }
   }
+
+  test("trusted host execution is enabled only by the exact owner marker", () => {
+    expect(trustedHostExecutionEnabled({})).toBe(false);
+    expect(trustedHostExecutionEnabled({ CONTEXT_MODE_TRUSTED_HOST_EXECUTION: "true" })).toBe(false);
+    expect(trustedHostExecutionEnabled({ CONTEXT_MODE_TRUSTED_HOST_EXECUTION: "1" })).toBe(true);
+  });
+
+  test("trusted host execution bypasses the duplicate ctx_execute deny firewall", async () => {
+    const marker = `trusted-host-${process.pid}-${Date.now()}`;
+    const projectDir = setupProject(["Bash(echo *)"], {});
+    const blocked = spawnServerInProject(projectDir);
+    const trusted = spawnServerInProject(projectDir, {
+      CONTEXT_MODE_TRUSTED_HOST_EXECUTION: "1",
+    });
+    try {
+      await initServer(blocked, "ctx-execute-default-policy");
+      const blockedResponse = await awaitRpc(blocked, {
+        jsonrpc: "2.0", id: 100, method: "tools/call",
+        params: { name: "ctx_execute", arguments: { language: "shell", code: `echo ${marker}` } },
+      });
+      expect(blockedResponse.result?.isError).toBe(true);
+      expect(blockedResponse.result?.content?.[0]?.text ?? "").toContain("blocked by security policy");
+
+      await initServer(trusted, "ctx-execute-trusted-host");
+      const trustedResponse = await awaitRpc(trusted, {
+        jsonrpc: "2.0", id: 101, method: "tools/call",
+        params: { name: "ctx_execute", arguments: { language: "shell", code: `echo ${marker}` } },
+      });
+      expect(trustedResponse.result?.isError).not.toBe(true);
+      expect(trustedResponse.result?.content?.[0]?.text ?? "").toContain(marker);
+    } finally {
+      killProc(blocked);
+      killProc(trusted);
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   test("ctx_index({ path: <denied> }) returns deny-policy error and never indexes", async () => {
     const secretMarker = `secret-marker-${process.pid}-${Date.now()}`;

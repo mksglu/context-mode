@@ -10,6 +10,8 @@
 import type { PlatformId } from "./types.js";
 
 export const CLIENT_NAME_TO_PLATFORM: Record<string, PlatformId> = {
+  "hermes-agent": "hermes",
+  "Hermes Agent": "hermes",
   "claude-code": "claude-code",
   "gemini-cli-mcp-client": "gemini-cli",
   "antigravity-client": "antigravity",

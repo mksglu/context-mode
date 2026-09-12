@@ -581,6 +581,67 @@ Full documentation: [`docs/adapters/openclaw.md`](docs/adapters/openclaw.md)
 </details>
 
 <details>
+<summary><strong>Hermes Agent</strong> — MCP data plane + native Python hooks</summary>
+
+**Prerequisites:** Node.js >= 22.5 and the published CLI (`npm install -g context-mode`).
+
+For the maintained source checkout, one command builds Context Mode, installs
+its native Hermes plugin through `hermes plugins install`, registers the MCP
+server through `hermes config`, removes superseded routing-skill copies, and
+reconciles every ordinary Hermes profile:
+
+```bash
+./audit.sh --target hermes
+./integrate.sh --target hermes
+./doctor.sh --target hermes
+```
+
+The maintained Hermes entry sets `CONTEXT_MODE_TRUSTED_HOST_EXECUTION=1`.
+`ctx_execute`, `ctx_execute_file`, and `ctx_batch_execute` then rely on Hermes's
+normal tool approval instead of applying a second Context Mode deny list or
+project boundary. Other Context Mode clients retain the upstream guards.
+
+Profiles reserved for an isolated worker are detected from their private MCP
+entry and deliberately left without the general Context Mode plugin, MCP, or
+routing skill. `./audit.sh --target hermes` reports the named source/fork and
+scoped Bun state without changing the worktree. `./update.sh --target hermes`
+uses Sandwich's shared repository engine to reconcile the source branch,
+re-apply the checked-in integration, prepare any verified local maintenance
+commit, and print the exact force-with-lease command for the maintained fork.
+It never pushes.
+
+```bash
+hermes plugins install mksglu/context-mode --enable
+```
+
+Configure the canonical MCP server in `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  context_mode:
+    command: context-mode
+    args: []
+    enabled: true
+```
+
+Restart Hermes, then verify with `/ctx-doctor` and
+`/ctx-stats`; `/ctx-search <query>` searches the same MCP index.
+
+Hermes receives exact MCP names such as `mcp__context_mode__ctx_search`. The
+root plugin uses only public lifecycle hooks and `dispatch_tool`: it captures
+prompts/tool events in the existing SessionDB pipeline and replaces eligible
+oversized read-only results only after `mcp__context_mode__ctx_index` confirms
+success. All bridge subprocesses are bounded and fail open. Tool-input
+rewrites are not exposed by Hermes' public plugin API, so redirects become
+enforceable denials. Hermes reports compaction on `pre_llm_call`; the plugin
+runs the exact `compact` session-start path and injects its continuity context
+into that same model call. Storage is isolated at
+`$HERMES_HOME/context-mode` (normally `~/.hermes/context-mode`). Memory-provider
+and context-engine APIs are not used.
+
+</details>
+
+<details>
 <summary><strong>Codex CLI</strong> — MCP + hooks</summary>
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Codex CLI installed.
@@ -1047,6 +1108,20 @@ Full configs: [`configs/kiro/mcp.json`](configs/kiro/mcp.json) | [`configs/kiro/
 <summary><strong>OMP (Oh My Pi)</strong> — plugin with full hook support</summary>
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Oh My Pi installed.
+
+For the maintained source checkout, use the same repeatable contract. It calls
+OMP's native plugin linker, points the MCP entry at the checked-out bundle, and
+checks both registrations without starting an agent session:
+
+```bash
+./integrate.sh --target omp
+./doctor.sh --target omp
+```
+
+The maintained OMP entry sets `CONTEXT_MODE_TRUSTED_HOST_EXECUTION=1`.
+`ctx_execute`, `ctx_execute_file`, and `ctx_batch_execute` then rely on OMP's
+normal tool approval instead of applying a second Context Mode deny list or
+project boundary. Other Context Mode clients retain the upstream guards.
 
 **Install — plugin path (recommended):**
 

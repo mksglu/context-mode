@@ -73,6 +73,20 @@ function syncManifests() {
     }
   }
 
+  // Hermes requires YAML manifests. Keep the source manifest and the minimal
+  // native-install package in release lockstep without adding a YAML parser.
+  for (const file of ["plugin.yaml", "integrations/hermes-plugin/plugin.yaml"]) {
+    try {
+      const raw = readFileSync(file, "utf8");
+      if (!/^version:\s*["']?[^\n"']+["']?\s*$/m.test(raw)) throw new Error("version field missing");
+      writeFileSync(file, raw.replace(/^version:\s*.*$/m, `version: "${version}"`));
+      console.log(`  ✓ ${file}`);
+    } catch (e) {
+      console.error(`  ✗ ${file} — ${e.message}`);
+      failures.push(file);
+    }
+  }
+
   if (failures.length > 0) {
     console.error(
       `version-sync: FAIL — ${failures.length} manifest(s) could not be synced: ${failures.join(", ")}`,
