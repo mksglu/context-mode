@@ -148,18 +148,60 @@ config_file() {
   display="$(abbrev_path "$path")"
   if [ -f "$path" ]; then
     kv "$label" "$display (exists)"
-    # Use node for proper JSON escaping of file content
-    local content_json
+    local content_json node_path
+    node_path="$path"
+    if [ "$OS_TYPE" = "windows" ] && command -v cygpath &>/dev/null; then
+      node_path="$(cygpath -m "$path" 2>/dev/null || echo "$path")"
+    fi
     content_json="$(node -e "
-      const fs=require('fs');
-      let c=fs.readFileSync('$path','utf8').slice(0,3000);
-      // Redact secrets
-      c=c.replace(/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/g,'\$1***');
-      c=c.replace(/(postgres(ql)?:\/\/[^:]+:)[^@]+(@)/g,'\$1***\$3');
-      c=c.replace(/(mongodb(\+srv)?:\/\/[^:]+:)[^@]+(@)/g,'\$1***\$3');
-      console.log(JSON.stringify(c));
-    " 2>/dev/null || echo '""')"
-    printf '{"t":"cfg","s":"%s","k":"%s","path":"%s","exists":true,"content":%s}\n' "$CURRENT_SECTION" "$(_jesc "$label")" "$(_jesc "$display")" "$content_json" >> "$JSONL_FILE"
+      const fs = require('fs');
+      const MARK = '***REDACTED***';
+      const looksSecret = (k) => {
+        const s = String(k).toLowerCase();
+        if (/secret|password|passwd|pwd|credential|token|privatekey|apikey|api_key|api-key|access_key|access-key|bearer|authorization/.test(s)) return true;
+        return /(^|[-_. ])(key|auth)\$/.test(s);
+      };
+      const shape = (s) => String(s)
+        .replace(/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/g, '\$1' + MARK)
+        .replace(/((?:ghp|ghu|ghs|gho)_[A-Za-z0-9]{4})[A-Za-z0-9]+/g, '\$1' + MARK)
+        .replace(/(xox[bpras]-[A-Za-z0-9]{4})[A-Za-z0-9-]+/g, '\$1' + MARK)
+        .replace(/(AKIA)[A-Z0-9]{16}/g, '\$1' + MARK)
+        .replace(/((?:squ_|dt0c01[._-]?))[A-Za-z0-9._-]{8,}/g, '\$1' + MARK)
+        .replace(/(eyJ[A-Za-z0-9_-]{10})[A-Za-z0-9._-]+/g, '\$1' + MARK)
+        .replace(/\\b(Bearer\\s+)[A-Za-z0-9._~+\/=-]{8,}/gi, '\$1' + MARK)
+        .replace(/((?:postgres(?:ql)?|mysql|redis|mongodb(?:\\+srv)?|https?):\\/\\/[^:\\/\\s]+:)[^@\\/\\s]+(@)/g, '\$1' + MARK + '\$2');
+      const walk = (node, inEnv) => {
+        if (Array.isArray(node)) return node.map((v) => walk(v, inEnv));
+        if (node && typeof node === 'object') {
+          const out = {};
+          for (const k of Object.keys(node)) {
+            const v = node[k];
+            const childEnv = inEnv || k === 'env';
+            if (typeof v === 'string') {
+              out[k] = (inEnv || looksSecret(k)) ? MARK : shape(v);
+            } else {
+              out[k] = walk(v, childEnv);
+            }
+          }
+          return out;
+        }
+        return node;
+      };
+      const maskTomlLine = (line) => {
+        const m = line.match(/^(\\s*[A-Za-z0-9_.-]+\\s*=\\s*)(\\S{4,})((?:\\s.*)?)\$/);
+        if (!m) return line;
+        return looksSecret(m[1]) ? m[1] + MARK + m[3] : line;
+      };
+      const raw = fs.readFileSync(process.argv[1], 'utf8');
+      let out;
+      try {
+        out = JSON.stringify(walk(JSON.parse(raw), false), null, 2);
+      } catch (err) {
+        out = shape(raw.split('\\n').map(maskTomlLine).join('\\n'));
+      }
+      console.log(JSON.stringify(out.slice(0, 3000)));
+    " "$node_path" 2>/dev/null || echo '""')"
+    printf '{"t":"cfg","s":"%s","k":"%s","path":"%s","exists":true,"redacted":true,"content":%s}\n' "$CURRENT_SECTION" "$(_jesc "$label")" "$(_jesc "$display")" "$content_json" >> "$JSONL_FILE"
   else
     kv "$label" "$display (not found)"
   fi
@@ -1064,7 +1106,7 @@ node -e "
       } else if (e.t === 'd') {
         sec.details.push(e.m);
       } else if (e.t === 'cfg') {
-        sec.configs.push({ name: e.k, path: e.path, exists: e.exists, content: e.content || null });
+        sec.configs.push({ name: e.k, path: e.path, exists: e.exists, redacted: !!(e.content && e.redacted), content: e.content || null });
       }
     } catch {}
   }
