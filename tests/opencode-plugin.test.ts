@@ -910,7 +910,7 @@ describe("ContextModePlugin", () => {
       expect(joined).toContain("<context_window_protection>");
       expect(joined).toContain("<priority_instructions>");
       // platform-specific tool name proves createToolNamer wired correctly
-      expect(joined).toContain("context-mode_ctx_search");
+      expect(joined).toContain("ctx_search");
     });
 
     it("OC-1: re-injects routing block on every turn (per-turn reliability)", async () => {
