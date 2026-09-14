@@ -94,10 +94,12 @@ describe("getToolName", () => {
     );
   });
 
-  it("returns correct name for opencode", () => {
-    expect(getToolName("opencode", "ctx_search")).toBe(
-      "context-mode_ctx_search",
-    );
+  it("returns correct name for opencode (plugin-native)", () => {
+    expect(getToolName("opencode", "ctx_search")).toBe("ctx_search");
+  });
+
+  it("returns correct name for kilo (plugin-native)", () => {
+    expect(getToolName("kilo", "ctx_search")).toBe("ctx_search");
   });
 
   it("returns correct name for vscode-copilot", () => {
@@ -205,10 +207,10 @@ describe("createReadGuidance", () => {
 });
 
 describe("createGrepGuidance", () => {
-  it("uses opencode-style tool names for opencode platform", () => {
+  it("uses native ctx_* tool names for opencode platform", () => {
     const t = createToolNamer("opencode");
     const guidance = createGrepGuidance(t);
-    expect(guidance).toContain("context-mode_ctx_execute");
+    expect(guidance).toContain("ctx_execute");
   });
 });
 
@@ -230,12 +232,12 @@ describe("createExternalMcpGuidance (#529)", () => {
     expect(guidance).toContain("@context-mode/ctx_search");
   });
 
-  it("uses opencode-style tool names for opencode platform", () => {
+  it("uses native ctx_* tool names for opencode platform", () => {
     const t = createToolNamer("opencode");
     const guidance = createExternalMcpGuidance(t);
-    expect(guidance).toContain("context-mode_ctx_execute");
-    expect(guidance).toContain("context-mode_ctx_fetch_and_index");
-    expect(guidance).toContain("context-mode_ctx_search");
+    expect(guidance).toContain("ctx_execute");
+    expect(guidance).toContain("ctx_fetch_and_index");
+    expect(guidance).toContain("ctx_search");
   });
 
   it("uses zed-style tool names for zed platform", () => {
