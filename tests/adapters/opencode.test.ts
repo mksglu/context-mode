@@ -543,6 +543,64 @@ describe("OpenCodeAdapter", () => {
         rmSync(root, { recursive: true, force: true });
       });
 
+      it("configureAllHooks merges sibling opencode.json plugin array into opencode.jsonc (#sibling-plugin-shadow-drop)", () => {
+        const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
+        const src = resolve(process.cwd(), "src", "adapters", "opencode", "index.ts");
+        const tsx = resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+        const home = join(root, "home");
+        const globalConfDir = join(home, ".config", "opencode");
+        const projectRoot = join(root, "project");
+        mkdirSync(globalConfDir, { recursive: true });
+        mkdirSync(projectRoot, { recursive: true });
+
+        // Global opencode.jsonc — authoritative, has config but NO plugin key.
+        writeFileSync(
+          join(globalConfDir, "opencode.jsonc"),
+          `{
+  // My provider config
+  "theme": "x"
+}
+`,
+        );
+        // Global opencode.json — sibling, carries the plugin array.
+        writeFileSync(
+          join(globalConfDir, "opencode.json"),
+          JSON.stringify({ plugin: ["alpha", "beta", "context-mode"] }),
+        );
+
+        const run = spawnSync(
+          process.execPath,
+          [
+            tsx,
+            "-e",
+            `import { OpenCodeAdapter } from ${JSON.stringify(src)};const a=new OpenCodeAdapter();console.log(JSON.stringify(a.configureAllHooks(${JSON.stringify(projectRoot)})))`,
+          ],
+          { cwd: projectRoot, env: env(home), encoding: "utf-8" },
+        );
+        expect(run.status).toBe(0);
+
+        // The resulting opencode.jsonc must contain all plugins — authoritative
+        // ones from the sibling AND context-mode.
+        const jsonc = JSON.parse(
+          readFileSync(join(globalConfDir, "opencode.jsonc"), "utf-8"),
+        );
+        expect(jsonc.plugin).toEqual([
+          "alpha",
+          "beta",
+          "context-mode",
+        ]);
+
+        // The sibling opencode.json must be UNCHANGED.
+        const jsonSibling = JSON.parse(
+          readFileSync(join(globalConfDir, "opencode.json"), "utf-8"),
+        );
+        expect(jsonSibling).toEqual({
+          plugin: ["alpha", "beta", "context-mode"],
+        });
+
+        rmSync(root, { recursive: true, force: true });
+      });
+
       it("validates hooks with jsonc config shows correct error message", () => {
         const root = mkdtempSync(join(tmpdir(), "opencode-adapter-"));
         const dir = join(root, "project");
