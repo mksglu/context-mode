@@ -2439,7 +2439,7 @@ function extractIntent(message: string): SessionEvent[] {
  * unlike `intent`, which stores only the coarse mode (investigate/implement)
  * and discards the goal text. Triggered by the `/goal <text>` command or an
  * explicit `goal:` / `objective:` marker, so the FULL goal text is preserved
- * (priority 4 = critical in the DB eviction contract) and restored at the top
+ * (priority 1 = critical in the DB eviction contract) and restored at the top
  * of the resume snapshot.
  * Without this, a `/goal` directive is lost across compaction/resume.
  */
@@ -2457,7 +2457,7 @@ function extractGoal(message: string): SessionEvent[] {
     type: "goal",
     category: "goal",
     data: safeString(goalText),
-    priority: 4,
+    priority: 1,
   }];
 }
 
