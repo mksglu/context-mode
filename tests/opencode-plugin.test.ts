@@ -60,6 +60,34 @@ describe("ContextModePlugin", () => {
     } catch { /* cleanup best effort */ }
   });
 
+  // ── OpenCode 2 compatibility (V1/V2 dual export) ──────
+  // OpenCode 2's plugin loader ignores the V1 `{ id, server }` shape
+  // entirely (opencode.ai/v2/docs/migrate-v1: "V1 plugin implementations
+  // do not run in V2") and instead requires a default export produced by
+  // `Plugin.define({ id, setup })` from `@opencode/plugin`. Verified against
+  // a real opencode@2.0.3 install: the plain `{ id, server }` object is
+  // silently skipped, while `Plugin.define({ id, setup })` loads and its
+  // setup() runs. This does not exercise setup() itself (that requires a
+  // live OpenCode 2 host) — it locks in the export *shape* OpenCode 2's
+  // loader inspects, per its own "support V1 and V2 from one package"
+  // pattern (opencode.ai/v2/docs/build/plugins#support-v1).
+  describe("OpenCode 2 plugin export shape", () => {
+    it("default export keeps the V1 { id, server } shape for OpenCode 1.x/KiloCode", async () => {
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      expect(mod.default).toHaveProperty("id", "context-mode");
+      expect(typeof mod.default.server).toBe("function");
+    });
+
+    it("default export also carries a V2 setup() when @opencode/plugin is installed", async () => {
+      // Confirms the dual-export path actually ran Plugin.define(...) rather
+      // than silently falling back to V1-only (e.g. because the dependency
+      // failed to resolve in this test environment).
+      await import("@opencode/plugin");
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      expect(typeof (mod.default as any).setup).toBe("function");
+    });
+  });
+
   // ── Factory ───────────────────────────────────────────
 
   describe("factory", () => {
