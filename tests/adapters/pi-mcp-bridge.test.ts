@@ -24,7 +24,7 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -85,6 +85,97 @@ describe("resolveJsRuntimeForBridge — Pi fork-bomb guard (#516)", () => {
     });
 
     expect(resolved).toBe("C:\\bun\\bun.exe");
+  });
+});
+
+// Slice 1b — spawnability of the resolved runtime on Windows
+//
+// `detectRuntimes().javascript` reports a bare command name. On Windows
+// `child_process.spawn()` without `shell: true` routes through CreateProcess,
+// which executes real binaries only: npm-style installs (nvm4w, scoop, npm -g)
+// ship `bun` / `bun.cmd` / `bun.ps1` and no `bun.exe`, so spawning the bare
+// name fails with ENOENT. Node surfaces that on the child's `error` event,
+// which this bridge reported as "MCP server exited" — the bridge looked
+// crashed and every ctx_* tool stayed unregistered, with no diagnostic
+// anywhere because `pi.logger` is not part of every Pi build.
+describe("resolveJsRuntimeForBridge — Windows spawnability", () => {
+  const load = async () =>
+    (await import("../../src/adapters/pi/mcp-bridge.js")) as unknown as {
+      resolveJsRuntimeForBridge: (deps?: {
+        detect?: () => { javascript: string | null };
+        which?: (cmd: string) => string | null;
+        execPath?: string;
+        platform?: string;
+      }) => string | null;
+    };
+
+  it("skips `bun` when PATH only offers the extensionless shim, and uses node.exe", async () => {
+    const { resolveJsRuntimeForBridge } = await load();
+
+    const resolved = resolveJsRuntimeForBridge({
+      platform: "win32",
+      detect: () => ({ javascript: "bun" }),
+      // `where bun` lists the extensionless shim first on nvm4w installs.
+      which: (cmd) => {
+        if (cmd === "bun") return "C:\\nvm4w\\nodejs\\bun";
+        if (cmd === "node") return "C:\\nvm4w\\nodejs\\node.exe";
+        return null;
+      },
+      execPath: "C:\\nvm4w\\nodejs\\node.exe",
+    });
+
+    expect(resolved).toBe("C:\\nvm4w\\nodejs\\node.exe");
+  });
+
+  it("keeps bun when PATH resolves it to a real bun.exe", async () => {
+    const { resolveJsRuntimeForBridge } = await load();
+
+    const resolved = resolveJsRuntimeForBridge({
+      platform: "win32",
+      detect: () => ({ javascript: "bun" }),
+      which: (cmd) => (cmd === "bun" ? "C:\\Users\\me\\.bun\\bin\\bun.exe" : null),
+      execPath: "C:\\nvm4w\\nodejs\\node.exe",
+    });
+
+    expect(resolved).toBe("C:\\Users\\me\\.bun\\bin\\bun.exe");
+  });
+
+  it("returns null when every candidate is a non-executable shim", async () => {
+    const { resolveJsRuntimeForBridge } = await load();
+
+    const resolved = resolveJsRuntimeForBridge({
+      platform: "win32",
+      detect: () => ({ javascript: "bun" }),
+      which: (cmd) => (cmd === "bun" ? "C:\\nvm4w\\nodejs\\bun" : null),
+      execPath: "C:\\Program Files\\Pi\\pi.exe",
+    });
+
+    expect(resolved).toBeNull();
+  });
+
+  it("does not apply the .exe rule on POSIX", async () => {
+    const { resolveJsRuntimeForBridge } = await load();
+
+    const resolved = resolveJsRuntimeForBridge({
+      platform: "linux",
+      detect: () => ({ javascript: "bun" }),
+      which: () => null,
+      execPath: "/usr/local/bin/pi",
+    });
+
+    expect(resolved).toBe("bun");
+  });
+});
+
+describe("spawnExitError — carries the exit cause", () => {
+  it("includes the exit code, the signal, and falls back to 'unknown'", async () => {
+    const { spawnExitError } = (await import("../../src/adapters/pi/mcp-bridge.js")) as unknown as {
+      spawnExitError: (code: number | null, signal: NodeJS.Signals | null) => Error;
+    };
+
+    expect(spawnExitError(1, null).message).toBe("MCP server exited (code 1)");
+    expect(spawnExitError(null, "SIGKILL").message).toBe("MCP server exited (signal SIGKILL)");
+    expect(spawnExitError(null, null).message).toBe("MCP server exited (code unknown)");
   });
 });
 
@@ -182,7 +273,9 @@ describe("bootstrapMCPTools — no JS runtime + execPath is pi (#516)", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(stderrSpy).not.toHaveBeenCalled();
 
-    // No logger reachable -> drop silently, never throw, never touch stderr.
+    // No logger reachable -> never throws, never touches stderr. The line is
+    // persisted to `<pi config dir>/context-mode/bridge-diag.log` instead —
+    // see the dedicated assertion below.
     const diagNoLogger = makeBridgeDiag({ registerTool: vi.fn() });
     expect(() => diagNoLogger("anything", "warn")).not.toThrow();
     expect(stderrSpy).not.toHaveBeenCalled();
@@ -193,6 +286,34 @@ describe("bootstrapMCPTools — no JS runtime + execPath is pi (#516)", () => {
     expect(splitDiagLines("trailing\n")).toEqual(["trailing"]);
 
     stderrSpy.mockRestore();
+  });
+
+  it("persists to <pi config dir>/context-mode/bridge-diag.log when the host exposes no logger", async () => {
+    const { makeBridgeDiag } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    // Pin the config dir so the assertion cannot depend on the host's HOME.
+    const prevConfigDir = process.env.PI_CONFIG_DIR;
+    process.env.PI_CONFIG_DIR = scratch;
+    const logFile = join(scratch, "context-mode", "bridge-diag.log");
+
+    try {
+      // Pi builds whose extension API has no `logger` (0.85.x) used to lose
+      // this line entirely, leaving "ctx_* tools will not be callable" as the
+      // only symptom and no cause anywhere on disk.
+      makeBridgeDiag({ registerTool: vi.fn() })(
+        "[context-mode] WARNING: failed to bridge MCP tools to Pi (MCP server exited).",
+        "warn",
+      );
+
+      expect(existsSync(logFile)).toBe(true);
+      expect(readFileSync(logFile, "utf-8").includes("failed to bridge MCP tools to Pi")).toBe(true);
+      expect(stderrSpy).not.toHaveBeenCalled();
+    } finally {
+      if (prevConfigDir === undefined) delete process.env.PI_CONFIG_DIR;
+      else process.env.PI_CONFIG_DIR = prevConfigDir;
+      stderrSpy.mockRestore();
+    }
   });
 });
 
