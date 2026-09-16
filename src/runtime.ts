@@ -1,5 +1,6 @@
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
+import { win32 as winPath } from "node:path";
 import { JS_RUNTIMES } from "./adapters/types.js";
 
 /**
@@ -75,10 +76,139 @@ export interface RuntimeMap {
 
 const isWindows = process.platform === "win32";
 
+/**
+ * Directory listing used for in-process Windows PATH resolution (#1159).
+ *
+ * `where <cmd>` used to be the only way a command was resolved here, and each
+ * probe was a synchronous `execSync` through cmd.exe — two process creations
+ * per probe. `detectRuntimes()` issues 15-19 of them at module scope, before
+ * the MCP server can answer `initialize`. On hosts where process creation is
+ * instrumented (endpoint security / EDR / application control / sandboxing),
+ * that is a multi-second stall on the user's first prompt.
+ *
+ * Resolving a command on PATH is a pure filesystem question, so the index is
+ * built once and every probe is answered from memory.
+ */
+export interface WindowsPathIndex {
+  /** Search order: cwd first, then PATH entries. `names` keeps readdir order. */
+  dirs: { dir: string; names: string[] }[];
+  /** PATHEXT extensions, verbatim — `where` does not trim entries. */
+  exts: string[];
+}
+
+/** Inputs for building {@link WindowsPathIndex}; all default to the real host. */
+export interface WindowsPathIndexDeps {
+  env?: NodeJS.ProcessEnv;
+  cwd?: string;
+  readdir?: (
+    dir: string,
+    opts: { withFileTypes: true },
+  ) => { name: string; isDirectory(): boolean }[];
+}
+
+let winPathIndex: WindowsPathIndex | null = null;
+let whereOverride: ((cmd: string) => string[]) | null = null;
+
+/**
+ * Test-only: replace PATH resolution with a fixed listing, so
+ * `detectRuntimes()` can be exercised on any CI runner without creating real
+ * executables. Pass `null` to restore filesystem probing.
+ */
+export function __setWhereOnPathForTests(
+  fn: ((cmd: string) => string[]) | null,
+): void {
+  whereOverride = fn;
+  winPathIndex = null;
+}
+function buildWindowsPathIndex(deps: WindowsPathIndexDeps = {}): WindowsPathIndex {
+  const env = deps.env ?? process.env;
+  const cwd = deps.cwd ?? process.cwd();
+  const readdir = deps.readdir ?? readdirSync;
+
+  // PATHEXT verbatim: `where` does not trim entries, and an empty or unset
+  // PATHEXT matches extensionless files only — no default list is applied.
+  const exts = (env.PATHEXT ?? "").split(";").filter((e) => e.length > 0);
+
+  // `where` searches the current directory before PATH, and an empty PATH
+  // segment means the current directory — leading with cwd covers both.
+  const dirs = [cwd, ...(env.PATH ?? "").split(";")];
+
+  const entries: { dir: string; names: string[] }[] = [];
+  for (const raw of dirs) {
+    // Win32 strips trailing spaces and dots from path components. Do it
+    // explicitly so behaviour does not depend on the host filesystem's own
+    // normalization (the Windows path is also exercised from POSIX CI).
+    const dir = raw.replace(/[\s.]+$/, "");
+    if (dir.length === 0) continue;
+
+    let dirents: { name: string; isDirectory(): boolean }[];
+    try {
+      dirents = readdir(dir, { withFileTypes: true });
+    } catch {
+      continue; // unreadable / nonexistent PATH entry — `where` skips it too
+    }
+
+    const names: string[] = [];
+    // `!isDirectory()`, NOT `isFile()`: the Microsoft Store App Execution
+    // Alias stubs under %LOCALAPPDATA%\Microsoft\WindowsApps are symlinks
+    // whose statSync fails with EACCES, so Dirent.isFile() is false for them
+    // and they would be dropped — silently changing the #455 behaviour that
+    // exists to reason about those very stubs.
+    for (const d of dirents) if (!d.isDirectory()) names.push(d.name);
+    entries.push({ dir, names });
+  }
+
+  return { dirs: entries, exts };
+}
+
+function windowsPathIndex(deps?: WindowsPathIndexDeps): WindowsPathIndex {
+  if (deps) return buildWindowsPathIndex(deps);
+  if (winPathIndex) return winPathIndex;
+  winPathIndex = buildWindowsPathIndex();
+  return winPathIndex;
+}
+
+/**
+ * Filesystem-only equivalent of `where <cmd>`, in `where`'s order.
+ *
+ * Semantics preserved, each verified against the real `where.exe`:
+ *   - cwd is searched before PATH; an empty PATH segment means cwd
+ *   - every PATHEXT match in a directory is returned, not just the first
+ *   - within a directory the order is the directory's own listing order
+ *     (readdir), which is what `where` emits — NOT PATHEXT order
+ *   - directories are never returned, even when named `*.exe`
+ *   - matching is case-insensitive; returned paths keep on-disk casing
+ *   - an explicit extension in the query suppresses PATHEXT expansion
+ *   - subdirectories are not recursed into
+ */
+export function whereOnPath(cmd: string, deps?: WindowsPathIndexDeps): string[] {
+  const { dirs, exts } = windowsPathIndex(deps);
+  const cmdLower = cmd.toLowerCase();
+  const hasKnownExt = exts.some((e) => cmdLower.endsWith(e.toLowerCase()));
+  const wanted = new Set<string>([cmdLower]);
+  if (!hasKnownExt) for (const e of exts) wanted.add(cmdLower + e.toLowerCase());
+
+  const out: string[] = [];
+  for (const { dir, names } of dirs) {
+    for (const name of names) {
+      if (wanted.has(name.toLowerCase())) out.push(winPath.join(dir, name));
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve a command on Windows. Goes through the PATH index; the test-only
+ * override lets suites fix the listing without touching the filesystem.
+ */
+function where(cmd: string): string[] {
+  return (whereOverride ?? whereOnPath)(cmd);
+}
+
 function commandExists(cmd: string): boolean {
+  if (isWindows) return where(cmd).length > 0;
   try {
-    const check = isWindows ? `where ${cmd}` : `command -v ${cmd}`;
-    execSync(check, { stdio: "pipe" });
+    execSync(`command -v ${cmd}`, { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -95,16 +225,11 @@ function commandExists(cmd: string): boolean {
  */
 function runnableExists(cmd: string): boolean {
   if (isWindows) {
-    // Reject if every `where` hit lives under Microsoft\WindowsApps (Store stubs).
-    try {
-      const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe" });
-      const hits = out.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-      if (hits.length === 0) return false;
-      const realHits = hits.filter(p => !/\\Microsoft\\WindowsApps\\/i.test(p));
-      if (realHits.length === 0) return false;
-    } catch {
-      return false;
-    }
+    // Reject if every PATH hit lives under Microsoft\WindowsApps (Store stubs).
+    const hits = where(cmd);
+    if (hits.length === 0) return false;
+    const realHits = hits.filter(p => !/\\Microsoft\\WindowsApps\\/i.test(p));
+    if (realHits.length === 0) return false;
   } else if (!commandExists(cmd)) {
     return false;
   }
@@ -196,11 +321,9 @@ const KNOWN_GIT_BASH_PATHS = [
  * keeps MSYS path conversion) by preferring a matching known path that exists.
  */
 function resolveWindowsBash(): string | null {
-  let candidates: string[];
-  try {
-    const result = execSync("where bash", { encoding: "utf-8", stdio: "pipe" });
-    candidates = result.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-  } catch {
+  // #1159: resolve from the in-process PATH index rather than spawning `where`.
+  const candidates = where("bash");
+  if (candidates.length === 0) {
     // bash not on PATH → genuinely unavailable. Fall through to pwsh/etc.
     return null;
   }
