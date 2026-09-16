@@ -4,6 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RuntimeMap } from "../src/runtime.js";
 
+/**
+ * Windows command resolution no longer spawns `where` — it reads a PATH index
+ * built from the filesystem (#1159). Suites that used to assert on
+ * `execSync("where <cmd>")` now inject the listing directly via
+ * `__setWhereOnPathForTests`, which keeps the same "this command is/ isn't on
+ * PATH" shape without depending on the host's real PATH.
+ *
+ * Returns the mocked `whereOnPath` plus the `execSync`/`execFileSync` spies so
+ * a suite can still assert on the `--version` probe that is deliberately kept.
+ */
+function mockWhereOnPath(hits: Record<string, string[]>) {
+  const fn = vi.fn((cmd: string) => hits[cmd] ?? []);
+  return { whereOnPath: fn };
+}
+
 describe("runtime version reporting", () => {
   afterEach(() => {
     vi.resetModules();
@@ -187,8 +202,6 @@ describe("SHELL env var override", () => {
     delete process.env.SHELL;
 
     const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bash") throw new Error("no bash");
-      if (cmd === "where pwsh") return "C:\\Program Files\\PowerShell\\7\\pwsh.exe\r\n";
       if (cmd === '"pwsh" --version') return "v7.4.0\n";
       if (cmd === '"powershell" --version') return "v5.1.0\n";
       if (cmd === '"node" --version') return "v25.0.0\n";
@@ -199,18 +212,27 @@ describe("SHELL env var override", () => {
       throw new Error(`unmocked execFileSync: ${cmd}`);
     });
     vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync: vi.fn(() => false) };
+    });
 
     try {
       Object.defineProperty(process, "platform", { value: "win32", configurable: true });
       vi.resetModules();
-      const { detectRuntimes } = await import("../src/runtime.js");
-      const r = detectRuntimes();
+      const mod = await import("../src/runtime.js");
+      // #1159: PATH resolution is now an in-process index, not `where`.
+      mod.__setWhereOnPathForTests(
+        mockWhereOnPath({ pwsh: ["C:\\Program Files\\PowerShell\\7\\pwsh.exe"] }).whereOnPath,
+      );
+      const r = mod.detectRuntimes();
       expect(r.shell).toBe("pwsh");
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
       if (originalShell === undefined) delete process.env.SHELL;
       else process.env.SHELL = originalShell;
       vi.doUnmock("node:child_process");
+      vi.doUnmock("node:fs");
       vi.resetModules();
     }
   });
@@ -341,8 +363,11 @@ describe("SHELL env var override", () => {
 
     try {
       Object.defineProperty(process, "platform", { value: "win32", configurable: true });
-      const { detectRuntimes } = await import("../src/runtime.js");
-      const r = detectRuntimes();
+      const mod = await import("../src/runtime.js");
+      // #1159: nothing is on PATH, so bash/sh/pwsh/powershell all miss and
+      // detection falls through to cmd.exe.
+      mod.__setWhereOnPathForTests(mockWhereOnPath({}).whereOnPath);
+      const r = mod.detectRuntimes();
       expect(r.shell).toBe(cmd);
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
@@ -372,29 +397,30 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
     Object.defineProperty(process, "platform", { value: "win32", configurable: true });
   });
 
-  /** Build a child_process mock for runnableExists() probes.
+  /** Build the mocks for runnableExists() probes.
    *
-   * PR #537 (DEP0190 fix): on Windows, `runnableExists` now calls
-   *   execSync(`"${cmd}" --version`, …)
-   * for the version probe (string form, no args array), and `getVersion`
-   * does the same. So on win32, BOTH `where <cmd>` and the `"<cmd>" --version`
-   * probe are routed through `execSync`. `execFileSync` is no longer reached
-   * on the Windows code path.
+   * #1159: `where <cmd>` is no longer spawned — PATH resolution is an
+   * in-process filesystem index. The "is this command on PATH" half is
+   * injected via `whereOnPathResults`, and only the `"<cmd>" --version`
+   * probe (which must really execute the binary to catch MS Store App
+   * Execution Alias stubs) still goes through `execSync`.
+   *
+   * PR #537 (DEP0190 fix): on Windows the version probe is a quoted command
+   * string, so `execSync` — not `execFileSync` — is the reached path.
    */
   function mockChildProcess(opts: {
     whereResults: Record<string, string[] | "throw">;
     versionExits: Record<string, "ok" | "throw" | { code: number }>;
   }) {
+    // Translate the old `where <cmd>` mock shape into PATH hits. A "throw"
+    // entry means "not on PATH", i.e. an empty hit list.
+    const hits: Record<string, string[]> = {};
+    for (const [tool, result] of Object.entries(opts.whereResults)) {
+      hits[tool] = result === "throw" ? [] : result;
+    }
+    const whereOnPath = vi.fn((cmd: string) => hits[cmd] ?? []);
+
     const execSync = vi.fn((cmd: string) => {
-      // `where <tool>` and `command -v <tool>` (defensive) lookups.
-      const whereMatch = cmd.match(/^(?:where|command -v)\s+(.+)$/);
-      if (whereMatch) {
-        const tool = whereMatch[1].trim();
-        const result = opts.whereResults[tool];
-        if (result === undefined) throw new Error(`no mock for ${tool}`);
-        if (result === "throw") throw new Error(`not found: ${tool}`);
-        return result.join("\r\n") + "\r\n";
-      }
       // PR #537 Windows probe shape: `"<cmd>" --version` (cmd is quoted).
       const probeMatch = cmd.match(/^"([^"]+)"\s+--version$/);
       if (probeMatch) {
@@ -431,11 +457,28 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
       }
       return Buffer.from(`${cmd} 3.11.0\n`);
     });
-    return { execSync, execFileSync };
+    return { execSync, execFileSync, whereOnPath };
+  }
+
+  /** Install the mocks and import a fresh runtime module with PATH injected. */
+  async function loadRuntime(
+    mocks: ReturnType<typeof mockChildProcess>,
+  ) {
+    vi.doMock("node:child_process", () => ({
+      execSync: mocks.execSync,
+      execFileSync: mocks.execFileSync,
+    }));
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync: vi.fn(() => false) };
+    });
+    const mod = await import("../src/runtime.js");
+    mod.__setWhereOnPathForTests(mocks.whereOnPath);
+    return mod;
   }
 
   test("filters Microsoft\\WindowsApps stub when a real python3 also exists", async () => {
-    const { execSync, execFileSync } = mockChildProcess({
+    const mocks = mockChildProcess({
       whereResults: {
         python3: [
           "C:\\Users\\X\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe",
@@ -459,9 +502,8 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
       },
       versionExits: { python3: "ok" },
     });
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-
-    const { detectRuntimes } = await import("../src/runtime.js");
+    const { execSync } = mocks;
+    const { detectRuntimes } = await loadRuntime(mocks);
     const r = detectRuntimes();
 
     // python3 was found in PATH AND --version succeeded → runtime is "python3"
@@ -479,7 +521,7 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
   });
 
   test("rejects when every `where` hit is a WindowsApps stub", async () => {
-    const { execSync, execFileSync } = mockChildProcess({
+    const mocks = mockChildProcess({
       whereResults: {
         python3: ["C:\\Users\\X\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe"],
         python: ["C:\\Users\\X\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"],
@@ -500,19 +542,18 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
         elixir: "throw",
         "dotnet-script": "throw",
       },
-      // Probes must NOT be reached because all hits are stubs and `where` short-circuits.
+      // Probes must NOT be reached because all hits are stubs.
       versionExits: {},
     });
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-
-    const { detectRuntimes } = await import("../src/runtime.js");
+    const { execSync } = mocks;
+    const { detectRuntimes } = await loadRuntime(mocks);
     const r = detectRuntimes();
 
     expect(r.python).toBeNull();
     // PR #537: on Windows, --version probes are issued via execSync as
     // the string `"<cmd>" --version`. No probe should have been executed
-    // for python3/python (stubs filtered out before the probe). py threw at
-    // `where`, so it's also rejected without a probe.
+    // for python3/python (stubs filtered out before the probe). py was not
+    // on PATH, so it's also rejected without a probe.
     expect(execSync).not.toHaveBeenCalledWith('"python3" --version', expect.anything());
     expect(execSync).not.toHaveBeenCalledWith('"python" --version', expect.anything());
   });
@@ -521,7 +562,7 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
     // Defensive: even if a stub somehow slips past the path filter (e.g. user
     // installed a custom python3.exe under WindowsApps), exit code 9009 from
     // `<cmd> --version` must reject the runtime.
-    const { execSync, execFileSync } = mockChildProcess({
+    const mocks = mockChildProcess({
       whereResults: {
         python3: ["C:\\Custom\\python3.exe"], // not under WindowsApps
         python: "throw",
@@ -544,9 +585,8 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
       },
       versionExits: { python3: { code: 9009 } },
     });
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-
-    const { detectRuntimes } = await import("../src/runtime.js");
+    const { execSync } = mocks;
+    const { detectRuntimes } = await loadRuntime(mocks);
     const r = detectRuntimes();
 
     expect(r.python).toBeNull();
@@ -555,7 +595,7 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
   });
 
   test("falls back to `py` when python3 and python both fail", async () => {
-    const { execSync, execFileSync } = mockChildProcess({
+    const mocks = mockChildProcess({
       whereResults: {
         python3: "throw",
         python: "throw",
@@ -578,9 +618,8 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
       },
       versionExits: { py: "ok" },
     });
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-
-    const { detectRuntimes } = await import("../src/runtime.js");
+    const { execSync } = mocks;
+    const { detectRuntimes } = await loadRuntime(mocks);
     const r = detectRuntimes();
 
     expect(r.python).toBe("py");
@@ -661,12 +700,12 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
     const npmBunExe =
       "C:\\Users\\Test\\AppData\\Roaming\\npm\\node_modules\\bun\\bin\\bun.exe";
 
-    // `where bun` returns a `.cmd` shim — the broken case from #506.
-    const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bun") {
-        return "C:\\Users\\Test\\AppData\\Roaming\\npm\\bun.cmd\r\n";
-      }
-      throw new Error(`unmocked execSync: ${cmd}`);
+    // PATH resolves `bun` to a `.cmd` shim — the broken case from #506.
+    const whereOnPath = vi.fn((cmd: string) =>
+      cmd === "bun" ? ["C:\\Users\\Test\\AppData\\Roaming\\npm\\bun.cmd"] : [],
+    );
+    const execSync = vi.fn(() => {
+      throw new Error("unmocked execSync");
     });
     const execFileSync = vi.fn(() => Buffer.from("1.1.0\n"));
 
@@ -682,8 +721,9 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
       return { ...actual, existsSync };
     });
 
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const mod = await import("../src/runtime.js");
+    mod.__setWhereOnPathForTests(whereOnPath);
+    const r = mod.detectRuntimes();
 
     // detectRuntimes picks the JavaScript runtime: must be the absolute
     // .exe path, NOT the bare string "bun" (the bug regressed under #506).
@@ -693,9 +733,9 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
 
   test("still resolves the native ~/.bun/bin/bun.exe when both native and npm are present", async () => {
     const nativeBunExe = "C:\\Users\\Test\\.bun\\bin\\bun.exe";
-    const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bun") return `${nativeBunExe}\r\n`;
-      throw new Error(`unmocked execSync: ${cmd}`);
+    const whereOnPath = vi.fn((cmd: string) => (cmd === "bun" ? [nativeBunExe] : []));
+    const execSync = vi.fn(() => {
+      throw new Error("unmocked execSync");
     });
     const execFileSync = vi.fn(() => Buffer.from("1.1.0\n"));
 
@@ -708,8 +748,9 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
       return { ...actual, existsSync };
     });
 
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const mod = await import("../src/runtime.js");
+    mod.__setWhereOnPathForTests(whereOnPath);
+    const r = mod.detectRuntimes();
 
     expect(r.javascript).toBe(nativeBunExe);
   });
@@ -924,32 +965,52 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     });
   }
 
-  test("Windows OpenCode binary host (opencode.exe) falls back to 'node' on PATH", async () => {
-    stubExecPath("C:\\Users\\Test\\opencode.exe");
-
-    // No bun anywhere; commandExists("node") returns true. We don't
-    // stub process.platform here — commandExists uses whichever probe
-    // matches the test host (POSIX: `command -v`, Windows: `where`).
-    const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bun" || cmd === "command -v bun") throw new Error("bun not found");
-      if (cmd === "where node") return "C:\\Program Files\\nodejs\\node.exe\r\n";
-      if (cmd === "command -v node") return "/usr/local/bin/node\n";
-      // Other commandExists() probes (tsx, ts-node, ruby, go, …) → not found.
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
-    });
+  /**
+   * Install the child_process mock and, for the Windows path, the injected
+   * PATH index.
+   *
+   * `commandExists` is platform-split: on win32 it reads the in-process PATH
+   * index (#1159 — no more `where` spawn), on POSIX it still shells out to
+   * `command -v`. So Windows determinism comes from `whereHits`, POSIX
+   * determinism from the `execSync` mock. Both are needed because the suite
+   * runs on all three CI platforms.
+   */
+  async function loadRuntime(opts: {
+    whereHits: Record<string, string[]>;
+    execSync: (cmd: string) => string;
+    existsSync: (p: string | URL) => boolean;
+  }) {
+    const execSync = vi.fn(opts.execSync);
     const execFileSync = vi.fn(() => Buffer.from("ok\n"));
-    const existsSync = vi.fn(() => false); // no bun fallback paths exist
 
     vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
     vi.doMock("node:fs", async () => {
       const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
+      return { ...actual, existsSync: vi.fn(opts.existsSync) };
     });
 
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const mod = await import("../src/runtime.js");
+    const whereOnPath = vi.fn((cmd: string) => opts.whereHits[cmd] ?? []);
+    mod.__setWhereOnPathForTests(whereOnPath);
+    return mod;
+  }
+
+  test("Windows OpenCode binary host (opencode.exe) falls back to 'node' on PATH", async () => {
+    stubExecPath("C:\\Users\\Test\\opencode.exe");
+
+    // No bun anywhere; node is on PATH. The Windows index supplies node and
+    // nothing else; the POSIX branch uses the `command -v` mock.
+    const mod = await loadRuntime({
+      whereHits: { node: ["C:\\Program Files\\nodejs\\node.exe"] },
+      execSync: (cmd: string) => {
+        if (cmd === "command -v bun") throw new Error("bun not found");
+        if (cmd === "command -v node") return "/usr/local/bin/node\n";
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: () => false, // no bun fallback paths exist
+    });
+    const r = mod.detectRuntimes();
 
     // Must NOT return the opencode.exe path — that's the bug.
     expect(r.javascript).not.toBe("C:\\Users\\Test\\opencode.exe");
@@ -959,28 +1020,17 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
   test("POSIX OpenCode binary host (opencode) falls back to 'node' on PATH — cross-OS (not Windows-only)", async () => {
     stubExecPath("/usr/local/bin/opencode");
 
-    const execSync = vi.fn((cmd: string) => {
-      // commandExists uses `where <name>` on win32, `command -v <name>` elsewhere.
-      // Mock BOTH probe shapes so the test exercises the same fallback path on
-      // every CI runner (the test name says "cross-OS, not Windows-only").
-      if (cmd === "where bun") throw new Error("bun not found");
-      if (cmd === "where node") return "C:\\Program Files\\nodejs\\node.exe\n";
-      if (cmd === "command -v node") return "/usr/local/bin/node\n";
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
+    const mod = await loadRuntime({
+      whereHits: { node: ["C:\\Program Files\\nodejs\\node.exe"] },
+      execSync: (cmd: string) => {
+        if (cmd === "command -v bun") throw new Error("bun not found");
+        if (cmd === "command -v node") return "/usr/local/bin/node\n";
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: () => false,
     });
-    const execFileSync = vi.fn(() => Buffer.from("ok\n"));
-    const existsSync = vi.fn(() => false);
-
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-    vi.doMock("node:fs", async () => {
-      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
-    });
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const r = mod.detectRuntimes();
 
     expect(r.javascript).not.toBe("/usr/local/bin/opencode");
     expect(r.javascript).toBe("node");
@@ -989,25 +1039,16 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
   test("returns null when host is non-JS binary AND node is missing — surfaces actionable error", async () => {
     stubExecPath("/usr/local/bin/opencode");
 
-    const execSync = vi.fn((cmd: string) => {
-      // Nothing exists — no bun, no node, no other runtime.
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
+    // Nothing exists — no bun, no node, no other runtime.
+    const mod = await loadRuntime({
+      whereHits: {},
+      execSync: (cmd: string) => {
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: () => false,
     });
-    const execFileSync = vi.fn(() => {
-      throw new Error("not found");
-    });
-    const existsSync = vi.fn(() => false);
-
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-    vi.doMock("node:fs", async () => {
-      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
-    });
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const r = mod.detectRuntimes();
 
     expect(r.javascript).toBeNull();
   });
@@ -1022,23 +1063,16 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     // disk, so the existsSync guard passes and execPath is returned.
     stubExecPath("/snap/node/current/bin/node");
 
-    const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bun") throw new Error("bun not found");
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
+    const mod = await loadRuntime({
+      whereHits: {},
+      execSync: (cmd: string) => {
+        if (cmd === "command -v bun") throw new Error("bun not found");
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: (p: string | URL) => String(p) === "/snap/node/current/bin/node",
     });
-    const execFileSync = vi.fn(() => Buffer.from("ok\n"));
-    const existsSync = vi.fn((p: string) => p === "/snap/node/current/bin/node");
-
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-    vi.doMock("node:fs", async () => {
-      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
-    });
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const r = mod.detectRuntimes();
 
     // Snap path returned verbatim — NOT collapsed to bare "node" (would
     // re-invoke the snap wrapper, the original #190 bug).
@@ -1053,26 +1087,17 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     // demote a bun execPath.
     stubExecPath("/home/user/.bun/bin/bun");
 
-    const execSync = vi.fn((cmd: string) => {
-      // bunExists() — make `where bun` / `command -v bun` succeed so
-      // bunCommand() returns the bun path itself.
-      if (cmd === "where bun") return "/home/user/.bun/bin/bun\n";
-      if (cmd === "command -v bun") return "/home/user/.bun/bin/bun\n";
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
+    // bun is on PATH, so bunExists()/bunCommand() take the bun branch.
+    const mod = await loadRuntime({
+      whereHits: { bun: ["/home/user/.bun/bin/bun"] },
+      execSync: (cmd: string) => {
+        if (cmd === "command -v bun") return "/home/user/.bun/bin/bun\n";
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: (p: string | URL) => String(p) === "/home/user/.bun/bin/bun",
     });
-    const execFileSync = vi.fn(() => Buffer.from("1.1.0\n"));
-    const existsSync = vi.fn((p: string) => p === "/home/user/.bun/bin/bun");
-
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-    vi.doMock("node:fs", async () => {
-      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
-    });
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const r = mod.detectRuntimes();
 
     // bun branch fires first; javascript should be a bun runtime (not
     // collapsed to bare "node" even though basename(execPath) === "bun").
@@ -1086,31 +1111,22 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     // The liveness guard must fall through to PATH-resolved "node".
     stubExecPath("/opt/homebrew/Cellar/node/26.0.0/bin/node");
 
-    const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bun") throw new Error("bun not found");
-      if (cmd === "command -v node") return "/opt/homebrew/bin/node\n";
-      if (cmd === "where node") return "C:\\Program Files\\nodejs\\node.exe\n";
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
-    });
-    const execFileSync = vi.fn(() => Buffer.from("ok\n"));
-    // Cellar path is deleted; bun fallback paths don't exist (simulate no-bun host).
-    // Cross-platform: bunFallbackPaths returns POSIX paths (/.bun/bin/bun) and
-    // Windows paths (\\.bun\\bin\\bun.exe, \\bun\\bin\\bun.exe) — all must be
-    // blocked so bunExists() returns false and PATH node is resolved.
+    // Cellar path is deleted; bun fallback paths don't exist (simulate no-bun
+    // host), but node IS on PATH.
     const CELLAR_PATH = "/opt/homebrew/Cellar/node/26.0.0/bin/node";
     const BUN_PATH_RE = /[\/\\]\.?bun[\/\\]bin[\/\\]bun/;
-    const existsSync = vi.fn((p: string) => p !== CELLAR_PATH && !BUN_PATH_RE.test(p));
-
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-    vi.doMock("node:fs", async () => {
-      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
+    const mod = await loadRuntime({
+      whereHits: { node: ["C:\\Program Files\\nodejs\\node.exe"] },
+      execSync: (cmd: string) => {
+        if (cmd === "command -v bun") throw new Error("bun not found");
+        if (cmd === "command -v node") return "/opt/homebrew/bin/node\n";
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: (p: string | URL) =>
+        String(p) !== CELLAR_PATH && !BUN_PATH_RE.test(String(p)),
     });
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const r = mod.detectRuntimes();
 
     // Must NOT return the stale Cellar path — that's the bug.
     expect(r.javascript).not.toBe("/opt/homebrew/Cellar/node/26.0.0/bin/node");
@@ -1124,25 +1140,17 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     // actionable error instead of a cryptic spawn ENOENT.
     stubExecPath("/opt/homebrew/Cellar/node/26.0.0/bin/node");
 
-    const execSync = vi.fn((cmd: string) => {
-      if (cmd === "where bun") throw new Error("bun not found");
-      if (/^command -v\s/.test(cmd)) throw new Error("not found");
-      if (/^where\s/.test(cmd)) throw new Error("not found");
-      throw new Error(`unmocked execSync: ${cmd}`);
+    // Worst case: no node on PATH either.
+    const mod = await loadRuntime({
+      whereHits: {},
+      execSync: (cmd: string) => {
+        if (cmd === "command -v bun") throw new Error("bun not found");
+        if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        throw new Error(`unmocked execSync: ${cmd}`);
+      },
+      existsSync: () => false, // Nothing exists — no Cellar, no bun
     });
-    const execFileSync = vi.fn(() => {
-      throw new Error("not found");
-    });
-    const existsSync = vi.fn(() => false); // Nothing exists — no Cellar, no bun
-
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-    vi.doMock("node:fs", async () => {
-      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-      return { ...actual, existsSync };
-    });
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    const r = detectRuntimes();
+    const r = mod.detectRuntimes();
 
     expect(r.javascript).toBeNull();
   });
@@ -1174,5 +1182,222 @@ describe("detectRuntimes — JS runtime fallback for in-process plugin hosts (#7
     expect(summary).toMatch(/JavaScript/);
     expect(summary).toMatch(/not available|install/i);
     expect(summary).not.toMatch(/JavaScript: null/);
+  });
+});
+// ─────────────────────────────────────────────────────────
+// #1159: `where <cmd>` used to be the only Windows PATH resolution path, at
+// two process creations per probe and 15-19 probes per `detectRuntimes()`.
+// `whereOnPath()` replaces it with an in-process index.
+//
+// These tests pin the `where` semantics that must be preserved. Each
+// expectation was verified against the real `where.exe` on Windows; the
+// assertions run on every CI platform by injecting the directory listing, so
+// they do not depend on the host's actual PATH.
+// ─────────────────────────────────────────────────────────
+describe("whereOnPath — in-process Windows PATH resolution (#1159)", () => {
+  const WINDOWS_PATHEXT = ".COM;.EXE;.BAT;.CMD";
+  /** Sentinel for "leave PATHEXT unset" (distinct from "use the default"). */
+  const UNSET = "\u0000unset";
+
+  /** Fake directory listing: dir -> entry names (all treated as files). */
+  function makeReaddir(filesByDir: Record<string, string[]>) {
+    return (dir: string) =>
+      (filesByDir[dir] ?? []).map((name) => ({
+        name,
+        isDirectory: () => false,
+      }));
+  }
+
+  /** Build the injection deps for `whereOnPath`. */
+  function index(
+    filesByDir: Record<string, string[]>,
+    {
+      path,
+      cwd,
+      pathext = WINDOWS_PATHEXT,
+    }: { path: string; cwd: string; pathext?: string },
+  ) {
+    const env: NodeJS.ProcessEnv = { PATH: path };
+    // Callers that want PATHEXT *unset* pass the sentinel below; `undefined`
+    // here means "use the default", which is what most cases want.
+    if (pathext !== UNSET) env.PATHEXT = pathext;
+    return { env, cwd, readdir: makeReaddir(filesByDir) };
+  }
+
+  test("returns every PATHEXT match in a directory, not just the first", async () => {
+    // `where docker` really returns both docker and docker.exe; `where code`
+    // returns code and code.cmd. Stopping at the first extension drops hits.
+    const { whereOnPath } = await import("../src/runtime.js");
+    const got = whereOnPath(
+      "dup",
+      index({ "C:\\A": ["dup.exe", "dup.cmd"] }, { path: "C:\\A", cwd: "C:\\EMPTY" }),
+    );
+    expect(got).toHaveLength(2);
+    expect(got.map((p) => p.toLowerCase()).sort()).toEqual([
+      "c:\\a\\dup.cmd",
+      "c:\\a\\dup.exe",
+    ]);
+  });
+
+  test("keeps directory listing order within a directory, not PATHEXT order", async () => {
+    // Real `where` emits readdir order. Changing PATHEXT order does NOT
+    // reorder the output — so the implementation must not loop over PATHEXT.
+    const { whereOnPath } = await import("../src/runtime.js");
+    const listing = ["z.bat", "z.cmd", "z.com", "z.exe"];
+    const a = whereOnPath(
+      "z",
+      index({ "C:\\A": listing }, { path: "C:\\A", cwd: "C:\\E", pathext: ".COM;.EXE;.BAT;.CMD" }),
+    );
+    const b = whereOnPath(
+      "z",
+      index({ "C:\\A": listing }, { path: "C:\\A", cwd: "C:\\E", pathext: ".CMD;.BAT;.EXE;.COM" }),
+    );
+    expect(a.map((p) => p.toLowerCase())).toEqual([
+      "c:\\a\\z.bat",
+      "c:\\a\\z.cmd",
+      "c:\\a\\z.com",
+      "c:\\a\\z.exe",
+    ]);
+    expect(b).toEqual(a);
+  });
+
+  test("searches cwd before PATH", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const got = whereOnPath(
+      "same",
+      index(
+        { "C:\\CWD": ["same.exe"], "C:\\P1": ["same.exe"] },
+        { path: "C:\\P1", cwd: "C:\\CWD" },
+      ),
+    );
+    expect(got.map((p) => p.toLowerCase())).toEqual(["c:\\cwd\\same.exe", "c:\\p1\\same.exe"]);
+  });
+
+  test("an empty PATH segment resolves to cwd, and cwd is not searched twice", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const got = whereOnPath(
+      "only",
+      index({ "C:\\CWD": ["only.exe"] }, { path: ";;", cwd: "C:\\CWD" }),
+    );
+    // cwd is prepended explicitly, so the empty segments must not duplicate it.
+    expect(got.map((p) => p.toLowerCase())).toEqual(["c:\\cwd\\only.exe"]);
+  });
+
+  test("never returns a directory, even one named *.exe", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const deps = {
+      env: { PATH: "C:\\A", PATHEXT: WINDOWS_PATHEXT } as NodeJS.ProcessEnv,
+      cwd: "C:\\EMPTY",
+      readdir: (dir: string) =>
+        dir === "C:\\A"
+          ? [
+              { name: "dirnamed.exe", isDirectory: () => true },
+              { name: "real.exe", isDirectory: () => false },
+            ]
+          : [],
+    };
+    expect(whereOnPath("dirnamed", deps)).toEqual([]);
+    expect(whereOnPath("real", deps)).toHaveLength(1);
+  });
+
+  test("keeps symlink entries — the Store App Execution Alias case (#455)", async () => {
+    // %LOCALAPPDATA%\Microsoft\WindowsApps stubs are symlinks whose statSync
+    // fails EACCES, so Dirent.isFile() is false for them. Filtering on
+    // isFile() would silently drop them; !isDirectory() keeps them.
+    const { whereOnPath } = await import("../src/runtime.js");
+    const windowsApps = "C:\\Users\\X\\AppData\\Local\\Microsoft\\WindowsApps";
+    const deps = {
+      env: { PATH: windowsApps, PATHEXT: WINDOWS_PATHEXT } as NodeJS.ProcessEnv,
+      cwd: "C:\\EMPTY",
+      readdir: (dir: string) =>
+        dir === windowsApps
+          ? [
+              // isFile() === false (symlink/EACCES), isDirectory() === false
+              { name: "python3.exe", isDirectory: () => false },
+            ]
+          : [],
+    };
+    expect(whereOnPath("python3", deps)).toEqual([
+      "C:\\Users\\X\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe",
+    ]);
+  });
+
+  test("case-insensitive match, on-disk casing preserved in the result", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const deps = index({ "C:\\A": ["MixedCase.EXE"] }, { path: "C:\\A", cwd: "C:\\E" });
+    expect(whereOnPath("mixedcase", deps)).toEqual(["C:\\A\\MixedCase.EXE"]);
+    expect(whereOnPath("MIXEDCASE", deps)).toEqual(["C:\\A\\MixedCase.EXE"]);
+  });
+
+  test("an explicit extension in the query suppresses PATHEXT expansion", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const deps = index({ "C:\\A": ["tool.exe", "tool.cmd"] }, { path: "C:\\A", cwd: "C:\\E" });
+    expect(whereOnPath("tool.exe", deps).map((p) => p.toLowerCase())).toEqual(["c:\\a\\tool.exe"]);
+  });
+
+  test("unset or empty PATHEXT matches extensionless files only — no default list", async () => {
+    // Real `where` applies no fallback: with PATHEXT unset, only a bare
+    // extensionless file matches. A `|| ".COM;.EXE;.BAT;.CMD"` default would
+    // change the result set.
+    const { whereOnPath } = await import("../src/runtime.js");
+    for (const pathext of [UNSET, ""]) {
+      const deps = index(
+        { "C:\\A": ["bare", "bare.exe"] },
+        { path: "C:\\A", cwd: "C:\\E", pathext },
+      );
+      expect(whereOnPath("bare", deps).map((p) => p.toLowerCase())).toEqual(["c:\\a\\bare"]);
+    }
+  });
+
+  test("does not recurse into subdirectories", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const deps = {
+      env: { PATH: "C:\\A", PATHEXT: WINDOWS_PATHEXT } as NodeJS.ProcessEnv,
+      cwd: "C:\\EMPTY",
+      readdir: (dir: string) =>
+        dir === "C:\\A"
+          ? [
+              { name: "sub", isDirectory: () => true },
+              { name: "top.exe", isDirectory: () => false },
+            ]
+          : [],
+    };
+    expect(whereOnPath("nested", deps)).toEqual([]);
+    expect(whereOnPath("top", deps)).toHaveLength(1);
+  });
+
+  test("an unreadable PATH entry is skipped, not fatal", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const deps = {
+      env: { PATH: "C:\\MISSING;C:\\A", PATHEXT: WINDOWS_PATHEXT } as NodeJS.ProcessEnv,
+      cwd: "C:\\EMPTY",
+      readdir: (dir: string) => {
+        if (dir === "C:\\MISSING") throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+        return dir === "C:\\A" ? [{ name: "found.exe", isDirectory: () => false }] : [];
+      },
+    };
+    expect(whereOnPath("found", deps)).toHaveLength(1);
+  });
+
+  test("returns [] for a command that is nowhere on PATH", async () => {
+    const { whereOnPath } = await import("../src/runtime.js");
+    const deps = index({ "C:\\A": ["present.exe"] }, { path: "C:\\A", cwd: "C:\\E" });
+    expect(whereOnPath("absent", deps)).toEqual([]);
+  });
+
+  test("does not spawn a child process to resolve a command (#1159 regression)", async () => {
+    // The whole point of the change: PATH resolution must be filesystem-only.
+    const { whereOnPath } = await import("../src/runtime.js");
+    const execSync = vi.fn(() => {
+      throw new Error("whereOnPath must not spawn a child process");
+    });
+    vi.doMock("node:child_process", () => ({ execSync, execFileSync: vi.fn() }));
+    try {
+      const deps = index({ "C:\\A": ["x.exe"] }, { path: "C:\\A", cwd: "C:\\E" });
+      expect(whereOnPath("x", deps)).toHaveLength(1);
+      expect(execSync).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock("node:child_process");
+    }
   });
 });
