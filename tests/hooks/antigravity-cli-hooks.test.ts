@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { fromAgy } from "../../hooks/antigravity-cli/payload.mjs";
+import { fromAgy, extractUserRequest, getLatestUserPromptFromTranscript } from "../../hooks/antigravity-cli/payload.mjs";
 
 const REPO = resolve(__dirname, "..", "..");
 const SID = "agy-hook-session";
@@ -176,6 +176,37 @@ describe("antigravity-cli hooks", () => {
       expect(input.tool_name).toBe(expectedTool);
       expect(input.tool_input).toHaveProperty(expectedField);
     }
+  });
+
+  test("extractUserRequest extracts text from USER_REQUEST tags and falls back to trimmed prose", () => {
+    expect(extractUserRequest("<USER_REQUEST>\nuse vite instead of webpack\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\ntime: now\n</ADDITIONAL_METADATA>")).toBe("use vite instead of webpack");
+    expect(extractUserRequest("<USER_REQUEST>remember this decision</USER_REQUEST>")).toBe("remember this decision");
+    expect(extractUserRequest("  plain prompt without tags  ")).toBe("plain prompt without tags");
+    expect(extractUserRequest("")).toBe("");
+    expect(extractUserRequest(null)).toBe("");
+  });
+
+  test("getLatestUserPromptFromTranscript returns the most recent USER_INPUT from transcript.jsonl", () => {
+    const transcriptFile = join(home, "transcript.jsonl");
+    expect(getLatestUserPromptFromTranscript(transcriptFile)).toBeNull();
+    expect(getLatestUserPromptFromTranscript("/non/existent/path.jsonl")).toBeNull();
+
+    writeFileSync(transcriptFile, "");
+    expect(getLatestUserPromptFromTranscript(transcriptFile)).toBeNull();
+
+    const lines = [
+      JSON.stringify({ step_index: 0, type: "USER_INPUT", content: "<USER_REQUEST>first prompt</USER_REQUEST>" }),
+      JSON.stringify({ step_index: 1, type: "PLANNER_RESPONSE", content: "response 1" }),
+      JSON.stringify({ step_index: 2, type: "GENERIC", content: "tool output" }),
+      JSON.stringify({ step_index: 3, type: "USER_INPUT", content: "<USER_REQUEST>second decision prompt</USER_REQUEST>\n<ADDITIONAL_METADATA>meta</ADDITIONAL_METADATA>" }),
+      JSON.stringify({ step_index: 4, type: "PLANNER_RESPONSE", content: "response 2" }),
+    ];
+    writeFileSync(transcriptFile, lines.join("\n") + "\n");
+
+    const result = getLatestUserPromptFromTranscript(transcriptFile);
+    expect(result).not.toBeNull();
+    expect(result?.prompt).toBe("second decision prompt");
+    expect(result?.stepIndex).toBe(3);
   });
 
   test("PostToolUse normalizes agy run_command payloads and captures git events", () => {
