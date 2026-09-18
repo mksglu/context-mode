@@ -381,7 +381,7 @@ Google Antigravity is an AI-powered IDE by Google/DeepMind. It shares the `~/.ge
 
 **Hook Paradigm:** MCP for tools + JSON stdin/stdout hooks
 
-The standalone Antigravity CLI (`agy`) is the command-line companion to Google Antigravity. Unlike the Antigravity IDE, `agy` has a **native plugin system** (`agy plugin install|import`) and a hook surface (`~/.gemini/config/hooks.json`). context-mode ships as a first-class agy plugin (`configs/antigravity-cli/`) bundling the MCP server, a routing rule, a routing skill, and bounded `PreToolUse`/`PostToolUse`/`Stop` hooks. It shares the `~/.gemini/` session root with the rest of the Gemini family; `agy` reads its **global** MCP profile from `~/.gemini/config/mcp_config.json` (not the IDE's `~/.gemini/antigravity/mcp_config.json`).
+The standalone Antigravity CLI (`agy`) is the command-line companion to Google Antigravity. Unlike the Antigravity IDE, `agy` has a **native plugin system** (`agy plugin install|import`) and a hook surface (`~/.gemini/config/hooks.json`). context-mode ships as a first-class agy plugin (`configs/antigravity-cli/`) bundling the MCP server, a routing rule, a routing skill, and bounded `PreToolUse`/`PostToolUse`/`PreInvocation`/`Stop` hooks. It shares the `~/.gemini/` session root with the rest of the Gemini family; `agy` reads its **global** MCP profile from `~/.gemini/config/mcp_config.json` (not the IDE's `~/.gemini/antigravity/mcp_config.json`).
 
 **Verified:** agy 1.0.10 (Linux). The GitHub-subpath install requires **agy ≥ 1.0.7** (subpath + branch resolution landed in 1.0.7 — run `agy update` to upgrade). No agy hook event was added, removed, or renamed through 1.0.10, and the shared `~/.gemini/config/hooks.json` location has been canonical since agy 1.0.8, so the bundle's `PreToolUse`/`PostToolUse`/`Stop` wiring is current.
 
@@ -916,7 +916,7 @@ The dispatcher resolves the hook script relative to the installed package and dy
 | `kimi` | `pretooluse`, `posttooluse`, `precompact`, `sessionstart`, `userpromptsubmit`, `stop` |
 | `qwen-code` | `pretooluse`, `posttooluse`, `precompact`, `sessionstart`, `userpromptsubmit` |
 | `copilot-cli` | `pretooluse`, `posttooluse`, `precompact`, `sessionstart`, `userpromptsubmit`, `stop` |
-| `antigravity-cli` | `pretooluse`, `posttooluse`, `stop` |
+| `antigravity-cli` | `pretooluse`, `posttooluse`, `preinvocation`, `stop` |
 | `kiro` | `pretooluse`, `posttooluse` |
 
 OpenCode, KiloCode, and OpenClaw use a TS plugin paradigm (no command dispatcher). Pi and OMP register hooks through their own host APIs rather than the CLI dispatcher; Antigravity IDE and Zed are MCP-only (no hooks).
