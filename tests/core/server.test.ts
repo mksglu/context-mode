@@ -12,7 +12,7 @@
  */
 
 import { strict as assert } from "node:assert";
-import { spawn, spawnSync, execSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, execSync, execFileSync, type ChildProcess } from "node:child_process";
 import {
   chmodSync,
   writeFileSync,
@@ -3355,8 +3355,29 @@ describe("runBatchCommands edge cases", () => {
 
   test("buildBatchNodeOptionsPrefix formats POSIX shell assignment", () => {
     const prefix = buildBatchNodeOptionsPrefix("bash", "/tmp/cm fs'preload.js");
-    expect(prefix).toBe("NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js' ");
+    expect(prefix).toBe("export NODE_OPTIONS='--require /tmp/cm fs'\\''preload.js'; ");
   });
+
+  // #1117: an inline `NODE_OPTIONS=… cmd` prefix is a bash syntax error before
+  // compound commands and never reaches later commands in a chain.
+  test.skipIf(process.platform === "win32")(
+    "POSIX prefix keeps compound commands valid and reaches every command in a chain",
+    () => {
+      const prefix = buildBatchNodeOptionsPrefix("bash", "/tmp/cm-fs-preload.js");
+      const run = (cmd: string) =>
+        execFileSync("bash", ["-c", prefix + cmd], {
+          encoding: "utf8",
+          env: { ...process.env, NODE_OPTIONS: "" },
+        }).trim();
+
+      expect(run("for p in a b; do printf %s $p; done")).toBe("ab");
+      expect(run("while false; do :; done; echo ok")).toBe("ok");
+      expect(run("if true; then echo yes; fi")).toBe("yes");
+      expect(run("{ echo grouped; }")).toBe("grouped");
+      expect(run('true && echo "$NODE_OPTIONS"')).toBe("--require /tmp/cm-fs-preload.js");
+      expect(run('echo x | sh -c \'echo "$NODE_OPTIONS"\'')).toBe("--require /tmp/cm-fs-preload.js");
+    },
+  );
 
   test("buildBatchNodeOptionsPrefix formats PowerShell assignment", () => {
     const prefix = buildBatchNodeOptionsPrefix(
