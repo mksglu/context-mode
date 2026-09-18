@@ -411,6 +411,84 @@ describe("antigravity-cli hooks", () => {
     db.close();
   });
 
+  test("PreInvocation extracts user prompt from transcript and captures decision events", () => {
+    const transcriptFile = join(home, "transcript.jsonl");
+    const lines = [
+      JSON.stringify({ step_index: 0, type: "USER_INPUT", content: "<USER_REQUEST>don't use npm, use bun instead</USER_REQUEST>" }),
+    ];
+    writeFileSync(transcriptFile, lines.join("\n") + "\n");
+
+    const r = dispatch(
+      "preinvocation.mjs",
+      {
+        conversationId: SID,
+        workspacePaths: [CWD],
+        transcriptPath: transcriptFile,
+        invocationNum: 1,
+      },
+      home,
+    );
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout.trim())).toEqual({});
+
+    const db = openDB(home);
+    const prompts = db.prepare("select type, category, data, source_hook from session_events where type = 'user_prompt'").all() as Array<{
+      type: string;
+      category: string;
+      data: string;
+      source_hook: string;
+    }>;
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toMatchObject({
+      type: "user_prompt",
+      data: "don't use npm, use bun instead",
+      source_hook: "PreInvocation",
+    });
+
+    const decisions = db.prepare("select category, source_hook from session_events where category = 'decision'").all() as Array<{
+      category: string;
+      source_hook: string;
+    }>;
+    expect(decisions.length).toBeGreaterThanOrEqual(1);
+    expect(decisions[0].source_hook).toBe("PreInvocation");
+
+    // Invocation 2: should not duplicate
+    const r2 = dispatch(
+      "preinvocation.mjs",
+      {
+        conversationId: SID,
+        workspacePaths: [CWD],
+        transcriptPath: transcriptFile,
+        invocationNum: 2,
+      },
+      home,
+    );
+    expect(r2.status).toBe(0);
+    const promptsAfter = db.prepare("select count(*) as count from session_events where type = 'user_prompt'").get() as { count: number };
+    expect(promptsAfter.count).toBe(1);
+
+    db.close();
+  });
+
+  test("PreInvocation fails open on missing transcript or malformed stdin", () => {
+    const r1 = dispatch("preinvocation.mjs", "not-json{{", home);
+    expect(r1.status).toBe(0);
+    expect(JSON.parse(r1.stdout.trim())).toEqual({});
+
+    const r2 = dispatch(
+      "preinvocation.mjs",
+      {
+        conversationId: SID,
+        workspacePaths: [CWD],
+        transcriptPath: "/non/existent/transcript.jsonl",
+        invocationNum: 1,
+      },
+      home,
+    );
+    expect(r2.status).toBe(0);
+    expect(JSON.parse(r2.stdout.trim())).toEqual({});
+  });
+
   test("PreToolUse fails open on malformed stdin", () => {
     const r = dispatch("pretooluse.mjs", "not-json{{", home);
     expect(r.status).toBe(0);
