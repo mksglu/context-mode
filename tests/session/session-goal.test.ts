@@ -18,6 +18,7 @@ import { describe, test } from "vitest";
 import { SessionDB } from "../../src/session/db.js";
 import { extractUserEvents } from "../../src/session/extract.js";
 import { buildResumeSnapshot, type StoredEvent } from "../../src/session/snapshot.js";
+import { EventPriority } from "../../src/types.js";
 
 function makeEvent(
   overrides: Partial<StoredEvent> & Pick<StoredEvent, "type" | "category">,
@@ -53,7 +54,7 @@ describe("capture: extractGoal", () => {
 
   test("a /goal directive has critical priority under the DB eviction contract", () => {
     const ev = extractUserEvents("/goal keep tests green").find((e) => e.category === "goal");
-    assert.equal(ev?.priority, 4);
+    assert.equal(ev?.priority, EventPriority.CRITICAL);
   });
 });
 

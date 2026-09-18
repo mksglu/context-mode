@@ -134,14 +134,14 @@ export interface ResumeSnapshot {
 // ─────────────────────────────────────────────────────────
 
 /**
- * Priority levels for SessionEvent records. Higher numbers are more important
- * and are retained when the snapshot budget is tight.
+ * Priority levels for SessionEvent records. Lower numbers are more important
+ * and are retained when the event store reaches its capacity.
  */
 export const EventPriority = {
-  LOW: 1,
-  NORMAL: 2,
-  HIGH: 3,
-  CRITICAL: 4,
+  LOW: 4,
+  NORMAL: 3,
+  HIGH: 2,
+  CRITICAL: 1,
 } as const;
 
 export type EventPriorityLevel = (typeof EventPriority)[keyof typeof EventPriority];
