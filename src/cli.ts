@@ -136,6 +136,7 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     pretooluse: "hooks/antigravity-cli/pretooluse.mjs",
     posttooluse: "hooks/antigravity-cli/posttooluse.mjs",
     stop: "hooks/antigravity-cli/stop.mjs",
+    preinvocation: "hooks/antigravity-cli/preinvocation.mjs",
   },
   "kimi": {
     pretooluse: "hooks/kimi/pretooluse.mjs",
