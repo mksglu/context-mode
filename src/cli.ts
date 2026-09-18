@@ -69,6 +69,7 @@ function browserOpenArgv(
 // ── Adapter imports ──────────────────────────────────────
 import { detectPlatform, getAdapter } from "./adapters/detect.js";
 import { isInProcessPluginPlatform } from "./adapters/types.js";
+import { charSafePrefix } from "./truncate.js";
 
 /* -------------------------------------------------------
  * Hook dispatcher — `context-mode hook <platform> <event>`
@@ -615,7 +616,7 @@ async function searchCommand(argv: string[]): Promise<number> {
       }
       for (const [i, r] of results.entries()) {
         const content = r.content.replace(/\s+/g, " ").trim();
-        const snippet = content.length > 500 ? `${content.slice(0, 500)}...` : content;
+        const snippet = content.length > 500 ? `${charSafePrefix(content, 500)}...` : content;
         console.log(`## ${i + 1}. ${r.title}`);
         console.log(`Source: ${r.source}`);
         console.log(`Type: ${r.contentType}`);
@@ -795,7 +796,7 @@ async function doctor(): Promise<number> {
       p.log.success(color.green("Server test: PASS"));
     } else {
       criticalFails++;
-      const detail = result.stderr?.trim() ? ` (${result.stderr.trim().slice(0, 200)})` : "";
+      const detail = result.stderr?.trim() ? ` (${charSafePrefix(result.stderr.trim(), 200)})` : "";
       p.log.error(
         color.red("Server test: FAIL") + ` — exit ${result.exitCode}${detail}`,
       );
