@@ -35,13 +35,8 @@
     ],
     "PreInvocation": [
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "context-mode hook antigravity-cli preinvocation"
-          }
-        ]
+        "type": "command",
+        "command": "context-mode hook antigravity-cli preinvocation"
       }
     ]
   }
