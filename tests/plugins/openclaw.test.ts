@@ -578,7 +578,7 @@ describe("OpenClawPlugin", () => {
       expect(result?.appendSystemContext).toContain("Default to context-mode for ALL commands.");
     });
 
-    it("has priority 5", async () => {
+    it("uses OpenClaw hook-order priority 5, separate from SessionEvent priority", async () => {
       const mock = await createTestPlugin(join(tempDir, "prompt-priority"));
       const promptHook = mock.lifecycle.find(
         (l) => l.event === "before_prompt_build" && l.opts?.priority === 5,
