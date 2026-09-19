@@ -13,21 +13,23 @@
  * with absolute paths using `process.execPath` and forward slashes.
  */
 
-import { describe, test, expect, afterEach } from "vitest";
+import { describe, test, expect, afterEach, beforeEach } from "vitest";
 import {
   mkdtempSync,
   rmSync,
   writeFileSync,
   readFileSync,
   mkdirSync,
+  symlinkSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, delimiter } from "node:path";
 import { tmpdir } from "node:os";
 import {
   needsHookNormalization,
   normalizeHooksJson,
   normalizePluginJson,
   normalizeHooksOnStartup,
+  resolveStableInterpreterPath,
 } from "../../hooks/normalize-hooks.mjs";
 
 const cleanups: string[] = [];
@@ -506,5 +508,205 @@ describe("normalize-hooks survives a version bump (#604)", () => {
     );
     expect(healedV136).toContain("/1.0.136/");
     expect(healedV136).not.toContain("/1.0.135/");
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Slice 6: prefer a stable interpreter path over a version-manager
+// snapshot (#1090)
+//
+// process.execPath can itself be a versioned snapshot (Homebrew Cellar,
+// nvm, asdf, mise). Baking that verbatim into hooks.json / plugin.json
+// dangles the moment the version manager deletes the old version dir —
+// and unlike the sibling read-time liveness guards (#800/#803, #841),
+// nothing can self-heal `mcpServers.command` afterwards: the process
+// that would run the heal is the MCP server itself, which is exactly
+// what fails to spawn once the path is gone.
+// ─────────────────────────────────────────────────────────
+
+describe("resolveStableInterpreterPath (#1090)", () => {
+  let base: string;
+  let cellarNode: string;
+  let stableDir: string;
+  let originalPath: string | undefined;
+
+  beforeEach(() => {
+    base = makeTmp();
+    // Simulate a Homebrew-style layout:
+    //   <base>/Cellar/node/26.8.2/bin/node   <- versioned snapshot (execPath)
+    //   <base>/bin/node -> ../Cellar/...      <- stable, unversioned symlink
+    const cellarBin = join(base, "Cellar", "node", "26.8.2", "bin");
+    mkdirSync(cellarBin, { recursive: true });
+    cellarNode = join(cellarBin, "node");
+    writeFileSync(cellarNode, "#!/bin/sh\n");
+
+    stableDir = join(base, "bin");
+    mkdirSync(stableDir, { recursive: true });
+    symlinkSync(cellarNode, join(stableDir, "node"));
+
+    originalPath = process.env.PATH;
+  });
+
+  afterEach(() => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+  });
+
+  test("prefers the stable PATH sibling when it resolves to the same binary", () => {
+    process.env.PATH = stableDir;
+
+    const result = resolveStableInterpreterPath(cellarNode);
+
+    expect(result).toBe(join(stableDir, "node"));
+    expect(result).not.toBe(cellarNode);
+  });
+
+  test("leaves execPath unchanged when it is not version-pinned in the first place", () => {
+    const plain = join(base, "bin", "node");
+    process.env.PATH = stableDir;
+
+    expect(resolveStableInterpreterPath(plain)).toBe(plain);
+  });
+
+  test("leaves execPath unchanged when no stable sibling exists on PATH (nvm/asdf, PR #582)", () => {
+    // nvm/asdf pin PATH itself to the versioned install dir — there is no
+    // unversioned alias to fall back to. The pinned path must be preserved
+    // so bare "node" is never substituted (PR #582's fix for /bin/sh PATH).
+    process.env.PATH = [join(base, "some", "other", "dir")].join(delimiter);
+
+    expect(resolveStableInterpreterPath(cellarNode)).toBe(cellarNode);
+  });
+
+  test("does not substitute a same-named binary that resolves to a DIFFERENT real file", () => {
+    // A decoy `node` earlier on PATH that happens to share the basename but
+    // is not the same interpreter must never be treated as "stable".
+    const decoyDir = join(base, "decoy", "bin");
+    mkdirSync(decoyDir, { recursive: true });
+    writeFileSync(join(decoyDir, "node"), "#!/bin/sh\necho decoy\n");
+
+    process.env.PATH = decoyDir; // no genuine stable sibling on PATH
+
+    expect(resolveStableInterpreterPath(cellarNode)).toBe(cellarNode);
+  });
+
+  test("skips a PATH candidate that is itself version-pinned and keeps looking", () => {
+    // A second versioned snapshot (e.g. an old nvm alias earlier on PATH)
+    // is not "stable" even if it happens to resolve to the same binary —
+    // prefer the later, genuinely unversioned entry.
+    const otherVersionedDir = join(
+      base,
+      "nvm",
+      "versions",
+      "node",
+      "v26.8.2",
+      "bin",
+    );
+    mkdirSync(otherVersionedDir, { recursive: true });
+    symlinkSync(cellarNode, join(otherVersionedDir, "node"));
+
+    process.env.PATH = [otherVersionedDir, stableDir].join(delimiter);
+
+    expect(resolveStableInterpreterPath(cellarNode)).toBe(
+      join(stableDir, "node"),
+    );
+  });
+});
+
+describe("normalizeHooksOnStartup persists a stable path, not the version-pinned snapshot (#1090)", () => {
+  let base: string;
+  let cellarNode: string;
+  let stableDir: string;
+  let originalPath: string | undefined;
+
+  beforeEach(() => {
+    base = makeTmp();
+    const cellarBin = join(base, "Cellar", "node", "26.8.2", "bin");
+    mkdirSync(cellarBin, { recursive: true });
+    cellarNode = join(cellarBin, "node");
+    writeFileSync(cellarNode, "#!/bin/sh\n");
+
+    stableDir = join(base, "bin");
+    mkdirSync(stableDir, { recursive: true });
+    symlinkSync(cellarNode, join(stableDir, "node"));
+
+    originalPath = process.env.PATH;
+    process.env.PATH = stableDir;
+  });
+
+  afterEach(() => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+  });
+
+  test("plugin.json mcpServers.command is the stable sibling, not the Cellar path that dies on upgrade", () => {
+    const pluginRoot = makeTmp();
+    mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+    const pluginPath = join(pluginRoot, ".claude-plugin", "plugin.json");
+    writeFileSync(
+      pluginPath,
+      JSON.stringify(
+        {
+          name: "context-mode",
+          mcpServers: {
+            "context-mode": {
+              command: "node",
+              args: ["${CLAUDE_PLUGIN_ROOT}/start.mjs"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    normalizeHooksOnStartup({
+      pluginRoot,
+      nodePath: cellarNode,
+      platform: "linux",
+    });
+
+    const parsed = JSON.parse(readFileSync(pluginPath, "utf-8"));
+    const command = parsed.mcpServers["context-mode"].command;
+    // This is the #1090 bug: pre-fix, `command` is the versioned Cellar
+    // path verbatim — dead the moment `brew upgrade node && brew cleanup`
+    // runs, with no self-heal possible (the MCP server that would re-run
+    // this normalization is the very process that fails to spawn).
+    expect(command).not.toBe(cellarNode);
+    expect(command).toBe(join(stableDir, "node"));
+  });
+
+  test("hooks.json commands are also the stable sibling", () => {
+    const pluginRoot = makeTmp();
+    mkdirSync(join(pluginRoot, "hooks"), { recursive: true });
+    const hooksPath = join(pluginRoot, "hooks", "hooks.json");
+    writeFileSync(
+      hooksPath,
+      JSON.stringify({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: "",
+              hooks: [
+                {
+                  type: "command",
+                  command:
+                    'node "${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart.mjs"',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    normalizeHooksOnStartup({
+      pluginRoot,
+      nodePath: cellarNode,
+      platform: "linux",
+    });
+
+    const after = readFileSync(hooksPath, "utf-8");
+    expect(after).not.toContain(cellarNode.replace(/\\/g, "/"));
+    expect(after).toContain(join(stableDir, "node").replace(/\\/g, "/"));
   });
 });
