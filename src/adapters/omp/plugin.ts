@@ -2,13 +2,14 @@
  * Oh My Pi (OMP) plugin entry point for context-mode.
  *
  * Mirrors the Pi extension shape (`src/adapters/pi/extension.ts`) for
- * the four OMP hook events that materially protect the context window
- * and persist session continuity:
+ * the OMP hook events that protect the context window and persist session
+ * continuity:
  *
  *   - session_start         — initialize the session row in our DB
- *   - tool_call             — hard-block curl/wget/inline-HTTP in bash
- *   - tool_result           — extract structured events into the session DB
+ *   - tool_call             — route broad analysis and block inline HTTP
+ *   - tool_result           — bound direct output and extract session events
  *   - session_before_compact — persist a resume snapshot before compaction
+ *   - turn_end              — persist per-turn token and cost usage
  *
  * Loaded by OMP via the `omp` (or `pi`) field in package.json — see
  * upstream loader at refs/platforms/oh-my-pi/packages/coding-agent/src/
@@ -35,6 +36,8 @@ import type { HookInput } from "../../session/extract.js";
 import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
 import { OMPAdapter } from "./index.js";
+import { classifyOmpToolCall, limitOmpToolResult } from "./routing-guard.js";
+import type { ToolResultReplacement } from "./routing-guard.js";
 import { parseOmpUsage } from "./usage.js";
 
 // ── Tool-name normalization ─────────────────────────────
@@ -49,22 +52,6 @@ const OMP_TOOL_MAP: Record<string, string> = {
   list: "Glob",
   view: "Read",
 };
-
-// ── Routing patterns ─────────────────────────────────────
-// Inline HTTP client patterns to hard-block in bash. Identical to the
-// Pi extension list (src/adapters/pi/extension.ts:42). One unrouted
-// curl can dump 56 KB into context.
-const BLOCKED_BASH_PATTERNS: RegExp[] = [
-  /\bcurl\s/,
-  /\bwget\s/,
-  /\bfetch\s*\(/,
-  /\brequests\.get\s*\(/,
-  /\brequests\.post\s*\(/,
-  /\bhttp\.get\s*\(/,
-  /\bhttp\.request\s*\(/,
-  /\burllib\.request/,
-  /\bInvoke-WebRequest\b/,
-];
 
 // ── Module-level singletons ──────────────────────────────
 // Same shape as Pi: one DB per process, session ID rebound on each
@@ -235,7 +222,7 @@ export interface MinimalHookAPI {
   on(event: "session_start", handler: HookHandler<{ type: "session_start" }>): void;
   on(event: "session_before_compact", handler: HookHandler<{ type: "session_before_compact" }>): void;
   on(event: "tool_call", handler: HookHandler<ToolCallEvent, ToolCallEventResult>): void;
-  on(event: "tool_result", handler: HookHandler<ToolResultEvent>): void;
+  on(event: "tool_result", handler: HookHandler<ToolResultEvent, ToolResultReplacement>): void;
   // turn_end carries a single per-turn AssistantMessage with `.usage`/`.model`
   // (refs/.../extensibility/shared-events.ts:204-208). agent_end carries
   // `messages: AssistantMessage[]` (:191-194) — both flow through parseOmpUsage.
@@ -247,9 +234,9 @@ export interface MinimalHookAPI {
 
 /**
  * OMP plugin default export. Called once by the OMP runtime per
- * upstream `extensibility/plugins/loader.ts` after `omp plugin install
- * context-mode`. Subsequent `pi.on(...)` registrations route the four
- * lifecycle events to our SessionDB-backed handlers below.
+ * upstream `extensibility/plugins/loader.ts` after `omp plugin install context-mode`.
+ * Subsequent `pi.on(...)` registrations route lifecycle events to the
+ * SessionDB-backed handlers below.
  */
 export default function ompPlugin(pi: MinimalHookAPI): void {
   // OMP upstream uses PI_-prefixed env vars only (verified against
@@ -279,40 +266,21 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
     return undefined;
   });
 
-  // ── 2. tool_call — pre-tool-call hard-block ───────────
-  // Returning `{block: true, reason}` per
-  // refs/.../hooks/types.ts:566 (ToolCallEventResult) terminates the
-  // tool call with the reason surfaced to the LLM.
+  // ── 2. tool_call — routing enforcement ─────────────────
+  // The guard covers broad analysis, inline HTTP, and oversized-output
+  // fallbacks while leaving scoped reads, edits, and unknown tools alone.
   pi.on("tool_call", (event) => {
-    try {
-      const toolName = String(event?.toolName ?? "").toLowerCase();
-      if (toolName !== "bash") return undefined;
-
-      const command = String((event?.input as { command?: unknown } | undefined)?.command ?? "");
-      if (!command) return undefined;
-
-      const isBlocked = BLOCKED_BASH_PATTERNS.some((p) => p.test(command));
-      if (isBlocked) {
-        return {
-          block: true,
-          reason:
-            "Use context-mode MCP tools (ctx_execute, ctx_fetch_and_index) instead of inline HTTP. " +
-            "curl/wget/fetch dump raw HTTP into the context window.",
-        };
-      }
-    } catch {
-      // routing failure → allow passthrough
-    }
-    return undefined;
+    return classifyOmpToolCall(event, { cwd: projectDir });
   });
 
-  // ── 3. tool_result — post-tool-call event capture ─────
-  // OMP `tool_result` payload (refs/.../hooks/types.ts:461 onward) is
-  // `{toolName, toolCallId, input, content[], isError}`. We adapt to
-  // the Claude Code-shaped HookInput consumed by extractEvents.
+  // ── 3. tool_result — output bound + event capture ───────
+  // Apply the model-facing bound before the session guard so a malformed or
+  // sessionless call cannot bypass the fallback limiter. Persist the original
+  // result for session search; only the returned value is bounded.
   pi.on("tool_result", (event) => {
+    const replacement = limitOmpToolResult(event);
     try {
-      if (!_sessionId) return undefined;
+      if (!_sessionId) return replacement;
 
       const rawToolName = String(event?.toolName ?? "");
       const mappedToolName = OMP_TOOL_MAP[rawToolName.toLowerCase()] ?? rawToolName;
@@ -335,9 +303,9 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
         db.insertEvent(_sessionId, ev as SessionEvent, "PostToolUse");
       }
     } catch {
-      // best effort
+      // best effort — never break a tool result or its replacement
     }
-    return undefined;
+    return replacement;
   });
 
   // ── 4. session_before_compact — resume snapshot ───────
