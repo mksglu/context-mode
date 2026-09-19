@@ -83,7 +83,7 @@ Restart Claude Code (or run `/reload-plugins`).
 
 All checks should show `[x]`. The doctor validates runtimes, hooks, FTS5, and plugin registration.
 
-**Routing:** Automatic. The SessionStart hook injects routing instructions at runtime — no file is written to your project. The plugin registers all hooks (PreToolUse, PostToolUse, UserPromptSubmit, PreCompact, SessionStart, Stop) and 11 MCP tools — six sandbox tools (`ctx_batch_execute`, `ctx_execute`, `ctx_execute_file`, `ctx_index`, `ctx_search`, `ctx_fetch_and_index`) plus five meta-tools (`ctx_stats`, `ctx_doctor`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`).
+**Routing:** Automatic. The SessionStart hook injects routing instructions at runtime — no file is written to your project. The plugin registers all hooks (PreToolUse, PostToolUse, UserPromptSubmit, PreCompact, SessionStart, Stop) and 12 MCP tools — six sandbox tools (`ctx_batch_execute`, `ctx_execute`, `ctx_execute_file`, `ctx_index`, `ctx_search`, `ctx_fetch_and_index`) plus six meta-tools (`ctx_stats`, `ctx_doctor`, `ctx_upgrade`, `ctx_purge`, `ctx_forget`, `ctx_insight`).
 
 | Slash Command | What it does |
 |---|---|
@@ -1172,6 +1172,7 @@ npm install -g context-mode
 | `ctx_doctor` | Diagnose installation: runtimes, hooks, FTS5, versions. | — |
 | `ctx_upgrade` | Upgrade to latest version from GitHub, rebuild, reconfigure hooks. | — |
 | `ctx_purge` | Permanently deletes all indexed content from the knowledge base. | — |
+| `ctx_forget` | Delete one indexed source by label, or list indexed sources. Narrower than ctx_purge. | — |
 
 ## How the Sandbox Works
 

@@ -1473,6 +1473,20 @@ export class ContentStore {
     }>;
   }
 
+  deleteSource(label: string): { existed: boolean; deletedChunks: number } {
+    const meta = this.getSourceMeta(label);
+    const deletedChunks = meta?.chunkCount ?? 0;
+    withRetry(() => {
+      const tx = this.#db.transaction(() => {
+        this.#stmtDeleteChunksByLabel.run(label);
+        this.#stmtDeleteChunksTrigramByLabel.run(label);
+        this.#stmtDeleteSourcesByLabel.run(label);
+      });
+      tx();
+    });
+    return { existed: meta !== null, deletedChunks };
+  }
+
   /**
    * Aggregate snapshot of the persistent content store. Returns total
    * chunk count, source count, and the most recent indexed_at timestamp.
