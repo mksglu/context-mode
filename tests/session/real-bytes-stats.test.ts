@@ -103,7 +103,7 @@ function seed(
 }
 
 describe("getConversationWindowStats (v1.0.169 live-window framing)", () => {
-  test("splits the worktree: kept-out = whole worktree moved minus THIS window's retrieval; With = this session only", () => {
+  test("scopes to THIS session only: sub-agent sessions in the same worktree are not credited to the live window", () => {
     const dir = mkSessionsDir();
     const hash = "feedfacefeedface";
     const db = dbPathFor(dir, hash);
@@ -126,13 +126,15 @@ describe("getConversationWindowStats (v1.0.169 live-window framing)", () => {
 
     // "With context-mode" = ONLY what entered the live window (main's retrieval).
     expect(r.bytesReturned).toBe(10_000);
-    // "kept out" = whole worktree moved (600k+1.9M avoided + 510k retrieval)
-    //              minus the 10k that landed in the live window = 3,000,000.
-    expect(r.bytesAvoided).toBe(3_000_000);
-    // The bar's "Without context-mode" = avoided + returned = total worktree
-    // bytes moved = 3,010,000. Sub-agent retrieval is credited as kept-out,
-    // not charged to the user's window.
-    expect(r.bytesAvoided + r.bytesReturned).toBe(3_010_000);
+    // Honest-savings fix: "kept out" counts only redirects recorded for THIS
+    // session_id. The sub-agent's 1.9M avoided + 500k retrieval belong to its
+    // own disposable window — crediting them here inflated sessions that
+    // never called a ctx_* tool (a zero-ctx session showed MBs "kept out").
+    expect(r.bytesAvoided).toBe(600_000);
+    // The bar's "Without context-mode" = this session's avoided + returned.
+    expect(r.bytesAvoided + r.bytesReturned).toBe(610_000);
+    // Savings estimate follows the same scope: avoided / 4.
+    expect(r.totalSavedTokens).toBe(Math.floor(600_000 / 4));
   });
 
   test("excludes the user's OTHER parallel worktrees (different cwd-hash = different DB file)", () => {
@@ -176,11 +178,11 @@ describe("getRealBytesStats (Phase 8 renderer source-of-truth)", () => {
     expect(r.bytesAvoided).toBe(30_000);
     expect(r.bytesReturned).toBe(5_000);
     expect(r.snapshotBytes).toBe(8_000);
-    // totalSavedTokens = (eventDataBytes + bytesAvoided + snapshotBytes) / 4
-    // (bytesReturned is "what the model already paid for" — don't add)
-    const expectedTokens = Math.floor((r.eventDataBytes + r.bytesAvoided + r.snapshotBytes) / 4);
-    expect(r.totalSavedTokens).toBe(expectedTokens);
-    expect(r.totalSavedTokens).toBeGreaterThan(9_000); // ≈ 9_500
+    // Honest-savings fix: totalSavedTokens = bytesAvoided / 4 only.
+    // eventDataBytes and snapshotBytes are analytics/resume infrastructure
+    // that never enters the context window; bytesReturned is what the model
+    // already paid for. None of them are savings.
+    expect(r.totalSavedTokens).toBe(Math.floor(r.bytesAvoided / 4)); // 7_500
   });
 
   test("8.1b conversation tier: 'With context-mode' folds ONLY retrieval tool returns, not sandbox work-output", () => {
@@ -339,7 +341,7 @@ describe("getRealBytesStats (Phase 8 renderer source-of-truth)", () => {
     expect(getContentBytesForSession("no-such-session", contentDbPath)).toBe(0);
   });
 
-  test("8.9 getRealBytesStats with contentDbPath folds chunk bytes into bytesAvoided + totalSavedTokens", () => {
+  test("8.9 getRealBytesStats with contentDbPath reports chunk bytes as contentBytes, NOT as bytesAvoided", () => {
     const dir = mkSessionsDir();
     const sid = `int-${randomUUID()}`;
     const dbPath = dbPathFor(dir, "cafebabecafebabe");
@@ -365,8 +367,13 @@ describe("getRealBytesStats (Phase 8 renderer source-of-truth)", () => {
     const baseline = getRealBytesStats({ sessionId: sid, sessionsDir: dir });
     const withChunks = getRealBytesStats({ sessionId: sid, sessionsDir: dir, contentDbPath });
 
-    expect(withChunks.bytesAvoided).toBeGreaterThan(baseline.bytesAvoided + 9_000);
-    expect(withChunks.totalSavedTokens).toBeGreaterThan(baseline.totalSavedTokens + 2_000);
+    // Honest-savings fix: indexed chunks are content captured for recall —
+    // the original bytes already entered the context window through the tool
+    // result that produced them, so they are NOT savings. They surface as
+    // contentBytes for the "indexed for recall" metric only.
+    expect(withChunks.contentBytes).toBeGreaterThan(9_000);
+    expect(withChunks.bytesAvoided).toBe(baseline.bytesAvoided);
+    expect(withChunks.totalSavedTokens).toBe(baseline.totalSavedTokens);
     // bytesReturned untouched — content DB doesn't represent re-served bytes.
     expect(withChunks.bytesReturned).toBe(baseline.bytesReturned);
   });
