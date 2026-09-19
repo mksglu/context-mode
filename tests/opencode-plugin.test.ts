@@ -60,6 +60,152 @@ describe("ContextModePlugin", () => {
     } catch { /* cleanup best effort */ }
   });
 
+  // ── OpenCode 2 compatibility (V1/V2 dual export) ──────
+  // OpenCode 2's plugin loader ignores the V1 `{ id, server }` shape
+  // entirely (opencode.ai/v2/docs/migrate-v1: "V1 plugin implementations
+  // do not run in V2") and instead requires a default export produced by
+  // `Plugin.define({ id, setup })` from `@opencode/plugin`. Verified against
+  // a real opencode@2.0.3 install: the plain `{ id, server }` object is
+  // silently skipped, while `Plugin.define({ id, setup })` loads and its
+  // setup() runs. This does not exercise setup() itself (that requires a
+  // live OpenCode 2 host) — it locks in the export *shape* OpenCode 2's
+  // loader inspects, per its own "support V1 and V2 from one package"
+  // pattern (opencode.ai/v2/docs/build/plugins#support-v1).
+  describe("OpenCode 2 plugin export shape", () => {
+    it("default export keeps the V1 { id, server } shape for OpenCode 1.x/KiloCode", async () => {
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      expect(mod.default).toHaveProperty("id", "context-mode");
+      expect(typeof mod.default.server).toBe("function");
+    });
+
+    it("default export also carries a V2 setup() when @opencode/plugin is installed", async () => {
+      // Confirms the dual-export path actually ran Plugin.define(...) rather
+      // than silently falling back to V1-only (e.g. because the dependency
+      // failed to resolve in this test environment).
+      await import("@opencode/plugin");
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      expect(typeof (mod.default as any).setup).toBe("function");
+    });
+
+    // Runs the real V2 setup() against a minimal fake OpenCode 2 context and
+    // records what it registers. Two things only a live host exposed:
+    // - `editor.add` defaults to `codemode: true`, which keeps a tool out of the
+    //   model's direct tool list (reachable only through the `execute` tool's
+    //   catalog), while routing enforcement tells the model to call ctx_* tools
+    //   directly;
+    // - the redirect messages and routing block name tools via
+    //   `createToolNamer(platform)`, so registration must use the same names or
+    //   the model is pointed at tools that do not exist.
+    it("V2 setup() registers ctx_* tools as direct tools under the routed names", async () => {
+      await import("@opencode/plugin");
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      const { createToolNamer } = await import("../hooks/core/tool-naming.mjs");
+      const namer = createToolNamer("opencode");
+
+      type Added = { name: string; options?: { codemode?: boolean; namespace?: string } };
+      const added: Added[] = [];
+      const controller = new AbortController();
+      const ctx = {
+        location: { directory: tempDir },
+        tool: {
+          transform: async (fn: (editor: unknown) => unknown) => {
+            await fn({ add: (tool: Added) => added.push(tool) });
+          },
+          hook: async () => {},
+        },
+        session: { hook: async () => {} },
+        event: {
+          subscribe: () => ({
+            async *[Symbol.asyncIterator]() {
+              await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+            },
+          }),
+        },
+      };
+
+      const dispose = await (mod.default as any).setup(ctx);
+      try {
+        expect(added.length).toBeGreaterThan(0);
+        for (const tool of added) {
+          expect(tool.options?.codemode).toBe(false);
+        }
+        // OpenCode 2 shows `<namespace>_<name>` to the model: that visible name
+        // must be exactly the routed name for every registered tool.
+        for (const tool of added) {
+          const visible = tool.options?.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name;
+          expect(tool.name.startsWith("ctx_")).toBe(true);
+          expect(visible).toBe(namer(tool.name));
+        }
+        expect(added.map((t) => t.name)).toContain("ctx_execute");
+      } finally {
+        controller.abort();
+        if (typeof dispose === "function") await dispose();
+      }
+    });
+  });
+
+  // Routing (hooks/core/routing.mjs) only redirects curl/wget/large output when
+  // isMCPReady() finds a live readiness sentinel -- written by the stdio MCP
+  // server's main(). With native V2 tools there is no MCP server, so unless the
+  // plugin marks itself ready, routing silently depends on some unrelated
+  // context-mode MCP process (e.g. another client's) happening to be alive.
+  describe("OpenCode 2 readiness sentinel", () => {
+    it("V2 setup() writes a readiness sentinel for its own process and removes it on dispose", async () => {
+      const sentinelDir = mkdtempSync(join(tmpdir(), "cm-v2-sentinel-"));
+      const prev = process.env.CONTEXT_MODE_MCP_SENTINEL_DIR;
+      process.env.CONTEXT_MODE_MCP_SENTINEL_DIR = sentinelDir;
+      const sentinel = join(sentinelDir, `context-mode-mcp-ready-${process.pid}`);
+      const controller = new AbortController();
+      try {
+        await import("@opencode/plugin");
+        const mod = await import("../src/adapters/opencode/plugin.js");
+        const ctx = {
+          location: { directory: tempDir },
+          tool: { transform: async (fn: (e: unknown) => unknown) => { await fn({ add: () => {} }); }, hook: async () => {} },
+          session: { hook: async () => {} },
+          event: {
+            subscribe: () => ({
+              async *[Symbol.asyncIterator]() {
+                await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+              },
+            }),
+          },
+        };
+        expect(existsSync(sentinel)).toBe(false);
+        const dispose = await (mod.default as any).setup(ctx);
+        expect(existsSync(sentinel)).toBe(true);
+        const { isMCPReady } = await import("../hooks/core/mcp-ready.mjs");
+        expect(isMCPReady()).toBe(true);
+        controller.abort();
+        await dispose();
+        expect(existsSync(sentinel)).toBe(false);
+      } finally {
+        controller.abort();
+        if (prev === undefined) delete process.env.CONTEXT_MODE_MCP_SENTINEL_DIR;
+        else process.env.CONTEXT_MODE_MCP_SENTINEL_DIR = prev;
+        rmSync(sentinelDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("v2ToolIdentity", () => {
+    it("maps a <prefix>_<tool> namer onto OpenCode 2's namespace option", async () => {
+      const { v2ToolIdentity } = await import("../src/adapters/opencode/plugin.js");
+      expect(v2ToolIdentity("ctx_execute", (t) => `context-mode_${t}`)).toEqual({
+        name: "ctx_execute",
+        namespace: "context-mode",
+      });
+    });
+
+    it("uses any other namer shape verbatim, with no namespace", async () => {
+      const { v2ToolIdentity } = await import("../src/adapters/opencode/plugin.js");
+      expect(v2ToolIdentity("ctx_execute", (t) => t)).toEqual({ name: "ctx_execute" });
+      expect(v2ToolIdentity("ctx_execute", (t) => `mcp__context-mode__${t}`)).toEqual({
+        name: "mcp__context-mode__ctx_execute",
+      });
+    });
+  });
+
   // ── Factory ───────────────────────────────────────────
 
   describe("factory", () => {
