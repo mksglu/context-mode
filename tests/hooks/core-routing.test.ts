@@ -167,6 +167,88 @@ describe("routePreToolUse", () => {
       expect(result).toBeNull();
     });
 
+    it("allows curl | head on bounded output", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | head -c 200",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows curl | jq on bounded output", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | jq -r .name",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows curl | grep -c on bounded output", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | grep -c ok",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows curl | wc -l on bounded output", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | wc -l",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("blocks curl | cat because it is still unbounded", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("blocks curl |& cat because it is still unbounded", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com |& cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("blocks curl piped to an absolute-path cat", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | /bin/cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("blocks curl piped to cat through the shell builtin", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com | command cat",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("allows backslash-continued piped curl command", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com \\\n  | jq -r .name",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows multi-line curl output-bound and safe sibling commands", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl -s https://example.com -o /tmp/out.json\ncat /tmp/out.json",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("blocks multi-line block when a line has unbounded curl", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl https://example.com\ndate",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
     it("blocks curl -o - (stdout alias)", () => {
       const result = routePreToolUse("Bash", {
         command: "curl -s -o - https://example.com",
