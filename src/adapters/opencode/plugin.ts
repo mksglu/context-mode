@@ -630,6 +630,7 @@ async function createContextModePlugin(ctx: PluginContext) {
         const stats = db.getSessionStats(sessionId);
         const snapshot = buildResumeSnapshot(events, {
           compactCount: (stats?.compact_count ?? 0) + 1,
+          searchTool: toolNamer("ctx_search"),
         });
 
         db.upsertResume(sessionId, snapshot, events.length);
