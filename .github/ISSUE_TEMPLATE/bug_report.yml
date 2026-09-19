@@ -82,6 +82,14 @@ body:
         ```
         If installed via npm: `bash "$(npm root -g)/context-mode/scripts/ctx-debug.sh"`
         The script writes a JSON file to /tmp — copy its contents here.
+
+        **The script automatically redacts secret values** (everything under `env`
+        blocks, plus `*TOKEN` / `*KEY` / `*SECRET` / `*PASSWORD` / `*CREDENTIAL`-shaped
+        fields) in the `6. Config Files` section before writing the report.
+
+        **Never paste raw config files, tokens, or credentials into this field by
+        hand.** Paste only the script's own output, and if you spot anything
+        sensitive the script missed, redact it before submitting.
         **Issues without debug output will be closed immediately.**
       placeholder: "Paste the contents of /tmp/ctx-debug-<timestamp>.json"
       render: json
@@ -148,6 +156,8 @@ body:
       label: Pre-submission checklist
       options:
         - label: I have run the debug script and pasted the output above
+          required: true
+        - label: The debug output above is the script's own output — I did not paste any credentials, tokens, or raw config file contents by hand
           required: true
         - label: I am using the latest version of context-mode
           required: true
