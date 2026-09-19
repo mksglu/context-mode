@@ -156,9 +156,19 @@ export let _mcpBridgeReady: Promise<void> = Promise.resolve();
 
 // Cached buildAutoInjection (500-token cap, prioritized).
 let _buildAutoInjection:
-  | ((events: Array<{ category: string; data: string }>) => string)
+  | ((
+      events: Array<{ category: string; data: string }>,
+      source: "compaction" | "active_memory",
+    ) => string)
   | null
   | undefined = undefined;
+
+// Set by session_compact; consumed by the next before_agent_start so the
+// FIRST post-compact injection is honestly labeled "compaction" (with the
+// fidelity line telling the agent where its history lives). Read-and-cleared
+// at the top of the handler so it can never strand true and mislabel a
+// later, unrelated turn.
+let _pendingCompactLabel = false;
 
 // Pending context to inject via the 'context' hook (avoiding systemPrompt mutation
 // which breaks prefix prompt cache on DeepSeek/Anthropic/OpenAI).
@@ -166,7 +176,7 @@ let _buildAutoInjection:
 let _pendingContext = "";
 async function getAutoInjection(
   pluginRoot: string,
-): Promise<((events: Array<{ category: string; data: string }>) => string) | null> {
+): Promise<((events: Array<{ category: string; data: string }>, source: "compaction" | "active_memory") => string) | null> {
   if (_buildAutoInjection !== undefined) return _buildAutoInjection;
   try {
     const mod = await import(
@@ -607,6 +617,13 @@ export default function piExtension(pi: any): void {
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       _pendingContext = ""; // Reset — will be filled below if events exist
+      // Consume any pending real-compaction label FIRST (fail-safe: even if
+      // this turn injects nothing, the flag can never leak into a later,
+      // unrelated turn and produce a false "compaction" signal).
+      const injectSource: "compaction" | "active_memory" = _pendingCompactLabel
+        ? "compaction"
+        : "active_memory";
+      _pendingCompactLabel = false;
       // Lazily start and await the MCP bridge only when Pi is about to
       // dispatch a real agent turn. This is the non-brittle #534/#809 guard:
       // help/version/package/config CLI paths may load the extension, but they
@@ -690,6 +707,7 @@ export default function piExtension(pi: any): void {
               category: String(e.category ?? ""),
               data: String(e.data ?? ""),
             })),
+            injectSource,
           );
         }
         // Fallback (or if helper produced empty output): inline 500-token cap.
@@ -848,6 +866,7 @@ export default function piExtension(pi: any): void {
     try {
       if (!_sessionId) return;
       db.incrementCompactCount(_sessionId);
+      _pendingCompactLabel = true;
     } catch {
       // best effort
     }
@@ -863,6 +882,7 @@ export default function piExtension(pi: any): void {
       _db = null;
       _dbPath = "";
       _sessionId = "";
+      _pendingCompactLabel = false;
     } catch {
       // best effort — never throw during shutdown
     }
