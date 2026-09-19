@@ -683,6 +683,92 @@ describe("Pi Extension", () => {
       expect(String(messages[1].content)).not.toContain("You are a helpful assistant.");
     });
 
+    it("keeps Pi context-hook injection at one stable index across a tool loop, then replaces it next turn", async () => {
+      await registerPiExtension(api);
+
+      await api._trigger("session_start", {
+        session_id: "same-turn-context",
+        project_dir: tempDir,
+      });
+      await api._trigger("tool_result", {
+        tool_name: "read",
+        tool_input: { file_path: "/src/cache.ts" },
+        tool_result: "export const cached = true;",
+      });
+      await api._trigger("session_before_compact", {});
+      await api._trigger("session_compact", {});
+
+      await api._trigger("before_agent_start", {
+        systemPrompt: "Stable system prompt.",
+        prompt: "Continue after compaction.",
+      });
+
+      const firstMessages: Array<Record<string, unknown>> = [
+        { role: "user", content: "Continue after compaction." },
+      ];
+
+      await api._trigger("context", { messages: firstMessages });
+
+      const secondMessages: Array<Record<string, unknown>> = [
+        { role: "user", content: "Continue after compaction." },
+        { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "read" }] },
+        {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "read",
+          content: [{ type: "text", text: "export const cached = true;" }],
+        },
+      ];
+      await api._trigger("context", { messages: secondMessages });
+
+      expect(firstMessages).toHaveLength(2);
+      expect(firstMessages.map((message) => message.role)).toEqual(["user", "user"]);
+      expect(secondMessages.map((message) => message.role)).toEqual([
+        "user",
+        "user",
+        "assistant",
+        "toolResult",
+      ]);
+      expect(secondMessages.slice(0, firstMessages.length)).toEqual(firstMessages);
+      expect(String(firstMessages[1].content)).toContain("session_resume");
+
+      await api._trigger("before_agent_start", {
+        systemPrompt: "Stable system prompt.",
+        prompt: "Start the next turn.",
+      });
+      const nextTurnMessages: Array<Record<string, unknown>> = [
+        { role: "user", content: "Start the next turn." },
+      ];
+      await api._trigger("context", { messages: nextTurnMessages });
+
+      expect(nextTurnMessages).toHaveLength(2);
+      expect(String(nextTurnMessages[1].content)).toContain("context-mode active");
+      expect(String(nextTurnMessages[1].content)).not.toContain("session_resume");
+    });
+
+    it("does not publish pending context after session shutdown wins an in-flight Pi turn", async () => {
+      await registerPiExtension(api);
+      await api._trigger("session_start", {
+        session_id: "shutdown-context-race",
+        project_dir: tempDir,
+      });
+
+      const agentStart = api._trigger("before_agent_start", {
+        systemPrompt: "Stable system prompt.",
+        prompt: "Prepare context while shutdown begins.",
+      });
+      const shutdown = api._trigger("session_shutdown");
+      await Promise.all([agentStart, shutdown]);
+
+      const messages: Array<Record<string, unknown>> = [
+        { role: "user", content: "Prepare context while shutdown begins." },
+      ];
+      const result = await api._trigger("context", { messages });
+
+      expect(result).toBeUndefined();
+      expect(messages).toHaveLength(1);
+    });
+
     it("appends resume and active context after existing messages", async () => {
       await registerPiExtension(api);
 
