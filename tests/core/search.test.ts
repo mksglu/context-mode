@@ -1895,6 +1895,17 @@ describe("extractSnippet with highlight markers", () => {
     );
   });
 
+  test("returns a bounded prefix for the legacy oversized-row sentinel", () => {
+    const prefix = "safe leading content ".repeat(100);
+    const relevant = "legacyuniqueterm only appears at the end";
+    const content = prefix + "x".repeat(100_000) + relevant;
+
+    const result = extractSnippet(content, "legacyuniqueterm", 1500, "");
+
+    assert.equal(result, content.slice(0, 1500) + "\n…");
+    assert.ok(!result.includes("legacyuniqueterm"), "sentinel must not scan the full legacy row");
+  });
+
   test("returns prefix when no matches found at all", () => {
     const content = buildContent("Nothing relevant here.", "Still nothing relevant.");
     const result = extractSnippet(content, "xylophone");

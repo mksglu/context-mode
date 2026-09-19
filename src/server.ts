@@ -1305,6 +1305,12 @@ export function extractSnippet(
 ): string {
   if (content.length <= maxLen) return content;
 
+  // Empty string is the ContentStore sentinel for a legacy FTS row whose
+  // highlight() was deliberately skipped due to its oversized byte length.
+  // Returning a bounded prefix avoids turning the snippet fallback into the
+  // same full-row scan that the SQL guard prevented.
+  if (highlighted === "") return content.slice(0, maxLen) + "\n…";
+
   // Derive match positions from FTS5 highlight markers when available
   const positions: number[] = [];
 
