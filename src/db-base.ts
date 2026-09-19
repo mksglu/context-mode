@@ -441,9 +441,14 @@ export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): 
       }
       lastError = err instanceof Error ? err : new Error(msg);
       if (attempt < delays.length) {
-        const delay = delays[attempt];
-        const start = Date.now();
-        while (Date.now() - start < delay) { /* busy-wait for sync retry */ }
+        // Block the thread without spinning a CPU core. better-sqlite3 is
+        // synchronous, so we cannot await a timer here; Atomics.wait provides a
+        // real blocking sleep. The previous spin-loop backoff pegged a core for
+        // the full 100+500+2000ms window, which under multi-session write
+        // contention accumulated hundreds of CPU-seconds per instance (#985).
+        // A zero delay still returns immediately, preserving the [0, 0, 0]
+        // test contract above.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delays[attempt]);
       }
     }
   }
