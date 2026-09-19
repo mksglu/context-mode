@@ -940,14 +940,14 @@ export class SessionDB extends SQLiteBase {
               project_dir, attribution_source, attribution_confidence,
               bytes_avoided, bytes_returned,
               source_hook, created_at, data_hash
-       FROM session_events WHERE session_id = ? AND priority >= ? ORDER BY id ASC LIMIT ?`);
+       FROM session_events WHERE session_id = ? AND priority <= ? ORDER BY id ASC LIMIT ?`);
 
     p(S.getEventsByTypeAndPriority,
       `SELECT id, session_id, type, category, priority, data,
               project_dir, attribution_source, attribution_confidence,
               bytes_avoided, bytes_returned,
               source_hook, created_at, data_hash
-       FROM session_events WHERE session_id = ? AND type = ? AND priority >= ? ORDER BY id ASC LIMIT ?`);
+       FROM session_events WHERE session_id = ? AND type = ? AND priority <= ? ORDER BY id ASC LIMIT ?`);
 
     p(S.getEventCount,
       `SELECT COUNT(*) AS cnt FROM session_events WHERE session_id = ?`);
@@ -970,7 +970,7 @@ export class SessionDB extends SQLiteBase {
     p(S.evictLowestPriority,
       `DELETE FROM session_events WHERE id = (
          SELECT id FROM session_events WHERE session_id = ?
-         ORDER BY priority ASC, id ASC LIMIT 1
+         ORDER BY priority DESC, id ASC LIMIT 1
        )`);
 
     p(S.updateMetaLastEvent,
@@ -1132,7 +1132,7 @@ export class SessionDB extends SQLiteBase {
    * last DEDUP_WINDOW events for this session.
    *
    * Eviction: if session exceeds MAX_EVENTS_PER_SESSION, evicts the
-   * lowest-priority (then oldest) event.
+   * least-important (highest numeric priority, then oldest) event.
    */
   insertEvent(
     sessionId: string,
