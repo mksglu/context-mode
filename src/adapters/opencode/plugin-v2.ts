@@ -249,7 +249,11 @@ export async function setupV2(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
           // schema failure or an isError handler result; the rejection surfaces to
           // the model as a failed tool call without crashing the session.
           const text = await t.run(input, project, toolCtx.sessionID);
-          return { output: text, metadata: { title: t.title } };
+          // v2 result contract: this tool declares no `output` schema, so the
+          // result must carry the text in `content` (a string). Returning an
+          // `output` key here would trip the host's
+          // "Tool result declared output without an output schema" guard.
+          return { content: text, metadata: { title: t.title } };
         },
         options: {
           namespace: "ctx",

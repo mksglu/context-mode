@@ -249,7 +249,25 @@ describe("OpenCode v2 setup mouth", () => {
       try {
         const stats = tools.find((t) => t.name === "stats")!;
         const res = await stats.execute({}, { sessionID: "s-exec-valid" });
-        expect(res.output).toContain("context-mode");
+        expect(res.content).toContain("context-mode");
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it("returns text in `content` and never an `output` key (v2 no-output-schema contract)", async () => {
+      // The v2 host dies with "Tool result declared output without an output
+      // schema" when a tool that declares no `output` schema returns an `output`
+      // key. This tool set declares none, so results must carry text in
+      // `content` and must NOT include an `output` key.
+      const dir = join(tempDir, "exec-content-contract");
+      const { tools, cleanup } = await setupV2For(dir);
+      try {
+        const stats = tools.find((t) => t.name === "stats")!;
+        const res = await stats.execute({}, { sessionID: "s-content-contract" });
+        expect(res).not.toHaveProperty("output");
+        expect(typeof res.content).toBe("string");
+        expect(res.content).toContain("context-mode");
       } finally {
         await cleanup();
       }
@@ -280,7 +298,7 @@ describe("OpenCode v2 setup mouth", () => {
           } as any,
           { sessionID: "s-exec-coerce" },
         );
-        expect(res.output).toContain("Executed");
+        expect(res.content).toContain("Executed");
       } finally {
         await cleanup();
       }
@@ -358,7 +376,7 @@ describe("OpenCode v2 setup mouth", () => {
         try {
           const purge = tools.find((t) => t.name === "purge")!;
           const res = await purge.execute({}, { sessionID: "s-allow" });
-          expect(res.output).toBe("purge-ran");
+          expect(res.content).toBe("purge-ran");
         } finally {
           coreTool.run = origRun;
           if (prev === undefined) delete process.env.CONTEXT_MODE_ALLOW_DESTRUCTIVE;
@@ -374,7 +392,7 @@ describe("OpenCode v2 setup mouth", () => {
       try {
         const stats = tools.find((t) => t.name === "stats")!;
         const res = await stats.execute({}, { sessionID: "s-nongate" });
-        expect(res.output).toContain("context-mode");
+        expect(res.content).toContain("context-mode");
       } finally {
         await cleanup();
       }
