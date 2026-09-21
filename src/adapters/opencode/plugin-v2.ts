@@ -13,17 +13,29 @@
  *                              → ctx.session.hook("context")       routing block + resume
  *   - experimental.session.compacting
  *                              → ctx.session.hook("compaction")    DB TOC as summary
+ *   - session.step.started/ended
+ *                              → ctx.event.subscribe()             per-step usage capture
+ *
+ * In v2 native-tool mode there is no MCP stdio server, so this mouth also
+ * publishes the MCP-readiness sentinel itself (see {@link startReadinessSentinel})
+ * — otherwise the routing redirects would silently depend on some unrelated
+ * context-mode MCP process being alive.
  *
  * `@opencode/plugin` is a TYPE-ONLY dependency: every import from it is an
  * `import type`, erased at compile time, so this module loads on a v2 host where
  * the package is absent from the runtime tree.
  */
 
+import { writeFileSync, unlinkSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 import type { Plugin } from "@opencode/plugin";
 import z from "zod/v4";
 
 import { getCore, detectPlatform, type ContextModeCore } from "./core.js";
 import { zod3ShapeToV4 } from "./zod3tov4.js";
+import { parseOpencodeV2StepUsage, buildAgentUsageEvent } from "../../session/extract.js";
 
 /**
  * The three sandbox-execute tools borrow the host `bash` action so a blanket
@@ -68,6 +80,116 @@ function extractShape(inputSchema: unknown): Record<string, unknown> {
   if (typeof s?.shape === "object" && s.shape !== null) return s.shape as Record<string, unknown>;
   if (typeof s?._def?.shape === "function") return (s._def.shape as () => Record<string, unknown>)();
   return {};
+}
+
+/**
+ * Publish the MCP-readiness sentinel from this v2 plugin process.
+ *
+ * Routing enforcement (hooks/core/routing.mjs) gates redirects behind
+ * `isMCPReady()`, which scans the sentinel directory for a live marker written by
+ * the MCP stdio server. In v2 native-tool mode there is no MCP server, so without
+ * this the routing redirects would silently depend on some unrelated context-mode
+ * MCP process being alive. This mirrors the server's sentinel exactly: this
+ * process's PID, refreshed every 30s (the reader's freshness window is 90s), and
+ * removed on dispose. It reuses `sentinelPathForPid` so the sentinel directory +
+ * prefix — and the `CONTEXT_MODE_MCP_SENTINEL_DIR` test override — stay consistent
+ * with the reader.
+ *
+ * Returns a disposer that stops the refresh timer and removes the sentinel.
+ */
+async function startReadinessSentinel(): Promise<() => void> {
+  const buildDir = dirname(fileURLToPath(import.meta.url));
+  const mcpReadyPath = resolve(buildDir, "..", "..", "..", "hooks", "core", "mcp-ready.mjs");
+  const { sentinelPathForPid } = (await import(pathToFileURL(mcpReadyPath).href)) as {
+    sentinelPathForPid: (pid: number) => string;
+  };
+  const sentinel = sentinelPathForPid(process.pid);
+  const write = () => {
+    try {
+      writeFileSync(sentinel, String(process.pid));
+    } catch {
+      /* best effort — never break the plugin */
+    }
+  };
+  write();
+  const refresh = setInterval(write, 30_000);
+  refresh.unref();
+  return () => {
+    clearInterval(refresh);
+    try {
+      unlinkSync(sentinel);
+    } catch {
+      /* best effort */
+    }
+  };
+}
+
+/**
+ * Capture per-step token + cost usage from the v2 event bus.
+ *
+ * v2 has no generic `event` hook like v1's `message.updated`. Instead the
+ * `ctx.event` domain exposes an async-iterable of every bus event, which we
+ * consume in a background loop and correlate the two durable events that bracket a
+ * single model call:
+ *   - `session.step.started` carries the model (`{ id, providerID }`) keyed by
+ *     `assistantMessageID`;
+ *   - `session.step.ended` carries that step's `cost` + `tokens` buckets.
+ *
+ * Each step.ended becomes one `agent_usage` row written through the core (the
+ * same DB path v1 uses, tagged with a `StepEnded` source). Reasoning tokens are
+ * folded into output by the v2 parse. The loop is torn down via AbortController on
+ * plugin cleanup, and every error is swallowed so usage capture can never break a
+ * session.
+ *
+ * Returns a disposer that aborts the subscription.
+ */
+function startUsageCapture(
+  core: ContextModeCore,
+  ctx: Plugin.Context,
+  resolveDir: (sessionID: string) => Promise<string>,
+): () => void {
+  const controller = new AbortController();
+  // Model observed on step.started, keyed by assistantMessageID, so the matching
+  // step.ended (which omits the model) can be attributed.
+  const modelByMessage = new Map<string, string>();
+
+  void (async () => {
+    try {
+      for await (const ev of ctx.event.subscribe({ signal: controller.signal })) {
+        const data = (ev as { data?: Record<string, unknown> })?.data;
+        if (!data) continue;
+
+        if (ev.type === "session.step.started") {
+          const msgId = data.assistantMessageID;
+          const model = data.model as { id?: unknown; providerID?: unknown } | undefined;
+          if (typeof msgId === "string" && model) {
+            const id = typeof model.id === "string" ? model.id : "";
+            const providerID = typeof model.providerID === "string" ? model.providerID : "";
+            modelByMessage.set(msgId, providerID && id ? `${providerID}/${id}` : id || providerID);
+          }
+          continue;
+        }
+
+        if (ev.type === "session.step.ended") {
+          const sessionId = data.sessionID;
+          if (typeof sessionId !== "string" || !sessionId) continue;
+          const msgId = typeof data.assistantMessageID === "string" ? data.assistantMessageID : "";
+          const counts = parseOpencodeV2StepUsage(data, modelByMessage.get(msgId) ?? "");
+          if (!counts) continue;
+          const usageEvent = buildAgentUsageEvent(counts);
+          if (!usageEvent) continue;
+          const project = await resolveDir(sessionId);
+          core.recordUsage(sessionId, project, usageEvent, "StepEnded");
+          // Release the correlation entry once consumed (bounded memory).
+          if (msgId) modelByMessage.delete(msgId);
+        }
+      }
+    } catch {
+      /* stream closed / aborted — usage capture must never break the session */
+    }
+  })();
+
+  return () => controller.abort();
 }
 
 /**
@@ -138,6 +260,15 @@ export async function setupV2(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
     }
   });
   disposers.push(() => toolReg.dispose());
+
+  // ── Readiness sentinel — the routing island checks it in-process ──────
+  // v2 native-tool mode has no MCP stdio server, so this process publishes its
+  // own readiness marker; otherwise routing redirects would only fire when some
+  // other context-mode MCP process happens to be alive.
+  const stopReadinessSentinel = await startReadinessSentinel();
+
+  // ── Usage capture — per-step tokens + cost from the v2 event bus ──────
+  const stopUsageCapture = startUsageCapture(core, ctx, resolveDir);
 
   // ── 2. Routing enforcement before each tool execution ───────────────
   const beforeReg = await ctx.tool.hook("execute.before", async (ev) => {
@@ -218,6 +349,16 @@ export async function setupV2(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
 
   // ── Cleanup: release registrations, then the shared core ────────────
   return async () => {
+    try {
+      stopUsageCapture();
+    } catch {
+      /* best-effort teardown */
+    }
+    try {
+      stopReadinessSentinel();
+    } catch {
+      /* best-effort teardown */
+    }
     for (const dispose of disposers) {
       try {
         await dispose();

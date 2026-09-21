@@ -89,6 +89,7 @@ export interface ContextModeCore {
     sessionId: string,
     projectDir: string,
     usageEvent: Omit<SessionEvent, "data_hash"> & { data_hash?: string },
+    source?: string,
   ): void;
   buildCompactionSnapshot(sessionId: string, projectDir: string): CompactionResult | null;
   claimResume(sessionId: string): { snapshot: string } | null;
@@ -349,11 +350,11 @@ async function createCore(options: CoreOptions): Promise<ContextModeCore> {
       }
     },
 
-    recordUsage(sessionId, projectDir, usageEvent) {
+    recordUsage(sessionId, projectDir, usageEvent, source = "MessageUpdated") {
       if (!sessionId || !usageEvent) return;
       try {
         db.ensureSession(sessionId, projectDir);
-        db.insertEvent(sessionId, usageEvent, "MessageUpdated");
+        db.insertEvent(sessionId, usageEvent, source);
       } catch {
         /* best-effort */
       }

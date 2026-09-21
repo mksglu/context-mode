@@ -12,12 +12,14 @@ import "./setup-home";
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, unlinkSync, existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 import pluginDefault, { ContextModePlugin } from "../src/adapters/opencode/plugin.js";
 import { getCore, resetCoreCache } from "../src/adapters/opencode/core.js";
+import { parseOpencodeV2StepUsage } from "../src/session/extract.js";
+import { isMCPReady, sentinelPathForPid } from "../hooks/core/mcp-ready.mjs";
 
 // ── Mock Plugin.Context ───────────────────────────────────
 
@@ -26,6 +28,10 @@ interface MockCtx {
   tools: any[];
   toolHooks: Record<string, Array<(ev: any) => any>>;
   sessionHooks: Record<string, Array<(ev: any) => any>>;
+  eventBus: {
+    push: (ev: any) => void;
+    subscribe: (opts?: { signal?: AbortSignal }) => AsyncIterable<any>;
+  };
   disposed: string[];
   sessionGetCalls: () => number;
 }
@@ -48,8 +54,42 @@ function makeMockCtx(directory: string, sessionDir?: string): MockCtx {
     },
   });
 
+  // ── Event bus backing ctx.event.subscribe (drives usage capture) ──
+  // A single-consumer async queue: `push` enqueues and wakes a parked consumer;
+  // `subscribe` yields queued events and parks when empty, ending on abort.
+  const pending: any[] = [];
+  let wake: (() => void) | null = null;
+  const eventBus = {
+    push(ev: any) {
+      pending.push(ev);
+      const w = wake;
+      wake = null;
+      if (w) w();
+    },
+    subscribe(opts?: { signal?: AbortSignal }): AsyncIterable<any> {
+      const signal = opts?.signal;
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<any>> {
+              for (;;) {
+                if (signal?.aborted) return { done: true, value: undefined };
+                if (pending.length > 0) return { done: false, value: pending.shift() };
+                await new Promise<void>((resolve) => {
+                  wake = () => resolve();
+                  signal?.addEventListener("abort", () => resolve(), { once: true });
+                });
+              }
+            },
+          };
+        },
+      };
+    },
+  };
+
   const ctx: any = {
     location: { directory },
+    event: eventBus,
     session: {
       get: async ({ sessionID }: { sessionID: string }) => {
         getCallCount++;
@@ -82,6 +122,7 @@ function makeMockCtx(directory: string, sessionDir?: string): MockCtx {
     tools,
     toolHooks,
     sessionHooks,
+    eventBus,
     disposed,
     sessionGetCalls: () => getCallCount,
   };
@@ -656,6 +697,301 @@ describe("OpenCode v2 setup mouth", () => {
       // Core removed from the cache on dispose.
       const after = await getCore({ platform: "opencode", loadScopeDir: dir });
       expect(after).not.toBe(core);
+    });
+  });
+
+  // ── parseOpencodeV2StepUsage (pure mapping) ────────────────────────
+
+  describe("parseOpencodeV2StepUsage", () => {
+    it("maps v2 step.ended data, folding reasoning into output", () => {
+      const c = parseOpencodeV2StepUsage(
+        {
+          cost: 0.05,
+          tokens: { input: 10, output: 4, reasoning: 6, cache: { read: 3, write: 1 } },
+        },
+        "anthropic/claude-sonnet-4",
+      );
+      expect(c).toEqual({
+        model_id: "anthropic/claude-sonnet-4",
+        input_tokens: 10,
+        output_tokens: 10, // 4 output + 6 reasoning folded
+        cache_creation_tokens: 1,
+        cache_read_tokens: 3,
+        native_cost_usd: 0.05,
+      });
+    });
+
+    it("returns null for an all-zero step", () => {
+      expect(
+        parseOpencodeV2StepUsage(
+          { cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: {} } },
+          "m",
+        ),
+      ).toBeNull();
+    });
+
+    it("returns null when tokens are absent", () => {
+      expect(parseOpencodeV2StepUsage({ cost: 1 }, "m")).toBeNull();
+    });
+
+    it("tolerates a missing cache and a non-numeric cost", () => {
+      const c = parseOpencodeV2StepUsage({ tokens: { input: 5, output: 2 } }, "m");
+      expect(c).toEqual({
+        model_id: "m",
+        input_tokens: 5,
+        output_tokens: 2,
+        cache_creation_tokens: 0,
+        cache_read_tokens: 0,
+        native_cost_usd: null,
+      });
+    });
+
+    it("returns null for non-object data", () => {
+      expect(parseOpencodeV2StepUsage(null, "m")).toBeNull();
+      expect(parseOpencodeV2StepUsage("x", "m")).toBeNull();
+    });
+  });
+
+  // ── Usage capture wiring (event bus → core.recordUsage) ────────────
+
+  describe("usage capture", () => {
+    // The capture loop runs in the background; poll until it records.
+    async function waitFor(cond: () => boolean, ms = 2000): Promise<void> {
+      const start = Date.now();
+      while (!cond()) {
+        if (Date.now() - start > ms) throw new Error("timed out waiting for usage capture");
+        await new Promise((r) => setTimeout(r, 5));
+      }
+    }
+
+    const stepStarted = (
+      sessionID: string,
+      msgId: string,
+      providerID: string,
+      model: string,
+    ) => ({
+      type: "session.step.started",
+      data: { sessionID, assistantMessageID: msgId, agent: "build", model: { id: model, providerID } },
+    });
+
+    const stepEnded = (sessionID: string, msgId: string, tokens: unknown, cost: number) => ({
+      type: "session.step.ended",
+      data: { sessionID, assistantMessageID: msgId, finish: "stop", cost, tokens },
+    });
+
+    /** Replace core.recordUsage with a capturing passthrough; returns the sink + restore. */
+    function captureUsage(core: any) {
+      const calls: Array<{ sid: string; project: string; ev: any; src?: string }> = [];
+      const orig = core.recordUsage.bind(core);
+      core.recordUsage = (sid: string, project: string, ev: any, src?: string) => {
+        calls.push({ sid, project, ev, src });
+        return orig(sid, project, ev, src);
+      };
+      return { calls, restore: () => (core.recordUsage = orig) };
+    }
+
+    it("records one agent_usage per step.ended, with the model from step.started", async () => {
+      const dir = join(tempDir, "usage-basic");
+      const { eventBus, cleanup } = await setupV2For(dir);
+      const core = await getCore({ platform: "opencode", loadScopeDir: dir });
+      const { calls, restore } = captureUsage(core);
+      try {
+        eventBus.push(stepStarted("s1", "m1", "anthropic", "claude-sonnet-4"));
+        eventBus.push(
+          stepEnded(
+            "s1",
+            "m1",
+            { input: 100, output: 40, reasoning: 10, cache: { read: 5, write: 2 } },
+            0.0123,
+          ),
+        );
+        await waitFor(() => calls.length >= 1);
+
+        expect(calls).toHaveLength(1);
+        const { sid, src, ev } = calls[0];
+        expect(sid).toBe("s1");
+        expect(src).toBe("StepEnded");
+        expect(ev.type).toBe("agent_usage");
+        expect(ev.model_id).toBe("anthropic/claude-sonnet-4");
+        expect(ev.input_tokens).toBe(100);
+        expect(ev.output_tokens).toBe(50); // 40 + 10 reasoning
+        expect(ev.cache_read_tokens).toBe(5);
+        expect(ev.cache_creation_tokens).toBe(2);
+        expect(ev.cost_usd).toBeCloseTo(0.0123, 6);
+      } finally {
+        restore();
+        await cleanup();
+      }
+    });
+
+    it("folds reasoning tokens into output", async () => {
+      const dir = join(tempDir, "usage-reasoning");
+      const { eventBus, cleanup } = await setupV2For(dir);
+      const core = await getCore({ platform: "opencode", loadScopeDir: dir });
+      const { calls, restore } = captureUsage(core);
+      try {
+        eventBus.push(stepStarted("s2", "m2", "openai", "gpt-5"));
+        eventBus.push(
+          stepEnded("s2", "m2", { input: 10, output: 7, reasoning: 33, cache: { read: 0, write: 0 } }, 0.001),
+        );
+        await waitFor(() => calls.length >= 1);
+        expect(calls[0].ev.input_tokens).toBe(10);
+        expect(calls[0].ev.output_tokens).toBe(40); // 7 + 33
+      } finally {
+        restore();
+        await cleanup();
+      }
+    });
+
+    it("still records usage when step.ended has no matching step.started (empty model)", async () => {
+      const dir = join(tempDir, "usage-no-model");
+      const { eventBus, cleanup } = await setupV2For(dir);
+      const core = await getCore({ platform: "opencode", loadScopeDir: dir });
+      const { calls, restore } = captureUsage(core);
+      try {
+        eventBus.push(
+          stepEnded("s3", "orphan", { input: 5, output: 3, reasoning: 0, cache: { read: 0, write: 0 } }, 0.0005),
+        );
+        await waitFor(() => calls.length >= 1);
+        // Empty model → the builder omits model_id, but cost + tokens are captured.
+        expect(calls[0].ev.model_id).toBeUndefined();
+        expect(calls[0].ev.input_tokens).toBe(5);
+        expect(calls[0].ev.output_tokens).toBe(3);
+        expect(calls[0].ev.cost_usd).toBeCloseTo(0.0005, 8);
+      } finally {
+        restore();
+        await cleanup();
+      }
+    });
+
+    it("does not record an all-zero step", async () => {
+      const dir = join(tempDir, "usage-zero");
+      const { eventBus, cleanup } = await setupV2For(dir);
+      const core = await getCore({ platform: "opencode", loadScopeDir: dir });
+      const { calls, restore } = captureUsage(core);
+      try {
+        eventBus.push(stepStarted("s4", "m4", "anthropic", "claude"));
+        eventBus.push(
+          stepEnded("s4", "m4", { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, 0),
+        );
+        await new Promise((r) => setTimeout(r, 60));
+        expect(calls).toHaveLength(0);
+      } finally {
+        restore();
+        await cleanup();
+      }
+    });
+
+    it("ignores non-usage event types", async () => {
+      const dir = join(tempDir, "usage-ignore");
+      const { eventBus, cleanup } = await setupV2For(dir);
+      const core = await getCore({ platform: "opencode", loadScopeDir: dir });
+      const { calls, restore } = captureUsage(core);
+      try {
+        eventBus.push({ type: "session.idle", data: { sessionID: "s5" } });
+        eventBus.push({ type: "server.heartbeat", data: {} });
+        await new Promise((r) => setTimeout(r, 60));
+        expect(calls).toHaveLength(0);
+      } finally {
+        restore();
+        await cleanup();
+      }
+    });
+
+    it("stops processing after cleanup aborts the subscription", async () => {
+      const dir = join(tempDir, "usage-abort");
+      const { eventBus, cleanup } = await setupV2For(dir);
+      const core = await getCore({ platform: "opencode", loadScopeDir: dir });
+      const { calls, restore } = captureUsage(core);
+      try {
+        eventBus.push(stepStarted("s6", "m6", "anthropic", "claude"));
+        eventBus.push(
+          stepEnded("s6", "m6", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }, 0.0001),
+        );
+        await waitFor(() => calls.length >= 1);
+        const before = calls.length;
+
+        await cleanup();
+
+        // After teardown, further events must not be processed.
+        eventBus.push(
+          stepEnded("s6", "m6b", { input: 9, output: 9, reasoning: 0, cache: { read: 0, write: 0 } }, 0.9),
+        );
+        await new Promise((r) => setTimeout(r, 60));
+        expect(calls.length).toBe(before);
+      } finally {
+        restore();
+      }
+    });
+  });
+
+  // ── Readiness sentinel (v2 native-tool mode publishes its own marker) ──
+  // In v2 there is no MCP stdio server, so the setup mouth must write the
+  // sentinel that the routing island (isMCPReady) checks. Isolated via
+  // CONTEXT_MODE_MCP_SENTINEL_DIR so the writer and reader share a temp dir.
+
+  describe("readiness sentinel", () => {
+    let sentinelDir: string;
+
+    beforeEach(() => {
+      sentinelDir = mkdtempSync(join(tmpdir(), "cm-v2-sentinel-"));
+      process.env.CONTEXT_MODE_MCP_SENTINEL_DIR = sentinelDir;
+    });
+
+    afterEach(() => {
+      delete process.env.CONTEXT_MODE_MCP_SENTINEL_DIR;
+      try {
+        rmSync(sentinelDir, { recursive: true, force: true });
+      } catch {
+        /* cleanup best effort */
+      }
+    });
+
+    it("publishes a sentinel carrying this process's PID during setup", async () => {
+      const path = sentinelPathForPid(process.pid);
+      expect(existsSync(path)).toBe(false); // fresh isolated dir — nothing yet
+
+      const { cleanup } = await setupV2For(join(tempDir, "sentinel-write"));
+      try {
+        expect(existsSync(path)).toBe(true);
+        expect(readFileSync(path, "utf8")).toBe(String(process.pid));
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it("makes the routing reader (isMCPReady) see this process as ready", async () => {
+      const { cleanup } = await setupV2For(join(tempDir, "sentinel-ready"));
+      try {
+        expect(isMCPReady()).toBe(true);
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it("removes the sentinel on cleanup", async () => {
+      const path = sentinelPathForPid(process.pid);
+      const { cleanup } = await setupV2For(join(tempDir, "sentinel-remove"));
+      expect(existsSync(path)).toBe(true); // written during setup
+
+      await cleanup();
+      expect(existsSync(path)).toBe(false);
+    });
+
+    it("re-establishes the sentinel on a later setup after the prior cleanup", async () => {
+      const path = sentinelPathForPid(process.pid);
+      const first = await setupV2For(join(tempDir, "sentinel-a"));
+      await first.cleanup();
+      expect(existsSync(path)).toBe(false);
+
+      const second = await setupV2For(join(tempDir, "sentinel-b"));
+      try {
+        expect(existsSync(path)).toBe(true);
+        expect(isMCPReady()).toBe(true);
+      } finally {
+        await second.cleanup();
+      }
+      expect(existsSync(path)).toBe(false);
     });
   });
 });

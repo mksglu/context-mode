@@ -1893,6 +1893,75 @@ export function parseOpencodeUsage(payload: unknown): AgentUsageCounts | null {
 }
 
 /**
+ * Map an OpenCode v2 `session.step.ended` payload into the `buildAgentUsageEvent`
+ * input shape.
+ *
+ * v2 differs from v1's `message.updated` in three ways that make the v1 parser
+ * unusable here:
+ *   1. Usage lives under `data` (not `properties.info`).
+ *   2. The model is NOT carried on the usage event — it is observed on the
+ *      matching `session.step.started` and passed in as `modelId` (the caller
+ *      correlates the two durable events by `assistantMessageID`).
+ *   3. There is an extra `reasoning` token bucket.
+ *
+ * Following the gemini-cli convention (thoughts folded into output), the v2
+ * `reasoning` bucket is folded into `output_tokens` — the provider bills it as
+ * output. The event ships a native USD cost, so it is taken verbatim as
+ * `native_cost_usd` and the pricing catalog is bypassed.
+ *
+ * Pure, null-safe, struct-only — NO regex. Returns null when every token bucket is
+ * zero/absent, so an all-zero step emits no event.
+ */
+export function parseOpencodeV2StepUsage(
+  data: unknown,
+  modelId: string,
+): AgentUsageCounts | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+
+  const tokensRaw = d.tokens;
+  if (!tokensRaw || typeof tokensRaw !== "object") return null;
+  const tokens = tokensRaw as Record<string, unknown>;
+
+  const num = (v: unknown): number =>
+    typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+
+  const cacheRaw = tokens.cache;
+  const cache =
+    cacheRaw && typeof cacheRaw === "object"
+      ? (cacheRaw as Record<string, unknown>)
+      : {};
+
+  const input_tokens = num(tokens.input);
+  // v2 exposes a distinct `reasoning` bucket; fold it into output (billed as output).
+  const output_tokens = num(tokens.output) + num(tokens.reasoning);
+  const cache_read_tokens = num(cache.read);
+  const cache_creation_tokens = num(cache.write);
+
+  if (
+    input_tokens <= 0 &&
+    output_tokens <= 0 &&
+    cache_creation_tokens <= 0 &&
+    cache_read_tokens <= 0
+  ) {
+    return null;
+  }
+
+  const costRaw = d.cost;
+  const native_cost_usd =
+    typeof costRaw === "number" && Number.isFinite(costRaw) ? costRaw : null;
+
+  return {
+    model_id: typeof modelId === "string" ? modelId : "",
+    input_tokens,
+    output_tokens,
+    cache_creation_tokens,
+    cache_read_tokens,
+    native_cost_usd,
+  };
+}
+
+/**
  * Build a structured `agent_usage` event from summed per-model token counts.
  * Emits the colon-string `data` (human/debug + back-compat) AND the structured
  * top-level fields the forward envelope spreads to the platform. cost_usd via
