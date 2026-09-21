@@ -634,7 +634,10 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
  * Get the adapter instance for a given platform.
  * Lazily imports platform-specific adapter modules.
  */
-export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
+export async function getAdapter(
+  platform?: PlatformId,
+  pluginTarget?: import("./opencode/index.js").AdapterTarget,
+): Promise<HookAdapter> {
   const target = platform ?? detectPlatform().platform;
 
   switch (target) {
@@ -651,7 +654,7 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "kilo":
     case "opencode": {
       const { OpenCodeAdapter } = await import("./opencode/index.js");
-      return new OpenCodeAdapter(target);
+      return new OpenCodeAdapter(target, pluginTarget ?? "v1");
     }
 
     case "openclaw": {

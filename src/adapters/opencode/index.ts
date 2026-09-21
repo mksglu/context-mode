@@ -84,6 +84,13 @@ import { HOOK_TYPES as OPENCODE_HOOK_NAMES } from "./hooks.js";
 
 export type AdapterPlatformType = Extract<PlatformId, "opencode" | "kilo">;
 
+/**
+ * Which OpenCode generation this adapter targets. v1 registers the plugin under
+ * the singular `plugin` config key; v2 uses the plural `plugins` key. The axis
+ * is orthogonal to `platform` (opencode vs kilo).
+ */
+export type AdapterTarget = "v1" | "v2";
+
 export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   get name(): string {
     return this.platform === "kilo" ? "KiloCode" : "OpenCode";
@@ -102,12 +109,24 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   };
 
   private platform: AdapterPlatformType;
+  private target: AdapterTarget;
 
-  constructor(platform: AdapterPlatformType = "opencode") {
+  constructor(platform: AdapterPlatformType = "opencode", target: AdapterTarget = "v1") {
     // sessionDirSegments unused — opencode overrides getSessionDir()
     // with XDG_CONFIG_HOME / APPDATA logic
     super([".config", platform]);
     this.platform = platform;
+    this.target = target;
+  }
+
+  /** The config key this target uses for plugin registration. */
+  get pluginKey(): "plugin" | "plugins" {
+    return this.target === "v2" ? "plugins" : "plugin";
+  }
+
+  /** The opposite key — its presence after a target switch is stale. */
+  get oppositeKey(): "plugin" | "plugins" {
+    return this.target === "v2" ? "plugin" : "plugins";
   }
 
   // ── Input parsing ──────────────────────────────────────
@@ -406,15 +425,15 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       return results;
     }
 
-    // Check for "context-mode" in plugin array
+    // Check for "context-mode" in THIS target's plugin array
     const hasPlugin = this.hasContextModePlugin(settings);
-    if (Array.isArray(settings.plugin)) {
+    if (Array.isArray(settings[this.pluginKey])) {
       results.push({
         check: "Plugin registration",
         status: hasPlugin ? "pass" : "fail",
         message: hasPlugin
-          ? "context-mode found in plugin array"
-          : "context-mode not found in plugin array",
+          ? `context-mode found in ${this.pluginKey} array`
+          : `context-mode not found in ${this.pluginKey} array`,
         fix: hasPlugin
           ? undefined
           : "context-mode upgrade",
@@ -423,8 +442,20 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       results.push({
         check: "Plugin registration",
         status: "fail",
-        message: `No plugin array found in ${this.platform}.json or ${this.platform}.jsonc`,
+        message: `No ${this.pluginKey} array found in ${this.platform}.json or ${this.platform}.jsonc`,
         fix: "context-mode upgrade",
+      });
+    }
+
+    // A leftover registration under the opposite key is stale for this target:
+    // the v2 host merges both keys into a double registration, and a v1
+    // host ignores `plugins` entirely. Flag it so `upgrade` can clear it.
+    if (this.hasStaleOppositeKey(settings)) {
+      results.push({
+        check: "Stale plugin key",
+        status: "warn",
+        message: `context-mode is also listed in the ${this.oppositeKey} key, which does not match the ${this.target} target`,
+        fix: "context-mode upgrade (removes the stale key)",
       });
     }
 
@@ -462,14 +493,14 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       return {
         check: "Plugin registration",
         status: "pass",
-        message: "context-mode found in plugin array",
+        message: `context-mode found in ${this.pluginKey} array`,
       };
     }
 
     return {
       check: "Plugin registration",
       status: "fail",
-      message: `context-mode not found in ${this.platform}.json plugin array`,
+      message: `context-mode not found in ${this.platform}.json ${this.pluginKey} array`,
       fix: "context-mode upgrade",
     };
   }
@@ -493,22 +524,54 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
     return "not installed";
   }
 
+  /**
+   * Target-agnostic scan of the existing config: which generation does it point
+   * at? Returns "v2" if context-mode is registered under `plugins`, "v1" if
+   * under `plugin`, or null when neither key carries it. Used by the CLI to
+   * auto-detect the upgrade target before choosing which adapter target
+   * to construct. Ignores `this.target` — it inspects both keys across every
+   * candidate config path.
+   */
+  detectTargetFromConfig(): "v1" | "v2" | null {
+    for (const configPath of this.paths()) {
+      try {
+        const raw = readFileSync(configPath, "utf-8");
+        const text = configPath.endsWith(".jsonc") ? stripJsonComments(raw) : raw;
+        const settings = JSON.parse(text) as Record<string, unknown>;
+        if (this.listHasContextMode(settings.plugins)) return "v2";
+        if (this.listHasContextMode(settings.plugin)) return "v1";
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
   // ── Upgrade ────────────────────────────────────────────
 
   configureAllHooks(_pluginRoot: string): string[] {
     const settings = this.readSettings() ?? {};
     const changes: string[] = [];
 
-    // Add "context-mode" to the plugin array
-    const plugins = (settings.plugin ?? []) as string[];
-    if (!plugins.some((p) => p.includes("context-mode"))) {
+    // Add "context-mode" to THIS target's plugin array (v1: `plugin`, v2: `plugins`).
+    const key = this.pluginKey;
+    const plugins = (settings[key] ?? []) as unknown[];
+    if (!this.listHasContextMode(plugins)) {
       plugins.push("context-mode");
-      changes.push("Added context-mode to plugin array");
+      changes.push(`Added context-mode to ${key} array`);
     } else {
-      changes.push("context-mode already in plugin array");
+      changes.push(`context-mode already in ${key} array`);
     }
 
-    settings.plugin = plugins;
+    settings[key] = plugins;
+
+    // Remove the stale opposite key left by a prior target. Gated on
+    // presence, so a pure-v1 install (no `plugins` key) is untouched.
+    const opp = this.oppositeKey;
+    if (Object.prototype.hasOwnProperty.call(settings, opp)) {
+      delete settings[opp];
+      changes.push(`Removed stale ${opp} key (target switch to ${this.target})`);
+    }
 
     const mcp = settings.mcp;
     if (mcp && typeof mcp === "object" && !Array.isArray(mcp)) {
@@ -555,11 +618,33 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   // ── Internal helpers ───────────────────────────────────
 
   /**
-   * Check whether a settings object has the context-mode plugin registered.
+   * Check whether a settings object has the context-mode plugin registered under
+   * THIS target's config key (`plugin` for v1, `plugins` for v2). Entries may be
+   * bare strings ("context-mode") or v2 `{ package, options }` objects.
    */
   private hasContextModePlugin(settings: Record<string, unknown>): boolean {
-    const plugins = settings.plugin;
-    return Array.isArray(plugins) && plugins.some((p: unknown) => typeof p === "string" && p.includes("context-mode"));
+    return this.listHasContextMode(settings[this.pluginKey]);
+  }
+
+  /**
+   * Whether context-mode is registered under the OPPOSITE key — a leftover from
+   * a prior target that must be removed on switch.
+   */
+  private hasStaleOppositeKey(settings: Record<string, unknown>): boolean {
+    return this.listHasContextMode(settings[this.oppositeKey]);
+  }
+
+  /** Shared matcher for a plugin array entry being context-mode (string or object). */
+  private listHasContextMode(plugins: unknown): boolean {
+    if (!Array.isArray(plugins)) return false;
+    return plugins.some((p: unknown) => {
+      if (typeof p === "string") return p.includes("context-mode");
+      if (p && typeof p === "object") {
+        const pkg = (p as { package?: unknown }).package;
+        return typeof pkg === "string" && pkg.includes("context-mode");
+      }
+      return false;
+    });
   }
 
   private hasLegacyContextModeMcp(settings: Record<string, unknown>): boolean {

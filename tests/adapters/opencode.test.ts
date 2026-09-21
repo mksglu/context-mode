@@ -769,3 +769,196 @@ describe("OpenCodeAdapter for KiloCode", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// v1 / v2 target axis
+// ─────────────────────────────────────────────────────────
+
+describe("OpenCodeAdapter v1/v2 target axis", () => {
+  /**
+   * Run `fn` against a fresh project dir + isolated HOME with `config` written
+   * to opencode.json, using an adapter built for `target`. Restores cwd/env.
+   */
+  function withTargetConfig<T>(
+    config: Record<string, unknown>,
+    target: "v1" | "v2",
+    fn: (adapter: OpenCodeAdapter, file: string) => T,
+  ): T {
+    const root = mkdtempSync(join(tmpdir(), "opencode-target-"));
+    const dir = join(root, "project");
+    const home = join(root, "home");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "opencode.json");
+    writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
+    const prevHome = process.env.HOME;
+    const prevUserProfile = process.env.USERPROFILE;
+    const cwd = process.cwd();
+    Object.assign(process.env, env(home));
+    process.chdir(dir);
+    try {
+      const adapter = new OpenCodeAdapter("opencode", target);
+      return fn(adapter, file);
+    } finally {
+      process.chdir(cwd);
+      if (prevHome !== undefined) process.env.HOME = prevHome;
+      else delete process.env.HOME;
+      if (prevUserProfile !== undefined) process.env.USERPROFILE = prevUserProfile;
+      else delete process.env.USERPROFILE;
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  describe("key getters", () => {
+    it("v1 targets the singular `plugin` key", () => {
+      const a = new OpenCodeAdapter("opencode", "v1");
+      expect(a.pluginKey).toBe("plugin");
+      expect(a.oppositeKey).toBe("plugins");
+    });
+
+    it("v2 targets the plural `plugins` key", () => {
+      const a = new OpenCodeAdapter("opencode", "v2");
+      expect(a.pluginKey).toBe("plugins");
+      expect(a.oppositeKey).toBe("plugin");
+    });
+
+    it("defaults to v1 when no target is passed", () => {
+      const a = new OpenCodeAdapter("opencode");
+      expect(a.pluginKey).toBe("plugin");
+    });
+  });
+
+  describe("configureAllHooks (7.1 / 7.3)", () => {
+    it("v2 writes the `plugins` key and leaves no `plugin` key", () => {
+      withTargetConfig({}, "v2", (_a, file) => {
+        const adapter = new OpenCodeAdapter("opencode", "v2");
+        const changes = adapter.configureAllHooks("/tmp/plugin");
+        expect(changes).toContain("Added context-mode to plugins array");
+        const written = JSON.parse(readFileSync(file, "utf-8"));
+        expect(written).toEqual({ plugins: ["context-mode"] });
+        expect(written).not.toHaveProperty("plugin");
+      });
+    });
+
+    it("v1 writes the `plugin` key and leaves no `plugins` key (byte-identical)", () => {
+      withTargetConfig({}, "v1", (_a, file) => {
+        const adapter = new OpenCodeAdapter("opencode", "v1");
+        const changes = adapter.configureAllHooks("/tmp/plugin");
+        expect(changes).toEqual(["Added context-mode to plugin array"]);
+        const written = JSON.parse(readFileSync(file, "utf-8"));
+        expect(written).toEqual({ plugin: ["context-mode"] });
+        expect(written).not.toHaveProperty("plugins");
+      });
+    });
+
+    it("v1→v2 upgrade removes the stale `plugin` key (7.3)", () => {
+      withTargetConfig({ plugin: ["context-mode"] }, "v2", (_a, file) => {
+        const adapter = new OpenCodeAdapter("opencode", "v2");
+        const changes = adapter.configureAllHooks("/tmp/plugin");
+        expect(changes).toContain("Added context-mode to plugins array");
+        expect(changes.some((c) => c.includes("Removed stale plugin key"))).toBe(true);
+        const written = JSON.parse(readFileSync(file, "utf-8"));
+        expect(written).toEqual({ plugins: ["context-mode"] });
+        expect(written).not.toHaveProperty("plugin");
+      });
+    });
+
+    it("v2→v1 downgrade removes the stale `plugins` key (7.3)", () => {
+      withTargetConfig({ plugins: ["context-mode"] }, "v1", (_a, file) => {
+        const adapter = new OpenCodeAdapter("opencode", "v1");
+        const changes = adapter.configureAllHooks("/tmp/plugin");
+        expect(changes).toContain("Added context-mode to plugin array");
+        expect(changes.some((c) => c.includes("Removed stale plugins key"))).toBe(true);
+        const written = JSON.parse(readFileSync(file, "utf-8"));
+        expect(written).toEqual({ plugin: ["context-mode"] });
+        expect(written).not.toHaveProperty("plugins");
+      });
+    });
+
+    it("pure-v1 install (no `plugins` key) is untouched by the stale-key logic", () => {
+      withTargetConfig({ plugin: ["context-mode"] }, "v1", (_a, file) => {
+        const adapter = new OpenCodeAdapter("opencode", "v1");
+        const changes = adapter.configureAllHooks("/tmp/plugin");
+        // No "Removed stale" change — there was no opposite key to clear.
+        expect(changes).toEqual(["context-mode already in plugin array"]);
+        const written = JSON.parse(readFileSync(file, "utf-8"));
+        expect(written).toEqual({ plugin: ["context-mode"] });
+      });
+    });
+
+    it("v2 recognizes a `{ package }` object entry as already registered", () => {
+      withTargetConfig({ plugins: [{ package: "context-mode" }] }, "v2", (_a, file) => {
+        const adapter = new OpenCodeAdapter("opencode", "v2");
+        const changes = adapter.configureAllHooks("/tmp/plugin");
+        expect(changes).toContain("context-mode already in plugins array");
+        // No duplicate pushed.
+        const written = JSON.parse(readFileSync(file, "utf-8"));
+        expect(written.plugins).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("doctor / validateHooks (7.4)", () => {
+    it("v2 flags a stale `plugin` key as a warning", () => {
+      withTargetConfig({ plugins: ["context-mode"], plugin: ["context-mode"] }, "v2", (adapter) => {
+        const results = adapter.validateHooks("/tmp/plugin");
+        expect(results).toContainEqual(
+          expect.objectContaining({
+            check: "Stale plugin key",
+            status: "warn",
+            message: expect.stringContaining("plugin"),
+            fix: expect.stringContaining("removes the stale key"),
+          }),
+        );
+      });
+    });
+
+    it("v1 flags a stale `plugins` key as a warning", () => {
+      withTargetConfig({ plugin: ["context-mode"], plugins: ["context-mode"] }, "v1", (adapter) => {
+        const results = adapter.validateHooks("/tmp/plugin");
+        expect(results).toContainEqual(
+          expect.objectContaining({
+            check: "Stale plugin key",
+            status: "warn",
+            message: expect.stringContaining("plugins"),
+          }),
+        );
+      });
+    });
+
+    it("no stale-key warning when only the target key is present", () => {
+      withTargetConfig({ plugins: ["context-mode"] }, "v2", (adapter) => {
+        const results = adapter.validateHooks("/tmp/plugin");
+        expect(results.some((r) => r.check === "Stale plugin key")).toBe(false);
+        expect(results).toContainEqual(
+          expect.objectContaining({ check: "Plugin registration", status: "pass" }),
+        );
+      });
+    });
+  });
+
+  describe("detectTargetFromConfig", () => {
+    it("returns v2 when context-mode is under `plugins`", () => {
+      withTargetConfig({ plugins: ["context-mode"] }, "v1", (adapter) => {
+        expect(adapter.detectTargetFromConfig()).toBe("v2");
+      });
+    });
+
+    it("returns v1 when context-mode is under `plugin`", () => {
+      withTargetConfig({ plugin: ["context-mode"] }, "v2", (adapter) => {
+        expect(adapter.detectTargetFromConfig()).toBe("v1");
+      });
+    });
+
+    it("prefers v2 when both keys carry context-mode", () => {
+      withTargetConfig({ plugin: ["context-mode"], plugins: ["context-mode"] }, "v1", (adapter) => {
+        expect(adapter.detectTargetFromConfig()).toBe("v2");
+      });
+    });
+
+    it("returns null when neither key carries context-mode", () => {
+      withTargetConfig({ theme: "tokyonight" }, "v1", (adapter) => {
+        expect(adapter.detectTargetFromConfig()).toBeNull();
+      });
+    });
+  });
+});

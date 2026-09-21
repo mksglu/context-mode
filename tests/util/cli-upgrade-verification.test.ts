@@ -234,3 +234,42 @@ describe("v1.0.114 hotfix — full bug-prevention contract", () => {
     expect(upgradeBody).toMatch(/v1\.0\.114|hotfix/);
   });
 });
+
+// ─── OpenCode v1/v2 upgrade-target detection ───────────────────────────────────
+// The upgrade flow must resolve WHICH OpenCode plugin key to write. Locks the
+// detection order and that the resolved target reaches getAdapter. (The key-tier
+// detection itself — detectTargetFromConfig — is unit-tested in
+// tests/adapters/opencode.test.ts; this locks the CLI wiring around it.)
+describe("cli.ts OpenCode upgrade-target detection", () => {
+  const resolveIdx = cliSrc.indexOf("function resolveUpgradeTarget");
+  const resolveBody = resolveIdx >= 0 ? cliSrc.slice(resolveIdx, resolveIdx + 1200) : "";
+
+  test("parses --v2 / --opencode2 flags", () => {
+    expect(cliSrc).toMatch(/"--v2"[^\n]*"--opencode2"/);
+  });
+
+  test("resolveUpgradeTarget order: explicit -> opencode2-on-PATH -> existing-config -> v1", () => {
+    expect(resolveIdx).toBeGreaterThan(-1);
+    const explicitIdx = resolveBody.indexOf("if (explicit) return explicit;");
+    const pathIdx = resolveBody.indexOf('commandOnPath("opencode2")');
+    const cfgIdx = resolveBody.indexOf("detectTargetFromConfig");
+    const defaultIdx = resolveBody.lastIndexOf('return "v1"');
+    expect(explicitIdx).toBeGreaterThan(-1);
+    expect(pathIdx).toBeGreaterThan(explicitIdx);
+    expect(cfgIdx).toBeGreaterThan(pathIdx);
+    expect(defaultIdx).toBeGreaterThan(cfgIdx);
+  });
+
+  test("commandOnPath scans PATH (and PATHEXT on Windows)", () => {
+    const cpIdx = cliSrc.indexOf("function commandOnPath");
+    expect(cpIdx).toBeGreaterThan(-1);
+    const cpBody = cliSrc.slice(cpIdx, cpIdx + 700);
+    expect(cpBody).toContain("process.env.PATH");
+    expect(cpBody).toContain("PATHEXT");
+  });
+
+  test("upgrade() threads the resolved target into getAdapter", () => {
+    expect(upgradeBody).toContain("resolveUpgradeTarget(detection.platform, opts?.target)");
+    expect(upgradeBody).toContain("getAdapter(detection.platform, target)");
+  });
+});
