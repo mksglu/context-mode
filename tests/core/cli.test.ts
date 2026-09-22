@@ -493,21 +493,22 @@ describe("ABI-aware native binary caching (#148)", () => {
     expect(existsSync(join(releaseDir, "better_sqlite3.abi137.node"))).toBe(true);
   });
 
-  // ── Bun ABI cache seeding (#543) ────────────────────────────
+  // ── Bun must not seed the ABI cache (#543 follow-up) ────────────
   //
-  // When ensureNativeCompat runs under Bun, it early-returns BEFORE writing
-  // better_sqlite3.abi${N}.node — so the very next /ctx-upgrade run (which
-  // checks for that file as the success marker) prints a spurious
-  // "Native addon ABI cache missing" warning.
+  // #543 made the Bun branch copy the active better_sqlite3.node to
+  // better_sqlite3.abi${process.versions.modules}.node, so that the next
+  // /ctx-upgrade found its success marker. Bun SPOOFS
+  // process.versions.modules, and the bytes being copied were built by
+  // whichever Node last ran `npm rebuild` — so the copy is named after an ABI
+  // nobody verified it matches.
   //
-  // Bun spoofs process.versions.modules to the Node ABI (e.g. 137 on
-  // Darwin/Bun-1.2+, matching Node 24), so a plain file-copy of the active
-  // better_sqlite3.node to the ABI-tagged path produces the CORRECT
-  // filename for any subsequent Node boot at the same ABI level.
+  // The fast path in ensureNativeCompat then swaps that file into the active
+  // slot and, when skipProbe is true, returns without loading it, which
+  // installs an ABI-mismatched binding as the live one.
   //
-  // The fix lives BEFORE the existing `if (typeof globalThis.Bun !== "undefined") return;`
-  // guard inside ensureNativeCompat: if the active binary exists AND the
-  // ABI cache file does NOT, copy active → cache, then early-return.
+  // Under Bun the store runs on bun:sqlite and better-sqlite3 is never
+  // loaded, so the cache is simply not Bun's to write. /ctx-upgrade reports
+  // "not required under Bun" instead of warning.
   //
   // @see https://github.com/mksglu/context-mode/issues/543
 
@@ -529,21 +530,31 @@ describe("ABI-aware native binary caching (#148)", () => {
       }
     });
 
-    test("under Bun, with active .node but no abi cache: seeds the cache via copy", async () => {
+    test("under Bun, with active .node but no abi cache: leaves the cache absent", async () => {
       // Load AFTER the Bun shim is installed so the function captures it.
       const ensureNativeCompat = await loadEnsureNativeCompat();
       createFakeBinary(binaryPath, "active-binary-from-postinstall");
-      // Cache file is intentionally absent — this is the #543 scenario.
       expect(existsSync(abiCachePath())).toBe(false);
 
       ensureNativeCompat(tempDir);
 
-      // The fix: copy active → abi-tagged so the next /ctx-upgrade boot
-      // (under Node) finds the marker file and reports "ABI cache present".
-      expect(existsSync(abiCachePath())).toBe(true);
-      expect(readFileSync(abiCachePath(), "utf-8")).toBe("active-binary-from-postinstall");
+      // Bun cannot know which ABI those bytes were built for, so it must not
+      // claim one. The next real Node boot writes an entry it verified.
+      expect(existsSync(abiCachePath())).toBe(false);
       // Active binary remains untouched.
       expect(readFileSync(binaryPath, "utf-8")).toBe("active-binary-from-postinstall");
+    });
+
+    test("under Bun, no abi-named file is created for any ABI", async () => {
+      const ensureNativeCompat = await loadEnsureNativeCompat();
+      createFakeBinary(binaryPath, "active-binary-from-postinstall");
+
+      ensureNativeCompat(tempDir);
+
+      const seeded = readdirSync(releaseDir).filter(f =>
+        /^better_sqlite3\.abi\d+\.node$/.test(f),
+      );
+      expect(seeded).toEqual([]);
     });
 
     test("under Bun, without active .node source: does not throw and does not create cache", async () => {
@@ -553,18 +564,18 @@ describe("ABI-aware native binary caching (#148)", () => {
 
       expect(() => ensureNativeCompat(tempDir)).not.toThrow();
 
-      // No cache should be invented out of thin air.
       expect(existsSync(abiCachePath())).toBe(false);
     });
 
-    test("under Bun, when abi cache already exists: does not overwrite", async () => {
+    test("under Bun, an existing abi cache is left untouched", async () => {
       const ensureNativeCompat = await loadEnsureNativeCompat();
       createFakeBinary(binaryPath, "fresh-active");
       createFakeBinary(abiCachePath(), "preexisting-cache");
 
       ensureNativeCompat(tempDir);
 
-      // Idempotent: existing cache must be preserved untouched.
+      // A Node boot wrote that entry and verified it — Bun neither refreshes
+      // nor removes it.
       expect(readFileSync(abiCachePath(), "utf-8")).toBe("preexisting-cache");
     });
 
@@ -576,36 +587,25 @@ describe("ABI-aware native binary caching (#148)", () => {
 
       expect(() => ensureNativeCompat(tempDir)).not.toThrow();
 
-      // Cache MUST NOT be created because the source dir doesn't exist —
-      // creating files inside a deleted directory would either throw or
-      // re-materialize state the user explicitly removed.
       expect(existsSync(abiCachePath())).toBe(false);
     });
 
-    test("under Bun, cache filename uses cross-platform resolve() (no hard-coded separators)", () => {
-      // Source-contract guard: the fix must reuse the existing resolve()-based
-      // path construction (nativeDir / binaryPath / abiCachePath are already
-      // resolve()'d at the top of ensureNativeCompat). A future maintainer
-      // adding hard-coded "/" or "\\" inside the Bun branch would break
-      // Windows. We assert the fix lives inside ensureNativeCompat AND that
-      // no new path concatenation with hard-coded separators appears in
-      // the Bun branch.
+    test("under Bun, the branch writes nothing at all", () => {
+      // Source-contract guard: the Bun gate must stay a bare early return.
+      // Any file write reintroduced there is a cache entry whose ABI name
+      // nothing verified — the defect this test block exists for.
       const src = readFileSync(resolve(ROOT, "hooks", "ensure-deps.mjs"), "utf-8");
       const fnMatch = src.match(/^export function ensureNativeCompat\b[\s\S]*?^}/m);
       expect(fnMatch).not.toBeNull();
       const body = fnMatch![0];
-      // The fix must reference both source and destination paths.
-      expect(body).toMatch(/binaryPath/);
-      expect(body).toMatch(/abiCachePath/);
-      // Cross-platform safety: no path string built with "\\" or "/" literals
-      // inside the Bun gate region. We anchor on the Bun gate comment and
-      // scan the surrounding region for forbidden hard-coded separators.
       const bunGateIdx = body.indexOf("Bun ships bun:sqlite");
       expect(bunGateIdx).toBeGreaterThan(-1);
-      const bunRegion = body.slice(Math.max(0, bunGateIdx - 200), bunGateIdx + 600);
-      // No string concatenation with hard-coded path separators in the Bun region.
-      expect(bunRegion).not.toMatch(/["'][^"']*\\\\better_sqlite3/);
-      expect(bunRegion).not.toMatch(/["']\/[^"']*better_sqlite3\.node["']/);
+      const bunRegion = body.slice(bunGateIdx, bunGateIdx + 700);
+      const gateEnd = bunRegion.indexOf("return;");
+      expect(gateEnd).toBeGreaterThan(-1);
+      expect(bunRegion.slice(0, gateEnd)).not.toMatch(
+        /copyFileSync|writeFileSync|renameSync|mkdirSync/,
+      );
     });
   });
 });

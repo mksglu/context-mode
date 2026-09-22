@@ -1699,6 +1699,12 @@ async function upgrade(opts?: { platform?: string }) {
           if (existsSync(bsqAbiCachePath)) {
             s.stop(color.green("Native addons OK") + color.dim(" — ABI cache present"));
             changes.push(`better-sqlite3 ABI ${process.versions.modules} cache ready`);
+          } else if ((globalThis as any).Bun) {
+            // Under Bun the store runs on bun:sqlite, so better-sqlite3 is
+            // never loaded and its ABI cache says nothing about this install.
+            // #543 silenced this warning by writing a cache entry Bun could
+            // not verify; report the truth instead.
+            s.stop(color.green("Native addons OK") + color.dim(" — not required under Bun"));
           } else {
             s.stop(color.yellow("Native addon ABI cache missing"));
             p.log.warn(
