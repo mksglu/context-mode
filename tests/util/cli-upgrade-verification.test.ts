@@ -245,7 +245,11 @@ describe("cli.ts OpenCode upgrade-target detection", () => {
   const resolveBody = resolveIdx >= 0 ? cliSrc.slice(resolveIdx, resolveIdx + 1200) : "";
 
   test("parses --v2 / --opencode2 flags", () => {
-    expect(cliSrc).toMatch(/"--v2"[^\n]*"--opencode2"/);
+    const v2Idx = cliSrc.indexOf('"--v2"');
+    expect(v2Idx).toBeGreaterThan(-1);
+    const lineEnd = cliSrc.indexOf("\n", v2Idx);
+    const line = cliSrc.slice(v2Idx, lineEnd);
+    expect(line.includes('"--opencode2"')).toBe(true);
   });
 
   test("resolveUpgradeTarget order: explicit -> opencode2-on-PATH -> existing-config -> v1", () => {

@@ -113,6 +113,22 @@ export function isSyntheticMessage(text: string): boolean {
 
 export const ROUTING_MARKERS = ["<context_window_protection>", "ctx_search", "ctx_index"];
 
+/** Whole-word presence via a delimiter walk (no regex): the marker must not sit
+ * inside a longer alphanumeric run on either side. */
+function containsAsWord(haystack: string, needle: string): boolean {
+  const isWordChar = (ch: string) =>
+    (ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9") || ch === "_";
+  let from = 0;
+  for (;;) {
+    const at = haystack.indexOf(needle, from);
+    if (at === -1) return false;
+    const before = at === 0 ? "" : haystack.charAt(at - 1);
+    const after = at + needle.length >= haystack.length ? "" : haystack.charAt(at + needle.length);
+    if (!isWordChar(before) && !isWordChar(after)) return true;
+    from = at + 1;
+  }
+}
+
 export function systemHasRoutingInstructions(system: string[]): boolean {
   const joined = system.join("\n");
   let count = 0;
@@ -120,8 +136,7 @@ export function systemHasRoutingInstructions(system: string[]): boolean {
     if (marker.startsWith("<")) {
       if (joined.includes(marker)) count++;
     } else {
-      const re = new RegExp(`(?:^|\\W)${marker}(?:\\W|$)`);
-      if (re.test(joined)) count++;
+      if (containsAsWord(joined, marker)) count++;
     }
   }
   return count >= 2;

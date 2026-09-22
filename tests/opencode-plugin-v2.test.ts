@@ -437,7 +437,7 @@ describe("OpenCode v2 setup mouth", () => {
         };
         try {
           await before(ev);
-          expect(String(ev.input.command)).toMatch(/^echo /);
+          expect(String(ev.input.command).startsWith("echo ")).toBe(true);
         } catch (e: any) {
           expect(e.message).toContain("context-mode");
         }
