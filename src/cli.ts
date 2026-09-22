@@ -19,7 +19,7 @@ import color from "picocolors";
 import { execFileSync, execSync, execFile as nodeExecFile, type ExecSyncOptions } from "node:child_process";
 import { readFileSync, writeFileSync, cpSync, accessSync, existsSync, readdirSync, rmSync, closeSync, openSync, chmodSync, mkdirSync, lstatSync, realpathSync, statSync, constants } from "node:fs";
 import { request as httpsRequest } from "node:https";
-import { resolve, dirname, join, sep, basename, isAbsolute } from "node:path";
+import { resolve, dirname, join, sep, basename, isAbsolute, delimiter } from "node:path";
 import { tmpdir, devNull, homedir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -67,7 +67,7 @@ function browserOpenArgv(
 }
 
 // ── Adapter imports ──────────────────────────────────────
-import { detectPlatform, getAdapter } from "./adapters/detect.js";
+import { detectPlatform, getAdapter, detectOpencodeTargetFromConfig } from "./adapters/detect.js";
 import { isInProcessPluginPlatform } from "./adapters/types.js";
 
 /* -------------------------------------------------------
@@ -242,7 +242,14 @@ if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
     platformFlagIdx >= 0 && args[platformFlagIdx + 1]
       ? args[platformFlagIdx + 1]
       : undefined;
-  upgrade(platformArg ? { platform: platformArg } : undefined).catch((err: unknown) => {
+  // v2 target opt-in. When absent, upgrade() auto-detects the target
+  // from PATH / existing config keys and defaults to v1.
+  const v2Flag = args.includes("--v2") || args.includes("--opencode2");
+  const upgradeOpts: { platform?: string; target?: "v1" | "v2" } = {};
+  if (platformArg) upgradeOpts.platform = platformArg;
+  if (v2Flag) upgradeOpts.target = "v2";
+  const upgradeArg = Object.keys(upgradeOpts).length ? upgradeOpts : undefined;
+  upgrade(upgradeArg).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     p.log.error(color.red(message));
     process.exit(1);
@@ -658,12 +665,16 @@ async function doctor(): Promise<number> {
 
   // Detect platform
   const detection = detectPlatform();
-  const adapter = await getAdapter(detection.platform);
+  // Resolve the OpenCode v1/v2 target from the user's own config so the doctor
+  // reports the compaction posture they actually configured (v2-only check).
+  const target = (await detectOpencodeTargetFromConfig(detection.platform)) ?? "v1";
+  const adapter = await getAdapter(detection.platform, target);
 
   p.intro(color.bgMagenta(color.white(" context-mode doctor ")));
   p.log.info(
     `Platform: ${color.cyan(adapter.name)}` +
-      color.dim(` (${detection.confidence} confidence — ${detection.reason})`),
+      color.dim(` (${detection.confidence} confidence — ${detection.reason})`) +
+      (target === "v2" ? color.cyan(" · v2 target") : color.dim(" · v1 target")),
   );
 
   let criticalFails = 0;
@@ -1231,7 +1242,56 @@ async function insight() {
  * Upgrade — adapter-aware hook configuration
  * ------------------------------------------------------- */
 
-async function upgrade(opts?: { platform?: string }) {
+/**
+ * Resolve the OpenCode v1/v2 upgrade target:
+ *   explicit --v2 → `opencode2` on PATH → existing `plugins` key →
+ *   existing `plugin` key → default v1.
+ * Non-opencode platforms always resolve to v1 (the axis is ignored there).
+ */
+async function resolveUpgradeTarget(
+  platform: string | undefined,
+  explicit?: "v1" | "v2",
+): Promise<"v1" | "v2"> {
+  if (explicit) return explicit;
+  if (platform !== "opencode" && platform !== "kilo") return "v1";
+  if (commandOnPath("opencode2")) return "v2";
+  try {
+    const probe = await getAdapter(
+      platform as Parameters<typeof getAdapter>[0],
+      "v1",
+    );
+    const fromConfig = (
+      probe as { detectTargetFromConfig?: () => "v1" | "v2" | null }
+    ).detectTargetFromConfig?.();
+    if (fromConfig) return fromConfig;
+  } catch {
+    /* fall through to default */
+  }
+  return "v1";
+}
+
+/** Whether an executable is resolvable on PATH (cross-platform). */
+function commandOnPath(cmd: string): boolean {
+  const pathDirs = (process.env.PATH || "").split(delimiter);
+  const exts =
+    process.platform === "win32"
+      ? (process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM").split(";")
+      : [""];
+  for (const dir of pathDirs) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      try {
+        accessSync(join(dir, cmd + ext), constants.X_OK);
+        return true;
+      } catch {
+        /* try next candidate */
+      }
+    }
+  }
+  return false;
+}
+
+async function upgrade(opts?: { platform?: string; target?: "v1" | "v2" }) {
   if (process.stdout.isTTY) console.clear();
 
   // Issue #542 — when the MCP ctx_upgrade handler threads through an
@@ -1243,12 +1303,16 @@ async function upgrade(opts?: { platform?: string }) {
   const detection = opts?.platform
     ? { platform: opts.platform as Parameters<typeof getAdapter>[0], confidence: "high" as const, reason: `--platform ${opts.platform} from ctx_upgrade handler` }
     : detectPlatform();
-  const adapter = await getAdapter(detection.platform);
+
+  // Resolve the OpenCode v1/v2 target before constructing the adapter.
+  const target = await resolveUpgradeTarget(detection.platform, opts?.target);
+  const adapter = await getAdapter(detection.platform, target);
 
   p.intro(color.bgCyan(color.black(" context-mode upgrade ")));
   p.log.info(
     `Platform: ${color.cyan(adapter.name)}` +
-      color.dim(` (${detection.confidence} confidence)`),
+      color.dim(` (${detection.confidence} confidence)`) +
+      (target === "v2" ? color.cyan(" · v2 target") : color.dim(" · v1 target")),
   );
 
   let pluginRoot = getPluginRoot();

@@ -631,10 +631,37 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
 }
 
 /**
+ * Detect the OpenCode v1/v2 adapter target from the user's own config files
+ * (the `plugins` vs `plugin` key) for read-only diagnosis. This is the
+ * config-as-ground-truth signal the doctor uses so it reports the compaction
+ * posture the user actually configured, independent of PATH heuristics.
+ *
+ * Returns null for non-opencode platforms or when neither key carries
+ * context-mode. A v1-only config (`plugin`) returns "v1" — never a false v2.
+ */
+export async function detectOpencodeTargetFromConfig(
+  platform: PlatformId,
+): Promise<"v1" | "v2" | null> {
+  if (platform !== "opencode" && platform !== "kilo") return null;
+  try {
+    const probe = await getAdapter(platform, "v1");
+    return (
+      (probe as { detectTargetFromConfig?: () => "v1" | "v2" | null })
+        .detectTargetFromConfig?.() ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get the adapter instance for a given platform.
  * Lazily imports platform-specific adapter modules.
  */
-export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
+export async function getAdapter(
+  platform?: PlatformId,
+  pluginTarget?: import("./opencode/index.js").AdapterTarget,
+): Promise<HookAdapter> {
   const target = platform ?? detectPlatform().platform;
 
   switch (target) {
@@ -651,7 +678,7 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
     case "kilo":
     case "opencode": {
       const { OpenCodeAdapter } = await import("./opencode/index.js");
-      return new OpenCodeAdapter(target);
+      return new OpenCodeAdapter(target, pluginTarget ?? "v1");
     }
 
     case "openclaw": {
