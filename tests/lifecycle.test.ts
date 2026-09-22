@@ -294,6 +294,7 @@ describe("makeDefaultIsParentAlive — grandparent orphan detection (#311)", () 
     const isAlive = makeDefaultIsParentAlive({
       getPpid: () => 100,
       readGrandparentPpid: () => currentGrandparent,
+      isPidAlive: () => true, // parent PID present; isolate the grandparent path
     });
 
     assert.equal(isAlive(), true, "alive at startup when grandparent is a normal process");
@@ -310,6 +311,7 @@ describe("makeDefaultIsParentAlive — grandparent orphan detection (#311)", () 
     const isAlive = makeDefaultIsParentAlive({
       getPpid: () => 100,
       readGrandparentPpid: () => 1,
+      isPidAlive: () => true,
     });
 
     // Multiple polls — never flip to false while ppid is stable.
@@ -318,15 +320,34 @@ describe("makeDefaultIsParentAlive — grandparent orphan detection (#311)", () 
     assert.equal(isAlive(), true);
   });
 
-  test("tolerates NaN grandparent (Windows / ps failure)", () => {
-    // On Windows readGrandparentPpidImpl returns NaN; the check must fall
-    // back to the original ppid-only path and stay green while ppid is stable.
+  test("tolerates NaN grandparent (Windows / ps failure) while parent PID is alive", () => {
+    // On Windows readGrandparentPpidImpl returns NaN; with the parent PID still
+    // present the check must stay green while ppid is stable.
     const isAlive = makeDefaultIsParentAlive({
       getPpid: () => 100,
       readGrandparentPpid: () => NaN,
+      isPidAlive: () => true,
     });
 
     assert.equal(isAlive(), true);
+  });
+
+  test("detects parent death on Windows via PID existence probe (#982)", () => {
+    // The Windows failure mode: an orphaned child keeps its original ppid (no
+    // reparent-to-init) and the ps-based grandparent probe returns NaN, so
+    // BOTH the ppid-equality and grandparent checks stay green forever. The
+    // PID existence probe is the only signal that fires — without it the guard
+    // never shut the orphan down.
+    let parentAlive = true;
+    const isAlive = makeDefaultIsParentAlive({
+      getPpid: () => 100, // stable ppid, exactly as Windows keeps it
+      readGrandparentPpid: () => NaN, // no ps on Windows
+      isPidAlive: () => parentAlive,
+    });
+
+    assert.equal(isAlive(), true, "alive while the parent PID still exists");
+    parentAlive = false; // claude.exe exits; child is NOT reparented on Windows
+    assert.equal(isAlive(), false, "must reap once the parent PID is gone (#982)");
   });
 
   test("direct ppid death still takes precedence over grandparent check", () => {
@@ -336,6 +357,7 @@ describe("makeDefaultIsParentAlive — grandparent orphan detection (#311)", () 
     const isAlive = makeDefaultIsParentAlive({
       getPpid: () => ppid,
       readGrandparentPpid: () => 7, // grandparent alive the whole time
+      isPidAlive: () => true,
     });
 
     assert.equal(isAlive(), true);
@@ -350,6 +372,7 @@ describe("makeDefaultIsParentAlive — grandparent orphan detection (#311)", () 
     const aliveCheck = makeDefaultIsParentAlive({
       getPpid: () => 100,
       readGrandparentPpid: () => currentGrandparent,
+      isPidAlive: () => true,
     });
 
     let shutdownCalled = false;
