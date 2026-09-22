@@ -11,7 +11,7 @@ import "./setup-home";
  * per-session directory resolution, load-idempotency, and cleanup.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync, existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -182,6 +182,28 @@ describe("OpenCode v2 setup mouth", () => {
 
     it("preserves the pre-1.18.29 named export lifeline", () => {
       expect(typeof ContextModePlugin).toBe("function");
+    });
+
+    // #1171 — the v2 `setup` must survive a host where @opencode/plugin
+    // cannot be resolved (e.g. `opencode plugin add` skipping full dependency
+    // resolution). Our default export is a plain object literal, so it never
+    // depends on that import — but this guards against a future reintroduction
+    // of a dynamic-import-with-fallback that would silently drop `setup` and
+    // make OpenCode 2 reject the whole plugin ("Plugin must export a default
+    // definition with an id and an effect or setup function").
+    it("still exposes a working v2 `setup` when @opencode/plugin fails to resolve", async () => {
+      vi.resetModules();
+      vi.doMock("@opencode/plugin", () => {
+        throw new Error("Cannot find module '@opencode/plugin'");
+      });
+      try {
+        const mod = await import("../src/adapters/opencode/plugin.js");
+        expect(typeof (mod.default as any).setup).toBe("function");
+        expect(typeof (mod.default as any).server).toBe("function");
+      } finally {
+        vi.doUnmock("@opencode/plugin");
+        vi.resetModules();
+      }
     });
   });
 
