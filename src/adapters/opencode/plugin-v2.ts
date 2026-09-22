@@ -65,6 +65,36 @@ function destructivePolicyAllows(name: string): boolean {
 }
 
 /**
+ * v2 compaction posture, configurable via the plugin's `options.compaction`.
+ *
+ * - "own" (default): the DB table-of-contents becomes the compaction summary and
+ *   the model summarization call is skipped — the strongest form, deterministic
+ *   and model-cost-free.
+ * - "passthrough": leave the result unset so the host model narrates its own
+ *   summary. The COMPACTING session therefore sees the host's narrative, not the
+ *   TOC. The TOC is still persisted (buildCompactionSnapshot upserts it) so a
+ *   DIFFERENT resumed session claims it via the `context` hook — the same
+ *   cross-session resume delivery own mode also provides. This is the escape hatch
+ *   for a host or user who wants the model's narrative continuity back rather than
+ *   a deterministic TOC-as-summary.
+ *
+ * This is deliberately NOT a v1 replica. v1 folded the TOC into the SAME
+ * session's compaction summary (`output.context.push`); the v2 `SessionCompaction`
+ * type exposes no such lever — only the `result` override that skips the model.
+ * So passthrough cannot reproduce v1's same-session TOC-in-summary: it hands the
+ * summary to the host and leaves the TOC for cross-session resume only. It is
+ * named for that actual behavior, not "v1", to avoid promising a mechanism the
+ * v2 API cannot provide.
+ */
+type CompactionMode = "own" | "passthrough";
+
+/** Resolve `options.compaction` to a {@link CompactionMode}; unrecognized → "own". */
+function resolveCompactionMode(raw: unknown): CompactionMode {
+  const v = String(raw ?? "").trim().toLowerCase();
+  return v === "passthrough" || v === "host" ? "passthrough" : "own";
+}
+
+/**
  * Strip the `ctx_` prefix so the effective name (`namespace` + `name`) stays
  * `ctx_*`, matching the v1 surface. Registering the bare name under the `ctx`
  * namespace yields `ctx_<bare>`; the bare `execute` name is reserved for CodeMode
@@ -202,6 +232,11 @@ export async function setupV2(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
   const loadScopeDir = ctx.location?.directory ?? process.cwd();
 
   const core: ContextModeCore = await getCore({ platform, loadScopeDir });
+
+  // Compaction posture from the v2 plugin's `options.compaction`: "own" (default)
+  // makes the TOC the summary and skips the model; "passthrough" lets the host
+  // model narrate. See {@link CompactionMode}.
+  const compactionMode = resolveCompactionMode(ctx.options?.compaction);
 
   // Per-session workspace directory: resolved from the calling session's own
   // location (not just the plugin-load-scope dir) and cached so repeated calls
@@ -341,13 +376,18 @@ export async function setupV2(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
   disposers.push(() => contextReg.dispose());
 
   // ── 6. Compaction — DB table-of-contents as the summary ─────────────
-  // Supplying `result` skips the model summarization call. An empty TOC leaves
-  // the result unset so the host performs its normal compaction.
+  // "own" (default): supplying `result` skips the model summarization call.
+  // "passthrough": `result` is left unset so the host model narrates; the TOC
+  // still reaches the model via the resume path (buildCompactionSnapshot upserts
+  // it, the `context` hook claims it next turn). An empty TOC leaves the result
+  // unset in either mode so the host performs its normal compaction.
   const compactionReg = await ctx.session.hook("compaction", async (ev) => {
     const project = await resolveDir(ev.sessionID);
     const res = core.buildCompactionSnapshot(ev.sessionID, project);
     if (!res || !res.snapshot || res.snapshot.trim().length === 0) return;
-    ev.result = { summary: res.snapshot };
+    if (compactionMode === "own") {
+      ev.result = { summary: res.snapshot };
+    }
   });
   disposers.push(() => compactionReg.dispose());
 

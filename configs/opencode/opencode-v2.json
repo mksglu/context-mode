@@ -1,6 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "context-mode"
+    {
+      "package": "context-mode",
+      "options": {
+        "compaction": "own"
+      }
+    }
   ]
 }

@@ -17,6 +17,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 import pluginDefault, { ContextModePlugin } from "../src/adapters/opencode/plugin.js";
+import { OpenCodeAdapter } from "../src/adapters/opencode/index.js";
 import { getCore, resetCoreCache } from "../src/adapters/opencode/core.js";
 import { parseOpencodeV2StepUsage } from "../src/session/extract.js";
 import { isMCPReady, sentinelPathForPid } from "../hooks/core/mcp-ready.mjs";
@@ -41,7 +42,7 @@ interface MockCtx {
  * `sessionDir` (optional) is what `session.get` reports as the session's own
  * location, so per-session resolution can be pointed at a different dir.
  */
-function makeMockCtx(directory: string, sessionDir?: string): MockCtx {
+function makeMockCtx(directory: string, sessionDir?: string, options?: Record<string, any>): MockCtx {
   const tools: any[] = [];
   const toolHooks: Record<string, Array<(ev: any) => any>> = {};
   const sessionHooks: Record<string, Array<(ev: any) => any>> = {};
@@ -89,6 +90,7 @@ function makeMockCtx(directory: string, sessionDir?: string): MockCtx {
 
   const ctx: any = {
     location: { directory },
+    options: options ?? {},
     event: eventBus,
     session: {
       get: async ({ sessionID }: { sessionID: string }) => {
@@ -129,8 +131,8 @@ function makeMockCtx(directory: string, sessionDir?: string): MockCtx {
 }
 
 /** Run the v2 setup mouth against a mock context and return the captured state. */
-async function setupV2For(directory: string, sessionDir?: string) {
-  const mock = makeMockCtx(directory, sessionDir);
+async function setupV2For(directory: string, sessionDir?: string, options?: Record<string, any>) {
+  const mock = makeMockCtx(directory, sessionDir, options);
   const cleanup = await (pluginDefault.setup as any)(mock.ctx);
   return { ...mock, cleanup: cleanup as () => Promise<void> };
 }
@@ -618,6 +620,166 @@ describe("OpenCode v2 setup mouth", () => {
       } finally {
         await cleanup();
       }
+    });
+
+    it("passthrough: leaves result unset so the host narrates, but still upserts the resume TOC", async () => {
+      const { toolHooks, sessionHooks, cleanup } = await setupV2For(
+        join(tempDir, "compact-passthrough"),
+        undefined,
+        { compaction: "passthrough" },
+      );
+      try {
+        const after = toolHooks["execute.after"][0];
+        await after({
+          tool: "Read",
+          sessionID: "s-compact-pass",
+          input: { file_path: "/src/index.ts" },
+          status: "completed",
+          result: { output: "export default {}", metadata: {} },
+        });
+        const compaction = sessionHooks["compaction"][0];
+        const ev: any = { sessionID: "s-compact-pass" };
+        await compaction(ev);
+        // passthrough: the model narrates — the result override is NOT set.
+        expect(ev.result).toBeUndefined();
+        // The TOC was still upserted at compaction. The COMPACTING session does
+        // NOT re-inject its own TOC (anti-self-injection: `session_id != ?`),
+        // but a DIFFERENT resumed session claims it via the context hook — the
+        // same cross-session resume delivery that own mode also provides.
+        const context = sessionHooks["context"][0];
+        const cev: any = { sessionID: "s-resumed-pass", system: [] };
+        await context(cev);
+        const joined = cev.system.map((p: any) => p.text).join("\n");
+        expect(joined).toContain("session_resume");
+        expect(joined).toContain("index.ts");
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it("passthrough alias `host` also leaves the result unset", async () => {
+      const { toolHooks, sessionHooks, cleanup } = await setupV2For(
+        join(tempDir, "compact-host-alias"),
+        undefined,
+        { compaction: "host" },
+      );
+      try {
+        const after = toolHooks["execute.after"][0];
+        await after({
+          tool: "Read",
+          sessionID: "s-compact-host",
+          input: { file_path: "/src/index.ts" },
+          status: "completed",
+          result: { output: "export default {}", metadata: {} },
+        });
+        const compaction = sessionHooks["compaction"][0];
+        const ev: any = { sessionID: "s-compact-host" };
+        await compaction(ev);
+        expect(ev.result).toBeUndefined();
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it("explicit `own` option still supplies the TOC as the summary", async () => {
+      const { toolHooks, sessionHooks, cleanup } = await setupV2For(
+        join(tempDir, "compact-own-explicit"),
+        undefined,
+        { compaction: "own" },
+      );
+      try {
+        const after = toolHooks["execute.after"][0];
+        await after({
+          tool: "Read",
+          sessionID: "s-compact-own",
+          input: { file_path: "/src/index.ts" },
+          status: "completed",
+          result: { output: "export default {}", metadata: {} },
+        });
+        const compaction = sessionHooks["compaction"][0];
+        const ev: any = { sessionID: "s-compact-own" };
+        await compaction(ev);
+        expect(ev.result).toBeDefined();
+        expect(ev.result.summary).toContain("session_resume");
+      } finally {
+        await cleanup();
+      }
+    });
+  });
+
+  // ── Doctor: compaction-mode surfacing (v2 only) ──────────
+
+  describe("doctor — compaction mode", () => {
+    function doctorWith(settings: Record<string, unknown>, target: "v1" | "v2") {
+      const dir = mkdtempSync(join(tempDir, "doctor-"));
+      const settingsPath = join(dir, "opencode.json");
+      writeFileSync(settingsPath, JSON.stringify(settings));
+      const adapter = new OpenCodeAdapter("opencode", target);
+      // readSettings() reads this.paths(); point it at the temp settings file.
+      Object.defineProperty(adapter, "paths", { value: () => [settingsPath] });
+      return adapter.validateHooks("");
+    }
+
+    it("reports 'own' by default for a v2 target with no compaction option", () => {
+      const results = doctorWith({ plugins: ["context-mode"] }, "v2");
+      const cm = results.find((r) => r.check === "Compaction mode");
+      expect(cm).toBeDefined();
+      expect(cm!.status).toBe("pass");
+      expect(cm!.message).toContain("own");
+    });
+
+    it("reports 'passthrough' when options.compaction is passthrough", () => {
+      const results = doctorWith(
+        { plugins: [{ package: "context-mode", options: { compaction: "passthrough" } }] },
+        "v2",
+      );
+      const cm = results.find((r) => r.check === "Compaction mode");
+      expect(cm).toBeDefined();
+      expect(cm!.message).toContain("passthrough");
+    });
+
+    it("honors the `host` alias in the config", () => {
+      const results = doctorWith(
+        { plugins: [{ package: "context-mode", options: { compaction: "host" } }] },
+        "v2",
+      );
+      const cm = results.find((r) => r.check === "Compaction mode");
+      expect(cm!.message).toContain("passthrough");
+    });
+
+    it("does NOT surface a compaction-mode check for a v1 target", () => {
+      const results = doctorWith({ plugin: ["context-mode"] }, "v1");
+      expect(results.find((r) => r.check === "Compaction mode")).toBeUndefined();
+    });
+  });
+
+  // ── Doctor: target reachability (config → adapter target) ──
+
+  describe("doctor — target reachability", () => {
+    async function targetFromConfig(config: Record<string, unknown>) {
+      const dir = mkdtempSync(join(tempDir, "reach-"));
+      const cwd = process.cwd();
+      writeFileSync(join(dir, "opencode.json"), JSON.stringify(config));
+      process.chdir(dir);
+      try {
+        const { detectOpencodeTargetFromConfig } = await import("../src/adapters/detect.js");
+        return await detectOpencodeTargetFromConfig("opencode");
+      } finally {
+        process.chdir(cwd);
+      }
+    }
+
+    it("resolves v2 from a `plugins` config so the doctor builds a v2 adapter", async () => {
+      expect(await targetFromConfig({ plugins: ["context-mode"] })).toBe("v2");
+    });
+
+    it("resolves v1 from a `plugin` config (no false v2)", async () => {
+      expect(await targetFromConfig({ plugin: ["context-mode"] })).toBe("v1");
+    });
+
+    it("returns null for a non-opencode platform (helper gating)", async () => {
+      const { detectOpencodeTargetFromConfig } = await import("../src/adapters/detect.js");
+      expect(await detectOpencodeTargetFromConfig("claude-code")).toBeNull();
     });
   });
 

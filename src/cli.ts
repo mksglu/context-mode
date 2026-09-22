@@ -67,7 +67,7 @@ function browserOpenArgv(
 }
 
 // ── Adapter imports ──────────────────────────────────────
-import { detectPlatform, getAdapter } from "./adapters/detect.js";
+import { detectPlatform, getAdapter, detectOpencodeTargetFromConfig } from "./adapters/detect.js";
 import { isInProcessPluginPlatform } from "./adapters/types.js";
 
 /* -------------------------------------------------------
@@ -665,12 +665,16 @@ async function doctor(): Promise<number> {
 
   // Detect platform
   const detection = detectPlatform();
-  const adapter = await getAdapter(detection.platform);
+  // Resolve the OpenCode v1/v2 target from the user's own config so the doctor
+  // reports the compaction posture they actually configured (v2-only check).
+  const target = (await detectOpencodeTargetFromConfig(detection.platform)) ?? "v1";
+  const adapter = await getAdapter(detection.platform, target);
 
   p.intro(color.bgMagenta(color.white(" context-mode doctor ")));
   p.log.info(
     `Platform: ${color.cyan(adapter.name)}` +
-      color.dim(` (${detection.confidence} confidence — ${detection.reason})`),
+      color.dim(` (${detection.confidence} confidence — ${detection.reason})`) +
+      (target === "v2" ? color.cyan(" · v2 target") : color.dim(" · v1 target")),
   );
 
   let criticalFails = 0;

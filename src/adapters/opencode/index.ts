@@ -459,6 +459,21 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       });
     }
 
+    // v2-only: surface the effective compaction posture so it is observable via
+    // `ctx doctor`. "own" makes the DB TOC the summary and skips the model;
+    // "passthrough" lets the host model narrate (TOC delivered via resume).
+    if (this.target === "v2") {
+      const mode = this.effectiveCompactionMode(settings);
+      results.push({
+        check: "Compaction mode",
+        status: "pass",
+        message:
+          mode === "passthrough"
+            ? "passthrough — host model narrates the summary; context-mode TOC delivered via resume"
+            : "own — context-mode DB table-of-contents is the summary; model summarization skipped",
+      });
+    }
+
     if (this.hasLegacyContextModeMcp(settings)) {
       results.push({
         check: "Legacy MCP registration",
@@ -645,6 +660,28 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       }
       return false;
     });
+  }
+
+  /**
+   * Effective v2 compaction posture from the context-mode plugin entry's
+   * `options.compaction`. Reads the same `{ package, options }` object the v2
+   * host passes to `ctx.options`. Defaults to "own" when unset or unrecognized;
+   * "passthrough" (or "host") selects the host-narrates mode.
+   */
+  private effectiveCompactionMode(settings: Record<string, unknown>): "own" | "passthrough" {
+    const plugins = settings[this.pluginKey];
+    if (!Array.isArray(plugins)) return "own";
+    for (const p of plugins) {
+      if (p && typeof p === "object") {
+        const pkg = (p as { package?: unknown }).package;
+        if (typeof pkg === "string" && pkg.includes("context-mode")) {
+          const raw = (p as { options?: { compaction?: unknown } }).options?.compaction;
+          const v = String(raw ?? "").trim().toLowerCase();
+          return v === "passthrough" || v === "host" ? "passthrough" : "own";
+        }
+      }
+    }
+    return "own";
   }
 
   private hasLegacyContextModeMcp(settings: Record<string, unknown>): boolean {

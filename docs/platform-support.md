@@ -219,6 +219,15 @@ Entries may be a bare string or a `{ "package": "...", "options": { ... } }` obj
 
 **Compaction ownership:** on `ctx.session.hook("compaction")`, context-mode replaces the host's model-generated summary with its own snapshot (`ev.result = { summary }`), skipping the extra model call. The guard only fires when the snapshot is non-empty. The host retains the recent tail (≤ `compaction.keep.tokens`, ~15k) — the old `autoBlock` lever is dropped.
 
+**Compaction mode (configurable):** the posture is set by the plugin's `options.compaction` in the config file:
+
+| Value | Behavior |
+|-------|----------|
+| `own` (default) | The DB table-of-contents **is** the summary; the model summarization call is **skipped**. Deterministic and model-cost-free. |
+| `passthrough` (alias `host`) | `result` is left unset so the **host model narrates** its own summary. The **compacting** session sees the host narrative, **not** the TOC. The TOC is still persisted at compaction so a *different* resumed session claims it via the `context` hook (cross-session resume) — the same delivery `own` mode also provides. |
+
+`passthrough` is the escape hatch for a host or user who wants the model's narrative continuity back instead of a deterministic TOC-as-summary. It is **not** a V1 replica: V1 folded the TOC into the *same* session's compaction summary (`output.context.push`), a lever the V2 `SessionCompaction` type does not expose. So `passthrough` hands the summary to the host and leaves the TOC for cross-session resume only — the compacting session itself does not get the TOC back (the anti-self-injection guard, `session_id != ?`, prevents it). `context-mode doctor` reports the effective mode under **Compaction mode**.
+
 **Routing block + resume pointer:** injected into `ev.system` in the `context` hook. The `context` hook fires only for `kind="primary"` requests, so it never pollutes the compaction-summary path. A quorum guard (`systemHasRoutingInstructions`) keeps the block from being added twice.
 
 **Permission posture (honest — read this):**
@@ -242,7 +251,7 @@ V2's plugin-tool permission model is **coarser than V1's per-call hooks**. Be aw
 
 When switching targets, the installer writes the correct key and **removes the stale opposite key** (a leftover `plugin` alongside `plugins` would double-register). A pure-V1 config is left byte-identical. `context-mode doctor` warns when a stale opposite-generation key is present.
 
-**Not yet on V2:** usage/token capture (V2's `session.usage.updated` / `step.ended` shape differs from V1's `message.updated` parser) is deferred — it is out of scope for the v2 adapter change.
+**Usage / token capture (V2):** shipped. V2 has no `message.updated` event, so capture rides `session.step.ended` — cost, tokens (input/output/reasoning/cache) and session/message IDs are read from the step payload and correlated to the model via `session.step.started`. Reasoning tokens are folded into `output_tokens` (the `AgentUsageCounts` shape has no reasoning field), and V2's native USD cost is recorded verbatim as `native_cost_usd`, bypassing the pricing catalog.
 
 ---
 

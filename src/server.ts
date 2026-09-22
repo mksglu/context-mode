@@ -541,9 +541,12 @@ let _detectedAdapter: HookAdapter | null = null;
 async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
   if (_detectedAdapter) return _detectedAdapter;
   try {
-    const { getAdapter } = await import("./adapters/detect.js");
+    const { getAdapter, detectOpencodeTargetFromConfig } = await import("./adapters/detect.js");
     const signal = detectPlatform();
-    return await getAdapter(signal.platform);
+    // Resolve the OpenCode v1/v2 target from the user's config so the in-chat
+    // ctx_doctor reports the compaction posture they actually configured.
+    const target = (await detectOpencodeTargetFromConfig(signal.platform)) ?? "v1";
+    return await getAdapter(signal.platform, target);
   } catch {
     return null;
   }
@@ -5379,10 +5382,13 @@ async function main() {
 
   // Detect platform adapter — stored for platform-aware session paths
   try {
-    const { detectPlatform, getAdapter } = await import("./adapters/detect.js");
+    const { detectPlatform, getAdapter, detectOpencodeTargetFromConfig } = await import("./adapters/detect.js");
     const clientInfo = server.server.getClientVersion();
     const signal = detectPlatform(clientInfo ?? undefined);
-    _detectedAdapter = await getAdapter(signal.platform);
+    // Resolve the OpenCode v1/v2 target from the user's config so the memoized
+    // diagnostic adapter carries the correct plugin key + compaction posture.
+    const target = (await detectOpencodeTargetFromConfig(signal.platform)) ?? "v1";
+    _detectedAdapter = await getAdapter(signal.platform, target);
     if (clientInfo) {
       console.error(`MCP client: ${clientInfo.name} v${clientInfo.version} → ${signal.platform}`);
     }
