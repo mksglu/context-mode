@@ -153,6 +153,10 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     sessionstart: "hooks/sessionstart.mjs",
     userpromptsubmit: "hooks/userpromptsubmit.mjs",
   },
+  "mistral-vibe": {
+    pretooluse: "hooks/mistral-vibe/pretooluse.mjs",
+    posttooluse: "hooks/mistral-vibe/posttooluse.mjs",
+  },
 };
 
 async function hookDispatch(platform: string, event: string): Promise<void> {
