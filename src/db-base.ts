@@ -405,6 +405,37 @@ export function closeDB(db: DatabaseInstance): void {
   }
 }
 
+/**
+ * Start a periodic PASSIVE WAL checkpoint on `db`, returning a stop function.
+ *
+ * `closeDB()`'s `wal_checkpoint(TRUNCATE)` is the only WAL-truncation path, and
+ * it only runs on graceful shutdown. A server killed hard (crash, reboot,
+ * SIGKILL, or a Windows parent-death before the lifecycle guard fires) never
+ * reaches it, so under multi-session load the shared content-store WAL can grow
+ * unbounded — the reader-starvation failure ADR 0001 attributes to #560. A
+ * PASSIVE checkpoint reclaims whatever WAL frames it can between reader gaps; it
+ * never blocks and touches no locking, so it stays fully within ADR 0001's
+ * multi-writer contract (no EXCLUSIVE, no lockfile).
+ *
+ * The timer is `.unref()`'d so it never keeps the event loop alive. A
+ * non-positive or non-finite interval disables it and returns a no-op stopper.
+ */
+export function startWalCheckpointTimer(
+  db: DatabaseInstance,
+  intervalMs: number,
+): () => void {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
+  const timer = setInterval(() => {
+    try {
+      db.pragma("wal_checkpoint(PASSIVE)");
+    } catch {
+      /* best-effort — a busy or closing DB just retries next tick */
+    }
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
+
 // ─────────────────────────────────────────────────────────
 // Default path helper
 // ─────────────────────────────────────────────────────────
