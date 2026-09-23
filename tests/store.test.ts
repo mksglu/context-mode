@@ -522,6 +522,43 @@ describe("BM25 Search", () => {
   });
 });
 
+describe("Source Deletion (deleteSource / ctx_forget)", () => {
+  test("deletes a source and reports the chunk count", () => {
+    const store = createStore();
+    store.index({ content: "# Doc\n\nForget me later.", source: "to-forget" });
+    assert.ok(store.search("forget", 1).length > 0);
+
+    const { existed, deletedChunks } = store.deleteSource("to-forget");
+    assert.equal(existed, true);
+    assert.ok(deletedChunks > 0);
+
+    assert.equal(store.search("forget", 1).length, 0);
+    assert.ok(!store.listSources().some((s) => s.label === "to-forget"));
+    store.close();
+  });
+
+  test("returns existed:false with zero chunks for an unknown label", () => {
+    const store = createStore();
+    const { existed, deletedChunks } = store.deleteSource("never-indexed");
+    assert.equal(existed, false);
+    assert.equal(deletedChunks, 0);
+    store.close();
+  });
+
+  test("leaves sibling sources intact", () => {
+    const store = createStore();
+    store.index({ content: "# Keep\n\nApple pie recipe.", source: "keep" });
+    store.index({ content: "# Drop\n\nBanana bread recipe.", source: "drop" });
+
+    store.deleteSource("drop");
+
+    assert.ok(store.search("apple", 1).length > 0);
+    assert.equal(store.search("banana", 1).length, 0);
+    assert.ok(store.listSources().some((s) => s.label === "keep"));
+    store.close();
+  });
+});
+
 describe("Multi-Source Indexing", () => {
   test("search across multiple indexed sources", () => {
     const store = createStore();
