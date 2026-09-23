@@ -153,61 +153,70 @@ export class PiAdapter extends BaseAdapter implements HookAdapter {
         check: "Hook support",
         status: "pass",
         message:
-          "Pi hooks are wired via the context-mode Pi extension " +
-          "(~/.pi/extensions/context-mode/), not via JSON-stdio.",
+          "Pi hooks are wired via the context-mode Pi extension, " +
+          "not via JSON-stdio.",
       },
     ];
   }
 
+  private getExtensionPackagePaths(): string[] {
+    const agentDir = process.env.PI_CODING_AGENT_DIR
+      ?? resolve(homedir(), ".pi", "agent");
+
+    return [
+      resolve(agentDir, "npm", "node_modules", "context-mode", "package.json"),
+      resolve(homedir(), ".pi", "extensions", "context-mode", "package.json"),
+    ];
+  }
+
   checkPluginRegistration(): DiagnosticResult {
-    // Pi registers extensions by directory presence; the version-sync
-    // script writes ~/.pi/extensions/context-mode/package.json. We treat
-    // that file as the registration signal.
-    const pkgPath = resolve(
-      homedir(),
-      ".pi",
-      "extensions",
-      "context-mode",
-      "package.json",
-    );
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-      if (pkg?.name === "context-mode") {
-        return {
-          check: "Pi extension registration",
-          status: "pass",
-          message: `context-mode extension installed at ${pkgPath}`,
-        };
+    let unexpectedPath: string | undefined;
+
+    for (const pkgPath of this.getExtensionPackagePaths()) {
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        if (pkg?.name === "context-mode") {
+          return {
+            check: "Pi extension registration",
+            status: "pass",
+            message: `context-mode extension installed at ${pkgPath}`,
+          };
+        }
+        unexpectedPath ??= pkgPath;
+      } catch {
+        // Try the next supported Pi package layout.
       }
+    }
+
+    if (unexpectedPath) {
       return {
         check: "Pi extension registration",
         status: "warn",
-        message: `Unexpected package at ${pkgPath}`,
-      };
-    } catch {
-      return {
-        check: "Pi extension registration",
-        status: "fail",
-        message: `context-mode not found at ${pkgPath}`,
-        fix: "Run: context-mode upgrade",
+        message: `Unexpected package at ${unexpectedPath}`,
       };
     }
+
+    return {
+      check: "Pi extension registration",
+      status: "fail",
+      message: "context-mode not found in Pi's managed or legacy extension directories",
+      fix: "Run: context-mode upgrade",
+    };
   }
 
   getInstalledVersion(): string {
-    try {
-      const pkgPath = resolve(
-        homedir(),
-        ".pi",
-        "extensions",
-        "context-mode",
-        "package.json",
-      );
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-      return pkg.version ?? "unknown";
-    } catch {
-      return "not installed";
+    for (const pkgPath of this.getExtensionPackagePaths()) {
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        if (pkg?.name === "context-mode") {
+          return pkg.version ?? "unknown";
+        }
+      } catch {
+        // Try the next supported Pi package layout.
+      }
     }
+
+    return "not installed";
   }
 
   // ── Upgrade ────────────────────────────────────────────
