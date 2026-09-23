@@ -24,6 +24,8 @@ import {
   readToolDenyPatterns,
   fileGlobToRegex,
   evaluateFilePath,
+  evaluateProjectContainment,
+  expandGlobAnchors,
   extractShellCommands,
 } from "../build/security.js";
 
@@ -992,5 +994,86 @@ describe("cross-adapter deny-policy parity (#451 round-3)", () => {
       allDeny.includes("Bash(claude-only *)"),
       `expected claude deny in union (defense in depth), got ${JSON.stringify(allDeny)}`,
     );
+  });
+});
+
+// ==============================================================================
+// Issue #1075 — `//` and `~/` permission-pattern anchors
+// ==============================================================================
+
+describe("permission pattern anchors (#1075)", () => {
+  const home = homedir().replace(/\\/g, "/");
+
+  test("expandGlobAnchors: // resolves to the filesystem root", () => {
+    assert.deepEqual(expandGlobAnchors("//etc/passwd"), [
+      "//etc/passwd",
+      "/etc/passwd",
+    ]);
+  });
+
+  test("expandGlobAnchors: ~/ resolves to the home directory", () => {
+    const [raw, expanded] = expandGlobAnchors("~/.ssh/id_rsa");
+    assert.equal(raw, "~/.ssh/id_rsa");
+    assert.equal(expanded.replace(/\\/g, "/"), `${home}/.ssh/id_rsa`);
+  });
+
+  test("expandGlobAnchors: unanchored globs are returned untouched", () => {
+    assert.deepEqual(expandGlobAnchors("**/.env"), ["**/.env"]);
+    assert.deepEqual(expandGlobAnchors("/src/**"), ["/src/**"]);
+  });
+
+  test("deny: `//` rule blocks the absolute path it names", () => {
+    // Before the fix this failed open: the regex was built from the literal
+    // "//etc/passwd", which no candidate path can equal.
+    const result = evaluateFilePath("/etc/passwd", [["//etc/passwd"]], false);
+    assert.equal(result.denied, true);
+    assert.equal(result.matchedPattern, "//etc/passwd");
+  });
+
+  test("deny: `~/` rule blocks the home-relative path it names", () => {
+    const result = evaluateFilePath(`${home}/.ssh/id_rsa`, [["~/.ssh/**"]], false);
+    assert.equal(result.denied, true);
+    assert.equal(result.matchedPattern, "~/.ssh/**");
+  });
+
+  test("deny: an anchored rule still does not match unrelated paths", () => {
+    assert.equal(
+      evaluateFilePath("/etc/hosts", [["//etc/passwd"]], false).denied,
+      false,
+    );
+    assert.equal(
+      evaluateFilePath(`${home}/notes/todo.md`, [["~/.ssh/**"]], false).denied,
+      false,
+    );
+  });
+
+  test("allow: `~/` rule lets an out-of-project read through the #852 guard", () => {
+    const projectRoot = resolve(tmpdir(), "ctx-anchor-project");
+    const target = `${home}/logs/app.log`;
+    // Without the allow rule the containment guard rejects an outside path.
+    assert.equal(
+      evaluateProjectContainment(target, projectRoot, [], false).allowed,
+      false,
+    );
+    const allowed = evaluateProjectContainment(
+      target,
+      projectRoot,
+      [["~/logs/**"]],
+      false,
+    );
+    assert.equal(allowed.allowed, true);
+    assert.equal(allowed.reason, "allow-rule");
+  });
+
+  test("allow: `//` rule lets an out-of-project read through the #852 guard", () => {
+    const projectRoot = resolve(tmpdir(), "ctx-anchor-project");
+    const allowed = evaluateProjectContainment(
+      "/var/log/system.log",
+      projectRoot,
+      [["//var/log/**"]],
+      false,
+    );
+    assert.equal(allowed.allowed, true);
+    assert.equal(allowed.reason, "allow-rule");
   });
 });
