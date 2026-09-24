@@ -1130,3 +1130,73 @@ describe("foreground keep-alive — idle reaper scoped by session kind (#868)", 
     client.shutdown();
   });
 });
+
+describe("MCPStdioClient — request cancellation (#1175)", () => {
+  it("rejects an in-flight callTool when the abort signal fires and sends notifications/cancelled", async () => {
+    const markerPath = join(scratch, "cancelled-marker.json");
+    const fakePath = join(scratch, "no-reply.mjs");
+    writeFileSync(
+      fakePath,
+      `
+      import { writeFileSync } from "node:fs";
+      const MARKER = ${JSON.stringify(markerPath)};
+      let line = "";
+      process.stdin.on("data", (chunk) => {
+        line += chunk.toString("utf-8");
+        let idx;
+        while ((idx = line.indexOf("\\n")) >= 0) {
+          const raw = line.slice(0, idx).trim();
+          line = line.slice(idx + 1);
+          if (!raw) continue;
+          let msg;
+          try { msg = JSON.parse(raw); } catch { continue; }
+          if (msg.method === "initialize") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: {} } }) + "\\n");
+          } else if (msg.method === "tools/list") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "stall", description: "p", inputSchema: { type: "object" } }] } }) + "\\n");
+          } else if (msg.method === "notifications/cancelled") {
+            writeFileSync(MARKER, JSON.stringify(msg.params));
+          }
+          // tools/call intentionally never answered.
+        }
+      });
+      setInterval(() => {}, 60000);
+      `,
+      "utf-8",
+    );
+
+    const { existsSync, readFileSync } = await import("node:fs");
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient(fakePath);
+    client.start();
+    await client.initialize();
+
+    const ac = new AbortController();
+    const t0 = Date.now();
+    const p = (client as unknown as {
+      callTool: (name: string, args?: unknown, signal?: AbortSignal) => Promise<unknown>;
+    }).callTool("stall", {}, ac.signal);
+    setTimeout(() => ac.abort(), 300);
+
+    let rejection: Error | null = null;
+    try {
+      await p;
+    } catch (e) {
+      rejection = e as Error;
+    }
+    const elapsed = Date.now() - t0;
+
+    const waitDeadline = Date.now() + 2000;
+    while (Date.now() < waitDeadline && !existsSync(markerPath)) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    client.shutdown();
+
+    expect(rejection).toBeInstanceOf(Error);
+    expect(rejection?.message).toMatch(/cancelled/i);
+    expect(elapsed).toBeLessThan(5000);
+    expect(existsSync(markerPath)).toBe(true);
+    const params = JSON.parse(readFileSync(markerPath, "utf-8")) as { requestId?: number };
+    expect(typeof params.requestId).toBe("number");
+  });
+});
