@@ -650,7 +650,7 @@ async function createContextModePlugin(ctx: PluginContext) {
         // hooks/auto-injection.mjs). Pushed as a separate context entry so
         // OpenCode can fold it independently from the verbose snapshot.
         try {
-          const autoBlock: string = autoInjectionMod.buildAutoInjection(events);
+          const autoBlock: string = autoInjectionMod.buildAutoInjection(events, "compaction");
           if (autoBlock && autoBlock.length > 0) {
             output.context.push(autoBlock);
           }
