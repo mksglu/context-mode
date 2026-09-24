@@ -23,7 +23,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { spawn, execSync, execFileSync, type ChildProcess } from "node:child_process";
 import { detectRuntimes } from "../../runtime.js";
 import { foreignWorkspaceEnv, foreignIdentificationEnv } from "../detect.js";
 
@@ -515,8 +515,20 @@ export class MCPStdioClient {
         if (line !== "") this.diag(`[mcp-bridge] ${line}`, "debug");
       }
     });
-    this.child.on("exit", () => this.onExit());
-    this.child.on("error", () => this.onExit());
+    // Identity guard (abort support): a notification about a PREVIOUS
+    // child must never be applied to the CURRENT child's state. After a
+    // killTree()/shutdown() nulls the handle, a respawn can already be
+    // live by the time the killed child's `exit` event reaches the loop
+    // (taskkill/kill are asynchronous reapers); without the guard that
+    // stale handler flips the fresh child's `exited` flag and rejects
+    // its in-flight requests with "MCP server exited".
+    const child = this.child;
+    child.on("exit", () => {
+      if (this.child === child) this.onExit();
+    });
+    child.on("error", () => {
+      if (this.child === child) this.onExit();
+    });
   }
 
   private onExit(): void {
@@ -757,6 +769,102 @@ export class MCPStdioClient {
     this.initialized = false;
     this.exited = true;
   }
+
+  /**
+   * Abort support: terminate the MCP server AND its whole process tree.
+   *
+   * `shutdown()` only signals the direct child, and the server's own
+   * graceful shutdown does not kill RUNNING foreground executors (it only
+   * reaps `cleanupBackgrounded()` pids) — so a lone SIGTERM, which on
+   * Windows is a hard TerminateProcess that never runs signal handlers,
+   * leaves executor grandchildren orphaned mid-loop, burning CPU with no
+   * host left to notice. The reliable host-side stop is a tree kill:
+   *
+   *   - Windows: `taskkill /T /F` walks the tree (server + executors).
+   *   - POSIX: executors are spawned `detached` (own process group, see
+   *     executor.ts), so killing the server alone never reaches them.
+   *     Walk `ps` children-first and kill each descendant's process
+   *     group — falling back to the direct pid when it is not a group
+   *     leader — then the server itself.
+   *
+   * After the kill, in-flight requests settle immediately via onExit()
+   * (idempotent — the child's own `exit` event stays a no-op) and the
+   * next `request()` respawns the server through the existing #583
+   * machinery, so a follow-up ctx_* call in the same session self-heals.
+   * Concurrent ctx_* calls in the aborted turn each register their own
+   * listener; the first kill wins and the rest return early, and a
+   * respawn racing the abort gets reaped by the siblings' listeners.
+   */
+  killTree(): void {
+    const child = this.child;
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
+      return;
+    }
+    const pid = child.pid;
+    if (pid === undefined) {
+      this.shutdown();
+      return;
+    }
+    try {
+      if (isWindows) {
+        execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], {
+          stdio: "ignore",
+        });
+      } else {
+        // Children-first collection (pure string/number work — the repo
+        // forbids regex in source): kill leaves before their parents so a
+        // parent cannot adopt or respawn between our two kills.
+        const descendants: number[] = [];
+        const collect = (root: number): void => {
+          let out: string;
+          try {
+            out = execSync(`ps -o pid= --ppid ${root}`, { encoding: "utf8" });
+          } catch {
+            return; // ps failed or no children — nothing to collect
+          }
+          for (const line of out.split("\n")) {
+            const cpid = Number(line.trim());
+            if (Number.isInteger(cpid) && cpid > 0) {
+              descendants.push(cpid);
+              collect(cpid);
+            }
+          }
+        };
+        collect(pid);
+        for (const dpid of descendants) {
+          // Group kill first: an executor is a process-group leader, so
+          // -pid takes down anything it spawned too. When dpid is not a
+          // leader (plain helper child) the negative kill throws and the
+          // direct kill applies.
+          try {
+            process.kill(-dpid, "SIGKILL");
+          } catch {
+            try {
+              process.kill(dpid, "SIGKILL");
+            } catch {
+              /* already dead */
+            }
+          }
+        }
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          /* already dead */
+        }
+      }
+    } catch {
+      // taskkill/ps unavailable or refused — fall back to a plain
+      // shutdown() so the transport at least settles. Executors may
+      // survive this path, but it is strictly better than hanging.
+      this.shutdown();
+      return;
+    }
+    // Settle state now rather than waiting for the exit event; onExit()
+    // is idempotent, so the later `exit` event handler stays a no-op.
+    this.onExit();
+    this.child = null;
+    this.initialized = false;
+  }
 }
 
 /**
@@ -784,6 +892,7 @@ export interface PiToolRegistration {
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
+    signal: AbortSignal | undefined,
   ) => Promise<{
     content: Array<{ type: "text"; text: string }>;
     details: Record<string, unknown>;
@@ -1031,8 +1140,47 @@ export async function bootstrapMCPTools(
       parameters: tool.inputSchema ?? { type: "object", properties: {} },
       renderCall: createContextModeCallRenderer(tool.name),
       renderResult: createContextModeResultRenderer(tool.name),
-      async execute(_toolCallId, params) {
-        const result = await client.callTool(tool.name, params ?? {});
+      async execute(_toolCallId, params, signal) {
+        // Abort propagation: Pi passes an AbortSignal as the third
+        // execute argument ("the current abort signal, or undefined when
+        // the agent is not streaming" — pi extension contract). ctx_*
+        // tools are deliberately unbounded (#643) and the server's
+        // graceful shutdown does not kill RUNNING foreground executors
+        // (it only reaps backgrounded pids), so the host-side abort is
+        // the only reliable stop for a runaway executor: kill the bridge
+        // server's process tree, taking the executors (its children)
+        // down with it. In-flight requests settle via the child-exit
+        // path and the #583 respawn machinery heals the next ctx_* call
+        // in this session.
+        if (signal?.aborted) {
+          throw new Error(`${tool.name} aborted before execution`);
+        }
+        const onAbort = () => {
+          diag(
+            `[context-mode] abort signal fired while ${tool.name} was in ` +
+              `flight — killing the MCP server process tree (runaway ` +
+              `executor guard).`,
+          );
+          client.killTree();
+        };
+        signal?.addEventListener("abort", onAbort, { once: true });
+        let result: MCPCallResult;
+        try {
+          result = await client.callTool(tool.name, params ?? {});
+        } catch (err) {
+          // killTree() rejects in-flight requests with "MCP server
+          // exited"; surface an abort-aware message instead so the
+          // failure reads as the user's Stop, not a crash.
+          if (signal?.aborted) {
+            throw new Error(
+              `${tool.name} aborted: the MCP server process tree was ` +
+                `killed to stop the executor`,
+            );
+          }
+          throw err;
+        } finally {
+          signal?.removeEventListener("abort", onAbort);
+        }
         const text = (result.content ?? [])
           .filter((c) => c?.type === "text" && typeof c.text === "string")
           .map((c) => c.text as string)
