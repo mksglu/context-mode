@@ -170,8 +170,8 @@ export class OMPAdapter extends BaseAdapter implements HookAdapter {
         check: "Hook support",
         status: "warn",
         message:
-          "context-mode delivers via MCP for OMP. " +
-          "Native OMP pre/post tool-call hooks are not yet wired by this adapter.",
+          "OMP lifecycle hooks are provided by the separately loaded context-mode extension " +
+          "(build/adapters/omp/plugin.js). MCP doctor cannot verify live extension loading.",
       },
     ];
   }

@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 // AND additional %LOCALAPPDATA%\Programs\bun\* candidates; faithfully mocking
 // that generator from the test side is brittle and has already gone red twice
 // chasing one-off mismatches. The production code path itself is Windows-safe
-// (bunCommand() handles the .exe suffix + %LOCALAPPDATA% trap from #506); we
+// (resolveBunRuntime() handles the .exe suffix + %LOCALAPPDATA% trap from #506); we
 // guard those invariants in tests/runtime.test.ts which uses the real fs.
 // Skip the POSIX-mock-only cases on Windows so CI stops getting blocked by
 // test-infra fragility while still exercising the same logic on Ubuntu+macOS.
@@ -41,9 +41,9 @@ describe("resolveHookRuntime — auto-detect bun ≥1.0, fall back to node (#738
   });
 
   itPosix("returns bun path + isBun=true when bun ≥1.0 is available", async () => {
-    // bunCommand() resolves to either:
-    //   1) the first existing path in bunFallbackPaths() (~/.bun/bin/bun on Unix), OR
-    //   2) the literal "bun" string when commandExists("bun") succeeds.
+    // resolveBunRuntime() selects either:
+    //   1) the first runnable path in bunFallbackPaths() (~/.bun/bin/bun on Unix), OR
+    //   2) the literal "bun" string when PATH Bun passes the version probe.
     // We exercise branch (1) by stubbing HOME to a known directory and
     // claiming only "$HOME/.bun/bin/bun" exists.
     const fakeHome = "/fake/home/for-738-test";
@@ -270,7 +270,7 @@ describe("resolveHookRuntime — liveness-guard stale version-manager execPath (
 
   // bunFallbackPaths() emits POSIX (~/.bun/bin/bun) AND Windows
   // (\.bun\bin\bun.exe, \bun\bin\bun.exe) candidates. Block them all so
-  // bunExists() is false and the node fallback path is exercised.
+  // Bun resolution returns null and the node fallback path is exercised.
   // Algorithmic (no regex): true when the path contains a bun binary segment
   // (…/bun/bin/bun or …/.bun/bin/bun), with either path separator. The
   // original regex /[\\/]\.?bun[\\/]bin[\\/]bun/ required a leading separator
