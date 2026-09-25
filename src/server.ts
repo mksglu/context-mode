@@ -2806,26 +2806,26 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
 );
 
 // ─────────────────────────────────────────────────────────
-// Turndown path resolution (external dep, like better-sqlite3)
+// Turndown subprocess bundle resolution
 // ─────────────────────────────────────────────────────────
+//
+// turndown + turndown-plugin-gfm + @mixmark-io/domino are pure JS, so build
+// time bundles them into a single self-contained CJS file shipped next to
+// server.bundle.mjs (turndown-subprocess.bundle.cjs — see package.json
+// "bundle" script and src/turndown-subprocess-entry.ts). The subprocess
+// spawned by buildFetchCode requires that shipped file by absolute path
+// derived from this server's own package root, instead of resolving
+// "turndown" against the installing machine's node_modules — a plugin
+// marketplace install copies shipped files without running `npm install`,
+// so node_modules/turndown never existed there (rabbitholedotdev/rabbitos#826).
 
-let _turndownPath: string | null = null;
-let _gfmPluginPath: string | null = null;
+let _turndownBundlePath: string | null = null;
 
-function resolveTurndownPath(): string {
-  if (!_turndownPath) {
-    const require = createRequire(import.meta.url);
-    _turndownPath = require.resolve("turndown");
+function resolveTurndownBundlePath(): string {
+  if (!_turndownBundlePath) {
+    _turndownBundlePath = resolve(getPackageRoot(), "turndown-subprocess.bundle.cjs");
   }
-  return _turndownPath;
-}
-
-function resolveGfmPluginPath(): string {
-  if (!_gfmPluginPath) {
-    const require = createRequire(import.meta.url);
-    _gfmPluginPath = require.resolve("turndown-plugin-gfm");
-  }
-  return _gfmPluginPath;
+  return _turndownBundlePath;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2836,8 +2836,7 @@ function resolveGfmPluginPath(): string {
 // __CM_CT__:<type> marker on the first line so the handler can route to the
 // appropriate indexing strategy.  HTML is converted to markdown via Turndown.
 export function buildFetchCode(url: string, outputPath: string): string {
-  const turndownPath = JSON.stringify(resolveTurndownPath());
-  const gfmPath = JSON.stringify(resolveGfmPluginPath());
+  const turndownBundlePath = JSON.stringify(resolveTurndownBundlePath());
   const escapedOutputPath = JSON.stringify(outputPath);
   // Embed classifyIp into the subprocess so the connect-time DNS lookup is
   // re-validated with the same policy as ssrfGuard. Without this, an attacker
@@ -2865,8 +2864,7 @@ export function buildFetchCode(url: string, outputPath: string): string {
       : `var ${classifyIpFnName} = ${classifyIpInner};\nvar classifyIp = ${classifyIpFnName};`;
   const strictMode = process.env.CTX_FETCH_STRICT === "1";
   return `
-const TurndownService = require(${turndownPath});
-const { gfm } = require(${gfmPath});
+const { TurndownService, gfm } = require(${turndownBundlePath});
 const fs = require('fs');
 const dns = require('no' + 'de:dns');
 const dnsPromises = require('no' + 'de:dns/promises');
