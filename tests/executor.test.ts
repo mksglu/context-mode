@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from "vitest";
 import { strict as assert } from "node:assert";
-import { existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, rmSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -2081,4 +2081,307 @@ describe("killSiblingMcpServers (#559)", () => {
     // Process was already dead — counts as 0 since we never observed it alive.
     assert.equal(report.totalKilled, 0);
   });
+});
+
+// ---------------------------------------------------------------------------
+// AbortSignal cancellation — regression tests for the #83aefee fix
+// (request-scoped process-tree kill + temp dir / ownership sidecar cleanup).
+//
+// Windows/Git Bash notes that shape these tests:
+//  - bash $$ / $! are MSYS-internal PIDs, invisible to Node's process.kill and
+//    to taskkill — so tree descendants are native node processes, whose PIDs
+//    are real OS PIDs on both platforms.
+//  - Neither $TMPDIR (MSYS rewrites it to its own /tmp view) nor dirname $0
+//    ($0 is /usr/bin/bash under the executor's spawn form) identifies the
+//    sandbox dir, so it is located by scanning OS temp for a .ctx-mode-* dir
+//    whose ownership.json manifest carries THIS process's pid (tests run
+//    sequentially, so at most one live sandbox matches).
+// ---------------------------------------------------------------------------
+
+describe("AbortSignal cancellation (process tree + temp cleanup)", () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const MARKER_ENV = "__CM_ABORT_TEST_MARKER";
+
+  function isAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function waitDead(pid: number, deadlineMs = 3000): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < deadlineMs) {
+      if (!isAlive(pid)) return;
+      await sleep(50);
+    }
+  }
+
+  async function waitFor(
+    predicate: () => boolean,
+    timeoutMs = 10_000,
+    what = "condition",
+  ): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (predicate()) return;
+      await sleep(50);
+    }
+    throw new Error(`Timed out after ${timeoutMs}ms waiting for ${what}`);
+  }
+
+  // Locate the live per-call .ctx-mode-* sandbox dir for THIS process via its
+  // ownership manifest (executorPid filter; newest wins if a stale dir lingers
+  // from a crashed earlier test). Mirrors the executor's OS_TMPDIR choice.
+  function findSandboxDir(): string | null {
+    const base = process.platform === "win32"
+      ? (process.env.TEMP ?? process.env.TMP ?? tmpdir())
+      : tmpdir();
+    let best: { dir: string; createdAt: string } | null = null;
+    for (const entry of readdirSync(base)) {
+      if (!entry.startsWith(".ctx-mode-")) continue;
+      const dir = join(base, entry);
+      try {
+        const manifest = JSON.parse(readFileSync(join(dir, "ownership.json"), "utf-8"));
+        if (manifest.executorPid !== process.pid) continue;
+        if (!best || String(manifest.createdAt) > best.createdAt) best = { dir, createdAt: String(manifest.createdAt) };
+      } catch { /* not ours, or mid-cleanup */ }
+    }
+    return best?.dir ?? null;
+  }
+
+  test("abort kills the entire shell tree (child + grandchild) and cleans the .ctx-mode temp dir", async () => {
+    const scratch = mkdtempSync(join(tmpdir(), "ctx-abort-test-"));
+    const marker = join(scratch, "marker");
+    process.env[MARKER_ENV] = marker;
+    process.env.__CM_ABORT_NODE = process.execPath;
+    // Child code is passed through the environment (eval'd inside node) to
+    // avoid shell-quoting collisions; the child spawns the grandchild and
+    // reports both REAL OS PIDs to the marker.
+    process.env.__CM_ABORT_CHILD_CODE = [
+      "const cp = require('child_process');",
+      "const fs = require('fs');",
+      "const g = cp.spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)']);",
+      "fs.writeFileSync(process.env.__CM_ABORT_TEST_MARKER, JSON.stringify({ child: process.pid, grand: g.pid }));",
+      "setTimeout(() => {}, 120000);",
+    ].join("\n");
+    const pids: number[] = [];
+    let sandboxTmp = "";
+    try {
+      const controller = new AbortController();
+      const promise = executor.execute({
+        language: "shell",
+        // Tree: bash (spawned root) -> node child -> node grandchild.
+        code: `"$__CM_ABORT_NODE" -e "eval(process.env.__CM_ABORT_CHILD_CODE)"`,
+        signal: controller.signal,
+      });
+
+      await waitFor(() => existsSync(marker), 10_000, "process tree to spawn");
+      const info = JSON.parse(readFileSync(marker, "utf-8"));
+      pids.push(info.child, info.grand);
+      sandboxTmp = findSandboxDir() ?? "";
+
+      assert.ok(
+        sandboxTmp.includes(".ctx-mode-"),
+        `sandbox should be the per-call .ctx-mode temp dir, got: ${sandboxTmp}`,
+      );
+      assert.ok(
+        isAlive(info.child) && isAlive(info.grand),
+        "child and grandchild must be alive before abort",
+      );
+
+      controller.abort();
+      const abortAt = Date.now();
+      const result = await promise;
+      assert.ok(
+        Date.now() - abortAt < 5_000,
+        "abort must settle the execution promptly, not wait on child close",
+      );
+
+      assert.equal(result.timedOut, false, "abort must not be reported as timeout");
+      assert.notEqual(result.exitCode, 0, "aborted shell must exit non-zero");
+      for (const pid of pids) {
+        await waitDead(pid);
+        assert.equal(isAlive(pid), false, `PID ${pid} survived abort — orphaned process`);
+      }
+      assert.equal(
+        existsSync(sandboxTmp),
+        false,
+        ".ctx-mode-* temp dir must be removed after abort (ownership.json included)",
+      );
+    } finally {
+      delete process.env[MARKER_ENV];
+      delete process.env.__CM_ABORT_NODE;
+      delete process.env.__CM_ABORT_CHILD_CODE;
+      for (const pid of pids) {
+        try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ }
+      }
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  test("ownership.json sidecar carries metadata only (no command/code/secrets) and is cleaned up", async () => {
+    const scratch = mkdtempSync(join(tmpdir(), "ctx-abort-test-"));
+    const marker = join(scratch, "marker");
+    process.env[MARKER_ENV] = marker;
+    try {
+      const controller = new AbortController();
+      const promise = executor.execute({
+        language: "shell",
+        code: [
+          `echo running > "$${MARKER_ENV}"`,
+          `# CANARY_SECRET_9f2e41 must never appear in the sidecar`,
+          `sleep 120`,
+        ].join("\n"),
+        signal: controller.signal,
+      });
+
+      await waitFor(() => existsSync(marker), 10_000, "marker file");
+      const sandboxTmp = findSandboxDir() ?? "";
+      assert.ok(sandboxTmp.includes(".ctx-mode-"), `expected sandbox dir, got: ${sandboxTmp}`);
+
+      const manifestPath = join(sandboxTmp, "ownership.json");
+      const raw = readFileSync(manifestPath, "utf-8");
+      const manifest = JSON.parse(raw);
+
+      // Fixed metadata-only schema: no code, command, cwd, or environment.
+      assert.deepEqual(
+        Object.keys(manifest).sort(),
+        ["createdAt", "executorPid", "language", "nonce", "parentPid", "scriptPath", "scriptSha256", "version"],
+        "ownership.json must expose exactly the metadata-only schema",
+      );
+      assert.equal(manifest.version, 1);
+      assert.equal(manifest.language, "shell");
+      assert.equal(manifest.executorPid, process.pid);
+      assert.match(manifest.nonce, /^[0-9a-f]{32}$/);
+      assert.match(manifest.scriptSha256, /^[0-9a-f]{64}$/);
+      assert.ok(
+        manifest.scriptPath.startsWith(sandboxTmp),
+        `scriptPath must stay inside the sandbox tmp dir: ${manifest.scriptPath}`,
+      );
+      assert.equal(raw.includes("CANARY_SECRET_9f2e41"), false, "sidecar must not retain executed code text");
+      assert.equal(raw.includes("sleep 120"), false, "sidecar must not retain executed command text");
+
+      controller.abort();
+      const abortAt = Date.now();
+      await promise;
+      assert.ok(Date.now() - abortAt < 5_000, "abort must settle promptly");
+      assert.equal(existsSync(manifestPath), false, "ownership.json must be removed with the temp dir");
+      assert.equal(existsSync(sandboxTmp), false, ".ctx-mode-* temp dir must be removed after abort");
+    } finally {
+      delete process.env[MARKER_ENV];
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  test("pre-aborted signal settles immediately and never spawns the script", async () => {
+    const scratch = mkdtempSync(join(tmpdir(), "ctx-abort-test-"));
+    const marker = join(scratch, "marker");
+    process.env[MARKER_ENV] = marker;
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const started = Date.now();
+      const r = await executor.execute({
+        language: "shell",
+        code: `echo started > "$${MARKER_ENV}"\nsleep 120`,
+        signal: controller.signal,
+      });
+      assert.ok(Date.now() - started < 5_000, "pre-aborted execution must settle immediately");
+      assert.equal(r.timedOut, false, "pre-aborted execution is a cancellation, not a timeout");
+      assert.notEqual(r.exitCode, 0);
+      assert.equal(existsSync(marker), false, "pre-aborted execution must never run the script");
+    } finally {
+      delete process.env[MARKER_ENV];
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, 10_000);
+
+  test("abort is request-scoped: concurrent and fresh executions are unaffected", async () => {
+    const scratch = mkdtempSync(join(tmpdir(), "ctx-abort-test-"));
+    const marker = join(scratch, "marker");
+    process.env[MARKER_ENV] = marker;
+    let sandboxTmp = "";
+    try {
+      const controller = new AbortController();
+      const abortable = executor.execute({
+        language: "shell",
+        code: `echo running > "$${MARKER_ENV}"\nsleep 120`,
+        signal: controller.signal,
+      });
+      // Concurrent execution with NO signal — must run to completion untouched.
+      const concurrent = executor.execute({
+        language: "shell",
+        code: "sleep 1 && echo done",
+      });
+
+      await waitFor(() => existsSync(marker), 10_000, "marker file");
+      sandboxTmp = findSandboxDir() ?? "";
+      assert.ok(sandboxTmp.includes(".ctx-mode-"), `expected sandbox dir, got: ${sandboxTmp}`);
+
+      controller.abort();
+      const abortAt = Date.now();
+      const [aborted, kept] = await Promise.all([abortable, concurrent]);
+      assert.ok(Date.now() - abortAt < 5_000, "abort must settle promptly");
+
+      assert.equal(aborted.timedOut, false);
+      assert.notEqual(aborted.exitCode, 0);
+      assert.equal(kept.exitCode, 0, "concurrent execution must not be touched by another request's abort");
+      assert.equal(kept.timedOut, false);
+      assert.equal(kept.stdout.trim(), "done");
+      assert.equal(existsSync(sandboxTmp), false, "aborted execution's temp dir must be cleaned");
+
+      // Fresh execution AFTER the abort — a stale listener must never kill it.
+      const fresh = await executor.execute({
+        language: "javascript",
+        code: "console.log('fresh');",
+      });
+      assert.equal(fresh.exitCode, 0);
+      assert.equal(fresh.stdout.trim(), "fresh");
+    } finally {
+      delete process.env[MARKER_ENV];
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  test("timeout path stays green when an inert signal is attached", async () => {
+    const controller = new AbortController();
+    const r = await executor.execute({
+      language: "javascript",
+      code: "process.stdout.write(String(process.pid)); setTimeout(() => {}, 30000);",
+      timeout: 600,
+      signal: controller.signal,
+    });
+    assert.equal(r.timedOut, true, "timeout must still fire when a signal is attached but never aborts");
+    const pid = parseInt(r.stdout.trim(), 10);
+    assert.ok(pid > 0, `expected PID in stdout, got "${r.stdout}"`);
+    await waitDead(pid);
+    assert.equal(isAlive(pid), false, "timed-out process survived");
+  }, 10_000);
+
+  test("executeFile forwards the signal and aborts the wrapped execution", async () => {
+    const scratch = mkdtempSync(join(tmpdir(), "ctx-abort-test-"));
+    const dataFile = join(scratch, "data.txt");
+    writeFileSync(dataFile, "hello\nworld\n", "utf-8");
+    try {
+      const controller = new AbortController();
+      const promise = executor.executeFile({
+        path: dataFile,
+        language: "javascript",
+        code: "setTimeout(() => {}, 30000);",
+        signal: controller.signal,
+      });
+      await sleep(500);
+      controller.abort();
+      const started = Date.now();
+      const r = await promise;
+      assert.ok(Date.now() - started < 5_000, "executeFile abort must terminate promptly");
+      assert.equal(r.timedOut, false);
+      assert.notEqual(r.exitCode, 0);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
