@@ -241,6 +241,24 @@ function stripQuotedContent(cmd) {
 }
 
 /**
+ * curl/wget must appear in COMMAND POSITION — the executable slot at the
+ * start of a pipeline segment — to count as a real invocation (#679).
+ * `grep -rn curl ./scripts`, `# uses curl internally`, and
+ * `cat notes.md # talks about curl` all contain the substring "curl" but
+ * never invoke it; the old detection matched curl/wget preceded by ANY
+ * whitespace anywhere in the segment, so those false-triggered the block.
+ * Anchoring to the start of the (already operator-split) segment, past
+ * common wrapper words (`sudo`, `env FOO=bar`, ...), keeps real invocations
+ * — including chained/wrapped ones — caught while argument mentions pass
+ * through untouched.
+ */
+const CURL_WGET_PREFIX_WORDS = "(?:sudo|exec|command|env|time|nice|nohup|ionice|doas|xargs|watch)";
+const CURL_WGET_SEGMENT_RE = new RegExp(
+  `^\\s*(?:${CURL_WGET_PREFIX_WORDS}\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(curl|wget)\\b`,
+  "i",
+);
+
+/**
  * Built-in allowlist of structurally-bounded Bash commands (#463).
  *
  * The PreToolUse Bash nudge ("May produce large output. Use ctx_…") is
@@ -735,11 +753,22 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
       const segments = stripped.split(/\s*(?:&&|\|\||;)\s*/);
       const hasDangerousSegment = segments.some(seg => {
         const s = seg.trim();
-        // Only evaluate segments that contain curl or wget
-        if (!/(^|\s)(curl|wget)\s/i.test(s)) return false;
+        // Only evaluate segments where curl/wget is the invoked command,
+        // not merely mentioned as someone else's argument or in a comment
+        // (#679) — see CURL_WGET_SEGMENT_RE above.
+        if (!CURL_WGET_SEGMENT_RE.test(s)) return false;
 
         const isCurl = /\bcurl\b/i.test(s);
         const isWget = /\bwget\b/i.test(s);
+
+        // Metadata probes (--version/--help/-V) never fetch a URL, so they
+        // can't flood context — same rationale as the generic --version
+        // carve-out in SAFE_COMMAND_PATTERNS above, just reachable here too
+        // since curl/wget is evaluated before that generic allowlist runs.
+        // Guard against `curl --version https://...` by requiring no URL.
+        const isMetadataProbe =
+          /(^|\s)(--version|--help|-V|-h)\b/i.test(s) && !/https?:\/\//i.test(s);
+        if (isMetadataProbe) return false;
 
         // Check for file output flags
         const hasFileOutput = isCurl
