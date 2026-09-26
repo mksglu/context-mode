@@ -4,6 +4,12 @@
  */
 
 export const formatters = {
+  "hermes": {
+    deny: (reason) => ({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: reason } }),
+    ask: (reason) => ({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: reason || "Action requires confirmation" } }),
+    modify: (updatedInput) => ({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: codexRedirectReason(updatedInput?.command) } }),
+    context: (additionalContext) => ({ hookSpecificOutput: { additionalContext } }),
+  },
   "claude-code": {
     deny: (reason) => ({
       hookSpecificOutput: {

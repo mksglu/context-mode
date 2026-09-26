@@ -70,6 +70,12 @@ afterEach(() => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("getToolName", () => {
+  it("returns Hermes' exact sanitized MCP registry name", () => {
+    expect(getToolName("hermes", "ctx_search")).toBe(
+      "mcp__context_mode__ctx_search",
+    );
+  });
+
   it("returns correct name for claude-code", () => {
     expect(getToolName("claude-code", "ctx_fetch_and_index")).toBe(
       "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
@@ -153,6 +159,7 @@ describe("createToolNamer", () => {
 
 describe("KNOWN_PLATFORMS", () => {
   it("contains all platforms", () => {
+    expect(KNOWN_PLATFORMS).toContain("hermes");
     expect(KNOWN_PLATFORMS).toContain("claude-code");
     expect(KNOWN_PLATFORMS).toContain("gemini-cli");
     expect(KNOWN_PLATFORMS).toContain("antigravity");
