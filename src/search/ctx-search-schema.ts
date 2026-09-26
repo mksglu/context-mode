@@ -75,6 +75,20 @@ export function buildCtxSearchInputSchema(isSharedMode: boolean) {
     : ({} as Record<string, never>);
 
   return z.object({
+    // Issue #1200: the server.ts handler normalises a singular `query`
+    // string into the query list, but the field was never declared here,
+    // so the MCP SDK's argument validation (a Zod object parse strips
+    // unknown keys) removed it before the handler ran. Schema-conforming
+    // hosts answered the singular form with "Error: provide query or
+    // queries." Declaring the alias keeps the validated payload and the
+    // handler contract in sync.
+    query: z
+      .string()
+      .optional()
+      .describe(
+        "Single search query — convenience alias for queries: [query]. " +
+          "Use queries: [...] when batching multiple questions into one call.",
+      ),
     queries: z.preprocess(coerceJsonArray, z
       .array(z.string())
       .optional()
