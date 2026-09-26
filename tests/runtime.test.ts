@@ -615,6 +615,144 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
 });
 
 // ─────────────────────────────────────────────────────────
+// Windows: python/node exposed on PATH only as extensionless `#!/bin/sh`
+// shims (Git for Windows usr\bin) can be run by neither CreateProcess nor
+// cmd.exe (#1208). detectRuntimes() must still resolve them, probe them via
+// Git Bash, and flag them so the executor spawns them through bash.
+// ─────────────────────────────────────────────────────────
+describe("detectRuntimes — Windows extensionless POSIX shims (#1208)", () => {
+  const bash = "C:\\Program Files\\Git\\usr\\bin\\bash.exe";
+  const savedEnv: Record<string, string | undefined> = {};
+  const savedExecPath = process.execPath;
+
+  beforeEach(() => {
+    process.env.__ORIG_PLATFORM__ ??= process.platform;
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    // Hide any real Bun install so javascript resolution is deterministic.
+    for (const k of ["HOME", "USERPROFILE", "LOCALAPPDATA", "APPDATA"]) {
+      savedEnv[k] = process.env[k];
+      delete process.env[k];
+    }
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("node:child_process");
+    Object.defineProperty(process, "platform", {
+      value: process.env.__ORIG_PLATFORM__ ?? "darwin",
+      configurable: true,
+    });
+    Object.defineProperty(process, "execPath", { value: savedExecPath, configurable: true });
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  /** `where <tool>` answers from `where`; any other tool is "not found".
+   *  `<cmd> --version` succeeds only when run the way it can really execute:
+   *  via bash for extensionless shims, via cmd.exe for real .exe files. */
+  function mockWindows(where: Record<string, string[]>) {
+    const execSync = vi.fn((cmd: string, opts?: { shell?: string }) => {
+      const w = cmd.match(/^where\s+(.+)$/);
+      if (w) {
+        const hits = where[w[1].trim()];
+        if (!hits) throw new Error(`not found: ${w[1]}`);
+        return hits.join("\r\n") + "\r\n";
+      }
+      const probe = cmd.match(/^"?([^"\s]+)"?\s+--version$/);
+      if (probe) {
+        const tool = probe[1];
+        const shimOnly = (where[tool] ?? []).every(p => !/\.[a-z]+$/i.test(p));
+        if (shimOnly ? opts?.shell === bash : opts?.shell === undefined) {
+          return Buffer.from("Python 3.14.0\n");
+        }
+        throw new Error(`'${tool}' is not recognized as an internal or external command`);
+      }
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    const execFileSync = vi.fn(() => {
+      throw new Error("execFileSync must not be reached on win32");
+    });
+    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
+    return execSync;
+  }
+
+  test("resolves and flags python3 when its only PATH hit is an extensionless shim", async () => {
+    const execSync = mockWindows({
+      bash: [bash],
+      python3: ["C:\\Program Files\\Git\\usr\\bin\\python3"],
+    });
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes();
+
+    // Detection must not regress to null (the probe runs through bash).
+    expect(r.python).toBe("python3");
+    expect(r.posixShimCommands).toContain("python3");
+    expect(r.windowsBashPath).toBe(bash);
+    expect(execSync).toHaveBeenCalledWith(
+      "python3 --version",
+      expect.objectContaining({ shell: bash }),
+    );
+  });
+
+  test("does not flag python3 when a real .exe is on PATH (alone or beside a shim)", async () => {
+    const execSync = mockWindows({
+      bash: [bash],
+      python3: [
+        "C:\\Program Files\\Git\\usr\\bin\\python3",
+        "C:\\Python314\\python3.exe",
+      ],
+    });
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes();
+
+    expect(r.python).toBe("python3");
+    expect(r.posixShimCommands).not.toContain("python3");
+    // Unchanged cmd.exe probe shape for real executables.
+    expect(execSync).toHaveBeenCalledWith(
+      '"python3" --version',
+      expect.not.objectContaining({ shell: expect.anything() }),
+    );
+  });
+
+  test("flags the bare `node` fallback when its only PATH hit is an extensionless shim", async () => {
+    // Host binary that is not a JS runtime (#731) → PATH `node` fallback.
+    Object.defineProperty(process, "execPath", {
+      value: "C:\\Tools\\opencode.exe",
+      configurable: true,
+    });
+    mockWindows({
+      bash: [bash],
+      node: ["C:\\Program Files\\Git\\usr\\bin\\node"],
+      python3: ["C:\\Python314\\python3.exe"],
+    });
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes();
+
+    expect(r.javascript).toBe("node");
+    expect(r.posixShimCommands).toEqual(["node"]);
+  });
+
+  test("falls back to the cmd.exe probe when no Git Bash is available", async () => {
+    const execSync = mockWindows({
+      python3: ["C:\\Program Files\\Git\\usr\\bin\\python3"],
+    });
+
+    const { detectRuntimes } = await import("../src/runtime.js");
+    const r = detectRuntimes();
+
+    // Without bash nothing can run the shim: same outcome as before #1208.
+    expect(r.windowsBashPath).toBeNull();
+    expect(r.python).toBeNull();
+    expect(execSync).toHaveBeenCalledWith('"python3" --version', expect.anything());
+  });
+});
+
+// ─────────────────────────────────────────────────────────
 // Windows: bunCommand() must return an absolute .exe path when bun is
 // installed via `npm i -g bun` (#506). The npm shim creates a `bun.cmd`
 // dispatcher on PATH; CreateProcess (used by spawn() with shell:false)
