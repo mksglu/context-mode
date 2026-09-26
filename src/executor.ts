@@ -421,6 +421,13 @@ export class PolyglotExecutor {
       // on Windows that resolution typically goes through a `bun.cmd` shim
       // (npm i -g bun) which CreateProcess can't execute without cmd.exe.
       const needsShell = isWin && ["tsx", "ts-node", "elixir", "bun", "dotnet-script"].includes(cmd[0]);
+      // #1208: an extensionless `#!/bin/sh` shim (e.g. Git for Windows'
+      // usr\bin\python) is runnable by neither CreateProcess nor cmd.exe —
+      // only bash can interpret it. Route those through the resolved Git Bash.
+      const posixShell = isWin && !needsShell &&
+        this.#runtimes.posixShimCommands?.includes(cmd[0])
+        ? this.#runtimes.windowsBashPath ?? null
+        : null;
 
       // On Windows with Git Bash, pass the script as `bash -c "source /posix/path"`
       // rather than `bash /path/to/script.sh`. This avoids MSYS2 path mangling
@@ -456,7 +463,12 @@ export class PolyglotExecutor {
       // the args-array form of spawn(). Colllapsing to a string avoids the
       // warning while preserving the same shell behavior.
       let proc: ReturnType<typeof spawn>;
-      if (needsShell) {
+      if (posixShell) {
+        // #1208: this runs as `bash -c`. Single-quote every token so `$` and
+        // backticks in the script path stay literal (JSON.stringify would not).
+        const fullCmd = [spawnCmd, ...spawnArgs].map(quoteForPosixShell).join(" ");
+        proc = spawn(fullCmd, [], { ...commonOpts, shell: posixShell });
+      } else if (needsShell) {
         const fullCmd = [spawnCmd, ...spawnArgs]
           .map(a => /\s/.test(a) ? JSON.stringify(a) : a)
           .join(" ");

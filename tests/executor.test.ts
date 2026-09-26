@@ -1,6 +1,6 @@
-import { describe, test, expect, afterAll } from "vitest";
+import { describe, test, expect, afterAll, afterEach, vi } from "vitest";
 import { strict as assert } from "node:assert";
-import { existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -1946,6 +1946,114 @@ describe("Windows Shell Support", () => {
   test("buildScriptFilename: non-shell languages keep their extension on Unix", async () => {
     assert.equal(buildScriptFilename("python", "linux"), "script.py");
     assert.equal(buildScriptFilename("javascript", "darwin"), "script.js");
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Windows POSIX-shim runtimes (#1208): an extensionless `#!/bin/sh` python/node
+// shim can be run by neither CreateProcess (shell:false) nor cmd.exe
+// (shell:true). #spawn() must launch it through the resolved Git Bash.
+// ─────────────────────────────────────────────────────────
+describe("#spawn — Windows extensionless POSIX shims (#1208)", () => {
+  const bash = "C:\\Program Files\\Git\\usr\\bin\\bash.exe";
+  const savedTemp = process.env.TEMP;
+
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("node:child_process");
+    if (savedTemp === undefined) delete process.env.TEMP;
+    else process.env.TEMP = savedTemp;
+    Object.defineProperty(process, "platform", {
+      value: process.env.__ORIG_PLATFORM__ ?? process.platform,
+      configurable: true,
+    });
+  });
+
+  /** Run `language` on a win32-flavoured executor with a mocked spawn and
+   *  return the arguments spawn() was called with. */
+  async function spawnCallFor(
+    language: "python" | "typescript",
+    overrides: Partial<RuntimeMap>,
+    tempRoot?: string,
+  ) {
+    // The executor's win32 temp root comes from %TEMP%, read at import time.
+    if (tempRoot) process.env.TEMP = tempRoot;
+    process.env.__ORIG_PLATFORM__ ??= process.platform;
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    const { EventEmitter } = await import("node:events");
+    const { PassThrough } = await import("node:stream");
+    const spawn = vi.fn(() => {
+      const proc = Object.assign(new EventEmitter(), {
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        pid: undefined,
+      });
+      setImmediate(() => proc.emit("close", 0));
+      return proc;
+    });
+    vi.resetModules();
+    vi.doMock("node:child_process", async () => ({
+      ...(await vi.importActual<typeof import("node:child_process")>("node:child_process")),
+      spawn,
+    }));
+    const { PolyglotExecutor: WinExecutor } = await import("../src/executor.js");
+    const exec = new WinExecutor({
+      runtimes: { ...runtimes, python: "python3", typescript: "tsx", ...overrides },
+    });
+    await exec.execute({ language, code: "print(1)" });
+    expect(spawn).toHaveBeenCalledTimes(1);
+    return spawn.mock.calls[0] as unknown as [string, string[], { shell: unknown }];
+  }
+
+  test("spawns a flagged shim through the resolved bash path, not cmd.exe or CreateProcess", async () => {
+    const [cmd, args, opts] = await spawnCallFor("python", {
+      posixShimCommands: ["python3"],
+      windowsBashPath: bash,
+    });
+    expect(opts.shell).toBe(bash);
+    expect(args).toEqual([]);
+    expect(cmd).toMatch(/^'python3' '.+\/script\.py'$/);
+  });
+
+  test("single-quotes the bash command so `$` and backticks in the script path stay literal", async () => {
+    const hostile = mkdtempSync(join(tmpdir(), "ctx $HOME `echo pwned` "));
+    try {
+      const [cmd] = await spawnCallFor("python", {
+        posixShimCommands: ["python3"],
+        windowsBashPath: bash,
+      }, hostile);
+      const root = hostile.replace(/\\/g, "/");
+      // Exactly two single-quoted tokens; nothing bash could expand.
+      expect(cmd).toMatch(/^'python3' '[^']+'$/);
+      expect(cmd.startsWith(`'python3' '${root}/.ctx-mode-`)).toBe(true);
+      expect(cmd.endsWith("/script.py'")).toBe(true);
+    } finally {
+      rmSync(hostile, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps shell:false for an unflagged python (real .exe)", async () => {
+    const [cmd, args, opts] = await spawnCallFor("python", { windowsBashPath: bash });
+    expect(opts.shell).toBe(false);
+    expect(cmd).toBe("python3");
+    expect(args).toHaveLength(1);
+  });
+
+  test("keeps shell:false for a flagged shim when no bash was resolved", async () => {
+    const [cmd, , opts] = await spawnCallFor("python", {
+      posixShimCommands: ["python3"],
+      windowsBashPath: null,
+    });
+    expect(opts.shell).toBe(false);
+    expect(cmd).toBe("python3");
+  });
+
+  test("leaves the needsShell (cmd.exe) path untouched for tsx", async () => {
+    const [, , opts] = await spawnCallFor("typescript", {
+      posixShimCommands: ["tsx"],
+      windowsBashPath: bash,
+    });
+    expect(opts.shell).toBe(true);
   });
 });
 
