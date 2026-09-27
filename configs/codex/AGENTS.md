@@ -4,7 +4,7 @@ context-mode MCP tools available. Rules protect context window from flooding. On
 
 ## Think in Code — MANDATORY
 
-Analyze/count/filter/compare/search/parse/transform data: **write code** via `ctx_execute(language, code)`, `console.log()` only the answer. Do NOT read raw data into context. PROGRAM the analysis, not COMPUTE it. Pure JavaScript — Node.js built-ins only (`fs`, `path`, `child_process`). `try/catch`, handle `null`/`undefined`. One script replaces ten tool calls.
+Analyze/count/filter/compare/search/parse/transform data: **write code** via `ctx_execute(language, code)`, `console.log()` only the answer. Do NOT read raw data into context. PROGRAM the analysis, not COMPUTE it. Use JavaScript by default for sandbox analysis. Use another supported runtime when materially better. Prefer standard libraries. `try/catch`, handle `null`/`undefined`. One script replaces ten tool calls.
 
 ## BLOCKED — do NOT use
 
