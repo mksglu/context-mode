@@ -21,7 +21,8 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SessionDB } from "../src/session/db.js";
+import { resolveSessionDbPath, SessionDB } from "../src/session/db.js";
+import { EventPriority } from "../src/types.js";
 
 // ── Mock Pi API ──────────────────────────────────────────────
 
@@ -984,6 +985,60 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 9: active_memory injection", () => {
+    it("treats minPriority 3 as CRITICAL, HIGH, and NORMAL inclusive", async () => {
+      await registerPiExtension(api);
+      const sessionFile = join(tempDir, "active-memory-priority.jsonl");
+      const sessionId = createHash("sha256")
+        .update(sessionFile)
+        .digest("hex")
+        .slice(0, 16);
+
+      await api._trigger(
+        "session_start",
+        {},
+        { sessionManager: { getSessionFile: () => sessionFile } },
+      );
+
+      const dbPath = resolveSessionDbPath({
+        projectDir: process.env.PI_PROJECT_DIR!,
+        sessionsDir: join(
+          process.env.HOME!,
+          ".pi",
+          "context-mode",
+          "sessions",
+        ),
+      });
+      const db = new SessionDB({ dbPath });
+      try {
+        // SessionEvent priority is a 1..4 importance domain. OpenClaw's
+        // lifecycle-hook ordering priority is a separate framework contract.
+        for (const [label, priority] of [
+          ["critical", EventPriority.CRITICAL],
+          ["high", EventPriority.HIGH],
+          ["normal", EventPriority.NORMAL],
+          ["low", EventPriority.LOW],
+        ] as const) {
+          db.insertEvent(sessionId, {
+            type: `priority_${label}`,
+            category: "decision",
+            data: `pi-priority-${label}`,
+            priority,
+          });
+        }
+      } finally {
+        db.close();
+      }
+
+      await api._trigger("before_agent_start", { systemPrompt: "Base." });
+      const ctxResult = await api._trigger("context", { messages: [] });
+      const content = String(ctxResult?.messages?.[0]?.content ?? "");
+
+      expect(content).toContain("pi-priority-critical");
+      expect(content).toContain("pi-priority-high");
+      expect(content).toContain("pi-priority-normal");
+      expect(content).not.toContain("pi-priority-low");
+    });
+
     it("injects context every turn via context hook even when compact_count is 0", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {

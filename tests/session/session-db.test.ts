@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { afterAll, describe, expect, test } from "vitest";
 import { SessionDB } from "../../src/session/db.js";
+import { EventPriority } from "../../src/types.js";
 import {
   cleanOrphanedWALFiles,
   defaultDBPath,
@@ -237,21 +238,30 @@ describe("Filter by type", () => {
 // SLICE 4: FILTER BY MIN PRIORITY
 // ════════════════════════════════════════════
 
+test("EventPriority uses the persisted 1=critical through 4=low contract", () => {
+  assert.deepEqual(EventPriority, {
+    LOW: 4,
+    NORMAL: 3,
+    HIGH: 2,
+    CRITICAL: 1,
+  });
+});
+
 describe("Filter by minPriority", () => {
   test("getEvents filters by minPriority", () => {
     const db = createTestDB();
     const sid = "sess-3";
 
-    db.insertEvent(sid, makeEvent({ type: "file", data: "low.ts", priority: 1 }));
-    db.insertEvent(sid, makeEvent({ type: "git", data: "medium", priority: 2 }));
-    db.insertEvent(sid, makeEvent({ type: "error", data: "high", priority: 3 }));
-    db.insertEvent(sid, makeEvent({ type: "decision", data: "critical", priority: 4 }));
+    db.insertEvent(sid, makeEvent({ type: "file", data: "low.ts", priority: EventPriority.LOW }));
+    db.insertEvent(sid, makeEvent({ type: "git", data: "normal", priority: EventPriority.NORMAL }));
+    db.insertEvent(sid, makeEvent({ type: "error", data: "high", priority: EventPriority.HIGH }));
+    db.insertEvent(sid, makeEvent({ type: "decision", data: "critical", priority: EventPriority.CRITICAL }));
 
-    const highAndAbove = db.getEvents(sid, { minPriority: 3 });
+    const highAndAbove = db.getEvents(sid, { minPriority: EventPriority.HIGH });
     assert.equal(highAndAbove.length, 2);
-    assert.ok(highAndAbove.every(e => e.priority >= 3));
+    assert.deepEqual(highAndAbove.map(e => e.data), ["high", "critical"]);
 
-    const allEvents = db.getEvents(sid, { minPriority: 1 });
+    const allEvents = db.getEvents(sid, { minPriority: EventPriority.LOW });
     assert.equal(allEvents.length, 4);
   });
 });
@@ -321,18 +331,49 @@ describe("Deduplication", () => {
 // ════════════════════════════════════════════
 
 describe("Max Events & FIFO Eviction", () => {
-  test("max 1000 events with FIFO eviction of lowest priority", () => {
+  for (const method of ["insertEvent", "bulkInsertEvents"] as const) {
+    test(`${method} preserves critical events and evicts the oldest low-priority event`, () => {
+      const db = createTestDB();
+      const sid = `priority-contract-${method}`;
+      db.bulkInsertEvents(sid, [
+        makeEvent({ type: "rule", data: "keep-critical", priority: EventPriority.CRITICAL }),
+        ...Array.from({ length: 999 }, (_, i) => makeEvent({
+          data: `low-${i}`,
+          priority: EventPriority.LOW,
+        })),
+      ]);
+
+      const incoming = makeEvent({ data: "incoming", priority: EventPriority.NORMAL });
+      if (method === "insertEvent") db.insertEvent(sid, incoming);
+      else db.bulkInsertEvents(sid, [incoming]);
+
+      const events = db.getEvents(sid);
+      assert.ok(events.some(e => e.data === "keep-critical"));
+      assert.ok(!events.some(e => e.data === "low-0"));
+      assert.ok(events.some(e => e.data === "incoming"));
+    });
+  }
+
+  test("max 1000 events with FIFO eviction of least-important priority", () => {
     const db = createTestDB();
     const sid = "sess-5";
 
-    // Insert 1000 events at priority 2
+    // Insert 1000 normal-priority events.
     for (let i = 0; i < 1000; i++) {
-      db.insertEvent(sid, makeEvent({ type: "file", data: `file-${i}.ts`, priority: 2 }));
+      db.insertEvent(sid, makeEvent({
+        type: "file",
+        data: `file-${i}.ts`,
+        priority: EventPriority.NORMAL,
+      }));
     }
     assert.equal(db.getEventCount(sid), 1000);
 
-    // Insert one more at priority 3 - should evict the lowest priority (first p2 event)
-    db.insertEvent(sid, makeEvent({ type: "git", data: "new-event", priority: 3 }));
+    // A high-priority event evicts the oldest normal-priority event.
+    db.insertEvent(sid, makeEvent({
+      type: "git",
+      data: "new-event",
+      priority: EventPriority.HIGH,
+    }));
     assert.equal(db.getEventCount(sid), 1000);
 
     // The high-priority event should be present
@@ -340,7 +381,7 @@ describe("Max Events & FIFO Eviction", () => {
     assert.equal(gitEvents.length, 1);
     assert.equal(gitEvents[0].data, "new-event");
 
-    // The evicted event should be the lowest priority + oldest (file-0.ts)
+    // The evicted event should be the least important + oldest (file-0.ts).
     const allEvents = db.getEvents(sid);
     const hasFile0 = allEvents.some(e => e.data === "file-0.ts");
     assert.equal(hasFile0, false, "file-0.ts should have been evicted");
@@ -760,12 +801,12 @@ describe("Combined Filters", () => {
     const db = createTestDB();
     const sid = "sess-combo";
 
-    db.insertEvent(sid, makeEvent({ type: "file", data: "low-file.ts", priority: 1 }));
-    db.insertEvent(sid, makeEvent({ type: "file", data: "high-file.ts", priority: 3 }));
-    db.insertEvent(sid, makeEvent({ type: "git", data: "low-git", priority: 1 }));
-    db.insertEvent(sid, makeEvent({ type: "git", data: "high-git", priority: 3 }));
+    db.insertEvent(sid, makeEvent({ type: "file", data: "low-file.ts", priority: EventPriority.LOW }));
+    db.insertEvent(sid, makeEvent({ type: "file", data: "high-file.ts", priority: EventPriority.HIGH }));
+    db.insertEvent(sid, makeEvent({ type: "git", data: "low-git", priority: EventPriority.LOW }));
+    db.insertEvent(sid, makeEvent({ type: "git", data: "high-git", priority: EventPriority.HIGH }));
 
-    const highFiles = db.getEvents(sid, { type: "file", minPriority: 2 });
+    const highFiles = db.getEvents(sid, { type: "file", minPriority: EventPriority.HIGH });
     assert.equal(highFiles.length, 1);
     assert.equal(highFiles[0].data, "high-file.ts");
   });

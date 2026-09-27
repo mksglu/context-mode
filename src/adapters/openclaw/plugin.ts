@@ -833,6 +833,8 @@ export default {
         if (skillLikeInstructions) injectedBlocks.push(skillLikeInstructions);
         return { appendSystemContext: injectedBlocks.join("\n\n") };
       },
+      // OpenClaw lifecycle hook ordering; unrelated to the 1..4
+      // SessionEvent.priority importance domain.
       { priority: 5 },
     );
 

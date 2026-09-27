@@ -84,7 +84,7 @@ describe("hooks/codex — /goal survives compact resume context", () => {
     expect(promptResult.status, promptResult.stderr || promptResult.stdout).toBe(0);
 
     expect(readGoalRows(codexHome)).toEqual([
-      expect.objectContaining({ data: objective, priority: 4 }),
+      expect.objectContaining({ data: objective, priority: 1 }),
     ]);
 
     const compactResult = runHook(CODEX_PRECOMPACT_PATH, baseInput, env);
