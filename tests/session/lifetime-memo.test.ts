@@ -20,7 +20,8 @@ import { getLifetimeStats, resetLifetimeMemo, lifetimeMemoSize, lifetimeScanCoun
 import { loadDatabase } from "../../src/db-base.js";
 
 const cleanups: Array<() => void> = [];
-afterAll(() => { for (const fn of cleanups) { try { fn(); } catch { /* ignore */ } } });
+// Reverse order: handles registered after a directory must close before it is removed.
+afterAll(() => { for (const fn of [...cleanups].reverse()) { try { fn(); } catch { /* ignore */ } } });
 
 beforeEach(() => { resetLifetimeMemo(); });
 
@@ -82,7 +83,7 @@ describe("getLifetimeStats — per-file memo", () => {
     expect(spy.opens.length).toBe(2);
   });
 
-  test("🚨 a WAL write invalidates the memo even with the .db untouched", () => {
+  test("🚨 a WAL write invalidates the memo even with the .db untouched", (ctx) => {
     const dir = tmpDir("memo-wal");
     const { db, filePath } = seed(dir, "live", 2);
 
@@ -94,16 +95,14 @@ describe("getLifetimeStats — per-file memo", () => {
     const statAfter = statSync(filePath);
 
     // The scenario is only worth anything if the `.db` really did NOT change. When SQLite
-    // decides to checkpoint, the test stays correct but stops discriminating, and saying
-    // so beats pretending it proved something.
+    // decides to checkpoint, the .db alone would invalidate the key and the test would prove
+    // nothing about the -wal, so it skips instead of passing.
     const dbUntouched = statBefore.mtimeMs === statAfter.mtimeMs && statBefore.size === statAfter.size;
     expect(existsSync(`${filePath}-wal`)).toBe(true);
+    if (!dbUntouched) { db.close(); ctx.skip(); }
 
     const after = getLifetimeStats({ sessionsDir: dir, memoryRoot: join(dir, "vazio") });
-    expect(after.totalEvents, dbUntouched
-      ? "the .db did not change: only the -wal in the key detects this write"
-      : "a checkpoint happened; the discriminating case was not exercised this round",
-    ).toBe(3);
+    expect(after.totalEvents, "the .db did not change: only the -wal in the key detects this write").toBe(3);
     db.close();
   });
 
@@ -163,9 +162,9 @@ describe("getLifetimeStats — per-file memo", () => {
     const { db, filePath } = seed(dir, "corrida", 2);
 
     // The spy writes to the database the moment it is opened for reading: a writer committing
-    // mid-scan. The entry is stored under the OLD state's key, and that is precisely why
-    // nothing gets stuck — the next call computes the NEW state's key, misses the memo and
-    // rereads. The cost is one extra scan; the value never freezes.
+    // mid-scan. The fingerprint taken after the scan no longer matches the one taken before,
+    // so the aggregate is NOT stored, and the next call rereads. The cost is one extra scan;
+    // the value never freezes.
     const Real = loadDatabase() as unknown as new (p: string, o: unknown) => unknown;
     let wrote = false;
     const Intruder = function (this: unknown, p: string, o: unknown) {
@@ -178,6 +177,7 @@ describe("getLifetimeStats — per-file memo", () => {
     } as unknown as typeof Real;
 
     getLifetimeStats({ sessionsDir: dir, memoryRoot: join(dir, "v"), loadDatabase: () => Intruder });
+    expect(lifetimeMemoSize(), "a file that moved under the scan must not be memoised").toBe(0);
     const after = getLifetimeStats({ sessionsDir: dir, memoryRoot: join(dir, "v") });
 
     expect(after.totalEvents, "the old state's key must miss the memo and force a reread").toBe(3);
@@ -306,6 +306,7 @@ describe("getLifetimeStats — per-file memo", () => {
     db.insertEvent("s-live", event("/p/live/after.ts"), "PostToolUse");
 
     const r = getLifetimeStats(opts);
+    expect(lifetimeScanCounts(), "refused delta, then a full scan").toEqual({ full: 2, delta: 0 });
     expect(r.totalEvents, "with a deletion the delta must be refused").toBe(5);
     expect(r.categoryCounts?.file, "the per-category count must come down too").toBe(5);
     db.close();
@@ -491,13 +492,50 @@ describe("getLifetimeStats — per-file memo", () => {
     const dir = tmpDir("delta-corrompido");
     const { db, filePath } = seed(dir, "live", 3);
     db.close();
-    const opts = { sessionsDir: dir, memoryRoot: join(dir, "v") };
+    const spy = spyCtor();
+    const opts = { sessionsDir: dir, memoryRoot: join(dir, "v"), loadDatabase: spy.loadDatabase };
     expect(getLifetimeStats(opts).totalEvents).toBe(3);
 
     for (const s of ["-wal", "-shm"]) rmSync(`${filePath}${s}`, { force: true });
     writeFileSync(filePath, Buffer.alloc(8192, 7)); // not a database, different size
     expect(getLifetimeStats(opts).totalEvents).toBe(0);
     expect(lifetimeScanCounts()).toEqual({ full: 1, delta: 0 });
+    // 1 full scan, then the delta AND the fallback full scan both tried to open it.
+    expect(spy.opens.length, "delta attempted, then the full scan").toBe(3);
+  });
+
+  test("the read transaction is ended explicitly, not left to close()", () => {
+    const dir = tmpDir("memo-commit");
+    const { db, filePath } = seed(dir, "live", 3);
+    // A reader whose close() does nothing: a connection that outlives its caller, as
+    // sqlite3_close_v2 can leave behind until GC finalizes its statements.
+    const Real = loadDatabase() as unknown as new (p: string, o: unknown) => { close: () => void };
+    const leaked: Array<{ close: () => void }> = [];
+    const Zombie = function (this: unknown, p: string, o: unknown) {
+      const real = new Real(p, o);
+      leaked.push(real);
+      return new Proxy(real as unknown as Record<string, unknown>, {
+        get(t, k) {
+          if (k === "close") return () => {};
+          const v = t[k as string];
+          return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(t) : v;
+        },
+      });
+    } as unknown as typeof Real;
+    try {
+      getLifetimeStats({ sessionsDir: dir, memoryRoot: join(dir, "v"), loadDatabase: () => Zombie });
+      db.insertEvent("s-live", event("/p/live/next.ts"), "PostToolUse");
+      const w = new (loadDatabase() as unknown as new (p: string, o: unknown) => {
+        prepare: (s: string) => { get: () => { busy: number } };
+        close: () => void;
+      })(filePath, { readonly: false });
+      const ck = w.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get();
+      w.close();
+      expect(ck.busy, "an open read transaction would block the checkpoint").toBe(0);
+    } finally {
+      for (const c of leaked) { try { c.close(); } catch { /* already closed */ } }
+      db.close();
+    }
   });
 
   test("resetLifetimeMemo() forces everything to be reread", () => {

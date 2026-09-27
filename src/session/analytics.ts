@@ -733,7 +733,7 @@ type SidecarAggregate = {
 };
 
 /**
- * Per-file memo of the six-query sidecar scan, keyed by a filesystem fingerprint.
+ * Per-file memo of the sidecar scan, keyed by a filesystem fingerprint.
  *
  * getLifetimeStats() is reached from the 60s stats heartbeat, behind a 30s cache, and it
  * used to reopen and fully scan EVERY sidecar on every call. That is wasted work by
@@ -742,7 +742,7 @@ type SidecarAggregate = {
  * call, per server process — with 10 concurrent sessions, ~27.7 MB/s of continuous I/O
  * for as long as the sessions stayed open, working or not. The tree only grows.
  *
- * Process-local on purpose: this is a cache of immutable history, cheap to rebuild once
+ * Process-local on purpose: the history mostly only grows, it is cheap to rebuild once
  * per process, and a cross-process cache would need its own invalidation and locking.
  */
 const sidecarMemo = new Map<string, { key: string; value: SidecarAggregate }>();
@@ -817,8 +817,9 @@ function sidecarFingerprint(dbPath: string): string | null {
 }
 
 /**
- * The six-query scan of one sidecar. Returns null when the file cannot be opened at all;
- * individual queries degrade to zero so an older schema still contributes what it has.
+ * The full scan of one sidecar. Returns null when the file cannot be opened or the two
+ * COUNT(*) queries fail; the other queries degrade to empty so an older schema still
+ * contributes what it has.
  */
 function readSidecarAggregate(
   DatabaseCtor: ReturnType<typeof loadDatabaseImpl>,
@@ -833,7 +834,7 @@ function readSidecarAggregate(
     const sdb = new DatabaseCtor(dbPath, { readonly: true });
     try {
       // One read snapshot for every query below: the watermark must describe exactly the
-      // rows that were counted. close() ends the read transaction.
+      // rows that were counted. The finally block ends it.
       try { sdb.exec("BEGIN"); } catch { /* reads stay per-statement */ }
       const ev = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_events").get() as { cnt: number } | undefined;
       const ss = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_meta").get() as { cnt: number } | undefined;
@@ -898,6 +899,9 @@ function readSidecarAggregate(
       // local first moved that failure from "loses a little" to "loses the whole
       // sidecar, and only on some calls" — a lifetime total that oscillates between
       // consecutive reads. Swallow it here and keep what the queries returned.
+      // End the read transaction explicitly: node:sqlite closes with sqlite3_close_v2, which
+      // can keep a connection (and its WAL read mark) alive until GC finalizes statements.
+      try { sdb.exec("COMMIT"); } catch { /* no transaction open */ }
       try { sdb.close(); } catch { /* handle already gone */ }
     }
   } catch {
@@ -908,7 +912,8 @@ function readSidecarAggregate(
 }
 
 /**
- * Update a previous aggregate by reading ONLY the rows added since `previous.lastId`.
+ * Update a previous aggregate by reading only the rows added since `previous.lastId`,
+ * plus the cheap whole-table counts that prove nothing below it was removed.
  *
  * Why this exists, measured on the real tree: a session that is being written changes its
  * sidecar every cycle, so the per-file memo correctly misses on it and rescans. With one
@@ -916,7 +921,7 @@ function readSidecarAggregate(
  * to recount a table that only ever grew by a few dozen rows. Per-file memoisation solved
  * "which files"; this solves "how much of the file".
  *
- * Timed on that 67.9 MB sidecar (71.5k rows): the full six-query scan costs ~113 ms, and
+ * Timed on that 67.9 MB sidecar (71.5k rows): the full scan costs ~113 ms, and
  * three queries carry ~104 ms of it — MIN(created_at) 45 ms, GROUP BY category 35 ms,
  * DISTINCT project_dir 24 ms. Their `WHERE id > ?` counterparts cost 0.8–0.9 ms each.
  * COUNT(*) is only 5.5 ms and SUM(length(snapshot)) 2.7 ms, so those stay whole.
@@ -935,8 +940,13 @@ function readSidecarAggregate(
  * from ordinary growth — a substitute whose row count happened to match would be accepted
  * and, worse, would never heal, because a watermark above the substitute's real MAX(id)
  * leaves `added` at zero forever. The identity check on the watermark row below closes
- * that: a replacement is treated as continuous only if its row at `lastId` has the same
- * session_id, created_at and data, and at that point it is the same database.
+ * the realistic cases: a replacement is treated as continuous only if its row at `lastId`
+ * has the same session_id, created_at and data. What remains open is a replacement that
+ * shares that exact row and the row count but differs in an OLDER row (e.g. a restored
+ * copy edited below the watermark); the delta would keep the old aggregate for those rows.
+ * Rows are otherwise never edited in place: the only UPDATE (adapters/openclaw) rewrites
+ * session_id, which no aggregate reads and which fails the identity check if it hits the
+ * watermark row.
  *
  * A sidecar sitting at its row CAP evicts one row per insert (lowest priority, then oldest),
  * so the count stops moving and this guard refuses whenever an evicted row sat below the
@@ -945,8 +955,9 @@ function readSidecarAggregate(
  * cannot be subtracted. Measured: one such sidecar costs ~42.7 MB per cycle and it is the
  * whole of what the incremental path leaves on the table.
  *
- * Returns null whenever the delta cannot be proven safe. The caller then rescans; this
- * function never returns a half-trusted number.
+ * Returns null whenever the continuity checks fail, and the caller then rescans. The
+ * optional per-category / project / earliest-event queries degrade exactly as they do in
+ * the full scan (an older schema without the column contributes nothing).
  */
 function readSidecarDelta(
   DatabaseCtor: ReturnType<typeof loadDatabaseImpl>,
@@ -959,7 +970,7 @@ function readSidecarDelta(
     try {
       // One read snapshot: without it a row written between COUNT(*) and the per-category
       // query would be summed into categoryCounts but not into events, and the watermark
-      // would advance past a row the total never saw. close() ends the read transaction.
+      // would advance past a row the total never saw. The finally block ends it.
       try { sdb.exec("BEGIN"); } catch { /* reads stay per-statement */ }
       // 🚨 CONTINUITY before arithmetic, and it cannot be derived from counting.
       //
@@ -1046,6 +1057,9 @@ function readSidecarDelta(
       }
       return out;
     } finally {
+      // End the read transaction explicitly: node:sqlite closes with sqlite3_close_v2, which
+      // can keep a connection (and its WAL read mark) alive until GC finalizes statements.
+      try { sdb.exec("COMMIT"); } catch { /* no transaction open */ }
       try { sdb.close(); } catch { /* handle already gone */ }
     }
   } catch {
@@ -1122,16 +1136,15 @@ export function getLifetimeStats(opts?: {
             else { agg = readSidecarAggregate(DatabaseCtor, dbPath); if (agg) scanCounts.full++; }
             // Only memoise when the file did not move under the scan.
             //
-            // Usually a mid-scan commit changes the -wal enough that the next call's key
-            // misses on its own. Usually is not always: SQLite recycles the -wal in place
-            // after a checkpoint, rewriting frames from offset 0 without shrinking the
-            // file, so `size` can be identical across a commit — and then `mtime` is the
-            // only discriminant left. On a filesystem with coarse mtime (exFAT/FAT32 at
-            // 2s, SMB to FAT, NFS with cached attributes) the write lands inside the same
-            // granule and the key matches. The aggregate read BEFORE that commit would
-            // then be stored under a key that still validates, and the event stays
-            // invisible until the file changes again — permanently, for a session that
-            // just wrote its last event and went quiet. One extra statSync closes it.
+            // A commit during the scan usually shows in the fingerprint, and then this
+            // second stat refuses to store the pre-commit aggregate. It cannot see every
+            // commit: SQLite recycles the -wal in place after a checkpoint, so `size` can
+            // stay identical, and on a filesystem with coarse mtime (exFAT/FAT32 at 2s,
+            // SMB to FAT, NFS with cached attributes) a write inside the same granule
+            // leaves `mtime` identical too. Such a commit is invisible to both stats, and
+            // its rows stay out of the total until the file changes again.
+            // ponytail: stat-based key; a TTL or a SQLite-side change counter if
+            // coarse-mtime filesystems ever matter here (NTFS, ext4 and APFS do not hit it).
             if (agg && fingerprint && sidecarFingerprint(dbPath) === fingerprint) {
               sidecarMemo.set(dbPath, { key: fingerprint, value: agg });
             }
