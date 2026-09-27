@@ -189,6 +189,52 @@ describe("cli.bundle.mjs — marketplace install support", () => {
     const gitignore = readFileSync(resolve(ROOT, ".gitignore"), "utf-8");
     expect(gitignore).toContain("server.bundle.mjs");
     expect(gitignore).toContain("cli.bundle.mjs");
+    expect(gitignore).toContain("bin/analytics.bundle.mjs");
+  });
+});
+
+// ── bin/analytics.bundle.mjs — statusline marketplace install support ──
+//
+// bin/statusline.mjs dynamically imports the compiled analytics module.
+// Every other session/*.ts consumer (session-db, session-extract,
+// session-snapshot) ships a co-located CI bundle with build/ as fallback —
+// analytics.ts was the one left out, so a git-clone marketplace install
+// (build/ is gitignored, only `tsc` produces it, only npm/CI installs run
+// that) never resolved a target and bin/statusline.mjs permanently
+// rendered the empty-state headline instead of real KPIs.
+
+describe("bin/analytics.bundle.mjs — statusline marketplace install support", () => {
+  it("package.json bundle script builds bin/analytics.bundle.mjs", () => {
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf-8"));
+    expect(pkg.scripts.bundle).toContain("bin/analytics.bundle.mjs");
+    expect(pkg.scripts.bundle).toContain("src/session/analytics.ts");
+  });
+
+  it("package.json assert-bundle script covers bin/analytics.bundle.mjs", () => {
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf-8"));
+    expect(pkg.scripts["assert-bundle"]).toContain("bin/analytics.bundle.mjs");
+  });
+
+  it("bin/analytics.bundle.mjs exists after npm run bundle", () => {
+    expect(existsSync(resolve(ROOT, "bin", "analytics.bundle.mjs"))).toBe(true);
+  });
+
+  it("bin/analytics.bundle.mjs is readable", () => {
+    expect(() => accessSync(resolve(ROOT, "bin", "analytics.bundle.mjs"), constants.R_OK)).not.toThrow();
+  });
+
+  it("bin/statusline.mjs tries the co-located bundle before the build/ fallback", () => {
+    const src = readFileSync(resolve(ROOT, "bin", "statusline.mjs"), "utf-8");
+    expect(src).toContain("analytics.bundle.mjs");
+    expect(src).toContain("build");
+    expect(src).toContain("analytics.js");
+    // Must use existsSync to pick bundle vs. build/ fallback, same pattern
+    // as hooks/session-helpers.mjs's loadSessionDbModule().
+    expect(src).toContain("existsSync");
+    const bundleIdx = src.indexOf("ANALYTICS_BUNDLE_PATH");
+    const buildIdx = src.indexOf("ANALYTICS_BUILD_PATH");
+    expect(bundleIdx).toBeGreaterThan(-1);
+    expect(buildIdx).toBeGreaterThan(-1);
   });
 });
 
