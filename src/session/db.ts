@@ -970,7 +970,7 @@ export class SessionDB extends SQLiteBase {
     p(S.evictLowestPriority,
       `DELETE FROM session_events WHERE id = (
          SELECT id FROM session_events WHERE session_id = ?
-         ORDER BY priority ASC, id ASC LIMIT 1
+         ORDER BY priority DESC, id ASC LIMIT 1
        )`);
 
     p(S.updateMetaLastEvent,
@@ -1132,7 +1132,7 @@ export class SessionDB extends SQLiteBase {
    * last DEDUP_WINDOW events for this session.
    *
    * Eviction: if session exceeds MAX_EVENTS_PER_SESSION, evicts the
-   * lowest-priority (then oldest) event.
+   * least-important (highest numeric priority, then oldest) event.
    */
   insertEvent(
     sessionId: string,

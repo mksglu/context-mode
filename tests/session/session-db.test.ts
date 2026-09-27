@@ -321,6 +321,42 @@ describe("Deduplication", () => {
 // ════════════════════════════════════════════
 
 describe("Max Events & FIFO Eviction", () => {
+  for (const method of ["insertEvent", "bulkInsertEvents"] as const) {
+    test(`${method} preserves critical events and evicts the oldest least-important event`, () => {
+      const db = createTestDB();
+      const sid = `priority-eviction-${method}`;
+      db.insertEvent("other-session", makeEvent({ data: "unrelated", priority: 5 }));
+      db.bulkInsertEvents(sid, [
+        makeEvent({ type: "user_prompt", data: "keep my objective", priority: 1 }),
+        makeEvent({ type: "rule", data: "keep my rules", priority: 1 }),
+        ...Array.from({ length: 998 }, (_, i) => makeEvent({
+          data: `event-${i}`,
+          priority: 2 + (i % 4),
+        })),
+      ]);
+      const incoming = [
+        makeEvent({ data: "new-event-1", priority: 4 }),
+        makeEvent({ data: "new-event-2", priority: 4 }),
+      ];
+      if (method === "insertEvent") {
+        for (const event of incoming) db.insertEvent(sid, event);
+      } else {
+        db.bulkInsertEvents(sid, incoming);
+      }
+
+      const events = db.getEvents(sid);
+      assert.equal(db.getEventCount(sid), 1000);
+      assert.ok(events.some(e => e.data === "keep my objective"));
+      assert.ok(events.some(e => e.data === "keep my rules"));
+      assert.ok(events.some(e => e.data === "event-0"), "older priority-2 event survives");
+      assert.ok(!events.some(e => e.data === "event-3"), "oldest priority-5 event is evicted");
+      assert.ok(!events.some(e => e.data === "event-7"), "next priority-5 event is evicted");
+      assert.ok(events.some(e => e.data === "event-11"), "newer priority-5 event survives");
+      assert.ok(incoming.every(event => events.some(e => e.data === event.data)));
+      assert.equal(db.getEventCount("other-session"), 1);
+    });
+  }
+
   test("max 1000 events with FIFO eviction of lowest priority", () => {
     const db = createTestDB();
     const sid = "sess-5";
@@ -331,8 +367,8 @@ describe("Max Events & FIFO Eviction", () => {
     }
     assert.equal(db.getEventCount(sid), 1000);
 
-    // Insert one more at priority 3 - should evict the lowest priority (first p2 event)
-    db.insertEvent(sid, makeEvent({ type: "git", data: "new-event", priority: 3 }));
+    // Insert a priority-1 event; the oldest existing priority-2 event is evicted
+    db.insertEvent(sid, makeEvent({ type: "git", data: "new-event", priority: 1 }));
     assert.equal(db.getEventCount(sid), 1000);
 
     // The high-priority event should be present
