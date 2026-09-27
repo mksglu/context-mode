@@ -12,7 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, sep } from "node:path";
+import { join, sep, dirname } from "node:path";
 import { loadDatabase as loadDatabaseImpl } from "../db-base.js";
 import { ensureSessionEventsSchema } from "./db.js";
 import { resolveClaudeConfigDir } from "../util/claude-config.js";
@@ -700,12 +700,368 @@ function autoMemoryPrefix(filename: string): string {
   return m ? m[1].toLowerCase() : "other";
 }
 
+/** Aggregate contributed by ONE SessionDB sidecar. Memoised per file — see below. */
+type SidecarAggregate = {
+  events: number;
+  sessions: number;
+  rescueBytes: number;
+  /** POSITIVE_INFINITY when the sidecar has no dated event. */
+  firstEventMs: number;
+  categoryCounts: Record<string, number>;
+  projectDirs: string[];
+  /**
+   * Highest `session_events.id` this aggregate accounts for, or 0 when the table was
+   * empty. It is what lets the NEXT scan of the same file read only the rows added
+   * since — see `readSidecarDelta`.
+   */
+  lastId: number;
+  /**
+   * Identity of the row AT `lastId` — its session, timestamp and payload joined — or ""
+   * when there was none.
+   *
+   * Without it the incremental path cannot tell "this table grew" from "this file is now
+   * a different database". Row counts cannot: two SessionDBs created independently both
+   * start at id 1, so an unrelated 4-row database has the same count AND the same max id
+   * as the 4-row one it replaced.
+   *
+   * 🚨 `created_at` alone is NOT enough, and the test proved it before this comment
+   * existed: the column defaults to `datetime('now')`, at one-second resolution, so two
+   * databases built milliseconds apart carry the identical string. Identity has to come
+   * from CONTENT — `data` and `session_id` — not from a clock.
+   */
+  lastStamp: string;
+};
+
+/**
+ * Per-file memo of the six-query sidecar scan, keyed by a filesystem fingerprint.
+ *
+ * getLifetimeStats() is reached from the 60s stats heartbeat, behind a 30s cache, and it
+ * used to reopen and fully scan EVERY sidecar on every call. That is wasted work by
+ * construction: a session DB that nobody is writing to cannot change its own counts.
+ * Measured 2026-09-25 on a real tree of ~85 sidecars / ~151 MB, it read 166.5 MB per
+ * call, per server process — with 10 concurrent sessions, ~27.7 MB/s of continuous I/O
+ * for as long as the sessions stayed open, working or not. The tree only grows.
+ *
+ * Process-local on purpose: this is a cache of immutable history, cheap to rebuild once
+ * per process, and a cross-process cache would need its own invalidation and locking.
+ */
+const sidecarMemo = new Map<string, { key: string; value: SidecarAggregate }>();
+
+/**
+ * How each sidecar read was served since the last reset. Tests only.
+ *
+ * Exported for the same reason as `lifetimeMemoSize()`: the incremental read is INVISIBLE
+ * in the result by construction — it exists to produce the SAME number for less work, so
+ * no assertion on the aggregate can tell it from a full scan. Without a counter, breaking
+ * it (a watermark that stops advancing, a delta that is never attempted) silently falls
+ * back to full scans and every test stays green.
+ */
+const scanCounts = { full: 0, delta: 0 };
+
+/** Reads served by a full scan vs by an incremental one. Tests only. */
+export function lifetimeScanCounts(): { full: number; delta: number } {
+  return { ...scanCounts };
+}
+
+/** Drop the whole memo. Tests only — real callers rely on fingerprint invalidation. */
+export function resetLifetimeMemo(): void {
+  sidecarMemo.clear();
+  scanCounts.full = 0;
+  scanCounts.delta = 0;
+}
+
+/**
+ * How many sidecars the memo is holding. Tests only.
+ *
+ * Exported because the pruning of vanished sidecars is otherwise INVISIBLE: a deleted
+ * file already drops out of the directory listing, so the aggregate is right either
+ * way and only the retained memory tells the two behaviours apart.
+ */
+export function lifetimeMemoSize(): number {
+  return sidecarMemo.size;
+}
+
+/**
+ * Filesystem fingerprint used to invalidate one sidecar's memo entry.
+ *
+ * 🚨 The `-wal` sidecar is part of the key, and leaving it out is a correctness bug, not
+ * an optimisation detail. Every SessionDB here runs in WAL mode, and in WAL mode a write
+ * lands in `<db>-wal` while the main `.db` file keeps its mtime and size until a
+ * checkpoint. Keyed on the `.db` alone, the ONE database being actively written — the
+ * live session's own — is exactly the one that would serve a frozen count.
+ *
+ * Returns null when the main file cannot be stat'd, which disables memoisation for it
+ * (the scan still runs; it just is not cached).
+ */
+function sidecarFingerprint(dbPath: string): string | null {
+  let main: ReturnType<typeof statSync>;
+  try {
+    main = statSync(dbPath);
+  } catch {
+    return null;
+  }
+  // An EMPTY -wal and no -wal at all are the same state — no uncheckpointed data — and
+  // they must produce the same key. Merely opening a WAL database read-only creates a
+  // zero-length -wal next to it, so treating "absent" and "present but empty" as
+  // different makes the very first scan invalidate the entry it just wrote: the key
+  // stored says "absent", and by the time anyone compares it the reader itself has
+  // created the file. Measured — it cost a full extra scan of every sidecar per process.
+  let wal = "empty";
+  try {
+    const w = statSync(`${dbPath}-wal`);
+    if (w.size > 0) wal = `${w.mtimeMs}:${w.size}`;
+  } catch {
+    // no -wal — same meaning as an empty one
+  }
+  return `${main.mtimeMs}:${main.size}|${wal}`;
+}
+
+/**
+ * The six-query scan of one sidecar. Returns null when the file cannot be opened at all;
+ * individual queries degrade to zero so an older schema still contributes what it has.
+ */
+function readSidecarAggregate(
+  DatabaseCtor: ReturnType<typeof loadDatabaseImpl>,
+  dbPath: string,
+): SidecarAggregate | null {
+  const out: SidecarAggregate = {
+    events: 0, sessions: 0, rescueBytes: 0,
+    firstEventMs: Number.POSITIVE_INFINITY,
+    categoryCounts: {}, projectDirs: [], lastId: 0, lastStamp: "",
+  };
+  try {
+    const sdb = new DatabaseCtor(dbPath, { readonly: true });
+    try {
+      // One read snapshot for every query below: the watermark must describe exactly the
+      // rows that were counted. close() ends the read transaction.
+      try { sdb.exec("BEGIN"); } catch { /* reads stay per-statement */ }
+      const ev = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_events").get() as { cnt: number } | undefined;
+      const ss = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_meta").get() as { cnt: number } | undefined;
+      out.events = ev?.cnt ?? 0;
+      out.sessions = ss?.cnt ?? 0;
+      // Per-category aggregation across every sidecar so the
+      // Persistent memory bars stay populated even when the
+      // current project's local DB is fresh / empty.
+      try {
+        const catRows = sdb.prepare(
+          "SELECT category, COUNT(*) AS cnt FROM session_events GROUP BY category",
+        ).all() as Array<{ category: string; cnt: number }>;
+        for (const row of catRows) {
+          if (!row.category) continue;
+          out.categoryCounts[row.category] = (out.categoryCounts[row.category] ?? 0) + (row.cnt ?? 0);
+        }
+      } catch {
+        // older schema / no category column — ignore
+      }
+      // Lifetime rescue: compact-snapshot bytes restored across every DB.
+      // Without this, the lifetime $ silently undercounts the killer
+      // continuity-after-/compact feature.
+      try {
+        const snap = sdb.prepare(
+          "SELECT COALESCE(SUM(length(snapshot)), 0) AS bytes FROM session_resume WHERE consumed = 1",
+        ).get() as { bytes: number } | undefined;
+        if (snap?.bytes) out.rescueBytes += snap.bytes;
+      } catch { /* old schema */ }
+      // Earliest event timestamp + distinct project_dirs for the
+      // "since X · Y projects" lifetime narrative.
+      try {
+        const mn = sdb.prepare(
+          "SELECT MIN(created_at) AS t FROM session_events",
+        ).get() as { t: string | null } | undefined;
+        if (mn?.t) {
+          const identity = mn.t.endsWith("Z") ? mn.t : mn.t + "Z";
+          const ms = Date.parse(identity);
+          if (Number.isFinite(ms) && ms < out.firstEventMs) out.firstEventMs = ms;
+        }
+      } catch { /* old schema */ }
+      try {
+        const projRows = sdb.prepare(
+          "SELECT DISTINCT project_dir AS p FROM session_events WHERE project_dir != ''",
+        ).all() as Array<{ p: string }>;
+        for (const row of projRows) if (row.p) out.projectDirs.push(row.p);
+      } catch { /* old schema */ }
+      try {
+        // The highest-id row and its identity, in one query. Together they are the
+        // watermark: the id says how far this aggregate counted, the identity says the
+        // file is still the same database next time round.
+        const mx = sdb.prepare(
+          "SELECT id AS id, session_id || char(31) || created_at || char(31) || data AS t" +
+          " FROM session_events ORDER BY id DESC LIMIT 1",
+        ).get() as { id: number; t: string | null } | undefined;
+        out.lastId = mx?.id ?? 0;
+        out.lastStamp = mx?.t ?? "";
+      } catch { /* no id column: lastId stays 0 and the delta is never attempted */ }
+    } finally {
+      // close() failing must not throw away work already read. The original loop wrote
+      // straight into the shared accumulators, so a close() that threw (network share
+      // dropping, EIO) still left its partial contribution counted. Collecting into a
+      // local first moved that failure from "loses a little" to "loses the whole
+      // sidecar, and only on some calls" — a lifetime total that oscillates between
+      // consecutive reads. Swallow it here and keep what the queries returned.
+      try { sdb.close(); } catch { /* handle already gone */ }
+    }
+  } catch {
+    // missing tables / corrupt file — skip
+    return null;
+  }
+  return out;
+}
+
+/**
+ * Update a previous aggregate by reading ONLY the rows added since `previous.lastId`.
+ *
+ * Why this exists, measured on the real tree: a session that is being written changes its
+ * sidecar every cycle, so the per-file memo correctly misses on it and rescans. With one
+ * active session that file was 67.9 MB — 45.6% of the whole corpus — rescanned every 60s
+ * to recount a table that only ever grew by a few dozen rows. Per-file memoisation solved
+ * "which files"; this solves "how much of the file".
+ *
+ * Timed on that 67.9 MB sidecar (71.5k rows): the full six-query scan costs ~113 ms, and
+ * three queries carry ~104 ms of it — MIN(created_at) 45 ms, GROUP BY category 35 ms,
+ * DISTINCT project_dir 24 ms. Their `WHERE id > ?` counterparts cost 0.8–0.9 ms each.
+ * COUNT(*) is only 5.5 ms and SUM(length(snapshot)) 2.7 ms, so those stay whole.
+ *
+ * 🚨 Rows ARE deleted from session_events (db.ts:971 caps, :1081 and :1721 clean up), so
+ * `WHERE id > lastId` alone would over-count: a row removed BELOW the cut is invisible to
+ * it and the total would never come back down. The guard is one COUNT(*), and it is EXACT
+ * rather than merely careful: the column is `id INTEGER PRIMARY KEY AUTOINCREMENT`
+ * (db.ts:829), so SQLite never reuses an id and every row inserted since the last pass
+ * necessarily has `id > lastId`. Therefore `added` is exactly the inserted set, and
+ * `total === previous.events − removed + added` collapses to
+ * `previous.events + added === total` if and only if `removed === 0`.
+ *
+ * That exactness holds for one table evolving in place. It does NOT, on its own, cover a
+ * file being REPLACED by a different database, which the fingerprint cannot distinguish
+ * from ordinary growth — a substitute whose row count happened to match would be accepted
+ * and, worse, would never heal, because a watermark above the substitute's real MAX(id)
+ * leaves `added` at zero forever. The identity check on the watermark row below closes
+ * that: a replacement is treated as continuous only if its row at `lastId` has the same
+ * session_id, created_at and data, and at that point it is the same database.
+ *
+ * A sidecar sitting at its row CAP evicts one row per insert (lowest priority, then oldest),
+ * so the count stops moving and this guard refuses whenever an evicted row sat below the
+ * watermark — in practice most cycles. That refusal is correct, not a missed optimisation:
+ * nothing tells a reader which category the evicted row carried, so its contribution
+ * cannot be subtracted. Measured: one such sidecar costs ~42.7 MB per cycle and it is the
+ * whole of what the incremental path leaves on the table.
+ *
+ * Returns null whenever the delta cannot be proven safe. The caller then rescans; this
+ * function never returns a half-trusted number.
+ */
+function readSidecarDelta(
+  DatabaseCtor: ReturnType<typeof loadDatabaseImpl>,
+  dbPath: string,
+  previous: SidecarAggregate,
+): SidecarAggregate | null {
+  if (previous.lastId <= 0) return null;   // older aggregate, no watermark
+  try {
+    const sdb = new DatabaseCtor(dbPath, { readonly: true });
+    try {
+      // One read snapshot: without it a row written between COUNT(*) and the per-category
+      // query would be summed into categoryCounts but not into events, and the watermark
+      // would advance past a row the total never saw. close() ends the read transaction.
+      try { sdb.exec("BEGIN"); } catch { /* reads stay per-statement */ }
+      // 🚨 CONTINUITY before arithmetic, and it cannot be derived from counting.
+      //
+      // The file may have been REPLACED by a different database — a restored backup, a
+      // sync conflict, a rebuilt table — and an mtime+size fingerprint cannot tell that
+      // from ordinary growth; in fact that is exactly what triggers the delta. Counting
+      // does not help: two SessionDBs created independently both start at id 1, so an
+      // unrelated 4-row database has the SAME count AND the SAME max(id) as the 4-row
+      // one it replaced. Measured — a test of exactly that shape failed the version of
+      // this guard that only compared max(id).
+      //
+      // The damage would be PERMANENT, not a one-off: with a watermark above the real
+      // max id, `added` stays zero forever and the aggregate never heals itself.
+      //
+      // The identity of the watermark row settles it, by primary key, in O(1).
+      const identity = (sdb.prepare("SELECT session_id || char(31) || created_at || char(31) || data AS t FROM session_events WHERE id = ?")
+        .get(previous.lastId) as { t: string | null } | undefined)?.t ?? "";
+      if (!identity || identity !== previous.lastStamp) return null;
+      const maxId = (sdb.prepare("SELECT MAX(id) AS m FROM session_events").get() as { m: number | null } | undefined)?.m ?? 0;
+
+      const total = (sdb.prepare("SELECT COUNT(*) AS c FROM session_events").get() as { c: number } | undefined)?.c ?? 0;
+      const added = (sdb.prepare("SELECT COUNT(*) AS c FROM session_events WHERE id > ?")
+        .get(previous.lastId) as { c: number } | undefined)?.c ?? 0;
+      // The equality IS the proof. If it does not hold, a row left (or this is another DB).
+      if (previous.events + added !== total) return null;
+
+      const out: SidecarAggregate = {
+        events: total,
+        sessions: previous.sessions,
+        rescueBytes: 0,
+        firstEventMs: previous.firstEventMs,
+        categoryCounts: { ...previous.categoryCounts },
+        projectDirs: [...previous.projectDirs],
+        lastId: previous.lastId,
+        lastStamp: previous.lastStamp,
+      };
+
+      // session_meta and session_resume are cheap (0.9 ms and 2.7 ms measured) and have
+      // no watermark of their own — recomputing them whole costs less than keeping state.
+      out.sessions = (sdb.prepare("SELECT COUNT(*) AS c FROM session_meta").get() as { c: number } | undefined)?.c ?? 0;
+      try {
+        const snap = sdb.prepare(
+          "SELECT COALESCE(SUM(length(snapshot)), 0) AS bytes FROM session_resume WHERE consumed = 1",
+        ).get() as { bytes: number } | undefined;
+        out.rescueBytes = snap?.bytes ?? 0;
+      } catch { /* old schema */ }
+
+      if (added > 0) {
+        try {
+          const cats = sdb.prepare(
+            "SELECT category, COUNT(*) AS cnt FROM session_events WHERE id > ? GROUP BY category",
+          ).all(previous.lastId) as Array<{ category: string; cnt: number }>;
+          for (const row of cats) {
+            if (!row.category) continue;
+            out.categoryCounts[row.category] = (out.categoryCounts[row.category] ?? 0) + (row.cnt ?? 0);
+          }
+        } catch { /* old schema */ }
+        try {
+          const projs = sdb.prepare(
+            "SELECT DISTINCT project_dir AS p FROM session_events WHERE id > ? AND project_dir != ''",
+          ).all(previous.lastId) as Array<{ p: string }>;
+          const known = new Set(out.projectDirs);
+          for (const row of projs) if (row.p && !known.has(row.p)) { known.add(row.p); out.projectDirs.push(row.p); }
+        } catch { /* old schema */ }
+        // The global minimum can only FALL with a new row, never rise — an old row is
+        // never born later. Looking at the new ones is enough, and costs the same as counting.
+        try {
+          const mn = sdb.prepare(
+            "SELECT MIN(created_at) AS t FROM session_events WHERE id > ?",
+          ).get(previous.lastId) as { t: string | null } | undefined;
+          if (mn?.t) {
+            const ms = Date.parse(mn.t.endsWith("Z") ? mn.t : mn.t + "Z");
+            if (Number.isFinite(ms) && ms < out.firstEventMs) out.firstEventMs = ms;
+          }
+        } catch { /* old schema */ }
+        // The watermark advances together with its identity — splitting the two would
+        // leave the new id pointing at a row whose identity was never checked.
+        const newest = sdb.prepare(
+          "SELECT id AS id, session_id || char(31) || created_at || char(31) || data AS t" +
+          " FROM session_events ORDER BY id DESC LIMIT 1",
+        ).get() as { id: number; t: string | null } | undefined;
+        out.lastId = newest?.id ?? maxId;
+        out.lastStamp = newest?.t ?? "";
+      }
+      return out;
+    } finally {
+      try { sdb.close(); } catch { /* handle already gone */ }
+    }
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Aggregate lifetime stats from all SessionDB files in `sessionsDir` and
  * all auto-memory markdown files under `memoryRoot/<project>/memory/`.
  *
  * Best-effort: silently ignores missing/unreadable files so ctx_stats
  * can never be broken by a corrupt sidecar.
+ *
+ * Sidecars are scanned only when their filesystem fingerprint changed since the last
+ * call — see `sidecarMemo`. The aggregate is identical either way; only the I/O differs.
  */
 export function getLifetimeStats(opts?: {
   sessionsDir?: string;
@@ -733,8 +1089,13 @@ export function getLifetimeStats(opts?: {
   // ── SessionDB aggregation ──
   if (existsSync(sessionsDir)) {
     let dbFiles: string[] = [];
+    // Distinguishes "listed it, and it is empty" from "could not list it". Pruning on the
+    // second would evict live entries because of a transient EACCES/EBUSY, and the next
+    // call would pay a full rescan for nothing.
+    let listed = false;
     try {
       dbFiles = readdirSync(sessionsDir).filter((f) => f.endsWith(".db"));
+      listed = true;
     } catch { /* unreadable */ }
 
     if (dbFiles.length > 0) {
@@ -749,61 +1110,61 @@ export function getLifetimeStats(opts?: {
       if (DatabaseCtor) {
         for (const file of dbFiles) {
           const dbPath = join(sessionsDir, file);
-          try {
-            const sdb = new DatabaseCtor(dbPath, { readonly: true });
-            try {
-              const ev = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_events").get() as { cnt: number } | undefined;
-              const ss = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_meta").get() as { cnt: number } | undefined;
-              totalEvents += ev?.cnt ?? 0;
-              totalSessions += ss?.cnt ?? 0;
-              // Per-category aggregation across every sidecar so the
-              // Persistent memory bars stay populated even when the
-              // current project's local DB is fresh / empty.
-              try {
-                const catRows = sdb.prepare(
-                  "SELECT category, COUNT(*) AS cnt FROM session_events GROUP BY category",
-                ).all() as Array<{ category: string; cnt: number }>;
-                for (const row of catRows) {
-                  if (!row.category) continue;
-                  categoryCounts[row.category] = (categoryCounts[row.category] ?? 0) + (row.cnt ?? 0);
-                }
-              } catch {
-                // older schema / no category column — ignore
-              }
-              // Lifetime rescue: compact-snapshot bytes restored across every DB.
-              // Without this, the lifetime $ silently undercounts the killer
-              // continuity-after-/compact feature.
-              try {
-                const snap = sdb.prepare(
-                  "SELECT COALESCE(SUM(length(snapshot)), 0) AS bytes FROM session_resume WHERE consumed = 1",
-                ).get() as { bytes: number } | undefined;
-                if (snap?.bytes) rescueBytes += snap.bytes;
-              } catch { /* old schema */ }
-              // Earliest event timestamp + distinct project_dirs for the
-              // "since X · Y projects" lifetime narrative.
-              try {
-                const mn = sdb.prepare(
-                  "SELECT MIN(created_at) AS t FROM session_events",
-                ).get() as { t: string | null } | undefined;
-                if (mn?.t) {
-                  const stamp = mn.t.endsWith("Z") ? mn.t : mn.t + "Z";
-                  const ms = Date.parse(stamp);
-                  if (Number.isFinite(ms) && ms < firstEventMs) firstEventMs = ms;
-                }
-              } catch { /* old schema */ }
-              try {
-                const projRows = sdb.prepare(
-                  "SELECT DISTINCT project_dir AS p FROM session_events WHERE project_dir != ''",
-                ).all() as Array<{ p: string }>;
-                for (const row of projRows) if (row.p) distinctProjectsSet.add(row.p);
-              } catch { /* old schema */ }
-            } finally {
-              sdb.close();
+          const fingerprint = sidecarFingerprint(dbPath);
+          const cached = fingerprint ? sidecarMemo.get(dbPath) : undefined;
+          let agg = cached && cached.key === fingerprint ? cached.value : null;
+          if (!agg) {
+            // The file changed, but what changed is usually a handful of rows at the end.
+            // Try the incremental read first; it returns null whenever it cannot PROVE
+            // the delta is safe, and then the full scan takes over.
+            agg = cached ? readSidecarDelta(DatabaseCtor, dbPath, cached.value) : null;
+            if (agg) scanCounts.delta++;
+            else { agg = readSidecarAggregate(DatabaseCtor, dbPath); if (agg) scanCounts.full++; }
+            // Only memoise when the file did not move under the scan.
+            //
+            // Usually a mid-scan commit changes the -wal enough that the next call's key
+            // misses on its own. Usually is not always: SQLite recycles the -wal in place
+            // after a checkpoint, rewriting frames from offset 0 without shrinking the
+            // file, so `size` can be identical across a commit — and then `mtime` is the
+            // only discriminant left. On a filesystem with coarse mtime (exFAT/FAT32 at
+            // 2s, SMB to FAT, NFS with cached attributes) the write lands inside the same
+            // granule and the key matches. The aggregate read BEFORE that commit would
+            // then be stored under a key that still validates, and the event stays
+            // invisible until the file changes again — permanently, for a session that
+            // just wrote its last event and went quiet. One extra statSync closes it.
+            if (agg && fingerprint && sidecarFingerprint(dbPath) === fingerprint) {
+              sidecarMemo.set(dbPath, { key: fingerprint, value: agg });
             }
-          } catch {
-            // missing tables / corrupt file — skip
           }
+          if (!agg) continue;
+
+          totalEvents += agg.events;
+          totalSessions += agg.sessions;
+          rescueBytes += agg.rescueBytes;
+          if (agg.firstEventMs < firstEventMs) firstEventMs = agg.firstEventMs;
+          for (const [cat, n] of Object.entries(agg.categoryCounts)) {
+            categoryCounts[cat] = (categoryCounts[cat] ?? 0) + n;
+          }
+          for (const p of agg.projectDirs) distinctProjectsSet.add(p);
         }
+      }
+    }
+
+    // A sidecar that was deleted must not keep its entry alive forever.
+    //
+    // Prune by MEMBERSHIP, and only inside the directory just listed. Three traps behind
+    // that sentence. A `size > seen.size` shortcut is wrong: one unreadable sidecar is
+    // counted in `seen` but never memoised, so the sizes can match while a dead entry is
+    // still held. `sessionsDir` is a parameter — a caller alternating two directories
+    // would have each pass evict the other's entries, turning the memo into pure
+    // overhead. And this runs OUTSIDE the `dbFiles.length > 0` branch on purpose: when
+    // the last sidecar disappears there is no loop left to prune from, and the entries
+    // for a directory that emptied out would be held for the life of the process —
+    // exactly the leak the prune exists to prevent, arrived at from the other side.
+    if (listed) {
+      const seen = new Set(dbFiles.map((f) => join(sessionsDir, f)));
+      for (const k of sidecarMemo.keys()) {
+        if (!seen.has(k) && dirname(k) === sessionsDir) sidecarMemo.delete(k);
       }
     }
   }
