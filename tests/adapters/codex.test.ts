@@ -1,6 +1,6 @@
 import "../setup-home";
 import { describe, it, expect, beforeEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -956,8 +956,39 @@ describe("Codex pretooluse hook script", () => {
   });
 });
 
+describe("Codex posttooluse hook script", () => {
+  it("outputs valid JSON without empty additionalContext", () => {
+    const hookScript = resolve(__dirname, "../../hooks/codex/posttooluse.mjs");
+    const input = JSON.stringify({
+      tool_name: "Bash",
+      tool_input: { command: "echo hi" },
+      tool_response: "hi\n",
+      session_id: "test-posttooluse",
+      cwd: tmpdir(),
+      hook_event_name: "PostToolUse",
+      model: "o3",
+      permission_mode: "default",
+      tool_use_id: "tu1",
+      transcript_path: null,
+      turn_id: "t1",
+    });
+
+    const result = spawnSync(process.execPath, [hookScript], {
+      input,
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout.trim());
+    expect(parsed.hookSpecificOutput).toBeDefined();
+    expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
+    expect(parsed.hookSpecificOutput).not.toHaveProperty("additionalContext");
+  });
+});
+
 describe("Codex userpromptsubmit hook script", () => {
-  it("outputs valid JSON with UserPromptSubmit hookEventName", () => {
+  it("outputs valid JSON without empty additionalContext", () => {
     const hookScript = resolve(__dirname, "../../hooks/codex/userpromptsubmit.mjs");
     const input = JSON.stringify({
       session_id: "test-userprompt",
@@ -970,15 +1001,17 @@ describe("Codex userpromptsubmit hook script", () => {
       turn_id: "t1",
     });
 
-    const stdout = execFileSync(process.execPath, [hookScript], {
+    const result = spawnSync(process.execPath, [hookScript], {
       input,
       encoding: "utf-8",
       timeout: 10000,
     });
 
-    const parsed = JSON.parse(stdout.trim());
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout.trim());
     expect(parsed.hookSpecificOutput).toBeDefined();
     expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+    expect(parsed.hookSpecificOutput).not.toHaveProperty("additionalContext");
   });
 });
 
