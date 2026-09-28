@@ -227,6 +227,12 @@ context-mode hook codex stop
 ```
 
 **Known Issues / Caveats:**
+- Root Codex `rg`/`grep`/`find` calls whose path operand is the effective
+  `CODEX_HOME` are redirected to `ctx_execute` before a recursive search can
+  ingest session rollouts. This is a bounded context-hygiene rule, not a shell
+  security boundary: it applies to direct broad-search forms, requires the MCP
+  server to be ready, and leaves child-agent exploration and pointed files such
+  as `config.toml` unchanged.
 - PreToolUse `additionalContext` is unsupported — context injection works via PostToolUse and SessionStart instead. The codex formatter handles this automatically (deny works, context is dropped). Source: `codex-rs/hooks/src/engine/output_parser.rs:267`.
 - PreToolUse input rewriting still needs upstream `updatedInput` support. Track: [openai/codex#18491](https://github.com/openai/codex/issues/18491).
 - PreCompact support is runtime-gated: context-mode configures it and treats a missing registration as a warning, because older Codex builds may not emit the event. The hook stores the resume snapshot out-of-band and SessionStart restores it.
