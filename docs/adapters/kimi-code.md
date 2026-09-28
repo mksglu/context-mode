@@ -26,7 +26,7 @@ Kimi Code CLI uses a JSON stdin/stdout hook paradigm similar to Claude Code and 
 | UserPromptSubmit | Yes (handles `ContentPart[]` array format) |
 | Stop | Yes (per-turn end) |
 | Modify args | No (`updatedInput` silently dropped by host runner) |
-| Modify output | Yes |
+| Modify output | No (PostToolUse `additionalContext` emitted but not acted upon by host; `canModifyOutput: false`) |
 | Inject session context | No via `additionalContext` (host has no channel) — use `UserPromptSubmit.message` instead |
 | Block tools | Yes (exit code 2 or `permissionDecision: "deny"`) |
 
@@ -142,3 +142,8 @@ echo '{"tool_name":"Bash","tool_input":{"command":"curl https://example.com"}}' 
 ```
 
 Expected output: a JSON response with routing guidance redirecting to `ctx_execute` / `ctx_fetch_and_index`.
+
+## Confirm savings
+
+Run `ctx stats` to see how much context window context-mode saved this session
+(savings ratio plus a per-tool token breakdown).
