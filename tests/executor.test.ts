@@ -7,6 +7,7 @@ import {
   PolyglotExecutor,
   buildScriptFilename,
   buildShellScriptContent,
+  windowsPathToPosix,
   buildPowerShellScriptContent,
   buildSpawnOptions,
 } from "../src/executor.js";
@@ -210,8 +211,34 @@ describe("Runtime Detection", () => {
     assert.equal(script, "export PATH='/parent/it'\\''works/bin'\necho ok");
   });
 
-  test("buildShellScriptContent leaves Windows shell scripts unchanged", () => {
-    const script = buildShellScriptContent("echo ok", "C:\\parent\\bin", "win32");
+  test("windowsPathToPosix converts a drive-letter path", () => {
+    assert.equal(windowsPathToPosix("C:\\Program Files\\GitHub CLI"), "/c/Program Files/GitHub CLI");
+  });
+
+  test("windowsPathToPosix lowercases the drive letter", () => {
+    assert.equal(windowsPathToPosix("D:\\tools"), "/d/tools");
+  });
+
+  test("windowsPathToPosix falls back to a plain backslash swap for non-drive paths", () => {
+    assert.equal(windowsPathToPosix("\\\\server\\share"), "//server/share");
+  });
+
+  test("buildShellScriptContent appends the converted inherited PATH on win32 (issue #1217)", () => {
+    const winPath = "C:\\Program Files\\GitHub CLI;C:\\Windows\\system32";
+    const script = buildShellScriptContent("echo ok", winPath, "win32");
+    assert.equal(
+      script,
+      'export PATH="$PATH:"\'/c/Program Files/GitHub CLI:/c/Windows/system32\'\necho ok',
+    );
+  });
+
+  test("buildShellScriptContent on win32 does not drop bash's own PATH (regression guard for issue #1217)", () => {
+    const script = buildShellScriptContent("echo ok", "C:\\Windows\\system32", "win32");
+    assert.match(script, /\$PATH/);
+  });
+
+  test("buildShellScriptContent leaves the script unchanged when inheritedPath is empty on win32", () => {
+    const script = buildShellScriptContent("echo ok", "", "win32");
     assert.equal(script, "echo ok");
   });
 
