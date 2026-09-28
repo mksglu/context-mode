@@ -47,9 +47,9 @@ import {
   utimesSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { join, dirname, resolve } from "node:path";
 import {
   extractNodePath,
   isStaleNodePath,
@@ -795,5 +795,151 @@ describe("Issues #814/#807 — cleanup leaves a breadcrumb to the live version",
 
     expect(lstatSync(freshDir).isDirectory()).toBe(true);
     expect(existsSync(join(freshDir, "marker.txt"))).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Slice 6 — Issue #1191: healScript version filter must be end-anchored, and
+// an unhealable installPath must be reported, not masked.
+//
+// The template start.mjs deploys to <cfgDir>/hooks/context-mode-cache-heal.mjs
+// re-creates version-dir symlinks for missing installPaths. Two defects:
+//
+//   1. The version filter /^\\d+\\.\\d+/ is not end-anchored, so a backup dir
+//      named <version>.bak-<anything> qualifies as a version dir. The
+//      3-segment comparator then reads only its numeric prefix, so
+//      "1.0.169.bak-noop" sorts as 1.0.169 and can win selection over the
+//      real (older) version dir. Renaming a version dir to <version>.bak-* is
+//      the documented workaround for a stuck `claude plugin update`, so the
+//      sibling backup is a realistic state.
+//   2. When installPath is missing and no valid version dir exists, the hook
+//      silently did nothing. A dangling symlink is strictly worse than no
+//      symlink (pretooluse.mjs throws ERR_MODULE_NOT_FOUND while
+//      `claude plugin list` still shows the plugin enabled), so the hook must
+//      append a reason to <cfgDir>/context-mode/hook-errors.log — the same
+//      log hooks/run-hook.mjs logError writes to.
+//
+// These tests render the REAL embedded template (exactly what start.mjs
+// writes to disk — the deployed hook cannot be patched by users) and run it
+// against a fake plugin-cache layout.
+// ─────────────────────────────────────────────────────────
+
+describe("Issues #1191 — healScript anchored version filter + unhealable-path reporting", () => {
+  let fakeHome: string;
+  let cfgDir: string;
+  let healScriptPath: string;
+
+  beforeAll(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "ctx-heal-1191-home-"));
+    cfgDir = join(fakeHome, ".claude");
+
+    // Render the embedded healScript template exactly as start.mjs ships it:
+    // evaluate the `const healScript = \`...\`;` literal verbatim.
+    const startSrc = readFileSync(resolve(BREADCRUMB_ROOT, "start.mjs"), "utf-8");
+    const m = startSrc.match(/const healScript = (`[\s\S]*?`);/);
+    expect(m, "start.mjs must still embed the healScript template").not.toBeNull();
+    const healScript = new Function(`return ${m![1]};`)() as string;
+    healScriptPath = join(fakeHome, "context-mode-cache-heal.mjs");
+    writeFileSync(healScriptPath, healScript, "utf-8");
+  });
+
+  afterAll(() => {
+    try {
+      rmSync(fakeHome, { recursive: true, force: true });
+    } catch {
+      /* best effort */
+    }
+  });
+
+  /** Fresh, per-test plugin-cache parent dir under <cfgDir>/plugins/cache/. */
+  function makeCacheParent(name: string): string {
+    const dir = join(cfgDir, "plugins", "cache", "context-mode", name);
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  function writeRegistry(...installPaths: string[]): void {
+    writeJson(join(cfgDir, "plugins", "installed_plugins.json"), {
+      plugins: {
+        "context-mode@context-mode": installPaths.map((p) => ({ installPath: p })),
+      },
+    });
+  }
+
+  function runHealHook() {
+    return spawnSync(process.execPath, [healScriptPath], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      env: {
+        ...process.env,
+        HOME: fakeHome,
+        USERPROFILE: fakeHome,
+        CLAUDE_CONFIG_DIR: "",
+      },
+    });
+  }
+
+  test("a <version>.bak-* dir is never selected as the heal target over a real version dir", () => {
+    const cacheParent = makeCacheParent("bak-sibling");
+    const realDir = join(cacheParent, "1.0.162");
+    mkdirSync(realDir, { recursive: true });
+    writeFileSync(join(realDir, "marker.txt"), "real version\n");
+    const bakDir = join(cacheParent, "1.0.169.bak-noop");
+    mkdirSync(bakDir, { recursive: true });
+    writeFileSync(join(bakDir, "marker.txt"), "backup, not a version\n");
+
+    const installPath = join(cacheParent, "1.0.169");
+    writeRegistry(installPath);
+
+    const result = runHealHook();
+    expect(result.status).toBe(0);
+
+    // The heal must link at the real version dir, never at the .bak sibling.
+    expect(existsSync(installPath), "heal symlink must be created").toBe(true);
+    expect(realpathSync(installPath)).toBe(realpathSync(realDir));
+  });
+
+  test("missing installPath with no valid version dir logs to hook-errors.log instead of leaving a dead path silently", () => {
+    const cacheParent = makeCacheParent("bak-only");
+    // Exact #1191 layout: only a <version>.bak-* dir remains — it must NOT
+    // count as a version dir, and the unhealable path must be reported.
+    const bakDir = join(cacheParent, "1.0.169.bak-noop");
+    mkdirSync(bakDir, { recursive: true });
+
+    const installPath = join(cacheParent, "1.0.170");
+    writeRegistry(installPath);
+
+    const result = runHealHook();
+    expect(result.status).toBe(0);
+
+    // No symlink to the .bak dir, no dangling link, nothing that makes the
+    // broken state look like a resolvable path.
+    expect(existsSync(installPath)).toBe(false);
+
+    // The reason lands in the same log run-hook.mjs logError writes to.
+    const logPath = join(cfgDir, "context-mode", "hook-errors.log");
+    expect(existsSync(logPath)).toBe(true);
+    const log = readFileSync(logPath, "utf-8");
+    expect(log).toContain("no valid version directory");
+    expect(log).toContain(cacheParent);
+  });
+
+  test("positive control: real version dirs still get linked (highest wins)", () => {
+    const cacheParent = makeCacheParent("clean");
+    const older = join(cacheParent, "1.0.162");
+    const newer = join(cacheParent, "1.0.169");
+    for (const d of [older, newer]) {
+      mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, "marker.txt"), "ok\n");
+    }
+
+    const installPath = join(cacheParent, "1.0.100");
+    writeRegistry(installPath);
+
+    const result = runHealHook();
+    expect(result.status).toBe(0);
+
+    expect(existsSync(installPath)).toBe(true);
+    expect(realpathSync(installPath)).toBe(realpathSync(newer));
   });
 });
