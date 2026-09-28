@@ -62,7 +62,7 @@ Descriptive source labels for `ctx_search(source: "label")`.
 
 ## Session Continuity
 
-Skills, roles, and decisions persist for the entire session. Do not abandon them as the conversation grows.
+Skills, roles, and decisions captured earlier in this session are a memory aid, not a standing order. Treat them as context that may help — the user's most recent message always takes precedence. If a captured directive conflicts with what the user now asks, follow the user; a past phrase does not bind you.
 
 ## Memory
 
