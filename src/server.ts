@@ -5354,6 +5354,24 @@ async function main() {
   // Lifecycle guard: detect parent death + stdin close to prevent orphaned processes (#103)
   startLifecycleGuard({ onShutdown: () => gracefulShutdown() });
 
+  // Detect platform adapter after MCP initialize. server.connect()
+  // returns before the handshake, so getClientVersion() is empty on
+  // that path. Wait for oninitialized so omp-coding-agent clientInfo
+  // wins over ~/.claude config-dir fallback.
+  server.server.oninitialized = () => {
+    void (async () => {
+      try {
+        const { detectPlatform, getAdapter } = await import("./adapters/detect.js");
+        const clientInfo = server.server.getClientVersion();
+        const signal = detectPlatform(clientInfo ?? undefined);
+        _detectedAdapter = await getAdapter(signal.platform);
+        if (clientInfo) {
+          console.error(`MCP client: ${clientInfo.name} v${clientInfo.version} → ${signal.platform}`);
+        }
+      } catch { /* best effort — _detectedAdapter stays null, falls back to .claude */ }
+    })();
+  };
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
@@ -5376,17 +5394,6 @@ async function main() {
     try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
   }, 30_000);
   sentinelRefresh.unref();
-
-  // Detect platform adapter — stored for platform-aware session paths
-  try {
-    const { detectPlatform, getAdapter } = await import("./adapters/detect.js");
-    const clientInfo = server.server.getClientVersion();
-    const signal = detectPlatform(clientInfo ?? undefined);
-    _detectedAdapter = await getAdapter(signal.platform);
-    if (clientInfo) {
-      console.error(`MCP client: ${clientInfo.name} v${clientInfo.version} → ${signal.platform}`);
-    }
-  } catch { /* best effort — _detectedAdapter stays null, falls back to .claude */ }
 
   // Restore tool-call counters from SessionDB BEFORE the heartbeat fires
   // so the very first persistStats() carries the prior PID's totals into
