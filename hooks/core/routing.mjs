@@ -532,6 +532,7 @@ const TOOL_ALIASES = {
   "view": "Read",
   "grep": "Grep",
   "fetch": "WebFetch",
+  "webfetch": "WebFetch",
   "agent": "Agent",
   // Codex CLI
   "shell": "Bash",
