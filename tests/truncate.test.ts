@@ -9,7 +9,7 @@
 
 import { describe, test } from "vitest";
 import { strict as assert } from "node:assert";
-import { truncateJSON, capBytes, escapeXML, charSafePrefix } from "../src/truncate.js";
+import { truncateJSON, capBytes, escapeXML, charSafePrefix, charSafeSlice } from "../src/truncate.js";
 
 // ─────────────────────────────────────────────────────────
 // truncateJSON
@@ -352,5 +352,33 @@ describe("charSafePrefix", () => {
     const out = charSafePrefix(input, 101);
     assert.equal(out.length, 100); // backed off from 101 to 100
     assert.equal(out, filler + "🟡");
+  });
+});
+
+describe("charSafeSlice", () => {
+  const hasLoneSurrogate = (s: string) =>
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
+
+  test("start inside a pair widens to include the whole character", () => {
+    const s = "ab\u{1F916}cd"; // 🤖 occupies code units 2..3
+    assert.equal(charSafeSlice(s, 3), "\u{1F916}cd");
+  });
+
+  test("end inside a pair drops the stranded high half", () => {
+    const s = "ab\u{1F916}cd";
+    assert.equal(charSafeSlice(s, 0, 3), "ab");
+  });
+
+  test("ASCII behaves like String.slice", () => {
+    assert.equal(charSafeSlice("hello world", 2, 7), "hello world".slice(2, 7));
+  });
+
+  test("never yields a lone surrogate for any cut on emoji-dense text", () => {
+    const s = "x\u{1F916}y\u{1F600}\u{1F680}z".repeat(5);
+    for (let a = 0; a <= s.length; a++) {
+      for (let b = a; b <= s.length; b++) {
+        assert.ok(!hasLoneSurrogate(charSafeSlice(s, a, b)), `slice(${a}, ${b})`);
+      }
+    }
   });
 });

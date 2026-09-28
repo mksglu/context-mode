@@ -3362,3 +3362,31 @@ describe("SessionDB.searchEvents (unified)", () => {
 // ═══════════════════════════════════════════════════════════
 // 11. Knowledge-reuse event (removed — read path must not mutate state)
 // ═══════════════════════════════════════════════════════════
+
+describe("extractSnippet surrogate safety (#1163)", () => {
+  const hasLoneSurrogate = (s: string) =>
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
+
+  test("window start landing mid-emoji does not strand the low half", () => {
+    const q = "scope";
+    const content = "x".repeat(800) + "\u{1F916}" + "a".repeat(299) + q + " y".repeat(50);
+    // pos - 300 falls exactly between the two halves of 🤖
+    expect(content.indexOf(q) - 300).toBe(content.indexOf("\u{1F916}") + 1);
+    const snippet = extractSnippet(content, q, 500);
+    expect(hasLoneSurrogate(snippet)).toBe(false);
+    expect(snippet).toContain("\u{1F916}");
+  });
+
+  test("no window boundary on emoji-dense content yields a lone surrogate", () => {
+    const content = "\u{1F916}z".repeat(1200) + " needle " + "\u{1F600}".repeat(600);
+    for (let maxLen = 100; maxLen < 700; maxLen += 7) {
+      expect(hasLoneSurrogate(extractSnippet(content, "needle", maxLen))).toBe(false);
+    }
+  });
+
+  test("no-match prefix path does not end on a high surrogate", () => {
+    const content = "a" + "\u{1F916}".repeat(1000);
+    const snippet = extractSnippet(content, "zzz-no-match", 100);
+    expect(hasLoneSurrogate(snippet)).toBe(false);
+  });
+});

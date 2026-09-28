@@ -33,7 +33,7 @@ import {
 } from "./runtime.js";
 import { classifyNonZeroExit } from "./exit-classify.js";
 import { startLifecycleGuard, noteMcpActivity, noteRequestStart, noteRequestEnd, attachMcpActivityTap } from "./lifecycle.js";
-import { charSafePrefix } from "./truncate.js";
+import { charSafePrefix, charSafeSlice } from "./truncate.js";
 import {
   describeStorageDirectorySource,
   ensureWritableStorageDir,
@@ -1323,7 +1323,7 @@ export function extractSnippet(
 
   // No matches at all — return prefix
   if (positions.length === 0) {
-    return content.slice(0, maxLen) + "\n…";
+    return charSafePrefix(content, maxLen) + "\n…";
   }
 
   // Sort positions, merge overlapping windows
@@ -1346,7 +1346,7 @@ export function extractSnippet(
   let total = 0;
   for (const [start, end] of windows) {
     if (total >= maxLen) break;
-    const part = content.slice(start, Math.min(end, start + (maxLen - total)));
+    const part = charSafeSlice(content, start, Math.min(end, start + (maxLen - total)));
     parts.push(
       (start > 0 ? "…" : "") + part + (end < content.length ? "…" : ""),
     );
@@ -2010,7 +2010,7 @@ function intentSearch(
   ];
 
   for (const r of results) {
-    const preview = r.content.split("\n")[0].slice(0, 120);
+    const preview = charSafePrefix(r.content.split("\n")[0], 120);
     lines.push(`  - ${r.title}: ${preview}`);
   }
 
@@ -4663,7 +4663,7 @@ server.registerTool(
         if (result.exitCode === 0 && result.stdout.trim() === "ok") {
           lines.push("[OK] Server test: PASS");
         } else {
-          const detail = result.stderr?.trim() ? ` (${result.stderr.trim().slice(0, 200)})` : "";
+          const detail = result.stderr?.trim() ? ` (${charSafePrefix(result.stderr.trim(), 200)})` : "";
           lines.push(`[FAIL] Server test: FAIL — exit ${result.exitCode}${detail}`);
         }
       } catch (err: unknown) {
