@@ -387,3 +387,128 @@ describe("v1.0.130 — SQLiteBase lifecycle composition", () => {
     }
   });
 });
+
+
+// ─────────────────────────────────────────────────────────
+// Issue #867 — mid-session corruption heal on write path
+// ─────────────────────────────────────────────────────────
+describe("db-base corruption heal (#867)", () => {
+	it("withRetry catches SQLITE_CORRUPT and calls heal callback", async () => {
+		const { withRetry } = await import("../../src/db-base.js");
+		let healCalled = false;
+		let calls = 0;
+		const fn = () => {
+			calls++;
+			if (calls === 1) throw new Error("SQLITE_CORRUPT: database disk image is malformed");
+			return "ok";
+		};
+		const heal = () => { healCalled = true; return true; };
+		const result = withRetry(fn, [0, 0, 0], heal);
+		expect(result).toBe("ok");
+		expect(healCalled).toBe(true);
+		expect(calls).toBe(2);
+	});
+
+	it("withRetry throws original error when heal fails", async () => {
+		const { withRetry } = await import("../../src/db-base.js");
+		let calls = 0;
+		const fn = () => {
+			calls++;
+			throw new Error("SQLITE_CORRUPT: database disk image is malformed");
+		};
+		const heal = () => false;
+		expect(() => withRetry(fn, [0, 0, 0], heal)).toThrow(/SQLITE_CORRUPT/);
+		expect(calls).toBe(1);
+	});
+
+	it("attemptLosslessHeal preserves data on a valid DB", async () => {
+		const { attemptLosslessHeal, loadDatabase, closeDB } = await import("../../src/db-base.js");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const { rmSync } = await import("node:fs");
+		const Database = loadDatabase();
+		const dbPath = join(tmpdir(), "heal-test-" + Date.now() + ".db");
+		const src = new Database(dbPath);
+		try {
+			src.pragma("journal_mode=WAL");
+			src.exec("CREATE TABLE t(x INT)");
+			src.prepare("INSERT INTO t VALUES(?)").run(42);
+			closeDB(src);
+			const ok = attemptLosslessHeal(dbPath);
+			expect(ok).toBe(true);
+			const healed = new Database(dbPath);
+			const row = healed.prepare("SELECT count(*) as c FROM t").get() as { c: number };
+			expect(row.c).toBe(1);
+			closeDB(healed);
+		} finally {
+			try { rmSync(dbPath, { force: true }); } catch {}
+			try { rmSync(dbPath + "-wal", { force: true }); } catch {}
+			try { rmSync(dbPath + "-shm", { force: true }); } catch {}
+		}
+	});
+
+	it("attemptLosslessHeal returns false for non-existent file", async () => {
+		const { attemptLosslessHeal } = await import("../../src/db-base.js");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const ok = attemptLosslessHeal(join(tmpdir(), "no-such-db-" + Date.now() + ".db"));
+		expect(ok).toBe(false);
+	});
+
+	it("attemptLosslessHeal returns false for file that is not a database", async () => {
+		const { attemptLosslessHeal } = await import("../../src/db-base.js");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const { writeFileSync, rmSync } = await import("node:fs");
+		const path = join(tmpdir(), "not-a-db-" + Date.now() + ".db");
+		writeFileSync(path, "not a sqlite database");
+		try {
+			const ok = attemptLosslessHeal(path);
+			expect(ok).toBe(false);
+		} finally {
+			try { rmSync(path, { force: true }); } catch {}
+		}
+	});
+
+	it("attemptLosslessHeal handles paths containing single-quote", async () => {
+		const { attemptLosslessHeal, loadDatabase, closeDB } = await import("../../src/db-base.js");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const { rmSync } = await import("node:fs");
+		const Database = loadDatabase();
+		// Path with a single-quote — VACUUM INTO literal must be escaped
+		const dbPath = join(tmpdir(), "heal-it" + "'" + "s-ok-" + Date.now() + ".db");
+		const src = new Database(dbPath);
+		try {
+			src.pragma("journal_mode=WAL");
+			src.exec("CREATE TABLE t(x INT)");
+			src.prepare("INSERT INTO t VALUES(?)").run(42);
+			closeDB(src);
+			const ok = attemptLosslessHeal(dbPath);
+			expect(ok).toBe(true);
+			const healed = new Database(dbPath);
+			const row = healed.prepare("SELECT count(*) as c FROM t").get() as { c: number };
+			expect(row.c).toBe(1);
+			closeDB(healed);
+		} finally {
+			try { rmSync(dbPath, { force: true }); } catch {}
+			try { rmSync(dbPath + "-wal", { force: true }); } catch {}
+			try { rmSync(dbPath + "-shm", { force: true }); } catch {}
+		}
+	});
+
+	it("withRetry passes post-heal retry through full BUSY loop", async () => {
+		const { withRetry } = await import("../../src/db-base.js");
+		const callOrder: string[] = [];
+		const fn = () => {
+			callOrder.push("fn");
+			if (callOrder.filter(x => x === "fn").length === 1) throw new Error("SQLITE_CORRUPT: disk image is malformed");
+			if (callOrder.filter(x => x === "fn").length === 2) throw new Error("SQLITE_BUSY: database is locked");
+			return "ok";
+		};
+		const heal = () => { callOrder.push("heal"); return true; };
+		const result = withRetry(fn, [0, 0, 0], heal);
+		expect(result).toBe("ok");
+		expect(callOrder).toEqual(["fn", "heal", "fn", "fn"]); // corrupt→heal→BUSY→success
+	});
+});
