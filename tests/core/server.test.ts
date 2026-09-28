@@ -620,6 +620,10 @@ const TurndownService = require(${JSON.stringify(turndownPath)});
 const { gfm } = require(${JSON.stringify(gfmPath)});
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 td.use(gfm);
+td.addRule('emptyTable', {
+  filter: (node) => node.nodeName === 'TABLE' && node.rows.length === 0,
+  replacement: (content) => content,
+});
 td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
 console.log(td.turndown(${JSON.stringify(html)}));
 `;
@@ -701,6 +705,25 @@ describe("turndown HTML-to-markdown conversion tests", () => {
     assert(result.stdout.includes("| Name"), `expected pipe table, got: ${result.stdout}`);
     assert(result.stdout.includes("| Alice"));
     assert(result.stdout.includes("| ---"), `expected table separator, got: ${result.stdout}`);
+  });
+
+  test("skips empty tables", async () => {
+    const result = await turndownExecutor.execute({
+      language: "javascript",
+      code: buildConversionCode("<p>Before</p><table></table><p>After</p>"),
+    });
+    assert.equal(result.exitCode, 0, `stderr: ${result.stderr}`);
+    assert(result.stdout.includes("Before"), `lost preceding content: ${result.stdout}`);
+    assert(result.stdout.includes("After"), `lost following content: ${result.stdout}`);
+  });
+
+  test("preserves content from tables without rows", async () => {
+    const result = await turndownExecutor.execute({
+      language: "javascript",
+      code: buildConversionCode("<table><caption>Summary</caption></table>"),
+    });
+    assert.equal(result.exitCode, 0, `stderr: ${result.stderr}`);
+    assert(result.stdout.includes("Summary"), `lost table content: ${result.stdout}`);
   });
 
   test("handles nested tags correctly", async () => {

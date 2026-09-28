@@ -3287,6 +3287,12 @@ async function main() {
     const sourceBytes = Buffer.byteLength(html, 'utf-8');
     const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
     td.use(gfm);
+    // turndown-plugin-gfm assumes every TABLE contains at least one row.
+    // Let Turndown preserve any non-row content instead of calling that rule.
+    td.addRule('emptyTable', {
+      filter: (node) => node.nodeName === 'TABLE' && node.rows.length === 0,
+      replacement: (content) => content,
+    });
     td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
     const converted = td.turndown(html);
 
