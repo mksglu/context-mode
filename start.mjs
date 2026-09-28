@@ -187,7 +187,7 @@ if (cacheMatch) {
 
         const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
         for (const [key, entries] of Object.entries(ip.plugins || {})) {
-          if (key !== "context-mode@context-mode") continue;
+          if (!key.startsWith("context-mode@")) continue;
           for (const entry of entries) {
             entry.installPath = newestDir;
             entry.version = newest;
@@ -203,7 +203,7 @@ if (cacheMatch) {
     if (existsSync(ipPath)) {
       const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
       for (const [key, entries] of Object.entries(ip.plugins || {})) {
-        if (key !== "context-mode@context-mode") continue;
+        if (!key.startsWith("context-mode@")) continue;
         for (const entry of entries) {
           const rp = entry.installPath;
           if (!rp || existsSync(rp) || rp === __dirname) continue;
@@ -238,13 +238,17 @@ if (cacheMatch) {
 // truth) so users who fix themselves via `npm install -g context-mode`
 // follow the exact same code path. Best-effort, never blocks MCP boot.
 try {
-  const { healInstalledPlugins, healSettingsEnabledPlugins, healPluginJsonMcpServers, sweepStaleMcpJson } =
+  const { healInstalledPlugins, healSettingsEnabledPlugins, healPluginJsonMcpServers, resolveContextModePluginKey, sweepStaleMcpJson } =
     await import("./scripts/heal-installed-plugins.mjs");
-  const pluginKey = "context-mode@context-mode";
   const claudeConfigDir = resolveClaudeConfigDir();
   const registryPath = resolve(claudeConfigDir, "plugins", "installed_plugins.json");
   const pluginCacheRoot = resolve(claudeConfigDir, "plugins", "cache");
   const settingsPath = resolve(claudeConfigDir, "settings.json");
+  let pluginKey = "context-mode@context-mode";
+  try {
+    const ip = JSON.parse(readFileSync(registryPath, "utf-8"));
+    pluginKey = resolveContextModePluginKey(ip.plugins);
+  } catch { /* best effort */ }
   try { healInstalledPlugins({ registryPath, pluginCacheRoot, pluginKey }); }
   catch { /* best effort */ }
   // v1.0.116: Claude Code's plugin loader reads settings.json.enabledPlugins
@@ -335,7 +339,7 @@ try{
   const cacheRoot=resolve(cfgDir(),"plugins","cache");
   const ip=JSON.parse(readFileSync(f,"utf-8"));
   for(const[k,es]of Object.entries(ip.plugins||{})){
-    if(k!=="context-mode@context-mode")continue;
+    if(!k.startsWith("context-mode@"))continue;
     for(const e of es){
       const p=e.installPath;
       if(!p)continue;

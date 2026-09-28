@@ -14,7 +14,7 @@ import { dirname, resolve, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { healBetterSqlite3Binding } from "./heal-better-sqlite3.mjs";
-import { healInstalledPlugins, healSettingsEnabledPlugins, healPluginJsonMcpServers, sweepStaleMcpJson } from "./heal-installed-plugins.mjs";
+import { healInstalledPlugins, healSettingsEnabledPlugins, healPluginJsonMcpServers, resolveContextModePluginKey, sweepStaleMcpJson } from "./heal-installed-plugins.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, "..");
@@ -116,13 +116,19 @@ function isSafeWindowsPath(p) {
 // sync. Only runs in real `npm install -g` to avoid surprising
 // contributors. Best effort, never blocks install. (#46915 follow-up.)
 if (isGlobalInstall()) {
+  const registryPath = resolve(homedir(), ".claude", "plugins", "installed_plugins.json");
+  const pluginCacheRoot = resolve(homedir(), ".claude", "plugins", "cache");
+  let pluginKey = "context-mode@context-mode";
   try {
-    const registryPath = resolve(homedir(), ".claude", "plugins", "installed_plugins.json");
-    const pluginCacheRoot = resolve(homedir(), ".claude", "plugins", "cache");
+    const ip = JSON.parse(readFileSync(registryPath, "utf-8"));
+    pluginKey = resolveContextModePluginKey(ip.plugins);
+  } catch { /* best effort */ }
+
+  try {
     const result = healInstalledPlugins({
       registryPath,
       pluginCacheRoot,
-      pluginKey: "context-mode@context-mode",
+      pluginKey,
     });
     if (result.skipped === "no-registry") {
       // Standalone npm user (no Claude Code) — silent success.
@@ -147,7 +153,7 @@ if (isGlobalInstall()) {
     const settingsPath = resolve(homedir(), ".claude", "settings.json");
     const r = healSettingsEnabledPlugins({
       settingsPath,
-      pluginKey: "context-mode@context-mode",
+      pluginKey,
     });
     if (r.healed && r.healed.length > 0) {
       process.stderr.write(`context-mode: healed settings.json (${r.healed.join(", ")})\n`);
@@ -161,11 +167,9 @@ if (isGlobalInstall()) {
   // already-broken users self-recover the next time `npm install -g context-mode`
   // runs. Best effort, never blocks install.
   try {
-    const ipPath = resolve(homedir(), ".claude", "plugins", "installed_plugins.json");
-    const cacheRoot = resolve(homedir(), ".claude", "plugins", "cache");
-    if (existsSync(ipPath)) {
-      const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
-      const entries = (ip && ip.plugins && ip.plugins["context-mode@context-mode"]) || [];
+    if (existsSync(registryPath)) {
+      const ip = JSON.parse(readFileSync(registryPath, "utf-8"));
+      const entries = (ip && ip.plugins && ip.plugins[pluginKey]) || [];
       let healedAny = false;
       if (Array.isArray(entries)) {
         for (const entry of entries) {
@@ -174,8 +178,8 @@ if (isGlobalInstall()) {
           try {
             const r = healPluginJsonMcpServers({
               pluginRoot: installPath,
-              pluginCacheRoot: cacheRoot,
-              pluginKey: "context-mode@context-mode",
+              pluginCacheRoot,
+              pluginKey,
             });
             if (r && Array.isArray(r.healed) && r.healed.length > 0) {
               healedAny = true;
@@ -190,8 +194,8 @@ if (isGlobalInstall()) {
       // future auto-updates from working cleanly. Single sweep per install.
       try {
         const sweepResult = sweepStaleMcpJson({
-          pluginCacheRoot: cacheRoot,
-          pluginKey: "context-mode@context-mode",
+          pluginCacheRoot,
+          pluginKey,
         });
         if (sweepResult && Array.isArray(sweepResult.removed) && sweepResult.removed.length > 0) {
           process.stderr.write(`context-mode: swept ${sweepResult.removed.length} stale .mcp.json file(s) (Issue #609)\n`);
@@ -213,7 +217,7 @@ try {
     const ip = JSON.parse(readFileSync(ipPath, "utf-8"));
     const cacheRoot = resolve(homedir(), ".claude", "plugins", "cache");
     for (const [key, entries] of Object.entries(ip.plugins || {})) {
-      if (key !== "context-mode@context-mode") continue;
+      if (!key.startsWith("context-mode@")) continue;
       for (const entry of entries) {
         const rp = entry.installPath;
         if (!rp || existsSync(rp)) continue;

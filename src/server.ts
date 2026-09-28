@@ -865,7 +865,7 @@ function healCacheMidSession(): void {
     // Plugin root: build/ for tsc, plugin root for bundle
     const pluginRoot = getPackageRoot();
     for (const [key, entries] of Object.entries((ip.plugins ?? {}) as Record<string, Array<{ installPath?: string }>>)) {
-      if (key !== "context-mode@context-mode") continue;
+      if (!key.startsWith("context-mode@")) continue;
       for (const entry of entries) {
         const rp = entry.installPath;
         if (!rp || existsSync(rp)) continue;
