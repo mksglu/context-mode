@@ -702,6 +702,32 @@ describe("bun:sqlite adapter (#45)", () => {
     db.close();
   });
 
+  test("exec: adapter.exec() ignores ; and quotes inside SQL comments", async () => {
+    const { BunSQLiteAdapter } = await import("../../src/db-base.js");
+    const fake = await createBunLikeFake();
+    const db = new BunSQLiteAdapter(fake);
+    db.exec(`
+      CREATE TABLE t1 (id INTEGER PRIMARY KEY);
+      -- don't add the index yet; revisit later
+      CREATE TABLE t2 (id INTEGER PRIMARY KEY);
+      /* it's staged; ship next release */
+      CREATE TABLE t3 (id INTEGER PRIMARY KEY);
+    `);
+    const rows = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as { name: string }[];
+    expect(rows.map((r) => r.name)).toEqual(["t1", "t2", "t3"]);
+    db.close();
+  });
+
+  test("exec: adapter.exec() skips comment-only statements", async () => {
+    const { BunSQLiteAdapter } = await import("../../src/db-base.js");
+    const fake = await createBunLikeFake();
+    const db = new BunSQLiteAdapter(fake);
+    expect(() => db.exec("-- migration header\n/* nothing to do */;")).not.toThrow();
+    db.close();
+  });
+
   test("get: adapter.prepare().get() returns undefined not null for missing row", async () => {
     const { BunSQLiteAdapter } = await import("../../src/db-base.js");
     const fake = await createBunLikeFake();
