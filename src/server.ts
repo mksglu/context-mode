@@ -3332,7 +3332,10 @@ async function main() {
   }
   emit('text', text, Buffer.byteLength(text, 'utf-8'), 'text', '1-text-passthrough', []);
 }
-main();
+main().catch((err) => {
+  console.error(err?.cause?.message ?? err?.message ?? String(err));
+  process.exitCode = 1;
+});
 `;
 }
 

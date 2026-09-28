@@ -3830,6 +3830,17 @@ import { buildFetchCode } from "../../src/server.js";
 describe("buildFetchCode — embedded SSRF guard contract", () => {
   const generated = buildFetchCode("https://example.com/x", "/tmp/x");
 
+  test("failed fetch reports its cause without a Node crash stack", () => {
+    const code = buildFetchCode("http://127.0.0.1:59999", join(tmpdir(), "ctx-fetch-refused-test.dat"));
+    const result = spawnSync(process.execPath, ["--input-type=commonjs", "-"], {
+      input: code, encoding: "utf8", timeout: 5_000,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/ECONNREFUSED/);
+    expect(result.stderr).not.toMatch(/node:internal|\n\s+at\s|Node\.js v/);
+  });
+
   test("strips proxy env vars (HTTP_PROXY / HTTPS_PROXY / ALL_PROXY)", () => {
     // A configured outbound proxy would route fetch through an arbitrary
     // target; DNS resolution would happen at the proxy and the in-subprocess
