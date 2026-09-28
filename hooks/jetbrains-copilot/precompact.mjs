@@ -10,6 +10,7 @@ import "../ensure-deps.mjs";
  */
 
 import { createSessionLoaders } from "../session-loaders.mjs";
+import { createToolNamer } from "../core/tool-naming.mjs";
 import { readStdin, parseStdin, getSessionId, getSessionDBPath, getInputProjectDir, JETBRAINS_OPTS } from "../session-helpers.mjs";
 import { appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -39,6 +40,7 @@ try {
     const stats = db.getSessionStats(sessionId);
     const snapshot = buildResumeSnapshot(events, {
       compactCount: (stats?.compact_count ?? 0) + 1,
+      searchTool: createToolNamer("jetbrains-copilot")("ctx_search"),
     });
 
     db.upsertResume(sessionId, snapshot, events.length);

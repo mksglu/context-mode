@@ -124,4 +124,68 @@ describe("precompact.mjs — snapshot-built event (D2 PRD Phase 6.1)", () => {
     expect(row.bytes_avoided).toBeGreaterThan(0);
     expect(row.bytes_returned).toBe(0);
   });
+
+  test("resume snapshot uses platform-prefixed tool name (#1028)", () => {
+    // Claude Code platform: ctx_search → mcp__plugin_context-mode_context-mode__ctx_search
+    const { createHash } = require("node:crypto") as typeof import("node:crypto");
+    const projectHash = _hashCanonical(fakeProject.replace(/\\/g, "/"));
+    const dbDir = join(fakeHome, ".claude", "context-mode", "sessions");
+    require("node:fs").mkdirSync(dbDir, { recursive: true });
+    const dbPath = join(dbDir, `${projectHash}.db`);
+
+    {
+      const seedDb = new SessionDB({ dbPath });
+      seedDb.ensureSession(sessionId, fakeProject);
+      seedDb.insertEvent(
+        sessionId,
+        { type: "file_edit", category: "file", data: "/project/src/server.ts", priority: 1 },
+        "PostToolUse",
+      );
+      seedDb.insertEvent(
+        sessionId,
+        { type: "decision", category: "decision", data: "use FTS5 for search", priority: 1 },
+        "PostToolUse",
+      );
+      seedDb.close();
+    }
+
+    const result = spawnSync("node", [PRECOMPACT_PATH], {
+      input: JSON.stringify({ session_id: sessionId, cwd: fakeProject }),
+      encoding: "utf-8",
+      timeout: 30_000,
+      env: { ...process.env, ...env },
+    });
+
+    assert.equal(result.status, 0, `precompact exit non-zero. stderr: ${result.stderr}`);
+
+    // Read the resume snapshot from DB
+    const Database = loadDatabase();
+    const raw = new Database(dbPath, { readonly: true });
+    let snapshot: string;
+    try {
+      const row = raw.prepare(
+        "SELECT snapshot FROM session_resume WHERE session_id = ?",
+      ).get(sessionId) as { snapshot: string } | undefined;
+      snapshot = row?.snapshot ?? "";
+    } finally {
+      raw.close();
+    }
+
+    // precompact.mjs is the claude-code hook — its platform tool name is:
+    // mcp__plugin_context-mode_context-mode__ctx_search
+    const expectedTool = "mcp__plugin_context-mode_context-mode__ctx_search";
+    assert.ok(
+      snapshot.includes(expectedTool),
+      `snapshot should contain platform-prefixed tool name "${expectedTool}" but got: ${snapshot.slice(0, 300)}`,
+    );
+    // The bare form "ctx_search(" should not appear without a platform prefix.
+    // Platform-prefixed forms like "context-mode__ctx_search(" are fine.
+    // Split on the expected prefix and check that all "ctx_search(" occurrences
+    // are preceded by the prefix (i.e. no standalone bare form).
+    const barePattern = snapshot.split(expectedTool).join("").includes("ctx_search(");
+    assert.ok(
+      !barePattern,
+      `snapshot should NOT contain bare "ctx_search(" without platform prefix. Got: ${snapshot.slice(0, 300)}`,
+    );
+  });
 });

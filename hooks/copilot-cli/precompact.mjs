@@ -3,6 +3,7 @@ import "../suppress-stderr.mjs";
 import "../ensure-deps.mjs";
 
 import { createSessionLoaders } from "../session-loaders.mjs";
+import { createToolNamer } from "../core/tool-naming.mjs";
 import {
   readStdin,
   parseStdin,
@@ -54,6 +55,7 @@ try {
     const stats = db.getSessionStats(sessionId);
     const snapshot = buildResumeSnapshot(events, {
       compactCount: (stats?.compact_count ?? 0) + 1,
+      searchTool: createToolNamer("copilot-cli")("ctx_search"),
     });
 
     db.upsertResume(sessionId, snapshot, events.length);

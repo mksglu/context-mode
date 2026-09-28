@@ -21,6 +21,7 @@ await runHook(async () => {
     resolveConfigDir,
   } = await import("./session-helpers.mjs");
   const { createSessionLoaders, attributeAndInsertEvents } = await import("./session-loaders.mjs");
+  const { createToolNamer } = await import("./core/tool-naming.mjs");
   const { appendFileSync } = await import("node:fs");
   const { join, dirname } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
@@ -48,6 +49,7 @@ await runHook(async () => {
       const stats = db.getSessionStats(sessionId);
       const snapshot = buildResumeSnapshot(events, {
         compactCount: (stats?.compact_count ?? 0) + 1,
+        searchTool: createToolNamer("claude-code")("ctx_search"),
       });
 
       db.upsertResume(sessionId, snapshot, events.length);
