@@ -422,7 +422,7 @@ const executor = new PolyglotExecutor({
 // FS read tracking preload for ctx_batch_execute
 // ─────────────────────────────────────────────────────────
 // NODE_OPTIONS is denied by the executor's #buildSafeEnv (security).
-// Instead, we inject it as an inline shell env prefix in each batch command.
+// Instead, we set it at the top of each batch command's shell script.
 // This temp file is loaded via --require when batch commands spawn Node processes.
 const CM_FS_PRELOAD = join(tmpdir(), `cm-fs-preload-${process.pid}.js`);
 writeFileSync(
@@ -1456,7 +1456,12 @@ export function buildBatchNodeOptionsPrefix(shellPath: string, preloadPath: stri
     return `set "NODE_OPTIONS=${option.replace(/"/g, '""')}" && `;
   }
 
-  return `NODE_OPTIONS=${quotePosixSingle(option)} `;
+  // `export …;` rather than an inline `NODE_OPTIONS=… cmd` assignment: an
+  // inline assignment is a syntax error before compound commands (`for`,
+  // `while`, `if`, `{ … }`) and only reaches the first command of a `&&` or
+  // `|` chain (#1117). Each batch command runs in its own shell, so the export
+  // does not leak between commands.
+  return `export NODE_OPTIONS=${quotePosixSingle(option)}; `;
 }
 
 /**
@@ -4257,7 +4262,7 @@ EXAMPLE: ctx_batch_execute(
     try {
       // Inject NODE_OPTIONS for FS read tracking in spawned Node processes.
       // The executor denies NODE_OPTIONS in its env (security), so we set it
-      // as an inline shell prefix. This only affects child `node` invocations.
+      // at the top of each command's shell script. This only affects child `node` invocations.
       const nodeOptsPrefix = buildBatchNodeOptionsPrefix(runtimes.shell, CM_FS_PRELOAD);
 
       // Full stdout is preserved per-command and indexed into FTS5 (Issue #61, #197).
