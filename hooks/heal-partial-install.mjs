@@ -444,9 +444,12 @@ function logHealResult(result) {
  *   marketplaceClonePath - absolute path to the marketplace clone. Auto-derived
  *                          from pluginRoot when omitted.
  *   log                  - when true (default), appends a JSON line to
- *                          ~/.claude/context-mode/heal-partial-install.log
- *                          on every run, including skipped ones, so an
- *                          operator can grep for evidence the hook fired.
+ *                          <config-dir>/context-mode/heal-partial-install.log
+ *                          on every run that reaches a Claude Code install, so
+ *                          an operator can grep for evidence the hook fired.
+ *                          The `no-plugin-root` and `not-claude-code` skips
+ *                          are deliberately NOT logged — see those branches
+ *                          (#1072).
  *
  * Returns an object whose exact shape depends on the branch taken.
  * Common fields:
@@ -479,7 +482,8 @@ export function healPartialInstallFromMarketplace(opts = {}) {
       stillMissing: [],
       skipped: "no-plugin-root",
     };
-    if (log) logHealResult(result);
+    // A missing plugin root is not evidence of a Claude Code install. Logging
+    // it would create ~/.claude for npm-global, Codex, or other callers.
     return result;
   }
 
@@ -504,7 +508,12 @@ export function healPartialInstallFromMarketplace(opts = {}) {
       skipped: "not-claude-code",
       pluginRoot,
     };
-    if (log) logHealResult(result);
+    // #1072: deliberately NOT logged. Reaching this branch proves the caller
+    // is not a Claude Code install, so writing a diagnostic into Claude's
+    // config dir would CREATE ~/.claude for users who do not have one —
+    // e.g. `node start.mjs` from .codex-plugin/mcp.json with
+    // CONTEXT_MODE_PLATFORM=codex. The skip reason is still reported in the
+    // return value for callers that want to act on it.
     return result;
   }
 
