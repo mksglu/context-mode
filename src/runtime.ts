@@ -71,6 +71,15 @@ export interface RuntimeMap {
   r: string | null;
   elixir: string | null;
   csharp: string | null;
+  /**
+   * Windows only (#1208): bare commands whose every PATH hit is an
+   * extensionless POSIX shim (e.g. Git for Windows' `#!/bin/sh` wrappers in
+   * `usr\bin`). Neither CreateProcess (`shell:false`) nor cmd.exe can run
+   * those, so the executor launches them through `windowsBashPath`.
+   */
+  posixShimCommands?: readonly string[];
+  /** Windows only (#1208): resolved Git Bash used for `posixShimCommands`. */
+  windowsBashPath?: string | null;
 }
 
 const isWindows = process.platform === "win32";
@@ -86,27 +95,46 @@ function commandExists(cmd: string): boolean {
 }
 
 /**
+ * #1208: true when every `where <cmd>` hit is the literal extensionless name
+ * (a `#!/bin/sh` shim). CreateProcess only appends .com/.exe and cmd.exe cannot
+ * interpret a shebang, so such a command is only runnable through bash.
+ */
+function isPosixShimOnly(cmd: string, hits: string[]): boolean {
+  return hits.length > 0 &&
+    hits.every(p => runtimeBasename(p).toLowerCase() === cmd.toLowerCase());
+}
+
+/**
  * Stricter probe than commandExists() — also verifies the resolved binary
  * actually runs. On Windows, `where python3` matches the Microsoft Store
  * App Execution Alias stub at C:\Users\<u>\AppData\Local\Microsoft\WindowsApps\
  * even when no real Python is installed; the stub exits non-zero (9009) and
  * pops the Store. Filter those entries out and require `<cmd> --version` to
  * exit 0 before declaring the runtime available (#455).
+ *
+ * Also reports `needsPosixShell` (#1208) from the same `where` output: when
+ * every hit is an extensionless shim, the probe runs through `windowsBash`.
  */
-function runnableExists(cmd: string): boolean {
+function runnableExists(
+  cmd: string,
+  windowsBash: string | null = null,
+): { ok: boolean; needsPosixShell: boolean } {
+  const fail = { ok: false, needsPosixShell: false };
+  let needsPosixShell = false;
   if (isWindows) {
     // Reject if every `where` hit lives under Microsoft\WindowsApps (Store stubs).
     try {
       const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe" });
       const hits = out.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-      if (hits.length === 0) return false;
+      if (hits.length === 0) return fail;
       const realHits = hits.filter(p => !/\\Microsoft\\WindowsApps\\/i.test(p));
-      if (realHits.length === 0) return false;
+      if (realHits.length === 0) return fail;
+      needsPosixShell = isPosixShimOnly(cmd, realHits);
     } catch {
-      return false;
+      return fail;
     }
   } else if (!commandExists(cmd)) {
-    return false;
+    return fail;
   }
   // Probe with --version. On Windows, allow 5s for cold-start (MS Store stub
   // fallthrough can be slow). On POSIX, 1500ms is plenty for a real binary
@@ -115,14 +143,17 @@ function runnableExists(cmd: string): boolean {
     // DEP0190 fix: avoid args array with shell:true on Windows.
     // Use execSync with a command string when shell is required;
     // keep execFileSync (no shell) on POSIX.
-    if (isWindows) {
+    if (isWindows && needsPosixShell && windowsBash) {
+      // #1208: probe the shim the same way the executor will spawn it.
+      execSync(`${cmd} --version`, { stdio: "pipe", timeout: 5000, shell: windowsBash });
+    } else if (isWindows) {
       execSync(`"${cmd}" --version`, { stdio: "pipe", timeout: 5000 });
     } else {
       execFileSync(cmd, ["--version"], { stdio: "pipe", timeout: 1500 });
     }
-    return true;
+    return { ok: true, needsPosixShell };
   } catch {
-    return false;
+    return fail;
   }
 }
 
@@ -357,8 +388,35 @@ export function detectRuntimes(): RuntimeMap {
     ? userShell
     : null;
 
+  // #1208: bare python/node names whose only PATH hits are extensionless
+  // POSIX shims. Classified from the `where` output each probe already issues.
+  const posixShimCommands: string[] = [];
+  const javascript = resolveJavascriptRuntime(bun, isWin
+    ? {
+      commandExists: (cmd) => {
+        try {
+          const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe" });
+          const hits = String(out ?? "").trim().split(/\r?\n/).map(p => p.trim())
+            .filter(p => p && !/\\Microsoft\\WindowsApps\\/i.test(p));
+          if (isPosixShimOnly(cmd, hits)) posixShimCommands.push(cmd);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    }
+    : {});
+  let python: string | null = null;
+  for (const cmd of ["python3", "python", "py"]) {
+    const probe = runnableExists(cmd, windowsBash);
+    if (!probe.ok) continue;
+    python = cmd;
+    if (probe.needsPosixShell) posixShimCommands.push(cmd);
+    break;
+  }
+
   return {
-    javascript: resolveJavascriptRuntime(bun),
+    javascript,
     typescript: bun
       ? bun
       : commandExists("tsx")
@@ -366,13 +424,7 @@ export function detectRuntimes(): RuntimeMap {
         : commandExists("ts-node")
           ? "ts-node"
           : null,
-    python: runnableExists("python3")
-      ? "python3"
-      : runnableExists("python")
-        ? "python"
-        : runnableExists("py")
-          ? "py"
-          : null,
+    python,
     shell: shellOverride ?? (isWin
       ? resolveWindowsShell(windowsBash)
       : commandExists("bash") ? "bash" : "sh"),
@@ -388,6 +440,7 @@ export function detectRuntimes(): RuntimeMap {
         : null,
     elixir: commandExists("elixir") ? "elixir" : null,
     csharp: commandExists("dotnet-script") ? "dotnet-script" : null,
+    ...(isWin ? { posixShimCommands, windowsBashPath: windowsBash } : {}),
   };
 }
 
