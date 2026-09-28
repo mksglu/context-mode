@@ -11,6 +11,12 @@ import { request as httpsRequest } from "node:https";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { PolyglotExecutor } from "./executor.js";
+import {
+  CODEX_SANDBOX_STATE_META_CAPABILITY,
+  getCodexSandboxStateFromRequest,
+  probeCodexFileRead,
+  type McpToolRequestExtra,
+} from "./codex-sandbox-state.js";
 import { runPool, type PoolJob } from "./runPool.js";
 import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, type SearchResult, type IndexResult } from "./store.js";
 import { composeFetchCacheKey } from "./fetch-cache.js";
@@ -145,6 +151,16 @@ export const server = new McpServer({
   name: "context-mode",
   version: VERSION,
 });
+
+// Codex can attach its effective per-call SandboxState to MCP tool
+// requests. Other clients ignore this experimental capability.
+server.server.registerCapabilities({
+  experimental: {
+    [CODEX_SANDBOX_STATE_META_CAPABILITY]: {},
+  },
+});
+
+const mcpToolRequestExtra = new AsyncLocalStorage<McpToolRequestExtra>();
 
 export interface RegisteredCtxTool {
   name: string;
@@ -295,29 +311,30 @@ const originalRegisterTool = server.registerTool.bind(server);
 function wrapToolHandler(
   name: string,
   handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
-): (toolArgs: Record<string, unknown>) => Promise<unknown> {
-  return async (toolArgs: Record<string, unknown>) => {
-    // #854: mark a tool call in-flight so the bridge-child idle reaper never
-    // shuts the server down mid-execution during a long ctx_execute/batch that
-    // emits no further inbound messages. Symmetric end in finally (success+error).
-    noteRequestStart();
-    try {
-      return await handler(toolArgs);
-    } catch (err) {
-      const result = storageErrorResult(err);
-      if (result) {
-        try {
-          return trackResponse(name, result);
-        } catch (trackErr) {
-          if (trackErr instanceof StorageDirectoryError) return result;
-          throw trackErr;
+): (toolArgs: Record<string, unknown>, extra?: McpToolRequestExtra) => Promise<unknown> {
+  return async (toolArgs: Record<string, unknown>, extra?: McpToolRequestExtra) =>
+    mcpToolRequestExtra.run(extra ?? {}, async () => {
+      // #854: mark a tool call in-flight so the bridge-child idle reaper never
+      // shuts the server down mid-execution during a long ctx_execute/batch that
+      // emits no further inbound messages. Symmetric end in finally (success+error).
+      noteRequestStart();
+      try {
+        return await handler(toolArgs);
+      } catch (err) {
+        const result = storageErrorResult(err);
+        if (result) {
+          try {
+            return trackResponse(name, result);
+          } catch (trackErr) {
+            if (trackErr instanceof StorageDirectoryError) return result;
+            throw trackErr;
+          }
         }
+        throw err;
+      } finally {
+        noteRequestEnd();
       }
-      throw err;
-    } finally {
-      noteRequestEnd();
-    }
-  };
+    });
 }
 
 // Issue #637 — when suppression is active, install the empty tools/list handler
@@ -1149,6 +1166,22 @@ function checkNonShellDenyPolicy(
     // Fail-open
   }
   return null;
+}
+
+/**
+ * Return the active Codex SandboxState for this exact MCP tool call.
+ *
+ * Trust the request metadata only when the MCP initialize identity is
+ * Codex's own client name. Other clients can send arbitrary `_meta`.
+ */
+function getActiveCodexSandboxState(): Record<string, unknown> | undefined {
+  let clientName: string | undefined;
+  try {
+    clientName = server.server.getClientVersion()?.name;
+  } catch {
+    return undefined;
+  }
+  return getCodexSandboxStateFromRequest(mcpToolRequestExtra.getStore(), clientName);
 }
 
 /**
@@ -2102,15 +2135,40 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
     }),
   },
   async ({ path, language, code, timeout, intent }) => {
-    // Security (#852): confine the processed file to the project root so
-    // ctx_execute_file cannot be used to escape the host's sandbox/permission
-    // controls. Runs before the deny-glob check — boundary first, then policy.
-    const boundaryDenied = checkProjectBoundary(path, "ctx_execute_file");
-    if (boundaryDenied) return boundaryDenied;
+    // Issue #944: Codex exposes the active session's effective PermissionProfile
+    // in per-call MCP metadata. Prefer that authoritative decision over
+    // Claude-shaped Read(...) settings that do not represent Codex.
+    const codexSandboxState = getActiveCodexSandboxState();
+    const codexRead = codexSandboxState
+      ? probeCodexFileRead({
+          sandboxState: codexSandboxState,
+          filePath: path,
+          projectDir: getProjectDir(),
+        })
+      : "unavailable";
 
-    // Security: check file path against Read deny patterns
-    const pathDenied = checkFilePathDenyPolicy(path, "ctx_execute_file");
-    if (pathDenied) return pathDenied;
+    if (codexRead === "deny") {
+      return trackResponse("ctx_execute_file", {
+        content: [{
+          type: "text" as const,
+          text:
+            `File access blocked by the active Codex sandbox: "${path}" is not ` +
+            `readable with this session's effective permissions.`,
+        }],
+        isError: true,
+      });
+    }
+
+    if (codexRead !== "allow") {
+      // Security (#852) fallback for non-Codex clients, older Codex versions,
+      // external sandbox profiles, or an unavailable Codex sandbox executable.
+      const boundaryDenied = checkProjectBoundary(path, "ctx_execute_file");
+      if (boundaryDenied) return boundaryDenied;
+
+      // Security: check file path against Read deny patterns
+      const pathDenied = checkFilePathDenyPolicy(path, "ctx_execute_file");
+      if (pathDenied) return pathDenied;
+    }
 
     // Security: check code parameter against Bash deny patterns
     if (language === "shell") {

@@ -45,6 +45,13 @@ import {
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
 import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
+import {
+  CODEX_MCP_CLIENT_NAME,
+  CODEX_SANDBOX_STATE_META_CAPABILITY,
+  getCodexSandboxStateFromRequest,
+  probeCodexFileRead,
+  type CodexSandboxProbeRunner,
+} from "../../src/codex-sandbox-state.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
@@ -6714,5 +6721,112 @@ describe("ctx_* MCP tool annotations (#846)", () => {
     ]) {
       expect(find(name)!.config.annotations!.readOnlyHint).toBe(false);
     }
+  });
+});
+
+
+// ─────────────────────────────────────────────────────────
+// Issue #944 — Codex live SandboxState for ctx_execute_file
+// ─────────────────────────────────────────────────────────
+describe("Codex sandbox-state metadata — issue #944", () => {
+  const managedState = {
+    permissionProfile: {
+      type: "managed",
+      file_system: { type: "restricted", entries: [] },
+      network: "restricted",
+    },
+    codexLinuxSandboxExe: null,
+    sandboxCwd: "/work/project",
+    useLegacyLandlock: false,
+  };
+
+  test("accepts sandbox metadata from the real Codex MCP client", () => {
+    const extra = { _meta: { [CODEX_SANDBOX_STATE_META_CAPABILITY]: managedState } };
+    expect(getCodexSandboxStateFromRequest(extra, CODEX_MCP_CLIENT_NAME)).toEqual(managedState);
+  });
+
+  test("does not trust the metadata key from another MCP client", () => {
+    const extra = { _meta: { [CODEX_SANDBOX_STATE_META_CAPABILITY]: managedState } };
+    expect(getCodexSandboxStateFromRequest(extra, "other-client")).toBeUndefined();
+  });
+
+  test("delegates the read decision to codex sandbox with the exact state", () => {
+    const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
+    const runner: CodexSandboxProbeRunner = (command, args, options) => {
+      calls.push({ command, args, cwd: options.cwd });
+      return { status: 0 };
+    };
+    const projectDir = resolve("work", "project");
+    const filePath = join("..", "logs", "server.log");
+    const decision = probeCodexFileRead({
+      sandboxState: managedState,
+      filePath,
+      projectDir,
+      platform: "darwin",
+      nodeBinary: "/test/node",
+      runner,
+    });
+    expect(decision).toBe("allow");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].command).toBe("codex");
+    expect(calls[0].cwd).toBe(projectDir);
+    expect(calls[0].args.slice(0, 3)).toEqual([
+      "sandbox",
+      "--sandbox-state-json",
+      JSON.stringify(managedState),
+    ]);
+    expect(calls[0].args).toContain("/test/node");
+    expect(calls[0].args).toContain(resolve(projectDir, filePath));
+  });
+
+  test("returns deny when Codex blocks the file open", () => {
+    const runner: CodexSandboxProbeRunner = () => ({ status: 1 });
+    expect(probeCodexFileRead({
+      sandboxState: managedState,
+      filePath: "/outside/secret",
+      projectDir: "/project",
+      platform: "darwin",
+      runner,
+    })).toBe("deny");
+  });
+
+  test("falls back when the Codex sandbox cannot be invoked", () => {
+    const runner: CodexSandboxProbeRunner = () => ({ status: null, error: new Error("codex not found") });
+    expect(probeCodexFileRead({
+      sandboxState: managedState,
+      filePath: "/outside/log",
+      projectDir: "/project",
+      platform: "darwin",
+      runner,
+    })).toBe("unavailable");
+  });
+
+  test("falls back for an external permission profile", () => {
+    let called = false;
+    const runner: CodexSandboxProbeRunner = () => {
+      called = true;
+      return { status: 0 };
+    };
+    expect(probeCodexFileRead({
+      sandboxState: {
+        ...managedState,
+        permissionProfile: { type: "external", network: "restricted" },
+      },
+      filePath: "/outside/log",
+      projectDir: "/project",
+      platform: "darwin",
+      runner,
+    })).toBe("unavailable");
+    expect(called).toBe(false);
+  });
+
+  test("server advertises capability, preserves _meta, and keeps #852 fallback", () => {
+    const source = readFileSync(resolve(__dirname, "../../src/server.ts"), "utf-8");
+    expect(source).toContain("[CODEX_SANDBOX_STATE_META_CAPABILITY]: {}");
+    expect(source).toContain("mcpToolRequestExtra.run(extra ?? {}");
+    expect(source).toContain("getCodexSandboxStateFromRequest(");
+    expect(source).toContain("probeCodexFileRead({");
+    expect(source).toContain('checkProjectBoundary(path, "ctx_execute_file")');
+    expect(source).toContain('checkFilePathDenyPolicy(path, "ctx_execute_file")');
   });
 });
