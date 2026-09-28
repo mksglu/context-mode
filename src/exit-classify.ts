@@ -1,11 +1,12 @@
 /**
  * Classify non-zero exit codes for ctx_execute / ctx_execute_file.
  *
- * Shell commands like `grep` exit 1 for "no matches" — not a real error.
- * We treat exit code 1 as a soft failure when:
+ * Some shell commands use exit code 1 for a non-error status.
+ * We treat exit code 1 as a soft failure only when:
  *   - language is "shell"
  *   - exit code is exactly 1
  *   - stdout has non-whitespace content
+ *   - stderr is empty
  */
 export interface ExitClassification {
   isError: boolean;
@@ -22,7 +23,8 @@ export function classifyNonZeroExit(params: {
   const isSoftFail =
     language === "shell" &&
     exitCode === 1 &&
-    stdout.trim().length > 0;
+    stdout.trim().length > 0 &&
+    stderr.trim().length === 0;
 
   return {
     isError: !isSoftFail,

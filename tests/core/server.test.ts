@@ -208,9 +208,9 @@ describe("storage path resolution", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("Non-zero Exit Code Classification", () => {
-  // ── Soft-fail: shell + exit 1 + stdout present ──
+  // ── Soft-fail: shell + exit 1 + stdout + no stderr ──
 
-  test("shell exit 1 with stdout → not an error (grep no-match pattern)", () => {
+  test("shell exit 1 with stdout and no stderr → not an error", () => {
     const result = classifyNonZeroExit({
       language: "shell",
       exitCode: 1,
@@ -219,6 +219,17 @@ describe("Non-zero Exit Code Classification", () => {
     });
     expect(result.isError).toBe(false);
     expect(result.output).toBe("file1.ts:10: writeRouting\nfile2.ts:20: writeRouting");
+  });
+
+  test("shell exit 1 with stderr → real error", () => {
+    const result = classifyNonZeroExit({
+      language: "shell",
+      exitCode: 1,
+      stdout: "partial output",
+      stderr: "expected failure",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain("expected failure");
   });
 
   test("shell exit 1 with empty stdout → real error", () => {
@@ -6664,6 +6675,23 @@ describe("resolveExecTimeout (agy default execution timeout)", () => {
 // "Server & tools" domain → this file owns tool registration per CONTRIBUTING.md.
 // Inspects the actual registered descriptors via the exported registry, not just
 // descriptions, so a missing/incorrect annotation fails CI.
+describe("ctx_execute progress notifications", () => {
+  test("forwards handler metadata through the registered wrapper", async () => {
+    const tool = REGISTERED_CTX_TOOLS.find(({ name }) => name === "ctx_execute");
+    const notifications: Array<{ message: string }> = [];
+    await tool!.handler(
+      { language: "shell", code: "printf streamed" },
+      {
+        _meta: { progressToken: "test-progress" },
+        sendNotification: async (notification: { params: { message: string } }) => {
+          notifications.push({ message: notification.params.message });
+        },
+      },
+    );
+    expect(notifications.map(({ message }) => message).join("")).toContain("streamed");
+  });
+});
+
 describe("ctx_* MCP tool annotations (#846)", () => {
   type Hints = {
     readOnlyHint: boolean;

@@ -222,6 +222,7 @@ interface ExecuteOptions {
    * a non-project cwd (e.g. $HOME).
    */
   cwd?: string;
+  onOutput?: (chunk: string) => void;
 }
 
 interface ExecuteFileOptions extends ExecuteOptions {
@@ -280,7 +281,7 @@ export class PolyglotExecutor {
   }
 
   async execute(opts: ExecuteOptions): Promise<ExecResult> {
-    const { language, code, timeout, background = false, cwd: cwdOverride } = opts;
+    const { language, code, timeout, background = false, cwd: cwdOverride, onOutput } = opts;
     const tmpDir = mkdtempSync(join(OS_TMPDIR, ".ctx-mode-"));
 
     try {
@@ -304,7 +305,7 @@ export class PolyglotExecutor {
       // Issue #45 — `cwdOverride` lets per-call sites (Codex MCP handlers) pin
       // cwd without mutating process-wide state.
       const cwd = cwdOverride ?? this.#projectRoot;
-      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background);
+      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background, onOutput);
 
       // Skip tmpDir cleanup if process was backgrounded — it may still need files
       if (!result.backgrounded) {
@@ -319,14 +320,14 @@ export class PolyglotExecutor {
   }
 
   async executeFile(opts: ExecuteFileOptions): Promise<ExecResult> {
-    const { path: filePath, language, code, timeout } = opts;
+    const { path: filePath, language, code, timeout, onOutput } = opts;
     const absolutePath = resolve(this.#projectRoot, filePath);
     const wrappedCode = this.#wrapWithFileContent(
       absolutePath,
       language,
       code,
     );
-    return this.execute({ language, code: wrappedCode, timeout });
+    return this.execute({ language, code: wrappedCode, timeout, onOutput });
   }
 
   #writeScript(tmpDir: string, code: string, language: Language): string {
@@ -412,6 +413,7 @@ export class PolyglotExecutor {
     sandboxTmpDir: string,
     timeout: number | undefined,
     background = false,
+    onOutput?: (chunk: string) => void,
   ): Promise<ExecResult> {
     return new Promise((res) => {
       // Only .cmd/.bat shims need shell on Windows; real executables don't.
@@ -520,6 +522,7 @@ export class PolyglotExecutor {
         totalBytes += chunk.length;
         if (totalBytes <= this.#hardCapBytes) {
           stdoutChunks.push(chunk);
+          onOutput?.(chunk.toString("utf-8"));
         } else if (!capExceeded) {
           capExceeded = true;
           killTree(proc);
@@ -530,6 +533,7 @@ export class PolyglotExecutor {
         totalBytes += chunk.length;
         if (totalBytes <= this.#hardCapBytes) {
           stderrChunks.push(chunk);
+          onOutput?.(chunk.toString("utf-8"));
         } else if (!capExceeded) {
           capExceeded = true;
           killTree(proc);
