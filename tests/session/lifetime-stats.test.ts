@@ -10,15 +10,19 @@
  * should surface the count and the projects involved.
  */
 
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { afterAll, describe, expect, test } from "vitest";
 import { SessionDB } from "../../src/session/db.js";
 import { getLifetimeStats } from "../../src/session/analytics.js";
+import { readLifetimeTokenSnapshot, writeLifetimeTokenSnapshot } from "../../src/session/lifetime-snapshot.js";
 
 const cleanups: Array<() => void> = [];
+const execFileAsync = promisify(execFile);
 
 afterAll(() => {
   for (const fn of cleanups) {
@@ -134,4 +138,58 @@ describe("getLifetimeStats — cross-session totals + auto-memory", () => {
     expect(stats.categoryCounts.cwd).toBe(1);
     expect(stats.categoryCounts.rule).toBe(1);
   });
+});
+
+describe("shared lifetime token snapshot", () => {
+  test("round-trips a validated snapshot", () => {
+    const sessionsDir = tmpDir("lifetime-snapshot");
+
+    writeLifetimeTokenSnapshot(sessionsDir, 654_321, 1_700_000_000_000);
+
+    expect(readLifetimeTokenSnapshot(sessionsDir)).toEqual({
+      schemaVersion: 1,
+      tokens: 654_321,
+      computedAt: 1_700_000_000_000,
+    });
+  });
+
+  test("does not amplify I/O across thousands of DBs and concurrent bridge processes", async () => {
+    const sessionsDir = tmpDir("lifetime-snapshot-load");
+    for (let i = 0; i < 2_443; i += 1) {
+      writeFileSync(join(sessionsDir, `project-${i}.db`), "not-a-database");
+    }
+    writeLifetimeTokenSnapshot(sessionsDir, 987_654_321, Date.now());
+
+    const moduleUrl = new URL(
+      "../../src/session/lifetime-snapshot.ts",
+      import.meta.url,
+    ).href;
+    const childScript = `
+      import { readLifetimeTokenSnapshot } from ${JSON.stringify(moduleUrl)};
+      const sessionsDir = ${JSON.stringify(sessionsDir)};
+      for (let i = 0; i < 25; i += 1) {
+        const snapshot = readLifetimeTokenSnapshot(sessionsDir);
+        if (snapshot?.tokens !== 987654321) process.exit(2);
+      }
+    `;
+
+    const startedAt = performance.now();
+    await Promise.all(
+      Array.from({ length: 12 }, () =>
+        execFileAsync(
+          process.execPath,
+          ["--import", "tsx", "--input-type=module", "--eval", childScript],
+          { timeout: 10_000 },
+        ),
+      ),
+    );
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(elapsedMs).toBeLessThan(10_000);
+    expect(
+      readdirSync(sessionsDir).filter(
+        (file) => file.endsWith("-wal") || file.endsWith("-shm"),
+      ),
+    ).toEqual([]);
+  }, 15_000);
 });

@@ -72,6 +72,7 @@ import { resolveClaudeConfigDir } from "./util/claude-config.js";
 import { resolveProjectDir } from "./util/project-dir.js";
 import { loadDatabase } from "./db-base.js";
 import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, pricePerToken } from "./session/analytics.js";
+import { readLifetimeTokenSnapshot, writeLifetimeTokenSnapshot } from "./session/lifetime-snapshot.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
 const VERSION: string = (() => {
   for (const rel of ["../package.json", "./package.json"]) {
@@ -998,11 +999,14 @@ function sanitizeSessionId(raw: string): string {
   return SESSION_ID_RE.test(raw) ? raw : `pid-${process.ppid}`;
 }
 
+function getStatsStorageDir(): string {
+  return ensureWritableStorageDir(resolveStatsStorageDir(getDefaultSessionDir));
+}
+
 function getStatsFilePath(): string {
   const raw = process.env.CLAUDE_SESSION_ID || `pid-${process.ppid}`;
   const sessionId = sanitizeSessionId(raw);
-  const statsDir = ensureWritableStorageDir(resolveStatsStorageDir(getDefaultSessionDir));
-  return join(statsDir, `stats-${sessionId}.json`);
+  return join(getStatsStorageDir(), `stats-${sessionId}.json`);
 }
 
 function persistStats(): void {
@@ -1030,19 +1034,14 @@ function persistStats(): void {
         : 0;
     const tokensSaved = Math.round(keptOut / 4);
 
-    // Lifetime savings — cached separately because getLifetimeStats() scans
-    // disk (per-project SessionDBs + auto-memory dirs) and is too expensive
-    // for the 500ms persist throttle. Refresh every 30s; the statusline
-    // doesn't need second-by-second lifetime accuracy.
+    // Lifetime aggregation is explicitly requested through ctx_stats and
+    // published once for every bridge sharing this adapter's stats directory.
+    // Heartbeats only read that O(1) snapshot; they never discover or open DBs.
     let lifetimeTokens = _lifetimeCache?.tokens ?? 0;
     if (!_lifetimeCache || now - _lifetimeCache.computedAt > LIFETIME_REFRESH_MS) {
-      try {
-        const life = getLifetimeStats({ sessionsDir: getSessionDir() });
-        lifetimeTokens = (life?.totalEvents ?? 0) * TOKENS_PER_EVENT;
-        _lifetimeCache = { tokens: lifetimeTokens, computedAt: now };
-      } catch {
-        // best-effort — keep stale cache or 0
-      }
+      const snapshot = readLifetimeTokenSnapshot(getStatsStorageDir());
+      lifetimeTokens = snapshot?.tokens ?? lifetimeTokens;
+      _lifetimeCache = { tokens: lifetimeTokens, computedAt: now };
     }
 
     const payload = {
@@ -4387,6 +4386,18 @@ function patchPiLifetimeFromStatsFiles(lifetime: ReturnType<typeof getLifetimeSt
   }
 }
 
+/** Share an explicitly requested lifetime aggregation with status heartbeats. */
+function publishLifetimeTokenSnapshot(lifetime: ReturnType<typeof getLifetimeStats>): void {
+  const now = Date.now();
+  const tokens = Math.max(0, lifetime.totalEvents * TOKENS_PER_EVENT);
+  _lifetimeCache = { tokens, computedAt: now };
+  try {
+    writeLifetimeTokenSnapshot(getStatsStorageDir(), tokens, now);
+  } catch {
+    // best-effort — ctx_stats reporting must not depend on snapshot persistence
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // Tool: stats
 // ─────────────────────────────────────────────────────────
@@ -4550,6 +4561,7 @@ server.registerTool(
           if (_detectedAdapter?.name === "Pi") {
             patchPiLifetimeFromStatsFiles(lifetime, getSessionDir());
           }
+          publishLifetimeTokenSnapshot(lifetime);
           // v1.0.117: pass projectDir as cwd so the narrative renderer's
           // "started in <path>" line matches the user's actual project.
           // Snapshot the persistent store so the renderer can show
@@ -4571,6 +4583,7 @@ server.registerTool(
         if (_detectedAdapter?.name === "Pi") {
           patchPiLifetimeFromStatsFiles(lifetime, getSessionDir());
         }
+        publishLifetimeTokenSnapshot(lifetime);
         let multiAdapter;
         try { multiAdapter = getMultiAdapterLifetimeStats(); } catch { /* never block ctx_stats */ }
         let indexState;
@@ -4586,6 +4599,7 @@ server.registerTool(
       if (_detectedAdapter?.name === "Pi" && lifetime) {
         patchPiLifetimeFromStatsFiles(lifetime, getSessionDir());
       }
+      if (lifetime) publishLifetimeTokenSnapshot(lifetime);
       let multiAdapter;
       try { multiAdapter = getMultiAdapterLifetimeStats(); } catch { /* never block ctx_stats */ }
       text = formatReport(report, VERSION, _latestVersion, (lifetime || multiAdapter) ? { lifetime, multiAdapter } : undefined);
