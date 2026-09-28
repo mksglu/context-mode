@@ -745,6 +745,7 @@ export default function piExtension(pi: any): void {
       event.messages.push({
         role: "user",
         content: ctx,
+        timestamp: Date.now(),
       });
       return { messages: event.messages };
     } catch {
