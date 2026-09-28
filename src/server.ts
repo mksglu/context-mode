@@ -12,7 +12,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { PolyglotExecutor } from "./executor.js";
 import { runPool, type PoolJob } from "./runPool.js";
-import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, type SearchResult, type IndexResult } from "./store.js";
+import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, cleanupStaleSessionFiles, type SearchResult, type IndexResult } from "./store.js";
 import { composeFetchCacheKey } from "./fetch-cache.js";
 import { PageStore } from "./fetch/page-store.js";
 import { extractAndStore, routeSkipsExtraction, type FetchRoute, type Relabelled } from "./fetch/extract.js";
@@ -732,6 +732,10 @@ function getStore(): ContentStore {
       // Also clean legacy shared dir from before platform isolation
       const legacyDir = join(homedir(), ".context-mode", "content");
       if (existsSync(legacyDir)) cleanupStaleContentDBs(legacyDir, 0);
+      // sessions/ mirrors the same retention window — without it, per-session
+      // stats-*.json files and idle per-project session DBs grow without
+      // bound (#949: 5k+ files / 331MB on a two-month install).
+      cleanupStaleSessionFiles(getSessionDir(), 14);
     } catch { /* best-effort */ }
 
     // Also clean old PID-based DBs from migration

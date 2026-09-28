@@ -260,6 +260,46 @@ export function cleanupStaleContentDBs(contentDir: string, maxAgeDays: number): 
   return cleaned;
 }
 
+/**
+ * Clean up stale files in the sessions/ storage directory (#949).
+ *
+ * content/ has pruned at 14 days since day one, but sessions/ had no
+ * retention at all: per-session `stats-*.json` files (one per server
+ * process, never reread after the session ends) and idle per-project
+ * session DBs accumulate without bound.
+ *
+ * Retention is purely mtime-based — every hook write refreshes the DB's
+ * mtime, so a file untouched for maxAgeDays cannot belong to a live
+ * session. Deliberately NO WAL-liveness heuristic here: guessing owner
+ * death from WAL staleness can delete files under a live handle (#880).
+ * Unknown file types are left alone.
+ */
+export function cleanupStaleSessionFiles(sessionsDir: string, maxAgeDays: number): number {
+  let cleaned = 0;
+  try {
+    if (!existsSync(sessionsDir)) return 0;
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    for (const file of readdirSync(sessionsDir)) {
+      const isSessionDb = file.endsWith(".db");
+      const isStatsFile = file.startsWith("stats-") && file.endsWith(".json");
+      if (!isSessionDb && !isStatsFile) continue;
+      try {
+        const filePath = join(sessionsDir, file);
+        if (statSync(filePath).mtimeMs >= cutoff) continue;
+        if (isSessionDb) {
+          for (const suffix of ["", "-wal", "-shm"]) {
+            try { unlinkSync(filePath + suffix); } catch { /* ignore */ }
+          }
+        } else {
+          unlinkSync(filePath);
+        }
+        cleaned++;
+      } catch { /* ignore per-file errors */ }
+    }
+  } catch { /* ignore readdir errors */ }
+  return cleaned;
+}
+
 // ── Proximity helpers (pure functions) ──
 
 /** Find all positions of a term in text. */

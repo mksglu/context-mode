@@ -7,12 +7,12 @@
 
 import { describe, test, expect } from "vitest";
 import { strict as assert } from "node:assert";
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdtempSync, utimesSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { ContentStore, cleanupStaleDBs } from "../src/store.js";
+import { ContentStore, cleanupStaleDBs, cleanupStaleSessionFiles } from "../src/store.js";
 import {
   withRetry,
   closeDB,
@@ -1188,6 +1188,59 @@ describe("DB Cleanup", () => {
     store.cleanup();
     // Second call should not throw
     assert.doesNotThrow(() => store.cleanup());
+  });
+
+  // #949 — sessions/ retention (content/ prunes at 14d; sessions/ never did)
+  test("cleanupStaleSessionFiles removes old session DBs and stats files, keeps fresh ones", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-sessions-retention-"));
+    const old = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
+
+    // Stale: 20-day-old session DB (with WAL/SHM) + stats file
+    const oldDb = join(dir, "abc123.db");
+    writeFileSync(oldDb, "db");
+    writeFileSync(oldDb + "-wal", "wal");
+    writeFileSync(oldDb + "-shm", "shm");
+    writeFileSync(join(dir, "stats-pid-11111.json"), "{}");
+    for (const f of [oldDb, oldDb + "-wal", oldDb + "-shm", join(dir, "stats-pid-11111.json")]) {
+      utimesSync(f, old, old);
+    }
+
+    // Fresh: current-mtime DB + stats file, plus an unknown file type
+    const freshDb = join(dir, "def456.db");
+    writeFileSync(freshDb, "db");
+    writeFileSync(join(dir, "stats-pid-22222.json"), "{}");
+    writeFileSync(join(dir, "notes.txt"), "unrelated");
+    utimesSync(join(dir, "notes.txt"), old, old);
+
+    const cleaned = cleanupStaleSessionFiles(dir, 14);
+    assert.equal(cleaned, 2, "one DB trio + one stats file");
+    assert.ok(!existsSync(oldDb), "old DB removed");
+    assert.ok(!existsSync(oldDb + "-wal"), "old WAL removed");
+    assert.ok(!existsSync(oldDb + "-shm"), "old SHM removed");
+    assert.ok(!existsSync(join(dir, "stats-pid-11111.json")), "old stats removed");
+    assert.ok(existsSync(freshDb), "fresh DB kept");
+    assert.ok(existsSync(join(dir, "stats-pid-22222.json")), "fresh stats kept");
+    assert.ok(existsSync(join(dir, "notes.txt")), "unknown file types are never touched");
+  });
+
+  test("cleanupStaleSessionFiles has no WAL-liveness heuristic — recent DB with old WAL is kept", () => {
+    // cleanupStaleContentDBs' WAL-staleness guess can delete files under a
+    // live handle (#880); the sessions variant must rely on mtime only.
+    const dir = mkdtempSync(join(tmpdir(), "cm-sessions-wal-"));
+    const db = join(dir, "live.db");
+    writeFileSync(db, "db");
+    writeFileSync(db + "-wal", "wal");
+    const old = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
+    utimesSync(db + "-wal", old, old); // stale WAL, fresh DB
+
+    const cleaned = cleanupStaleSessionFiles(dir, 14);
+    assert.equal(cleaned, 0);
+    assert.ok(existsSync(db), "live DB kept despite stale-looking WAL");
+    assert.ok(existsSync(db + "-wal"), "its WAL kept too");
+  });
+
+  test("cleanupStaleSessionFiles returns 0 for a missing directory", () => {
+    assert.equal(cleanupStaleSessionFiles(join(tmpdir(), "cm-does-not-exist-949"), 14), 0);
   });
 });
 
