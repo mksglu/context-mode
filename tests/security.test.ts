@@ -22,8 +22,10 @@ import {
   evaluateCommandDenyOnly,
   parseToolPattern,
   readToolDenyPatterns,
+  readToolPermissionPatterns,
   fileGlobToRegex,
   evaluateFilePath,
+  evaluateProjectContainment,
   extractShellCommands,
 } from "../build/security.js";
 
@@ -992,5 +994,160 @@ describe("cross-adapter deny-policy parity (#451 round-3)", () => {
       allDeny.includes("Bash(claude-only *)"),
       `expected claude deny in union (defense in depth), got ${JSON.stringify(allDeny)}`,
     );
+  });
+});
+
+/**
+ * Pi documents `<project>/.pi/settings.json` as its project settings file.
+ * Security readers must prefer it while retaining the existing Claude project
+ * paths as compatibility fallbacks. Both allow and deny extraction share the
+ * same resolver so the project-boundary escape hatch cannot drift from deny
+ * enforcement.
+ */
+describe("Pi project permission settings", () => {
+  let tmpBase: string;
+  let projectDir: string;
+  let externalFile: string;
+  let missingGlobalPath: string;
+  let piAllowGlob: string;
+  let claudeLocalAllowGlob: string;
+  let claudeSharedAllowGlob: string;
+  let savedPlatform: string | undefined;
+
+  beforeAll(() => {
+    tmpBase = join(tmpdir(), `security-pi-project-test-${Date.now()}`);
+    projectDir = join(tmpBase, "project");
+    const piDir = join(projectDir, ".pi");
+    const claudeDir = join(projectDir, ".claude");
+    const externalDir = join(tmpBase, "ExternalEngine");
+    externalFile = join(externalDir, "CoreTypes.h");
+    missingGlobalPath = join(tmpBase, "missing-global-settings.json");
+    piAllowGlob = join(externalDir, "**");
+    claudeLocalAllowGlob = join(tmpBase, "claude-local", "**");
+    claudeSharedAllowGlob = join(tmpBase, "claude-shared", "**");
+
+    mkdirSync(piDir, { recursive: true });
+    mkdirSync(claudeDir, { recursive: true });
+    mkdirSync(externalDir, { recursive: true });
+    writeFileSync(externalFile, "// external engine fixture\n");
+
+    writeFileSync(
+      join(piDir, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: [
+            `Read(${piAllowGlob})`,
+            "Read(D:/ExternalEngine/**)",
+            "Bash(pi-safe:*)",
+          ],
+          deny: ["Read(**/*.pi-secret)", "Bash(pi-blocked:*)"],
+        },
+      }),
+    );
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        permissions: {
+          allow: [`Read(${claudeLocalAllowGlob})`, "Bash(claude-local-safe:*)"],
+          deny: [
+            "Read(**/*.claude-local-secret)",
+            "Bash(claude-local-blocked:*)",
+          ],
+        },
+      }),
+    );
+    writeFileSync(
+      join(claudeDir, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: [`Read(${claudeSharedAllowGlob})`, "Bash(claude-shared-safe:*)"],
+          deny: [
+            "Read(**/*.claude-shared-secret)",
+            "Bash(claude-shared-blocked:*)",
+          ],
+        },
+      }),
+    );
+
+    savedPlatform = process.env.CONTEXT_MODE_PLATFORM;
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+  });
+
+  afterAll(() => {
+    if (savedPlatform === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
+    else process.env.CONTEXT_MODE_PLATFORM = savedPlatform;
+    rmSync(tmpBase, { recursive: true, force: true });
+  });
+
+  test("Pi allow rules precede Claude local and shared compatibility rules", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    const allowGlobs = readToolPermissionPatterns(
+      "Read",
+      "allow",
+      projectDir,
+      missingGlobalPath,
+    );
+
+    assert.deepEqual(allowGlobs, [
+      [piAllowGlob, "D:/ExternalEngine/**"],
+      [claudeLocalAllowGlob],
+      [claudeSharedAllowGlob],
+    ]);
+    assert.deepEqual(
+      evaluateProjectContainment(externalFile, projectDir, allowGlobs),
+      { allowed: true, reason: "allow-rule" },
+    );
+  });
+
+  test("Pi deny rules use the same project settings precedence", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    const denyGlobs = readToolDenyPatterns(
+      "Read",
+      projectDir,
+      missingGlobalPath,
+    );
+
+    assert.deepEqual(denyGlobs, [
+      ["**/*.pi-secret"],
+      ["**/*.claude-local-secret"],
+      ["**/*.claude-shared-secret"],
+    ]);
+  });
+
+  test("Bash policy loading uses the same Pi-first resolver", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "pi";
+    const policies = readBashPolicies(projectDir, missingGlobalPath);
+
+    assert.deepEqual(
+      policies.map((policy) => policy.allow),
+      [
+        ["Bash(pi-safe:*)"],
+        ["Bash(claude-local-safe:*)"],
+        ["Bash(claude-shared-safe:*)"],
+      ],
+    );
+    assert.deepEqual(
+      policies.map((policy) => policy.deny),
+      [
+        ["Bash(pi-blocked:*)"],
+        ["Bash(claude-local-blocked:*)"],
+        ["Bash(claude-shared-blocked:*)"],
+      ],
+    );
+  });
+
+  test("Claude Code keeps local-before-shared behavior and ignores Pi settings", () => {
+    process.env.CONTEXT_MODE_PLATFORM = "claude-code";
+    const allowGlobs = readToolPermissionPatterns(
+      "Read",
+      "allow",
+      projectDir,
+      missingGlobalPath,
+    );
+
+    assert.deepEqual(allowGlobs, [
+      [claudeLocalAllowGlob],
+      [claudeSharedAllowGlob],
+    ]);
   });
 });

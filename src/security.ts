@@ -1,7 +1,10 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
-import { resolveAdapterGlobalSettingsPaths } from "./util/claude-config.js";
+import {
+  resolveAdapterGlobalSettingsPaths,
+  resolveAdapterProjectSettingsPaths,
+} from "./util/claude-config.js";
 
 // ==============================================================================
 // Types
@@ -351,13 +354,16 @@ function readSingleSettings(path: string): SecurityPolicy | null {
 }
 
 /**
- * Read Bash permission policies from up to 3 settings files.
+ * Read Bash permission policies from adapter-aware project settings and global
+ * settings files.
  *
- * Returns policies in precedence order (most local first):
- *   1. .claude/settings.local.json  (project-local)
- *   2. .claude/settings.json        (project-shared)
- *   3. ~/.claude/settings.json      (global)
+ * Project precedence is resolved by `resolveAdapterProjectSettingsPaths`.
+ * Claude Code keeps its existing order:
+ *   1. .claude/settings.local.json
+ *   2. .claude/settings.json
  *
+ * Adapters with a documented native project settings path place it before
+ * those Claude compatibility paths. Global settings follow all project files.
  * Missing or invalid files are silently skipped.
  */
 export function readBashPolicies(
@@ -367,13 +373,10 @@ export function readBashPolicies(
   const policies: SecurityPolicy[] = [];
 
   if (projectDir) {
-    const localPath = resolve(projectDir, ".claude", "settings.local.json");
-    const localPolicy = readSingleSettings(localPath);
-    if (localPolicy) policies.push(localPolicy);
-
-    const sharedPath = resolve(projectDir, ".claude", "settings.json");
-    const sharedPolicy = readSingleSettings(sharedPath);
-    if (sharedPolicy) policies.push(sharedPolicy);
+    for (const projectPath of resolveAdapterProjectSettingsPaths(projectDir)) {
+      const projectPolicy = readSingleSettings(projectPath);
+      if (projectPolicy) policies.push(projectPolicy);
+    }
   }
 
   // Issue #451 round-3: read settings from EVERY adapter-specific global path
@@ -396,9 +399,10 @@ export function readBashPolicies(
 /**
  * Read deny patterns for a specific tool from settings files.
  *
- * Reads the same 3-tier settings as `readBashPolicies`, but extracts
- * only deny globs for the given tool. Used for Read and Grep enforcement
- * — checks if file paths should be blocked by deny patterns.
+ * Reads the same adapter-aware project and global settings as
+ * `readBashPolicies`, but extracts only deny globs for the given tool. Used for
+ * Read and Grep enforcement — checks if file paths should be blocked by deny
+ * patterns.
  *
  * Returns an array of arrays (one per settings file, in precedence order).
  * Each inner array contains the extracted glob strings.
@@ -413,7 +417,8 @@ export function readToolDenyPatterns(
 
 /**
  * Read `permissions.{deny|allow}` globs for a tool from every settings file in
- * precedence order (project local → project shared → adapter globals).
+ * precedence order (adapter project paths → Claude project compatibility →
+ * adapter globals).
  *
  * Generalizes the original deny-only reader so the project-boundary guard
  * (#852) can consult the SAME `permissions.allow` rules the user already
@@ -461,15 +466,10 @@ export function readToolPermissionPatterns(
   };
 
   if (projectDir) {
-    const localGlobs = extractGlobs(
-      resolve(projectDir, ".claude", "settings.local.json"),
-    );
-    if (localGlobs !== null) result.push(localGlobs);
-
-    const sharedGlobs = extractGlobs(
-      resolve(projectDir, ".claude", "settings.json"),
-    );
-    if (sharedGlobs !== null) result.push(sharedGlobs);
+    for (const projectPath of resolveAdapterProjectSettingsPaths(projectDir)) {
+      const projectGlobs = extractGlobs(projectPath);
+      if (projectGlobs !== null) result.push(projectGlobs);
+    }
   }
 
   // Issue #451 round-3: union over every adapter-specific global path PLUS

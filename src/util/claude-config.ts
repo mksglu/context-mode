@@ -24,6 +24,7 @@
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { detectPlatform, getSessionDirSegments } from "../adapters/detect.js";
+import type { PlatformId } from "../adapters/types.js";
 
 export function resolveClaudeConfigDir(env: NodeJS.ProcessEnv = process.env): string {
   const envVal = env.CLAUDE_CONFIG_DIR;
@@ -41,6 +42,50 @@ export function resolveClaudeGlobalSettingsPath(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   return resolve(resolveClaudeConfigDir(env), "settings.json");
+}
+
+type ProjectSettingsSegments = readonly (readonly string[])[];
+
+const CLAUDE_PROJECT_SETTINGS_SEGMENTS: ProjectSettingsSegments = [
+  [".claude", "settings.local.json"],
+  [".claude", "settings.json"],
+];
+
+/**
+ * Documented project-level permission settings paths for adapters that do not
+ * use Claude Code's `.claude` convention. Add new adapters here instead of
+ * branching inside the security readers.
+ *
+ * Pi documents `.pi/settings.json` as its only project settings file; it does
+ * not define a project `settings.local.json` convention.
+ */
+const ADAPTER_PROJECT_SETTINGS_SEGMENTS: Readonly<
+  Partial<Record<PlatformId, ProjectSettingsSegments>>
+> = {
+  pi: [[".pi", "settings.json"]],
+};
+
+/**
+ * Resolve project settings in policy precedence order.
+ *
+ * Adapter-native paths come first, followed by Claude Code's existing local
+ * and shared paths as compatibility fallbacks. The result is deduplicated so
+ * an adapter can adopt a Claude-compatible path without reading it twice.
+ */
+export function resolveAdapterProjectSettingsPaths(projectDir: string): string[] {
+  const platform = detectPlatform().platform;
+  const adapterSegments = ADAPTER_PROJECT_SETTINGS_SEGMENTS[platform] ?? [];
+  const paths: string[] = [];
+
+  for (const segments of [
+    ...adapterSegments,
+    ...CLAUDE_PROJECT_SETTINGS_SEGMENTS,
+  ]) {
+    const settingsPath = resolve(projectDir, ...segments);
+    if (!paths.includes(settingsPath)) paths.push(settingsPath);
+  }
+
+  return paths;
 }
 
 /**
