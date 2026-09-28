@@ -129,7 +129,7 @@ import{createRequire as ie}from"node:module";import{existsSync as ae,unlinkSync 
          AND (data LIKE '%' || ? || '%' ESCAPE '\\' OR category LIKE '%' || ? || '%' ESCAPE '\\')
          AND (? IS NULL OR category = ?)
        ORDER BY id ASC
-       LIMIT ?`),e(o.getOldSessions,"SELECT session_id FROM session_meta WHERE started_at < datetime('now', ? || ' days')"),e(o.incrementToolCall,`INSERT INTO tool_calls (session_id, tool, calls, bytes_returned)
+       LIMIT ?`),e(o.getOldSessions,"SELECT session_id FROM session_meta WHERE COALESCE(last_event_at, started_at) < datetime('now', ? || ' days')"),e(o.incrementToolCall,`INSERT INTO tool_calls (session_id, tool, calls, bytes_returned)
        VALUES (?, ?, 1, ?)
        ON CONFLICT(session_id, tool) DO UPDATE SET
          calls = calls + 1,
