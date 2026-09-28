@@ -194,7 +194,11 @@ setTimeout(() => {
     });
 
     try {
-      const result = await waitForClose(child, 2_000);
+      // The standalone bundle can take several seconds to initialize under
+      // WSL, especially when native dependencies are cold. The fatal handler
+      // still exits promptly after registration; allow startup time before
+      // classifying the child as surviving the exception storm.
+      const result = await waitForClose(child, 10_000);
       if (!result.closed) {
         child.kill("SIGTERM");
         await waitForClose(child, 1_000);

@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 
 import { CopilotBaseAdapter } from "../copilot-base.js";
 import { resolveContextModeDataRoot } from "../base.js";
+import { isVSCodeInstallPath } from "../../util/project-dir.js";
 import type { CopilotHookInput, CopilotHookModule } from "../copilot-base.js";
 
 import type {
@@ -77,10 +78,13 @@ export class VSCodeCopilotAdapter extends CopilotBaseAdapter {
     //      from this cascade — every direct VS Code Copilot session silently
     //      lost its workspace folder. PR #689 5-agent EM audit (Phase A
     //      claim verification) confirmed the gap; this is the minimal fix.
+    //      Skipped when it points at VS Code's own install directory: that
+    //      launch cwd is poisoned for remote workspaces.
     //   3. process.cwd() — last resort.
+    const vscodeCwd = process.env.VSCODE_CWD;
     return (
       process.env.CLAUDE_PROJECT_DIR
-      || process.env.VSCODE_CWD
+      || (vscodeCwd && !isVSCodeInstallPath(vscodeCwd) ? vscodeCwd : undefined)
       || process.cwd()
     );
   }
