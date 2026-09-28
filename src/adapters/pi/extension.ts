@@ -16,6 +16,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { classifyBashNetwork } from "../bash-network.js";
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
 import type { ProjectAttribution } from "../../session/project-attribution.js";
 import { extractEvents, extractUserEvents, parsePiUsage, buildAgentUsageEvent } from "../../session/extract.js";
@@ -38,96 +39,11 @@ const PI_TOOL_MAP: Record<string, string> = {
 };
 
 // ── Routing patterns ─────────────────────────────────────
-// Inline HTTP client patterns to block in bash — self-contained, no routing module needed.
-//
-// Issue #625 — split into two classes so we can apply different policies:
-//
-//   * BLOCKED_HTTP_PATTERNS — language-level HTTP calls (fetch, requests, http,
-//     urllib, Invoke-WebRequest). These always flood context with raw response
-//     bodies, so they remain unconditionally blocked.
-//
-//   * curl / wget — handled separately by isSafeCurlWget() below. Mirrors the
-//     reference logic in hooks/core/routing.mjs:660–722. Silent + file-output
-//     forms are allowed as an MCP-down escape hatch (the body never enters
-//     context). Unsafe forms (stdout, verbose, missing file output) still
-//     block. This prevents an unrecoverable session trap when the bridge dies.
-//
-// Both are evaluated AFTER stripQuotedContent() so quoted CLI arguments
-// (e.g. `gh issue list --search "curl wget"`) no longer false-positive.
-const BLOCKED_HTTP_PATTERNS: RegExp[] = [
-  /\bfetch\s*\(/,
-  /\brequests\.get\s*\(/,
-  /\brequests\.post\s*\(/,
-  /\bhttp\.get\s*\(/,
-  /\bhttp\.request\s*\(/,
-  /\burllib\.request/,
-  /\bInvoke-WebRequest\b/,
-];
-
-/**
- * Strip heredoc + single-quoted + double-quoted content from a shell command
- * so the routing regex only sees command tokens, not user-provided strings.
- *
- * Mirrors hooks/core/routing.mjs:196–209. Inlined here because the Pi
- * extension is bundled as a standalone build artifact (.pi/extensions/...)
- * and cannot import hooks/core/* at runtime — they live in a sibling tree
- * and may not be present in every Pi installation.
- *
- * Exported for unit tests.
- */
-export function stripQuotedContent(cmd: string): string {
-  return cmd
-    .replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, "") // heredocs
-    .replace(/'[^']*'/g, "''") // single-quoted
-    .replace(/"[^"]*"/g, '""'); // double-quoted
-}
-
-/**
- * Returns true iff `segment` is a curl/wget invocation that is SAFE to allow
- * through the Pi routing block — i.e. it cannot flood the model's context
- * window because the response body is written to disk (or appended to a file)
- * and no verbose/trace flag is dumping headers to stderr.
- *
- * Mirrors hooks/core/routing.mjs:672–701. Segments that are NOT curl/wget
- * return `true` (nothing to evaluate). The caller is expected to split chained
- * commands on `&&`, `||`, `;` and call this per segment.
- *
- * Issue #625 — without this, the only escape hatch when the MCP bridge dies
- * is `gh` CLI or a full Pi restart. Neither is acceptable as baseline UX.
- *
- * Exported for unit tests.
- */
-export function isSafeCurlWget(segment: string): boolean {
-  const s = segment.trim();
-  const isCurl = /\bcurl\b/i.test(s);
-  const isWget = /\bwget\b/i.test(s);
-  if (!isCurl && !isWget) return true; // not curl/wget — nothing to evaluate
-
-  // Check for file output flags (-o file / --output file for curl,
-  // -O file / --output-document file for wget) OR shell redirection (> / >>).
-  const hasFileOutput = isCurl
-    ? /\s(-o|--output)\s/.test(s) || /\s>\s*/.test(s) || /\s>>\s*/.test(s)
-    : /\s(-O|--output-document)\s/.test(s) ||
-      /\s>\s*/.test(s) ||
-      /\s>>\s*/.test(s);
-  if (!hasFileOutput) return false; // no file output → body flows to stdout
-
-  // Stdout aliases: -o -, -o /dev/stdout, -O -, -O /dev/stdout.
-  if (isCurl && /\s(-o|--output)\s+(-|\/dev\/stdout)(\s|$)/.test(s))
-    return false;
-  if (isWget && /\s(-O|--output-document)\s+(-|\/dev\/stdout)(\s|$)/.test(s))
-    return false;
-
-  // Verbose/trace flags dump request+response headers to stderr → context.
-  if (/\s(-v|--verbose|--trace)\b/.test(s)) return false;
-
-  // Must be silent (curl: -s/--silent, wget: -q/--quiet) so the progress bar
-  // does not spill into stderr → context.
-  const isSilent = isCurl
-    ? /\s-[a-zA-Z]*s|--silent/.test(s)
-    : /\s-[a-zA-Z]*q|--quiet/.test(s);
-  return isSilent;
-}
+// Owned by src/adapters/bash-network.ts, shared with the OMP plugin so one
+// change fixes both. Language-level HTTP calls are routed unconditionally;
+// curl/wget are judged per shell segment by what they transfer, so a
+// transfer-free run (`curl --version`) passes and a silent download to a file
+// stays available as an MCP-down escape hatch (Issue #625).
 
 // ── Module-level DB singleton ────────────────────────────
 
@@ -478,7 +394,7 @@ export default function piExtension(pi: any): void {
   });
 
   // ── 2. tool_call — PreToolUse routing enforcement ──────
-  // Block bash commands that contain curl/wget/fetch/requests patterns.
+  // Route bash commands whose network payload would land in context.
 
   pi.on("tool_call", (event: any) => {
     try {
@@ -488,13 +404,8 @@ export default function piExtension(pi: any): void {
       const command = String(event?.input?.command ?? "");
       if (!command) return;
 
-      // Issue #625 — strip quoted content first so words like `curl` inside
-      // a `gh issue list --search "...curl..."` argument do not false-positive.
-      const stripped = stripQuotedContent(command);
-
-      // Language-level HTTP calls (fetch, requests, http, urllib,
-      // Invoke-WebRequest) always flood context — block unconditionally.
-      if (BLOCKED_HTTP_PATTERNS.some((p) => p.test(stripped))) {
+      const verdict = classifyBashNetwork(command);
+      if (verdict === "inline-http") {
         return {
           block: true,
           reason:
@@ -502,25 +413,15 @@ export default function piExtension(pi: any): void {
             "Raw fetch/requests/http output floods the context window.",
         };
       }
-
-      // curl / wget — split chained command on &&, ||, ; and evaluate each
-      // segment with isSafeCurlWget(). Allowed if EVERY curl/wget segment is
-      // silent + file-output + no verbose + no stdout alias. This preserves
-      // the "do not flood context" intent while leaving a recovery path open
-      // when the MCP bridge is unreachable.
-      if (/(^|\s|&&|\||\;)(curl|wget)\s/i.test(stripped)) {
-        const segments = stripped.split(/\s*(?:&&|\|\||;)\s*/);
-        const hasUnsafeSegment = segments.some((seg) => !isSafeCurlWget(seg));
-        if (hasUnsafeSegment) {
-          return {
-            block: true,
-            reason:
-              "Use context-mode MCP tools (execute, fetch_and_index) instead of inline HTTP clients. " +
-              "Raw curl/wget output floods the context window. " +
-              "For an MCP-down escape hatch, use silent + file output: " +
-              "`curl -s -o /tmp/x.json URL` or `wget -q -O /tmp/x.json URL`.",
-          };
-        }
+      if (verdict === "context-flood") {
+        return {
+          block: true,
+          reason:
+            "Use context-mode MCP tools (execute, fetch_and_index) instead of inline HTTP clients. " +
+            "Raw curl/wget output floods the context window. " +
+            "For an MCP-down escape hatch, use silent + file output: " +
+            "`curl -s -o /tmp/x.json URL` or `wget -q -O /tmp/x.json URL`.",
+        };
       }
     } catch {
       // Routing failure — allow passthrough

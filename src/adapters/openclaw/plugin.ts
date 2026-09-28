@@ -61,10 +61,10 @@ const SYSTEM_REMINDER_PREFIXES = [
 const SKILL_FRONTMATTER_REGEX = /^---\s*\n[\s\S]*?\n---\s*\n?/;
 const OPENCLAW_SKILL_PROMPT_CHAR_LIMIT = 6000;
 const SKILL_SECTION_HEADINGS = [
-  "MANDATORY RULE",
-  "Decision Tree",
-  "When to Use Each Tool",
-  "Critical Rules",
+  "What this skill does not own",
+  "Which tool",
+  "Writing sandbox code",
+  "Anti-patterns",
 ] as const;
 function isSystemReminderMessage(msg: string): boolean {
   const trimmed = msg.trimStart();

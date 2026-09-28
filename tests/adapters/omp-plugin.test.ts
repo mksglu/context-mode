@@ -165,6 +165,72 @@ describe("OMP plugin", () => {
       expect(result).toBeUndefined();
     });
 
+    // The gate is about the transfer, not the program name. A blanket
+    // `/\bcurl\s/` blocked `curl --version` and any command whose *arguments*
+    // merely spelled the word — including the `grep` a user runs to find this
+    // very code — while transferring nothing.
+    it.each([
+      ["version probe", "curl --version"],
+      ["help probe", "wget --help"],
+      ["word inside a quoted search argument", 'grep -rn "curl|wget" src'],
+      ["word inside a quoted message", 'echo "we tried to wget the bundle"'],
+      ["source mentioning an HTTP call", 'grep -rn "fetch(" src/app.ts'],
+      ["URL passed to a program that only prints it", "printf curl https://example.invalid"],
+      ["silent download to a file", "curl -s -o /tmp/data.json https://example.com/api"],
+      [
+        "silent download carrying a mandated user agent",
+        'curl -sS -A "OpenAI File Downloader, XaiImageApiFetch/1.0" -o /tmp/x.pdf https://example.com/x.pdf',
+      ],
+      ["transfer-free probe inside a nested shell", 'bash -c "curl --version"'],
+      ["curl -i is include-headers, not wget's input-file", "curl -si -o /tmp/out.json https://good.example"],
+      ["same, unbundled", "curl -s -i -o /tmp/out.json https://good.example"],
+    ])("allows bash that transfers nothing into context: %s", async (_label, command) => {
+      await registerOmpPlugin(api);
+      const result = await api._trigger("tool_call", { toolName: "bash", input: { command } });
+      expect(result).toBeUndefined();
+    });
+
+    // A permitted segment must never license the rest of the command line.
+    it.each([
+      ["chained after &&", "curl --version && curl https://example.com/api"],
+      ["chained after ;", "curl --version; wget https://example.com/file"],
+      [
+        "safe download chained with a flooding one",
+        "curl -s -o /tmp/a.json https://a.example && curl https://b.example",
+      ],
+      ["command substitution", "echo $(curl https://example.com/api)"],
+      ["piped into a second fetch", "curl --version | curl https://example.com/api"],
+      ["nested shell", 'bash -c "curl https://example.com/api"'],
+      [
+        "mandated user agent but body on stdout",
+        'curl -A "OpenAI File Downloader, XaiImageApiFetch/1.0" https://example.com/api',
+      ],
+      ["explicit stdout alias", "curl -s -o - https://example.com/api"],
+      ["verbose alongside file output", "curl -v -s -o /tmp/x.json https://example.com"],
+      ["quoted executable still executes", '"curl" https://example.com/api'],
+      ["body on stdout while stderr is discarded", "curl -s https://example.com/api 2>/dev/null"],
+      [
+        "second URL has no output slot",
+        "curl -s -o /private/var/tmp/a https://a.invalid https://b.invalid",
+      ],
+      ["single-label host is still a transfer", "curl intranet"],
+      ["output device that lands in context", "curl -s -o /dev/stderr https://example.com/api"],
+      ["wrapper option value is not the command word", "nice -n 10 curl https://leak.example"],
+      ["wrapper option value, long form", "sudo -u www-data curl https://leak.example"],
+      ["wrapper option value, unset form", "env -u FOO curl https://leak.example"],
+      [
+        "wrapper hiding an interpreter",
+        'sudo -u www-data python3 -c "requests.get(url)"',
+      ],
+    ])("blocks bash that would flood context: %s", async (_label, command) => {
+      await registerOmpPlugin(api);
+      const result = await api._trigger("tool_call", { toolName: "bash", input: { command } });
+      expect(result).toMatchObject({
+        block: true,
+        reason: expect.stringContaining("context-mode:"),
+      });
+    });
+
     it("tolerates malformed event payloads (no throw)", async () => {
       await registerOmpPlugin(api);
       // Missing input, missing toolName — must not throw, must passthrough

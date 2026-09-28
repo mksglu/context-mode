@@ -29,6 +29,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { classifyBashNetwork } from "../bash-network.js";
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
 import { extractEvents, buildAgentUsageEvent } from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
@@ -51,20 +52,10 @@ const OMP_TOOL_MAP: Record<string, string> = {
 };
 
 // ── Routing patterns ─────────────────────────────────────
-// Inline HTTP client patterns to hard-block in bash. Identical to the
-// Pi extension list (src/adapters/pi/extension.ts:42). One unrouted
-// curl can dump 56 KB into context.
-const BLOCKED_BASH_PATTERNS: RegExp[] = [
-  /\bcurl\s/,
-  /\bwget\s/,
-  /\bfetch\s*\(/,
-  /\brequests\.get\s*\(/,
-  /\brequests\.post\s*\(/,
-  /\bhttp\.get\s*\(/,
-  /\bhttp\.request\s*\(/,
-  /\burllib\.request/,
-  /\bInvoke-WebRequest\b/,
-];
+// Network routing is owned by src/adapters/bash-network.ts. This plugin used to
+// keep its own `/\bcurl\s/` list, which blocked `curl --version`, `which curl`,
+// and any command whose *arguments* merely spelled the word. The shared
+// classifier judges the transfer instead of the program name, per shell segment.
 
 // ── Module-level singletons ──────────────────────────────
 // Same shape as Pi: one DB per process, session ID rebound on each
@@ -291,13 +282,26 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
       const command = String((event?.input as { command?: unknown } | undefined)?.command ?? "");
       if (!command) return undefined;
 
-      const isBlocked = BLOCKED_BASH_PATTERNS.some((p) => p.test(command));
-      if (isBlocked) {
+      const verdict = classifyBashNetwork(command);
+      if (verdict === "inline-http") {
         return {
           block: true,
           reason:
-            "Use context-mode MCP tools (ctx_execute, ctx_fetch_and_index) instead of inline HTTP. " +
-            "curl/wget/fetch dump raw HTTP into the context window.",
+            "context-mode: inline HTTP dumps the raw response into context. Call " +
+            "ctx_execute(language, code) to fetch and derive the answer in the sandbox, " +
+            "printing only the result.",
+        };
+      }
+      if (verdict === "context-flood") {
+        return {
+          block: true,
+          reason:
+            "context-mode: this transfer would land in context. Read a known URL with the native " +
+            "read tool; call ctx_fetch_and_index(url, source) then ctx_search when you need to " +
+            "query it, or ctx_execute(language, code) to derive an answer from the body in the " +
+            "sandbox. To keep curl's own request headers (a mandated user agent, auth), write the " +
+            "body to a file instead: `curl -sS -A \"<agent>\" -o /tmp/x.json <url>`. " +
+            "Transfer-free runs such as `curl --version` are not blocked.",
         };
       }
     } catch {
