@@ -2216,7 +2216,7 @@ function renderNarrative5Section(args: {
     const convMult   = Math.max(1, Math.round(convTokensWithout / convTokensWith));
     out.push(`  Without context-mode  ${kb(convBytesWithout).padStart(8)}  ${withoutBar}   ${fmtNum(convTokensWithout).padStart(7)} tokens`);
     out.push(`  With context-mode     ${kb(convBytesWith).padStart(8)}  ${withBar}   ${fmtNum(convTokensWith).padStart(7)} tokens`);
-    out.push(`                          ${convPct.toFixed(1)}% kept out of context · your AI ran ${convMult}× longer before /compact fired`);
+    out.push(`                          ${convPct.toFixed(1)}% kept out of context · ${convMult}× more data diverted from context window`);
     out.push("");
   }
 
