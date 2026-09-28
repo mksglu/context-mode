@@ -1,18 +1,25 @@
 {
-  "name": "context-mode",
-  "description": "Context-mode hooks for context window protection",
-  "hooks": {
-    "preToolUse": [
-      {
-        "matcher": "execute_bash|fs_read|@context-mode/ctx_execute|@context-mode/ctx_execute_file|@context-mode/ctx_batch_execute|@(?!context-mode/)",
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "context-mode-pretooluse",
+      "description": "Context-mode context-window protection (pre tool use)",
+      "trigger": "PreToolUse",
+      "matcher": "execute_bash|fs_read|@context-mode/ctx_execute|@context-mode/ctx_execute_file|@context-mode/ctx_batch_execute|@(?!context-mode/)",
+      "action": {
+        "type": "command",
         "command": "context-mode hook kiro pretooluse"
       }
-    ],
-    "postToolUse": [
-      {
-        "matcher": "*",
+    },
+    {
+      "name": "context-mode-posttooluse",
+      "description": "Context-mode context-window protection (post tool use)",
+      "trigger": "PostToolUse",
+      "matcher": "*",
+      "action": {
+        "type": "command",
         "command": "context-mode hook kiro posttooluse"
       }
-    ]
-  }
+    }
+  ]
 }
