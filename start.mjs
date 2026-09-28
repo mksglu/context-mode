@@ -65,13 +65,11 @@ if (!process.env.CONTEXT_MODE_PROJECT_DIR && safeOriginalCwd) {
 // a Bun installation and re-exec this file under Bun so the bundle takes the
 // safe path. No-op when already running under Bun or on non-Linux platforms.
 if (typeof globalThis.Bun === "undefined" && process.platform === "linux") {
-  const bunCandidates = [
-    process.env.BUN_INSTALL ? join(process.env.BUN_INSTALL, "bin", "bun") : null,
-    join(homedir(), ".bun", "bin", "bun"),
-    "/usr/local/bin/bun",
-    "/usr/bin/bun",
-  ].filter(Boolean);
-  const bunBin = bunCandidates.find((p) => existsSync(p));
+  let bunBin = null;
+  try {
+    const { findBun } = await import("./hooks/find-bun.mjs");
+    bunBin = findBun();
+  } catch { /* best effort — fall through to Node */ }
   if (bunBin) {
     const child = spawn(bunBin, [fileURLToPath(import.meta.url)], {
       stdio: ["pipe", "inherit", "inherit"],

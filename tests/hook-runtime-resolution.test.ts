@@ -29,6 +29,48 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 // test-infra fragility while still exercising the same logic on Ubuntu+macOS.
 const itPosix = process.platform === "win32" ? test.skip : test;
 
+describe("findBun — resolves bun from install locations AND $PATH", () => {
+  // Pure resolver used by start.mjs's Linux re-exec (#564). Deps are injected,
+  // so no fs/env mocking is needed.
+  let findBun: (typeof import("../hooks/find-bun.mjs"))["findBun"];
+  beforeEach(async () => {
+    ({ findBun } = await import("../hooks/find-bun.mjs"));
+  });
+
+  const has = (...present: string[]) => (p: string) => present.includes(p);
+
+  test("finds bun on $PATH when no hardcoded install location has it", () => {
+    const bunOnPath = "/opt/bin/bun";
+    const result = findBun({
+      platform: "linux",
+      home: "/home/user",
+      env: { PATH: "/nowhere:/opt/bin" },
+      existsSync: has(bunOnPath),
+    });
+    expect(result).toBe(bunOnPath);
+  });
+
+  test("prefers a hardcoded install location over $PATH", () => {
+    const result = findBun({
+      platform: "linux",
+      home: "/home/user",
+      env: { PATH: "/opt/bin" },
+      existsSync: has("/home/user/.bun/bin/bun", "/opt/bin/bun"),
+    });
+    expect(result).toBe("/home/user/.bun/bin/bun");
+  });
+
+  test("returns null when bun is nowhere (install dirs nor $PATH)", () => {
+    const result = findBun({
+      platform: "linux",
+      home: "/home/user",
+      env: { PATH: "/usr/bin:/bin" },
+      existsSync: () => false,
+    });
+    expect(result).toBeNull();
+  });
+});
+
 describe("resolveHookRuntime — auto-detect bun ≥1.0, fall back to node (#738)", () => {
   beforeEach(() => {
     vi.resetModules();
