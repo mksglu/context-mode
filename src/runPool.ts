@@ -35,7 +35,10 @@ export interface RunPoolResult<T> {
   settled: PromiseSettledResult<T>[];
   /** Concurrency actually used after all caps applied. */
   effectiveConcurrency: number;
-  /** True when effectiveConcurrency < requested concurrency. */
+  /**
+   * True only when a CPU/explicit cap reduced concurrency below requested.
+   * A pool larger than its workload (jobs.length < requested) is NOT a cap.
+   */
   capped: boolean;
 }
 
@@ -52,7 +55,9 @@ export async function runPool<T>(
   const requested = Math.max(1, concurrency);
   const cpuCap = capByCpuCount ? Math.max(1, cpus().length) : requested;
   const effectiveConcurrency = Math.min(requested, cpuCap, jobs.length);
-  const capped = effectiveConcurrency < requested;
+  // `capped` reflects only a CPU/explicit cap, not the job-count clamp — a pool
+  // larger than its workload (jobs.length < requested) is not a real cap.
+  const capped = Math.min(requested, cpuCap) < requested;
 
   const settled: PromiseSettledResult<T>[] = new Array(jobs.length);
   let nextIdx = 0;
