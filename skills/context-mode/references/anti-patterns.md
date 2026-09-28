@@ -198,7 +198,7 @@ BAD — will timeout on API calls:
     const resp = await fetch('https://api.slow-service.com/data');
     console.log(await resp.json());
   language: javascript
-  timeout_ms: 5000  ← API may take 10+ seconds
+  timeoutMs: 5000  ← API may take 10+ seconds
 
 GOOD — generous timeout for network:
   Tool: execute
@@ -206,11 +206,11 @@ GOOD — generous timeout for network:
     const resp = await fetch('https://api.slow-service.com/data');
     console.log(JSON.stringify(await resp.json(), null, 2));
   language: javascript
-  timeout_ms: 30000  ← 30 seconds for network calls
+  timeoutMs: 30000  ← 30 seconds for network calls
 ```
 
-**Recommended timeouts:**
-| Operation | timeout_ms |
+**Recommended timeouts (`timeoutMs` is milliseconds):**
+| Operation | timeoutMs |
 |-----------|-----------|
 | File reading/parsing | 5000 - 10000 |
 | Local computation | 10000 |
@@ -219,7 +219,7 @@ GOOD — generous timeout for network:
 | npm install / build | 120000 |
 | Full test suite | 120000 - 300000 |
 
-**Rule:** Always consider what your script does and set `timeout_ms` accordingly. Network calls and builds need significantly more time than file operations.
+**Rule:** Always consider what your script does and set `timeoutMs` accordingly. Network calls and builds need significantly more time than file operations.
 
 ---
 

@@ -20,6 +20,7 @@ import {
   mkdirSync,
   rmSync,
   readFileSync,
+  realpathSync,
   existsSync,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
@@ -6715,4 +6716,165 @@ describe("ctx_* MCP tool annotations (#846)", () => {
       expect(find(name)!.config.annotations!.readOnlyHint).toBe(false);
     }
   });
+});
+
+// ─── Issue #1081: the execution deadline field states its unit ──────────────
+// "Server & tools" domain → this file owns tool registration per CONTRIBUTING.md.
+// `ctx_execute`, `ctx_execute_file`, and `ctx_batch_execute` used to expose a
+// numeric `timeout` whose unit (milliseconds) appeared nowhere in the public
+// schema, so `timeout: 120` for a two-minute job bought a 120ms deadline. The
+// field is now `timeoutMs` with no alias. These cases drive the real server
+// over stdio (start.mjs loads server.bundle.mjs, so the shipped bundle is what
+// answers) because the deadline is a timer in a spawned process killing a
+// grandchild sandbox: nothing in this file's event loop owns that clock, so
+// fake timers cannot substitute. A 4-second script against a 120ms deadline is
+// a gap only a seconds-vs-milliseconds misreading can close.
+describe("issue #1081 — execution deadline field states its unit", () => {
+  const EXEC_TOOLS = ["ctx_execute", "ctx_execute_file", "ctx_batch_execute"] as const;
+
+  interface TimeoutRpcResponse {
+    id?: number;
+    error?: { message: string };
+    result?: {
+      isError?: boolean;
+      content?: Array<{ text?: string }>;
+      tools?: Array<{
+        name: string;
+        inputSchema?: { properties?: Record<string, { description?: string }> };
+      }>;
+    };
+  }
+  type ToolArguments = Record<string, unknown>;
+  type ListedTools = NonNullable<NonNullable<TimeoutRpcResponse["result"]>["tools"]>;
+
+  let projectDir: string;
+  let fixtureFile: string;
+  let proc: ChildProcess;
+  let tools: ListedTools = [];
+
+  function rpc(
+    id: number,
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<TimeoutRpcResponse | undefined> {
+    return new Promise((settle) => {
+      let buffer = "";
+      const done = (value: TimeoutRpcResponse | undefined) => {
+        proc.stdout!.off("data", onData);
+        clearTimeout(timer);
+        settle(value);
+      };
+      const onData = (chunk: Buffer) => {
+        buffer += chunk.toString();
+        let idx: number;
+        while ((idx = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, idx).trim();
+          buffer = buffer.slice(idx + 1);
+          if (!line) continue;
+          try {
+            const parsed = JSON.parse(line) as TimeoutRpcResponse;
+            if (parsed.id === id) return done(parsed);
+          } catch { /* interleaved log line */ }
+        }
+      };
+      const timer = setTimeout(() => done(undefined), 25_000);
+      proc.stdout!.on("data", onData);
+      proc.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+    });
+  }
+
+  const callTool = (id: number, name: string, args: ToolArguments) =>
+    rpc(id, "tools/call", { name, arguments: args });
+  const textOf = (r: TimeoutRpcResponse | undefined) => r?.result?.content?.[0]?.text ?? "";
+
+  /**
+   * A marker split across a concatenation so the joined form appears only in
+   * the child's stdout, never in the source echo the response prepends. Lets
+   * an assertion tell "the script produced output" from "the response quoted
+   * the script".
+   */
+  const splitMarker = (name: string) => ({
+    code: "'" + name + "' + '_1081'",
+    joined: name + "_1081",
+  });
+
+  beforeAll(async () => {
+    // realpath: macOS hands out /var/... symlinks for tmpdir and the #852
+    // project-boundary check compares resolved paths.
+    projectDir = realpathSync(mkdtempSync(join(tmpdir(), "timeout-ms-1081-")));
+    fixtureFile = join(projectDir, "sample-1081.txt");
+    writeFileSync(fixtureFile, "alpha\nbeta\ngamma\n");
+    proc = spawn("node", [mcpEntry], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
+        CLAUDE_PROJECT_DIR: projectDir,
+      },
+    });
+    await rpc(1, "initialize", {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "timeout-ms-1081-test", version: "1.0" },
+    });
+    proc.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+    tools = (await rpc(2, "tools/list", {}))?.result?.tools ?? [];
+  }, 60_000);
+
+  afterAll(() => {
+    try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  test("tools/list exposes timeoutMs with its unit, and no timeout alias", () => {
+    expect(tools.length).toBeGreaterThan(0);
+    for (const name of EXEC_TOOLS) {
+      const tool = tools.find((t) => t.name === name);
+      expect(tool, `${name} missing from tools/list`).toBeDefined();
+      const props = tool!.inputSchema?.properties ?? {};
+      expect(Object.keys(props), `${name} must advertise timeoutMs`).toContain("timeoutMs");
+      expect(Object.keys(props), `${name} must not advertise a timeout alias`).not.toContain("timeout");
+      expect(
+        props.timeoutMs?.description ?? "",
+        `${name}.timeoutMs description must name the unit`,
+      ).toMatch(/millisecond/i);
+    }
+  });
+
+  test("timeoutMs 120 is 120 milliseconds, not 120 seconds", async () => {
+    const marker = splitMarker("EXEC_SLOW");
+    const started = Date.now();
+    const resp = await callTool(10, "ctx_execute", {
+      language: "javascript",
+      code: `setTimeout(() => console.log(${marker.code}), 4000);`,
+      timeoutMs: 120,
+    });
+    const elapsed = Date.now() - started;
+    expect(resp?.error).toBeUndefined();
+    expect(resp?.result?.isError).toBe(true);
+    expect(textOf(resp)).toContain("Execution timed out after 120ms");
+    // 120 seconds would have let the 4s script print and exit cleanly.
+    expect(textOf(resp)).not.toContain(marker.joined);
+    expect(elapsed).toBeLessThan(4000);
+  }, 30_000);
+
+  test("the legacy timeout key is rejected on all three tools, never aliased", async () => {
+    const marker = splitMarker("EXEC_LEGACY");
+    const cases: Array<[string, ToolArguments]> = [
+      ["ctx_execute", { language: "javascript", code: `console.log(${marker.code});`, timeout: 120 }],
+      ["ctx_execute_file", { path: fixtureFile, language: "javascript", code: `console.log(${marker.code});`, timeout: 120 }],
+      ["ctx_batch_execute", { commands: [{ label: "echo", command: `node -e "console.log(${marker.code})"` }], queries: ["one"], timeout: 120 }],
+    ];
+    let id = 20;
+    for (const [name, args] of cases) {
+      const resp = await callTool(id++, name, args);
+      const text = textOf(resp);
+      expect(resp?.result?.isError, `${name} must reject the legacy key`).toBe(true);
+      expect(text).toContain("`timeout` was renamed to `timeoutMs`");
+      expect(text).toContain("timeoutMs: 120000 is two minutes");
+      // Rejected before execution: the code never ran, so there is no alias
+      // and no silent unbounded fallback for a caller who meant two minutes.
+      expect(text).not.toContain(marker.joined);
+    }
+  }, 45_000);
 });

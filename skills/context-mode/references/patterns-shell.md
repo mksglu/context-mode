@@ -36,7 +36,7 @@ wc -l < /tmp/build-output.txt | xargs -I{} echo "{} total lines of output"
 rm -f /tmp/build-output.txt
 ```
 > summary_prompt: "Report build success/failure, list all errors with file paths, and count warnings"
-> timeout_ms: 120000
+> timeoutMs: 120000
 
 ### TypeScript compilation check
 
@@ -67,7 +67,7 @@ fi
 rm -f /tmp/tsc-output.txt
 ```
 > summary_prompt: "Report type error count, most common error codes, and most affected files"
-> timeout_ms: 60000
+> timeoutMs: 60000
 
 ---
 
@@ -97,7 +97,7 @@ grep -i 'slow' /tmp/test-output.txt | head -10
 rm -f /tmp/test-output.txt
 ```
 > summary_prompt: "Report pass/fail ratio, list all failing test names with suite, note any slow tests"
-> timeout_ms: 120000
+> timeoutMs: 120000
 
 ### Pytest summary
 
@@ -119,7 +119,7 @@ grep -E '(FAILED|ERROR)' /tmp/pytest-output.txt | head -30
 rm -f /tmp/pytest-output.txt
 ```
 > summary_prompt: "Report test results, list all failures with file and test name"
-> timeout_ms: 120000
+> timeoutMs: 120000
 
 ---
 

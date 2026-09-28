@@ -1420,7 +1420,7 @@ export interface BatchRunResult {
 
 export interface BatchRunOptions {
   /**
-   * Total budget (concurrency=1, shared) or per-command (concurrency>1).
+   * Milliseconds. Total budget (concurrency=1, shared) or per-command (concurrency>1).
    * When `undefined`, no server-side timer fires — the MCP host's RPC
    * timeout governs (Issue #406).
    */
@@ -1478,17 +1478,47 @@ function truncateCommandForEcho(command: string): string {
  * blocking script hangs forever — the host never kills it and the user must
  * interrupt. Every other host enforces its own RPC timeout, so we keep the
  * no-server-timer behavior there (Issue #406 — long builds need an unbounded
- * run). A caller can still pass an explicit `timeout` to override on any host.
+ * run). A caller can still pass an explicit `timeoutMs` to override on any host.
  */
 export const AGY_DEFAULT_EXEC_TIMEOUT_MS = 120_000;
-export function resolveExecTimeout(timeout: number | undefined): number | undefined {
-  if (timeout !== undefined) return timeout;
+export function resolveExecTimeout(timeoutMs: number | undefined): number | undefined {
+  if (timeoutMs !== undefined) return timeoutMs;
   // Only agy gets a default — every other host enforces its own RPC timeout, so
   // keep the unbounded behavior there. Detected via the env the agy bundle pins
   // (CONTEXT_MODE_PLATFORM=antigravity-cli). Tunable via CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS.
   if (detectPlatform().platform !== "antigravity-cli") return undefined;
   const override = Number(process.env.CONTEXT_MODE_AGY_EXEC_TIMEOUT_MS);
   return Number.isFinite(override) && override > 0 ? override : AGY_DEFAULT_EXEC_TIMEOUT_MS;
+}
+
+interface LegacyTimeoutArguments {
+  readonly timeoutMs?: number;
+  readonly timeout?: unknown;
+}
+
+/**
+ * Issue #1081 — `timeout` was renamed to `timeoutMs`. Zod strips unknown keys,
+ * so a caller still sending `timeout` would get no deadline at all: a caller
+ * that meant two minutes gets an unbounded run instead. The three sandbox tools
+ * declare `.passthrough()` so the legacy key survives parsing and reaches this
+ * guard, which fails the call. The value is never read as a deadline, so
+ * `timeout` is not an alias.
+ */
+export function checkLegacyTimeoutArg(
+  args: LegacyTimeoutArguments,
+  toolName: string,
+): ToolResult | null {
+  if (!Object.hasOwn(args, "timeout")) return null;
+  return trackResponse(toolName, {
+    content: [{
+      type: "text" as const,
+      text:
+        `Input validation error: Invalid arguments for tool ${toolName}: ` +
+        "`timeout` was renamed to `timeoutMs` and is no longer accepted. " +
+        "Resend with `timeoutMs` in milliseconds — timeoutMs: 120000 is two minutes.",
+    }],
+    isError: true,
+  });
 }
 
 /**
@@ -1701,10 +1731,10 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         .describe(
           "Source code to execute. Use console.log (JS/TS), print (Python/Ruby/Perl/R), echo (Shell), echo (PHP), fmt.Println (Go), IO.puts (Elixir), or Console.WriteLine (C#) to output a summary to context.",
         ),
-      timeout: z
+      timeoutMs: z
         .coerce.number()
         .optional()
-        .describe("Max execution time in ms. When omitted, no server-side timer fires — the MCP host's RPC timeout governs (which is the right layer for this policy). Pass an explicit value for long-running builds (Gradle/Maven/SBT)."),
+        .describe("Max execution time in MILLISECONDS — timeoutMs: 120000 is two minutes, timeoutMs: 120 is 0.12 seconds. When omitted, no server-side timer fires — the MCP host's RPC timeout governs (which is the right layer for this policy). Pass an explicit value for long-running builds (Gradle/Maven/SBT)."),
       // background: wrapped in coerceBoolean preprocessor so the literal
       // strings "true"/"false" arriving from OpenCode's native plugin
       // bridge (and several LLM providers' tool-call JSON) parse as the
@@ -1714,7 +1744,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         .preprocess(coerceBoolean, z.boolean())
         .optional()
         .default(false)
-        .describe("Keep process running after timeout (for servers/daemons). Returns partial output without killing the process. IMPORTANT: Do NOT add setTimeout/self-close timers in background scripts — the process must stay alive until the timeout detaches it. For server+fetch patterns, prefer putting both server and fetch in ONE ctx_execute call instead of using background."),
+        .describe("Keep process running once the timeoutMs deadline passes (for servers/daemons). Returns partial output without killing the process. IMPORTANT: Do NOT add setTimeout/self-close timers in background scripts — the process must stay alive until timeoutMs detaches it. For server+fetch patterns, prefer putting both server and fetch in ONE ctx_execute call instead of using background."),
       cwd: z
         .string()
         .optional()
@@ -1728,9 +1758,17 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
           "Use ctx_search(queries: [...]) to retrieve specific sections. Example: 'failing tests', 'HTTP 500 errors'." +
           "\n\nTIP: Use specific technical terms, not just concepts. Check 'Searchable terms' in the response for available vocabulary.",
         ),
-    }),
+    // .passthrough(): #1081 keeps the legacy `timeout` key visible to the
+    // handler so it can be rejected instead of silently stripped. The emitted
+    // tools/list schema is unchanged — installStrictClientSchemaCompat() drops
+    // `additionalProperties` before it reaches the wire.
+    }).passthrough(),
   },
-  async ({ language, code, timeout, background, cwd, intent }) => {
+  async (args) => {
+    const legacyTimeout = checkLegacyTimeoutArg(args, "ctx_execute");
+    if (legacyTimeout) return legacyTimeout;
+    const { language, code, timeoutMs, background, cwd, intent } = args;
+
     // Security: deny-only firewall
     if (language === "shell") {
       const denied = checkDenyPolicy(code, "execute");
@@ -1808,7 +1846,7 @@ ${code}
 __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nsetInterval(()=>{},2147483647);' : ''}
 })(typeof require!=='undefined'?require:null);`;
       }
-      const effTimeout = resolveExecTimeout(timeout);
+      const effTimeout = resolveExecTimeout(timeoutMs);
       const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd });
 
       // Echo the executed source code before stdout so users can audit
@@ -2088,10 +2126,10 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         .describe(
           "Code to process FILE_CONTENT (file_content in Elixir). Print summary via console.log/print/echo/IO.puts/Console.WriteLine.",
         ),
-      timeout: z
+      timeoutMs: z
         .coerce.number()
         .optional()
-        .describe("Max execution time in ms. When omitted, no server-side timer fires — the MCP host's RPC timeout governs."),
+        .describe("Max execution time in MILLISECONDS — timeoutMs: 120000 is two minutes, timeoutMs: 120 is 0.12 seconds. When omitted, no server-side timer fires — the MCP host's RPC timeout governs."),
       intent: z
         .string()
         .optional()
@@ -2099,9 +2137,13 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
           "What you're looking for in the output. When provided and output is large (>5KB), " +
           "returns only matching sections via BM25 search instead of truncated output.",
         ),
-    }),
+    }).passthrough(), // #1081 — see ctx_execute
   },
-  async ({ path, language, code, timeout, intent }) => {
+  async (args) => {
+    const legacyTimeout = checkLegacyTimeoutArg(args, "ctx_execute_file");
+    if (legacyTimeout) return legacyTimeout;
+    const { path, language, code, timeoutMs, intent } = args;
+
     // Security (#852): confine the processed file to the project root so
     // ctx_execute_file cannot be used to escape the host's sandbox/permission
     // controls. Runs before the deny-glob check — boundary first, then policy.
@@ -2122,7 +2164,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
     }
 
     try {
-      const effTimeout = resolveExecTimeout(timeout);
+      const effTimeout = resolveExecTimeout(timeoutMs);
       const result = await executor.executeFile({
         path,
         language,
@@ -4211,10 +4253,10 @@ EXAMPLE: ctx_batch_execute(
           "Each returns top 5 matching sections with full content. " +
           "This is your ONLY chance — put ALL your questions here. No follow-up calls needed.",
         )),
-      timeout: z
+      timeoutMs: z
         .coerce.number()
         .optional()
-        .describe("Max execution time in ms. When omitted, no server-side timer fires — the MCP host's RPC timeout governs. With concurrency=1, the value (when set) is a shared budget across commands; with concurrency>1, it is applied per-command."),
+        .describe("Max execution time in MILLISECONDS — timeoutMs: 120000 is two minutes, timeoutMs: 120 is 0.12 seconds. When omitted, no server-side timer fires — the MCP host's RPC timeout governs. With concurrency=1, the value (when set) is a shared budget across commands; with concurrency>1, it is applied per-command."),
       concurrency: z
         .coerce.number()
         .int()
@@ -4245,9 +4287,13 @@ EXAMPLE: ctx_batch_execute(
           "— useful when you want the batch commands to enrich context and " +
           "the queries to also surface related prior knowledge in one round trip.",
         ),
-    }),
+    }).passthrough(), // #1081 — see ctx_execute
   },
-  async ({ commands, queries, timeout, concurrency, cwd, query_scope }) => {
+  async (args) => {
+    const legacyTimeout = checkLegacyTimeoutArg(args, "ctx_batch_execute");
+    if (legacyTimeout) return legacyTimeout;
+    const { commands, queries, timeoutMs, concurrency, cwd, query_scope } = args;
+
     // Security: check each command against deny patterns
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
@@ -4262,7 +4308,7 @@ EXAMPLE: ctx_batch_execute(
 
       // Full stdout is preserved per-command and indexed into FTS5 (Issue #61, #197).
       // Concurrency>1 switches to a worker pool with per-command timeouts.
-      const effTimeout = resolveExecTimeout(timeout);
+      const effTimeout = resolveExecTimeout(timeoutMs);
       const { outputs: perCommandOutputs, timedOut } = await runBatchCommands(
         commands,
         {
