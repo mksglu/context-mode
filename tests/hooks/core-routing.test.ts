@@ -137,6 +137,42 @@ describe("routePreToolUse", () => {
       );
     });
 
+    // ─── quote scanning: an apostrophe must not desynchronise the stripper ────────────
+    // stripQuotedContent ran two independent global replaces -- every '...' pair first,
+    // then every "..." pair. That is only correct when the two kinds never interleave.
+    // An apostrophe inside a double-quoted string pairs with the next unrelated ' in a
+    // later argument, and collapsing that span eats both the closing " of the message and
+    // the opening " of the following string. The message's own opening " is then left
+    // unpaired, so its body survives into the gate as if it were bare shell -- and when
+    // the prose happens to mention curl or wget, the command is redirected and never runs.
+    //
+    // Same class as #63, which those two replaces were added to fix; they just do not
+    // survive interleaving. Prose apostrophes ("don't", "it's", "the linter's") make
+    // commit and tag messages hit this routinely.
+
+    it("does not treat a tag message containing an apostrophe and curl as a curl call", () => {
+      // Fails against the two-replace implementation: it leaves
+      //   ... -m "the client -- curl for the header, the linter''v1''%H'
+      // with curl space-preceded and outside any quote.
+      const result = routePreToolUse("Bash", {
+        command:
+          `git tag -a v1 -m "the client -- curl for the header, the linter's fixtures" ` +
+          `&& echo "x $(git tag -l 'v1')" && git show --format='%H'`,
+      });
+      expect(JSON.stringify(result ?? {})).not.toContain("curl/wget redirected");
+    });
+
+    it("still redirects a genuine curl that follows an unterminated apostrophe", () => {
+      // Guards the new scanner rather than the old bug: an apostrophe that never closes
+      // is prose, not a string, so it must not swallow the rest of the line -- otherwise
+      // a real invocation after it would go unseen.
+      const result = routePreToolUse("Bash", {
+        command: "echo it's fine && curl -sS https://example.com",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
     // ─── curl/wget file-output allow-list (#166) ────────────
 
     it("allows curl -sLo file (silent + file output)", () => {
