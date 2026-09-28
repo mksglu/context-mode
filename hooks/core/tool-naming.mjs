@@ -9,7 +9,7 @@
  * | Gemini CLI         | mcp__context-mode__<tool>                                  |
  * | Antigravity        | mcp__context-mode__<tool>                                  |
  * | Antigravity CLI    | context-mode/<tool>                                        |
- * | OpenCode           | context-mode_<tool>                                        |
+ * | OpenCode / KiloCode | native ctx_* (plugin tools)                                |
  * | VS Code Copilot    | context-mode_<tool>                                        |
  * | Kiro               | @context-mode/<tool>                                       |
  * | Zed                | mcp:context-mode:<tool>                                    |
@@ -21,8 +21,8 @@ const TOOL_PREFIXES = {
   "gemini-cli":     (tool) => `mcp__context-mode__${tool}`,
   "antigravity":    (tool) => `mcp__context-mode__${tool}`,
   "antigravity-cli": (tool) => `context-mode/${tool}`,
-  "opencode":       (tool) => `context-mode_${tool}`,
-  "kilo":           (tool) => `context-mode_${tool}`,
+  "opencode":       (tool) => tool,
+  "kilo":           (tool) => tool,
   "vscode-copilot": (tool) => `context-mode_${tool}`,
   "jetbrains-copilot": (tool) => `context-mode_${tool}`,
   "copilot-cli":    (tool) => `context-mode_${tool}`,
