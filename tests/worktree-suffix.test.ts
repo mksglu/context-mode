@@ -117,4 +117,33 @@ describe("getWorktreeSuffix", () => {
     expect(first).toMatch(/^__[a-f0-9]{8}$/);
     expect(second).toBe(first);
   });
+
+  it("hides git subprocess console windows on Windows", async () => {
+    const originalPlatform = process.platform;
+    const execFileSyncMock = vi.fn((_cmd: string, args: string[], _opts?: unknown) => {
+      if (args.includes("rev-parse")) return "C:\\repo\\linked\r\n";
+      if (args.includes("worktree")) {
+        return "worktree C:\\repo\r\n\r\nworktree C:\\repo\\linked\r\n";
+      }
+      throw new Error(`unmocked git args: ${args.join(" ")}`);
+    });
+
+    vi.resetModules();
+    vi.doMock("node:child_process", () => ({ execFileSync: execFileSyncMock }));
+
+    try {
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      const { getWorktreeSuffix: getWorktreeSuffixForWindows } = await import("../src/session/db.js");
+
+      expect(getWorktreeSuffixForWindows("C:\\repo\\linked")).toMatch(/^__[a-f0-9]{8}$/);
+      expect(execFileSyncMock).toHaveBeenCalledTimes(2);
+      for (const call of execFileSyncMock.mock.calls) {
+        expect(call[2]).toEqual(expect.objectContaining({ windowsHide: true }));
+      }
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
+      vi.doUnmock("node:child_process");
+      vi.resetModules();
+    }
+  });
 });
