@@ -111,6 +111,8 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@opencode/plugin": "^2.0.12",
+    "@opencode/schema": "^2.0.12",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.11",
     "@types/turndown": "^5.0.5",
