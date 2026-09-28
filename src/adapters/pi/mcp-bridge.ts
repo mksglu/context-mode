@@ -332,6 +332,25 @@ function createContextModeCallRenderer(toolName: string) {
   };
 }
 
+/**
+ * Strip the echo preamble that ctx_execute / ctx_batch_execute prepend
+ * to every response (buildExecuteEcho / formatCommandOutput in
+ * server.ts).  In Pi's collapsed renderResult the first non-empty line
+ * is used as the status summary — without stripping, that line is the
+ * opening of a markdown code fence (e.g. ```shell) and the user sees
+ * a blank-looking tool result.  The full echo still reaches the LLM
+ * via execute(); this only affects the Pi TUI collapsed view.
+ */
+function stripEchoPreamble(output: string): string {
+  // ctx_execute: ```<lang>\n<code>\n```\n\n<output>
+  const fence = output.match(/^```[a-z]+\n[\s\S]*?\n```\n*/);
+  if (fence) return output.slice(fence[0].length);
+  // ctx_batch_execute: # <label>\n\n$ <cmd>\n\n<output>
+  const cmd = output.match(/^# .+\n\n\$ .+\n\n/);
+  if (cmd) return output.slice(cmd[0].length);
+  return output;
+}
+
 function createContextModeResultRenderer(toolName: string) {
   return (
     result: MCPCallResult,
@@ -355,7 +374,8 @@ function createContextModeResultRenderer(toolName: string) {
       text.setText(theme.fg("toolOutput", output));
       return text;
     }
-    const firstLine = output
+    const stripped = stripEchoPreamble(output);
+    const firstLine = stripped
       .split(/\r?\n/)
       .find((line) => line.trim().length > 0)
       ?.trim();
