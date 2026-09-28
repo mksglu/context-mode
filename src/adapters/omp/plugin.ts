@@ -2,13 +2,15 @@
  * Oh My Pi (OMP) plugin entry point for context-mode.
  *
  * Mirrors the Pi extension shape (`src/adapters/pi/extension.ts`) for
- * the four OMP hook events that materially protect the context window
+ * the OMP hook events that materially protect the context window
  * and persist session continuity:
  *
- *   - session_start         — initialize the session row in our DB
- *   - tool_call             — hard-block curl/wget/inline-HTTP in bash
- *   - tool_result           — extract structured events into the session DB
+ *   - session_start          — initialize the session row in our DB
+ *   - tool_call              — hard-block curl/wget/inline-HTTP in bash
+ *   - tool_result            — extract structured events into the session DB
  *   - session_before_compact — persist a resume snapshot before compaction
+ *   - before_agent_start     — queue unconsumed resume snapshot for context
+ *   - context                — append queued snapshot as a user message
  *
  * Loaded by OMP via the `omp` (or `pi`) field in package.json — see
  * upstream loader at refs/platforms/oh-my-pi/packages/coding-agent/src/
@@ -73,6 +75,7 @@ const BLOCKED_BASH_PATTERNS: RegExp[] = [
 let _db: SessionDB | null = null;
 let _dbPath = "";
 let _sessionId = "";
+let _pendingContext = "";
 
 const _ompAdapter = new OMPAdapter();
 
@@ -192,6 +195,7 @@ export function _resetOmpPluginStateForTests(): void {
   _db = null;
   _dbPath = "";
   _sessionId = "";
+  _pendingContext = "";
 }
 
 /**
@@ -240,6 +244,8 @@ export interface MinimalHookAPI {
   // (refs/.../extensibility/shared-events.ts:204-208). agent_end carries
   // `messages: AssistantMessage[]` (:191-194) — both flow through parseOmpUsage.
   on(event: "turn_end", handler: HookHandler<TurnEndEvent>): void;
+  on(event: "before_agent_start", handler: HookHandler<{ type: "before_agent_start"; prompt?: string }>): void;
+  on(event: "context", handler: HookHandler<{ messages?: Array<{ role: string; content: string }> }, { messages: Array<{ role: string; content: string }> }>): void;
   on(event: string, handler: (...args: unknown[]) => unknown): void;
 }
 
@@ -248,7 +254,7 @@ export interface MinimalHookAPI {
 /**
  * OMP plugin default export. Called once by the OMP runtime per
  * upstream `extensibility/plugins/loader.ts` after `omp plugin install
- * context-mode`. Subsequent `pi.on(...)` registrations route the four
+ * context-mode`. Subsequent `pi.on(...)` registrations route the
  * lifecycle events to our SessionDB-backed handlers below.
  */
 export default function ompPlugin(pi: MinimalHookAPI): void {
@@ -277,6 +283,37 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
       }
     }
     return undefined;
+  });
+
+  // ── 1b. before_agent_start — queue unconsumed resume snapshot ──
+  // Compact does not re-fire session_start. Pi queues on this hook
+  // (every user prompt) and lets `context` append as role:user so
+  // the systemPrompt prefix cache stays valid. Once.
+  pi.on("before_agent_start", () => {
+    try {
+      if (!_sessionId) return undefined;
+      const resume = db.getResume(_sessionId);
+      if (resume && !resume.consumed && resume.snapshot) {
+        _pendingContext = _pendingContext ? `${_pendingContext}\n\n${resume.snapshot}` : resume.snapshot;
+        db.markResumeConsumed(_sessionId);
+      }
+    } catch {
+      // best effort — never break the turn
+    }
+    return undefined;
+  });
+
+  pi.on("context", (event) => {
+    try {
+      if (!_pendingContext) return undefined;
+      const ctx = _pendingContext;
+      _pendingContext = "";
+      const messages = Array.isArray(event?.messages) ? event.messages : [];
+      messages.push({ role: "user", content: ctx });
+      return { messages };
+    } catch {
+      return undefined;
+    }
   });
 
   // ── 2. tool_call — pre-tool-call hard-block ───────────

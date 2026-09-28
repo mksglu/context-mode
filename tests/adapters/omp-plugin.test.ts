@@ -1,6 +1,6 @@
 import "../setup-home";
 /**
- * OMP plugin tests — TDD slices around the four hooks the plugin owns.
+ * OMP plugin tests — TDD slices around the hooks the plugin owns.
  *
  * The OMP plugin (src/adapters/omp/plugin.ts) is a default-exported
  * factory `(pi: HookAPI) => void`. Hook contract verified against
@@ -12,6 +12,7 @@ import "../setup-home";
  *   2. tool_result — post-tool-call event extraction into SessionDB
  *   3. session_start — session row created, cleanup runs
  *   4. session_before_compact — resume snapshot persisted
+ *   5. before_agent_start — unconsumed resume snapshot injected via context
  *
  * We mock the OMP HookAPI shape: `on(event, handler)` collects
  * handlers, `_trigger(event, ...args)` invokes them and returns the
@@ -318,6 +319,80 @@ describe("OMP plugin", () => {
       void mod;
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // Slice 5: before_agent_start injects unconsumed resume snapshot
+  // ═══════════════════════════════════════════════════════════
+
+  describe("Slice 5: before_agent_start resume restore", () => {
+    async function compactWithEvent() {
+      await api._trigger("session_start", { type: "session_start" }, {
+        sessionManager: { getSessionFile: () => "/path/to/session-restore.json" },
+      });
+      await api._trigger("tool_result", {
+        toolName: "read",
+        input: { file_path: "/tmp/x.ts" },
+        content: [{ type: "text", text: "x" }],
+      });
+      await api._trigger("session_before_compact", { type: "session_before_compact" }, {});
+    }
+
+    it("registers a before_agent_start handler", async () => {
+      await registerOmpPlugin(api);
+      expect(api._handlers.before_agent_start).toBeDefined();
+    });
+
+    it("injects the unconsumed resume snapshot through context after compact", async () => {
+      await registerOmpPlugin(api);
+      await compactWithEvent();
+
+      await api._trigger("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {});
+      const result = await api._trigger("context", { messages: [] }) as
+        | { messages: Array<{ role: string; content: string }> }
+        | undefined;
+
+      expect(result?.messages?.length).toBe(1);
+      expect(result?.messages?.[0]?.role).toBe("user");
+      expect(result?.messages?.[0]?.content.length).toBeGreaterThan(0);
+
+      const pluginMod = await import("../../src/adapters/omp/plugin.js");
+      const sid = pluginMod._getOmpPluginSessionIdForTests();
+      const { OMPAdapter } = await import("../../src/adapters/omp/index.js");
+      const adapter = new OMPAdapter();
+      const { resolveSessionDbPath } = await import("../../src/session/db.js");
+      const db = new SessionDB({
+        dbPath: resolveSessionDbPath({
+          projectDir: tempDir,
+          sessionsDir: adapter.getSessionDir(),
+        }),
+      });
+      expect(db.getResume(sid)?.consumed).toBeTruthy();
+    });
+
+    it("does not re-inject after the snapshot is consumed", async () => {
+      await registerOmpPlugin(api);
+      await compactWithEvent();
+
+      await api._trigger("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {});
+      await api._trigger("context", { messages: [] });
+
+      await api._trigger("before_agent_start", { type: "before_agent_start", prompt: "again" }, {});
+      const second = await api._trigger("context", { messages: [] });
+      expect(second).toBeUndefined();
+    });
+
+    it("does not inject on session_start — that event is boot-only", async () => {
+      await registerOmpPlugin(api);
+      await compactWithEvent();
+
+      await api._trigger("session_start", { type: "session_start" }, {
+        sessionManager: { getSessionFile: () => "/path/to/session-restore.json" },
+      });
+      const result = await api._trigger("context", { messages: [] });
+      expect(result).toBeUndefined();
+    });
+  });
+
 
   // ═══════════════════════════════════════════════════════════
   // Issue #645 — OMP plugin SessionDB path must match the MCP
