@@ -20,7 +20,7 @@
  */
 
 import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -70,15 +70,33 @@ export async function ensureDeps() {
   for (const pkg of NATIVE_DEPS) {
     const pkgDir = resolve(root, "node_modules", pkg);
     if (!existsSync(pkgDir)) {
-      // Package not installed at all
+      // Package not installed at all.
+      // #861 follow-up: mirror start.mjs (#861/e918eac). The previous
+      // `execSync("npm.cmd install …", { shell: true })` DROPS the `cwd` option
+      // on Windows — npm then resolves node_modules from the MCP server's
+      // inherited cwd (C:\Windows under Claude Code) → `mkdir
+      // C:\Windows\node_modules` → EPERM on every boot (the reporter listed
+      // better-sqlite3 among the EPERMs; e918eac fixed the turndown deps in
+      // start.mjs but not this native-dep install). Run npm's own CLI through
+      // node directly (`shell: false` honors `cwd`), falling back to the
+      // `npm.cmd` shim only when npm-cli.js isn't beside node so no host
+      // regresses; `windowsHide` suppresses the cmd.exe flash.
+      const npmCliJs = resolve(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+      const installArgs = ["install", pkg, "--no-package-lock", "--no-save", "--silent"];
       try {
-        execSync(`${process.platform === "win32" ? "npm.cmd" : "npm"} install ${pkg} --no-package-lock --no-save --silent`, {
-          cwd: root,
-          stdio: "pipe",
-          timeout: 120000,
-          shell: true,
-        });
-      } catch { /* best effort — hook degrades gracefully without DB */ }
+        if (existsSync(npmCliJs)) {
+          execFileSync(process.execPath, [npmCliJs, ...installArgs], {
+            cwd: root, stdio: "pipe", timeout: 120000, windowsHide: true,
+          });
+        } else {
+          execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", installArgs, {
+            cwd: root, stdio: "pipe", timeout: 120000, shell: process.platform === "win32", windowsHide: true,
+          });
+        }
+      } catch (err) {
+        // #861: surface the failure (was silently swallowed); still degrade gracefully.
+        process.stderr.write(`[context-mode] ensure-deps install of ${pkg} failed: ${err?.message ?? err}\n`);
+      }
     } else if (!existsSync(resolve(pkgDir, ...NATIVE_BINARIES[pkg]))) {
       // Package installed but native binary missing (e.g., npm ignore-scripts=true,
       // or Windows where `npm rebuild` falls through to node-gyp without MSVC — #408).
