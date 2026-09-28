@@ -641,6 +641,26 @@ function getWebFetchUrl(toolInput) {
   return "";
 }
 
+// claude.ai Artifact pages (#938) are a client-rendered SPA shell gated
+// behind the caller's authenticated claude.ai session. Native WebFetch has
+// a documented exception for these URLs — it fetches them using that
+// session — while ctx_fetch_and_index does a bare unauthenticated fetch and
+// can only ever retrieve the empty shell (~0.1KB, no real content). Parsed
+// via the URL constructor (not a substring/regex check on the raw string)
+// so a lookalike host like claude.ai.evil.com can't slip through.
+function isClaudeArtifactUrl(url) {
+  if (typeof url !== "string" || url === "") return false;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+  if (parsed.hostname !== "claude.ai" && parsed.hostname !== "preview.claude.ai") return false;
+  return parsed.pathname.startsWith("/code/artifact/");
+}
+
 function getCodexConfigDir(env = process.env) {
   const codexHome = env.CODEX_HOME;
   if (codexHome && codexHome.trim() !== "") return resolve(codexHome);
@@ -874,6 +894,10 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
   // ─── WebFetch: deny + redirect to sandbox ───
   if (canonical === "WebFetch") {
     const url = getWebFetchUrl(toolInput);
+    // Let claude.ai Artifact URLs through untouched — see isClaudeArtifactUrl (#938).
+    if (isClaudeArtifactUrl(url)) {
+      return null;
+    }
     return mcpRedirect({
       action: "deny",
       reason: `context-mode: WebFetch redirected. Call ${t("ctx_fetch_and_index")}(url: "${url}", source: "...") to fetch + index the page, then ${t("ctx_search")}(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call ${t("ctx_execute")}(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).`,
