@@ -742,9 +742,12 @@ export default function piExtension(pi: any): void {
       if (!_pendingContext) return;
       const ctx = _pendingContext;
       _pendingContext = "";
+      // Pi's Message type requires `timestamp: number`; providers that validate
+      // it (Radius gateway) reject the whole request with 400 when it is absent (#1179).
       event.messages.push({
         role: "user",
         content: ctx,
+        timestamp: Date.now(),
       });
       return { messages: event.messages };
     } catch {

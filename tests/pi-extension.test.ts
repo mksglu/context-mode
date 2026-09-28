@@ -923,6 +923,25 @@ describe("Pi Extension", () => {
       expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
     });
 
+    it("stamps the injected message with a finite numeric timestamp (#1179)", async () => {
+      // Pi's Message type carries `timestamp: number` and the Radius gateway
+      // rejects the whole request with 400 when any message lacks it.
+      await registerPiExtension(api);
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => `routing-ts-${Date.now()}-${Math.random()}` },
+      });
+      await api._trigger("before_agent_start", { systemPrompt: "Base prompt." });
+
+      const before = Date.now();
+      const ctxResult = await api._trigger("context", { messages: [] });
+
+      expect(ctxResult?.messages?.length).toBe(1);
+      const injected = ctxResult.messages[0];
+      expect(typeof injected.timestamp).toBe("number");
+      expect(Number.isFinite(injected.timestamp)).toBe(true);
+      expect(injected.timestamp).toBeGreaterThanOrEqual(before);
+    });
+
     it("re-injects the anchor via context hook on every subsequent call", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
