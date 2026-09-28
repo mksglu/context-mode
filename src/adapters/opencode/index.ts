@@ -25,7 +25,7 @@ import {
   existsSync,
   constants,
 } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname, extname, basename } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter, resolveContextModeDataRoot } from "../base.js";
@@ -499,8 +499,17 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
     const settings = this.readSettings() ?? {};
     const changes: string[] = [];
 
-    // Add "context-mode" to the plugin array
+    const siblingPaths = this.findSiblingConfigPaths();
+    const siblingPlugins = this.readSiblingPlugins(siblingPaths);
+
     const plugins = (settings.plugin ?? []) as string[];
+
+    for (const sp of siblingPlugins) {
+      if (!plugins.includes(sp)) {
+        plugins.push(sp);
+      }
+    }
+
     if (!plugins.some((p) => p.includes("context-mode"))) {
       plugins.push("context-mode");
       changes.push("Added context-mode to plugin array");
@@ -522,6 +531,32 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
 
     this.writeSettings(settings);
     return changes;
+  }
+
+  private findSiblingConfigPaths(): string[] {
+    const settingsPath = this.getSettingsPath();
+    const stem = join(dirname(settingsPath), basename(settingsPath, extname(settingsPath)));
+    const sibling = stem + (extname(settingsPath) === ".jsonc" ? ".json" : ".jsonc");
+    return existsSync(sibling) ? [sibling] : [];
+  }
+
+  private readSiblingPlugins(siblingPaths: string[]): string[] {
+    const plugins: string[] = [];
+    for (const configPath of siblingPaths) {
+      try {
+        const raw = readFileSync(configPath, "utf-8");
+        const text = configPath.endsWith(".jsonc") ? stripJsonComments(raw) : raw;
+        const settings = JSON.parse(text) as Record<string, unknown>;
+        if (Array.isArray(settings.plugin)) {
+          for (const p of settings.plugin) {
+            if (typeof p === "string" && !plugins.includes(p)) {
+              plugins.push(p);
+            }
+          }
+        }
+      } catch { /* skip unreadable/unparseable sibling */ }
+    }
+    return plugins;
   }
 
   backupSettings(): string | null {
