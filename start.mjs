@@ -322,10 +322,13 @@ try {
 // context-mode plugin cache self-heal (auto-deployed)
 // Fixes anthropics/claude-code#46915: auto-update breaks CLAUDE_PLUGIN_ROOT
 // Issue #727: also normalizes stale version paths in existing installPaths
+// Issue #1191: version filter is end-anchored so <version>.bak-* dirs are
+// never selected as heal targets, and an installPath with no valid version
+// dir to heal toward is logged instead of left silently unhealed.
 // Honors CLAUDE_CONFIG_DIR (#577) — checked at this script's runtime so users
 // who set CLAUDE_CONFIG_DIR after install still get healed correctly.
 // Pure Node.js — no bash/shell dependency.
-import{existsSync,readdirSync,statSync,symlinkSync,lstatSync,unlinkSync,readFileSync}from"node:fs";
+import{existsSync,readdirSync,symlinkSync,lstatSync,unlinkSync,readFileSync,appendFileSync,mkdirSync}from"node:fs";
 import{dirname,join,resolve,sep}from"node:path";
 import{homedir}from"node:os";
 function cfgDir(){const e=process.env.CLAUDE_CONFIG_DIR;if(e&&e.trim()!==""){return e.startsWith("~")?resolve(homedir(),e.replace(/^~[/\\\\]?/,"")):resolve(e)}return resolve(homedir(),".claude")}
@@ -360,8 +363,18 @@ try{
       const parent=dirname(p);
       if(!existsSync(parent))continue;
       try{if(lstatSync(p).isSymbolicLink())unlinkSync(p)}catch{}
-      const dirs=readdirSync(parent).filter(d=>/^\\d+\\.\\d+/.test(d)&&statSync(join(parent,d)).isDirectory());
-      if(!dirs.length)continue;
+      const dirs=readdirSync(parent).filter(d=>/^\\d+\\.\\d+(\\.\\d+)?$/.test(d)&&lstatSync(join(parent,d)).isDirectory());
+      if(!dirs.length){
+        // Issue #1191: nothing valid to heal toward. Report via the same
+        // log contract as hooks/run-hook.mjs logError (cfgDir() honors
+        // CLAUDE_CONFIG_DIR) instead of leaving the dead path silently.
+        try{
+          const errDir=resolve(cfgDir(),"context-mode");
+          if(!existsSync(errDir))mkdirSync(errDir,{recursive:true});
+          appendFileSync(resolve(errDir,"hook-errors.log"),"["+new Date().toISOString()+"] pid="+process.pid+" no valid version directory under "+parent+"; leaving "+p+" unhealed (#1191)\\n");
+        }catch{}
+        continue;
+      }
       dirs.sort((a,b)=>{const pa=a.split(".").map(Number),pb=b.split(".").map(Number);for(let i=0;i<3;i++){if((pa[i]||0)!==(pb[i]||0))return(pa[i]||0)-(pb[i]||0)}return 0});
       try{symlinkSync(join(parent,dirs[dirs.length-1]),p,process.platform==="win32"?"junction":undefined)}catch{}
     }
