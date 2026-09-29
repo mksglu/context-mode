@@ -249,3 +249,41 @@ describe("start.mjs — Issue #577 CLAUDE_CONFIG_DIR honoring", () => {
     expect(tpl).not.toMatch(tplBadForm);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Issue #1215 — a project-scope plugin install must not write the user's
+// global settings.json. start.mjs used to set enabledPlugins[key] = true and
+// register the cache-heal SessionStart hook there on every MCP boot, which
+// turned a single-project install on for every project on the machine.
+// The heal logic is covered in heal-installed-plugins.test.ts; these tests
+// pin the start.mjs wiring.
+// ─────────────────────────────────────────────────────────────────────────
+
+describe("start.mjs — Issue #1215 user settings only for user-scope installs", () => {
+  test("HEAL 4 passes the registry path to healSettingsEnabledPlugins", () => {
+    const heal34Idx = startSrc.indexOf("HEAL 3");
+    const layer4Idx = startSrc.indexOf("Self-heal Layer 4");
+    const block = startSrc.slice(heal34Idx, layer4Idx);
+    expect(block).toMatch(
+      /healSettingsEnabledPlugins\(\s*\{\s*settingsPath,\s*pluginKey,\s*registryPath\s*\}\s*\)/,
+    );
+  });
+
+  test("Layer 4 hook registration is gated on hasUserScopeInstall", () => {
+    const idx = startSrc.indexOf("Register the hook");
+    expect(idx).toBeGreaterThan(-1);
+    const block = startSrc.slice(idx, startSrc.indexOf("sessionStart.push(", idx));
+    expect(block).toContain("hasUserScopeInstall(");
+    expect(block).toMatch(/if\s*\(\s*!alreadyRegistered\s*&&\s*userScope\s*!==\s*false\s*\)/);
+  });
+
+  test("postinstall.mjs passes the registry path too", () => {
+    const postinstallSrc = readFileSync(
+      resolve(ROOT, "scripts", "postinstall.mjs"),
+      "utf-8",
+    );
+    const idx = postinstallSrc.indexOf("healSettingsEnabledPlugins({");
+    expect(idx).toBeGreaterThan(-1);
+    expect(postinstallSrc.slice(idx, idx + 300)).toContain("registryPath:");
+  });
+});

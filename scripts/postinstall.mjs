@@ -148,6 +148,7 @@ if (isGlobalInstall()) {
     const r = healSettingsEnabledPlugins({
       settingsPath,
       pluginKey: "context-mode@context-mode",
+      registryPath: resolve(homedir(), ".claude", "plugins", "installed_plugins.json"),
     });
     if (r.healed && r.healed.length > 0) {
       process.stderr.write(`context-mode: healed settings.json (${r.healed.join(", ")})\n`);

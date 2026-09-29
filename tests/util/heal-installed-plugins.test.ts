@@ -387,6 +387,102 @@ describe("healSettingsEnabledPlugins (v1.0.116)", () => {
     expect(result.healed).toEqual([]);
     expect(result.skipped).toBe("no-settings");
   });
+
+  // Issue #1215 — a project-scope install must not enable the plugin in the
+  // user's global settings.json.
+  function writeRegistry(dir: string, scopes: Array<string | undefined>): string {
+    const registryPath = join(dir, "installed_plugins.json");
+    const entries = scopes.map((scope) => ({
+      ...(scope === undefined ? {} : { scope }),
+      ...(scope === "user" || scope === undefined ? {} : { projectPath: join(dir, "proj") }),
+      installPath: join(dir, "cache", "context-mode", "context-mode", "1.0.169"),
+      version: "1.0.169",
+    }));
+    writeFileSync(
+      registryPath,
+      JSON.stringify({ version: 2, plugins: { "context-mode@context-mode": entries } }, null, 2),
+    );
+    return registryPath;
+  }
+
+  it("#1215: leaves user settings untouched when the only install is project-scope", () => {
+    const dir = tmp();
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(settingsPath, "{}\n");
+    const registryPath = writeRegistry(dir, ["project"]);
+
+    const result = healSettingsEnabledPlugins({
+      settingsPath,
+      pluginKey: "context-mode@context-mode",
+      registryPath,
+    });
+
+    expect(result.healed).toEqual([]);
+    expect(result.skipped).toBe("no-user-scope-install");
+    expect(readFileSync(settingsPath, "utf-8")).toBe("{}\n");
+  });
+
+  it("#1215: leaves user settings untouched for a local-scope install", () => {
+    const dir = tmp();
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(settingsPath, "{}\n");
+    const registryPath = writeRegistry(dir, ["local"]);
+
+    const result = healSettingsEnabledPlugins({
+      settingsPath,
+      pluginKey: "context-mode@context-mode",
+      registryPath,
+    });
+
+    expect(result.skipped).toBe("no-user-scope-install");
+    expect(readFileSync(settingsPath, "utf-8")).toBe("{}\n");
+  });
+
+  it("#1215: still heals when a user-scope entry exists next to project-scope ones", () => {
+    const dir = tmp();
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(settingsPath, "{}\n");
+    const registryPath = writeRegistry(dir, ["project", "user"]);
+
+    const result = healSettingsEnabledPlugins({
+      settingsPath,
+      pluginKey: "context-mode@context-mode",
+      registryPath,
+    });
+
+    expect(result.healed).toContain("enabled-plugins");
+    const after = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    expect(after.enabledPlugins).toEqual({ "context-mode@context-mode": true });
+  });
+
+  it("#1215: entries without a scope field count as user scope (pre-scope registries)", () => {
+    const dir = tmp();
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(settingsPath, "{}\n");
+    const registryPath = writeRegistry(dir, [undefined]);
+
+    const result = healSettingsEnabledPlugins({
+      settingsPath,
+      pluginKey: "context-mode@context-mode",
+      registryPath,
+    });
+
+    expect(result.healed).toContain("enabled-plugins");
+  });
+
+  it("#1215: keeps the previous behavior when the registry is missing", () => {
+    const dir = tmp();
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(settingsPath, "{}\n");
+
+    const result = healSettingsEnabledPlugins({
+      settingsPath,
+      pluginKey: "context-mode@context-mode",
+      registryPath: join(dir, "missing-installed_plugins.json"),
+    });
+
+    expect(result.healed).toContain("enabled-plugins");
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────
