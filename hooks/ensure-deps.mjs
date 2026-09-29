@@ -19,7 +19,7 @@
  * @see https://github.com/mksglu/context-mode/issues/203
  */
 
-import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, copyFileSync, renameSync, unlinkSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -64,6 +64,38 @@ function hasModernSqlite() {
   return major > 22 || (major === 22 && minor >= 5);
 }
 
+// Install failure backoff (#1139, #1174). ensureDeps() runs on EVERY hook
+// invocation. When the install cannot succeed (npm's Arborist crashing inside
+// the plugin dir, offline, registry errors), retrying synchronously on each
+// call spawns an npm process per tool call that never converges. A marker in
+// the plugin root records the attempt: while one is in flight other hook
+// calls skip it, and after a failure the install is retried at most once per
+// INSTALL_RETRY_MS — or immediately under a different Node version.
+const INSTALL_RETRY_MS = 60 * 60 * 1000;
+const INSTALL_INFLIGHT_MS = 5 * 60 * 1000; // > the 120s execSync timeout
+
+function installMarkerPath(pkg) {
+  return resolve(root, `.ensure-deps-${pkg}.install-state.json`);
+}
+
+function installBackoffActive(pkg) {
+  try {
+    const m = JSON.parse(readFileSync(installMarkerPath(pkg), "utf-8"));
+    const age = Date.now() - Number(m.at);
+    if (!(age >= 0)) return false;
+    if (m.pending) return age < INSTALL_INFLIGHT_MS;
+    return m.node === process.version && age < INSTALL_RETRY_MS;
+  } catch {
+    return false; // no marker (or unreadable) — install as before
+  }
+}
+
+function writeInstallMarker(pkg, data) {
+  try {
+    writeFileSync(installMarkerPath(pkg), JSON.stringify({ at: Date.now(), node: process.version, ...data }));
+  } catch { /* read-only plugin dir — fall back to the old behavior */ }
+}
+
 export async function ensureDeps() {
   // Bun ships bun:sqlite and never needs better-sqlite3
   if (typeof globalThis.Bun !== "undefined") return;
@@ -71,6 +103,9 @@ export async function ensureDeps() {
     const pkgDir = resolve(root, "node_modules", pkg);
     if (!existsSync(pkgDir)) {
       // Package not installed at all
+      if (installBackoffActive(pkg)) continue;
+      writeInstallMarker(pkg, { pending: true });
+      let error = "";
       try {
         execSync(`${process.platform === "win32" ? "npm.cmd" : "npm"} install ${pkg} --no-package-lock --no-save --silent`, {
           cwd: root,
@@ -78,7 +113,16 @@ export async function ensureDeps() {
           timeout: 120000,
           shell: true,
         });
-      } catch { /* best effort — hook degrades gracefully without DB */ }
+      } catch (err) {
+        /* best effort — hook degrades gracefully without DB */
+        // err.stderr is a Buffer (empty under --silent), so fall back to the message.
+        error = (String(err?.stderr ?? "").trim() || String(err?.message ?? err)).slice(-500);
+      }
+      if (existsSync(pkgDir)) {
+        try { unlinkSync(installMarkerPath(pkg)); } catch { /* already gone */ }
+      } else {
+        writeInstallMarker(pkg, { error: error || "install finished but package is still missing" });
+      }
     } else if (!existsSync(resolve(pkgDir, ...NATIVE_BINARIES[pkg]))) {
       // Package installed but native binary missing (e.g., npm ignore-scripts=true,
       // or Windows where `npm rebuild` falls through to node-gyp without MSVC — #408).
