@@ -129,6 +129,27 @@ export function healInstalledPlugins({ registryPath, pluginCacheRoot, pluginKey 
 }
 
 /**
+ * Issue #1215 — does installed_plugins.json carry a user-scope entry for
+ * `pluginKey`? Entries without a `scope` field predate scoped installs and
+ * count as user scope.
+ *
+ * Returns `null` when the registry is missing, unreadable, or has no entry
+ * for the key, so callers keep their previous behavior in that case.
+ *
+ * @param {{ registryPath: string, pluginKey: string }} opts
+ * @returns {boolean | null}
+ */
+export function hasUserScopeInstall({ registryPath, pluginKey }) {
+  if (!registryPath || !existsSync(registryPath)) return null;
+  let ip;
+  try { ip = JSON.parse(readFileSync(registryPath, "utf-8")); }
+  catch { return null; }
+  const entries = ip && ip.plugins && ip.plugins[pluginKey];
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  return entries.some((e) => e && (e.scope === undefined || e.scope === "user"));
+}
+
+/**
  * Heal `~/.claude/settings.json.enabledPlugins[pluginKey]`.
  *
  * v1.0.114's heal targeted `installed_plugins.json.enabledPlugins`, which is
@@ -140,12 +161,20 @@ export function healInstalledPlugins({ registryPath, pluginCacheRoot, pluginKey 
  *
  * Respects explicit user opt-out: if the key is `false`, leaves it alone.
  *
- * @param {{ settingsPath: string, pluginKey: string }} opts
+ * Issue #1215: when `registryPath` is given and installed_plugins.json only
+ * has project/local-scope entries for `pluginKey`, settings.json is the
+ * user's global file and must stay untouched — writing `true` there turns a
+ * single-project install on for every project.
+ *
+ * @param {{ settingsPath: string, pluginKey: string, registryPath?: string }} opts
  * @returns {HealResult}
  */
-export function healSettingsEnabledPlugins({ settingsPath, pluginKey }) {
+export function healSettingsEnabledPlugins({ settingsPath, pluginKey, registryPath }) {
   if (!settingsPath || !existsSync(settingsPath)) {
     return { healed: [], skipped: "no-settings" };
+  }
+  if (registryPath && hasUserScopeInstall({ registryPath, pluginKey }) === false) {
+    return { healed: [], skipped: "no-user-scope-install" };
   }
 
   let raw;

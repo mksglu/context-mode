@@ -250,7 +250,9 @@ try {
   // v1.0.116: Claude Code's plugin loader reads settings.json.enabledPlugins
   // (NOT installed_plugins.json) — heal that one too so /ctx-upgrade-induced
   // disable state is repaired before next /reload-plugins.
-  try { healSettingsEnabledPlugins({ settingsPath, pluginKey }); }
+  // Issue #1215: pass the registry so a project-scope install never writes
+  // enabledPlugins into the user's global settings.json.
+  try { healSettingsEnabledPlugins({ settingsPath, pluginKey, registryPath }); }
   catch { /* best effort */ }
   // v1.0.119 — Layer 5b (Issue #523): heal .claude-plugin/plugin.json's
   // mcpServers["context-mode"].args[0] when /ctx-upgrade left a tmpdir-prefixed
@@ -304,6 +306,7 @@ try {
 try {
   const { buildHookCommand, selfHealCacheHealHook, ensureShebangAndExecBit } =
     await import("./hooks/cache-heal-utils.mjs");
+  const { hasUserScopeInstall } = await import("./scripts/heal-installed-plugins.mjs");
 
   // #577: honor $CLAUDE_CONFIG_DIR — without this, Claude Code spawns hooks
   // from $CLAUDE_CONFIG_DIR/settings.json but we deploy them to ~/.claude/hooks/
@@ -394,7 +397,13 @@ try{
     const alreadyRegistered = sessionStart.some((h) =>
       h.hooks?.some((hh) => hh.command?.includes("context-mode-cache-heal")),
     );
-    if (!alreadyRegistered) {
+    // Issue #1215: only a user-scope install may register the hook in the
+    // user's global settings.json; a project-scope install stays in its project.
+    const userScope = hasUserScopeInstall({
+      registryPath: resolve(claudeConfigDir, "plugins", "installed_plugins.json"),
+      pluginKey: "context-mode@context-mode",
+    });
+    if (!alreadyRegistered && userScope !== false) {
       sessionStart.push({
         hooks: [
           {
