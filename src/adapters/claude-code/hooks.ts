@@ -39,19 +39,42 @@ export type HookType = (typeof HOOK_TYPES)[keyof typeof HOOK_TYPES];
 // ─────────────────────────────────────────────────────────
 
 /**
- * External MCP catch-all matcher for Claude Code (#529, #547 hotfix).
+ * External MCP catch-all matcher for Claude Code (#529, #547 hotfix, #1222).
  *
- * Claude Code's hook matcher engine treats this entry as a substring match
- * (it also accepts regex, but `mcp__` alone is enough — every MCP tool
- * surfaces as `mcp__<server>__<tool>`). v1.0.124 used a negative lookahead
- * `mcp__(?!plugin_context-mode_)` to skip context-mode's own MCP tools,
- * but this same hooks.json is bundled to Codex CLI which uses Rust's
- * `regex` crate (no look-around support) — Codex rejected the matcher at
- * boot, breaking every Codex user (#547). Drop the lookaround on both
- * sides; the hook BODY (`isExternalMcpTool()` in hooks/core/routing.mjs)
- * already filters context-mode's own tools, so semantics are preserved.
+ * Claude Code's hook matcher engine has two evaluation modes, selected by the
+ * characters in the matcher (see the "Matcher patterns" table in the Claude
+ * Code hooks reference):
+ *
+ *   - letters, digits, `_`, `-`, spaces, `,`, `|` only → exact string, or a
+ *     `|`/`,`-separated list of exact strings;
+ *   - anything else → JavaScript regular expression, unanchored.
+ *
+ * Since v2.1.195 the first mode no longer substring-matches, so a bare
+ * `mcp__` is compared as the exact tool name `mcp__` and matches no tool at
+ * all. Claude Code logs `Hook matcher 'mcp__' matches no tool (it is compared
+ * as an exact string)` on every session start, and the external-MCP routing
+ * added for #529 silently does nothing.
+ *
+ * The documented spelling for "every tool from any server" is `mcp__.*`: the
+ * `.*` pushes the matcher onto the regex path, where it is tested
+ * unanchored against `mcp__<server>__<tool>`.
+ *
+ * The `.*` must live in its OWN matcher entry. Folding it into a
+ * pipe-joined list (e.g. `Bash|Read|mcp__.*`) puts that whole list on the
+ * regex path, where every alternative becomes an unanchored substring match
+ * — `Read` would then also fire on `NotebookRead`, `Edit` on `MultiEdit`, and
+ * so on. Keeping the catch-all separate leaves the tool-name list on the
+ * exact-match path, which is what it was written for.
+ *
+ * v1.0.124 used a negative lookahead `mcp__(?!plugin_context-mode_)` to skip
+ * context-mode's own MCP tools, but this same hooks.json is bundled to Codex
+ * CLI which uses Rust's `regex` crate (no look-around support) — Codex
+ * rejected the matcher at boot, breaking every Codex user (#547). Plain
+ * `.*` is supported by both engines; the hook BODY (`isExternalMcpTool()` in
+ * hooks/core/routing.mjs) already filters context-mode's own tools, so
+ * semantics are preserved.
  */
-export const EXTERNAL_MCP_MATCHER_PATTERN = "mcp__";
+export const EXTERNAL_MCP_MATCHER_PATTERN = "mcp__.*";
 
 /** Tools that context-mode's PreToolUse hook intercepts. */
 export const PRE_TOOL_USE_MATCHERS = [
@@ -69,8 +92,14 @@ export const PRE_TOOL_USE_MATCHERS = [
 /**
  * Combined matcher pattern for settings.json (pipe-separated).
  * Used by the upgrade command when writing a single consolidated entry.
+ *
+ * Excludes EXTERNAL_MCP_MATCHER_PATTERN: that is a regex, and folding it into
+ * this list would put every tool name here on Claude Code's unanchored-regex
+ * path. It is registered as its own matcher entry instead (#1222).
  */
-export const PRE_TOOL_USE_MATCHER_PATTERN = PRE_TOOL_USE_MATCHERS.join("|");
+export const PRE_TOOL_USE_MATCHER_PATTERN = PRE_TOOL_USE_MATCHERS.filter(
+  (matcher) => matcher !== EXTERNAL_MCP_MATCHER_PATTERN,
+).join("|");
 
 // ─────────────────────────────────────────────────────────
 // PostToolUse matchers (#229)
@@ -80,6 +109,12 @@ export const PRE_TOOL_USE_MATCHER_PATTERN = PRE_TOOL_USE_MATCHERS.join("|");
  * Tools that context-mode's PostToolUse hook should fire on.
  * Only tools that extractEvents() actually handles — all others
  * produce zero events and cause false "hook error" display.
+ *
+ * The external-MCP catch-all is NOT a member of this list. It is a regex
+ * (`mcp__.*`), and joining it here would drag every other tool name onto
+ * Claude Code's unanchored-regex path, where `Read` would also match
+ * `NotebookRead` and `Edit` would match `MultiEdit`. It is emitted as its own
+ * matcher group instead — see POST_TOOL_USE_MCP_CATCH_ALL_MATCHER.
  */
 export const POST_TOOL_USE_MATCHERS = [
   "Bash",
@@ -98,13 +133,20 @@ export const POST_TOOL_USE_MATCHERS = [
   "Agent",
   "AskUserQuestion",
   "EnterWorktree",
-  "mcp__",
 ] as const;
 
 /**
  * Combined matcher pattern for PostToolUse in hooks.json / settings.json.
  */
 export const POST_TOOL_USE_MATCHER_PATTERN = POST_TOOL_USE_MATCHERS.join("|");
+
+/**
+ * Separate PostToolUse matcher group for external MCP tools (#1222).
+ *
+ * Kept out of POST_TOOL_USE_MATCHERS so the tool-name list above stays on
+ * Claude Code's exact-match path; see EXTERNAL_MCP_MATCHER_PATTERN.
+ */
+export const POST_TOOL_USE_MCP_CATCH_ALL_MATCHER = EXTERNAL_MCP_MATCHER_PATTERN;
 
 // ─────────────────────────────────────────────────────────
 // Hook script file names
