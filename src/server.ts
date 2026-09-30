@@ -519,7 +519,7 @@ export function resolveSessionIdFromSessionDB(opts?: {
  * The file is consumed (deleted) after indexing to prevent double-indexing.
  * Called on every getStore(); one existsSync is cheaper than the old readdir.
  */
-function maybeIndexSessionEvents(store: ContentStore): void {
+export function maybeIndexSessionEvents(store: ContentStore): void {
   try {
     const sessionsDir = getSessionDir();
     if (!existsSync(sessionsDir)) return;
