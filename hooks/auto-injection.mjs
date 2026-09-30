@@ -25,9 +25,12 @@ export function estimateTokens(text) {
 /**
  * Build auto-injection block from session events.
  * @param {Array<{category: string, data: string}>} events
+ * @param {"compaction"|"active_memory"} source — REQUIRED (fail-safe: no
+ *   default, so no caller can silently emit the wrong label). "compaction"
+ *   only after a real compact; "active_memory" for routine per-turn injection.
  * @returns {string} XML block or empty string
  */
-export function buildAutoInjection(events) {
+export function buildAutoInjection(events, source) {
   // Single O(N) pass instead of 4× O(N) Array.filter() loops. UserPromptSubmit
   // fires this on every prompt; with N up to 100 events the prior implementation
   // walked the array 4 times per prompt — wasteful on macOS, painful on Windows
@@ -98,5 +101,13 @@ export function buildAutoInjection(events) {
   }
 
   if (parts.length === 0) return "";
-  return `<session_state source="compaction">\n\n${parts.join("\n\n")}\n\n</session_state>`;
+  // Fidelity line only for genuine compaction: tells the agent what happened
+  // and where the history lives. Routine per-turn injection gets NO extra
+  // line — the label alone carries the meaning, and an always-present line
+  // would leak past the 500-token content budget (the wrapper is unbudgeted)
+  // and add noise to every turn.
+  const fidelity = source === "compaction"
+    ? "Context was compacted; full history persists in the session transcript.\n\n"
+    : "";
+  return `<session_state source="${source}">\n\n${fidelity}${parts.join("\n\n")}\n\n</session_state>`;
 }
