@@ -2761,15 +2761,14 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
       // already truncated. Soft warning after SEARCH_MAX_RESULTS_AFTER calls;
       // gentle informational line before that.
       const throttleRemaining = Math.max(0, SEARCH_BLOCK_AFTER - searchCallCount);
-      const softCapRemaining = Math.max(0, SEARCH_MAX_RESULTS_AFTER - searchCallCount);
       if (searchCallCount >= SEARCH_MAX_RESULTS_AFTER) {
         output += `\n\n⚠ search call #${searchCallCount}/${SEARCH_BLOCK_AFTER} in this window. ` +
           `Results limited to ${effectiveLimit}/query. ${throttleRemaining} call(s) remaining before block. ` +
           `Batch queries: ctx_search(queries: ["q1","q2","q3"]) or use ctx_batch_execute.`;
       } else {
-        output += `\n\n> Throttle: call #${searchCallCount}/${SEARCH_BLOCK_AFTER} in this window. ` +
-          `${softCapRemaining} call(s) before soft cap. ` +
-          `Prefer ctx_search(queries: [...]) array form for multi-query workloads — it counts as a single call.`;
+        output += `\n\n> Throttle: search call #${searchCallCount} this window. ` +
+          `Soft cap (fewer results/query) at call #${SEARCH_MAX_RESULTS_AFTER}, hard block at #${SEARCH_BLOCK_AFTER}. ` +
+          `Prefer ctx_search(queries: [...]) array form; it counts as one call.`;
       }
 
       if (output.trim().length === 0) {

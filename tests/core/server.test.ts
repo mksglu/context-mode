@@ -6430,8 +6430,11 @@ describe("ctx_search progressive throttle observability (issue #697)", () => {
   });
 
   test("throttle counter line is surfaced on every response, not only after soft cap", () => {
-    // Branch before the soft cap — should still inform the agent.
-    expect(serverSrc).toMatch(/Throttle:\s*call\s+#\$\{searchCallCount\}/);
+    // Branch before the soft cap — should still inform the agent, stating the
+    // soft-cap and hard-block call numbers as absolute thresholds.
+    expect(serverSrc).toMatch(/Throttle:\s*search call\s+#\$\{searchCallCount\}/);
+    expect(serverSrc).toMatch(/Soft cap[\s\S]{0,80}call\s+#\$\{SEARCH_MAX_RESULTS_AFTER\}/);
+    expect(serverSrc).toMatch(/hard block at #\$\{SEARCH_BLOCK_AFTER\}/);
     // Branch at/after soft cap keeps the historical warning shape.
     expect(serverSrc).toMatch(/⚠ search call #\$\{searchCallCount\}/);
   });
