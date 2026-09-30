@@ -4844,6 +4844,88 @@ server.registerTool(
   },
 );
 
+// Deletes one indexed source's chunks: destructive, but forgetting a missing
+// source is a no-op (idempotent). No network.
+server.registerTool(
+  "ctx_forget",
+  {
+    title: "Forget Indexed Source",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Delete one indexed source from the knowledge base by label, or list indexed source labels. Narrower than ctx_purge.
+
+WHEN:
+  - You indexed a source (ctx_index / ctx_fetch_and_index) and want to remove just that one, e.g. before re-indexing a cleaner version.
+  - You want to see which source labels are currently indexed.
+
+WHEN NOT:
+  - You want to clear a whole session or the entire project -> use ctx_purge.
+  - You are re-indexing the same source label -> ctx_index already replaces it atomically, so forgetting first is unnecessary.
+
+RETURNS:
+  With no source: the indexed source labels and their chunk counts. With source + confirm:true: the number of chunks removed. With a source but no confirm: a cancelled notice.
+
+EXAMPLE: ctx_forget()
+EXAMPLE: ctx_forget(source: "react-useeffect-docs", confirm: true)`,
+    inputSchema: z.object({
+      source: z.string().optional().describe(
+        "Label of the source to delete (the `source` passed to ctx_index). Omit to list all indexed source labels."
+      ),
+      confirm: z.preprocess(coerceBoolean, z.boolean()).optional().describe(
+        "MUST be true to delete. Omitted/false with a source returns 'cancelled'; not needed when listing."
+      ),
+    }),
+  },
+  async ({ source, confirm }) => {
+    const store = getStore();
+
+    const listText = (): string => {
+      const sources = store.listSources();
+      if (sources.length === 0) return "No indexed sources in this project's knowledge base.";
+      const lines = sources.map(
+        (s) => `  - ${s.label} (${s.chunkCount} chunk${s.chunkCount === 1 ? "" : "s"})`,
+      );
+      return `Indexed sources (${sources.length}):\n${lines.join("\n")}`;
+    };
+
+    if (!source) {
+      return trackResponse("ctx_forget", {
+        content: [{ type: "text" as const, text: listText() }],
+      });
+    }
+
+    if (!confirm) {
+      return trackResponse("ctx_forget", {
+        content: [{
+          type: "text" as const,
+          text: `Cancelled. Pass confirm: true to delete source '${source}'.`,
+        }],
+      });
+    }
+
+    const { existed, deletedChunks } = store.deleteSource(source);
+    if (!existed) {
+      return trackResponse("ctx_forget", {
+        content: [{
+          type: "text" as const,
+          text: `No such source: '${source}'.\n\n${listText()}`,
+        }],
+        isError: true,
+      });
+    }
+    return trackResponse("ctx_forget", {
+      content: [{
+        type: "text" as const,
+        text: `Forgot source '${source}': removed ${deletedChunks} chunk${deletedChunks === 1 ? "" : "s"}.`,
+      }],
+    });
+  },
+);
+
 // ─────────────────────────────────────────────────────────
 // Server startup
 // ─────────────────────────────────────────────────────────
