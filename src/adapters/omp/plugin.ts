@@ -36,6 +36,7 @@ import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
 import { OMPAdapter } from "./index.js";
 import { parseOmpUsage } from "./usage.js";
+import { stripQuotedContent, isSafeCurlWget } from "../bash-routing.js";
 
 // ── Tool-name normalization ─────────────────────────────
 // OMP uses lowercase tool names (refs/.../hooks/types.ts:451 example
@@ -51,12 +52,8 @@ const OMP_TOOL_MAP: Record<string, string> = {
 };
 
 // ── Routing patterns ─────────────────────────────────────
-// Inline HTTP client patterns to hard-block in bash. Identical to the
-// Pi extension list (src/adapters/pi/extension.ts:42). One unrouted
-// curl can dump 56 KB into context.
-const BLOCKED_BASH_PATTERNS: RegExp[] = [
-  /\bcurl\s/,
-  /\bwget\s/,
+// Language-level HTTP clients still need routing when invoked directly.
+const BLOCKED_HTTP_PATTERNS: RegExp[] = [
   /\bfetch\s*\(/,
   /\brequests\.get\s*\(/,
   /\brequests\.post\s*\(/,
@@ -291,7 +288,15 @@ export default function ompPlugin(pi: MinimalHookAPI): void {
       const command = String((event?.input as { command?: unknown } | undefined)?.command ?? "");
       if (!command) return undefined;
 
-      const isBlocked = BLOCKED_BASH_PATTERNS.some((p) => p.test(command));
+      const stripped = stripQuotedContent(command);
+      const inlineEval = /(?:^|[;&|])\s*(?:node|python(?:\d+(?:\.\d+)?)?)\s+(?:-e|--eval|-c)\s/i.test(command);
+      const hasInlineHttp = BLOCKED_HTTP_PATTERNS.some((p) =>
+        p.test(inlineEval ? command : stripped),
+      );
+      const hasCurlWget = /(^|\s|&&|\||;)(curl|wget)\s/i.test(stripped);
+      const hasUnsafeTransfer = hasCurlWget &&
+        stripped.split(/\s*(?:&&|\|\||;)\s*/).some((segment) => !isSafeCurlWget(segment));
+      const isBlocked = hasInlineHttp || hasUnsafeTransfer;
       if (isBlocked) {
         return {
           block: true,

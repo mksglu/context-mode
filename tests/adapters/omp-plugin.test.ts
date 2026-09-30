@@ -156,6 +156,36 @@ describe("OMP plugin", () => {
       expect(result).toBeUndefined();
     });
 
+    it.each([
+      "grep -n 'fetch(' client.ts",
+      'grep -rn "curl " scripts/',
+      'gh search issues --repo o/r "curl blocked"',
+      'git commit -m "docs: explain wget usage"',
+      "cat > /tmp/p.mjs <<'EOF'\nconst r = await fetch(u);\nEOF",
+      "curl -s -o /tmp/x.json https://api.github.com/repos/o/r",
+      "wget -q -O /tmp/x.json https://example.com",
+    ])("allows bash command without HTTP response in context: %s", async (command) => {
+      await registerOmpPlugin(api);
+      const result = await api._trigger("tool_call", {
+        toolName: "bash",
+        input: { command },
+      });
+      expect(result).toBeUndefined();
+    });
+
+    it.each([
+      "curl -s -o - https://example.com",
+      "wget -q -O - https://example.com",
+      "curl -s -o /tmp/x.json https://example.com && curl https://example.com",
+    ])("keeps blocking HTTP responses in bash output: %s", async (command) => {
+      await registerOmpPlugin(api);
+      const result = (await api._trigger("tool_call", {
+        toolName: "bash",
+        input: { command },
+      })) as { block?: boolean } | undefined;
+      expect(result?.block).toBe(true);
+    });
+
     it("does NOT block non-bash tools", async () => {
       await registerOmpPlugin(api);
       const result = await api._trigger("tool_call", {
