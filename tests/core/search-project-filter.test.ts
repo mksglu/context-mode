@@ -334,6 +334,37 @@ describe("Slice 4: ctx_search inputSchema conditional on CONTEXT_MODE_PROJECT_DI
   });
 });
 
+// ═══════════════════════════════════════════════════════════
+// Slice 7: Issue #1200 — singular `query` is a declared alias
+//
+// The handler has lifted `query` to `[query]` for a long time, but the
+// schema never declared it, so strict hosts strip it and the call fails
+// with "provide query or queries". Both modes must expose it, and parsing
+// `{ query }` must keep the value the handler normalizes.
+// ═══════════════════════════════════════════════════════════
+
+describe("Slice 7: ctx_search singular `query` alias (#1200)", () => {
+  test("schema exposes `query` in both shared modes", async () => {
+    const { buildCtxSearchInputSchema } = await import("../../src/search/ctx-search-schema.js");
+    expect(Object.keys(buildCtxSearchInputSchema(false).shape)).toContain("query");
+    expect(Object.keys(buildCtxSearchInputSchema(true).shape)).toContain("query");
+  });
+
+  test("parsing `{ query }` preserves the singular value", async () => {
+    const { buildCtxSearchInputSchema } = await import("../../src/search/ctx-search-schema.js");
+    const parsed = buildCtxSearchInputSchema(false).parse({ query: "some search", limit: 5 });
+    expect(parsed.query).toBe("some search");
+    expect(parsed.limit).toBe(5);
+  });
+
+  test("parsing `{}` leaves both query shapes absent", async () => {
+    const { buildCtxSearchInputSchema } = await import("../../src/search/ctx-search-schema.js");
+    const parsed = buildCtxSearchInputSchema(false).parse({});
+    expect(parsed.query).toBeUndefined();
+    expect(parsed.queries).toBeUndefined();
+  });
+});
+
 describe("Slice 5: resolveProjectScope", () => {
   test("returns getProjectDir() when param is undefined and shared mode is on", async () => {
     const { resolveProjectScope } = await import("../../src/search/ctx-search-schema.js");
