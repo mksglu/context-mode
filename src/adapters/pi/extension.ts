@@ -24,6 +24,8 @@ import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
 import { bootstrapMCPTools, makeBridgeDiag, isForegroundSession, type BridgeHandle } from "./mcp-bridge.js";
 import { PiAdapter } from "./index.js";
+import { stripQuotedContent, isSafeCurlWget } from "../bash-routing.js";
+export { stripQuotedContent, isSafeCurlWget } from "../bash-routing.js";
 
 // ── Pi Tool Name Mapping ─────────────────────────────────
 // Pi uses lowercase; shared extractors expect PascalCase (Claude Code convention).
@@ -63,71 +65,6 @@ const BLOCKED_HTTP_PATTERNS: RegExp[] = [
   /\burllib\.request/,
   /\bInvoke-WebRequest\b/,
 ];
-
-/**
- * Strip heredoc + single-quoted + double-quoted content from a shell command
- * so the routing regex only sees command tokens, not user-provided strings.
- *
- * Mirrors hooks/core/routing.mjs:196–209. Inlined here because the Pi
- * extension is bundled as a standalone build artifact (.pi/extensions/...)
- * and cannot import hooks/core/* at runtime — they live in a sibling tree
- * and may not be present in every Pi installation.
- *
- * Exported for unit tests.
- */
-export function stripQuotedContent(cmd: string): string {
-  return cmd
-    .replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, "") // heredocs
-    .replace(/'[^']*'/g, "''") // single-quoted
-    .replace(/"[^"]*"/g, '""'); // double-quoted
-}
-
-/**
- * Returns true iff `segment` is a curl/wget invocation that is SAFE to allow
- * through the Pi routing block — i.e. it cannot flood the model's context
- * window because the response body is written to disk (or appended to a file)
- * and no verbose/trace flag is dumping headers to stderr.
- *
- * Mirrors hooks/core/routing.mjs:672–701. Segments that are NOT curl/wget
- * return `true` (nothing to evaluate). The caller is expected to split chained
- * commands on `&&`, `||`, `;` and call this per segment.
- *
- * Issue #625 — without this, the only escape hatch when the MCP bridge dies
- * is `gh` CLI or a full Pi restart. Neither is acceptable as baseline UX.
- *
- * Exported for unit tests.
- */
-export function isSafeCurlWget(segment: string): boolean {
-  const s = segment.trim();
-  const isCurl = /\bcurl\b/i.test(s);
-  const isWget = /\bwget\b/i.test(s);
-  if (!isCurl && !isWget) return true; // not curl/wget — nothing to evaluate
-
-  // Check for file output flags (-o file / --output file for curl,
-  // -O file / --output-document file for wget) OR shell redirection (> / >>).
-  const hasFileOutput = isCurl
-    ? /\s(-o|--output)\s/.test(s) || /\s>\s*/.test(s) || /\s>>\s*/.test(s)
-    : /\s(-O|--output-document)\s/.test(s) ||
-      /\s>\s*/.test(s) ||
-      /\s>>\s*/.test(s);
-  if (!hasFileOutput) return false; // no file output → body flows to stdout
-
-  // Stdout aliases: -o -, -o /dev/stdout, -O -, -O /dev/stdout.
-  if (isCurl && /\s(-o|--output)\s+(-|\/dev\/stdout)(\s|$)/.test(s))
-    return false;
-  if (isWget && /\s(-O|--output-document)\s+(-|\/dev\/stdout)(\s|$)/.test(s))
-    return false;
-
-  // Verbose/trace flags dump request+response headers to stderr → context.
-  if (/\s(-v|--verbose|--trace)\b/.test(s)) return false;
-
-  // Must be silent (curl: -s/--silent, wget: -q/--quiet) so the progress bar
-  // does not spill into stderr → context.
-  const isSilent = isCurl
-    ? /\s-[a-zA-Z]*s|--silent/.test(s)
-    : /\s-[a-zA-Z]*q|--quiet/.test(s);
-  return isSilent;
-}
 
 // ── Module-level DB singleton ────────────────────────────
 
