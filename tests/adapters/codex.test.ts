@@ -979,6 +979,36 @@ describe("Codex userpromptsubmit hook script", () => {
     const parsed = JSON.parse(stdout.trim());
     expect(parsed.hookSpecificOutput).toBeDefined();
     expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+    expect(parsed.hookSpecificOutput).not.toHaveProperty("additionalContext");
+  });
+});
+
+describe("Codex posttooluse hook script", () => {
+  it("outputs valid JSON with PostToolUse hookEventName and omits empty additionalContext", () => {
+    const hookScript = resolve(__dirname, "../../hooks/codex/posttooluse.mjs");
+    const input = JSON.stringify({
+      tool_name: "Read",
+      tool_input: { file_path: "/tmp/demo.ts" },
+      tool_response: "const x = 1;",
+      session_id: "test-posttooluse",
+      cwd: "/tmp",
+      hook_event_name: "PostToolUse",
+      model: "o3",
+      permission_mode: "default",
+      transcript_path: null,
+      turn_id: "t1",
+    });
+
+    const stdout = execFileSync(process.execPath, [hookScript], {
+      input,
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+
+    const parsed = JSON.parse(stdout.trim());
+    expect(parsed.hookSpecificOutput).toBeDefined();
+    expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
+    expect(parsed.hookSpecificOutput).not.toHaveProperty("additionalContext");
   });
 });
 
