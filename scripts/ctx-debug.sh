@@ -67,6 +67,7 @@ redact() {
   sed -E \
     -e 's/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/\1***REDACTED***/g' \
     -e 's/("(key|token|secret|password|apiKey|api_key|auth|credential|authorization)"[[:space:]]*:[[:space:]]*")([^"]{4})[^"]*/\1\3***REDACTED***/g' \
+    -e 's/("[A-Za-z0-9_-]*([Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo]?[Rr]?[Dd]|[Aa][Pp][Ii]_?[Kk][Ee][Yy]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll])[A-Za-z0-9_-]*"[[:space:]]*:[[:space:]]*")[^"]+/\1***REDACTED***/g' \
     -e 's/(ghp_[A-Za-z0-9]{4})[A-Za-z0-9]+/\1***REDACTED***/g' \
     -e 's/(ghu_[A-Za-z0-9]{4})[A-Za-z0-9]+/\1***REDACTED***/g' \
     -e 's/(xox[bpras]-[A-Za-z0-9]{4})[A-Za-z0-9-]+/\1***REDACTED***/g' \
@@ -148,17 +149,25 @@ config_file() {
   display="$(abbrev_path "$path")"
   if [ -f "$path" ]; then
     kv "$label" "$display (exists)"
-    # Use node for proper JSON escaping of file content
+    # Redact BEFORE the content reaches the report: every value under an
+    # `env` block, every credential-shaped key, and known token shapes
+    # (scripts/lib/ctx-debug-redact.mjs, JSON-aware). The module also does
+    # the JSON escaping. Fall back to the old pattern-only redaction when the
+    # module is missing (script copied out of the repo on its own).
     local content_json
-    content_json="$(node -e "
-      const fs=require('fs');
-      let c=fs.readFileSync('$path','utf8').slice(0,3000);
-      // Redact secrets
-      c=c.replace(/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/g,'\$1***');
-      c=c.replace(/(postgres(ql)?:\/\/[^:]+:)[^@]+(@)/g,'\$1***\$3');
-      c=c.replace(/(mongodb(\+srv)?:\/\/[^:]+:)[^@]+(@)/g,'\$1***\$3');
-      console.log(JSON.stringify(c));
-    " 2>/dev/null || echo '""')"
+    if [ -f "$SCRIPT_DIR/lib/ctx-debug-redact.mjs" ]; then
+      content_json="$(node "$SCRIPT_DIR/lib/ctx-debug-redact.mjs" "$path" 2>/dev/null || echo '""')"
+    else
+      content_json="$(node -e "
+        const fs=require('fs');
+        let c=fs.readFileSync('$path','utf8');
+        c=c.replace(/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/g,'\$1***');
+        c=c.replace(/(postgres(ql)?:\/\/[^:]+:)[^@]+(@)/g,'\$1***\$3');
+        c=c.replace(/(mongodb(\+srv)?:\/\/[^:]+:)[^@]+(@)/g,'\$1***\$3');
+        c=c.replace(/(\"[^\"]*(token|secret|passw(or)?d|api[_-]?key|credential|authorization)[^\"]*\"\s*:\s*\")[^\"]+(\")/gi,'\$1***\$4');
+        console.log(JSON.stringify(c.slice(0,3000)));
+      " 2>/dev/null || echo '""')"
+    fi
     printf '{"t":"cfg","s":"%s","k":"%s","path":"%s","exists":true,"content":%s}\n' "$CURRENT_SECTION" "$(_jesc "$label")" "$(_jesc "$display")" "$content_json" >> "$JSONL_FILE"
   else
     kv "$label" "$display (not found)"
