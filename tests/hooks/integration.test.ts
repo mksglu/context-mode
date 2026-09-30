@@ -621,66 +621,60 @@ describe("Security Policy Enforcement", () => {
   });
 });
 
-describe("Plugin Tool Name Format in ROUTING_BLOCK", () => {
-  // When installed via Claude Code plugin marketplace, tool names follow:
-  //   mcp__plugin_<plugin-id>_<server-name>__<tool-name>
-  // For context-mode: mcp__plugin_context-mode_context-mode__<tool-name>
-  // The short form mcp__context-mode__* only works for direct MCP registration.
-
+// These tests run without CLAUDE_PLUGIN_ROOT → standalone prefix (mcp__context-mode__*).
+// In plugin installs (CLAUDE_PLUGIN_ROOT set), the guidance uses the plugin prefix.
+describe("Standalone Tool Name Format in ROUTING_BLOCK", () => {
+  const STANDALONE_PREFIX = "mcp__context-mode__";
   const PLUGIN_PREFIX = "mcp__plugin_context-mode_context-mode__";
-  const SHORT_PREFIX = "mcp__context-mode__";
 
-  test("Agent routing block uses plugin-format tool names", () => {
+  test("Agent routing block uses standalone-format tool names", () => {
     const result = runHook({ tool_name: "Agent", tool_input: { prompt: "Do something." } });
     assert.equal(result.exitCode, 0);
     const parsed = JSON.parse(result.stdout);
     const prompt = parsed.hookSpecificOutput.updatedInput.prompt;
-    assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_batch_execute"), "Expected plugin-format ctx_batch_execute");
-    assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_search"), "Expected plugin-format ctx_search");
-    assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_execute"), "Expected plugin-format ctx_execute");
-    assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_fetch_and_index"), "Expected plugin-format ctx_fetch_and_index");
-    assert.ok(!prompt.includes(SHORT_PREFIX + "ctx_batch_execute"), "Must not contain short-form ctx_batch_execute");
+    assert.ok(prompt.includes(STANDALONE_PREFIX + "ctx_batch_execute"), "Expected standalone ctx_batch_execute");
+    assert.ok(prompt.includes(STANDALONE_PREFIX + "ctx_search"), "Expected standalone ctx_search");
+    assert.ok(prompt.includes(STANDALONE_PREFIX + "ctx_execute"), "Expected standalone ctx_execute");
+    assert.ok(prompt.includes(STANDALONE_PREFIX + "ctx_fetch_and_index"), "Expected standalone ctx_fetch_and_index");
+    assert.ok(!prompt.includes(PLUGIN_PREFIX + "ctx_batch_execute"), "Must not contain plugin-format names in standalone mode");
   });
 
-  test("Read nudge uses plugin-format execute_file tool name", () => {
+  test("Read nudge uses standalone-format execute_file tool name", () => {
     const result = runHook({ tool_name: "Read", tool_input: { file_path: "/some/file.ts" } });
     assert.equal(result.exitCode, 0);
     const parsed = JSON.parse(result.stdout);
     const ctx = parsed.hookSpecificOutput.additionalContext;
-    assert.ok(ctx.includes(PLUGIN_PREFIX + "ctx_execute_file"), "Expected plugin-format ctx_execute_file in Read nudge");
-    assert.ok(!ctx.includes(SHORT_PREFIX + "ctx_execute_file"), "Read nudge must not contain short-form ctx_execute_file");
+    assert.ok(ctx.includes(STANDALONE_PREFIX + "ctx_execute_file"), "Expected standalone ctx_execute_file in Read nudge");
+    assert.ok(!ctx.includes(PLUGIN_PREFIX + "ctx_execute_file"), "Read nudge must not contain plugin-format names in standalone mode");
   });
 
-  test("Grep nudge uses plugin-format execute tool name", () => {
+  test("Grep nudge uses standalone-format execute tool name", () => {
     const result = runHook({ tool_name: "Grep", tool_input: { pattern: "TODO" } });
     assert.equal(result.exitCode, 0);
     const parsed = JSON.parse(result.stdout);
     const ctx = parsed.hookSpecificOutput.additionalContext;
-    assert.ok(ctx.includes(PLUGIN_PREFIX + "ctx_execute"), "Expected plugin-format ctx_execute in Grep nudge");
-    assert.ok(!ctx.includes(SHORT_PREFIX + "ctx_execute"), "Grep nudge must not contain short-form ctx_execute");
+    assert.ok(ctx.includes(STANDALONE_PREFIX + "ctx_execute"), "Expected standalone ctx_execute in Grep nudge");
+    assert.ok(!ctx.includes(PLUGIN_PREFIX + "ctx_execute"), "Grep nudge must not contain plugin-format names in standalone mode");
   });
 
-  test("WebFetch deny reason uses plugin-format fetch_and_index tool name", () => {
+  test("WebFetch deny reason uses standalone-format fetch_and_index tool name", () => {
     const result = runHook({ tool_name: "WebFetch", tool_input: { url: "https://example.com" } });
     assert.equal(result.exitCode, 0);
     const parsed = JSON.parse(result.stdout);
     const reason = parsed.hookSpecificOutput.permissionDecisionReason;
-    assert.ok(reason.includes(PLUGIN_PREFIX + "ctx_fetch_and_index"), "Expected plugin-format ctx_fetch_and_index in WebFetch deny");
-    assert.ok(!reason.includes(SHORT_PREFIX + "ctx_fetch_and_index"), "WebFetch deny must not contain short-form");
+    assert.ok(reason.includes(STANDALONE_PREFIX + "ctx_fetch_and_index"), "Expected standalone ctx_fetch_and_index in WebFetch deny");
+    assert.ok(!reason.includes(PLUGIN_PREFIX + "ctx_fetch_and_index"), "WebFetch deny must not contain plugin-format names in standalone mode");
   });
 
-  test("Bash inline-HTTP redirect uses plugin-format execute tool name (in deny reason)", () => {
-    // CC v2.1.x Bash tool ignores updatedInput.command — the formatter now
-    // emits deny + permissionDecisionReason. The plugin-format tool name
-    // assertion moves from updatedInput.command to permissionDecisionReason.
+  test("Bash inline-HTTP redirect uses standalone-format execute tool name (in deny reason)", () => {
     const bashCmd = "python3 -c 'import requests; requests.get(url)'";
     const result = runHook({ tool_name: "Bash", tool_input: { command: bashCmd } });
     assert.equal(result.exitCode, 0);
     const parsed = JSON.parse(result.stdout);
     const reason = parsed.hookSpecificOutput.permissionDecisionReason;
     assert.ok(typeof reason === "string" && reason.length > 0, "Expected non-empty permissionDecisionReason");
-    assert.ok(reason.includes(PLUGIN_PREFIX + "ctx_execute"), "Expected plugin-format ctx_execute in inline-HTTP redirect reason");
-    assert.ok(!reason.includes(SHORT_PREFIX + "ctx_execute"), "Inline-HTTP redirect must not contain short-form ctx_execute");
+    assert.ok(reason.includes(STANDALONE_PREFIX + "ctx_execute"), "Expected standalone ctx_execute in inline-HTTP redirect reason");
+    assert.ok(!reason.includes(PLUGIN_PREFIX + "ctx_execute"), "Inline-HTTP redirect must not contain plugin-format names in standalone mode");
   });
 });
 
