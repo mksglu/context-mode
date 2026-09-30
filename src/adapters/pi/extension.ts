@@ -716,10 +716,13 @@ export default function piExtension(pi: any): void {
       }
 
       // Store extra context (routing anchor, active_memory, resume, behavioralDirective)
-      // for injection via the 'context' hook as a message, NOT as a systemPrompt
-      // modification. Mutating systemPrompt breaks prefix prompt caching on
-      // DeepSeek/Anthropic/OpenAI because the system message sits at messages[0]
-      // and any change invalidates the entire cache chain.
+      // for injection via the 'context' hook as a hidden custom message, NOT as a
+      // systemPrompt modification. Mutating systemPrompt breaks prefix prompt
+      // caching on DeepSeek/Anthropic/OpenAI because the system message sits at
+      // messages[0] and any change invalidates the entire cache chain. A plain
+      // user-role message is also wrong here: Pi treats user messages as
+      // interactive conversation entries, which can leak this internal context
+      // into the CLI entry/editor surface.
       const baseLen = existingPrompt ? 1 : 0;
       if (parts.length > baseLen) {
         const extraParts = parts.slice(baseLen);
@@ -734,17 +737,20 @@ export default function piExtension(pi: any): void {
   });
 
   // ── 4a2. context — Inject active_memory + resume + behavioralDirective as message ──
-  // Uses the 'context' hook (like hindsight does) to append context at the END of
-  // messages rather than mutating systemPrompt at the beginning. This preserves
-  // prefix prompt cache for DeepSeek, Anthropic, and OpenAI.
+  // Uses the 'context' hook to append hidden context at the END of messages rather
+  // than mutating systemPrompt at the beginning. This preserves prefix prompt
+  // cache for DeepSeek, Anthropic, and OpenAI without rendering internal
+  // context-mode text in Pi's CLI entry/editor surface.
   pi.on("context", (event: any) => {
     try {
       if (!_pendingContext) return;
       const ctx = _pendingContext;
       _pendingContext = "";
       event.messages.push({
-        role: "user",
+        role: "custom",
+        customType: "context-mode-context",
         content: ctx,
+        display: false,
       });
       return { messages: event.messages };
     } catch {

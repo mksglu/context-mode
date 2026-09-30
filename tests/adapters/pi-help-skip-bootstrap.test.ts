@@ -52,9 +52,11 @@ function createMockPi() {
     registerTool: vi.fn(),
     sendMessage: vi.fn(),
     _trigger: async (event: string, ...args: any[]) => {
+      const results = [];
       for (const handler of handlers[event] ?? []) {
-        await handler(...args);
+        results.push(await handler(...args));
       }
+      return results;
     },
   };
 }
@@ -126,6 +128,30 @@ describe("piExtension — lazy MCP bootstrap avoids brittle argv detection (#534
     await pi._trigger("before_agent_start", { prompt: "second", systemPrompt: "" });
 
     expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("injects context-mode guidance as a hidden custom message, not a user entry", async () => {
+    const { pi, spy } = await registerWithBootstrapSpy(["-p", "task"]);
+    const ctx = {
+      sessionManager: {
+        getSessionFile: () => join(scratch, "session.jsonl"),
+      },
+    };
+
+    await pi._trigger("session_start", {}, ctx);
+    await pi._trigger("before_agent_start", { prompt: "task", systemPrompt: "" });
+    const event = { messages: [{ role: "user", content: "task" }] };
+    const [result] = await pi._trigger("context", event);
+    const injected = result.messages.at(-1);
+
+    expect(injected).toMatchObject({
+      role: "custom",
+      customType: "context-mode-context",
+      display: false,
+    });
+    expect(injected.content).toContain("context-mode active");
+    expect(injected.role).not.toBe("user");
     spy.mockRestore();
   });
 });
