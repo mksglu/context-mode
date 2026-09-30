@@ -1161,6 +1161,7 @@ describe("Codex sessionstart hook script", () => {
 describe("Codex matcher parity + config integrity", () => {
   const repoRoot = resolve(__dirname, "..", "..");
   const adapterSrcPath = join(repoRoot, "src", "adapters", "codex", "index.ts");
+  const configTomlPath = join(repoRoot, "configs", "codex", "config.toml");
   const hooksConfigPath = join(repoRoot, "configs", "codex", "hooks.json");
   const readmePath = join(repoRoot, "README.md");
 
@@ -1189,6 +1190,12 @@ describe("Codex matcher parity + config integrity", () => {
     expect(parsed.hooks.PreCompact).toBeDefined();
     const entry = parsed.hooks.PreCompact?.[0];
     expect(entry?.hooks?.[0]?.command).toBe("context-mode hook codex precompact");
+  });
+
+  it("manual config pins CONTEXT_MODE_PLATFORM for the MCP server", () => {
+    const config = readFileSync(configTomlPath, "utf8");
+    expect(config).toContain("[mcp_servers.context-mode.env]");
+    expect(config).toContain('CONTEXT_MODE_PLATFORM = "codex"');
   });
 
   it("README documents the same Codex PreToolUse matcher as the adapter", () => {
