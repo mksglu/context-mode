@@ -9,7 +9,7 @@
  */
 
 import type { Database as DatabaseInstance } from "better-sqlite3";
-import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError } from "./db-base.js";
+import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, deleteDBFiles, isSQLiteCorruptionError, startWalCheckpointTimer } from "./db-base.js";
 import type { PreparedStatement } from "./db-base.js";
 import { readFileSync, readdirSync, unlinkSync, existsSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -416,6 +416,8 @@ export class ContentStore {
   // entries only become stale when new words enter — we clear on actual insert.
   #fuzzyCache = new Map<string, string | null>();
   static readonly FUZZY_CACHE_SIZE = 256;
+  /** Stops the opportunistic PASSIVE WAL checkpoint timer (#985); null when off. */
+  #checkpointStop: (() => void) | null = null;
 
   constructor(dbPath?: string) {
     const Database = loadDatabase();
@@ -450,6 +452,8 @@ export class ContentStore {
 
   /** Delete this session's DB files. Call on process exit. */
   cleanup(): void {
+    this.#checkpointStop?.();
+    this.#checkpointStop = null;
     try {
       this.#db.close();
     } catch { /* ignore */ }
@@ -1612,7 +1616,20 @@ export class ContentStore {
     } catch { /* best effort — don't block indexing */ }
   }
 
+  /**
+   * Begin opportunistic PASSIVE WAL checkpoints (#985). The server calls this
+   * for the shared content store so the WAL stays bounded even when the process
+   * is killed before close() can run its TRUNCATE checkpoint. Idempotent — a
+   * second call replaces the prior timer. Stopped by close()/cleanup().
+   */
+  startCheckpointTimer(intervalMs: number): void {
+    this.#checkpointStop?.();
+    this.#checkpointStop = startWalCheckpointTimer(this.#db, intervalMs);
+  }
+
   close(): void {
+    this.#checkpointStop?.();
+    this.#checkpointStop = null;
     this.#optimizeFTS(); // defragment before close
     closeDB(this.#db); // WAL checkpoint before close — important for persistent DBs
   }
