@@ -1438,11 +1438,12 @@ export interface BatchRunOptions {
   concurrency: number;
   nodeOptsPrefix: string;
   cwd?: string;
+  signal?: AbortSignal;
   onFsBytes?: (bytes: number) => void;
 }
 
 interface BatchExecutor {
-  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string }): Promise<{ stdout: string; timedOut?: boolean }>;
+  execute(input: { language: "shell"; code: string; timeout: number | undefined; cwd?: string; signal?: AbortSignal }): Promise<{ stdout: string; timedOut?: boolean }>;
 }
 
 function quotePosixSingle(value: string): string {
@@ -1562,7 +1563,7 @@ export async function runBatchCommands(
   opts: BatchRunOptions,
   executor: BatchExecutor,
 ): Promise<BatchRunResult> {
-  const { timeout, concurrency, nodeOptsPrefix, cwd, onFsBytes } = opts;
+  const { timeout, concurrency, nodeOptsPrefix, cwd, signal, onFsBytes } = opts;
 
   if (concurrency <= 1) {
     // Serial path — shared timeout budget, cascading skip on timeout.
@@ -1589,6 +1590,7 @@ export async function runBatchCommands(
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout: perCmdTimeout,
         cwd,
+        signal,
       });
       outputs.push(formatCommandOutput(cmd.label, cmd.command, combineExecOutput(result), onFsBytes));
       if (result.timedOut) {
@@ -1612,6 +1614,7 @@ export async function runBatchCommands(
         code: `${nodeOptsPrefix}${cmd.command}`,
         timeout,
         cwd,
+        signal,
       });
       // Always route partial output through formatCommandOutput so __CM_FS__
       // markers are stripped + counted, even when the command timed out.
@@ -1740,7 +1743,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
         ),
     }),
   },
-  async ({ language, code, timeout, background, cwd, intent }) => {
+  async ({ language, code, timeout, background, cwd, intent }, extra) => {
     // Security: deny-only firewall
     if (language === "shell") {
       const denied = checkDenyPolicy(code, "execute");
@@ -1819,7 +1822,7 @@ __cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nse
 })(typeof require!=='undefined'?require:null);`;
       }
       const effTimeout = resolveExecTimeout(timeout);
-      const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd });
+      const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd, signal: extra?.signal });
 
       // Echo the executed source code before stdout so users can audit
       // and tooling can block command patterns (Issues #717 + #736).
@@ -2111,7 +2114,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         ),
     }),
   },
-  async ({ path, language, code, timeout, intent }) => {
+  async ({ path, language, code, timeout, intent }, extra) => {
     // Security (#852): confine the processed file to the project root so
     // ctx_execute_file cannot be used to escape the host's sandbox/permission
     // controls. Runs before the deny-glob check — boundary first, then policy.
@@ -2138,6 +2141,7 @@ EXAMPLE: ctx_execute_file(path: "data.csv", language: "javascript", code: "const
         language,
         code,
         timeout: effTimeout,
+        signal: extra?.signal,
       });
 
       // Echo path + executed source code before stdout for audit/debug
@@ -3285,7 +3289,7 @@ export function classifyIp(rawIp: string): "block" | "private" | "public" {
   return "public";
 }
 
-async function fetchOneUrl(url: string, source: string | undefined, force: boolean | undefined, ttl: number | undefined): Promise<FetchOneResult> {
+async function fetchOneUrl(url: string, source: string | undefined, force: boolean | undefined, ttl: number | undefined, signal?: AbortSignal): Promise<FetchOneResult> {
   // SSRF guard — reject file://, javascript:, loopback, RFC1918, IMDS, link-local
   // BEFORE any cache lookup or subprocess spawn. Even cached entries shouldn't
   // serve a previously-poisoned source label.
@@ -3321,6 +3325,7 @@ async function fetchOneUrl(url: string, source: string | undefined, force: boole
       language: "javascript",
       code: fetchCode,
       timeout: 30_000,
+      signal,
     });
     if (result.exitCode !== 0) {
       // Subprocess fetch failure — undici / fetch can surface EAI_AGAIN /
@@ -3492,7 +3497,7 @@ EXAMPLE: ctx_fetch_and_index(
         ),
     }),
   },
-  async ({ url, source, requests, concurrency, force, ttl }) => {
+  async ({ url, source, requests, concurrency, force, ttl }, extra) => {
     // Normalize input: legacy {url} or new {requests: [...]}.
     // requests wins when both are provided (explicit batch intent).
     const batch: { url: string; source?: string }[] = requests
@@ -3517,7 +3522,7 @@ EXAMPLE: ctx_fetch_and_index(
     // Parallel fetch via shared runPool primitive. capByCpuCount only for batch
     // — single-URL doesn't need the cap (only one job, executor is one subprocess).
     const jobs: PoolJob<FetchOneResult>[] = batch.map((req) => ({
-      run: () => fetchOneUrl(req.url, req.source, force, ttl),
+      run: () => fetchOneUrl(req.url, req.source, force, ttl, extra?.signal),
     }));
     const { settled, effectiveConcurrency, capped } = await runPool(jobs, {
       concurrency: requestedConcurrency,
@@ -3775,7 +3780,7 @@ EXAMPLE: ctx_batch_execute(
         ),
     }),
   },
-  async ({ commands, queries, timeout, concurrency, cwd, query_scope }) => {
+  async ({ commands, queries, timeout, concurrency, cwd, query_scope }, extra) => {
     // Security: check each command against deny patterns
     for (const cmd of commands) {
       const denied = checkDenyPolicy(cmd.command, "batch_execute");
@@ -3798,6 +3803,7 @@ EXAMPLE: ctx_batch_execute(
           concurrency,
           nodeOptsPrefix,
           cwd,
+          signal: extra?.signal,
           onFsBytes: (bytes) => { sessionStats.bytesSandboxed += bytes; },
         },
         executor,
