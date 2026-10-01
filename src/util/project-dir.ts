@@ -154,88 +154,63 @@ export function resolveProjectDirFromTranscript(opts: {
 }
 
 /**
- * Issue #45 / c4529042182 — recover the project-cwd from a Codex CLI
- * session log when the spawned MCP child inherits a non-project cwd
- * (e.g. $HOME when Codex was launched from anywhere outside the project).
+ * Best-effort "last activity" timestamp for a Codex rollout, read from its
+ * own content rather than filesystem mtime.
  *
- * Codex writes its session transcripts to either
- * `${CODEX_HOME ?? ~/.codex}/sessions/<uuid>.jsonl` (CLI) or a dated desktop
- * layout such as
- * `${CODEX_HOME ?? ~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl`.
- * The cwd appears on `meta.cwd` for the CLI shape and on
- * `payload.cwd` in `type: "session_meta"` records for Codex Desktop. Codex
- * publishes NO workspace env var to its child MCP processes — so unlike
- * Claude/Pi/Cursor, we have no env signal at all. The session log is the
- * strongest available signal.
+ * Issue #1210 — on Windows, Codex does not update a rollout's mtime while
+ * appending to it; confirmed against real rollout files on a live Windows
+ * machine (3 of 4 sampled sessions had mtime pinned to the first entry's
+ * timestamp even after 30+ minutes of logged activity; the fourth, a
+ * multi-day resumed session, only updated mtime when reopened). mtime is
+ * therefore not a trustworthy "is this session still active" signal there.
  *
- * Mirror of `resolveProjectDirFromTranscript` for Claude Code; differences:
- *   • Sessions may live flat or in a dated hierarchy (no per-project encoded
- *     subdir like Claude's `~/.claude/projects/<encoded>/`).
- *   • The cwd is nested on `meta.cwd` or `payload.cwd`, not top-level `cwd`.
+ * Every JSONL line Codex writes carries its own top-level `timestamp` field
+ * — data Codex itself recorded at the moment of the event, independent of
+ * OS-level write-buffering/flush behavior. Reads a bounded tail chunk and
+ * returns the latest parseable one, scanning backwards from EOF since JSONL
+ * is strictly append-only (last line = most recent event).
  *
- * Returns `null` when:
- *   • `codexHome` or its `sessions/` subdir does not exist.
- *   • No `.jsonl` files exist or none has a parseable cwd string.
- *   • The newest log is older than `transcriptMaxAgeMs` (multi-window guard).
- *   • The resolved cwd points at a plugin install path (poisoned).
+ * Returns `null` when the file carries no parseable timestamp (e.g. older
+ * CLI formats that predate this field) — callers fall back to mtime.
  */
-export function resolveCodexSessionCwd(opts?: {
-  /** Defaults to `process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex")`. */
-  codexHome?: string;
-  /**
-   * Optional freshness guard — Codex appends to the active log while the
-   * session is running, so a stale log from days ago must not become a
-   * global project-dir signal.
-   */
-  transcriptMaxAgeMs?: number;
-  /** Test seam for transcriptMaxAgeMs. Defaults to Date.now(). */
-  now?: number;
-}): string | null {
-  const codexHome =
-    opts?.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
-  const sessionsDir = path.join(codexHome, "sessions");
-  if (!fs.existsSync(sessionsDir)) return null;
-
-  const MAX_SCAN_DEPTH = 4; // sessions/YYYY/MM/DD/<file>.jsonl plus one spare.
-  const MAX_SCAN_ENTRIES = 10_000;
-  let visitedEntries = 0;
-  let bestPath: string | undefined;
-  let bestMtime = 0;
-  const visit = (dir: string, depth: number) => {
-    if (visitedEntries >= MAX_SCAN_ENTRIES) return;
-    let entries: string[];
-    try { entries = fs.readdirSync(dir); } catch { return; }
-    entries.sort().reverse();
-    for (const entry of entries) {
-      if (visitedEntries >= MAX_SCAN_ENTRIES) return;
-      visitedEntries++;
-      const fp = path.join(dir, entry);
-      let stat;
-      try { stat = fs.statSync(fp); } catch { continue; }
-      if (stat.isDirectory()) {
-        if (depth < MAX_SCAN_DEPTH) visit(fp, depth + 1);
-        continue;
-      }
-      if (!stat.isFile() || !entry.endsWith(".jsonl")) continue;
-      const m = stat.mtimeMs;
-      if (m > bestMtime) { bestMtime = m; bestPath = fp; }
-    }
-  };
+function readLastCodexTimestampMs(filePath: string, sizeBytes: number): number | null {
+  const TAIL_CHUNK = 65536;
   try {
-    visit(sessionsDir, 0);
-  } catch { return null; }
+    const fd = fs.openSync(filePath, "r");
+    try {
+      const length = Math.min(TAIL_CHUNK, sizeBytes);
+      const start = Math.max(0, sizeBytes - length);
+      const buf = Buffer.alloc(length);
+      const bytes = fs.readSync(fd, buf, 0, length, start);
+      const text = buf.subarray(0, bytes).toString("utf-8");
+      const lines = text.split("\n").filter((l) => l.trim().length > 0);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const obj = JSON.parse(lines[i]) as { timestamp?: unknown };
+          if (typeof obj.timestamp !== "string") continue;
+          const ms = Date.parse(obj.timestamp);
+          if (!Number.isNaN(ms)) return ms;
+        } catch { /* partial line at chunk boundary, or malformed — try the one before it */ }
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch { /* file vanished mid-read */ }
+  return null;
+}
 
-  if (!bestPath) return null;
-  if (typeof opts?.transcriptMaxAgeMs === "number") {
-    const nowMs = opts.now ?? Date.now();
-    if (nowMs - bestMtime > opts.transcriptMaxAgeMs) return null;
-  }
-
+/**
+ * Read the `cwd` out of a Codex rollout file's head chunk.
+ *
+ * Returns `null` when the file is unreadable, carries no parseable cwd, or
+ * the cwd resolves to a plugin install path (poisoned).
+ */
+function readCwdFromCodexRollout(filePath: string): string | null {
   // Read a bounded head chunk. Codex Desktop's first session_meta line can be
   // larger than Claude/Codex CLI metadata because it includes dynamic tool and
   // instruction fields, but the full transcript can still be tens of MB.
   try {
-    const fd = fs.openSync(bestPath, "r");
+    const fd = fs.openSync(filePath, "r");
     try {
       const buf = Buffer.alloc(1024 * 1024);
       const bytes = fs.readSync(fd, buf, 0, buf.length, 0);
@@ -258,8 +233,93 @@ export function resolveCodexSessionCwd(opts?: {
     } finally {
       fs.closeSync(fd);
     }
-  } catch { return null; /* file vanished mid-read */ }
+  } catch { /* file vanished mid-read */ }
   return null;
+}
+
+/**
+ * Issue #45 / c4529042182 — recover the project-cwd from a Codex CLI
+ * session log when the spawned MCP child inherits a non-project cwd
+ * (e.g. $HOME when Codex was launched from anywhere outside the project).
+ *
+ * Codex writes its session transcripts to either
+ * `${CODEX_HOME ?? ~/.codex}/sessions/<uuid>.jsonl` (CLI) or a dated desktop
+ * layout such as
+ * `${CODEX_HOME ?? ~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl`.
+ * The cwd appears on `meta.cwd` for the CLI shape and on
+ * `payload.cwd` in `type: "session_meta"` records for Codex Desktop. Codex
+ * publishes NO workspace env var to its child MCP processes — so unlike
+ * Claude/Pi/Cursor, we have no env signal at all. The session log is the
+ * strongest available signal.
+ *
+ * Mirror of `resolveProjectDirFromTranscript` for Claude Code; differences:
+ *   • Sessions may live flat or in a dated hierarchy (no per-project encoded
+ *     subdir like Claude's `~/.claude/projects/<encoded>/`).
+ *   • The cwd is nested on `meta.cwd` or `payload.cwd`, not top-level `cwd`.
+ *
+ * Selection (which rollout is "the" session) is unchanged: newest mtime
+ * anywhere under `sessions/`. Issue #1210 only changes the *freshness* check
+ * — see {@link readLastCodexTimestampMs} for why mtime can't be trusted for
+ * that on Windows. When the file carries no content timestamp at all, the
+ * freshness check falls back to the original mtime comparison so older/CLI
+ * formats keep working exactly as before.
+ *
+ * Returns `null` when `sessionsDir` doesn't exist, no `.jsonl` file is found,
+ * the selected file is stale, or it carries no parseable, non-plugin-path cwd.
+ */
+export function resolveCodexSessionCwd(opts?: {
+  /** Defaults to `process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex")`. */
+  codexHome?: string;
+  /**
+   * Optional freshness guard — a stale log from days ago must not become a
+   * global project-dir signal. Checked against the file's own last logged
+   * timestamp when available (issue #1210), else its mtime.
+   */
+  transcriptMaxAgeMs?: number;
+  /** Test seam for transcriptMaxAgeMs. Defaults to Date.now(). */
+  now?: number;
+}): string | null {
+  const codexHome =
+    opts?.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
+  const sessionsDir = path.join(codexHome, "sessions");
+  if (!fs.existsSync(sessionsDir)) return null;
+
+  const MAX_SCAN_DEPTH = 4; // sessions/YYYY/MM/DD/<file>.jsonl plus one spare.
+  const MAX_SCAN_ENTRIES = 10_000;
+  let visitedEntries = 0;
+  let bestPath: string | undefined;
+  let bestMtime = 0;
+  let bestSize = 0;
+  const visit = (dir: string, depth: number) => {
+    if (visitedEntries >= MAX_SCAN_ENTRIES) return;
+    let entries: string[];
+    try { entries = fs.readdirSync(dir); } catch { return; }
+    entries.sort().reverse();
+    for (const entry of entries) {
+      if (visitedEntries >= MAX_SCAN_ENTRIES) return;
+      visitedEntries++;
+      const fp = path.join(dir, entry);
+      let stat;
+      try { stat = fs.statSync(fp); } catch { continue; }
+      if (stat.isDirectory()) {
+        if (depth < MAX_SCAN_DEPTH) visit(fp, depth + 1);
+        continue;
+      }
+      if (!stat.isFile() || !entry.endsWith(".jsonl")) continue;
+      if (stat.mtimeMs > bestMtime) { bestMtime = stat.mtimeMs; bestPath = fp; bestSize = stat.size; }
+    }
+  };
+  try {
+    visit(sessionsDir, 0);
+  } catch { return null; }
+
+  if (!bestPath) return null;
+  if (typeof opts?.transcriptMaxAgeMs === "number") {
+    const nowMs = opts.now ?? Date.now();
+    const lastActivityMs = readLastCodexTimestampMs(bestPath, bestSize) ?? bestMtime;
+    if (nowMs - lastActivityMs > opts.transcriptMaxAgeMs) return null;
+  }
+  return readCwdFromCodexRollout(bestPath);
 }
 
 /**
