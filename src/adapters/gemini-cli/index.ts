@@ -32,6 +32,7 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter } from "../base.js";
+import { parseNodeCommand } from "../types.js";
 
 import type {
   HookAdapter,
@@ -509,6 +510,35 @@ export class GeminiCLIAdapter extends BaseAdapter implements HookAdapter {
 
     for (const config of hookConfigs) {
       const command = buildGeminiHookCommand(config.name as GeminiHookType, pluginRoot);
+      const ownsCommand = (value: unknown): boolean => {
+        if (typeof value !== "string") return false;
+        const trimmed = value.trim();
+        if (trimmed === command || trimmed === buildGeminiHookCommand(config.name as GeminiHookType)) return true;
+        const parsed = parseNodeCommand(trimmed);
+        let runtime = parsed?.nodePath;
+        let script = parsed?.scriptPath;
+        if (!parsed) {
+          for (const name of ["node", "bun"]) {
+            if (!trimmed.startsWith(`${name} `)) continue;
+            runtime = name;
+            script = trimmed.slice(name.length + 1).trim();
+            const quote = script[0];
+            if (quote === '"' || quote === "'") {
+              if (!script.endsWith(quote)) return false;
+              script = script.slice(1, -1);
+              if (script.includes(quote)) return false;
+            } else if (Array.from(script).some((character) => character.trim() === "")) {
+              return false;
+            }
+            break;
+          }
+        }
+        if (!runtime || !script) return false;
+        const binary = runtime.replaceAll("\\", "/").split("/").pop()?.toLowerCase();
+        if (!["node", "node.exe", "bun", "bun.exe"].includes(binary ?? "")) return false;
+        const path = script.replaceAll("\\", "/");
+        return path.includes("/context-mode/") && path.endsWith(`/hooks/gemini-cli/${GEMINI_HOOK_SCRIPTS[config.name as GeminiHookType]}`);
+      };
       const entry = {
         matcher: "",
         hooks: [{ type: "command", command }],
@@ -520,11 +550,23 @@ export class GeminiCLIAdapter extends BaseAdapter implements HookAdapter {
       if (existing && Array.isArray(existing)) {
         const idx = existing.findIndex((e) => {
           const entryHooks = e.hooks as Array<{ command?: string }> | undefined;
-          return entryHooks?.some((h) => h.command?.includes("context-mode"));
+          return entryHooks?.some((h) => ownsCommand(h.command));
         });
         if (idx >= 0) {
-          existing[idx] = entry;
-          changes.push(`Updated existing ${config.name} hook entry`);
+          const current = existing[idx];
+          const currentHooks = current.hooks as Array<Record<string, unknown>>;
+          const updated = {
+            ...current,
+            hooks: currentHooks.map((hook) =>
+              ownsCommand(hook.command)
+                ? { ...hook, type: "command", command }
+                : hook,
+            ),
+          };
+          if (JSON.stringify(current) !== JSON.stringify(updated)) {
+            existing[idx] = updated;
+            changes.push(`Updated existing ${config.name} hook entry`);
+          }
         } else {
           existing.push(entry);
           changes.push(`Added ${config.name} hook entry`);
@@ -537,7 +579,7 @@ export class GeminiCLIAdapter extends BaseAdapter implements HookAdapter {
     }
 
     settings.hooks = hooks;
-    this.writeSettings(settings);
+    if (changes.length > 0) this.writeSettings(settings);
     return changes;
   }
 

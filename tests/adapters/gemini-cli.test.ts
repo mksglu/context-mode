@@ -17,6 +17,101 @@ describe("GeminiCLIAdapter", () => {
     adapter = new GeminiCLIAdapter();
   });
 
+  it("refreshes its command without deleting sibling hooks or entry metadata", () => {
+    const guard = { type: "command", command: "node policy-check.mjs", timeout: 15000 };
+    const audit = { type: "command", command: "node audit-event.mjs" };
+    adapter.writeSettings({
+      retained: { enabled: true },
+      hooks: {
+        [HOOK_TYPES.BEFORE_TOOL]: [{
+          matcher: "run_shell_command",
+          sequential: true,
+          hooks: [guard, {
+            type: "command",
+            command: "node /old/context-mode/hooks/gemini-cli/beforetool.mjs",
+            timeout: 30000,
+          }, audit],
+        }],
+      },
+    });
+
+    adapter.configureAllHooks("/new/context-mode");
+    const written = adapter.readSettings()!;
+    const hooks = written.hooks as Record<string, unknown[]>;
+    expect(hooks[HOOK_TYPES.BEFORE_TOOL]).toEqual([{
+      matcher: "run_shell_command",
+      sequential: true,
+      hooks: [guard, {
+        type: "command",
+        command: buildHookCommand(HOOK_TYPES.BEFORE_TOOL, "/new/context-mode"),
+        timeout: 30000,
+      }, audit],
+    }]);
+    expect(written.retained).toEqual({ enabled: true });
+    expect(adapter.configureAllHooks("/new/context-mode")).toEqual([]);
+  });
+
+  it.each([HOOK_TYPES.BEFORE_AGENT, HOOK_TYPES.BEFORE_TOOL, HOOK_TYPES.SESSION_START])(
+    "preserves separate %s registrations while adding its hook",
+    (hookType) => {
+      const external = {
+        matcher: "company-tool",
+        sequential: true,
+        hooks: [{ type: "command", command: "node company-policy.mjs", timeout: 15000 }],
+      };
+      adapter.writeSettings({ hooks: { [hookType]: [external] } });
+      adapter.configureAllHooks("/new/context-mode");
+      const hooks = adapter.readSettings()!.hooks as Record<string, unknown[]>;
+      expect(hooks[hookType]).toEqual([external, {
+        matcher: "",
+        hooks: [{ type: "command", command: buildHookCommand(hookType, "/new/context-mode") }],
+      }]);
+      expect(adapter.configureAllHooks("/new/context-mode")).toEqual([]);
+    },
+  );
+
+  it("does not mistake a context-mode audit callback for its own hook", () => {
+    const external = {
+      type: "command",
+      command: "node /company/context-mode-audit.mjs --tag beforetool.mjs",
+      timeout: 15000,
+    };
+    const pathArgument = {
+      type: "command",
+      command: "node /company/audit.mjs --tag /context-mode/hooks/gemini-cli/beforetool.mjs",
+    };
+    adapter.writeSettings({ hooks: {
+      [HOOK_TYPES.BEFORE_TOOL]: [{ matcher: "", hooks: [external, pathArgument, {
+        type: "command",
+        command: "node /old/context-mode/hooks/gemini-cli/beforetool.mjs",
+      }] }],
+    } });
+    adapter.configureAllHooks("/new/context-mode");
+    const hooks = adapter.readSettings()!.hooks as Record<string, Array<{ hooks: unknown[] }>>;
+    expect(hooks[HOOK_TYPES.BEFORE_TOOL][0].hooks).toEqual([external, pathArgument, {
+      type: "command",
+      command: buildHookCommand(HOOK_TYPES.BEFORE_TOOL, "/new/context-mode"),
+    }]);
+  });
+
+  it.each([
+    '"C:/Program Files/nodejs/node.exe" "C:/Users/Rudy/context-mode/hooks/gemini-cli/beforetool.mjs"',
+    "bun '/old/context-mode/hooks/gemini-cli/beforetool.mjs'",
+    "context-mode hook gemini-cli beforetool",
+  ])("refreshes a known legacy command without duplicating custom install hooks: %s", (legacy) => {
+    adapter.writeSettings({ hooks: {
+      [HOOK_TYPES.BEFORE_TOOL]: [{ matcher: "", hooks: [{
+        type: "command", command: legacy, timeout: 30000,
+      }] }],
+    } });
+    adapter.configureAllHooks("/custom/installation");
+    const hooks = adapter.readSettings()!.hooks as Record<string, Array<{ hooks: unknown[] }>>;
+    expect(hooks[HOOK_TYPES.BEFORE_TOOL]).toEqual([{ matcher: "", hooks: [{
+      type: "command", command: buildHookCommand(HOOK_TYPES.BEFORE_TOOL, "/custom/installation"), timeout: 30000,
+    }] }]);
+    expect(adapter.configureAllHooks("/custom/installation")).toEqual([]);
+  });
+
   // ── Capabilities ──────────────────────────────────────
 
   describe("capabilities", () => {
