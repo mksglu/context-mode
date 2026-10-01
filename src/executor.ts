@@ -287,11 +287,6 @@ export class PolyglotExecutor {
       const filePath = this.#writeScript(tmpDir, code, language);
       const cmd = buildCommand(this.#runtimes, language, filePath);
 
-      // Rust: compile then run
-      if (cmd[0] === "__rust_compile_run__") {
-        return await this.#compileAndRun(filePath, tmpDir, timeout);
-      }
-
       // Every language runs in the project directory so git, relative paths,
       // and other project-aware tools resolve naturally. The script FILE lives
       // in the sandbox tmpDir and is passed to the runtime by absolute path
@@ -304,7 +299,9 @@ export class PolyglotExecutor {
       // Issue #45 — `cwdOverride` lets per-call sites (Codex MCP handlers) pin
       // cwd without mutating process-wide state.
       const cwd = cwdOverride ?? this.#projectRoot;
-      const result = await this.#spawn(cmd, cwd, tmpDir, timeout, background);
+      const result = cmd[0] === "__rust_compile_run__"
+        ? await this.#compileAndRun(filePath, cwd, tmpDir, timeout, background)
+        : await this.#spawn(cmd, cwd, tmpDir, timeout, background);
 
       // Skip tmpDir cleanup if process was backgrounded — it may still need files
       if (!result.backgrounded) {
@@ -377,7 +374,9 @@ export class PolyglotExecutor {
   async #compileAndRun(
     srcPath: string,
     cwd: string,
+    sandboxTmpDir: string,
     timeout: number | undefined,
+    background: boolean,
   ): Promise<ExecResult> {
     const binSuffix = isWin ? ".exe" : "";
     const binPath = srcPath.replace(/\.rs$/, "") + binSuffix;
@@ -403,7 +402,7 @@ export class PolyglotExecutor {
     }
 
     // Run
-    return this.#spawn([binPath], cwd, cwd, timeout);
+    return this.#spawn([binPath], cwd, sandboxTmpDir, timeout, background);
   }
 
   async #spawn(
