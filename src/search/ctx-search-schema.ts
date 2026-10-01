@@ -52,7 +52,7 @@ function coerceJsonArray(val: unknown): unknown {
 /**
  * Build the Zod object passed to `server.registerTool("ctx_search", …)`.
  *
- * The base fields (`queries`, `limit`, `source`, `contentType`, `sort`)
+ * The base fields (`queries`, `query`, `limit`, `source`, `contentType`, `sort`)
  * are always present and mirror today's contract exactly. The `project`
  * field is only spread in when `isSharedMode` is true. When the host runs
  * with the default per-project DB layout the schema does not expose the
@@ -79,6 +79,13 @@ export function buildCtxSearchInputSchema(isSharedMode: boolean) {
       .array(z.string())
       .optional()
       .describe("Array of search queries. Batch ALL questions in one call.")),
+    // Singular alias for a one-question call (#1200). The handler lifts it
+    // to [query]; declaring it here (rather than handler-only) keeps strict
+    // hosts from stripping it before it arrives.
+    query: z
+      .string()
+      .optional()
+      .describe("Single search query. Equivalent to queries: [query]."),
     // limit: z.coerce.number() (not z.number()) — OpenCode's native
     // plugin path delivers tool args straight from the LLM provider's
     // tool-call JSON, where several providers stringify primitives
