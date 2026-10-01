@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   isPluginInstallPath,
+  resolveCodexSessionCwd,
   resolveProjectDir,
   resolveProjectDirFromTranscript,
 } from "../../src/util/project-dir.js";
@@ -408,5 +409,92 @@ describe("resolveProjectDirFromTranscript", () => {
     const output = runCompiledResolver("bun", ["-e", compiledResolverScript()]);
 
     expect(output).toBe("/Users/x/fallback");
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Issue #1210 — on Windows, Codex never bumps a rollout's mtime while
+// appending to it (mtime stays pinned to the first entry's timestamp for the
+// whole session), so the old "newest-mtime, must be younger than
+// transcriptMaxAgeMs" freshness check treated every Windows session as
+// abandoned 5 minutes after it started and fell through to the plugin
+// install dir. The fix reads the freshness signal from the rollout's own
+// last logged `timestamp` (content Codex itself wrote at event time) instead
+// of filesystem mtime, falling back to mtime only when no such timestamp is
+// present in the file.
+// ─────────────────────────────────────────────────────────
+
+function makeCodexHome(): string {
+  const d = mkdtempSync(join(tmpdir(), "ctx-codex-home-"));
+  cleanup.push(d);
+  return d;
+}
+
+function writeCodexRollout(
+  codexHome: string,
+  fileName: string,
+  cwd: string,
+  lastTimestamp?: string,
+): string {
+  const dir = join(codexHome, "sessions", "2026", "01", "01");
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, fileName);
+  const lines = [JSON.stringify({ timestamp: lastTimestamp, type: "session_meta", payload: { cwd } })];
+  if (lastTimestamp) {
+    // A later event line, mirroring real rollouts where the freshness-relevant
+    // timestamp is on the LAST line, not necessarily the first.
+    lines.push(JSON.stringify({ timestamp: lastTimestamp, type: "turn_context", payload: { cwd } }));
+  }
+  writeFileSync(file, lines.join("\n") + "\n");
+  return file;
+}
+
+describe("resolveCodexSessionCwd (issue #1210)", () => {
+  it("trusts the rollout's own last-logged timestamp over a stale mtime (Windows append bug)", () => {
+    const codexHome = makeCodexHome();
+    const now = Date.now();
+    const recentActivity = new Date(now - 60_000).toISOString(); // active 1 minute ago
+    const file = writeCodexRollout(codexHome, "rollout-a.jsonl", "/Users/x/real-proj", recentActivity);
+
+    // Simulate Windows: mtime pinned to session start, 10 minutes in the
+    // past — well outside the old 5-minute freshness window — even though
+    // the content shows activity 1 minute ago.
+    const sessionStart = now - 10 * 60_000;
+    utimesSync(file, new Date(sessionStart), new Date(sessionStart));
+
+    const result = resolveCodexSessionCwd({ codexHome, transcriptMaxAgeMs: 5 * 60_000, now });
+
+    expect(result).toBe("/Users/x/real-proj");
+  });
+
+  it("falls back to mtime freshness when the rollout carries no content timestamp (legacy/CLI shape)", () => {
+    const codexHome = makeCodexHome();
+    const now = Date.now();
+    const dir = join(codexHome, "sessions");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "legacy.jsonl");
+    writeFileSync(file, JSON.stringify({ meta: { cwd: "/Users/x/legacy-proj" } }) + "\n");
+    utimesSync(file, new Date(now - 10_000), new Date(now - 10_000)); // fresh mtime
+
+    const result = resolveCodexSessionCwd({ codexHome, transcriptMaxAgeMs: 30_000, now });
+
+    expect(result).toBe("/Users/x/legacy-proj");
+  });
+
+  it("rejects a rollout that is genuinely stale by its own last-logged timestamp", () => {
+    const codexHome = makeCodexHome();
+    const now = Date.now();
+    const oldActivity = new Date(now - 10 * 60_000).toISOString();
+    const file = writeCodexRollout(codexHome, "rollout-b.jsonl", "/Users/x/stale-proj", oldActivity);
+    utimesSync(file, new Date(now), new Date(now)); // mtime looks fresh, content says otherwise
+
+    const result = resolveCodexSessionCwd({ codexHome, transcriptMaxAgeMs: 5 * 60_000, now });
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the sessions dir does not exist", () => {
+    const result = resolveCodexSessionCwd({ codexHome: join(tmpdir(), "ctx-no-such-codex-home") });
+    expect(result).toBeNull();
   });
 });
