@@ -69,6 +69,53 @@ describe("CopilotCliAdapter", () => {
   });
 
   describe("hook config", () => {
+    it("preserves custom hooks and their ordering when refreshing context-mode", () => {
+      const before = { type: "command", command: "node policy-check.mjs", timeoutSec: 15 };
+      const after = { type: "command", command: "node audit-event.mjs", cwd: "/audit" };
+      adapter.writeSettings({
+        version: 1,
+        customSetting: { retained: true },
+        hooks: {
+          [HOOK_TYPES.PRE_TOOL_USE]: [before, {
+            type: "command",
+            command: buildHookCommand(HOOK_TYPES.PRE_TOOL_USE),
+            timeoutSec: 30,
+          }, after],
+          customEvent: [after],
+        },
+      });
+
+      adapter.configureAllHooks("/any/plugin/root");
+      const written = adapter.readSettings()!;
+      const hooks = written.hooks as Record<string, unknown[]>;
+      expect(hooks[HOOK_TYPES.PRE_TOOL_USE]).toEqual([before, {
+        type: "command",
+        command: buildHookCommand(HOOK_TYPES.PRE_TOOL_USE),
+        timeoutSec: 30,
+      }, after]);
+      expect(hooks.customEvent).toEqual([after]);
+      expect(written.customSetting).toEqual({ retained: true });
+      expect(adapter.configureAllHooks("/any/plugin/root")).toEqual([]);
+    });
+
+    it.each(Object.values(HOOK_TYPES))("adds %s alongside existing custom callbacks", (hookType) => {
+      const external = {
+        type: "command",
+        command: "node ./company-pretooluse.mjs",
+        bash: "./guard.sh",
+        powershell: ".\\guard.ps1",
+        timeoutSec: 15,
+      };
+      const http = { type: "http", url: "https://audit.invalid/events" };
+      adapter.writeSettings({ version: 1, hooks: { [hookType]: [external, http] } });
+      adapter.configureAllHooks("/any/plugin/root");
+      const hooks = adapter.readSettings()!.hooks as Record<string, unknown[]>;
+      expect(hooks[hookType]).toEqual([external, http, {
+        type: "command", command: buildHookCommand(hookType),
+      }]);
+      expect(adapter.configureAllHooks("/any/plugin/root")).toEqual([]);
+    });
+
     it("buildHookCommand emits CLI dispatcher form", () => {
       expect(buildHookCommand(HOOK_TYPES.PRE_TOOL_USE)).toBe("context-mode hook copilot-cli pretooluse");
     });
