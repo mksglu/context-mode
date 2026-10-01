@@ -108,6 +108,10 @@ function agySessionId(raw: Record<string, unknown>): string {
 
 function hookEntryHasCommand(entry: unknown, command: string): boolean {
   const e = asRecord(entry);
+  // agy stores Stop (and its invocation hooks) as a flat list of handler
+  // objects, so accept `command` directly as well as the grouped
+  // matcher/hooks form PreToolUse/PostToolUse use (#1206).
+  if (e.command === command) return true;
   const nested = Array.isArray(e.hooks) ? e.hooks : [];
   return nested.some((hook) => asRecord(hook).command === command);
 }
@@ -348,9 +352,12 @@ export class AntigravityCliAdapter extends AntigravityAdapter {
       matcher: "",
       hooks: [{ type: "command", command: POST_HOOK_COMMAND }],
     };
+    // agy 1.2.x rejects the whole hooks.json when Stop uses the grouped
+    // matcher/hooks form; it expects Stop as a flat list of handler objects
+    // (its bundled docs table groups only PreToolUse/PostToolUse) (#1206).
     const desiredStop = {
-      matcher: "",
-      hooks: [{ type: "command", command: STOP_HOOK_COMMAND }],
+      type: "command",
+      command: STOP_HOOK_COMMAND,
     };
 
     const changedPre = configureHookEntry(hooks, "PreToolUse", desiredPre, PRE_HOOK_COMMAND);
