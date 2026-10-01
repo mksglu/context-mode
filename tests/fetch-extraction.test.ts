@@ -59,6 +59,73 @@ const SAMPLES: Array<[string, string]> = [
 ];
 
 describe("splitBlocks / reassemble — the lossless invariant", () => {
+  const fenceExamples = [
+    ["shorter interior backticks", "````markdown\n```js\n\nfirst();\n```\n````\n"],
+    ["mixed interior delimiter", "```js\nfirst();\n~~~\n\nsecond();\n```\n"],
+    ["closing-looking line with text", "```js\nfirst();\n```literal\n\nsecond();\n```\n"],
+    ["longer closing delimiter", "~~~js\nfirst();\n\nsecond();\n~~~~~ \t\n"],
+    ["indented fence", "   ```js\nfirst();\n\nsecond();\n  ```\n"],
+    ["over-indented interior delimiter", "```js\nfirst();\n    ```\n\nsecond();\n```\n"],
+    ["CRLF fence", "~~~js\r\nfirst();\r\n\r\nsecond();\r\n~~~\r\n"],
+  ];
+
+  for (const [name, code] of fenceExamples) {
+    test(`keeps a fenced example whole and resumes paragraph splitting: ${name}`, () => {
+      const document = code + "\nAfter the example.\n";
+      const blocks = splitBlocks(document);
+      assert.equal(blocks.length, 2);
+      assert.ok(blocks[0].raw.includes(code));
+      assert.equal(blocks[1].text, "After the example.");
+      assert.equal(reassemble(blocks), document);
+    });
+  }
+
+  test("an unclosed fence keeps all following paragraphs in the code example", () => {
+    const document = "````markdown\n```js\n\nfirst();\n\nsecond();\n";
+    assert.equal(splitBlocks(document).length, 1);
+    assert.equal(reassemble(splitBlocks(document)), document);
+  });
+
+  test("a backtick in the info string does not open a code fence", () => {
+    const document = "```not`a-fence\n\nOrdinary paragraph.\n";
+    assert.equal(splitBlocks(document).length, 2);
+    assert.equal(reassemble(splitBlocks(document)), document);
+  });
+
+  test("a closing fence followed by a form feed stays inside the code example", () => {
+    const document = "```js\nfirst();\n```\f\n\nsecond();\n```\n";
+    assert.equal(splitBlocks(document).length, 1);
+    assert.equal(reassemble(splitBlocks(document)), document);
+  });
+
+  test("nested fence examples stay searchable when one code line also appears on another page", () => {
+    const dbPath = join(tmpdir(), `cm-fetch-nested-fence-${process.pid}-${Date.now()}.db`);
+    const store = new PageStore(dbPath);
+    const navigation = "* [Docs](/docs)\n";
+    const code = "````markdown\n```js\n\nconsole.log('shared example');\n\nconsole.log('unique example');\n```\n````\n";
+    const document = `# Nested examples\n\n${navigation}\n${code}`;
+    try {
+      extractAndStore({
+        url: "https://fences.example/reference", sourceLabel: "reference",
+        document: `# Reference\n\n${navigation}\nconsole.log('shared example');\n\nReference prose.\n`,
+        route: "html", store,
+      });
+      const result = extractAndStore({
+        url: "https://fences.example/nested", sourceLabel: "nested",
+        document, route: "html", store,
+      });
+      assert.equal(result.kind, "index");
+      if (result.kind !== "index") return;
+      assert.ok(result.indexText.includes(code.trimEnd()), "a fenced example must remain intact in the search index");
+      assert.ok(!result.indexText.includes(navigation), "ordinary shared navigation is still extracted");
+      assert.equal(store.fullTextOf(pageKeyFor("https://fences.example/nested")), document);
+      assert.equal(reassemble(splitBlocks(document)), document);
+    } finally {
+      store.close();
+      for (const suffix of ["", "-wal", "-shm"]) rmSync(dbPath + suffix, { force: true });
+    }
+  });
+
   for (const [name, sample] of SAMPLES) {
     test(`reassemble(splitBlocks(x)) === x byte-for-byte: ${name}`, () => {
       const blocks = splitBlocks(sample);

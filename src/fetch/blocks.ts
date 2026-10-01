@@ -136,7 +136,8 @@ export function splitBlocks(markdown: string): Block[] {
   const lines = splitLinesKeepEnds(markdown);
   let rawParts: string[] = [];
   let hasText = false;
-  let inFence = false;
+  let fenceCharacter = "";
+  let fenceLength = 0;
   let pendingBreak = false;
 
   const flush = (): void => {
@@ -150,8 +151,29 @@ export function splitBlocks(markdown: string): Block[] {
 
   for (const line of lines) {
     const trimmed = trimEdges(line);
-    const isFenceMarker =
-      startsWith(trimmed, "```") || startsWith(trimmed, "~~~");
+    const inFence = fenceLength > 0;
+    // CommonMark fences open with at least three identical characters and
+    // close only with the same character, at least the opening length, and
+    // trailing whitespace. Shorter or mixed fences are literal code content.
+    let indentation = 0;
+    while (line.charAt(indentation) === " ") indentation++;
+    const character = line.charAt(indentation);
+    let markerLength = 0;
+    if (indentation <= 3 && (character === "`" || character === "~")) {
+      while (line.charAt(indentation + markerLength) === character) markerLength++;
+    }
+    const remainder = line.substring(indentation + markerLength);
+    let closingWhitespace = true;
+    for (const ch of remainder) {
+      if (ch !== " " && ch !== "\t" && ch !== "\r" && ch !== "\n") {
+        closingWhitespace = false;
+        break;
+      }
+    }
+    const isFenceMarker = markerLength >= 3 && (inFence
+      ? character === fenceCharacter && markerLength >= fenceLength &&
+        closingWhitespace
+      : character !== "`" || !remainder.includes("`"));
     const blank = !inFence && trimmed.length === 0;
     const heading = !inFence && !isFenceMarker && startsWith(trimmed, "#");
 
@@ -163,7 +185,10 @@ export function splitBlocks(markdown: string): Block[] {
       pendingBreak = false;
     }
 
-    if (isFenceMarker) inFence = !inFence;
+    if (isFenceMarker) {
+      fenceCharacter = inFence ? "" : character;
+      fenceLength = inFence ? 0 : markerLength;
+    }
 
     rawParts.push(line);
     if (!blank) hasText = true;
