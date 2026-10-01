@@ -24,13 +24,8 @@
     ],
     "Stop": [
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "context-mode hook antigravity-cli stop"
-          }
-        ]
+        "type": "command",
+        "command": "context-mode hook antigravity-cli stop"
       }
     ]
   }

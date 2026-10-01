@@ -267,7 +267,7 @@ describe("AntigravityCliAdapter", () => {
     expect(changes.length).toBeGreaterThan(0);
 
     const cfg = JSON.parse(readFileSync(antigravityCliHooksPath(), "utf-8")) as {
-      hooks: Record<string, Array<{ matcher: string; hooks: Array<{ command: string }> }>>;
+      hooks: Record<string, Array<Record<string, unknown>>>;
     };
     expect(cfg.hooks.PreToolUse[0].matcher).toBe("run_command|view_file|grep_search|web_fetch|read_url_content");
     expect(cfg.hooks.PreToolUse[0].hooks[0].command).toBe(
@@ -276,9 +276,12 @@ describe("AntigravityCliAdapter", () => {
     expect(cfg.hooks.PostToolUse[0].hooks[0].command).toBe(
       "context-mode hook antigravity-cli posttooluse",
     );
-    expect(cfg.hooks.Stop[0].hooks[0].command).toBe(
-      "context-mode hook antigravity-cli stop",
-    );
+    // agy requires Stop as a flat list of handler objects (no matcher/hooks
+    // wrapper); the grouped form makes agy reject the whole hooks.json (#1206).
+    expect(cfg.hooks.Stop[0]).toEqual({
+      type: "command",
+      command: "context-mode hook antigravity-cli stop",
+    });
 
     // Second run sees no drift.
     expect(adapter.configureAllHooks("/plugin/root")).toEqual([]);
@@ -299,7 +302,35 @@ describe("AntigravityCliAdapter", () => {
     expect(JSON.stringify(after.hooks.PreToolUse)).toContain("echo pre");
     expect(JSON.stringify(after.hooks.PreToolUse)).toContain("antigravity-cli pretooluse");
     expect(after.hooks.PostToolUse[0].hooks[0].command).toContain("antigravity-cli posttooluse");
-    expect(after.hooks.Stop[0].hooks[0].command).toContain("antigravity-cli stop");
+    expect(after.hooks.Stop[0].command).toContain("antigravity-cli stop");
+  });
+
+  it("configureAllHooks rewrites a legacy grouped Stop into the flat form agy accepts", () => {
+    // #1206: agy 1.2.x rejects the whole hooks.json when Stop is grouped.
+    rmSync(antigravityCliHooksPath(), { force: true });
+    const path = antigravityCliHooksPath();
+    writeFileSync(
+      path,
+      JSON.stringify({
+        hooks: {
+          Stop: [
+            {
+              matcher: "",
+              hooks: [{ type: "command", command: "context-mode hook antigravity-cli stop" }],
+            },
+          ],
+        },
+      }),
+    );
+
+    adapter.configureAllHooks("/plugin/root");
+
+    const after = JSON.parse(readFileSync(path, "utf-8"));
+    expect(after.hooks.Stop).toHaveLength(1);
+    expect(after.hooks.Stop[0]).toEqual({
+      type: "command",
+      command: "context-mode hook antigravity-cli stop",
+    });
   });
 
   it("validateHooks warns until all agy hooks are configured, then passes", () => {
@@ -330,11 +361,16 @@ describe("AntigravityCliAdapter", () => {
           PostToolUse: [
             { matcher: "", hooks: [{ type: "command", command: "context-mode hook antigravity-cli posttooluse" }] },
           ],
+          Stop: [
+            { type: "command", command: "context-mode hook antigravity-cli stop" },
+          ],
         },
       }),
     );
 
-    expect(adapter.validateHooks("/plugin/root")[0].status).toBe("pass");
+    const result = adapter.validateHooks("/plugin/root")[0];
+    expect(result.status).toBe("pass");
+    expect(result.message).toContain("best-effort Stop hook also configured");
     rmSync(pluginHooks, { force: true });
   });
 });
@@ -381,13 +417,14 @@ describe("configs/antigravity-cli — agy plugin bundle", () => {
     expect(JSON.parse(readFileSync(resolve(AGY_PLUGIN, "hooks", "hooks.json"), "utf-8"))).toEqual(hooks);
     const pre = hooks.hooks?.PreToolUse?.[0];
     const post = hooks.hooks?.PostToolUse?.[0]?.hooks?.[0];
-    const stop = hooks.hooks?.Stop?.[0]?.hooks?.[0];
+    const stop = hooks.hooks?.Stop?.[0];
     expect(pre?.matcher).toBe("run_command|view_file|grep_search|web_fetch|read_url_content");
     expect(pre?.hooks?.[0]?.command).toBe("context-mode hook antigravity-cli pretooluse");
     expect(post?.type).toBe("command");
     expect(post?.command).toBe("context-mode hook antigravity-cli posttooluse");
-    expect(stop?.type).toBe("command");
-    expect(stop?.command).toBe("context-mode hook antigravity-cli stop");
+    // Stop must stay flat: agy 1.2.x rejects the whole hooks.json when Stop
+    // carries the matcher/hooks wrapper (#1206).
+    expect(stop).toEqual({ type: "command", command: "context-mode hook antigravity-cli stop" });
     // Do not over-map invocation hooks until agy payload/response semantics are verified.
     expect(hooks.hooks?.PreInvocation).toBeUndefined();
     expect(hooks.hooks?.PostInvocation).toBeUndefined();
