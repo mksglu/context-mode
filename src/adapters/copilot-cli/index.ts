@@ -231,9 +231,19 @@ export class CopilotCliAdapter extends CopilotBaseAdapter {
     // HOOK_TYPES so new events are picked up automatically.
     for (const hookType of Object.values(HOOK_TYPES)) {
       if (!HOOK_SCRIPTS[hookType]) continue;
-      const desired = [
-        { type: "command", command: buildHookCommand(hookType, pluginRoot) },
-      ];
+      const command = buildHookCommand(hookType, pluginRoot);
+      const existing = Array.isArray(hooks[hookType])
+        ? hooks[hookType] as Array<Record<string, unknown>>
+        : [];
+      let found = false;
+      const desired = existing.map((entry) => {
+        if (typeof entry?.command !== "string" || entry.command.trim() !== command) {
+          return entry;
+        }
+        found = true;
+        return { ...entry, type: "command", command };
+      });
+      if (!found) desired.push({ type: "command", command });
       // Only treat a hook as drift when it differs from desired, so repeated
       // `context-mode upgrade` runs stay idempotent.
       if (JSON.stringify(hooks[hookType]) !== JSON.stringify(desired)) {
