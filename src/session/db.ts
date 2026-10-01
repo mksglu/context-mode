@@ -759,8 +759,9 @@ export function applyMissingSessionEventsColumns(db: {
  *
  * Two open/close cycles in the worst case (one readonly probe to detect
  * legacy schema, one writable to migrate). For already-migrated DBs
- * (the common case after first read), this opens writable once and
- * exits without writing — cheaper than always-writable.
+ * (the common case after first read), only the readonly probe runs.
+ * Keep WAL visibility: these are normal readonly connections, not
+ * immutable readers that would ignore uncheckpointed events.
  */
 export function ensureSessionEventsSchema(
   dbPath: string,
@@ -772,6 +773,11 @@ export function ensureSessionEventsSchema(
 ): void {
   let db: { pragma: (q: string) => Array<{ name: string }>; exec: (sql: string) => void; close: () => void } | null = null;
   try {
+    db = new DatabaseCtor(dbPath, { readonly: true });
+    const columns = new Set(db.pragma("table_xinfo(session_events)").map((column) => column.name));
+    if (SESSION_EVENTS_REQUIRED_COLUMNS.every(([name]) => columns.has(name))) return;
+    db.close();
+    db = null;
     db = new DatabaseCtor(dbPath);
     applyMissingSessionEventsColumns(db);
   } catch {

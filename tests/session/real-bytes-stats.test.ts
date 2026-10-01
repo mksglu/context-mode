@@ -20,7 +20,7 @@
  * project filter).
  */
 
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -39,6 +39,7 @@ import type {
   RealBytesStats,
 } from "../../src/session/analytics.js";
 import { ContentStore } from "../../src/store.js";
+import { loadDatabase } from "../../src/db-base.js";
 
 const cleanups: Array<() => void> = [];
 
@@ -492,6 +493,62 @@ describe("getRealBytesStats (Phase 8 renderer source-of-truth)", () => {
 // migration must be observable as columns added in place.
 // ──────────────────────────────────────────────────────────────────────
 describe("aggregator schema-migration recovery (#683 follow-up, v1.0.148)", () => {
+  test("reading current-schema WAL stats does not checkpoint the database", () => {
+    const writerDir = mkSessionsDir();
+    const writerPath = dbPathFor(writerDir, "writer");
+    const writer = new SessionDB({ dbPath: writerPath });
+    cleanups.push(() => writer.cleanup());
+    writer.ensureSession("saved", "/project");
+    writer.insertEvent("saved", {
+      type: "tool_use", category: "file", data: "saved uncheckpointed event", priority: 2,
+    }, "test", undefined, { bytesAvoided: 2048, bytesReturned: 256 });
+
+    // The synchronous writer is quiescent while copying its complete WAL
+    // state. The copy models a persisted database with no live writer.
+    const dir = mkSessionsDir();
+    const dbPath = dbPathFor(dir, "snapshot");
+    for (const suffix of ["", "-wal", "-shm"]) {
+      if (existsSync(writerPath + suffix)) copyFileSync(writerPath + suffix, dbPath + suffix);
+    }
+    expect(existsSync(`${dbPath}-wal`)).toBe(true);
+    const mainBefore = readFileSync(dbPath);
+
+    const stats = getRealBytesStats({ sessionsDir: dir, sessionId: "saved" });
+    expect(stats.eventDataBytes).toBe("saved uncheckpointed event".length);
+    expect(stats.bytesAvoided).toBe(2048);
+    expect(stats.bytesReturned).toBe(256);
+    expect(readFileSync(dbPath).equals(mainBefore)).toBe(true);
+    expect(getRealBytesStats({ sessionsDir: dir, sessionId: "saved" })).toEqual(stats);
+  });
+
+  test("current-schema stats use read-only connections and include live WAL events", () => {
+    const dir = mkSessionsDir();
+    const dbPath = dbPathFor(dir, "readonlylivewal");
+    const writer = new SessionDB({ dbPath });
+    cleanups.push(() => writer.cleanup());
+    writer.ensureSession("live", "/project");
+    writer.insertEvent("live", {
+      type: "tool_use", category: "file", data: "live uncheckpointed event", priority: 2,
+    }, "test", undefined, { bytesAvoided: 1024, bytesReturned: 128 });
+    expect(existsSync(`${dbPath}-wal`)).toBe(true);
+
+    const Database = loadDatabase();
+    const modes: boolean[] = [];
+    function ObservedDatabase(path: string, opts?: { readonly?: boolean }) {
+      modes.push(opts?.readonly === true);
+      return new Database(path, opts);
+    }
+    const stats = getRealBytesStats({
+      sessionsDir: dir, sessionId: "live", loadDatabase: () => ObservedDatabase,
+    });
+
+    expect(stats.eventDataBytes).toBe("live uncheckpointed event".length);
+    expect(stats.bytesAvoided).toBe(1024);
+    expect(stats.bytesReturned).toBe(128);
+    expect(modes.length).toBeGreaterThan(0);
+    expect(modes.every((readonly) => readonly)).toBe(true);
+  });
+
   /**
    * Build a pre-v1.0.130 session DB on disk — no `bytes_avoided`,
    * `bytes_returned`, `project_dir`, or attribution columns. Mirrors
@@ -603,8 +660,16 @@ describe("aggregator schema-migration recovery (#683 follow-up, v1.0.148)", () =
     expect(colsBefore.has("bytes_avoided")).toBe(false);
     expect(colsBefore.has("project_dir")).toBe(false);
 
-    // ACT — aggregator call triggers ensureSessionEventsSchema.
-    getRealBytesStats({ sessionsDir: dir });
+    const Database = loadDatabase();
+    const modes: boolean[] = [];
+    function ObservedDatabase(path: string, opts?: { readonly?: boolean }) {
+      modes.push(opts?.readonly === true);
+      return new Database(path, opts);
+    }
+    // Legacy schemas still migrate before the read-only aggregate runs.
+    const stats = getRealBytesStats({ sessionsDir: dir, loadDatabase: () => ObservedDatabase });
+    expect(stats.eventDataBytes).toBe("one event#0".length);
+    expect(modes).toEqual([true, false, true]);
 
     // ASSERT — the disk DB now carries all five post-v1.0.130 columns.
     const colsAfter = await readSessionEventsColumns(dbPath);
@@ -613,6 +678,9 @@ describe("aggregator schema-migration recovery (#683 follow-up, v1.0.148)", () =
     expect(colsAfter.has("attribution_confidence")).toBe(true);
     expect(colsAfter.has("bytes_avoided")).toBe(true);
     expect(colsAfter.has("bytes_returned")).toBe(true);
+    modes.length = 0;
+    expect(getRealBytesStats({ sessionsDir: dir, loadDatabase: () => ObservedDatabase })).toEqual(stats);
+    expect(modes.every((readonly) => readonly)).toBe(true);
   });
 
   test("migration is idempotent — second aggregator call adds no columns, no error", async () => {
