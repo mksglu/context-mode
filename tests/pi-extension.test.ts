@@ -1394,7 +1394,7 @@ describe("Pi MCP bridge (#426)", () => {
     it("before_agent_start bootstraps and registers ctx_* via pi.registerTool", async () => {
       const wireApi = createMockPiApi();
       // PI_PROJECT_DIR / CLAUDE_PROJECT_DIR set inside registerPiExtension.
-      await registerPiExtension(wireApi, { projectDir: tempDir });
+      await registerPiExtension(wireApi, { projectDir: mcpScratch });
 
       // Lazy bootstrap: no tool should be registered during extension discovery.
       expect((wireApi.registerTool as any).mock.calls.length).toBe(0);
@@ -1403,7 +1403,7 @@ describe("Pi MCP bridge (#426)", () => {
       await wireApi._trigger("before_agent_start", {
         prompt: "tool registration smoke",
         systemPrompt: "",
-      });
+      }, { cwd: mcpScratch });
       await mod._mcpBridgeReady;
 
       const calls = (wireApi.registerTool as any).mock.calls as Array<[any]>;
@@ -1448,14 +1448,14 @@ describe("Pi MCP bridge (#426)", () => {
     // reason — bridge happened to win the race).
     it("before_agent_start awaits MCP bridge bootstrap so ctx_* are registered before LLM call", async () => {
       const wireApi = createMockPiApi();
-      await registerPiExtension(wireApi, { projectDir: tempDir });
+      await registerPiExtension(wireApi, { projectDir: mcpScratch });
 
       // Establish a session so before_agent_start does real work
       // (the handler early-returns when `!_sessionId`).
       await wireApi._trigger(
         "session_start",
         {},
-        { session_id: "race-test", project_dir: tempDir },
+        { session_id: "race-test", project_dir: mcpScratch },
       );
 
       // Sanity: lazy bootstrap has not started during extension/session setup.
@@ -1470,7 +1470,7 @@ describe("Pi MCP bridge (#426)", () => {
         sessionID: "race-test",
         prompt: "anything",
         systemPrompt: "",
-      });
+      }, { cwd: mcpScratch });
 
       const calls = (wireApi.registerTool as any).mock.calls as Array<[any]>;
       const registeredNames = calls.map(([t]) => t?.name).filter(Boolean);
@@ -1664,7 +1664,7 @@ describe("Pi MCP bridge (#426)", () => {
         });
 
       try {
-        await registerPiExtension(wireApi, { projectDir: tempDir });
+        await registerPiExtension(wireApi, { projectDir: mcpScratch });
 
         const mod = await import("../src/adapters/pi/extension.js");
 
@@ -1674,7 +1674,7 @@ describe("Pi MCP bridge (#426)", () => {
         const agentStart = wireApi._trigger("before_agent_start", {
           prompt: "race",
           systemPrompt: "",
-        });
+        }, { cwd: mcpScratch });
         await bootstrapEntered;
         const shutdown = wireApi._trigger("session_shutdown");
         releaseBootstrap();
@@ -1927,5 +1927,43 @@ describe("Pi extension SessionDB path matches MCP server's canonical resolver (#
     expect(text).toContain(canonicalPath);
 
     await localApi._trigger("session_shutdown");
+  });
+
+  it("given two Pi sessions in one host, when their workspace contexts interleave and one shuts down, then the other retains its own MCP tools", async () => {
+    const { writeFileSync } = await import("node:fs");
+    const first = createMockPiApi();
+    const second = createMockPiApi();
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "pi-workspace-isolation-"));
+    const workspaces = [join(workspaceRoot, "first-worktree"), join(workspaceRoot, "second-worktree")];
+    for (const workspace of workspaces) {
+      mkdirSync(workspace);
+      writeFileSync(join(workspace, "marker.txt"), workspace);
+    }
+    await registerPiExtension(first, { projectDir: workspaces[0] });
+    await registerPiExtension(second, { projectDir: workspaces[1] });
+    try {
+      await first._trigger("before_agent_start", { prompt: "", systemPrompt: "" }, { cwd: workspaces[0], hasUI: false });
+      await second._trigger("before_agent_start", { prompt: "", systemPrompt: "" }, { cwd: workspaces[1], hasUI: false });
+      const getReadTool = (mockApi: ReturnType<typeof createMockPiApi>) => {
+        const registrations = mockApi.registerTool.mock.calls as Array<[import("../src/adapters/pi/mcp-bridge.js").PiToolRegistration]>;
+        const tool = registrations.map(([registration]) => registration).find((registration) => registration.name === "ctx_execute_file");
+        if (!tool) throw new Error("ctx_execute_file was not registered");
+        return tool;
+      };
+      const readMarker = async (mockApi: ReturnType<typeof createMockPiApi>) => {
+        const result = await getReadTool(mockApi).execute("read-marker", {
+          path: "marker.txt", language: "javascript", code: "console.log(FILE_CONTENT)",
+        });
+        return result.content.map((block) => block.text).join("\n");
+      };
+      expect(await readMarker(first)).toContain(workspaces[0]);
+      expect(await readMarker(second)).toContain(workspaces[1]);
+      await first._trigger("session_shutdown");
+      expect(await readMarker(second)).toContain(workspaces[1]);
+    } finally {
+      await first._trigger("session_shutdown");
+      await second._trigger("session_shutdown");
+      rmSync(workspaceRoot, { recursive: true, force: true });
+    }
   });
 });

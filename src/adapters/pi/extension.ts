@@ -140,7 +140,6 @@ let _sessionId = "";
 // actually call ctx_execute / ctx_search / etc. (#426). Pi 0.73.x has
 // no native MCP support, so without this bridge the tools are
 // invisible to the LLM and the routing block is dead weight.
-let _mcpBridge: BridgeHandle | null = null;
 
 /**
  * Settles when the MCP bridge bootstrap has finished — resolves on
@@ -339,12 +338,14 @@ function startPiMCPBridge(
   serverBundle: string,
   shouldKeepHandle: () => boolean,
   foreground: boolean,
+  cwd: string,
+  onReady: (handle: BridgeHandle) => void,
 ): Promise<void> {
   if (existsSync(serverBundle)) {
-    _mcpBridgeReady = bootstrapMCPTools(pi, serverBundle, { foreground }).then(
+    _mcpBridgeReady = bootstrapMCPTools(pi, serverBundle, { foreground, cwd }).then(
       (handle) => {
         if (shouldKeepHandle()) {
-          _mcpBridge = handle;
+          onReady(handle);
         } else {
           // Bootstrap completed after this extension registration had already
           // shut down or superseded the attempt. Do not publish a stale handle;
@@ -432,16 +433,21 @@ export default function piExtension(pi: any): void {
   const serverBundle = resolve(pluginRoot, "server.bundle.mjs");
   let mcpBridgeStarted = false;
   let mcpBridgeGeneration = 0;
-  const ensureMCPBridge = (foreground: boolean): Promise<void> => {
-    if (mcpBridgeStarted) return _mcpBridgeReady;
+  let _mcpBridge: BridgeHandle | null = null;
+  let mcpBridgeReady: Promise<void> = Promise.resolve();
+  const ensureMCPBridge = (foreground: boolean, cwd: string = projectDir): Promise<void> => {
+    if (mcpBridgeStarted) return mcpBridgeReady;
     mcpBridgeStarted = true;
     const generation = ++mcpBridgeGeneration;
-    return startPiMCPBridge(
+    mcpBridgeReady = startPiMCPBridge(
       pi,
       serverBundle,
       () => mcpBridgeStarted && mcpBridgeGeneration === generation,
       foreground,
+      cwd,
+      (handle) => { _mcpBridge = handle; },
     );
+    return mcpBridgeReady;
   };
   // Issue #545 — Pi workspace resolver. PI_CONFIG_DIR is Pi's CONFIG dir
   // (~/.pi), NOT the user's workspace; using it as the project anchor
@@ -632,7 +638,7 @@ export default function piExtension(pi: any): void {
       // buffered credential event). Do NOT add a latch here — it would guard an
       // unreachable state. (Verified against oh-my-pi: main.ts init→prompt order,
       // interactive-mode.ts uiContext wiring, executor.ts subagent hasUI:false.)
-      await ensureMCPBridge(isForegroundSession(ctx));
+      await ensureMCPBridge(isForegroundSession(ctx), ctx?.cwd);
 
       if (!_sessionId) return;
 
@@ -875,7 +881,7 @@ export default function piExtension(pi: any): void {
     mcpBridgeStarted = false;
     try {
       await Promise.race([
-        _mcpBridgeReady,
+        mcpBridgeReady,
         new Promise<void>((r) => setTimeout(r, 2000).unref()),
       ]);
     } catch {
@@ -890,7 +896,7 @@ export default function piExtension(pi: any): void {
       }
       _mcpBridge = null;
     }
-    _mcpBridgeReady = Promise.resolve();
+    mcpBridgeReady = Promise.resolve();
   });
 
   // ── 8. Slash commands ──────────────────────────────────
