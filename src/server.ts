@@ -56,6 +56,7 @@ import {
   emitSandboxExecuteEvent,
 } from "./session/event-emit.js";
 import { persistToolCallCounter, restoreSessionStats } from "./session/persist-tool-calls.js";
+import { resolveCallerSessionId } from "./session/caller-session.js";
 import { searchAllSources } from "./search/unified.js";
 import {
   buildCtxSearchInputSchema,
@@ -440,8 +441,7 @@ let _store: ContentStore | null = null;
 
 /**
  * Build the FK-attribution object passed to every ContentStore.index*() call
- * in this process. CLAUDE_SESSION_ID is the only MCP-side handle we have on
- * the current session — eventId stays undefined because MCP tool invocations
+ * in this process. eventId stays undefined because MCP tool invocations
  * are not paired with PostToolUse event rows at index time (the hook fires
  * AFTER the tool returns). Empty-string fallback inside #insertChunks keeps
  * legacy unattributed rows readable.
@@ -450,13 +450,13 @@ export function currentAttribution(): { sessionId?: string } | undefined {
   const override = projectDirOverride.getStore();
   if (override?.sessionId) return { sessionId: override.sessionId };
 
-  // CLAUDE_SESSION_ID env var is NOT propagated to MCP servers (only to hooks).
-  // Cross-adapter resolution: every adapter (15 of them) sets *_PROJECT_DIR env
-  // and writes session_events via hooks. Read the most-recent session_id from
-  // THIS project's session DB. Works for claude-code/cursor/gemini-cli/codex/
+  // Resolve Claude Code's caller first: the session file tracks /clear and
+  // resume even when the inherited env is stale. Other adapters set
+  // *_PROJECT_DIR env and write session_events via hooks, so fall back to the
+  // most-recent session_id from THIS project's DB. Works for cursor/gemini-cli/codex/
   // kiro/opencode/zed/kilo/openclaw/qwen-code/vscode-copilot/jetbrains-copilot/
   // omp/pi/antigravity — no adapter-specific transcript path required.
-  const sessionId = process.env.CLAUDE_SESSION_ID ?? resolveSessionIdFromSessionDB();
+  const sessionId = resolveCallerSessionId() ?? resolveSessionIdFromSessionDB();
   if (!sessionId) return undefined;
   return { sessionId };
 }
@@ -4463,12 +4463,12 @@ server.registerTool(
           // narrative 5-section "kitap gibi" layout (timeline, ladder, receipt,
           // example cost, auto-memory). Without these, formatReport falls back
           // to the legacy active-session header. Best-effort — failures absorbed.
-          // Resolve session_id: prefer env (CLAUDE_SESSION_ID), else most-recent
+          // Resolve the caller's session before falling back to the most-recent
           // UUID session_id from session_events in this DB.
           let conversation;
           let realBytes;
           try {
-            let sid = process.env.CLAUDE_SESSION_ID;
+            let sid = resolveCallerSessionId();
             if (!sid) {
               const row = sdb.prepare(
                 "SELECT session_id FROM session_events WHERE session_id LIKE '________-____-____-____-____________' ORDER BY created_at DESC LIMIT 1"

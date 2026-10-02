@@ -14,16 +14,16 @@
  * - Best-effort error swallowing matches `persistToolCallCounter` in
  *   `persist-tool-calls.ts`. A stats-side failure must NEVER break the
  *   parent MCP tool call.
- * - Resolves the latest `session_id` from `session_meta` so the wiring
- *   in `server.ts` is `setImmediate(() => emit*({...}))` — no need to
- *   plumb session ids through every handler.
+ * - Resolves the caller's session id when Claude Code exposes it, with the
+ *   latest `session_meta` row as a fallback for other hosts.
  */
 
 import { existsSync } from "node:fs";
 import { SessionDB } from "./db.js";
+import { resolveCallerSessionId } from "./caller-session.js";
 
 /**
- * Open the SessionDB at `dbPath`, find the latest session_id, and run
+ * Open the SessionDB at `dbPath`, find the caller's session_id, and run
  * `fn` with both. Wraps everything in try/catch so callers stay
  * fire-and-forget.
  */
@@ -35,7 +35,7 @@ function withLatestSession(
     if (!existsSync(dbPath)) return;
     const sdb = new SessionDB({ dbPath });
     try {
-      const sid = sdb.getLatestSessionId();
+      const sid = resolveCallerSessionId() ?? sdb.getLatestSessionId();
       if (!sid) return;
       fn(sdb, sid);
     } finally {
