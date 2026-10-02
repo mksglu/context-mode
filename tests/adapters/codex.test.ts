@@ -1242,21 +1242,33 @@ describe("Codex matcher #547 — is_exact_matcher charset compliance", () => {
     expect(matcher).toMatch(EXACT_MATCHER_CHARSET);
   });
 
-  it("hooks/hooks.json (universal bundle) MCP catch-all matcher passes is_exact_matcher charset", () => {
+  it("hooks/hooks.json (universal bundle) MCP catch-all stays Codex-regex-compatible (#547, #1222)", () => {
     // hooks/hooks.json is the universal bundled file Codex ALSO loads via
-    // the plugin cache. The MCP catch-all matcher must drop the lookahead so
-    // Codex's regex crate does not reject the file at boot. Claude Code
-    // continues to treat the literal `mcp__` as a substring matcher.
+    // the plugin cache. Codex's `regex` crate rejects LOOK-AROUND at boot
+    // ("look-around not supported"), which is what broke every Codex user
+    // in #547 — that, and not regex metacharacters generally, is the real
+    // constraint. #1222 moves the catch-all from the bare literal `mcp__`
+    // to `mcp__.*`, which the crate compiles fine (verified against regex
+    // 1.x) and which matches external MCP tool names on BOTH engines. The
+    // bare `mcp__` was in fact a no-op under Codex's `is_exact_matcher`
+    // short-circuit, so this fixes the Codex side of the catch-all too.
     const path = resolve(__dirname, "..", "..", "hooks", "hooks.json");
     const parsed = JSON.parse(readFileSync(path, "utf8")) as {
       hooks: { PreToolUse: Array<{ matcher: string }> };
     };
     const matchers = (parsed.hooks.PreToolUse ?? []).map((e) => e.matcher);
-    // Whichever entry was the external-MCP catch-all must now be charset-clean.
     const mcpCatchAll = matchers.find(
       (m) => m && m.startsWith("mcp__") && !m.includes("ctx_"),
     );
     expect(mcpCatchAll, "expected an mcp__ catch-all matcher in hooks.json").toBeDefined();
-    expect(mcpCatchAll).toMatch(EXACT_MATCHER_CHARSET);
+
+    // The #547 invariant: no look-around anywhere in the bundle.
+    expect(mcpCatchAll).not.toMatch(/\(\?<?[=!]/);
+
+    // And it must actually match a real external MCP tool name, otherwise
+    // the catch-all is decorative. JS and Rust `regex` agree on this shape.
+    expect(mcpCatchAll).toBe("mcp__.*");
+    expect(new RegExp(mcpCatchAll!).test("mcp__slack__list_channels")).toBe(true);
+    expect(new RegExp(mcpCatchAll!).test("Bash")).toBe(false);
   });
 });
