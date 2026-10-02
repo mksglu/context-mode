@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# If started by a POSIX shell (e.g. `sh scripts/ctx-debug.sh`), re-exec under
+# bash before touching any bash-only syntax below. Codex CLI plugin
+# validation and some agents invoke scripts with `sh`.
+if [ -z "${BASH_VERSION:-}" ]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  fi
+fi
 # context-mode diagnostic report
 # Runs 18 diagnostic sections, writes markdown + JSON to temp files,
 # shows a compact summary in the terminal.
