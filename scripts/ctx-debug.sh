@@ -8,6 +8,20 @@
 #
 # Works on Linux, macOS, and Windows (Git Bash / MSYS2 / WSL).
 
+# Re-exec under bash when started by a POSIX sh (e.g. `sh scripts/ctx-debug.sh`).
+# Everything below relies on bash-only syntax (arrays, process substitution,
+# [[ ]]) that a POSIX sh cannot parse (mksglu/context-mode#1242). Two shells
+# qualify: a non-bash sh such as dash (BASH_VERSION unset), and bash running
+# in POSIX mode — macOS /bin/sh sets BASH_VERSION but offers no process
+# substitution, so SHELLOPTS containing "posix" must re-exec too.
+if [ -z "${BASH_VERSION:-}" ] || [ "${SHELLOPTS#*posix}" != "${SHELLOPTS:-}" ]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  fi
+  printf 'ctx-debug.sh: bash is required (invoked by a POSIX sh without bash)\n' >&2
+  exit 127
+fi
+
 CTX_DEBUG_VERSION="2.0.0"
 set -uo pipefail  # NOT -e — we must never crash
 
