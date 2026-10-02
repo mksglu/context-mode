@@ -51,6 +51,27 @@ describe("vscode-copilot formatter", () => {
   });
 });
 
+describe("hermes formatter", () => {
+  it("turns unsupported argument rewrites into enforceable denials", () => {
+    const result = formatDecision("hermes", {
+      action: "modify",
+      updatedInput: { command: 'echo "use mcp__context_mode__ctx_execute"' },
+    });
+    expect(result.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(result.hookSpecificOutput.permissionDecisionReason).toContain("ctx_execute");
+  });
+
+  it("uses the Hermes block shape for direct denials", () => {
+    const result = formatDecision("hermes", { action: "deny", reason: "blocked" });
+    expect(result).toEqual({
+      hookSpecificOutput: {
+        permissionDecision: "deny",
+        permissionDecisionReason: "blocked",
+      },
+    });
+  });
+});
+
 describe("formatDecision integration", () => {
   it("claude-code deny flows through with correct field names", () => {
     const result = formatDecision("claude-code", { action: "deny", reason: "sandbox only" });

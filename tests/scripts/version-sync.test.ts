@@ -35,6 +35,10 @@ const PKG_JSON = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "ut
 };
 
 describe("scripts/version-sync.mjs targets", () => {
+  it("syncs the root Hermes plugin manifest", () => {
+    expect(SCRIPT_SRC).toContain('const file = "plugin.yaml"');
+    expect(PKG_JSON.scripts.version).toContain("plugin.yaml");
+  });
   it("includes .codex-plugin/plugin.json", () => {
     expect(SCRIPT_SRC).toContain('".codex-plugin/plugin.json"');
   });
@@ -170,6 +174,7 @@ describe("version-sync end-to-end", () => {
         cpSync(resolve(REPO_ROOT, m), join(scratch, m));
       }
       cpSync(resolve(REPO_ROOT, "scripts/version-sync.mjs"), join(scratch, "scripts/version-sync.mjs"));
+      cpSync(resolve(REPO_ROOT, "plugin.yaml"), join(scratch, "plugin.yaml"));
 
       // Write a synthetic package.json with a fresh version we can detect.
       const TEST_VERSION = "9.9.9-test";

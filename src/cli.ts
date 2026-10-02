@@ -75,6 +75,13 @@ import { isInProcessPluginPlatform } from "./adapters/types.js";
  * ------------------------------------------------------- */
 
 const HOOK_MAP: Record<string, Record<string, string>> = {
+  "hermes": {
+    pretooluse: "hooks/pretooluse.mjs",
+    posttooluse: "hooks/posttooluse.mjs",
+    sessionstart: "hooks/sessionstart.mjs",
+    userpromptsubmit: "hooks/userpromptsubmit.mjs",
+    stop: "hooks/stop.mjs",
+  },
   "claude-code": {
     pretooluse: "hooks/pretooluse.mjs",
     posttooluse: "hooks/posttooluse.mjs",
