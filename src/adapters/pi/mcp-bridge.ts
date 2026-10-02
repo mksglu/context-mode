@@ -413,6 +413,7 @@ export class MCPStdioClient {
      * terminal; bootstrapMCPTools wires this to the Pi host's file logger.
      */
     private readonly diag: BridgeDiag = () => {},
+    private readonly cwd?: string,
   ) {}
 
   /** Spawn the MCP child. Idempotent. */
@@ -494,6 +495,11 @@ export class MCPStdioClient {
         }
       }
     }
+    if (this.cwd !== undefined) {
+      childEnv.PWD = this.cwd;
+      childEnv.PI_WORKSPACE_DIR = this.cwd;
+      childEnv.CONTEXT_MODE_PROJECT_DIR = this.cwd;
+    }
     this._spawnEnv = childEnv;
     this.child = spawn(runtime, [this.serverScript], {
       // Pipe stderr (#472 round-3): swallowing it via "ignore" hides
@@ -504,6 +510,7 @@ export class MCPStdioClient {
       // write is rendered into the editor input box, blocking typing (#868).
       stdio: ["pipe", "pipe", "pipe"],
       env: childEnv,
+      cwd: this.cwd,
     });
     this.child.stdout?.on("data", (chunk) => this.onData(chunk));
     this.child.stderr?.on("data", (chunk: Buffer) => {
@@ -912,6 +919,8 @@ export interface BridgeHandle {
  */
 export interface BootstrapOptions {
   env?: NodeJS.ProcessEnv;
+  /** Active Pi session workspace; overrides inherited shell workspace variables. */
+  cwd?: string;
   /** DI hook for tests: override the runtime resolver entirely. */
   _resolveJsRuntime?: () => string | null;
   /**
@@ -976,7 +985,7 @@ export async function bootstrapMCPTools(
   // reaper disabled (CONTEXT_MODE_BRIDGE_IDLE_MS=0) so a human pause never drops
   // its tools; sub-context / non-interactive children keep the reaper (#854).
   const spawnEnv = foregroundBridgeEnv(env, options.foreground ?? false);
-  const client = new MCPStdioClient(serverScript, spawnEnv, runtime, diag);
+  const client = new MCPStdioClient(serverScript, spawnEnv, runtime, diag, options.cwd);
 
   // Retry-on-slow-initialize (#647).
   //
