@@ -370,21 +370,24 @@ async function loadEnsureNativeCompat(): Promise<(pluginRoot: string) => void> {
   const helpers = helperMatch ? helperMatch[0] + "\n" : "";
 
   // Extract codesignBinary and probeNativeInChildProcess helpers if present
+  const stampMatch = src.match(/^function nativeSwapStamp\b[\s\S]*?^}/m);
   const replaceBinaryMatch = src.match(/^function replaceActiveNativeBinaryFromCache\b[\s\S]*?^}/m);
   const codesignMatch = src.match(/^(?:export\s+)?function codesignBinary\b[\s\S]*?^}/m);
   const probeMatch = src.match(/^function probeNativeInChildProcess\b[\s\S]*?^}/m);
+  const stamp = stampMatch ? stampMatch[0] + "\n" : "";
   const replaceBinary = replaceBinaryMatch ? replaceBinaryMatch[0] + "\n" : "";
   const codesign = codesignMatch ? codesignMatch[0] + "\n" : "";
   const probe = probeMatch ? probeMatch[0] + "\n" : "";
 
   const tmpFile = join(tmpdir(), `abi-test-${Date.now()}.mjs`);
   writeFileSync(tmpFile, [
-    'import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";',
+    'import { existsSync, copyFileSync, renameSync, unlinkSync, readFileSync, writeFileSync, statSync } from "node:fs";',
     'import { resolve } from "node:path";',
     'import { createRequire } from "node:module";',
     'import { execSync } from "node:child_process";',
     helpers,
     codesign,
+    stamp,
     replaceBinary,
     probe,
     `${match[0]}`,

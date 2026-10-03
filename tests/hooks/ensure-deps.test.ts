@@ -12,7 +12,7 @@
 
 import { describe, test, expect, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -345,6 +345,60 @@ try {
     if (result.error) throw result.error;
     const out = JSON.parse(result.stdout.trim());
     expect(out).toEqual({ threw: false });
+  });
+});
+
+describe("ensure-deps: fast path skips a redundant cache swap (#1196)", () => {
+  // Every hook call imports ensure-deps.mjs. Without a swap stamp the fast
+  // path copied, codesigned and renamed the ABI cache over the active binary
+  // on every call, so the active binary got a new inode each time.
+  function setup() {
+    const root = createTempRoot();
+    const releaseDir = join(root, "node_modules", "better-sqlite3", "build", "Release");
+    mkdirSync(releaseDir, { recursive: true });
+    const binaryPath = join(releaseDir, "better_sqlite3.node");
+    const cachePath = join(releaseDir, `better_sqlite3.abi${process.versions.modules}.node`);
+    writeFileSync(binaryPath, "ACTIVE-binary");
+    writeFileSync(cachePath, "CACHED-binary");
+    const harnessPath = join(root, "_swap-stamp-harness.mjs");
+    writeFileSync(harnessPath, `
+import { ensureNativeCompat } from ${JSON.stringify("file://" + ensureDepsAbsPath.replace(/\\/g, "/"))};
+ensureNativeCompat(${JSON.stringify(root)});
+`, "utf-8");
+    const run = () => {
+      const result = spawnSync("node", [harnessPath], {
+        encoding: "utf-8",
+        timeout: 30_000,
+        cwd: join(fileURLToPath(import.meta.url), "..", ".."),
+      });
+      if (result.error) throw result.error;
+      return statSync(binaryPath).ino;
+    };
+    return { releaseDir, binaryPath, cachePath, run };
+  }
+
+  test("second call leaves the swapped-in binary untouched", () => {
+    const { binaryPath, releaseDir, run } = setup();
+    const first = run();
+    expect(readFileSync(binaryPath, "utf-8")).toBe("CACHED-binary");
+    expect(run()).toBe(first);
+    expect(readdirSync(releaseDir).filter((f) => f.includes(".staging-"))).toEqual([]);
+  });
+
+  test("a changed ABI cache is swapped in again", () => {
+    const { binaryPath, cachePath, run } = setup();
+    const first = run();
+    writeFileSync(cachePath, "NEWER-cached-binary");
+    expect(run()).not.toBe(first);
+    expect(readFileSync(binaryPath, "utf-8")).toBe("NEWER-cached-binary");
+  });
+
+  test("an active binary replaced from outside is swapped again", () => {
+    const { binaryPath, run } = setup();
+    run();
+    writeFileSync(binaryPath, "REBUILT-elsewhere");
+    run();
+    expect(readFileSync(binaryPath, "utf-8")).toBe("CACHED-binary");
   });
 });
 
