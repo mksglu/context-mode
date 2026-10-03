@@ -75,7 +75,9 @@ if (typeof globalThis.Bun === "undefined" && process.platform === "linux") {
   if (bunBin) {
     const child = spawn(bunBin, [fileURLToPath(import.meta.url)], {
       stdio: ["pipe", "inherit", "inherit"],
-      env: process.env,
+      // #1055: the Bun child's parent is this proxy, not the MCP client. Hand
+      // it the real host PID for its readiness sentinel.
+      env: { ...process.env, CONTEXT_MODE_HOST_PID: String(process.ppid) },
     });
     const _keepAlive = setInterval(() => {}, 2147483647);
     let _escTerm;
