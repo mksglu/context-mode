@@ -12,9 +12,15 @@
 // pattern on every MCP boot and rewrites with absolute paths using
 // process.execPath + forward slashes. Idempotent — only rewrites when needed.
 // Survives upgrades because it runs at every start.
+//
+// #1090: process.execPath itself can be a version-manager snapshot (Homebrew
+// Cellar, nvm, asdf, mise) that a later upgrade deletes. Before persisting it
+// here, resolveStableInterpreterPath() prefers a stable PATH-resolvable
+// sibling that resolves to the same real binary, so the baked-in path
+// survives the next upgrade instead of dangling.
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { resolve, delimiter } from "node:path";
 
 const PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}";
 
@@ -29,6 +35,89 @@ const CACHE_VERSION_RE =
 /** Convert any path string to forward slashes (MSYS-safe). */
 function fwd(p) {
   return String(p).replace(/\\/g, "/");
+}
+
+/** Cross-OS basename: split on either separator, take the last segment. */
+function baseName(p) {
+  const segments = String(p).split(/[\\/]/);
+  return segments[segments.length - 1] ?? String(p);
+}
+
+// #1090: shape of a version-manager-pinned interpreter directory — Homebrew
+// Cellar (`.../Cellar/node/26.8.2/bin/node`), nvm (`.../versions/node/v20.1.0/…`),
+// asdf (`.../installs/nodejs/20.1.0/…`), mise, volta, etc. Matched by SHAPE
+// (a `vX.Y.Z` path segment, optional `_N`/`-tag` revision suffix) rather than
+// by naming each manager, so a manager we've never heard of still matches.
+const VERSION_PINNED_SEGMENT_RE =
+  /[\\/]v?\d+\.\d+\.\d+(?:[-_.][A-Za-z0-9]+)*[\\/]/;
+
+function looksVersionPinned(p) {
+  return VERSION_PINNED_SEGMENT_RE.test(fwd(String(p)));
+}
+
+/**
+ * Issue #1090 — before PERSISTING an interpreter path into a static config
+ * file (hooks.json commands, plugin.json mcpServers.command), prefer a
+ * stable, PATH-resolvable equivalent over a version-manager snapshot that
+ * the next upgrade (`brew upgrade node && brew cleanup`, nvm install, …)
+ * will delete out from under the running config.
+ *
+ * This is deliberately a WRITE-TIME preference, not a read-time liveness
+ * guard like `resolveJavascriptRuntime()` (#800/#803) or `resolveHookRuntime()`
+ * (#841): those re-check `existsSync(execPath)` and fall back to a bare
+ * command-name once the pinned path is ALREADY dead. That pattern cannot
+ * help here — the process that would run the read-time check for
+ * `mcpServers.command` is the MCP server itself, which is exactly what
+ * fails to spawn once the pinned path is gone (see #1090). The fix has to
+ * avoid ever persisting the versioned snapshot in the first place, at the
+ * moment it's still alive and a stable sibling can still be found.
+ *
+ * `execPath` is returned UNCHANGED (pre-#1090 behaviour) unless ALL hold:
+ *   1. `execPath` itself looks version-pinned — nothing to improve otherwise.
+ *   2. A same-named binary exists on some PATH entry.
+ *   3. Its realpath matches `execPath`'s realpath — same underlying
+ *      interpreter, not merely a same-named unrelated binary.
+ *   4. That PATH entry's own (unresolved) path is NOT itself version-pinned
+ *      — a second Cellar/nvm snapshot earlier on PATH is not "stable".
+ *
+ * When no such candidate exists — e.g. plain nvm/asdf, which pin PATH itself
+ * to the versioned install dir with no unversioned alias — `execPath` is
+ * returned verbatim. This preserves PR #582 (bare `"node"` is not reliably
+ * on PATH for those managers when Claude Code spawns a hook via `/bin/sh`).
+ *
+ * Never throws: any fs error during the search falls back to `execPath`.
+ */
+export function resolveStableInterpreterPath(execPath, deps = {}) {
+  if (!execPath || typeof execPath !== "string") return execPath;
+  if (!looksVersionPinned(execPath)) return execPath;
+
+  const exists = deps.existsSync ?? existsSync;
+  const realpath = deps.realpathSync ?? realpathSync;
+  const pathEnv = deps.pathEnv ?? process.env.PATH ?? "";
+  const name = baseName(execPath);
+
+  let targetReal;
+  try {
+    targetReal = realpath(execPath);
+  } catch {
+    // Can't stat the very path we were handed — nothing to compare against.
+    return execPath;
+  }
+
+  for (const dir of pathEnv.split(delimiter)) {
+    if (!dir) continue;
+    const candidate = resolve(dir, name);
+    if (candidate === execPath) continue;
+    if (looksVersionPinned(candidate)) continue;
+    try {
+      if (!exists(candidate)) continue;
+      if (realpath(candidate) === targetReal) return candidate;
+    } catch {
+      /* unreadable/racy candidate — keep scanning */
+    }
+  }
+
+  return execPath;
 }
 
 /**
@@ -267,7 +356,10 @@ export function normalizeHooksJsonOnly({ pluginRoot, nodePath, jsRuntimePath, pl
     if (existsSync(hooksPath)) {
       const original = readFileSync(hooksPath, "utf-8");
       if (needsHookNormalization(original, pluginRoot)) {
-        const next = normalizeHooksJson(original, effectiveRuntime, pluginRoot);
+        // #1090: prefer a stable, PATH-resolvable equivalent over a
+        // version-manager snapshot before baking it into hooks.json.
+        const stableRuntime = resolveStableInterpreterPath(effectiveRuntime);
+        const next = normalizeHooksJson(original, stableRuntime, pluginRoot);
         if (next !== original) {
           writeFileSync(hooksPath, next, "utf-8");
         }
@@ -311,7 +403,11 @@ export function normalizeHooksOnStartup({ pluginRoot, nodePath, jsRuntimePath, p
     if (existsSync(pluginPath)) {
       const original = readFileSync(pluginPath, "utf-8");
       if (needsHookNormalization(original, pluginRoot)) {
-        const next = normalizePluginJson(original, nodePath, pluginRoot);
+        // #1090: same stable-path preference as the hooks.json branch above —
+        // plugin.json's mcpServers.command has no self-heal once it dangles,
+        // since the MCP server that would run the heal is what fails to spawn.
+        const stableNode = resolveStableInterpreterPath(nodePath);
+        const next = normalizePluginJson(original, stableNode, pluginRoot);
         if (next !== original) {
           writeFileSync(pluginPath, next, "utf-8");
         }
