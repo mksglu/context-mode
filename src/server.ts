@@ -425,10 +425,13 @@ const executor = new PolyglotExecutor({
 // Instead, we inject it as an inline shell env prefix in each batch command.
 // This temp file is loaded via --require when batch commands spawn Node processes.
 const CM_FS_PRELOAD = join(tmpdir(), `cm-fs-preload-${process.pid}.js`);
-writeFileSync(
-  CM_FS_PRELOAD,
-  `(function(){var __cm_fs=0;process.on('exit',function(){if(__cm_fs>0)try{process.stderr.write('__CM_FS__:'+__cm_fs+'\\n')}catch(e){}});try{var f=require('fs');var ors=f.readFileSync;f.readFileSync=function(){var r=ors.apply(this,arguments);if(Buffer.isBuffer(r))__cm_fs+=r.length;else if(typeof r==='string')__cm_fs+=Buffer.byteLength(r);return r;};}catch(e){}})();\n`,
-);
+// Bytes that count toward bytesSandboxed for one read/response payload.
+// Binary payloads (NUL byte in the first 8000 bytes, the same probe git uses)
+// count as 0: an ordinary command would never print them into model context,
+// so reporting them as saved tokens inflates the savings (#1151).
+const CM_TEXT_BYTES_JS = `function __cm_tb(d){if(typeof d==='string')return Buffer.byteLength(d);var u=d instanceof ArrayBuffer?new Uint8Array(d):d;if(!u||typeof u.length!=='number')return 0;return u.subarray(0,8000).indexOf(0)===-1?u.length:0;}`;
+export const CM_FS_PRELOAD_SOURCE = `(function(){${CM_TEXT_BYTES_JS}var __cm_fs=0;process.on('exit',function(){if(__cm_fs>0)try{process.stderr.write('__CM_FS__:'+__cm_fs+'\\n')}catch(e){}});try{var f=require('fs');var ors=f.readFileSync;f.readFileSync=function(){var r=ors.apply(this,arguments);__cm_fs+=__cm_tb(r);return r;};}catch(e){}})();\n`;
+writeFileSync(CM_FS_PRELOAD, CM_FS_PRELOAD_SOURCE);
 // In the stdio MCP path, main() also removes this file during graceful
 // shutdown. Plugin-native OpenCode/Kilo imports skip main() (#574), so
 // register a top-level best-effort cleanup too to avoid leaking preload
@@ -1443,6 +1446,79 @@ function quotePowerShellSingle(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+/**
+ * Wrap ctx_execute JS/TS code with FS and network byte instrumentation.
+ * Exported so tests can run the real wrapper instead of grepping the source.
+ */
+export function buildJsInstrumentedCode(code: string, background: boolean): string {
+  // Wrap user code in a closure that shadows CJS require with http/https interceptor.
+  // globalThis.require does NOT work because CJS require is module-scoped, not global.
+  // The closure approach (function(__cm_req){ var require=...; })(require) correctly
+  // shadows the CJS require for all code inside, including __cm_main().
+  return `
+${CM_TEXT_BYTES_JS}
+// FS read instrumentation — count text bytes read via fs.readFileSync/readFile
+let __cm_fs=0;
+process.on('exit',()=>{if(__cm_fs>0)try{process.stderr.write('__CM_FS__:'+__cm_fs+'\\n')}catch{}});
+(function(){
+  try{
+    var f=typeof require!=='undefined'?require('fs'):null;
+    if(!f)return;
+    var ors=f.readFileSync;
+    f.readFileSync=function(){var r=ors.apply(this,arguments);__cm_fs+=__cm_tb(r);return r;};
+    var orf=f.readFile;
+    if(orf)f.readFile=function(){var a=Array.from(arguments),cb=a.pop();orf.apply(this,a.concat([function(e,d){if(!e&&d)__cm_fs+=__cm_tb(d);cb(e,d);}]));};
+  }catch{}
+})();
+let __cm_net=0;
+// Report network bytes on process exit — works with both promise and callback patterns.
+// process.on('exit') fires after all I/O completes, unlike .finally() which fires
+// when __cm_main() resolves (immediately for callback-based http.get without await).
+process.on('exit',()=>{if(__cm_net>0)try{process.stderr.write('__CM_NET__:'+__cm_net+'\\n')}catch{}});
+;(function(__cm_req){
+// Intercept globalThis.fetch
+const __cm_f=globalThis.fetch;
+globalThis.fetch=async(...a)=>{const r=await __cm_f(...a);
+try{const cl=r.clone();const b=await cl.arrayBuffer();__cm_net+=__cm_tb(b)}catch{}
+return r};
+// Shadow CJS require with http/https network tracking.
+// A response is classified once, from its first chunk.
+function __cm_track(res){let bin=null;res.on('data',function(c){if(bin===null)bin=__cm_tb(c)===0&&c.length>0;if(!bin)__cm_net+=c.length});}
+const __cm_hc=new Map();
+const __cm_hm=new Set(['http','https','node:http','node:https']);
+function __cm_wf(m,origFn){return function(...a){
+  const li=a.length-1;
+  if(li>=0&&typeof a[li]==='function'){const oc=a[li];a[li]=function(res){
+    __cm_track(res);oc(res);};}
+  const req=origFn.apply(m,a);
+  const oOn=req.on.bind(req);
+  req.on=function(ev,cb,...r){
+    if(ev==='response'){return oOn(ev,function(res){
+      __cm_track(res);cb(res);
+    },...r);}
+    return oOn(ev,cb,...r);
+  };
+  return req;
+}}
+var require=__cm_req?function(id){
+  const m=__cm_req(id);
+  if(!__cm_hm.has(id))return m;
+  const k=id.replace('node:','');
+  if(__cm_hc.has(k))return __cm_hc.get(k);
+  const w=Object.create(m);
+  if(typeof m.get==='function')w.get=__cm_wf(m,m.get);
+  if(typeof m.request==='function')w.request=__cm_wf(m,m.request);
+  __cm_hc.set(k,w);return w;
+}:__cm_req;
+if(__cm_req){if(__cm_req.resolve)require.resolve=__cm_req.resolve;
+if(__cm_req.cache)require.cache=__cm_req.cache;}
+async function __cm_main(){
+${code}
+}
+__cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nsetInterval(()=>{},2147483647);' : ''}
+})(typeof require!=='undefined'?require:null);`;
+}
+
 export function buildBatchNodeOptionsPrefix(shellPath: string, preloadPath: string): string {
   const option = `--require ${preloadPath}`;
   const shell = shellPath.toLowerCase();
@@ -1744,69 +1820,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
       // For JS/TS: wrap in async IIFE with fetch + http/https interceptors to track network bytes
       let instrumentedCode = code;
       if (language === "javascript" || language === "typescript") {
-        // Wrap user code in a closure that shadows CJS require with http/https interceptor.
-        // globalThis.require does NOT work because CJS require is module-scoped, not global.
-        // The closure approach (function(__cm_req){ var require=...; })(require) correctly
-        // shadows the CJS require for all code inside, including __cm_main().
-        instrumentedCode = `
-// FS read instrumentation — count bytes read via fs.readFileSync/readFile
-let __cm_fs=0;
-process.on('exit',()=>{if(__cm_fs>0)try{process.stderr.write('__CM_FS__:'+__cm_fs+'\\n')}catch{}});
-(function(){
-  try{
-    var f=typeof require!=='undefined'?require('fs'):null;
-    if(!f)return;
-    var ors=f.readFileSync;
-    f.readFileSync=function(){var r=ors.apply(this,arguments);if(Buffer.isBuffer(r))__cm_fs+=r.length;else if(typeof r==='string')__cm_fs+=Buffer.byteLength(r);return r;};
-    var orf=f.readFile;
-    if(orf)f.readFile=function(){var a=Array.from(arguments),cb=a.pop();orf.apply(this,a.concat([function(e,d){if(!e&&d){if(Buffer.isBuffer(d))__cm_fs+=d.length;else if(typeof d==='string')__cm_fs+=Buffer.byteLength(d);}cb(e,d);}]));};
-  }catch{}
-})();
-let __cm_net=0;
-// Report network bytes on process exit — works with both promise and callback patterns.
-// process.on('exit') fires after all I/O completes, unlike .finally() which fires
-// when __cm_main() resolves (immediately for callback-based http.get without await).
-process.on('exit',()=>{if(__cm_net>0)try{process.stderr.write('__CM_NET__:'+__cm_net+'\\n')}catch{}});
-;(function(__cm_req){
-// Intercept globalThis.fetch
-const __cm_f=globalThis.fetch;
-globalThis.fetch=async(...a)=>{const r=await __cm_f(...a);
-try{const cl=r.clone();const b=await cl.arrayBuffer();__cm_net+=b.byteLength}catch{}
-return r};
-// Shadow CJS require with http/https network tracking.
-const __cm_hc=new Map();
-const __cm_hm=new Set(['http','https','node:http','node:https']);
-function __cm_wf(m,origFn){return function(...a){
-  const li=a.length-1;
-  if(li>=0&&typeof a[li]==='function'){const oc=a[li];a[li]=function(res){
-    res.on('data',function(c){__cm_net+=c.length});oc(res);};}
-  const req=origFn.apply(m,a);
-  const oOn=req.on.bind(req);
-  req.on=function(ev,cb,...r){
-    if(ev==='response'){return oOn(ev,function(res){
-      res.on('data',function(c){__cm_net+=c.length});cb(res);
-    },...r);}
-    return oOn(ev,cb,...r);
-  };
-  return req;
-}}
-var require=__cm_req?function(id){
-  const m=__cm_req(id);
-  if(!__cm_hm.has(id))return m;
-  const k=id.replace('node:','');
-  if(__cm_hc.has(k))return __cm_hc.get(k);
-  const w=Object.create(m);
-  if(typeof m.get==='function')w.get=__cm_wf(m,m.get);
-  if(typeof m.request==='function')w.request=__cm_wf(m,m.request);
-  __cm_hc.set(k,w);return w;
-}:__cm_req;
-if(__cm_req){if(__cm_req.resolve)require.resolve=__cm_req.resolve;
-if(__cm_req.cache)require.cache=__cm_req.cache;}
-async function __cm_main(){
-${code}
-}
-__cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nsetInterval(()=>{},2147483647);' : ''}
-})(typeof require!=='undefined'?require:null);`;
+        instrumentedCode = buildJsInstrumentedCode(code, background);
       }
       const effTimeout = resolveExecTimeout(timeout);
       const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd });
