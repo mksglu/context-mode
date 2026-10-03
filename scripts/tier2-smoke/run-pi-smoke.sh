@@ -12,6 +12,20 @@
 #   - FIXTURE             prompt fixture path (default: fixtures/search-corpus.txt)
 #
 # Exit code 0 on pass, non-zero on fail.
+
+# Re-exec under bash when started by a POSIX sh: this script relies on
+# bash-only features (`set -o pipefail`, `${BASH_SOURCE[0]}`, arrays) that
+# POSIX sh cannot run (mksglu/context-mode#1242). SHELLOPTS covers bash in
+# POSIX mode (macOS /bin/sh sets BASH_VERSION but lacks bash extensions) —
+# see scripts/ctx-debug.sh for the full rationale.
+if [ -z "${BASH_VERSION:-}" ] || [ "${SHELLOPTS#*posix}" != "${SHELLOPTS:-}" ]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  fi
+  printf '%s: bash is required (invoked by a POSIX sh without bash)\n' "$0" >&2
+  exit 127
+fi
+
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

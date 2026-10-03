@@ -18,7 +18,7 @@ if [ -z "${BASH_VERSION:-}" ] || [ "${SHELLOPTS#*posix}" != "${SHELLOPTS:-}" ]; 
   if command -v bash >/dev/null 2>&1; then
     exec bash "$0" "$@"
   fi
-  printf 'ctx-debug.sh: bash is required (invoked by a POSIX sh without bash)\n' >&2
+  printf '%s: bash is required (invoked by a POSIX sh without bash)\n' "$0" >&2
   exit 127
 fi
 
