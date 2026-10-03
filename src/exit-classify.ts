@@ -6,6 +6,7 @@
  *   - language is "shell"
  *   - exit code is exactly 1
  *   - stdout has non-whitespace content
+ *   - stderr is empty
  */
 export interface ExitClassification {
   isError: boolean;
@@ -22,7 +23,8 @@ export function classifyNonZeroExit(params: {
   const isSoftFail =
     language === "shell" &&
     exitCode === 1 &&
-    stdout.trim().length > 0;
+    stdout.trim().length > 0 &&
+    stderr.trim().length === 0;
 
   return {
     isError: !isSoftFail,
