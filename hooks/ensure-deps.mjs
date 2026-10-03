@@ -19,7 +19,7 @@
  * @see https://github.com/mksglu/context-mode/issues/203
  */
 
-import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, copyFileSync, renameSync, unlinkSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -127,7 +127,30 @@ function probeNativeInProcess(pluginRoot) {
   }
 }
 
+// Identity of the ABI cache and of the active binary it was installed as.
+// The active binary cannot be byte-compared with the cache (ad-hoc codesign
+// rewrites it), so a swap records both stats in a stamp file and later calls
+// skip the copy + codesign + rename while they still match (#1196). Anything
+// else that replaces the active binary (npm rebuild, another ABI's swap)
+// changes its stat and forces a fresh swap.
+function nativeSwapStamp(abiCachePath, binaryPath) {
+  try {
+    const c = statSync(abiCachePath);
+    const b = statSync(binaryPath);
+    return `${abiCachePath}:${c.size}:${c.mtimeMs}|${b.size}:${b.mtimeMs}:${b.ino}`;
+  } catch {
+    return null;
+  }
+}
+
 function replaceActiveNativeBinaryFromCache(abiCachePath, binaryPath) {
+  const stampPath = `${binaryPath}.swap-stamp`;
+  const current = nativeSwapStamp(abiCachePath, binaryPath);
+  if (current !== null) {
+    try {
+      if (readFileSync(stampPath, "utf8") === current) return;
+    } catch { /* no stamp yet — swap below */ }
+  }
   const tmpPath = `${binaryPath}.staging-${process.pid}-${Date.now()}`;
   try {
     copyFileSync(abiCachePath, tmpPath);
@@ -136,6 +159,16 @@ function replaceActiveNativeBinaryFromCache(abiCachePath, binaryPath) {
   } catch (err) {
     try { unlinkSync(tmpPath); } catch { /* best effort cleanup */ }
     throw err;
+  }
+  // A missing or unwritable stamp only means the next call swaps again.
+  const installed = nativeSwapStamp(abiCachePath, binaryPath);
+  if (installed === null) return;
+  const stampTmp = `${stampPath}.${process.pid}-${Date.now()}`;
+  try {
+    writeFileSync(stampTmp, installed);
+    renameSync(stampTmp, stampPath);
+  } catch {
+    try { unlinkSync(stampTmp); } catch { /* best effort cleanup */ }
   }
 }
 
