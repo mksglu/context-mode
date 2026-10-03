@@ -26,6 +26,7 @@
     "displayName": "context-mode",
     "shortDescription": "98% context window savings via FTS5 + sandboxed execution",
     "developerName": "Mert Koseoğlu",
-    "category": "Productivity"
+    "category": "Productivity",
+    "websiteURL": "https://github.com/mksglu/context-mode"
   }
 }
