@@ -164,6 +164,8 @@ let _buildAutoInjection:
 // which breaks prefix prompt cache on DeepSeek/Anthropic/OpenAI).
 // See: https://github.com/mksglu/context-mode/issues/598
 let _pendingContext = "";
+let _pendingContextIndex: number | null = null;
+let _pendingContextGeneration = 0;
 async function getAutoInjection(
   pluginRoot: string,
 ): Promise<((events: Array<{ category: string; data: string }>) => string) | null> {
@@ -465,6 +467,9 @@ export default function piExtension(pi: any): void {
   // ── 1. session_start — Initialize session ──────────────
 
   pi.on("session_start", (_event: any, ctx: any) => {
+    _pendingContextGeneration++;
+    _pendingContext = "";
+    _pendingContextIndex = null;
     try {
       _sessionId = deriveSessionId(ctx ?? {});
       db.ensureSession(_sessionId, projectDir);
@@ -605,8 +610,10 @@ export default function piExtension(pi: any): void {
   // ── 4. before_agent_start — Routing + active_memory + resume injection ─
 
   pi.on("before_agent_start", async (event: any, ctx: any) => {
+    const pendingContextGeneration = ++_pendingContextGeneration;
     try {
       _pendingContext = ""; // Reset — will be filled below if events exist
+      _pendingContextIndex = null;
       // Lazily start and await the MCP bridge only when Pi is about to
       // dispatch a real agent turn. This is the non-brittle #534/#809 guard:
       // help/version/package/config CLI paths may load the extension, but they
@@ -633,6 +640,7 @@ export default function piExtension(pi: any): void {
       // unreachable state. (Verified against oh-my-pi: main.ts init→prompt order,
       // interactive-mode.ts uiContext wiring, executor.ts subagent hasUI:false.)
       await ensureMCPBridge(isForegroundSession(ctx));
+      if (pendingContextGeneration !== _pendingContextGeneration) return;
 
       if (!_sessionId) return;
 
@@ -707,6 +715,7 @@ export default function piExtension(pi: any): void {
         }
         if (memoryContext) parts.push(memoryContext);
       }
+      if (pendingContextGeneration !== _pendingContextGeneration) return;
 
       // Resume snapshot (only when present and unconsumed).
       const resume = db.getResume(_sessionId);
@@ -720,33 +729,47 @@ export default function piExtension(pi: any): void {
       // modification. Mutating systemPrompt breaks prefix prompt caching on
       // DeepSeek/Anthropic/OpenAI because the system message sits at messages[0]
       // and any change invalidates the entire cache chain.
+      if (pendingContextGeneration !== _pendingContextGeneration) return;
       const baseLen = existingPrompt ? 1 : 0;
-      if (parts.length > baseLen) {
-        const extraParts = parts.slice(baseLen);
-        _pendingContext = extraParts.join("\n\n");
-      } else {
-        _pendingContext = "";
-      }
+      _pendingContext = parts.length > baseLen
+        ? parts.slice(baseLen).join("\n\n")
+        : "";
     } catch {
-      _pendingContext = ""; // Reset — ensure no stale data escapes
+      if (pendingContextGeneration === _pendingContextGeneration) {
+        _pendingContext = ""; // Reset — ensure no stale data escapes
+        _pendingContextIndex = null;
+      }
       // best effort — never break agent start
     }
   });
 
-  // ── 4a2. context — Inject active_memory + resume + behavioralDirective as message ──
-  // Uses the 'context' hook (like hindsight does) to append context at the END of
-  // messages rather than mutating systemPrompt at the beginning. This preserves
-  // prefix prompt cache for DeepSeek, Anthropic, and OpenAI.
+  // ── 4a2. context — Inject active_memory + resume as a stable message ──
+  // Pi rebuilds the provider payload from session history for every tool-loop
+  // request, so context-hook messages are not persisted. Keep this turn's
+  // injection at its first-request index to preserve the shared message prefix.
   pi.on("context", (event: any) => {
     try {
       if (!_pendingContext) return;
-      const ctx = _pendingContext;
-      _pendingContext = "";
-      event.messages.push({
+      const messages = event.messages;
+      const isPendingContext = (message: unknown): boolean => {
+        if (!message || typeof message !== "object") return false;
+        return "role" in message && "content" in message &&
+          message.role === "user" && message.content === _pendingContext;
+      };
+
+      const pendingIndex = _pendingContextIndex ?? messages.length;
+      _pendingContextIndex = pendingIndex;
+      if (isPendingContext(messages[pendingIndex])) {
+        return { messages };
+      }
+
+      const insertionIndex = Math.min(pendingIndex, messages.length);
+      _pendingContextIndex = insertionIndex;
+      messages.splice(insertionIndex, 0, {
         role: "user",
-        content: ctx,
+        content: _pendingContext,
       });
-      return { messages: event.messages };
+      return { messages };
     } catch {
       // best effort — never break context assembly
     }
@@ -856,21 +879,22 @@ export default function piExtension(pi: any): void {
   // ── 7. session_shutdown — Cleanup old sessions ─────────
 
   pi.on("session_shutdown", async () => {
+    _pendingContext = "";
+    _pendingContextGeneration++;
+    _pendingContextIndex = null;
     try {
       if (_db) {
         _db.cleanupOldSessions(7);
       }
+    } catch {
+      // best effort — never throw during shutdown
+    } finally {
       _db = null;
       _dbPath = "";
       _sessionId = "";
-    } catch {
-      // best effort — never throw during shutdown
     }
-    // Race fix (#472 round-3 + #809 lazy follow-up): if shutdown fires while
-    // bridge bootstrap is still in flight, _mcpBridge may be null at this
-    // point. Invalidate this bootstrap generation before waiting so any handle
-    // that resolves after the 2s ceiling self-shuts down instead of publishing
-    // a stale child handle after session shutdown.
+    // Invalidate an in-flight bridge bootstrap before awaiting it so a late
+    // handle cannot publish itself after this session has shut down.
     mcpBridgeGeneration++;
     mcpBridgeStarted = false;
     try {
