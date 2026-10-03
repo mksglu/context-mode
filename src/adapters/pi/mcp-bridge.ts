@@ -24,6 +24,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
 import { detectRuntimes } from "../../runtime.js";
 import { foreignWorkspaceEnv, foreignIdentificationEnv } from "../detect.js";
 
@@ -385,6 +386,30 @@ export class MCPStdioClient {
   private requestId = 0;
   private readonly pending = new Map<number, PendingRequest>();
   private buffer = "";
+  /**
+   * Incremental UTF-8 decoder for the child's stdout.
+   *
+   * A Node stream hands us bytes in arbitrary chunks that are NOT aligned to
+   * UTF-8 code-point boundaries. Decoding each chunk in isolation with
+   * `chunk.toString("utf-8")` substitutes U+FFFD for the incomplete trailing
+   * sequence, and because the decoded text is appended immediately, that
+   * U+FFFD is baked permanently into {@link buffer} — the real bytes arriving
+   * in the next chunk can no longer repair it.
+   *
+   * The corruption was silent rather than loud: U+FFFD is a legal character
+   * inside a JSON string, so `JSON.parse(line)` still succeeded and the
+   * `catch { continue }` never fired. The mangled text went straight to
+   * `handler.resolve(msg.result)`, so any tool output containing CJK, emoji,
+   * or accented text silently lost characters on the Pi/OMP path with no way
+   * for the calling agent to detect it.
+   *
+   * `StringDecoder` holds the incomplete trailing sequence back across chunks
+   * and emits it once the remaining bytes arrive. This is the stream-level
+   * counterpart to `Buffer.concat(...).toString("utf-8")` in
+   * src/executor.ts:496 — a concat is not available here because the bridge is
+   * long-lived and cannot know which chunk is the last one.
+   */
+  private readonly decoder = new StringDecoder("utf-8");
   private initialized = false;
   private exited = false;
   /**
@@ -522,13 +547,20 @@ export class MCPStdioClient {
   private onExit(): void {
     if (this.exited) return;
     this.exited = true;
+    // Release any partial UTF-8 sequence still held by the decoder so a
+    // respawn starts from clean decoder state. The flushed remainder belongs
+    // to a child that no longer exists, so the return value is discarded
+    // along with `this.buffer` in respawn().
+    this.decoder.end();
     const err = new Error("MCP server exited");
     for (const [, p] of this.pending) p.reject(err);
     this.pending.clear();
   }
 
   private onData(chunk: Buffer): void {
-    this.buffer += chunk.toString("utf-8");
+    // Incremental decode — see the `decoder` field comment. Never decode a
+    // chunk in isolation here: a chunk boundary can land mid-code-point.
+    this.buffer += this.decoder.write(chunk);
     let idx;
     while ((idx = this.buffer.indexOf("\n")) >= 0) {
       const line = this.buffer.slice(0, idx).trim();
@@ -712,6 +744,8 @@ export class MCPStdioClient {
    * test in tests/adapters/pi-mcp-bridge.test.ts):
    *   1. `this.child = null`     — drop stale handle
    *   2. `this.buffer = ""`       — discard leftover bytes from old child
+   *      (plus `this.decoder.end()`, which drops any partial UTF-8 sequence
+   *      the old child's last chunk left held — see the `decoder` field)
    *   3. `this.exited = false`    — must precede `start()` + `initialize()`,
    *                                 because `request("initialize", …)`
    *                                 inside `initialize()` re-checks this
@@ -724,6 +758,9 @@ export class MCPStdioClient {
   private async respawn(): Promise<void> {
     this.child = null;
     this.buffer = "";
+    // The decoder is readonly, so `.end()` is the reset: it flushes the old
+    // child's held partial sequence and clears internal state for the new one.
+    this.decoder.end();
     this.exited = false;
     this.initialized = false;
     this.start();
