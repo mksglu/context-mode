@@ -221,6 +221,19 @@ describe("Non-zero Exit Code Classification", () => {
     expect(result.output).toBe("file1.ts:10: writeRouting\nfile2.ts:20: writeRouting");
   });
 
+  test("shell exit 1 with partial stdout and stderr → real error", () => {
+    const result = classifyNonZeroExit({
+      language: "shell",
+      exitCode: 1,
+      stdout: "partial result\n",
+      stderr: "operation failed\n",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain("Exit code: 1");
+    expect(result.output).toContain("partial result");
+    expect(result.output).toContain("operation failed");
+  });
+
   test("shell exit 1 with empty stdout → real error", () => {
     const result = classifyNonZeroExit({
       language: "shell",
