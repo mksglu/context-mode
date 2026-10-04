@@ -498,22 +498,6 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
     };
   }
 
-  if (existsSync(resolve(home, ".claude"))) {
-    return {
-      platform: "claude-code",
-      confidence: "medium",
-      reason: "~/.claude/ directory exists",
-    };
-  }
-
-  if (existsSync(resolve(home, ".gemini"))) {
-    return {
-      platform: "gemini-cli",
-      confidence: "medium",
-      reason: "~/.gemini/ directory exists",
-    };
-  }
-
   if (existsSync(resolve(home, ".codex"))) {
     return {
       platform: "codex",
@@ -577,6 +561,22 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
       platform: "openclaw",
       confidence: "medium",
       reason: "~/.openclaw/ directory exists",
+    };
+  }
+
+  if (existsSync(resolve(home, ".claude"))) {
+    return {
+      platform: "claude-code",
+      confidence: "medium",
+      reason: "~/.claude/ directory exists",
+    };
+  }
+
+  if (existsSync(resolve(home, ".gemini"))) {
+    return {
+      platform: "gemini-cli",
+      confidence: "medium",
+      reason: "~/.gemini/ directory exists",
     };
   }
 
