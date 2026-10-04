@@ -940,14 +940,14 @@ export class SessionDB extends SQLiteBase {
               project_dir, attribution_source, attribution_confidence,
               bytes_avoided, bytes_returned,
               source_hook, created_at, data_hash
-       FROM session_events WHERE session_id = ? AND priority >= ? ORDER BY id ASC LIMIT ?`);
+       FROM session_events WHERE session_id = ? AND priority <= ? ORDER BY id ASC LIMIT ?`);
 
     p(S.getEventsByTypeAndPriority,
       `SELECT id, session_id, type, category, priority, data,
               project_dir, attribution_source, attribution_confidence,
               bytes_avoided, bytes_returned,
               source_hook, created_at, data_hash
-       FROM session_events WHERE session_id = ? AND type = ? AND priority >= ? ORDER BY id ASC LIMIT ?`);
+       FROM session_events WHERE session_id = ? AND type = ? AND priority <= ? ORDER BY id ASC LIMIT ?`);
 
     p(S.getEventCount,
       `SELECT COUNT(*) AS cnt FROM session_events WHERE session_id = ?`);
@@ -1310,20 +1310,25 @@ export class SessionDB extends SQLiteBase {
    */
   getEvents(
     sessionId: string,
-    opts?: { type?: string; minPriority?: number; limit?: number },
+    // Threshold is a numeric MAXIMUM because the extraction scale is
+    // 1=critical: the lower the number, the more load-bearing the event. The
+    // option was named for the opposite convention and the SQL matched that
+    // name, so a caller asking for the important events received the
+    // unimportant ones.
+    opts?: { type?: string; maxPriority?: number; limit?: number },
   ): StoredEvent[] {
     const limit = opts?.limit ?? 1000;
     const type = opts?.type;
-    const minPriority = opts?.minPriority;
+    const maxPriority = opts?.maxPriority;
 
-    if (type && minPriority !== undefined) {
-      return this.stmt(S.getEventsByTypeAndPriority).all(sessionId, type, minPriority, limit) as StoredEvent[];
+    if (type && maxPriority !== undefined) {
+      return this.stmt(S.getEventsByTypeAndPriority).all(sessionId, type, maxPriority, limit) as StoredEvent[];
     }
     if (type) {
       return this.stmt(S.getEventsByType).all(sessionId, type, limit) as StoredEvent[];
     }
-    if (minPriority !== undefined) {
-      return this.stmt(S.getEventsByPriority).all(sessionId, minPriority, limit) as StoredEvent[];
+    if (maxPriority !== undefined) {
+      return this.stmt(S.getEventsByPriority).all(sessionId, maxPriority, limit) as StoredEvent[];
     }
     return this.stmt(S.getEvents).all(sessionId, limit) as StoredEvent[];
   }

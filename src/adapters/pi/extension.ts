@@ -685,7 +685,9 @@ export default function piExtension(pi: any): void {
       // skills, decisions, and the resume snapshot are unaffected.
       const activeEvents = db
         .getEvents(_sessionId, {
-          minPriority: 3,
+          // Numeric maximum on the 1=critical scale, so this covers role (3),
+          // decision (2) and skill (2) — the three this block reads.
+          maxPriority: 3,
           limit: 50,
         })
         .filter((e: any) => String(e.category ?? "") !== "role");

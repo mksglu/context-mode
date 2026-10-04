@@ -237,22 +237,27 @@ describe("Filter by type", () => {
 // SLICE 4: FILTER BY MIN PRIORITY
 // ════════════════════════════════════════════
 
-describe("Filter by minPriority", () => {
-  test("getEvents filters by minPriority", () => {
+describe("Filter by maxPriority", () => {
+  // The extraction scale is 1=critical (extract.ts). This test previously
+  // labelled priority 1 "low" and 4 "critical" and filtered with >=, matching a
+  // second, opposite belief about the scale — the same one that inverted the
+  // eviction query (#902/#1156). A numeric maximum selects the important tier.
+  test("getEvents keeps the important events, not the unimportant ones", () => {
     const db = createTestDB();
     const sid = "sess-3";
 
-    db.insertEvent(sid, makeEvent({ type: "file", data: "low.ts", priority: 1 }));
-    db.insertEvent(sid, makeEvent({ type: "git", data: "medium", priority: 2 }));
-    db.insertEvent(sid, makeEvent({ type: "error", data: "high", priority: 3 }));
-    db.insertEvent(sid, makeEvent({ type: "decision", data: "critical", priority: 4 }));
+    db.insertEvent(sid, makeEvent({ type: "file", data: "critical.ts", priority: 1 }));
+    db.insertEvent(sid, makeEvent({ type: "git", data: "important", priority: 2 }));
+    db.insertEvent(sid, makeEvent({ type: "error", data: "ordinary", priority: 3 }));
+    db.insertEvent(sid, makeEvent({ type: "decision", data: "trivial", priority: 4 }));
 
-    const highAndAbove = db.getEvents(sid, { minPriority: 3 });
-    assert.equal(highAndAbove.length, 2);
-    assert.ok(highAndAbove.every(e => e.priority >= 3));
+    const important = db.getEvents(sid, { maxPriority: 2 });
+    assert.equal(important.length, 2);
+    assert.ok(important.every(e => e.priority <= 2));
+    assert.ok(important.some(e => e.data === "critical.ts"));
 
-    const allEvents = db.getEvents(sid, { minPriority: 1 });
-    assert.equal(allEvents.length, 4);
+    const everything = db.getEvents(sid, { maxPriority: 4 });
+    assert.equal(everything.length, 4);
   });
 });
 
@@ -756,18 +761,18 @@ describe("getEventCount", () => {
 // ════════════════════════════════════════════
 
 describe("Combined Filters", () => {
-  test("getEvents filters by both type and minPriority", () => {
+  test("getEvents filters by both type and maxPriority", () => {
     const db = createTestDB();
     const sid = "sess-combo";
 
-    db.insertEvent(sid, makeEvent({ type: "file", data: "low-file.ts", priority: 1 }));
-    db.insertEvent(sid, makeEvent({ type: "file", data: "high-file.ts", priority: 3 }));
-    db.insertEvent(sid, makeEvent({ type: "git", data: "low-git", priority: 1 }));
-    db.insertEvent(sid, makeEvent({ type: "git", data: "high-git", priority: 3 }));
+    db.insertEvent(sid, makeEvent({ type: "file", data: "critical-file.ts", priority: 1 }));
+    db.insertEvent(sid, makeEvent({ type: "file", data: "trivial-file.ts", priority: 3 }));
+    db.insertEvent(sid, makeEvent({ type: "git", data: "critical-git", priority: 1 }));
+    db.insertEvent(sid, makeEvent({ type: "git", data: "trivial-git", priority: 3 }));
 
-    const highFiles = db.getEvents(sid, { type: "file", minPriority: 2 });
-    assert.equal(highFiles.length, 1);
-    assert.equal(highFiles[0].data, "high-file.ts");
+    const importantFiles = db.getEvents(sid, { type: "file", maxPriority: 2 });
+    assert.equal(importantFiles.length, 1);
+    assert.equal(importantFiles[0].data, "critical-file.ts");
   });
 });
 
