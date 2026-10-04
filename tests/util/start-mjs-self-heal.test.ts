@@ -207,10 +207,13 @@ describe("start.mjs — Issue #577 CLAUDE_CONFIG_DIR honoring", () => {
       // The fallback inside the resolver itself
       // (`return resolve(homedir(), ".claude")` with no additional segments)
       // is the documented default — keep it allowed.
-      const fallbackOnly = /return\s+resolve\s*\(\s*homedir\s*\(\s*\)\s*,\s*["']\.claude["']\s*\)/;
+      const fallbackOnly =
+        /return\s+resolve\s*\(\s*homedir\s*\(\s*\)\s*,\s*["']\.claude["']\s*\)/;
       if (fallbackOnly.test(line)) continue;
       // The pattern we're hunting: resolve(homedir(), ".claude", <segment>, ...)
-      if (/resolve\s*\(\s*homedir\s*\(\s*\)\s*,\s*["']\.claude["']\s*,/.test(line)) {
+      if (
+        /resolve\s*\(\s*homedir\s*\(\s*\)\s*,\s*["']\.claude["']\s*,/.test(line)
+      ) {
         offenders.push(`L${i + 1}: ${line.trim()}`);
       }
     }
@@ -226,7 +229,10 @@ describe("start.mjs — Issue #577 CLAUDE_CONFIG_DIR honoring", () => {
     const ghdLine = startSrc
       .split("\n")
       .find((l) => /globalHooksDir\s*=/.test(l));
-    expect(ghdLine, "globalHooksDir assignment must exist in start.mjs").toBeDefined();
+    expect(
+      ghdLine,
+      "globalHooksDir assignment must exist in start.mjs",
+    ).toBeDefined();
     expect(ghdLine!).not.toMatch(
       /resolve\s*\(\s*homedir\s*\(\s*\)\s*,\s*["']\.claude["']\s*,\s*["']hooks["']\s*\)/,
     );
@@ -264,5 +270,54 @@ describe("start.mjs — Issue #577 CLAUDE_CONFIG_DIR honoring", () => {
     const tplBadForm =
       /resolve\(\s*homedir\(\)\s*,\s*["']\.claude["']\s*,\s*["']plugins["']/;
     expect(tpl).not.toMatch(tplBadForm);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Issue #1215 — a project-scope plugin install must not write the user's
+// global settings.json. start.mjs used to set enabledPlugins[key] = true and
+// register the cache-heal SessionStart hook there on every MCP boot, which
+// turned a single-project install on for every project on the machine.
+// The heal logic is covered in heal-installed-plugins.test.ts; these tests
+// pin the start.mjs wiring.
+// ─────────────────────────────────────────────────────────────────────────
+
+describe("start.mjs — Issue #1215 user settings only for user-scope installs", () => {
+  test("HEAL 4 passes the registry path to healSettingsEnabledPlugins", () => {
+    const heal34Idx = startSrc.indexOf("HEAL 3");
+    const layer4Idx = startSrc.indexOf("Self-heal Layer 4");
+    const block = startSrc.slice(heal34Idx, layer4Idx);
+    expect(block).toMatch(
+      /healSettingsEnabledPlugins\(\s*\{\s*settingsPath,\s*pluginKey,\s*registryPath\s*\}\s*\)/,
+    );
+  });
+
+  test("Layer 4 hook registration is gated on hasUserScopeInstall", () => {
+    const idx = startSrc.indexOf("Register the hook");
+    expect(idx).toBeGreaterThan(-1);
+    const block = startSrc.slice(
+      idx,
+      startSrc.indexOf("sessionStart.push(", idx),
+    );
+    expect(block).toContain("hasUserScopeInstall(");
+    expect(block).toMatch(
+      /if\s*\(\s*!alreadyRegistered\s*&&\s*userScope\s*!==\s*false\s*\)/,
+    );
+  });
+
+  test("postinstall.mjs passes the registry path too", () => {
+    const postinstallSrc = readFileSync(
+      resolve(ROOT, "scripts", "postinstall.mjs"),
+      "utf-8",
+    );
+    const idx = postinstallSrc.indexOf("healSettingsEnabledPlugins({");
+    expect(idx).toBeGreaterThan(-1);
+    // Accept both the explicit-property form (`registryPath:`) and the
+    // shorthand (`registryPath,`). The guard is "the argument is passed",
+    // not "which spelling was used" — the call site passes a variable
+    // already named registryPath, so the shorthand is the honest spelling.
+    expect(postinstallSrc.slice(idx, idx + 300)).toMatch(
+      /\bregistryPath\b\s*[:,]/,
+    );
   });
 });
