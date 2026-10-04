@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
 
+import { PLATFORM_ENV_VARS } from "../../src/adapters/detect.js";
 import { classifyNonZeroExit } from "../../src/exit-classify.js";
 import { PolyglotExecutor } from "../../src/executor.js";
 import { detectRuntimes } from "../../src/runtime.js";
@@ -1254,16 +1255,20 @@ describe("ctx_index: projectRoot path resolution (#365)", () => {
     // host env var (Claude Code, Codex, etc.) leaks into this child,
     // detectPlatform() can pick that host, enter strict mode, and ban
     // IDEA_INITIAL_DIRECTORY as a foreign var.
+    // Iterate PLATFORM_ENV_VARS instead of matching a hand-written prefix regex.
+    // The registry is the documented single source of truth for exactly this
+    // purpose, and a `^OPENCODE_` style pattern silently misses the
+    // UNSUFFIXED `OPENCODE` var the OpenCode host exports. That leak made
+    // detectPlatform() answer "opencode" with high confidence, so
+    // strictPlatform dropped IDEA_INITIAL_DIRECTORY out of the cascade and
+    // resolveProjectDir fell through to the developer's own $PWD — a red that
+    // only reproduced for anyone running the suite outside Claude Code.
     const cleanEnv = { ...process.env };
-    for (const key of Object.keys(cleanEnv)) {
-      if (
-        /^(CLAUDE|CODEX|GEMINI|VSCODE|CURSOR|OPENCODE|KILO|KIRO|PI|OMP|ZED|QWEN|KIMI|ANTIGRAVITY|OPENCLAW|COPILOT)_/.test(key) ||
-        key === "CONTEXT_MODE_PLATFORM" ||
-        key === "CONTEXT_MODE_PROJECT_DIR"
-      ) {
-        delete cleanEnv[key];
-      }
+    for (const entries of PLATFORM_ENV_VARS.values()) {
+      for (const { name } of entries) delete cleanEnv[name];
     }
+    delete cleanEnv.CONTEXT_MODE_PLATFORM;
+    delete cleanEnv.CONTEXT_MODE_PROJECT_DIR;
 
     const proc = spawn("node", [buildEntry], {
       stdio: ["pipe", "pipe", "pipe"],
