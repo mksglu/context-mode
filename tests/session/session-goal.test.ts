@@ -51,9 +51,14 @@ describe("capture: extractGoal", () => {
     assert.equal(goalOf("/goal    "), undefined);
   });
 
-  test("a /goal directive has critical priority under the DB eviction contract", () => {
+  test("a /goal directive carries the critical priority the eviction contract expects", () => {
+    // The extraction scale is 1=critical, and the evicter drops the HIGHEST
+    // number first. A goal at 4 used to look safe only because the eviction
+    // query was ORDER BY priority ASC — the writer was compensating for that
+    // bug. Fixing the query without fixing this turned the goal into the first
+    // row evicted (#902/#1156).
     const ev = extractUserEvents("/goal keep tests green").find((e) => e.category === "goal");
-    assert.equal(ev?.priority, 4);
+    assert.equal(ev?.priority, 1);
   });
 });
 
@@ -82,6 +87,48 @@ describe("storage: goal survives session event eviction", () => {
       assert.equal(db.getEventCount(sid), 1000);
       assert.equal(goals.length, 1);
       assert.equal(goals[0].data, "preserve this objective");
+    } finally {
+      db.close();
+    }
+  });
+
+  test("eviction drops the least important event, not the most important (#902/#1156)", () => {
+    // Same-priority fixtures cannot detect an inverted ordering — the id ASC
+    // tiebreak evicts the same row either way. Mixed priorities can.
+    const dir = mkdtempSync(join(tmpdir(), "context-mode-evict-dir-"));
+    const db = new SessionDB({ dbPath: join(dir, "session.db") });
+    const sid = "evict-direction";
+
+    try {
+      db.ensureSession(sid, "/tmp/context-mode-evict-dir");
+      for (let i = 0; i < 999; i++) {
+        db.insertEvent(sid, {
+          type: "file_read",
+          category: "file",
+          data: `filler-${i}.ts`,
+          priority: 2,
+        }, "PostToolUse");
+      }
+      // The load-bearing event: 1 = critical on the extraction scale.
+      db.insertEvent(sid, {
+        type: "user_prompt",
+        category: "user-prompt",
+        data: "ship the v2 release",
+        priority: 1,
+      }, "UserPromptSubmit");
+      // Crosses the cap, so exactly one row is evicted.
+      db.insertEvent(sid, { type: "git", category: "git", data: "new-event", priority: 2 }, "PostToolUse");
+
+      const rows = db.getEvents(sid, { limit: 1000 });
+      assert.equal(rows.length, 1000);
+      assert.ok(
+        rows.some((e) => e.data === "ship the v2 release"),
+        "the priority-1 event must survive; ORDER BY priority ASC evicted it first",
+      );
+      assert.ok(
+        !rows.some((e) => e.data === "filler-0.ts"),
+        "a priority-2 row should have been the one evicted",
+      );
     } finally {
       db.close();
     }

@@ -83,8 +83,11 @@ describe("hooks/codex — /goal survives compact resume context", () => {
     );
     expect(promptResult.status, promptResult.stderr || promptResult.stdout).toBe(0);
 
+    // 1 = critical on the extraction scale. A goal at 4 only looked durable
+    // because the eviction query was ORDER BY priority ASC; with the ordering
+    // corrected, 4 would have made it the first row evicted (#902/#1156).
     expect(readGoalRows(codexHome)).toEqual([
-      expect.objectContaining({ data: objective, priority: 4 }),
+      expect.objectContaining({ data: objective, priority: 1 }),
     ]);
 
     const compactResult = runHook(CODEX_PRECOMPACT_PATH, baseInput, env);

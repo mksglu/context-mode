@@ -635,7 +635,7 @@ export interface ToolCallStats {
 // Constants
 // ─────────────────────────────────────────────────────────
 
-/** Maximum events per session before FIFO eviction kicks in. */
+/** Maximum events per session before eviction kicks in. */
 const MAX_EVENTS_PER_SESSION = 1000;
 
 /** Number of recent events to check for deduplication. */
@@ -970,7 +970,7 @@ export class SessionDB extends SQLiteBase {
     p(S.evictLowestPriority,
       `DELETE FROM session_events WHERE id = (
          SELECT id FROM session_events WHERE session_id = ?
-         ORDER BY priority ASC, id ASC LIMIT 1
+         ORDER BY priority DESC, id ASC LIMIT 1
        )`);
 
     p(S.updateMetaLastEvent,
@@ -1126,7 +1126,7 @@ export class SessionDB extends SQLiteBase {
   // ═══════════════════════════════════════════
 
   /**
-   * Insert a session event with deduplication and FIFO eviction.
+   * Insert a session event with deduplication and capped eviction.
    *
    * Deduplication: skips if the same type + data_hash appears in the
    * last DEDUP_WINDOW events for this session.
@@ -1175,7 +1175,10 @@ export class SessionDB extends SQLiteBase {
       const dup = this.stmt(S.checkDuplicate).get(sessionId, DEDUP_WINDOW, event.type, dataHash);
       if (dup) return;
 
-      // Enforce max events with FIFO eviction of lowest priority
+      // Cap events by dropping the least important one. The extraction scale
+      // is 1=critical (extract.ts), so the HIGHEST number is evicted first and
+      // id ASC only breaks ties within a tier. ORDER BY priority ASC here
+      // deleted user_prompt / rule / file_* before anything else (#902/#1156).
       const countRow = this.stmt(S.getEventCount).get(sessionId) as { cnt: number };
       if (countRow.cnt >= MAX_EVENTS_PER_SESSION) {
         this.stmt(S.evictLowestPriority).run(sessionId);

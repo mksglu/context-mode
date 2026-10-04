@@ -2457,7 +2457,9 @@ function extractGoal(message: string): SessionEvent[] {
     type: "goal",
     category: "goal",
     data: safeString(goalText),
-    priority: 4,
+    // 1=critical on the extraction scale. At 4 the goal became the first row
+    // evicted once the eviction ordering was corrected (#902/#1156).
+    priority: 1,
   }];
 }
 
