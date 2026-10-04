@@ -5,7 +5,8 @@
  * Evidence-based naming conventions (from official docs):
  * | Platform           | Pattern                                                    |
  * |--------------------|------------------------------------------------------------|
- * | Claude Code        | mcp__plugin_context-mode_context-mode__<tool>               |
+ * | Claude Code (plugin) | mcp__plugin_context-mode_context-mode__<tool>             |
+ * | Claude Code (standalone / MacPorts) | mcp__context-mode__<tool>              |
  * | Gemini CLI         | mcp__context-mode__<tool>                                  |
  * | Antigravity        | mcp__context-mode__<tool>                                  |
  * | Antigravity CLI    | context-mode/<tool>                                        |
@@ -17,7 +18,12 @@
  */
 
 const TOOL_PREFIXES = {
-  "claude-code":    (tool) => `mcp__plugin_context-mode_context-mode__${tool}`,
+  // CLAUDE_PLUGIN_ROOT is set only when Claude Code manages hooks via its plugin system.
+  // Standalone installs (MacPorts, npm global) write absolute-path hooks to settings.json
+  // and register the MCP server as "context-mode" → prefix is mcp__context-mode__.
+  "claude-code":    (tool) => process.env.CLAUDE_PLUGIN_ROOT
+    ? `mcp__plugin_context-mode_context-mode__${tool}`
+    : `mcp__context-mode__${tool}`,
   "gemini-cli":     (tool) => `mcp__context-mode__${tool}`,
   "antigravity":    (tool) => `mcp__context-mode__${tool}`,
   "antigravity-cli": (tool) => `context-mode/${tool}`,
