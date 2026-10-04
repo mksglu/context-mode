@@ -27,7 +27,7 @@ import {
   evaluateProjectContainment,
   expandGlobAnchors,
   extractShellCommands,
-} from "../build/security.js";
+} from "../src/security.js";
 
 describe("parseBashPattern", () => {
   test("parseBashPattern: extracts glob from Bash(glob)", () => {
