@@ -770,6 +770,11 @@ export default function piExtension(pi: any): void {
       messages.splice(insertionIndex, 0, {
         role: "user",
         content: _pendingContext,
+        // Pi's Message type requires `timestamp: number`. Gateways that
+        // validate the serialized envelope — Radius rejects the whole request
+        // with 400 when any message lacks it — reject this injection and with
+        // it every context-mode turn (#1179).
+        timestamp: Date.now(),
       });
       return { messages };
     } catch {
