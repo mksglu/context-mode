@@ -39,8 +39,10 @@ jobs:
       - name: Cache better-sqlite3 native addon
         uses: actions/cache@v4
         with:
-          path: node_modules/better-sqlite3/build
-          key: better-sqlite3-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+          # pnpm lays the real package out under .pnpm; node_modules/better-sqlite3
+          # is only a symlink, which the cache action does not follow.
+          path: node_modules/.pnpm/better-sqlite3*/node_modules/better-sqlite3/build
+          key: better-sqlite3-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Cache OpenClaw binary
         id: cache-openclaw
@@ -50,10 +52,13 @@ jobs:
           key: openclaw-${{ runner.os }}-v${{ env.OPENCLAW_VERSION }}
 
       - name: Install dependencies and build
+        # Repo is pnpm-managed (see ci.yml); `npm install` crashes with an
+        # arborist error because package-lock.json no longer exists.
         run: |
-          npm install
+          corepack enable
+          pnpm install --frozen-lockfile
           npm run build
-          npm rebuild better-sqlite3
+          pnpm rebuild better-sqlite3
 
       - name: Install OpenClaw
         if: steps.cache-openclaw.outputs.cache-hit != 'true'

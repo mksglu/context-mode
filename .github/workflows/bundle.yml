@@ -22,7 +22,11 @@ jobs:
         with:
           node-version: "22.5"
 
-      - run: npm install
+      # Repo is pnpm-managed (see ci.yml); `npm install` crashes without
+      # package-lock.json.
+      - run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - run: npx tsc --noEmit
 

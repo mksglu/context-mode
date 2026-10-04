@@ -62,10 +62,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies and build
+        # Repo is pnpm-managed (see ci.yml); `npm ci` requires the deleted
+        # package-lock.json.
         run: |
-          npm ci
+          corepack enable
+          pnpm install --frozen-lockfile
           npm run build
-          npm rebuild better-sqlite3
+          pnpm rebuild better-sqlite3
 
       - name: Install Pi
         run: |
