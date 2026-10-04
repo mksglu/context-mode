@@ -44,7 +44,12 @@ jobs:
         run: choco install elixir --yes --no-progress
 
       - name: Install dependencies
-        run: npm install
+        # `packageManager` declares pnpm, and pnpm-lock.yaml is now committed, so a
+        # fresh `npm install` could resolve a different tree than the one the suite
+        # was verified against. corepack honours the declared version.
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: npx tsc -b --noEmit
@@ -57,6 +62,11 @@ jobs:
 
       - name: Assert bundle invariants (G3 — Issue #511 guardrail)
         run: npm run assert-bundle
+
+      - name: Assert bundles match the tracked sources
+        # The build above regenerated every bundle, so any file that now differs from
+        # HEAD was stale in the commit — the fix would not have shipped.
+        run: npm run assert-bundles-committed
 
       - name: Run all tests
         shell: bash
