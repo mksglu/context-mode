@@ -11,9 +11,9 @@ cruzados con las PRs que este fork ya adoptó.
 ## Resumen
 
 - **CUBIERTO-POR-PR**: 29 — la issue tiene una PR de las 34 adoptadas aquí.
-- **RESUELTO-AQUI**: 25 — corregido directamente en `fix/backlog-takeover`, con el commit.
+- **RESUELTO-AQUI**: 27 — (+2: #1187 y #1199, resueltas por el port a OpenCode v2) corregido directamente en `fix/backlog-takeover`, con el commit.
 - **RUIDO**: 3 — duplicado, pregunta o promoción; no se corrige con código.
-- **PENDIENTE**: 106 — requiere trabajo.
+- **PENDIENTE**: 104 — requiere trabajo.
 
 ## Pendientes por subsistema
 
@@ -79,7 +79,7 @@ cruzados con las PRs que este fork ya adoptó.
 | 1152 | adaptadores | bug | 0 | RESUELTO-AQUI | fix(codex) hooks efectivos (6bb2836) | [Bug]: Doctor reports hooks disabled when Codex enables them by default |
 | 1173 | adaptadores | bug | 2 | RESUELTO-AQUI | fix(session) restaurar post-compactacion acotado (e5b75d4) | [Bug]:  v1.0.169 can enter an infinite compaction loop and exhaust Claude Code token quota |
 | 1179 | adaptadores | bug | 0 | RESUELTO-AQUI | fix(pi) timestamp en el mensaje inyectado (391b235) | [Bug]: Pi context hook pushes a message without timestamp, Radius provider rejects with 400 |
-| 1187 | adaptadores | feature | 3 | PENDIENTE |  | [Feature]: Opencode V2 support |
+| 1187 | adaptadores | feature | 3 | RESUELTO-AQUI | port v2 dual `{id, server, setup}` | [Feature]: Opencode V2 support |
 | 1192 | adaptadores | feature | 0 | PENDIENTE |  | [Feature]: integrate with pi-blackhole |
 | 1205 | adaptadores | bug | 2 | PENDIENTE |  | [Bug]: Pi bridge on Bun spins on unfinalized statements — ~150k/day "invalid database connection pointer" per  |
 | 1206 | adaptadores | bug | 0 | CUBIERTO-POR-PR |  | [Bug]: Antigravity CLI (agy) rejects the plugin hooks.json — Stop is declared grouped, agy expects a flat hand |
@@ -133,7 +133,7 @@ cruzados con las PRs que este fork ya adoptó.
 | 874 | linux | bug | 1 | PENDIENTE |  | [BUG] OMP plugin tool_result captures metadata but never replaces output — bytes_avoided always 0 |
 | 895 | linux | bug | 1 | PENDIENTE |  | ctx_search ranks stale cross-session memory above fresh same-session captures |
 | 959 | linux | bug | 6 | PENDIENTE |  | Pi adapter: hung ctx_execute cannot be aborted; Esc/Ctrl+C does nothing |
-| 1036 | linux | bug | 1 | PENDIENTE |  | opencode adapter appends cumulative turn cost once per step, over-counting multi-step turns |
+| 1036 | linux | bug | 1 | PENDIENTE | v2: delta por paso via usageDelta (medido: usage.updated es por paso con payload ACUMULADO) |  | opencode adapter appends cumulative turn cost once per step, over-counting multi-step turns |
 | 1067 | linux | bug | 0 | PENDIENTE |  | pi adapter: collapsed tool status line shows the code-echo fence line (```javascript) instead of actual output |
 | 1069 | linux | bug | 1 | PENDIENTE |  | Pi adapter does not enforce mandatory context-mode routing for read-only tools |
 | 1085 | linux | bug | 0 | PENDIENTE |  | [OpenCode adapter] `experimental.chat.system.transform` injects extra system-role messages - strict Qwen singl |
@@ -144,7 +144,7 @@ cruzados con las PRs que este fork ya adoptó.
 | 1168 | linux | bug | 0 | RESUELTO-AQUI | fix(pi) installs gestionados (93058f4) | [Bug]: Pi adapter hardcodes legacy Pi paths — `~/.pi/settings.json` and `~/.pi/extensions/context-mode/` do no |
 | 1188 | linux | bug | 0 | PENDIENTE |  | ensure-deps.mjs: skipProbe path dlopens better-sqlite3 in-process, then rebuilds that same .node in place — SI |
 | 1193 | linux | bug | 2 | PENDIENTE |  | [Bug]: Bun seed writes an ABI-mismatched better_sqlite3 cache entry; fast path then trusts it (1.0.169, Linux) |
-| 1199 | linux | bug | 2 | PENDIENTE |  | OpenCode 2.x plugin fails to load (needs a V2 adapter: { id, effect\|setup }) |
+| 1199 | linux | bug | 2 | RESUELTO-AQUI | port v2: `setup` + descubrimiento en `plugins/` |  | OpenCode 2.x plugin fails to load (needs a V2 adapter: { id, effect\|setup }) |
 | 1201 | linux | bug | 0 | PENDIENTE |  | [Bug]: OpenClaw 2026.9.x — adapter fails to load from the plugin capture (computed import paths), unhandled re |
 | 1221 | linux | docs | 0 | CUBIERTO-POR-PR |  | [Bug]: OMP adapter hard-blocks curl/wget/fetch( inside quotes, grep patterns and heredocs (Pi fix from #625 ne |
 | 1254 | linux | bug | 0 | PENDIENTE |  | [Bug]: ctx_stats reports OpenCode as "Skipped / no real chat activity" — multi-adapter importer only knows the |

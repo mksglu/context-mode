@@ -472,36 +472,69 @@ Full configs: [`configs/cursor/hooks.json`](configs/cursor/hooks.json) | [`confi
 
 **Install:**
 
-1. Add to `opencode.json` in your project root (or `~/.config/opencode/opencode.json` for global):
+The `plugin` key in `opencode.json` does **not** work for this on OpenCode 2.x: that key resolves npm specifiers only, and a filesystem path in it is accepted by the schema and then ignored **silently** — no warning, no error, the plugin just never loads. Local plugins load by directory discovery instead.
 
-   ```json
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "plugin": ["context-mode"]
-   }
+1. Write the plugin entry into your **user-level** OpenCode config directory:
+
+   ```bash
+   mkdir -p ~/.config/opencode/plugins
+   cat > ~/.config/opencode/plugins/context-mode.ts <<'EOF'
+   export { default } from "/absolute/path/to/context-mode/build/adapters/opencode/plugin.js";
+   EOF
    ```
 
-   The `plugin` entry registers all 11 `ctx_*` tools natively and enables hooks — OpenCode calls context-mode's TypeScript plugin in-process, so there is no redundant stdio MCP child per session.
+   This is a per-user file. `~/.config/opencode/` belongs to the account you are logged in as, needs no `sudo`, and affects only that user — it is not a system-wide or root-level install. Nothing is written outside your home directory.
+
+   **Replace `/absolute/path/to/context-mode` with the real path on this machine.** It is whatever directory holds `build/adapters/opencode/plugin.js` — the root of your `context-mode` checkout, or the package directory of a global install:
+
+   ```bash
+   ls -d /path/to/your/context-mode/build/adapters/opencode/plugin.js
+   ```
+
+   Then confirm the entry actually resolves before restarting — this catches a wrong path immediately instead of leaving you with a silently unloaded plugin:
+
+   ```bash
+   node --experimental-strip-types -e \
+     "import('file://' + process.env.HOME + '/.config/opencode/plugins/context-mode.ts')
+        .then(() => console.log('resuelve OK'))
+        .catch(e => { console.error('ROTO:', e.message); process.exit(1) })"
+   ```
+
+   For a **single project** instead of all projects, put the same file in `<project>/.opencode/plugins/context-mode.ts`.
 
 2. *(Optional)* Copy the routing rules file. The model needs an `AGENTS.md` file for routing awareness:
 
    ```bash
-   cp node_modules/context-mode/configs/opencode/AGENTS.md AGENTS.md
+   cp /path/to/your/context-mode/configs/opencode/AGENTS.md AGENTS.md
    ```
 
    This tells the model which tools to use and which commands are blocked. Without it, hooks still enforce routing — but the model won't know *why* a command was denied.
 
-3. Restart OpenCode.
+3. Restart OpenCode:
 
-**Verify:** In the OpenCode session, type `ctx stats`. Context-mode tools should appear and respond.
+   ```bash
+   opencode service restart
+   ```
 
-**Upgrade note:** If an existing config has BOTH `plugin: ["context-mode"]` AND `mcp.context-mode`, OpenCode will register zero `ctx_*` tools — the plugin path correctly suppresses MCP duplicates, but the legacy MCP entry confuses the loader. Run `context-mode upgrade` to remove the legacy `mcp.context-mode` entry; your other MCP servers are preserved. v1.0.140+ emits a stderr diagnostic with the same guidance when this happens.
+   > Restarting the service ends any OpenCode session running in that terminal, including the one issuing the command. Run it from a different terminal, or detach it: `nohup sh -c 'sleep 1; opencode service restart' >/dev/null 2>&1 & disown`
 
-**Routing:** Hooks enforce routing programmatically via `tool.execute.before` and `tool.execute.after`. The optional [`AGENTS.md`](configs/opencode/AGENTS.md) file provides routing instructions for model awareness. The `experimental.session.compacting` hook builds resume snapshots when the conversation compacts. The `experimental.chat.system.transform` hook injects the routing block and prior-session snapshots at session start, enabling session continuity across restarts. The `chat.message` hook captures user prompts and decisions (UserPromptSubmit equivalent).
+**Verify:** run `ctx_doctor` from inside an OpenCode session. Every line must read `[OK]`. The `Plugin registration` line is the one that proves discovery worked.
 
-> **Note:** OpenCode lacks a real SessionStart hook ([#14808](https://github.com/sst/opencode/issues/14808), [#5409](https://github.com/sst/opencode/issues/5409)). The plugin uses `experimental.chat.system.transform` as a surrogate — it injects both the routing block and resume snapshots into the system prompt. User-prompt capture uses `chat.message` instead of the missing UserPromptSubmit hook. AGENTS.md/CLAUDE.md/CONTEXT.md rules are captured automatically on first hook fire per project.
+**Installing on another machine:** the same five steps apply — prerequisites (Node >= 22.5, pnpm), get the source, `pnpm install`, `pnpm run build`, write the shim, restart. Two things are **not** portable and must be redone per machine:
 
-Full configs: [`configs/opencode/opencode.json`](configs/opencode/opencode.json) | [`configs/opencode/AGENTS.md`](configs/opencode/AGENTS.md)
+- **`pnpm install` cannot be skipped or copied.** `better-sqlite3` ships a native binding named after the Node ABI (`better_sqlite3.abi147.node` on Node 26). A `node_modules/` copied from another machine, or a different Node major, will not load — and the failure surfaces late, when the plugin first opens its database, not at load time.
+- **`pnpm run build` is required on a fresh clone.** `build/` is gitignored; a clone has no `build/adapters/opencode/plugin.js` until you build.
+
+Never add `plugin: ["context-mode"]` to `opencode.json` on OpenCode 2.x — that key makes OpenCode install the *published* package from npm, which is not this fork.
+
+**Upgrade note:** do **not** leave an `mcp.context-mode` entry alongside the plugin. The plugin registers the 11 `ctx_*` tools in-process; a second MCP entry makes the loader register zero of them. If an older config has one, run `context-mode upgrade` to remove it — your other MCP servers are preserved. v1.0.140+ emits a stderr diagnostic with the same guidance.
+
+**Routing:** hooks enforce routing programmatically, registered on the owning v2 domain — `ctx.tool.hook("execute.before")` for routing enforcement and `ctx.tool.hook("execute.after")` for session event capture. The optional [`AGENTS.md`](configs/opencode/AGENTS.md) file gives the model routing awareness. `ctx.session.hook("compaction")` builds resume snapshots when the conversation compacts. `ctx.session.hook("context")` injects the routing block and prior-session snapshots, enabling session continuity across restarts. `ctx.session.hook("prompt")` captures user prompts and decisions (the UserPromptSubmit equivalent). Token and cost accounting comes from the `session.usage.updated` event stream, delta-ed per step so a multi-step turn is not counted N times.
+
+> **Note:** OpenCode 2.x has no real SessionStart hook ([#14808](https://github.com/sst/opencode/issues/14808), [#5409](https://github.com/sst/opencode/issues/5409)). The plugin uses `ctx.session.hook("context")` as a surrogate — it injects both the routing block and resume snapshots into the system prompt. That hook fires for *every* model request kind (primary, compaction, title, generate), so the routing block is injected once per session rather than on every turn. User-prompt capture uses `ctx.session.hook("prompt")` instead of the missing UserPromptSubmit hook. AGENTS.md/CLAUDE.md/CONTEXT.md rules are captured automatically on first hook fire per project.
+> **Type note:** in v2 the system prompt is `SystemPart[]` (`{ type: "text", text }`), not `string[]`. The plugin reads the element shape off the array itself so the same injection path serves both API generations.
+
+Full configs: [`configs/opencode/plugins/context-mode.ts`](configs/opencode/plugins/context-mode.ts) | [`configs/opencode/AGENTS.md`](configs/opencode/AGENTS.md)
 
 </details>
 

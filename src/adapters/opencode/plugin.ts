@@ -1,18 +1,29 @@
 /**
  * OpenCode / KiloCode TypeScript plugin entry point for context-mode.
  *
- * Provides five hooks (v1.0.107 — Mickey OC-1..OC-4 follow-up):
+ * Supports BOTH plugin API generations from one default export:
+ *   - OpenCode 1.x / KiloCode call `server(ctx)` and read a v1 hook map.
+ *   - OpenCode 2.x calls `setup(ctx)` and registers on the v2 plugin domains.
+ * The official dual-shape contract is `{ ...Plugin.define({id, setup}), server }`;
+ * the two APIs are separate and this file adapts between them explicitly.
+ *
+ * V1 hooks (v1.0.107 — Mickey OC-1..OC-4 follow-up):
  *   - tool.execute.before  — Routing enforcement (deny/modify/passthrough)
  *   - tool.execute.after   — Session event capture + first-fire AGENTS.md scan (OC-4)
  *   - experimental.session.compacting — Compaction snapshot + budget-capped auto-injection (OC-3)
  *   - experimental.chat.system.transform — ROUTING_BLOCK + resume snapshot injection (OC-1)
  *   - chat.message         — User-prompt capture w/ CCv2 inline filter (OC-2) + AGENTS.md scan (OC-4)
+ *   - event                — per-turn token + cost capture
+ *   - tool                 — the 11 ctx_* tools, in-process (no stdio MCP child)
  *
- * KiloCode loads this via: import("context-mode") → expects default export
- * with shape { server: (input) => Promise<Hooks> } (PluginModule).
- *
- * OpenCode loads this via: import("context-mode/plugin") → also supports
- * the named export ContextModePlugin for backward compat.
+ * V2 equivalents (see setupContextModeV2):
+ *   tool.execute.before   → ctx.tool.hook("execute.before")
+ *   tool.execute.after    → ctx.tool.hook("execute.after")
+ *   chat.message          → ctx.session.hook("prompt")
+ *   …session.compacting   → ctx.session.hook("compaction")
+ *   …chat.system.transform→ ctx.session.hook("context")
+ *   event                 → ctx.event.subscribe()
+ *   tool map              → ctx.tool.transform()
  *
  * Constraints:
  *   - No SessionStart hook (OpenCode doesn't support it — #14808, #5409)
@@ -25,8 +36,15 @@ import { dirname, resolve, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 
+import z from "zod/v4";
+
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
-import { extractEvents, extractUserEvents, parseOpencodeUsage, buildAgentUsageEvent } from "../../session/extract.js";
+import {
+  extractEvents,
+  extractUserEvents,
+  parseOpencodeUsage,
+  buildAgentUsageEvent,
+} from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
 import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
@@ -36,7 +54,7 @@ import { zod3ShapeToV4 } from "./zod3tov4.js";
 
 // ── Types ─────────────────────────────────────────────────
 
-/** KiloCode/OpenCode plugin input — both platforms pass at least `directory`. */
+/** OpenCode / Kilo plugin input — both platforms pass at least `directory`. */
 type PluginClientAppLogBodyExtra = {
   sessionId?: string;
   source?: string;
@@ -66,6 +84,22 @@ type PluginContext = {
   directory: string;
 };
 
+/**
+ * OpenCode 2.x plugin context. Only the members this adapter actually touches
+ * are declared — the real Context is a superset (see @opencode/plugin).
+ */
+type V2Context = {
+  location: { directory: string };
+  session: {
+    hook: (name: string, cb: (event: any) => unknown) => Promise<unknown>;
+  };
+  tool: {
+    hook: (name: string, cb: (event: any) => unknown) => Promise<unknown>;
+    transform: (cb: (editor: any) => void) => Promise<unknown>;
+  };
+  event: { subscribe: (opts?: { signal?: AbortSignal }) => AsyncIterable<any> };
+};
+
 type NativeToolContext = {
   sessionID: string;
   messageID: string;
@@ -73,7 +107,10 @@ type NativeToolContext = {
   directory: string;
   worktree?: string;
   abort?: AbortSignal;
-  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void;
+  metadata?: (input: {
+    title?: string;
+    metadata?: Record<string, unknown>;
+  }) => void;
 };
 
 type NativeToolDefinition = {
@@ -82,7 +119,25 @@ type NativeToolDefinition = {
   execute: (
     args: Record<string, unknown>,
     ctx: NativeToolContext,
-  ) => Promise<string | { title?: string; output: string; metadata?: Record<string, unknown> }>;
+  ) => Promise<
+    | string
+    | { title?: string; output: string; metadata?: Record<string, unknown> }
+  >;
+};
+
+/**
+ * A registered ctx_* tool, host-agnostic. `run` is the single implementation;
+ * the v1 and v2 adapters below only translate its arguments and result shape.
+ */
+type NativeToolSpec = {
+  name: string;
+  title: string;
+  description: string;
+  /** Zod 4 shape — what v1 hosts expect in `args`. */
+  zodShape: Record<string, unknown>;
+  /** JSON Schema — what v2 hosts expect in `input`. */
+  jsonSchema: Record<string, unknown>;
+  run: (args: Record<string, unknown>, sessionId: string) => Promise<string>;
 };
 
 /** OpenCode tool.execute.before — first parameter */
@@ -219,10 +274,58 @@ function systemHasRoutingInstructions(system: string[]): boolean {
   // share a prefix/suffix (e.g. a hypothetical `ctx_search_v2`).
   const wordBoundary = (m: string) => {
     if (m.startsWith("<")) return text.includes(m);
-    const re = new RegExp(`(?:^|\\W)${m.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}(?:\\W|$)`);
+    const re = new RegExp(
+      `(?:^|\\W)${m.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}(?:\\W|$)`,
+    );
     return re.test(text);
   };
   return ROUTING_MARKERS.filter(wordBoundary).length >= 2;
+}
+
+/**
+ * OpenCode 2.x types the system prompt as `SystemPart[]`
+ * (`{ type: "text", text, cache? }`), not `string[]`. Every v2 injection goes
+ * through here so the shape stays in one place.
+ */
+function textPart(text: string): { type: "text"; text: string } {
+  return { type: "text", text };
+}
+
+/**
+ * Insert `text` into a system-prompt array at `index`, matching whatever
+ * element shape that array already uses.
+ *
+ * v1 hosts pass `string[]`; v2 hosts pass `SystemPart[]`
+ * (`{ type: "text", text }`). Splicing a bare string into a v2 array would
+ * produce an element the provider driver cannot read, so the block would
+ * silently never reach the model — the exact class of bug that dropped the
+ * resume snapshot in PR #376. The element type is read off the array itself
+ * rather than hardcoded per entry point, so both generations share one path.
+ */
+function injectSystemText(
+  system: unknown[],
+  index: number,
+  text: string,
+): void {
+  if (text.length === 0) return;
+  const sample = system.find((p) => p !== undefined && p !== null);
+  const wantsParts =
+    typeof sample === "object" &&
+    typeof (sample as { text?: unknown }).text === "string";
+  system.splice(index, 0, wantsParts ? textPart(text) : text);
+}
+
+function systemPartTexts(system: unknown): string[] {
+  if (!Array.isArray(system)) return [];
+  return system
+    .map((p) =>
+      typeof p === "string"
+        ? p
+        : p && typeof p === "object" && typeof (p as any).text === "string"
+          ? (p as any).text
+          : "",
+    )
+    .filter((t) => t.length > 0);
 }
 
 /**
@@ -252,16 +355,63 @@ function getPlatform(): AdapterPlatformType {
   return "opencode";
 }
 
-// ── Plugin Factory ────────────────────────────────────────
+/** Best-effort debug sink. Never rejects — debug logging must not break a turn. */
+type LogSink = (
+  message?: string,
+  extra?: PluginClientAppLogBodyExtra,
+) => Promise<void>;
+
+// ── Shared state + handlers ───────────────────────────────
 
 /**
- * Plugin factory. Called once when KiloCode/OpenCode loads the plugin.
- * Returns an object mapping hook event names to async handler functions.
- *
- * KiloCode expects: export default { id: string, server: (input) => Promise<Hooks> }
- * OpenCode expects: export const ContextModePlugin = (ctx) => Promise<Hooks>
+ * Everything both API generations need: adapter, DB, routing modules, tool
+ * specs, and the hook bodies. Building this once and adapting it twice keeps
+ * v1 and v2 behaviorally identical by construction.
  */
-async function createContextModePlugin(ctx: PluginContext) {
+type ContextModeState = {
+  projectDir: string;
+  db: SessionDB;
+  routing: any;
+  routingBlock: string;
+  platform: AdapterPlatformType;
+  toolSpecs: NativeToolSpec[];
+  captureAgentsMd: (sessionId: string) => void;
+  safeLog: LogSink;
+  /** v1-only: the shell tool also reports a `directory` the v2 ToolContext lacks. */
+  handlers: {
+    before: (input: BeforeHookInput, output: BeforeHookOutput) => Promise<void>;
+    after: (input: AfterHookInput, output: AfterHookOutput) => Promise<void>;
+    onEvent: (input: EventHookInput) => Promise<void>;
+    onPrompt: (
+      input: ChatMessageHookInput,
+      output: ChatMessageHookOutput,
+    ) => Promise<void>;
+    onCompaction: (
+      input: CompactingHookInput,
+      output: CompactingHookOutput,
+    ) => Promise<string | void>;
+    onContext: (
+      input: SystemTransformHookInput,
+      output: SystemTransformHookOutput,
+      opts?: ContextHookOptions,
+    ) => Promise<void>;
+  };
+};
+
+/**
+ * `routingOncePerSession` is a v2-only concern. v1's
+ * `experimental.chat.system.transform` fires once per turn and deliberately
+ * re-injects the routing block every time for reliability. v2's `context` hook
+ * instead fires for EVERY request kind — primary, compaction, title, generate
+ * — so re-injecting unconditionally would burn ~2K chars on every title
+ * generation. v2 opts in to the per-session guard; v1 keeps its own behavior.
+ */
+type ContextHookOptions = { routingOncePerSession?: boolean };
+
+async function initState(
+  projectDir: string,
+  safeLog: LogSink,
+): Promise<ContextModeState> {
   // Resolve build dir from compiled JS location
   const platform = getPlatform();
   const adapter = new OpenCodeAdapter(platform);
@@ -271,17 +421,47 @@ async function createContextModePlugin(ctx: PluginContext) {
   const buildRoot = resolve(buildDir, "..", "..");
 
   // Load routing module (ESM .mjs, lives outside build/ in hooks/)
-  const routingPath = resolve(buildDir, "..", "..", "..", "hooks", "core", "routing.mjs");
+  const routingPath = resolve(
+    buildDir,
+    "..",
+    "..",
+    "..",
+    "hooks",
+    "core",
+    "routing.mjs",
+  );
   const routing = await import(pathToFileURL(routingPath).href);
   await routing.initSecurity(buildRoot);
 
   // OC-1 / OC-3: Load hook helpers once at plugin init. Dynamic import keeps
   // the .mjs ESM islands isolated from the .ts compile graph.
-  const routingBlockPath = resolve(buildDir, "..", "..", "..", "hooks", "routing-block.mjs");
+  const routingBlockPath = resolve(
+    buildDir,
+    "..",
+    "..",
+    "..",
+    "hooks",
+    "routing-block.mjs",
+  );
   const routingBlockMod = await import(pathToFileURL(routingBlockPath).href);
-  const toolNamingPath = resolve(buildDir, "..", "..", "..", "hooks", "core", "tool-naming.mjs");
+  const toolNamingPath = resolve(
+    buildDir,
+    "..",
+    "..",
+    "..",
+    "hooks",
+    "core",
+    "tool-naming.mjs",
+  );
   const toolNamingMod = await import(pathToFileURL(toolNamingPath).href);
-  const autoInjectionPath = resolve(buildDir, "..", "..", "..", "hooks", "auto-injection.mjs");
+  const autoInjectionPath = resolve(
+    buildDir,
+    "..",
+    "..",
+    "..",
+    "hooks",
+    "auto-injection.mjs",
+  );
   const autoInjectionMod = await import(pathToFileURL(autoInjectionPath).href);
 
   // Pre-build the routing block once per process — it is platform-specific
@@ -291,38 +471,26 @@ async function createContextModePlugin(ctx: PluginContext) {
   const toolNamer = toolNamingMod.createToolNamer(platform);
   const routingBlock: string = routingBlockMod.createRoutingBlock(toolNamer);
 
-  // Initialize per-process state. We do NOT fabricate a sessionId here —
-  // OpenCode/Kilo provide the real `input.sessionID` on every hook, and a
-  // process-global UUID would (a) never match prior-session resume rows and
-  // (b) collide across multi-session reuse (Mickey / PR #376 root cause).
-  const projectDir = ctx?.directory ?? process.cwd();
+  // We do NOT fabricate a sessionId here — OpenCode/Kilo provide the real
+  // session ID on every hook, and a process-global UUID would (a) never match
+  // prior-session resume rows and (b) collide across multi-session reuse
+  // (Mickey / PR #376 root cause).
   // C2 narrowing: resolve DB path through the canonical helper directly.
-  // BaseAdapter no longer exposes getSessionDBPath; the adapter only owns
-  // the sessions DIR (per-platform), the helper owns the per-project FILE
-  // (case-fold + worktree-suffix + one-shot legacy migration).
   const db = new SessionDB({
-    dbPath: resolveSessionDbPath({ projectDir, sessionsDir: adapter.getSessionDir() }),
+    dbPath: resolveSessionDbPath({
+      projectDir,
+      sessionsDir: adapter.getSessionDir(),
+    }),
   });
 
   // Clean up old sessions on startup (no SessionStart hook to do this).
   db.cleanupOldSessions(7);
 
-  // OC-4 (#487 follow-up): per-session capture gate. PR #487 trusted the host
-  // to deliver AGENTS.md events, but OpenCode only fires `rule_content` events
-  // when the user explicitly reads the file. snapshot.ts:172 + analytics.ts:152
-  // CONSUME `rule_content` to render rules into the resume snapshot — without
-  // this capture path, AGENTS.md is silently absent from continuity output.
-  // Keyed by sessionId (NOT projectDir) so multi-session reuse within a long-
-  // lived plugin process still gets per-session capture exactly once.
+  // OC-4 (#487 follow-up): per-session capture gate. Keyed by sessionId (NOT
+  // projectDir) so multi-session reuse within a long-lived plugin process
+  // still gets per-session capture exactly once.
   const agentsMdCaptured = new Set<string>();
 
-  /**
-   * OC-4: Read AGENTS.md (with CLAUDE.md / CONTEXT.md fallbacks) from the
-   * project directory and persist as `rule` + `rule_content` events. Mirrors
-   * the CC SessionStart pattern at hooks/sessionstart.mjs:121-132 and the
-   * OpenCode instruction.ts FILES order. Idempotent via `agentsMdCaptured`
-   * Set keyed by sessionId. Fail-soft: missing/unreadable files do not throw.
-   */
   function captureAgentsMd(sessionId: string): void {
     if (agentsMdCaptured.has(sessionId)) return;
     agentsMdCaptured.add(sessionId);
@@ -333,85 +501,65 @@ async function createContextModePlugin(ctx: PluginContext) {
         if (!existsSync(p)) continue;
         const content = readFileSync(p, "utf-8");
         if (!content.trim()) continue;
-        db.insertEvent(sessionId, {
-          type: "rule",
-          category: "rule",
-          data: p,
-          priority: 1,
-        } as SessionEvent, "PluginInit");
-        db.insertEvent(sessionId, {
-          type: "rule_content",
-          category: "rule",
-          data: content,
-          priority: 1,
-        } as SessionEvent, "PluginInit");
+        db.insertEvent(
+          sessionId,
+          {
+            type: "rule",
+            category: "rule",
+            data: p,
+            priority: 1,
+          } as SessionEvent,
+          "PluginInit",
+        );
+        db.insertEvent(
+          sessionId,
+          {
+            type: "rule_content",
+            category: "rule",
+            data: content,
+            priority: 1,
+          } as SessionEvent,
+          "PluginInit",
+        );
       } catch {
         // file missing or unreadable — skip silently
       }
     }
   }
 
-  function logger(
-    message = "context-mode debug log",
-    extra?: PluginClientAppLogBodyExtra,
-  ): Promise<void> {
-    return ctx.client.app.log({
-      body: {
-        service: "context-mode-logger",
-        level: "info",
-        message,
-        extra,
-      },
-    });
-  }
+  // ── Tool specs (host-agnostic) ─────────────────────────
 
-  /**
-   * Drop-in wrapper for `logger` that NEVER rejects (#448).
-   *
-   * The OPENCODE_DEBUG branch awaits `logger(...)` from inside the chat-turn
-   * hot path (chat.system.transform). If `ctx.client.app.log` rejects —
-   * transport error, closed stream, oversized payload — the promise rejection
-   * propagates back to OpenCode core and can break the turn. Debug logging
-   * is best-effort; swallow errors silently and let the turn proceed.
-   */
-  async function safeLog(
-    message?: string,
-    extra?: PluginClientAppLogBodyExtra,
-  ): Promise<void> {
-    try {
-      await logger(message, extra);
-    } catch {
-      // Never break the turn on debug-log failure.
-    }
-  }
-
-  async function buildNativeTools(): Promise<Record<string, NativeToolDefinition>> {
+  async function buildToolSpecs(): Promise<NativeToolSpec[]> {
     // Import the existing MCP server registry without starting its stdio
     // transport. This is the plugin-only bridge for #574: OpenCode/Kilo
-    // call ctx_* tools in-process through Hooks.tool instead of spawning
-    // a separate MCP child per session.
+    // call ctx_* tools in-process instead of spawning a separate MCP child
+    // per session.
     const prevEmbedded = process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
     process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS = "1";
     let mod: typeof import("../../server.js");
     try {
       mod = await import("../../server.js");
     } finally {
-      if (prevEmbedded === undefined) delete process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
+      if (prevEmbedded === undefined)
+        delete process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
       else process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS = prevEmbedded;
     }
-    const tools: Record<string, NativeToolDefinition> = {};
+    const specs: NativeToolSpec[] = [];
 
     for (const registered of mod.REGISTERED_CTX_TOOLS) {
       const config = registered.config as Record<string, unknown>;
       // Zod schema object that the MCP framework normally calls
       // safeParseAsync() on before invoking the handler. The native
-      // OpenCode plugin path bypasses MCP's transport layer entirely
-      // (refs/platforms/opencode/packages/opencode/src/tool/registry.ts:127),
-      // so we must parse args here too — otherwise z.preprocess() coercions
+      // plugin paths bypass MCP's transport layer entirely, so we must
+      // parse args here too — otherwise z.preprocess() coercions
       // (coerceCommandsArray / coerceJsonArray in server.ts) and defaults
       // never fire. Fixes #621.
       const inputSchema = config.inputSchema as
-        | { shape?: unknown; _def?: { shape?: unknown }; parse?: (input: unknown) => unknown }
+        | {
+            shape?: unknown;
+            _def?: { shape?: unknown };
+            parse?: (input: unknown) => unknown;
+          }
         | undefined;
       const shape =
         typeof inputSchema?.shape === "object" && inputSchema.shape !== null
@@ -423,14 +571,16 @@ async function createContextModePlugin(ctx: PluginContext) {
       // Both KiloCode and recent OpenCode bundle Zod v4 in-host; v3 schemas
       // crash with `n._zod.def` undefined. Gate widened from kilo-only (#632)
       // because every consumer of this file is an OpenCode-family host.
-      const argsForHost = zod3ShapeToV4(shape as Record<string, unknown>);
+      const zodShape = zod3ShapeToV4(shape as Record<string, unknown>);
 
-      tools[registered.name] = {
+      specs.push({
+        name: registered.name,
+        title: String(config.title ?? registered.name),
         description: String(config.description ?? ""),
-        args: argsForHost,
-        async execute(args: Record<string, unknown>, toolCtx: NativeToolContext) {
-          toolCtx.metadata?.({ title: String(config.title ?? registered.name) });
-          const project = toolCtx.directory || projectDir;
+        zodShape,
+        jsonSchema: zodShapeToJsonSchema(zodShape),
+        async run(args, sessionId) {
+          const project = projectDir;
 
           // Run the registered Zod schema BEFORE the handler — same contract
           // as the MCP SDK (server/mcp.js safeParseAsync at line 174). This
@@ -439,11 +589,11 @@ async function createContextModePlugin(ctx: PluginContext) {
           let parsedArgs: Record<string, unknown> = args ?? {};
           if (typeof inputSchema?.parse === "function") {
             try {
-              parsedArgs = inputSchema.parse(args ?? {}) as Record<string, unknown>;
+              parsedArgs = inputSchema.parse(args ?? {}) as Record<
+                string,
+                unknown
+              >;
             } catch (err) {
-              // Surface validation failures with a clear, actionable message
-              // (mirrors MCP SDK error format) instead of a downstream
-              // "x.map is not a function" crash.
               const message = err instanceof Error ? err.message : String(err);
               throw new Error(
                 `Invalid arguments for ${registered.name}: ${message}`,
@@ -451,8 +601,9 @@ async function createContextModePlugin(ctx: PluginContext) {
             }
           }
 
-          const result = await mod.withProjectDirOverride({ projectDir: project, sessionId: toolCtx.sessionID }, async () =>
-            registered.handler(parsedArgs),
+          const result = await mod.withProjectDirOverride(
+            { projectDir: project, sessionId },
+            async () => registered.handler(parsedArgs),
           );
 
           const r = result as {
@@ -468,29 +619,38 @@ async function createContextModePlugin(ctx: PluginContext) {
               ? result
               : JSON.stringify(result ?? "");
 
-          if (r?.isError) throw new Error(text || `${registered.name} returned an error`);
-          return { title: String(config.title ?? registered.name), output: text };
+          if (r?.isError)
+            throw new Error(text || `${registered.name} returned an error`);
+          return text;
         },
-      };
+      });
     }
 
-    return tools;
+    return specs;
   }
 
-  const nativeTools = await buildNativeTools();
+  // v1 re-checks the routing quorum on every transform because its system
+  // prompt is rebuilt per turn. v2's `context` hook fires for every request
+  // kind (primary/compaction/title/generate), so a per-session guard is what
+  // keeps the block from being injected into title/generate calls.
+  const routingBlockInjected = new Set<string>();
 
-  return {
-    tool: nativeTools,
+  // ── Handlers (shared by both API generations) ──────────
 
+  const handlers: ContextModeState["handlers"] = {
     // ── PreToolUse: Routing enforcement ─────────────────
-
-    "tool.execute.before": async (input: BeforeHookInput, output: BeforeHookOutput) => {
+    async before(input, output) {
       const toolName = input.tool ?? "";
       const toolInput = output.args ?? {};
 
       let decision;
       try {
-        decision = routing.routePreToolUse(toolName, toolInput, projectDir, platform);
+        decision = routing.routePreToolUse(
+          toolName,
+          toolInput,
+          projectDir,
+          platform,
+        );
       } catch {
         return; // Routing failure → allow passthrough
       }
@@ -503,19 +663,16 @@ async function createContextModePlugin(ctx: PluginContext) {
       }
 
       if (decision.action === "modify" && decision.updatedInput) {
-        // Mutate output.args — OpenCode reads the mutated output object
         Object.assign(output.args, decision.updatedInput);
       }
 
       if (decision.action === "context" && decision.additionalContext) {
-        // Mutate output.args — OpenCode reads the mutated output object
         output.args.additionalContext = decision.additionalContext;
       }
     },
 
     // ── PostToolUse: Session event capture ──────────────
-
-    "tool.execute.after": async (input: AfterHookInput, output: AfterHookOutput) => {
+    async after(input, output) {
       const sessionId = input.sessionID;
       if (!sessionId) return;
       try {
@@ -541,25 +698,8 @@ async function createContextModePlugin(ctx: PluginContext) {
       }
     },
 
-    // ── event: per-turn token + cost capture (paid-observability) ───
-    // The generic bus `event` hook (refs/platforms/opencode/packages/plugin/
-    // src/index.ts:224) delivers every Event; we filter `message.updated`
-    // (published on each assistant-message update incl. step-finish —
-    // session.ts:673) and read tokens/cost/modelID off properties.info
-    // (assistant filter via role; refs stream.transport.ts:214-216).
-    //
-    // CAVEAT (refs processor.ts:717-718): message-level `.tokens` is the LAST
-    // step's snapshot (overwritten per step-finish), while `.cost` is
-    // cumulative for the turn. parseOpencodeUsage passes `.cost` through as
-    // native_cost_usd so the billed $ stays exact despite the token snapshot
-    // being last-step only. `message.updated` fires multiple times per turn;
-    // because tokens are a terminal snapshot and cost is cumulative, the last
-    // event for a message carries the final figures — re-emitting on each
-    // update is idempotent at the cost column and merely refreshes the
-    // last-step token telemetry. db.insertEvent both persists locally AND
-    // forwards to the platform (the TS-plugin equivalent of the .mjs
-    // attributeAndInsertEvents path).
-    event: async (input: EventHookInput) => {
+    // ── event: per-turn token + cost capture (v1 bus) ───
+    async onEvent(input) {
       try {
         const ev = input?.event;
         if (!ev || ev.type !== "message.updated") return;
@@ -579,19 +719,20 @@ async function createContextModePlugin(ctx: PluginContext) {
     },
 
     // ── chat.message: User-prompt capture (OC-2 / Z2) ───
-    // SDK signature verified at refs/platforms/opencode/packages/plugin/src/
-    // index.ts:233. Orchestrator reference at refs/plugin-examples/opencode/
-    // opencode-orchestrator/src/plugin-handlers/chat-message-handler.ts:41-65.
-    // CCv2 inline filter: skip synthetic harness messages (system reminders,
-    // tool results, etc.) so we don't pollute the user-prompt event stream.
-    "chat.message": async (input: ChatMessageHookInput, output: ChatMessageHookOutput) => {
+    async onPrompt(input, output) {
       const sessionId = input?.sessionID;
       if (!sessionId) return;
       try {
         const parts = Array.isArray(output?.parts) ? output.parts : [];
-        const textPart = parts.find((p) => p && p.type === "text" && typeof p.text === "string" && p.text.length > 0);
-        if (!textPart || !textPart.text) return;
-        const message = textPart.text;
+        const textPartEntry = parts.find(
+          (p) =>
+            p &&
+            p.type === "text" &&
+            typeof p.text === "string" &&
+            p.text.length > 0,
+        );
+        if (!textPartEntry || !textPartEntry.text) return;
+        const message = textPartEntry.text;
         if (isSyntheticMessage(message)) return;
 
         db.ensureSession(sessionId, projectDir);
@@ -600,12 +741,16 @@ async function createContextModePlugin(ctx: PluginContext) {
         captureAgentsMd(sessionId);
 
         // 1. Always save the raw prompt
-        db.insertEvent(sessionId, {
-          type: "user_prompt",
-          category: "user-prompt",
-          data: message,
-          priority: 1,
-        } as SessionEvent, "UserPromptSubmit");
+        db.insertEvent(
+          sessionId,
+          {
+            type: "user_prompt",
+            category: "user-prompt",
+            data: message,
+            priority: 1,
+          } as SessionEvent,
+          "UserPromptSubmit",
+        );
 
         // 2. Extract role/decision/intent/skill events from the prompt body
         const userEvents = extractUserEvents(message);
@@ -618,8 +763,7 @@ async function createContextModePlugin(ctx: PluginContext) {
     },
 
     // ── PreCompact: Snapshot generation ─────────────────
-
-    "experimental.session.compacting": async (input: CompactingHookInput, output: CompactingHookOutput) => {
+    async onCompaction(input, output) {
       const sessionId = input.sessionID;
       if (!sessionId) return "";
       try {
@@ -635,7 +779,6 @@ async function createContextModePlugin(ctx: PluginContext) {
         db.upsertResume(sessionId, snapshot, events.length);
         db.incrementCompactCount(sessionId);
 
-        // Mutate output.context to inject the snapshot
         output.context.push(snapshot);
 
         if (process.env.OPENCODE_DEBUG) {
@@ -645,12 +788,14 @@ async function createContextModePlugin(ctx: PluginContext) {
           });
         }
 
-        // OC-3 / Z3: Add budget-capped auto-injection (P1 role / P2 rules /
+        // OC-3 / Z3: budget-capped auto-injection (P1 role / P2 rules /
         // P3 skills / P4 intent — ≤500 tokens / ~2000 chars per
-        // hooks/auto-injection.mjs). Pushed as a separate context entry so
-        // OpenCode can fold it independently from the verbose snapshot.
+        // hooks/auto-injection.mjs).
         try {
-          const autoBlock: string = autoInjectionMod.buildAutoInjection(events, "compaction");
+          const autoBlock: string = autoInjectionMod.buildAutoInjection(
+            events,
+            "compaction",
+          );
           if (autoBlock && autoBlock.length > 0) {
             output.context.push(autoBlock);
           }
@@ -673,52 +818,54 @@ async function createContextModePlugin(ctx: PluginContext) {
 
     // ── SessionStart equivalent (PR #376) ───────────────
     // OpenCode lacks a real SessionStart hook (#14808, #5409). The closest
-    // surrogate is `experimental.chat.system.transform` — verified shape:
-    //   input:  { sessionID?: string; model: Model }
-    //   output: { system: string[] }
-    // We claim the most-recent unconsumed resume snapshot atomically (race-
-    // safe across concurrent processes) and prepend it to the system prompt.
-    "experimental.chat.system.transform": async (
-      input: SystemTransformHookInput,
-      output: SystemTransformHookOutput,
-    ) => {
+    // surrogate is the system-prompt transform. We claim the most-recent
+    // unconsumed resume snapshot atomically (race-safe across concurrent
+    // processes) and splice it into the system prompt.
+    async onContext(input, output, opts) {
       const sessionId = input?.sessionID;
       if (!sessionId) return;
 
       // ── OC-1 / CCv1: ROUTING_BLOCK injection ──────────────
-      // Inject the <context_window_protection> XML block on the first
-      // chat.system.transform per session. This is INDEPENDENT of the
-      // resume snapshot path below — routing block must fire even when
-      // no prior session row exists. Splice at index 1 (NOT unshift) for
-      // the same OpenCode llm.ts:117-128 cache-fold reason as resume.
-      //
-      // Skip injection when system prompt already contains context-mode
-      // routing rules (e.g. via AGENTS.md / CLAUDE.md loaded by the host).
-      // Detect by checking for a quorum of distinctive tool names — any two
-      // of ctx_execute, ctx_batch_execute, ctx_fetch_and_index confirms the
-      // instructions are present and avoids ~2K chars of duplication.
-      if (Array.isArray(output?.system)) {
-        if (!systemHasRoutingInstructions(output.system)) {
+      // Splice at index 1 (NOT unshift) so the system[0] header identity
+      // survives — replacing system[0] invalidates the provider prompt
+      // cache fold on every turn. Skip when the prompt already carries the
+      // rules (e.g. via AGENTS.md / CLAUDE.md loaded by the host). v2 also
+      // gates on once-per-session (see ContextHookOptions).
+      const alreadyInjected =
+        opts?.routingOncePerSession === true &&
+        routingBlockInjected.has(sessionId);
+      if (Array.isArray(output?.system) && !alreadyInjected) {
+        if (!systemHasRoutingInstructions(systemPartTexts(output.system))) {
           try {
-            output.system.splice(1, 0, routingBlock);
+            injectSystemText(output.system, 1, routingBlock);
+            routingBlockInjected.add(sessionId);
           } catch {
             // Never break the chat turn on routing-block injection failure.
           }
 
           if (process.env.OPENCODE_DEBUG) {
-            await safeLog(output.system[1], {sessionId, source: 'on routing block injection'});
+            await safeLog(routingBlock, {
+              sessionId,
+              source: "on routing block injection",
+            });
           }
         } else if (process.env.OPENCODE_DEBUG) {
-          await safeLog(`routing block skipped — system prompt already contains context-mode instructions`, {sessionId, source: 'on routing block injection'});
+          await safeLog(
+            "routing block skipped — system prompt already contains context-mode instructions",
+            {
+              sessionId,
+              source: "on routing block injection",
+            },
+          );
         }
       }
 
       try {
-        // Pass current sessionId so SQL excludes self-injection (v1.0.106 — Mickey #376
-        // follow-up): if Session B compacts mid-flight and produces its own row,
-        // B's next system.transform must NOT claim that row back into B's prompt.
+        // Pass current sessionId so SQL excludes self-injection (v1.0.106 —
+        // Mickey #376 follow-up): if Session B compacts mid-flight and
+        // produces its own row, B's next transform must NOT claim that row.
         const row = db.claimLatestUnconsumedResume(sessionId);
-        if (!row || !row.snapshot) return;        // no row → retry on next turn
+        if (!row || !row.snapshot) return; // no row → retry on next turn
 
         if (process.env.OPENCODE_DEBUG) {
           await safeLog(row.snapshot, {
@@ -728,20 +875,10 @@ async function createContextModePlugin(ctx: PluginContext) {
         }
 
         if (Array.isArray(output?.system)) {
-          // Insert at index 1 (after the header) — NOT unshift.
-          // OpenCode's llm.ts:117-128 saves `header = system[0]` BEFORE this
-          // hook runs and then folds the rest into a 2-part structure
-          // `[header, body]` only if `system[0] === header` after the hook.
-          // Prepending via unshift replaces system[0] with the snapshot,
-          // making the equality check fail → cache-fold is skipped → every
-          // system block is sent as a separate `role: "system"` message →
-          // provider prompt cache is invalidated on every resume injection.
-          // Inserting at index 1 keeps the header invariant and lets the
-          // snapshot ride along inside the cached body block.
-          output.system.splice(1, 0, row.snapshot);
-          // Mark consumed only AFTER successful splice so failed paths can retry
+          injectSystemText(output.system, 1, row.snapshot);
+          // Mark consumed only AFTER successful splice so failed paths retry
           if (process.env.OPENCODE_DEBUG) {
-            await safeLog(output.system[1], { sessionId, source: "on resume" });
+            await safeLog(row.snapshot, { sessionId, source: "on resume" });
           }
         }
       } catch {
@@ -749,12 +886,400 @@ async function createContextModePlugin(ctx: PluginContext) {
       }
     },
   };
+
+  return {
+    projectDir,
+    db,
+    routing,
+    routingBlock,
+    platform,
+    toolSpecs: await buildToolSpecs(),
+    captureAgentsMd,
+    safeLog,
+    handlers,
+  };
+}
+
+/**
+ * Zod 4 shape → JSON Schema for OpenCode 2.x, which types tool inputs as
+ * `JsonSchema.JsonSchema` rather than a Zod object. `unrepresentable: "any"`
+ * degrades a type Zod cannot express (z.preprocess, custom transforms) to `{}`
+ * instead of throwing — the tool still works, it just documents less.
+ */
+function zodShapeToJsonSchema(
+  shape: Record<string, unknown>,
+): Record<string, unknown> {
+  try {
+    const asJson = z.toJSONSchema(
+      z.object(shape as Record<string, z.ZodType>),
+      {
+        io: "input",
+        unrepresentable: "any",
+      },
+    ) as Record<string, unknown>;
+    // $schema is meaningless to the host and only inflates every tool entry.
+    delete asJson.$schema;
+    return asJson;
+  } catch {
+    return { type: "object", properties: {}, additionalProperties: true };
+  }
+}
+
+// ── v1 entrypoint (OpenCode 1.x / KiloCode) ──────────────
+
+/**
+ * Plugin factory for the v1 plugin API. KiloCode/OpenCode 1.x call this and
+ * read the returned hook map.
+ */
+async function createContextModePlugin(ctx: PluginContext) {
+  const projectDir = ctx?.directory ?? process.cwd();
+
+  const logger = (
+    message = "context-mode debug log",
+    extra?: PluginClientAppLogBodyExtra,
+  ) =>
+    ctx.client.app.log({
+      body: { service: "context-mode-logger", level: "info", message, extra },
+    });
+
+  // Drop-in wrapper for `logger` that NEVER rejects (#448): if the transport
+  // errors, the rejection would propagate into the host and break the turn.
+  const safeLog: LogSink = async (message, extra) => {
+    try {
+      await logger(message, extra);
+    } catch {
+      // Never break the turn on debug-log failure.
+    }
+  };
+
+  const state = await initState(projectDir, safeLog);
+  const h = state.handlers;
+
+  const tool: Record<string, NativeToolDefinition> = {};
+  for (const spec of state.toolSpecs) {
+    tool[spec.name] = {
+      description: spec.description,
+      args: spec.zodShape,
+      async execute(args, toolCtx) {
+        toolCtx.metadata?.({ title: spec.title });
+        return {
+          title: spec.title,
+          output: await spec.run(args, toolCtx.sessionID),
+        };
+      },
+    };
+  }
+
+  return {
+    tool,
+    "tool.execute.before": h.before,
+    "tool.execute.after": h.after,
+    event: h.onEvent,
+    "chat.message": h.onPrompt,
+    "experimental.session.compacting": h.onCompaction,
+    "experimental.chat.system.transform": h.onContext,
+  };
+}
+
+// ── v2 usage accounting ─────────────────────────────────
+
+/** One `session.usage.updated` payload, flattened. */
+type UsageSnapshot = {
+  input: number;
+  output: number;
+  reasoning: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+};
+
+const ZERO_USAGE: UsageSnapshot = {
+  input: 0,
+  output: 0,
+  reasoning: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  cost: 0,
+};
+
+function num(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+/** Flatten a v2 usage event payload, or null when it carries no token block. */
+function readUsageSnapshot(data: any): UsageSnapshot | null {
+  const t = data?.tokens;
+  if (!t || typeof t !== "object") return null;
+  return {
+    input: num(t.input),
+    output: num(t.output),
+    reasoning: num(t.reasoning),
+    cacheRead: num(t.cache?.read),
+    cacheWrite: num(t.cache?.write),
+    cost: num(data?.cost),
+  };
+}
+
+/**
+ * Convert two consecutive `session.usage.updated` payloads into the usage
+ * attributable to the step between them.
+ *
+ * The event fires once per STEP, but its payload is the session's running
+ * total — `tokens.input` climbs monotonically across steps (measured: a
+ * three-step turn went 1279918 → 1280031 → 1280078). Inserting the payload
+ * verbatim once per step would record the cumulative total N times, so the
+ * DB over-counts by roughly the step count.
+ *
+ * This differs from v1, where `message.updated` carried a LAST-STEP `.tokens`
+ * alongside a turn-cumulative `.cost`, so only the cost needed delta-ing there.
+ * In v2 both sides are cumulative and both need it.
+ *
+ * Returns null when nothing moved, so a duplicate or zero-usage step inserts
+ * no event at all. A missing `prev` means this is the first snapshot we have
+ * seen for the session; since plugins load at server start, before any
+ * session exists, the first payload is the whole session total so far and
+ * zero is the correct baseline.
+ */
+function usageDelta(
+  prev: UsageSnapshot | undefined,
+  next: UsageSnapshot,
+): { tokens: Record<string, unknown>; cost: number } | null {
+  const base = prev ?? ZERO_USAGE;
+  const tokens = {
+    input: Math.max(0, next.input - base.input),
+    output: Math.max(0, next.output - base.output),
+    reasoning: Math.max(0, next.reasoning - base.reasoning),
+    cache: {
+      read: Math.max(0, next.cacheRead - base.cacheRead),
+      write: Math.max(0, next.cacheWrite - base.cacheWrite),
+    },
+  };
+  const cost = Math.max(0, next.cost - base.cost);
+  const moved =
+    num(tokens.input) +
+      num(tokens.output) +
+      num(tokens.reasoning) +
+      num(tokens.cache.read) +
+      num(tokens.cache.write) +
+      cost >
+    0;
+  if (!moved) return null;
+  return { tokens, cost };
+}
+
+// ── v2 entrypoint (OpenCode 2.x) ─────────────────────────
+
+/**
+ * OpenCode 2.x plugin API. `setup` receives the plugin context; hooks are
+ * registered on the domain that owns each operation. There is no
+ * `client.app.log` in v2 — the closest thing to a diagnostic sink is stderr,
+ * which the host forwards to its own log.
+ */
+async function setupContextModeV2(ctx: V2Context) {
+  const projectDir = ctx?.location?.directory ?? process.cwd();
+
+  const safeLog: LogSink = async (message, extra) => {
+    if (!process.env.OPENCODE_DEBUG) return;
+    try {
+      const tag = extra?.source ? ` [${extra.source}]` : "";
+      process.stderr.write(`[context-mode]${tag} ${message ?? ""}\n`);
+    } catch {
+      // Diagnostics only — never break the turn.
+    }
+  };
+
+  const state = await initState(projectDir, safeLog);
+  const h = state.handlers;
+
+  // ── ctx_* tools ───────────────────────────────────────
+  // v2 registers tools through a replayable transform. Keep the callback
+  // synchronous and side-effect free: it re-runs on every reload.
+  await ctx.tool.transform((editor) => {
+    for (const spec of state.toolSpecs) {
+      editor.add({
+        name: spec.name,
+        description: spec.description,
+        input: spec.jsonSchema,
+        async execute(
+          input: unknown,
+          toolCtx: { sessionID?: string; signal?: AbortSignal },
+        ) {
+          return {
+            content: await spec.run(
+              (input ?? {}) as Record<string, unknown>,
+              toolCtx?.sessionID ?? "",
+            ),
+          };
+        },
+      });
+    }
+  });
+
+  // ── PreToolUse: routing enforcement ───────────────────
+  // v2 delivers one mutable event: `input` replaces v1's `output.args`.
+  await ctx.tool.hook("execute.before", async (event) => {
+    await h.before(
+      { tool: event.tool, sessionID: event.sessionID, callID: event.id },
+      { args: event.input },
+    );
+  });
+
+  // ── PostToolUse: session event capture ────────────────
+  // v2 moved the result onto the event: `result.output` or `result.content`.
+  await ctx.tool.hook("execute.after", async (event) => {
+    const result =
+      event.status === "completed"
+        ? (event as { result?: any }).result
+        : undefined;
+    const output =
+      typeof result?.output === "string"
+        ? result.output
+        : Array.isArray(result?.content)
+          ? result.content
+              .filter(
+                (c: any) => c?.type === "text" && typeof c.text === "string",
+              )
+              .map((c: any) => c.text)
+              .join("\n")
+          : typeof result?.content === "string"
+            ? result.content
+            : "";
+    await h.after(
+      {
+        tool: event.tool,
+        sessionID: event.sessionID,
+        callID: event.id,
+        args: event.input,
+      },
+      { title: "", output, metadata: undefined },
+    );
+  });
+
+  // ── chat.message: user-prompt capture ──────────────────
+  // v2 exposes the prompt as `event.prompt` ({ text, files? }) instead of the
+  // v1 `output.parts` array, so the text lookup collapses to one field.
+  await ctx.session.hook("prompt", async (event) => {
+    const text = event?.prompt?.text;
+    if (typeof text !== "string" || !text) return;
+    await h.onPrompt(
+      { sessionID: event.sessionID, messageID: event.messageID },
+      { message: text, parts: [{ type: "text", text }] },
+    );
+  });
+
+  // ── PreCompact: snapshot injection ─────────────────────
+  // v2 types the system prompt as SystemPart[]; the snapshot rides along as
+  // an extra part instead of v1's `output.context` string array. We do NOT
+  // set `event.result` — that would skip the model's compaction request,
+  // which is not what v1 did.
+  await ctx.session.hook("compaction", async (event) => {
+    const sessionId = event?.sessionID;
+    if (!sessionId) return;
+    const context: string[] = [];
+    await h.onCompaction({ sessionID: sessionId }, { context });
+    if (!Array.isArray(event.system)) return;
+    for (const entry of context) {
+      injectSystemText(event.system, 1, entry);
+    }
+  });
+
+  // ── SessionStart surrogate: routing block + resume ────
+  // This hook fires for every request kind in v2, hence routingOncePerSession.
+  await ctx.session.hook("context", async (event) => {
+    await h.onContext(
+      { sessionID: event?.sessionID, model: (event as any)?.model },
+      { system: event.system as string[] },
+      { routingOncePerSession: true },
+    );
+  });
+
+  // ── per-turn token + cost capture ─────────────────────
+  // v1 listened for `message.updated` on the generic bus. v2 renamed the whole
+  // event vocabulary: usage is `session.usage.updated`, and the billed model
+  // is announced separately by `session.model.selected`.
+  const controller = new AbortController();
+  const modelBySession = new Map<
+    string,
+    { providerID?: string; modelID?: string }
+  >();
+  const usageBaseline = new Map<string, UsageSnapshot>();
+
+  void (async () => {
+    try {
+      for await (const ev of ctx.event.subscribe({
+        signal: controller.signal,
+      })) {
+        try {
+          const type = (ev as any)?.type;
+          const data = (ev as any)?.data;
+
+          if (type === "session.model.selected") {
+            if (typeof data?.sessionID === "string" && data.model) {
+              modelBySession.set(data.sessionID, data.model);
+            }
+            continue;
+          }
+
+          if (type === "session.deleted") {
+            if (typeof data?.sessionID === "string") {
+              modelBySession.delete(data.sessionID);
+              usageBaseline.delete(data.sessionID);
+            }
+            continue;
+          }
+
+          if (type !== "session.usage.updated") continue;
+          const sessionId = data?.sessionID;
+          if (typeof sessionId !== "string") continue;
+
+          const snapshot = readUsageSnapshot(data);
+          if (!snapshot) continue;
+
+          const delta = usageDelta(usageBaseline.get(sessionId), snapshot);
+          usageBaseline.set(sessionId, snapshot);
+          if (!delta) continue;
+
+          const model = modelBySession.get(sessionId);
+          // parseOpencodeUsage reads a v1-shaped assistant message. Rebuild
+          // that envelope from the v2 payload so the parser — and every test
+          // covering it — stays the single source of truth.
+          const counts = parseOpencodeUsage({
+            role: "assistant",
+            tokens: delta.tokens,
+            cost: delta.cost,
+            providerID: model?.providerID,
+            modelID: model?.modelID,
+          });
+          if (!counts) continue;
+          const usageEvent = buildAgentUsageEvent(counts);
+          if (!usageEvent) continue;
+
+          state.db.ensureSession(sessionId, state.projectDir);
+          state.db.insertEvent(sessionId, usageEvent, "UsageUpdated");
+        } catch {
+          // Silent — usage capture must never break the session.
+        }
+      }
+    } catch {
+      // Stream closed (unload) or transport error — nothing to do.
+    }
+  })();
+
+  return () => controller.abort();
 }
 
 // ── Exports ──────────────────────────────────────────────
-// KiloCode PluginModule: default export with { server } shape
-// OpenCode compat: named export for direct import("context-mode/plugin")
-export default { id:"context-mode", server: createContextModePlugin };
+// Dual shape: OpenCode 1.x / KiloCode call `server`, OpenCode 2.x calls `setup`.
+// Both receive identical behavior; only the registration surface differs.
+export default {
+  id: "context-mode",
+  server: createContextModePlugin,
+  setup: setupContextModeV2,
+};
 export { createContextModePlugin as ContextModePlugin };
+export { setupContextModeV2 as setupContextMode };
+// Usage accounting — exported for unit testing the cumulative-delta fix (#1036).
+export { usageDelta, readUsageSnapshot };
+export type { UsageSnapshot };
 // Test surface — exported for unit testing the quorum substring fix (#487).
 export { systemHasRoutingInstructions, ROUTING_MARKERS };

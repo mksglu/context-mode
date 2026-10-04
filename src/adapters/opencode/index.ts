@@ -23,9 +23,10 @@ import {
   copyFileSync,
   accessSync,
   existsSync,
+  readdirSync,
   constants,
 } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
 import { homedir } from "node:os";
 
 import { BaseAdapter, resolveContextModeDataRoot } from "../base.js";
@@ -177,9 +178,7 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   formatPreToolUseResponse(response: PreToolUseResponse): unknown {
     if (response.decision === "deny") {
       // OpenCode TS plugin paradigm: throw Error to block
-      throw new Error(
-        response.reason ?? "Blocked by context-mode hook",
-      );
+      throw new Error(response.reason ?? "Blocked by context-mode hook");
     }
     if (response.decision === "modify" && response.updatedInput) {
       // OpenCode: output.args mutation
@@ -188,7 +187,8 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
     if (response.decision === "ask") {
       // OpenCode: no native "ask" mechanism — throw to be safe
       throw new Error(
-        response.reason ?? "Action requires user confirmation (security policy)",
+        response.reason ??
+          "Action requires user confirmation (security policy)",
       );
     }
     // "context" — OpenCode's tool.execute.before cannot inject additionalContext
@@ -348,14 +348,18 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
   readSettings(): Record<string, unknown> | null {
     this.settingsPath = undefined;
     const configPaths = this.paths();
-    const globalPaths = new Set(configPaths.filter(p => p.includes(homedir())));
+    const globalPaths = new Set(
+      configPaths.filter((p) => p.includes(homedir())),
+    );
     let firstValidSettings: Record<string, unknown> | null = null;
     let firstValidPath: string | undefined;
 
     for (const configPath of configPaths) {
       try {
         const raw = readFileSync(configPath, "utf-8");
-        const text = configPath.endsWith(".jsonc") ? stripJsonComments(raw) : raw;
+        const text = configPath.endsWith(".jsonc")
+          ? stripJsonComments(raw)
+          : raw;
         const settings = JSON.parse(text) as Record<string, unknown>;
 
         if (!firstValidSettings) {
@@ -413,11 +417,9 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
         check: "Plugin registration",
         status: hasPlugin ? "pass" : "fail",
         message: hasPlugin
-          ? "context-mode found in plugin array"
-          : "context-mode not found in plugin array",
-        fix: hasPlugin
-          ? undefined
-          : "context-mode upgrade",
+          ? "context-mode registered (config entry or plugins/ discovery)"
+          : "context-mode not found in plugin array nor plugins/ directory",
+        fix: hasPlugin ? undefined : "context-mode upgrade",
       });
     } else {
       results.push({
@@ -432,7 +434,8 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       results.push({
         check: "Legacy MCP registration",
         status: "warn",
-        message: "mcp.context-mode is redundant: ctx_* tools are now provided by the plugin",
+        message:
+          "mcp.context-mode is redundant: ctx_* tools are now provided by the plugin",
         fix: "context-mode upgrade (removes only mcp.context-mode; preserves other MCP servers)",
       });
     }
@@ -441,8 +444,7 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
     results.push({
       check: "SessionStart hook",
       status: "pass",
-      message:
-        `SessionStart via experimental.chat.system.transform surrogate (native hook pending #14808, #5409)`,
+      message: `SessionStart via experimental.chat.system.transform surrogate (native hook pending #14808, #5409)`,
     });
 
     return results;
@@ -515,7 +517,9 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
       const servers = mcp as Record<string, unknown>;
       if (Object.prototype.hasOwnProperty.call(servers, "context-mode")) {
         delete servers["context-mode"];
-        changes.push("Removed legacy context-mode MCP block (plugin-native tools)");
+        changes.push(
+          "Removed legacy context-mode MCP block (plugin-native tools)",
+        );
       }
       if (Object.keys(servers).length === 0) delete settings.mcp;
     }
@@ -526,7 +530,7 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
 
   backupSettings(): string | null {
     const check = this.checkPluginRegistration();
-    
+
     if (!this.settingsPath) return null;
 
     if (check.status === "pass") {
@@ -537,9 +541,9 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
         const backupPath = this.settingsPath + ".bak";
         copyFileSync(this.settingsPath, backupPath);
         return backupPath;
-      } catch { 
+      } catch {
         return null;
-       }
+      }
     }
   }
 
@@ -559,7 +563,40 @@ export class OpenCodeAdapter extends BaseAdapter implements HookAdapter {
    */
   private hasContextModePlugin(settings: Record<string, unknown>): boolean {
     const plugins = settings.plugin;
-    return Array.isArray(plugins) && plugins.some((p: unknown) => typeof p === "string" && p.includes("context-mode"));
+    if (
+      Array.isArray(plugins) &&
+      plugins.some(
+        (p: unknown) => typeof p === "string" && p.includes("context-mode"),
+      )
+    ) {
+      return true;
+    }
+    // OpenCode 2.x resolves `plugin` config entries as npm specifiers only —
+    // a filesystem path there is ignored without an error. Local plugins load
+    // by DISCOVERY from <config-dir>/plugins/ and <project>/.opencode/plugins/,
+    // so a config-only check reports a false negative for every v2 install.
+    return this.hasDiscoveredContextModePlugin();
+  }
+
+  /** True when a context-mode plugin file sits in a discovery directory. */
+  private hasDiscoveredContextModePlugin(): boolean {
+    const dirs = new Set<string>();
+    if (this.settingsPath) {
+      dirs.add(join(dirname(this.settingsPath), "plugins"));
+    }
+    dirs.add(join(homedir(), ".config", this.platform, "plugins"));
+    dirs.add(join(process.cwd(), ".opencode", "plugins"));
+
+    for (const dir of dirs) {
+      try {
+        if (readdirSync(dir).some((name) => name.includes("context-mode"))) {
+          return true;
+        }
+      } catch {
+        continue; // directory absent — not an error
+      }
+    }
+    return false;
   }
 
   private hasLegacyContextModeMcp(settings: Record<string, unknown>): boolean {
