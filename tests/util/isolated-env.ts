@@ -50,6 +50,10 @@ const REDIRECT_KEYS = [
   "TEMP",
   "TMP",
   "CONTEXT_MODE_PROJECT_DIR",
+  // Phase 03 made enumerateAdapterDirs/resolveClaudeConfigDir honor this var.
+  // Redirect it at <fakeHome>/.claude so isolated tests see empty config state
+  // instead of the real ~/.claude session data.
+  "CLAUDE_CONFIG_DIR",
 ] as const;
 
 /** Keys that get split out from the fake HOME (Windows drive convention). */
@@ -120,6 +124,9 @@ function envForHome(fakeHome: string, opts?: IsolatedEnvOpts): Record<string, st
     TEMP: fakeHome,
     TMP: fakeHome,
     CONTEXT_MODE_PROJECT_DIR: fakeHome,
+    // Matches resolveClaudeConfigDir's homedir()+'.claude' derivation so the
+    // isolated env resolves an empty config dir under the fake HOME.
+    CLAUDE_CONFIG_DIR: join(fakeHome, ".claude"),
   };
   if (!opts?.keepXdg) {
     env.XDG_CONFIG_HOME = join(fakeHome, ".config");
