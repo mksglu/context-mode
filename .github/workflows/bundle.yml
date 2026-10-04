@@ -20,7 +20,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.5"
+          # See ci.yml: >=22.12 needed by rolldown's optional native bindings.
+          node-version: "22"
 
       # Repo is pnpm-managed (see ci.yml); `npm install` crashes without
       # package-lock.json.

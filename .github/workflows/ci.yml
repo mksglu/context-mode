@@ -21,7 +21,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.5"
+          # >=22.12 required by rolldown's native bindings (vite 8 / vitest 4);
+          # on older node pnpm silently skips them as incompatible optionals
+          # and every test run dies with "Cannot find native binding".
+          node-version: "22"
 
       - uses: actions/setup-python@v5
         with:
