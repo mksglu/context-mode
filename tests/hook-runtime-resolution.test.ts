@@ -85,6 +85,7 @@ describe("resolveHookRuntime — auto-detect bun ≥1.0, fall back to node (#738
   test("returns node + isBun=false when bun is not installed", async () => {
     const execSync = vi.fn((cmd: string) => {
       if (/^command -v\s+bun$/.test(cmd)) throw new Error("not found");
+      if (/^where\s+bun$/.test(cmd)) throw new Error("not found");
       return "";
     });
     const execFileSync = vi.fn(() => Buffer.from(""));
@@ -96,12 +97,7 @@ describe("resolveHookRuntime — auto-detect bun ≥1.0, fall back to node (#738
       return { ...actual, existsSync: (p: string | URL) => String(p) === process.execPath };
     });
 
-    const mod = await import("../src/runtime.js");
-    const { resolveHookRuntime, resetHookRuntimeCache } = mod;
-    // #1159: on Windows `commandExists` reads the in-process PATH index, not
-    // `where`. Inject an empty index so this is deterministic regardless of
-    // whether the CI runner has bun installed.
-    mod.__setWhereOnPathForTests(() => []);
+    const { resolveHookRuntime, resetHookRuntimeCache } = await import("../src/runtime.js");
     resetHookRuntimeCache();
     const r = resolveHookRuntime();
     expect(r.isBun).toBe(false);
@@ -218,10 +214,7 @@ describe("resolveHookRuntime — auto-detect bun ≥1.0, fall back to node (#738
       return { ...actual, existsSync: () => false };
     });
 
-    const mod = await import("../src/runtime.js");
-    const { resolveHookRuntime, resetHookRuntimeCache } = mod;
-    // #1159: deterministic bun-absent host on every platform.
-    mod.__setWhereOnPathForTests(() => []);
+    const { resolveHookRuntime, resetHookRuntimeCache } = await import("../src/runtime.js");
     resetHookRuntimeCache();
     const r1 = resolveHookRuntime();
     const probeCallCount = execSync.mock.calls.length + execFileSync.mock.calls.length;
@@ -304,9 +297,13 @@ describe("resolveHookRuntime — liveness-guard stale version-manager execPath (
       stubExecPath(stalePath);
 
       const execSync = vi.fn((cmd: string) => {
-        if (cmd === "command -v bun") throw new Error("bun not found");
+        if (cmd === "where bun" || cmd === "command -v bun") {
+          throw new Error("bun not found");
+        }
         if (cmd === "command -v node") return "/home/dev/.local/share/mise/shims/node\n";
+        if (cmd === "where node") return "C:\\Program Files\\nodejs\\node.exe\n";
         if (/^command -v\s/.test(cmd)) throw new Error("not found");
+        if (/^where\s/.test(cmd)) throw new Error("not found");
         throw new Error(`unmocked execSync: ${cmd}`);
       });
       const execFileSync = vi.fn(() => Buffer.from("ok\n"));
@@ -321,13 +318,7 @@ describe("resolveHookRuntime — liveness-guard stale version-manager execPath (
         return { ...actual, existsSync };
       });
 
-      const mod = await import("../src/runtime.js");
-      const { resolveHookRuntime, resetHookRuntimeCache } = mod;
-      // #1159: `node` on PATH is now answered by the in-process index on
-      // Windows, so inject it instead of mocking `where node`.
-      mod.__setWhereOnPathForTests((cmd) =>
-        cmd === "node" ? ["C:\\Program Files\\nodejs\\node.exe"] : [],
-      );
+      const { resolveHookRuntime, resetHookRuntimeCache } = await import("../src/runtime.js");
       resetHookRuntimeCache();
       const r = resolveHookRuntime();
 
@@ -348,8 +339,9 @@ describe("resolveHookRuntime — liveness-guard stale version-manager execPath (
     stubExecPath(livePath);
 
     const execSync = vi.fn((cmd: string) => {
-      if (cmd === "command -v bun") throw new Error("bun not found");
+      if (cmd === "where bun" || cmd === "command -v bun") throw new Error("bun not found");
       if (/^command -v\s/.test(cmd)) throw new Error("not found");
+      if (/^where\s/.test(cmd)) throw new Error("not found");
       throw new Error(`unmocked execSync: ${cmd}`);
     });
     const execFileSync = vi.fn(() => Buffer.from("ok\n"));
@@ -361,10 +353,7 @@ describe("resolveHookRuntime — liveness-guard stale version-manager execPath (
       return { ...actual, existsSync: (p: string | URL) => String(p) === livePath };
     });
 
-    const mod = await import("../src/runtime.js");
-    const { resolveHookRuntime, resetHookRuntimeCache } = mod;
-    // #1159: no bun on the injected PATH index either.
-    mod.__setWhereOnPathForTests(() => []);
+    const { resolveHookRuntime, resetHookRuntimeCache } = await import("../src/runtime.js");
     resetHookRuntimeCache();
     const r = resolveHookRuntime();
 
@@ -419,6 +408,7 @@ describe("buildHookRuntimeCommand — emits bun when available, node otherwise (
   test("emits node (process.execPath) when bun is unavailable", async () => {
     const execSync = vi.fn((cmd: string) => {
       if (/^command -v\s+bun$/.test(cmd)) throw new Error("not found");
+      if (/^where\s+bun$/.test(cmd)) throw new Error("not found");
       return "";
     });
     const execFileSync = vi.fn(() => Buffer.from(""));
@@ -430,10 +420,7 @@ describe("buildHookRuntimeCommand — emits bun when available, node otherwise (
       return { ...actual, existsSync: (p: string | URL) => String(p) === process.execPath };
     });
 
-    const mod = await import("../src/runtime.js");
-    const { resetHookRuntimeCache } = mod;
-    // #1159: deterministic bun-absent host on every platform.
-    mod.__setWhereOnPathForTests(() => []);
+    const { resetHookRuntimeCache } = await import("../src/runtime.js");
     resetHookRuntimeCache();
     const { buildHookRuntimeCommand } = await import("../src/adapters/types.js");
     const cmd = buildHookRuntimeCommand("/plugin/hooks/pretooluse.mjs");

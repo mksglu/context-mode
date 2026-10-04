@@ -19,15 +19,9 @@
  * @see https://github.com/mksglu/context-mode/issues/203
  */
 
-<<<<<<< ours
 import { existsSync, copyFileSync, renameSync, unlinkSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
-=======
-import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
-import { execFileSync, execSync } from "node:child_process";
-import { delimiter, resolve, dirname } from "node:path";
->>>>>>> theirs
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
@@ -151,15 +145,11 @@ export async function ensureDeps() {
  */
 function probeNativeInChildProcess(pluginRoot) {
   try {
-    execFileSync(
-      process.execPath,
-      ["-e", "new (require('better-sqlite3'))(':memory:').close()"],
-      {
-        cwd: pluginRoot,
-        stdio: "pipe",
-        timeout: 10000,
-      },
-    );
+    execSync(`node -e "new (require('better-sqlite3'))(':memory:').close()"`, {
+      cwd: pluginRoot,
+      stdio: "pipe",
+      timeout: 10000,
+    });
     return true;
   } catch {
     return false;
@@ -249,7 +239,6 @@ export function ensureNativeCompat(pluginRoot) {
         stdio: "pipe",
         timeout: 60000,
         shell: true,
-        env: envWithRunningNodeFirst(),
       });
       codesignBinary(binaryPath);
       if (existsSync(binaryPath)) {
@@ -269,7 +258,6 @@ export function ensureNativeCompat(pluginRoot) {
         stdio: "pipe",
         timeout: 60000,
         shell: true,
-        env: envWithRunningNodeFirst(),
       });
       codesignBinary(binaryPath);
       if (existsSync(binaryPath) && probeNativeInChildProcess(pluginRoot)) {
@@ -279,17 +267,6 @@ export function ensureNativeCompat(pluginRoot) {
   } catch {
     /* best effort — caller will report the error on first DB access */
   }
-}
-
-function envWithRunningNodeFirst() {
-  const env = {};
-  // Windows treats environment keys case-insensitively. Remove any existing
-  // Path/PATH entry before adding one authoritative value for the child.
-  for (const [key, value] of Object.entries(process.env)) {
-    if (key.toLowerCase() !== "path") env[key] = value;
-  }
-  env.PATH = `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`;
-  return env;
 }
 
 /**

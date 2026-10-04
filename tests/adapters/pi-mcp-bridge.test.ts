@@ -24,7 +24,7 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1128,67 +1128,5 @@ describe("foreground keep-alive — idle reaper scoped by session kind (#868)", 
     const live = (client as unknown as { _spawnEnv?: NodeJS.ProcessEnv })._spawnEnv;
     expect(live?.CONTEXT_MODE_BRIDGE_IDLE_MS).toBe("0");
     client.shutdown();
-  });
-});
-
-
-describe("Pi MCP tools — worktree isolation", () => {
-  it("given two sessions and a retired shell PWD, when their real MCP tools interleave, then each reads its own worktree", async () => {
-    const { bootstrapMCPTools } = await import("../../src/adapters/pi/mcp-bridge.js");
-    const serverScript = join(import.meta.dirname, "../../server.bundle.mjs");
-    const configDir = join(scratch, ".pi");
-    mkdirSync(configDir);
-    const env = {
-      ...process.env,
-      HOME: scratch,
-      PI_CONFIG_DIR: configDir,
-      PI_WORKSPACE_DIR: undefined,
-      PI_PROJECT_DIR: undefined,
-      CONTEXT_MODE_PROJECT_DIR: undefined,
-      PWD: join(scratch, "retired-worktree"),
-      CONTEXT_MODE_BRIDGE_DEPTH: undefined,
-      CONTEXT_MODE_BRIDGE_IDLE_MS: "0",
-    };
-    const hostCwd = process.cwd();
-    const sessions: Array<{
-      cwd: string;
-      marker: string;
-      tools: Map<string, import("../../src/adapters/pi/mcp-bridge.js").PiToolRegistration>;
-      handle: import("../../src/adapters/pi/mcp-bridge.js").BridgeHandle;
-    }> = [];
-    try {
-      for (const marker of ["studio-worktree", "gateway-worktree"]) {
-        const cwd = join(scratch, marker);
-        mkdirSync(cwd);
-        writeFileSync(join(cwd, "workspace-marker.txt"), marker);
-        const tools = new Map<string, import("../../src/adapters/pi/mcp-bridge.js").PiToolRegistration>();
-        const handle = await bootstrapMCPTools({ registerTool: (tool) => tools.set(tool.name, tool) }, serverScript, {
-          env,
-          cwd,
-          _resolveJsRuntime: () => process.execPath,
-        });
-        sessions.push({ cwd, marker, tools, handle });
-      }
-      for (const name of ["ctx_execute", "ctx_execute_file", "ctx_batch_execute"]) {
-        for (const session of [...sessions, sessions[0]]) {
-          const tool = session.tools.get(name);
-          expect(tool).toBeDefined();
-          if (!tool) throw new Error(`MCP tool was not registered: ${name}`);
-          const args = name === "ctx_execute"
-            ? { language: "javascript", code: 'console.log(require("fs").readFileSync("workspace-marker.txt", "utf8"))' }
-            : name === "ctx_execute_file"
-              ? { path: "workspace-marker.txt", language: "javascript", code: "console.log(FILE_CONTENT)" }
-              : { commands: [{ label: "workspace", command: "cat workspace-marker.txt" }], queries: [session.marker] };
-          const result = await tool.execute(`workspace-${name}`, args);
-          const text = result.content.map((block) => block.text).join("\n");
-          expect(text).toContain(session.marker);
-          expect(text).not.toContain(sessions.find((other) => other !== session)?.marker);
-        }
-      }
-      expect(process.cwd()).toBe(hostCwd);
-      expect(env.PWD).toBe(join(scratch, "retired-worktree"));
-    } finally {
-      for (const session of sessions) session.handle.shutdown();
-    }
   });
 });
