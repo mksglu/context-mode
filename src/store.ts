@@ -214,12 +214,36 @@ function isProcessAlive(pid: number): boolean {
 }
 
 /**
- * Clean up stale per-project content store DBs older than maxAgeDays.
- * Scans the given directory for *.db files and checks mtime.
- * Also detects zombie processes holding WAL locks — if a WAL file exists
- * but the owning PID is dead, the DB files are cleaned up regardless of age.
+ * Clean up abandoned per-project content store DBs older than maxAgeDays.
+ *
+ * Abandonment is decided by the age sweep alone. The previous second
+ * condition — a non-empty WAL untouched for over an hour — deleted databases
+ * that a live process still had open, because a WAL mtime is a *write*
+ * timestamp: a server that simply had nothing to index for an hour looked
+ * exactly like a crashed one (#1024). Under bun:sqlite the resulting
+ * unlink-under-live-handle also wedged the holder on a permanent
+ * SQLITE_IOERR, which is why the failure surfaced with a green ctx_doctor
+ * (#880, #992).
+ *
+ * There is no way to ask the file whether it is owned. A SQLite WAL header
+ * carries no PID, and taking the WAL write lock does not answer the question
+ * either — a live idle connection holds that lock only for the duration of a
+ * write transaction, so the probe succeeds against a database that is very
+ * much in use. So the hour-scale override is gone rather than replaced with a
+ * guess: the age sweep is the only signal that cannot fire on a database that
+ * is merely quiet.
+ *
+ * `maxAgeDays` of 0 disables the sweep. It used to mean "cutoff === now",
+ * which expired every file in the directory (#1024).
+ *
+ * Callers pass their own open DB in `exclude`; the store is constructed
+ * before this runs, and into the directory being swept.
  */
-export function cleanupStaleContentDBs(contentDir: string, maxAgeDays: number): number {
+export function cleanupStaleContentDBs(
+  contentDir: string,
+  maxAgeDays: number,
+  opts: { exclude?: readonly string[] } = {},
+): number {
   let cleaned = 0;
   try {
     if (!existsSync(contentDir)) return 0;
@@ -228,27 +252,9 @@ export function cleanupStaleContentDBs(contentDir: string, maxAgeDays: number): 
     for (const file of files) {
       try {
         const filePath = join(contentDir, file);
+        if (opts.exclude?.includes(filePath)) continue;
         const mtime = statSync(filePath).mtimeMs;
-        let shouldClean = mtime < cutoff;
-
-        // Detect zombie processes holding WAL locks:
-        // If a WAL file exists, try to read the WAL header to extract the PID.
-        // WAL files from dead processes can block new connections.
-        if (!shouldClean) {
-          const walPath = filePath + "-wal";
-          if (existsSync(walPath)) {
-            try {
-              const walStat = statSync(walPath);
-              // If WAL file is non-empty and DB hasn't been modified in >1 hour,
-              // the owning process may be dead — check via mtime staleness
-              if (walStat.size > 0 && (Date.now() - walStat.mtimeMs) > 3600_000) {
-                shouldClean = true;
-              }
-            } catch { /* ignore WAL check errors */ }
-          }
-        }
-
-        if (shouldClean) {
+        if (maxAgeDays > 0 && mtime < cutoff) {
           for (const suffix of ["", "-wal", "-shm"]) {
             try { unlinkSync(filePath + suffix); } catch { /* ignore */ }
           }
