@@ -45,8 +45,8 @@ Ya resueltos antes de la revisión individual:
 | 948 | 2 | +10/-1 | next | clean | 53 | docs(codex): make JavaScript the default ctx_execute runtime | DESCARTAR — cambia 1 de 14 configs, convirtiendo un invariante cross-adapter en excepcion |
 | 932 | 2 | +10/-4 | next | clean | 53 | fix(runPool): don't report capped when pool is larger than workload (#915) | ADOPTADO |
 | 906 | 2 | +10/-0 | next | clean | 53 | docs(codex): pin platform env in manual config | ADAPTAR — anade [mcp_servers.context-mode.env] pero removeTomlSections empareja exacto y dejaria huerfana esa subtabla |
-| 1250 | 2 | +16/-1 | next | unstable | 1 | fix: classify shell exit 1 with stderr as an error | ADOPTAR |
-| 1059 | 2 | +17/-0 | next | clean | 47 | fix(opencode): route webfetch through the WebFetch redirect (#1052) | ADOPTAR |
+| 1250 | 2 | +16/-1 | next | unstable | 1 | fix: classify shell exit 1 with stderr as an error | ADOPTADO |
+| 1059 | 2 | +17/-0 | next | clean | 47 | fix(opencode): route webfetch through the WebFetch redirect (#1052) | ADOPTADO |
 | 930 | 2 | +18/-1 | next | clean | 49 | fix(docs): avoid GraphQL issue listing | DESCARTAR — no reproducible; el test grepea un markdown y solo puede fallar si alguien edita la doc |
 | 1180 | 2 | +22/-0 | next | unstable | 16 | fix(pi): stamp the context-hook message with a timestamp so Radius accepts it | DESCARTADO — superseded por #1149 (mismo cambio, test mas debil) |
 | 974 | 2 | +23/-1 | next | clean | 53 | fix(start.mjs): remove chdir | DESCARTAR — start.mjs:608 ya restaura el cwd antes del import; el cambio es neutro y ensancha la exposicion |
@@ -63,24 +63,24 @@ Ya resueltos antes de la revisión individual:
 | 1001 | 2 | +44/-0 | main | clean | 70 | fix(pricing): add MiniMax catalog entries | ADAPTAR — las tarifas de MiniMax-M3 estan al doble (copio los precios tachados pre-descuento) |
 | 1073 | 2 | +52/-13 | next | clean | 41 | fix: update Kiro hooks config to 1.0 v1 schema | DESCARTAR — contradice el schema documentado de Kiro; ademas generateHookConfig sigue emitiendo la forma vieja |
 | 922 | 2 | +53/-10 | next | clean | 53 | fix: trim the per-call ctx_batch_execute footer | ADOPTADO |
-| 1235 | 2 | +60/-3 | next | unstable | 3 | fix(copilot-cli): preserve custom hooks during upgrade | ADOPTAR |
-| 987 | 2 | +60/-3 | main | clean | 74 | fix(lifecycle): detect parent death on Windows via PID existence probe (#982) | ADOPTAR |
+| 1235 | 2 | +60/-3 | next | unstable | 3 | fix(copilot-cli): preserve custom hooks during upgrade | ADOPTADO |
+| 987 | 2 | +60/-3 | main | clean | 74 | fix(lifecycle): detect parent death on Windows via PID existence probe (#982) | ADOPTADO |
 | 968 | 2 | +60/-5 | next | clean | 53 | fix(exec): add CONTEXT_MODE_DEFAULT_EXEC_TIMEOUT_MS opt-in bound for exec calls (#936) | ADOPTADO |
-| 945 | 2 | +61/-0 | next | clean | 47 | fix(routing): let claude.ai Artifact URLs pass through WebFetch (#938) | ADOPTAR |
+| 945 | 2 | +61/-0 | next | clean | 47 | fix(routing): let claude.ai Artifact URLs pass through WebFetch (#938) | ADOPTADO |
 | 863 | 2 | +63/-9 | next | clean | 53 | fix(windows): run the better-sqlite3 boot-install via node, not npm.cmd+shell (#861 follow-up) | ADAPTAR — el cambio de stderr es bueno, pero los tests grepean el fuente tras quitar comentarios |
-| 1118 | 2 | +65/-7 | next | clean | 31 | fix(db-base): keep SQL comments from splitting exec statements | ADOPTAR |
+| 1118 | 2 | +65/-7 | next | clean | 31 | fix(db-base): keep SQL comments from splitting exec statements | ADOPTADO |
 | 876 | 2 | +67/-3 | next | clean | 53 | fix(omp): seed APPEND_SYSTEM.md routing instructions | DUDOSO — no se puede confirmar desde el repo que OMP descubra APPEND_SYSTEM.md; el propio adapter documenta lo contrario |
 | 921 | 2 | +68/-3 | next | dirty | 53 | fix: dedupe chunks across queries in a multi-query ctx_search call | ADAPTAR — los tests ejercitan el helper aislado; el cableado al handler no esta probado |
 | 986 | 2 | +78/-3 | main | clean | 74 | fix(db): replace SQLITE_BUSY busy-wait backoff with Atomics.wait sleep (#985) | DESCARTADO — ya aplicado en este fork con una implementacion mejor (celda compartida a nivel de modulo) |
-| 1236 | 2 | +79/-5 | next | unstable | 3 | fix(stats): probe session schemas read-only before migration | ADOPTAR |
+| 1236 | 2 | +79/-5 | next | unstable | 3 | fix(stats): probe session schemas read-only before migration | ADOPTADO |
 | 1030 | 2 | +85/-6 | next | clean | 53 | fix(db): retry transient SQLITE_IOERR instead of failing the caller | ADAPTAR — la direccion es correcta; hay que revisar que IOERR no entre al predicado de corrupcion |
 | 1228 | 2 | +89/-14 | next | unstable | 0 | fix(hooks): ship default timeouts so a hung hook cannot block the CLI | PENDIENTE — no alcanzado en el pre-cribado |
-| 1086 | 2 | +90/-3 | next | clean | 40 | fix(hooks): scan quotes left to right so prose apostrophes cannot expose a command | ADOPTAR |
+| 1086 | 2 | +90/-3 | next | clean | 40 | fix(hooks): scan quotes left to right so prose apostrophes cannot expose a command | ADOPTADO |
 | 1056 | 2 | +94/-12 | next | clean | 50 | fix(db): stop mutating shared DB files across processes (close-time TRUNCATE checkpoint + default mmap) | ADOPTAR — corregir dos comentarios: el timer PASSIVE de #988 no existe todavia y el mmap por defecto se perdia por rendimiento |
 | 1160 | 2 | +95/-2 | next | unstable | 20 | fix(opencode): merge sibling config plugin arrays when writing opencode.jsonc | ADOPTAR — anadir guarda Array.isArray en (settings.plugin ?? []) |
 | 1238 | 2 | +96/-4 | next | unstable | 3 | fix(fetch): keep nested fenced examples intact during extraction | DESCARTAR — src/fetch/ no existe en este fork; es solo de next |
 | 1129 | 2 | +110/-9 | next | unstable | 8 | fix(hooks): pin ABI healing to the running Node | CONFLICTO — hooks/ensure-deps.mjs, que tocamos en 45d5185 |
-| 929 | 2 | +110/-1 | next | clean | 49 | fix(packaging): guard packaged helper scripts | ADOPTAR |
+| 929 | 2 | +110/-1 | next | clean | 49 | fix(packaging): guard packaged helper scripts | ADOPTADO |
 | 1237 | 2 | +115/-9 | next | unstable | 3 | fix(executor): preserve Rust execution cwd and sandbox lifecycle | ADOPTAR — sus 5 tests son runIf(rust): sin rustc el fix queda sin cubrir |
 | 1116 | 2 | +118/-6 | next | clean | 32 | feat(omp): restore resume snapshot after compact | ADAPTAR — _pendingContext no se resetea en session_start, asi que un snapshot de la sesion A se inyecta en la B |
 | 1239 | 2 | +141/-4 | next | unstable | 3 | fix(gemini-cli): retain sibling hooks when upgrading | APLICADO Y REVERTIDO — rompio la suite (hooks de gemini) |
@@ -91,12 +91,12 @@ Ya resueltos antes de la revisión individual:
 | 1229 | 2 | +190/-15 | next | unstable | 4 | fix: scope session-event indexing to the current project (#1214) | ADOPTADO |
 | 1166 | 2 | +220/-13 | next | unstable | 18 | fix(pi): spawn a Windows-spawnable runtime and keep bridge diagnostics | ADOPTAR — el log de diag no tiene rotacion |
 | 1093 | 2 | +265/-3 | next | clean | 38 | feat(pi): interrupt support (Esc) for in-flight ctx_* tool calls | DESCARTAR — superseded por #1164: matar el bridge no detiene el executor, que es justo el incidente que describe |
-| 1092 | 2 | +362/-13 | next | clean | 38 | feat(pi): live command preview and result tail in the Pi TUI | ADOPTAR |
+| 1092 | 2 | +362/-13 | next | clean | 38 | feat(pi): live command preview and result tail in the Pi TUI | ADOPTADO |
 | 1164 | 2 | +433/-6 | main | unstable | 19 | fix(pi): propagate Pi's AbortSignal — kill the bridge server tree to stop runaway executors | ADAPTAR — portar el guard de stdin error desde #1093 y encadenar spawnExitError de #1166 |
 | 1211 | 2 | +979/-53 | next | unstable | 1 | perf(analytics): stop re-reading every sidecar in getLifetimeStats | REVERTIDO — idem |
 | 928 | 3 | +27/-4 | next | clean | 49 | fix: avoid deprecated gh issue project cards query | DESCARTAR — el Fixes #890 es falso (no toca pricing.js) y el defecto no se reproduce |
 | 910 | 3 | +32/-2 | next | clean | 53 | fix(codex): omit empty additionalContext in hook output | DESCARTAR — duplicado exacto de #971, con tests mas debiles |
-| 971 | 3 | +39/-6 | next | clean | 40 | fix(codex): omit empty hook context | ADOPTAR |
+| 971 | 3 | +39/-6 | next | clean | 40 | fix(codex): omit empty hook context | ADOPTADO |
 | 899 | 3 | +57/-6 | main | clean | 96 | fix: avoid false shell error captures | ADAPTAR — el regex de 3 frases no detecta npm ERR!/ELIFECYCLE/fatal: en Claude Code, que no manda tool_output |
 | 973 | 3 | +71/-7 | next | clean | 53 | fix(start.mjs): allow resolve bun from $PATH | ADAPTAR — falta un test que compruebe el cableado en start.mjs, no solo el modulo puro |
 | 958 | 3 | +79/-70 | next | clean | 53 | refactor(cache-heal): extract inline healScript to hooks/cache-heal.mjs | DESCARTAR — borra el template inline que #1216 edita y rompe los tests de #1216 |
@@ -104,7 +104,7 @@ Ya resueltos antes de la revisión individual:
 | 970 | 3 | +100/-3 | next | clean | 53 | fix(store): add 14-day retention for the sessions/ directory (#949) | ADAPTAR — el sweep borra la propia DB del proyecto actual; replicar el patron exclude de cleanupStaleContentDBs |
 | 1076 | 3 | +118/-0 | next | clean | 41 | feat: add CONTEXT_MODE_TOOLS allow-list to skip tool registration | ADAPTAR — el skip es silencioso (typo => toolset mysteriously reducido) y 2 tests reimplementan el guard |
 | 1126 | 3 | +120/-122 | next | unstable | 28 | fix(pi): remove unverified tool-availability routing anchor | ADAPTAR — conservar sus tests (usan memoria real como senal) pero condicionar el anchor en vez de borrarlo; quitar CHANGELOG.md |
-| 1143 | 3 | +130/-2 | next | unstable | 24 | fix(session): key cleanupOldSessions TTL off last activity, not started_at | ADOPTAR |
+| 1143 | 3 | +130/-2 | next | unstable | 24 | fix(session): key cleanupOldSessions TTL off last activity, not started_at | ADOPTADO |
 | 1172 | 3 | +177/-160 | next | unstable | 17 | fix(fetch): report concise subprocess errors | CONFLICTO — src/server.ts |
 | 1155 | 3 | +181/-12 | main | unstable | 21 | Redact secrets from the debug report before it leaves the machine | DUDOSO — no alcanzado en el pre-cribado |
 | 1145 | 3 | +187/-11 | next | unstable | 24 | fix: skip Claude self-healing for non-Claude launches | DUDOSO — no alcanzado en el pre-cribado |
@@ -115,11 +115,11 @@ Ya resueltos antes de la revisión individual:
 | 1147 | 3 | +274/-34 | next | unstable | 23 | fix(exec): bound ctx_execute on Pi, which has no host-side ceiling | ADAPTAR — el diseno es lo mejor del lote; confirmar que 600s es aceptable en Pi (se quito un techo de 120s a proposito) |
 | 1165 | 3 | +328/-30 | next | unstable | 19 | fix(codex): honor active sandbox state for file reads | DUDOSO — el mapeo de fallo es fail-CLOSED sobre un flag no verificado: status!=0 denies, asi que sin Codex instalado rompe toda lectura |
 | 1066 | 3 | +416/-57 | main | clean | 46 | feat(omp): route broad tool calls and cap direct results | DESCARTAR — contradice a #1227 en el mismo handler y reimplementa el enrutado que ya existe en hooks/core/routing.mjs |
-| 1240 | 4 | +59/-25 | next | unstable | 3 | fix: declare antigravity-cli Stop hook in the flat form agy accepts | ADOPTAR |
+| 1240 | 4 | +59/-25 | next | unstable | 3 | fix: declare antigravity-cli Stop hook in the flat form agy accepts | ADOPTADO |
 | 1227 | 4 | +78/-72 | next | unstable | 4 | fix(omp): allow quoted HTTP references and silent file downloads | ADAPTAR — su hasCurlWget reintroduce la forma laxa que reemplazamos con el anchor de posicion de comando |
 | 1197 | 4 | +112/-116 | main | unstable | 11 | fix: reject unusable Bun shims and clarify OMP hook diagnostics | ADAPTAR — hasBunRuntime pasa de existsSync a lanzar subprocess por cada candidato; memoizar |
 | 1154 | 4 | +113/-6 | next | unstable | 21 | fix(windows): suppress child process console windows | ADOPTADO |
-| 988 | 4 | +117/-1 | main | clean | 74 | fix(store): opportunistic PASSIVE WAL checkpoint to bound the content-store WAL (#985) | ADOPTAR |
+| 988 | 4 | +117/-1 | main | clean | 74 | fix(store): opportunistic PASSIVE WAL checkpoint to bound the content-store WAL (#985) | ADOPTADO |
 | 918 | 4 | +128/-104 | main | clean | 92 | fix(routing-block): remove injection-shaped framing (#911) | DESCARTAR — quita la regla ANTI-inyeccion que es lo que hace que una directiva capturada ceda al turno actual; tomar #1034 |
 | 1246 | 4 | +133/-18 | next | unstable | 2 | fix(pi): isolate MCP bridges by session workspace | CONFLICTO — src/adapters/pi/, que tocamos en 391b235 |
 | 871 | 4 | +294/-7 | next | clean | 53 | fix(db-base): extend withRetry to catch mid-session SQLITE_CORRUPT with lossless heal (#867) | ADAPTAR — limpia dbPath-wal/-shh en vez de backupPath-*: en multi-writer el WAL sobrevive y vuelve a corromper |
@@ -128,12 +128,12 @@ Ya resueltos antes de la revisión individual:
 | 898 | 4 | +420/-318 | next | dirty | 53 | fix(store): cap oversized markdown chunks | REVERTIDO — el hunk entra, pero el lote entera dejo 117 fallos; queda pendiente reaplicar aislado |
 | 991 | 4 | +435/-318 | next | dirty | 53 | fix: auto-index mid-size exec output for ctx_search without intent | ADAPTAR — tomar solo indexForSearch; el shortHash(code) relabela sources y dispara crecimiento de filas |
 | 963 | 4 | +834/-389 | next | dirty | 53 | fix(store): bound FTS search result hydration for oversized rows | DUDOSO — convierte una busqueda limit:20 de 1 consulta en 21-41, en el camino de lectura mas caliente, por filas legacy |
-| 1104 | 5 | +7/-5 | main | clean | 35 | fix(codex): route Code Mode exec through PreToolUse | ADOPTAR |
+| 1104 | 5 | +7/-5 | main | clean | 35 | fix(codex): route Code Mode exec through PreToolUse | ADOPTADO |
 | 1158 | 5 | +44/-8 | next | unstable | 20 | fix(session): evict least-important events first | DESCARTADO — ya aplicado en este fork (eviction DESC + goal a priority 1) |
-| 1161 | 5 | +51/-49 | next | unstable | 20 | fix(tool-naming): use native ctx_* names for OpenCode/KiloCode plugin tools | ADOPTAR |
+| 1161 | 5 | +51/-49 | next | unstable | 20 | fix(tool-naming): use native ctx_* names for OpenCode/KiloCode plugin tools | ADOPTADO |
 | 1033 | 5 | +61/-2 | next | clean | 53 | Fix VS Code Remote-WSL project root detection (issue #1032) | ADAPTAR — el fallback sigue siendo process.cwd(), que en el escenario descrito tambien es el directorio de la app |
 | 888 | 5 | +62/-74 | main | dirty | 97 | Fix/mcp singleton concurrency | ADAPTAR — revertir el hoist de boundProjectDir (cachea el project dir de un deny-checker que debe ser por-request); quitar stats.json; sin tests |
-| 1034 | 5 | +75/-3 | next | clean | 53 | fix(routing): self-identify subagent routing block, add opt-out (#967) | ADOPTAR |
+| 1034 | 5 | +75/-3 | next | clean | 53 | fix(routing): self-identify subagent routing block, add opt-out (#967) | ADOPTADO |
 | 1113 | 5 | +80/-35 | next | clean | 32 | fix(detect): wait for MCP initialize before platform detect | ADAPTAR — el reorder de detect.ts es limpio; el half de server.ts abre una ventana async en la que _detectedAdapter es null |
 | 1176 | 5 | +88/-8 | next | unstable | 16 | fix: make snippet and echo truncation surrogate-safe (#1163) | ADOPTADO |
 | 913 | 5 | +90/-72 | next | clean | 53 | fix(standalone): use mcp__context-mode__ prefix when CLAUDE_PLUGIN_ROOT is absent | DUDOSO — no alcanzado en el pre-cribado |
