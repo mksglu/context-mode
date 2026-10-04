@@ -33,12 +33,12 @@ Ya resueltos antes de la revisión individual:
 | 1137 | 1 | +1/-1 | next | unstable | 25 | docs: align session continuity guidance | ADOPTADO |
 | 972 | 1 | +1/-1 | next | clean | 53 | fix(gitSetupShell): do not hardcode bash location | ADOPTADO — el titulo exagera: el hardcode solo existia en el test, nunca en el producto |
 | 1245 | 1 | +2/-2 | next | unstable | 2 | fix(deps): refresh express-rate-limit to pull in patched ip-address | DESCARTADO — el fix ya esta en efecto via pnpm-lock.yaml (ip-address@10.7.3, express-rate-limit@8.7.0); bun.lock es vestigial |
-| 1244 | 1 | +2/-1 | main | unstable | 1 | Add website URL to plugin.json | PENDIENTE |
-| 975 | 1 | +2/-2 | main | clean | 77 | fix(ctx_execute): prevent hang when background=true without timeout | PENDIENTE |
-| 1061 | 1 | +4/-4 | next | clean | 47 | docs(readme): correct Pi session completeness from High to Full (#1021) | PENDIENTE |
-| 927 | 1 | +5/-5 | main | dirty | 89 | fix(hooks): downgrade WebFetch hard-deny to once-per-session advisory | PENDIENTE |
-| 1132 | 1 | +7/-9 | next | unstable | 26 | docs: clarify Claude network routing guidance | PENDIENTE |
-| 1243 | 1 | +8/-0 | next | unstable | 2 | fix(scripts): re-exec ctx-debug.sh under bash when invoked by a POSIX shell | PENDIENTE |
+| 1244 | 1 | +2/-1 | main | unstable | 1 | Add website URL to plugin.json | DESCARTADO — anade websiteURL apuntando al repo abandonado; el campo no es verificable desde aqui |
+| 975 | 1 | +2/-2 | main | clean | 77 | fix(ctx_execute): prevent hang when background=true without timeout | ADOPTADO — ver commit: quita el keep-alive cuando no hay timeout efectivo, que es el hang |
+| 1061 | 1 | +4/-4 | next | clean | 47 | docs(readme): correct Pi session completeness from High to Full (#1021) | ADOPTADO — verificado: Pi cablea turn_end y before_agent_start, la tabla estaba mal |
+| 927 | 1 | +5/-5 | main | dirty | 89 | fix(hooks): downgrade WebFetch hard-deny to once-per-session advisory | DESCARTADO — baja WebFetch de deny duro a aviso una-vez, Politica que excede #1037; el opt-out CONTEXT_MODE_ALLOW_WEBFETCH ya resuelve #1037 sin debilitar el default |
+| 1132 | 1 | +7/-9 | next | unstable | 26 | docs: clarify Claude network routing guidance | ADAPTADO — acoplado con #927: soften la guia solo es honesto si el deny es suave. Se reescribe solo el marco (ADR-0003: redirigir != restringir) sin cambiar la politica |
+| 1243 | 1 | +8/-0 | next | unstable | 2 | fix(scripts): re-exec ctx-debug.sh under bash when invoked by a POSIX shell | DESCARTADO — superseded por #1247 (superconjunto: 176 lineas y test; este son 8 sin test) |
 | 1095 | 1 | +21/-1 | next | clean | 38 | fix(pi): strip echo preamble in collapsed renderResult | PENDIENTE |
 | 892 | 2 | +4/-4 | main | dirty | 97 | Fix typo in README verification instructions | PENDIENTE |
 | 920 | 2 | +8/-6 | next | clean | 53 | fix: state ctx_search throttle thresholds as absolute call numbers | PENDIENTE |
