@@ -1637,7 +1637,7 @@ export class ContentStore {
     this.#checkpointStop?.();
     this.#checkpointStop = null;
     this.#optimizeFTS(); // defragment before close
-    closeDB(this.#db); // WAL checkpoint before close — important for persistent DBs
+    closeDB(this.#db); // SQLite checkpoints+deletes -wal on LAST close (see closeDB doc)
   }
 
   // ── Vocabulary Extraction ──
