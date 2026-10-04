@@ -152,19 +152,6 @@ function maxEditDistance(wordLength: number): number {
 // boundaries when a chunk exceeds this cap.
 const MAX_CHUNK_BYTES = 4096;
 
-/**
- * `highlight()` reconstructs and tokenizes the entire FTS row. Do not invoke it
- * for legacy rows written before the byte-cap invariant existed: a single giant
- * row can otherwise synchronously monopolize the MCP server's event loop.
- */
-function safeHighlightExpression(table: "chunks" | "chunks_trigram"): string {
-  return `CASE
-    WHEN length(CAST(${table}.content AS BLOB)) <= ${MAX_CHUNK_BYTES}
-    THEN highlight(${table}, 1, char(2), char(3))
-    ELSE ''
-  END AS highlighted`;
-}
-
 // Blank-line sectioning is used only for output that is *naturally* sectioned:
 // at least a few sections, not an unbounded explosion, and no single section so
 // large that the split is clearly not the real structure (those fall back to
@@ -604,10 +591,7 @@ export class ContentStore {
       "DELETE FROM sources WHERE label = ?",
     );
 
-    // Search path (hot). SQLite CASE evaluates lazily, so the FTS5
-    // highlight() auxiliary function is never called for oversized legacy rows.
-    const porterHighlight = safeHighlightExpression("chunks");
-    const trigramHighlight = safeHighlightExpression("chunks_trigram");
+    // Search path (hot)
     this.#stmtSearchPorter = this.#db.prepare(`
       SELECT
         chunks.title,
@@ -616,7 +600,7 @@ export class ContentStore {
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        ${porterHighlight},
+        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -632,7 +616,7 @@ export class ContentStore {
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        ${porterHighlight},
+        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -648,7 +632,7 @@ export class ContentStore {
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        ${porterHighlight},
+        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -664,7 +648,7 @@ export class ContentStore {
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        ${trigramHighlight},
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -680,7 +664,7 @@ export class ContentStore {
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        ${trigramHighlight},
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -696,7 +680,7 @@ export class ContentStore {
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        ${trigramHighlight},
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -714,7 +698,7 @@ export class ContentStore {
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        ${porterHighlight},
+        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -730,7 +714,7 @@ export class ContentStore {
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        ${porterHighlight},
+        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -746,7 +730,7 @@ export class ContentStore {
         chunks.timestamp,
         sources.label,
         bm25(chunks, 5.0, 1.0) AS rank,
-        ${porterHighlight},
+        highlight(chunks, 1, char(2), char(3)) AS highlighted,
         chunks.session_id
       FROM chunks
       JOIN sources ON sources.id = chunks.source_id
@@ -762,7 +746,7 @@ export class ContentStore {
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        ${trigramHighlight},
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -778,7 +762,7 @@ export class ContentStore {
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        ${trigramHighlight},
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -794,7 +778,7 @@ export class ContentStore {
         chunks_trigram.timestamp,
         sources.label,
         bm25(chunks_trigram, 5.0, 1.0) AS rank,
-        ${trigramHighlight},
+        highlight(chunks_trigram, 1, char(2), char(3)) AS highlighted,
         chunks_trigram.session_id
       FROM chunks_trigram
       JOIN sources ON sources.id = chunks_trigram.source_id
@@ -1045,8 +1029,7 @@ export class ContentStore {
       return this.indexPlainText(content, source, undefined, attribution, maxChunkBytes);
     }
 
-    const byteCappedChunks = this.#finalizeChunkByteCap(chunks, maxChunkBytes);
-    return withRetry(() => this.#insertChunks(byteCappedChunks, source, content, undefined, undefined, attribution));
+    return withRetry(() => this.#insertChunks(chunks, source, content, undefined, undefined, attribution));
   }
 
   // ── Shared DB Insertion ──
@@ -1343,10 +1326,7 @@ export class ContentStore {
         // proximity max ≈1.0, in title-boost range), saturates at 4 hits.
         let proximityBoost = 0;
         let phraseBoost = 0;
-        // An empty highlighted value is the explicit sentinel for a legacy row
-        // above MAX_CHUNK_BYTES. Do not reintroduce an unbounded full-content
-        // scan after safely skipping FTS5 highlight() for that row.
-        if (terms.length >= 2 && r.highlighted !== "") {
+        if (terms.length >= 2) {
           const content = r.content.toLowerCase();
           const positions = terms.map((t) => findAllPositions(content, t));
 
@@ -1818,7 +1798,7 @@ export class ContentStore {
     // Flush remaining content
     flush();
 
-    return this.#finalizeChunkByteCap(chunks, maxChunkBytes);
+    return chunks;
   }
 
   /**
@@ -1912,23 +1892,6 @@ export class ContentStore {
     }
     flushAccumulator();
     return subChunks;
-  }
-
-  /**
-   * Apply the persistence invariant after structure-aware chunkers finish.
-   * Markdown and JSON preserve their natural hierarchy first, but a lone giant
-   * paragraph, fenced block, primitive, or array item has no safe structural
-   * boundary. Reuse the UTF-8-aware plain-text splitter as the last defense.
-   */
-  #finalizeChunkByteCap(chunks: Chunk[], maxChunkBytes: number): Chunk[] {
-    return chunks.flatMap((chunk) => {
-      if (Buffer.byteLength(chunk.content) <= maxChunkBytes) return [chunk];
-      return this.#splitOversizedPlainChunk(
-        chunk.content.split("\n"),
-        chunk.title,
-        maxChunkBytes,
-      ).map((part) => ({ ...part, hasCode: chunk.hasCode }));
-    });
   }
 
   #chunkPlainText(
