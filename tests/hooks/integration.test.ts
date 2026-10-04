@@ -1143,7 +1143,10 @@ describe("empty stdin resilience (#322)", () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("buildAutoInjection", () => {
-  let buildAutoInjection: (events: Array<{category: string; data: string}>) => string;
+  let buildAutoInjection: (
+    events: Array<{ category: string; data: string }>,
+    source: "compaction" | "active_memory",
+  ) => string;
   let estimateTokens: (text: string) => number;
 
   beforeAll(async () => {
@@ -1152,8 +1155,10 @@ describe("buildAutoInjection", () => {
     estimateTokens = mod.estimateTokens;
   });
 
+  // These cover the section builders, not the label; the fidelity line and
+  // the source contract are pinned in tests/hooks/auto-injection-label.test.ts.
   test("returns empty for no events", () => {
-    const result = buildAutoInjection([]);
+    const result = buildAutoInjection([], "active_memory");
     expect(result).toBe("");
   });
 
@@ -1161,7 +1166,7 @@ describe("buildAutoInjection", () => {
     const events = [
       { category: "role", data: "You are a senior staff engineer" },
     ];
-    const result = buildAutoInjection(events);
+    const result = buildAutoInjection(events, "active_memory");
     expect(result).toContain("<behavioral_directive>");
     expect(result).toContain("senior staff engineer");
     expect(result).toContain("</behavioral_directive>");
@@ -1172,7 +1177,7 @@ describe("buildAutoInjection", () => {
       { category: "decision", data: "Use ctx- prefix instead of cm-" },
       { category: "decision", data: "Never push to main without asking" },
     ];
-    const result = buildAutoInjection(events);
+    const result = buildAutoInjection(events, "active_memory");
     expect(result).toContain("<rules>");
     expect(result).toContain("ctx- prefix");
     expect(result).toContain("Never push");
@@ -1184,7 +1189,7 @@ describe("buildAutoInjection", () => {
       { category: "skill", data: "tdd" },
       { category: "skill", data: "commit" },
     ];
-    const result = buildAutoInjection(events);
+    const result = buildAutoInjection(events, "active_memory");
     expect(result).toContain("<active_skills>");
     expect(result).toContain("tdd");
     expect(result).toContain("commit");
@@ -1202,7 +1207,7 @@ describe("buildAutoInjection", () => {
     for (let i = 0; i < 50; i++) {
       events.push({ category: "skill", data: `skill-${i}` });
     }
-    const result = buildAutoInjection(events);
+    const result = buildAutoInjection(events, "active_memory");
     const tokens = estimateTokens(result);
     // The budget is 500 tokens. Role (P1) is never truncated but decisions
     // overflow to 3. Total should stay near or under budget.

@@ -46,6 +46,7 @@ import {
   PRE_TOOL_USE_MATCHERS,
   PRE_TOOL_USE_MATCHER_PATTERN,
   EXTERNAL_MCP_MATCHER_PATTERN,
+  HOOK_TIMEOUT_SECONDS,
   isContextModeHook,
   isAnyContextModeHook,
   extractHookScriptPath,
@@ -135,66 +136,24 @@ export class ClaudeCodeAdapter extends ClaudeCodeBaseAdapter implements HookAdap
     const preToolUseCommand = buildHookRuntimeCommand(`${pluginRoot}/hooks/pretooluse.mjs`);
     const preToolUseMatchers = [...PRE_TOOL_USE_MATCHERS];
 
+    // Every command hook carries a bounded runtime (#1226) so a hung script
+    // ends instead of blocking the host CLI indefinitely.
+    const cmd = (event: string, script: string) => ({
+      type: "command" as const,
+      command: buildHookRuntimeCommand(`${pluginRoot}/hooks/${script}`),
+      timeout: HOOK_TIMEOUT_SECONDS[event],
+    });
+
     return {
       PreToolUse: preToolUseMatchers.map((matcher) => ({
         matcher,
-        hooks: [{ type: "command", command: preToolUseCommand }],
+        hooks: [cmd("PreToolUse", "pretooluse.mjs")],
       })),
-      PostToolUse: [
-        {
-          matcher: "",
-          hooks: [
-            {
-              type: "command",
-              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/posttooluse.mjs`),
-            },
-          ],
-        },
-      ],
-      PreCompact: [
-        {
-          matcher: "",
-          hooks: [
-            {
-              type: "command",
-              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/precompact.mjs`),
-            },
-          ],
-        },
-      ],
-      UserPromptSubmit: [
-        {
-          matcher: "",
-          hooks: [
-            {
-              type: "command",
-              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/userpromptsubmit.mjs`),
-            },
-          ],
-        },
-      ],
-      SessionStart: [
-        {
-          matcher: "",
-          hooks: [
-            {
-              type: "command",
-              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/sessionstart.mjs`),
-            },
-          ],
-        },
-      ],
-      Stop: [
-        {
-          matcher: "",
-          hooks: [
-            {
-              type: "command",
-              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/stop.mjs`),
-            },
-          ],
-        },
-      ],
+      PostToolUse: [{ matcher: "", hooks: [cmd("PostToolUse", "posttooluse.mjs")] }],
+      PreCompact: [{ matcher: "", hooks: [cmd("PreCompact", "precompact.mjs")] }],
+      UserPromptSubmit: [{ matcher: "", hooks: [cmd("UserPromptSubmit", "userpromptsubmit.mjs")] }],
+      SessionStart: [{ matcher: "", hooks: [cmd("SessionStart", "sessionstart.mjs")] }],
+      Stop: [{ matcher: "", hooks: [cmd("Stop", "stop.mjs")] }],
     };
   }
 

@@ -208,8 +208,9 @@ await runHook(async () => {
         const eventMeta = writeSessionEventsFile(events, getSessionEventsPath());
         additionalContext += buildSessionDirective("compact", eventMeta, toolNamer);
 
-        // Auto-inject behavioral state on compaction (role, decisions, skills, intent)
-        const autoInjection = buildAutoInjection(events);
+        // Auto-inject behavioral state on compaction (role, decisions, skills, intent).
+        // Gated on a pending resume, so a compaction really did happen here.
+        const autoInjection = buildAutoInjection(events, "compaction");
         if (autoInjection) {
           additionalContext += "\n\n" + autoInjection;
         }

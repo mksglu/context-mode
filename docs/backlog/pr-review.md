@@ -8,7 +8,61 @@ Veredicciones: `ADOPTADO` · `ADAPTADO` (fix válido, implementación
 sustituida) · `DESCARTADO` (supersedido, incorrecto o sin valor) ·
 `DIFERIDO` (requiere una decisión que no es del fix) · `PENDIENTE`.
 
-Ya resueltos antes de la revisión individual:
+## Cribado del lote final (29 PRs, 2026-10-04)
+
+Los 29 `PENDIENTE`/`DUDOSO` que quedaban ya tienen veredicto. El cribado fue
+mecánico primero — diffs bajados a disco, no al contexto, y cada added line
+cruzada contra el árbol para medir cuanto del PR ya estaba aqui. Eso resolvio
+solos varios: **#1247** ya estaba al 100% (y por eso #1243 se descarto como
+supersedido), y **#1228** parecia "solo tests" hasta que se vio que tocaba
+`hooks/hooks.json`.
+
+**Implementados y verificados en esta tanda** (uno a uno, nunca en lote — la
+leccion del repo es que "el lote entera dejo 117 fallos"):
+
+- **#1043** — el snapshot post-compaction mandaba llamar `ctx_search`, un
+  nombre que no existe en 7 plataformas. `searchTool` ya estaba implementado
+  en `src/session/snapshot.ts`; solo faltaban los callers.
+- **#1228** — ningun hook declaraba timeout: uno colgado bloqueaba el CLI sin
+  salida. Arreglado en las dos rutas de instalacion, no solo en la que tocaba
+  upstream.
+- **#996** — `buildAutoInjection` etiquetaba `source="compaction"` en la
+  inyeccion de rutina, cada turno, en un repo que ya habia basado su nombre
+  ("context-mode") en no mentirle al modelo.
+- **#1145** — el plugin de Codex lanza `start.mjs`, que desplegaba el self-heal
+  de Claude Code y creaba `~/.claude/` para quien no tiene Claude Code.
+
+Cada uno con un test que se verifico revirtiendo el fix (si el guard no muerde,
+no es un test). Suite completa: 227 archivos / 4986 tests, `npm run build` con
+`assert-bundle` y `assert-asymmetric-drift` en verde.
+
+**Siguiente tanda, en este orden** (los ADAPTAR que quedan, con dependencia
+respetada):
+
+1. #1089 → #1220 — la plugin key hardcodeada rompe el self-heal en cuanto el
+   marketplace no se llama como el repo. #1220 depende de #1089: tal cual,
+   reintroduce el literal.
+2. #913 — prefijo de claude-code segun `CLAUDE_PLUGIN_ROOT`. Premisa ya
+   confirmada en el propio codigo del fork. Toca ~8 tests existentes.
+3. #1155 — ampliar la redaction de `ctx-debug.sh` (superconjunto del #1144 ya
+   adoptado). Subir solo la capa node: la capa `sed` de este fork no existe
+   upstream.
+4. #1256 → #1241 → #1040 — el racimo de atribucion de sesion. #1241 trae un
+   bug de orden: consulta el env antes que el fichero que justamente existe
+   porque el env queda stale.
+5. #897, #1178, #1029 — #1029 es la pieza real de Pi AbortSignal (#1182 es su
+   versión más débil, ya descartada). Los tres son Windows/Pi-específicos y no
+   verificables desde macOS: su valor es el de la revisión, no el de la
+   ejecución.
+
+**Los 4 DIFERIDO no son_PR de fix**, sino decisiones de producto: #1123
+reintroduciría un truncado que `src/session/snapshot.ts` declara explícitamente
+no tener ("Zero truncation. Zero information loss"), y #957/#1010/#1044 son
+adaptadores nuevos (Devin, Hermes, Mistral Vibe) — ~3700 líneas de superficie
+pura. La pregunta "¿queremos soportar X?" no la responde una revisión de diff.
+
+## Ya resueltos antes de la revisión individual
+
 - **#924** — ADOPTADO — ADAPTADO — el fix era correcto pero sus tests incluian `expect(src).toContain("best effort")`
 - **#1035** — ADOPTADO
 - **#1041** — ADOPTADO — ADAPTADO — el PR calculaba el bloque condicional y nunca lo interpolaba: la opt-in no hacia nada
@@ -23,10 +77,10 @@ Ya resueltos antes de la revisión individual:
 - **#1230** — ADOPTADO
 
 - **#1207** — reemplazado por #1230 (mismo fix, menor)
-- **#1128** — reemplazado por #1189 (mismo fix, con tests negatives)
+- **#1128** — reemplazado por #1189 (mismo fix, con tests negativos)
 - **#1122** — DIFERIDO: sin test, y #1126 (draft) argue por borrarlo: decision de producto
 
-## Pendientes (146)
+## Veredictos (146)
 
 | PR |-arch | +add/-del | base | merge | act. | título | veredicto |
 |---|---|---|---|---|---|---|---|
@@ -58,7 +112,7 @@ Ya resueltos antes de la revisión individual:
 | 1177 | 2 | +32/-6 | next | unstable | 16 | fix(batch): export NODE_OPTIONS so compound shell commands work (#1117) | ADOPTAR — supersede #934; ejecuta el shell de verdad y arregla los comentarios obsoletos |
 | 931 | 2 | +37/-16 | next | clean | 49 | fix: surface statusline analytics import failures (#894) | ADOPTADO |
 | 969 | 2 | +40/-5 | next | clean | 53 | fix(batch): re-create the fs-preload temp file if an OS cleaner removed it (#951) | ADOPTADO |
-| 864 | 2 | +41/-9 | next | unstable | 53 | Hide Pi context injection from user entry | DUDOSO — depende de si Pi acepta role:'custom' desde el hook context; no verificable aqui |
+| 864 | 2 | +41/-9 | next | unstable | 53 | Hide Pi context injection from user entry | DESCARTAR — `role:"custom"` + `display:false` en el hook `context` de Pi. No verificable sin Pi instalado y este repo no tiene refs de Pi. #1002 ya se descarto por ser el diseno opuesto (mover el contexto a systemPrompt), asi que elegir aqui es elegir entre dos contratos incompatibles a ciegas |
 | 1002 | 2 | +43/-115 | main | clean | 66 | fix(pi): keep runtime context at system boundary | DESCARTAR — el oposto de #864: mueve el contexto a systemPrompt, lo que el propio codigo documenta que rompe el prefix cache cada turno |
 | 1001 | 2 | +44/-0 | main | clean | 70 | fix(pricing): add MiniMax catalog entries | ADAPTAR — las tarifas de MiniMax-M3 estan al doble (copio los precios tachados pre-descuento) |
 | 1073 | 2 | +52/-13 | next | clean | 41 | fix: update Kiro hooks config to 1.0 v1 schema | DESCARTAR — contradice el schema documentado de Kiro; ademas generateHookConfig sigue emitiendo la forma vieja |
@@ -69,12 +123,12 @@ Ya resueltos antes de la revisión individual:
 | 945 | 2 | +61/-0 | next | clean | 47 | fix(routing): let claude.ai Artifact URLs pass through WebFetch (#938) | ADOPTADO |
 | 863 | 2 | +63/-9 | next | clean | 53 | fix(windows): run the better-sqlite3 boot-install via node, not npm.cmd+shell (#861 follow-up) | ADAPTAR — el cambio de stderr es bueno, pero los tests grepean el fuente tras quitar comentarios |
 | 1118 | 2 | +65/-7 | next | clean | 31 | fix(db-base): keep SQL comments from splitting exec statements | ADOPTADO |
-| 876 | 2 | +67/-3 | next | clean | 53 | fix(omp): seed APPEND_SYSTEM.md routing instructions | DUDOSO — no se puede confirmar desde el repo que OMP descubra APPEND_SYSTEM.md; el propio adapter documenta lo contrario |
+| 876 | 2 | +67/-3 | next | clean | 53 | fix(omp): seed APPEND_SYSTEM.md routing instructions | DESCARTAR — `APPEND_SYSTEM.md` no aparece en ningun sitio de este fork y el propio adapter de OMP documenta lo contrario. No se puede confirmar que OMP lo descubra, y un anchor de routing que nunca se lee es peor que ninguno |
 | 921 | 2 | +68/-3 | next | dirty | 53 | fix: dedupe chunks across queries in a multi-query ctx_search call | ADAPTAR — los tests ejercitan el helper aislado; el cableado al handler no esta probado |
 | 986 | 2 | +78/-3 | main | clean | 74 | fix(db): replace SQLITE_BUSY busy-wait backoff with Atomics.wait sleep (#985) | DESCARTADO — ya aplicado en este fork con una implementacion mejor (celda compartida a nivel de modulo) |
 | 1236 | 2 | +79/-5 | next | unstable | 3 | fix(stats): probe session schemas read-only before migration | ADOPTADO |
 | 1030 | 2 | +85/-6 | next | clean | 53 | fix(db): retry transient SQLITE_IOERR instead of failing the caller | ADAPTAR — la direccion es correcta; hay que revisar que IOERR no entre al predicado de corrupcion |
-| 1228 | 2 | +89/-14 | next | unstable | 0 | fix(hooks): ship default timeouts so a hung hook cannot block the CLI | PENDIENTE — no alcanzado en el pre-cribado |
+| 1228 | 2 | +89/-14 | next | unstable | 0 | fix(hooks): ship default timeouts so a hung hook cannot block the CLI | ADAPTADO — timeout en las 15 entradas de `hooks/hooks.json` (PreToolUse 10s por ser el camino critico de cada tool call, resto 30s) Y en `generateHookConfig`, que upstream no toco y es la ruta de los installs standalone: sin ahi un hook colgado sigue bloqueando el CLI. Constante unica en `claude-code/hooks.ts` + test que ata ambos ficheros |
 | 1086 | 2 | +90/-3 | next | clean | 40 | fix(hooks): scan quotes left to right so prose apostrophes cannot expose a command | ADOPTADO |
 | 1056 | 2 | +94/-12 | next | clean | 50 | fix(db): stop mutating shared DB files across processes (close-time TRUNCATE checkpoint + default mmap) | ADOPTAR — corregir dos comentarios: el timer PASSIVE de #988 no existe todavia y el mmap por defecto se perdia por rendimiento |
 | 1160 | 2 | +95/-2 | next | unstable | 20 | fix(opencode): merge sibling config plugin arrays when writing opencode.jsonc | ADOPTAR — anadir guarda Array.isArray en (settings.plugin ?? []) |
@@ -106,14 +160,14 @@ Ya resueltos antes de la revisión individual:
 | 1126 | 3 | +120/-122 | next | unstable | 28 | fix(pi): remove unverified tool-availability routing anchor | ADAPTAR — conservar sus tests (usan memoria real como senal) pero condicionar el anchor en vez de borrarlo; quitar CHANGELOG.md |
 | 1143 | 3 | +130/-2 | next | unstable | 24 | fix(session): key cleanupOldSessions TTL off last activity, not started_at | ADOPTADO |
 | 1172 | 3 | +177/-160 | next | unstable | 17 | fix(fetch): report concise subprocess errors | CONFLICTO — src/server.ts |
-| 1155 | 3 | +181/-12 | main | unstable | 21 | Redact secrets from the debug report before it leaves the machine | DUDOSO — no alcanzado en el pre-cribado |
-| 1145 | 3 | +187/-11 | next | unstable | 24 | fix: skip Claude self-healing for non-Claude launches | DUDOSO — no alcanzado en el pre-cribado |
-| 1040 | 3 | +214/-20 | main | clean | 58 | fix(cost): emit opencode multi-step usage as deltas (#1036) | DUDOSO — no alcanzado en el pre-cribado |
+| 1155 | 3 | +181/-12 | main | unstable | 21 | Redact secrets from the debug report before it leaves the machine | ADAPTAR — superconjunto del #1144 que ya se adopto: la capa node pasa de 3 regex a un walk JSON-aware (bloques `env` completos, claves con forma de credencial) + masking de lineas TOML + mas formas de token (AKIA, dt0c, eyJ, Bearer, squ_). CONFLICTO: este fork ya tiene una capa `sed` en `config_file` que upstream no tiene; subir solo la capa node, no reemplazar el bloque entero |
+| 1145 | 3 | +187/-11 | next | unstable | 24 | fix: skip Claude self-healing for non-Claude launches | ADAPTADO — dos mitades. (a) Los skips `no-plugin-root` y `not-claude-code` ya no loggean: son justo las ramas que prueban que NO es Claude Code, asi que escribir ahi plantaba evidencia de un install CC. (b) `isClaudeLaunch` en start.mjs, porque el plugin de Codex tambien lanza start.mjs con CONTEXT_MODE_PLATFORM=codex y creaba `~/.claude/hooks/` para quien no tiene Claude Code. Sin plataforma declarada se mantiene el heal: Claude Code nunca pone la var |
+| 1040 | 3 | +214/-20 | main | clean | 58 | fix(cost): emit opencode multi-step usage as deltas (#1036) | ADAPTAR — el delta de coste acumulativo→por paso es correcto, pero borra el bloque de comentarios que documenta que `.tokens` es last-step y `.cost` es acumulativo por turno. Conservarlo: en este fork la honestidad de las etiquetas es invariante (mismo motivo que #996) |
 | 1127 | 3 | +220/-19 | next | unstable | 27 | feat(server): make echo budgets configurable per host | ADOPTADO |
 | 1019 | 3 | +228/-26 | next | clean | 53 | fix(security): honor Pi project permission settings | CONFLICTO — reaplicar a mano sobre src/security.ts |
 | 1144 | 3 | +239/-10 | main | unstable | 24 | fix(ctx-debug): redact env blocks and credential-shaped keys in captured configs | ADOPTADO — ver commit |
 | 1147 | 3 | +274/-34 | next | unstable | 23 | fix(exec): bound ctx_execute on Pi, which has no host-side ceiling | ADAPTAR — el diseno es lo mejor del lote; confirmar que 600s es aceptable en Pi (se quito un techo de 120s a proposito) |
-| 1165 | 3 | +328/-30 | next | unstable | 19 | fix(codex): honor active sandbox state for file reads | DUDOSO — el mapeo de fallo es fail-CLOSED sobre un flag no verificado: status!=0 denies, asi que sin Codex instalado rompe toda lectura |
+| 1165 | 3 | +328/-30 | next | unstable | 19 | fix(codex): honor active sandbox state for file reads | DESCARTAR — falla cerrado sobre un flag no verificado: `status != 0` deniega, asi que sin Codex instalado rompe TODA lectura de archivos. El fail-closed deberia ser la excepcion, no el default |
 | 1066 | 3 | +416/-57 | main | clean | 46 | feat(omp): route broad tool calls and cap direct results | DESCARTAR — contradice a #1227 en el mismo handler y reimplementa el enrutado que ya existe en hooks/core/routing.mjs |
 | 1240 | 4 | +59/-25 | next | unstable | 3 | fix: declare antigravity-cli Stop hook in the flat form agy accepts | ADOPTADO |
 | 1227 | 4 | +78/-72 | next | unstable | 4 | fix(omp): allow quoted HTTP references and silent file downloads | ADAPTAR — su hasCurlWget reintroduce la forma laxa que reemplazamos con el anchor de posicion de comando |
@@ -127,7 +181,7 @@ Ya resueltos antes de la revisión individual:
 | 1009 | 4 | +400/-14 | main | clean | 68 | fix(executor): terminate abandoned execution trees | ADOPTAR — aplazar ownership.json: nada lo lee y es especulativo |
 | 898 | 4 | +420/-318 | next | dirty | 53 | fix(store): cap oversized markdown chunks | REVERTIDO — el hunk entra, pero el lote entera dejo 117 fallos; queda pendiente reaplicar aislado |
 | 991 | 4 | +435/-318 | next | dirty | 53 | fix: auto-index mid-size exec output for ctx_search without intent | ADAPTAR — tomar solo indexForSearch; el shortHash(code) relabela sources y dispara crecimiento de filas |
-| 963 | 4 | +834/-389 | next | dirty | 53 | fix(store): bound FTS search result hydration for oversized rows | DUDOSO — convierte una busqueda limit:20 de 1 consulta en 21-41, en el camino de lectura mas caliente, por filas legacy |
+| 963 | 4 | +834/-389 | next | dirty | 53 | fix(store): bound FTS search result hydration for oversized rows | DIFERIDO — convierte una busqueda `limit:20` de una consulta en 21-41 en el camino de lectura mas caliente, y solo para filas legacy. `src/store.ts` divergio mucho respecto a upstream; sin timings medidos que justifiquen el coste no se toca el bus mas caliente |
 | 1104 | 5 | +7/-5 | main | clean | 35 | fix(codex): route Code Mode exec through PreToolUse | ADOPTADO |
 | 1158 | 5 | +44/-8 | next | unstable | 20 | fix(session): evict least-important events first | DESCARTADO — ya aplicado en este fork (eviction DESC + goal a priority 1) |
 | 1161 | 5 | +51/-49 | next | unstable | 20 | fix(tool-naming): use native ctx_* names for OpenCode/KiloCode plugin tools | ADOPTADO |
@@ -136,43 +190,43 @@ Ya resueltos antes de la revisión individual:
 | 1034 | 5 | +75/-3 | next | clean | 53 | fix(routing): self-identify subagent routing block, add opt-out (#967) | ADOPTADO |
 | 1113 | 5 | +80/-35 | next | clean | 32 | fix(detect): wait for MCP initialize before platform detect | ADAPTAR — el reorder de detect.ts es limpio; el half de server.ts abre una ventana async en la que _detectedAdapter es null |
 | 1176 | 5 | +88/-8 | next | unstable | 16 | fix: make snippet and echo truncation surrogate-safe (#1163) | ADOPTADO |
-| 913 | 5 | +90/-72 | next | clean | 53 | fix(standalone): use mcp__context-mode__ prefix when CLAUDE_PLUGIN_ROOT is absent | DUDOSO — no alcanzado en el pre-cribado |
-| 996 | 5 | +120/-6 | main | clean | 72 | fix: honest session_state source label — "compaction" only after real compaction | DUDOSO — no alcanzado en el pre-cribado |
-| 1256 | 5 | +136/-12 | next | unstable | 1 | fix(hooks): scope MCP readiness to the calling Claude Code session (#1055) | DUDOSO — no alcanzado en el pre-cribado |
-| 1241 | 5 | +154/-19 | next | unstable | 3 | fix(session): attribute MCP work to caller session | DUDOSO — no alcanzado en el pre-cribado |
-| 1247 | 5 | +176/-0 | next | unstable | 2 | fix(scripts): re-exec plugin shell scripts under bash for POSIX-sh callers (#1242) | PENDIENTE |
-| 1220 | 5 | +177/-4 | next | unstable | 5 | fix(heal): keep project-scope installs out of user settings.json (#1215) | DUDOSO — no alcanzado en el pre-cribado |
-| 1182 | 5 | +179/-19 | main | unstable | 15 | fix(pi): Honor AbortSignal so Escape cancels in-flight | DUDOSO — no alcanzado en el pre-cribado |
+| 913 | 5 | +90/-72 | next | clean | 53 | fix(standalone): use mcp__context-mode__ prefix when CLAUDE_PLUGIN_ROOT is absent | ADAPTAR — el prefijo de claude-code pasa a depender de `process.env.CLAUDE_PLUGIN_ROOT` en tiempo de llamada. La premisa esta confirmada en el propio fork: `src/adapters/claude-code/index.ts:517` dice que `${CLAUDE_PLUGIN_ROOT}` "only set in plugin mode", y los installs standalone registran el server como `context-mode` → `mcp__context-mode__`. El scrub de `detect.ts` no lo rompe (solo borra vars de platforms ajenas, en el bridge de Pi). Coste: ~8 tests de `tests/hooks/tool-naming.test.ts` codifican el supuesto de modo plugin y hay que declararlos. Notado: `omp` no esta en TOOL_PREFIXES, asi que su namer cae al prefijo de claude-code |
+| 996 | 5 | +120/-6 | main | clean | 72 | fix: honest session_state source label — "compaction" only after real compaction | ADAPTADO — `buildAutoInjection` sin default: la etiqueta se gano o no se gano. Anadido guard en runtime porque los callers de `hooks/` son `.mjs` y ahi no hay aridad: sin el, un argumento ausente interpolaba `source="undefined"`. sessionstart+opencode = "compaction" (estan tras un resume pendiente real); Pi = "active_memory" con `_pendingCompactLabel` armado en session_compact |
+| 1256 | 5 | +136/-12 | next | unstable | 1 | fix(hooks): scope MCP readiness to the calling Claude Code session (#1055) | ADAPTAR — el sentinel pasa a llevar el host PID en 2a linea y el hook construye la tabla de ancestros con `ps`, para que un servidor de sesion hermana no cuente como disponible. Fail-open a maquina cuando no hay `ps`, y el scope solo se activa en claude-code porque la topologia de spawn de los otros hosts no esta verificada. Es el mejor diseno del lote |
+| 1241 | 5 | +154/-19 | next | unstable | 3 | fix(session): attribute MCP work to caller session | ADAPTAR — `resolveCallerSessionId` lee `<config-dir>/sessions/<ppid>.json`, pero consulta `CLAUDE_SESSION_ID` PRIMERO y su propio docstring dice que el env queda stale tras `/clear`. Si Claude Code lo propaga al MCP, el fix no hace nada: invertir el orden, o documentar por que env-first es seguro. Complementa a #1229 (ya adoptado) |
+| 1247 | 5 | +176/-0 | next | unstable | 2 | fix(scripts): re-exec plugin shell scripts under bash for POSIX-sh callers (#1242) | ADOPTADO (ya en el arbol) — el 100% de sus lineas coincide con el codigo actual; por eso #1243 se descarto como supersedido por este |
+| 1220 | 5 | +177/-4 | next | unstable | 5 | fix(heal): keep project-scope installs out of user settings.json (#1215) | ADAPTAR — gate de scope en `healSettingsEnabledPlugins`: un install de proyecto no debe escribir `enabledPlugins` en el settings.json global. `null` = sin registro = comportamiento previo (fail-safe). Depende de #1089: tal cual, reintroduce el literal hardcodeado en la llamada nueva |
+| 1182 | 5 | +179/-19 | main | unstable | 15 | fix(pi): Honor AbortSignal so Escape cancels in-flight | DESCARTAR — misma familia que #1029 pero mas debil: no limpia el timer en el abort (fuga) ni usa `throwIfAborted` antes de escribir. Quedate con #1029 |
 | 1231 | 5 | +317/-49 | main | unstable | 4 | fix(claude-code): restore external-MCP hook routing with `mcp__.*` (#1222) | ADOPTAR — tambien falta en src/adapters/codex/hooks.ts:60 y configs/codex/hooks.json:5 |
 | 1111 | 5 | +332/-174 | next | unstable | 25 | fix(stats): stop heartbeat lifetime scans | ADAPTAR — lifetimeTokens queda en 0 para quien nunca llama ctx_stats: el statusline ve $0.00 permanente |
-| 884 | 5 | +372/-198 | next | clean | 53 | docs: sync adapter install/usage/debugging with the code (v1.0.167) | DUDOSO — 250 lineas de observaciones de campo del autor presentadas como hecho, en hardware no especificado |
+| 884 | 5 | +372/-198 | next | clean | 53 | docs: sync adapter install/usage/debugging with the code (v1.0.167) | DESCARTAR — 372 lineas de sincronizacion de docs, 0 tests, y presenta como hecho lo que son notas de campo del autor sobre hardware no especificado. La deriva real de docs se arregla leyendo el codigo, no adoptando un changelog de observaciones |
 | 1167 | 5 | +1193/-572 | next | unstable | 18 | fix(windows): resolve runtime probes in-process instead of spawning where | REVERTIDO — rompe los seams de test que inyectan un where falso: el indice se construye de otra fuente. Windows-especifico e imposible de verificar en macOS |
 | 1148 | 6 | +101/-10 | next | unstable | 16 | fix: bundle bin/statusline.mjs's analytics import (marketplace installs never get build/) | ADAPTAR — anadir bin/analytics.bundle.mjs a assert-bundles-committed o el guard no lo vera |
 | 955 | 6 | +172/-19 | next | clean | 53 | feat(codex): load Windows guidance as a platform overlay | ADAPTAR |
 | 939 | 6 | +200/-1 | main | clean | 87 | feat: add ctx_forget for per-source knowledge-base eviction | APLICADO Y REVERTIDO — rompio la suite (ctx_forget, anade registerTool en server.ts) |
 | 952 | 7 | +419/-410 | main | clean | 84 | fix(stats): count only measured redirects as savings, label capture volume honestly | ADAPTAR — tomar (a) totalSavedTokens=bytesAvoided/4, (b) no plegar contentBytes, (c) el fix de renderCostExample; RECHAZAR el flip de getConversationWindowStats y los relabel, contradicen ADR-0004 |
 | 1121 | 7 | +433/-214 | next | clean | 30 | fix(pi): stream context tool output | ADAPTAR — onOutput no distingue stdout de stderr y hace toString por chunk ( surrogates rotos); tomar el cambio de exit-classify aparte |
-| 935 | 7 | +506/-308 | next | dirty | 53 | feat(opencode): add /ctx slash command to TUI for session stats | DUDOSO — tui.bundle.mjs es un artefacto nuevo que el script bundle no produce y el guard no rastrea |
+| 935 | 7 | +506/-308 | next | dirty | 53 | feat(opencode): add /ctx slash command to TUI for session stats | DESCARTAR — crea `tui.bundle.mjs`, un artefacto que el script `bundle` no produce y que `assert-bundles-committed` no rastrea (ninguno de los dos loerian); ademas 0 tests |
 | 1091 | 7 | +571/-354 | main | clean | 38 | fix(search): guard FTS5 highlight on oversized rows | REVERTIDO — el lote entera dejo 117 fallos; reaplicar aislado. Usar charSafePrefix en el slice de 1500, no content.slice |
 | 1084 | 7 | +583/-6 | next | clean | 28 | fix(codex): redirect broad home searches before ingestion | ADAPTAR — no enmendar un ADR dentro de un PR de feature; la sustancia es correcta |
-| 1124 | 7 | +669/-647 | next | unstable | 29 | adapters: Route network commands by transfer output | DUDOSO — borra 218 lineas de tests de un adapter y deja dos dueños de la regla de red |
+| 1124 | 7 | +669/-647 | next | unstable | 29 | adapters: Route network commands by transfer output | DESCARTAR — borra 218 lineas de tests de un adapter y reintroduce la heuristica "por transfer output" que este fork ya sustituyo por el anchor de posicion de comando (#1227, que sigue vivo). Dos duenos de la regla de red no es una mejora |
 | 1171 | 7 | +1741/-53 | main | unstable | 4 | fix(opencode): support OpenCode 2 plugin API (V1/V2 dual export) | DESCARTAR — superseded por #1194, y pone @opencode/plugin en dependencies sin que el codigo de produccion lo importe |
 | 907 | 8 | +141/-31 | next | clean | 17 | fix(session): keep SessionStart truncation surrogate-safe | ADOPTAR — complementar #1176 (que ya tomamos) en los call sites que este no alcanzo; anadir el par a assert-asymmetric-drift |
 | 1082 | 8 | +242/-33 | next | clean | 7 | mcp: name execution timeout in milliseconds | ADAPTAR — el rename sin alias daria runs sin limite; el .passthrough lo evita. Regenerar bundle;/docsgrep |
 | 995 | 8 | +362/-299 | next | dirty | 53 | Fix Vitest Windows CI EPERM Hang | DESCARTAR — ademas del churn (afterEach entre imports, 6 espacios, push x3), bumpea stats.json |
 | 866 | 8 | +479/-386 | next | dirty | 53 | fix(analytics): honor $CLAUDE_CONFIG_DIR in enumerateAdapterDirs (ctx_stats conversation count) | REVERTIDO — idem |
-| 1029 | 8 | +613/-398 | next | dirty | 32 | fix(pi): propagate MCP cancellation to executor | DUDOSO — superseded en espirito por #904? no: #904 es el mas temprano y mas estrecho; #1029 es el general. Conflicto con #1121/#1082 |
-| 980 | 8 | +2064/-462 | next | dirty | 53 | fix(batch): enforce indexed byte and chunk budgets | DUDOSO — borra formatCommandOutput y tests/core/echo-commands.test.ts deja de compilar; ademas structuredContent es un campo nuevo sin consumidor |
+| 1029 | 8 | +613/-398 | next | dirty | 32 | fix(pi): propagate MCP cancellation to executor | ADAPTAR — la pieza real de Pi AbortSignal: `src/executor.ts` no tiene `signal` en este fork (#1164 mata el arbol del bridge, no el del executor). Hilo de AbortSignal desde registerTool hasta ctx_execute/execute_file/batch_execute. Diff invasivo: aplicarlo solo |
+| 980 | 8 | +2064/-462 | next | dirty | 53 | fix(batch): enforce indexed byte and chunk budgets | DESCARTAR — depende de `src/batch-ingestion.ts`, que no existe en este fork; borra `formatCommandOutput` y deja `tests/core/echo-commands.test.ts` sin compilar; y `structuredContent` es un campo nuevo sin ningun consumidor |
 | 1060 | 9 | +79/-0 | next | clean | 47 | fix(snapshot): pass platform tool name into PreCompact resume snapshot (#1028) | DESCARTAR — subconjunto estricto de #1043, que ademas trae tests |
 | 1181 | 9 | +134/-35 | next | unstable | 15 | fix(session): align priority contract and minPriority filtering | ADAPTAR — la db.ts ya esta; quedan src/types.ts:140-145 con la escala INVERTIDA, el docstring de extract.ts:2442 contradictorio, y el comentario de openclaw:836 |
 | 904 | 9 | +496/-343 | main | clean | 94 | fix(pi): propagate abort signals through tools | DESCARTAR — superseded por #1029, que es el mismo defecto mas general |
 | 877 | 9 | +623/-307 | next | dirty | 53 | fix(omp): replace large tool results with search references | ADAPTAR — no alcanzado en detalle |
-| 1043 | 10 | +111/-0 | main | clean | 57 | fix(precompact): use platform ctx_search name in resume snapshot | PENDIENTE — no alcanzado en el pre-cribado |
-| 1089 | 10 | +136/-44 | next | clean | 30 | fix: derive context-mode registry key | PENDIENTE — no alcanzado en el pre-cribado |
-| 897 | 10 | +450/-392 | next | dirty | 53 | fix(claude-code): route PowerShell hooks on Windows | PENDIENTE — no alcanzado en el pre-cribado |
-| 1178 | 10 | +644/-329 | next | dirty | 16 | feat(agy): capture user decisions and prompt events via PreInvocation hook | PENDIENTE — no alcanzado en el pre-cribado |
-| 1123 | 16 | +514/-350 | main | unstable | 29 | fix: enforce the bounded resume snapshot budget | PENDIENTE — no alcanzado en el pre-cribado |
-| 1194 | 17 | +3461/-894 | next | unstable | 12 | Opencode v2 compatibility (compaction within context-mode) | PENDIENTE — no alcanzado en el pre-cribado |
-| 1044 | 20 | +1831/-334 | main | clean | 54 | feat(adapters): add Mistral Vibe platform adapter | PENDIENTE — no alcanzado en el pre-cribado |
-| 1010 | 26 | +781/-310 | main | unstable | 10 | feat: add native Hermes Agent support | PENDIENTE — no alcanzado en el pre-cribado |
-| 957 | 32 | +2697/-369 | next | dirty | 53 | feat: add Devin CLI adapter + decision extraction | PENDIENTE — no alcanzado en el pre-cribado |
+| 1043 | 10 | +111/-0 | main | clean | 57 | fix(precompact): use platform ctx_search name in resume snapshot | ADOPTADO — `searchTool` ya existia en `src/session/snapshot.ts:477`; faltaban los callers. Aplicado a los 7 hooks donde el nombre estaba mal (claude-code, codex, gemini-cli, kimi, vscode-copilot, jetbrains-copilot, copilot-cli). opencode/pi/openclaw/omp ya daban el nombre bare correcto, que es el default |
+| 1089 | 10 | +136/-44 | next | clean | 30 | fix: derive context-mode registry key | ADAPTAR — derivar la plugin key de `installed_plugins.json` en vez del literal `context-mode@context-mode`, e invertir los segmentos del path del cache a `<marketplace>/<plugin>`. Con el literal, todo self-heal queda roto en cuanto el marketplace no se llama como el repo. APLICAR ANTES que #1220 |
+| 897 | 10 | +450/-392 | next | dirty | 53 | fix(claude-code): route PowerShell hooks on Windows | ADAPTAR — anade PowerShell a los 4 mapas de una vez (TOOL_ALIASES, PRE/POST matchers, hooks.json, TOOL_NAME_NORMALIZE) con 3 tests. Mecanico y consistente, pero Windows-only: no verificable en macOS, asi que su valor es el de la revision, no el de la ejecucion |
+| 1178 | 10 | +644/-329 | next | dirty | 16 | feat(agy): capture user decisions and prompt events via PreInvocation hook | ADAPTAR — hook PreInvocation para `agy` (captura de decisiones del usuario): 207 lineas, 1 test. Sin test de la logica de payload, y bumpea `stats.json` — quitar ese hunk |
+| 1123 | 16 | +514/-350 | main | unstable | 29 | fix: enforce the bounded resume snapshot budget | DIFERIDO — `src/session/snapshot.ts` declara "Zero truncation. Zero information loss" y su `maxBytes` esta "KEPT for backward compat but IGNORED". #1123 reintroduce el truncado a 2048B con prioridad por seccion. No es revisar un fix, es revertir un invariante declarado del fork: decision de producto |
+| 1194 | 17 | +3461/-894 | next | unstable | 12 | Opencode v2 compatibility (compaction within context-mode) | DESCARTAR — el trabajo ya esta: #1171 se descarto por supersedido por este, y #1161 (ADOPTADO) ya usa los nombres `ctx_*` nativos de OpenCode. Ademas parte `plugin.ts` en core/plugin/plugin-v2 y mete `@opencode/plugin` en dependencies sin que el codigo de produccion lo importe |
+| 1044 | 20 | +1831/-334 | main | clean | 54 | feat(adapters): add Mistral Vibe platform adapter | DIFERIDO — adaptador nuevo de Mistral Vibe: 1031 lineas, 6 archivos nuevos, y borra 4 lineas de tests de los existentes. Decision de producto |
+| 1010 | 26 | +781/-310 | main | unstable | 10 | feat: add native Hermes Agent support | DIFERIDO — adaptador nuevo de Hermes. Ademas trae `__init__.py` en la raiz de un repo Node/TS y un `plugin.yaml` en la raiz: senal de que el PR se armo contra otra estructura. Decision de producto, no de fix |
+| 957 | 32 | +2697/-369 | next | dirty | 53 | feat: add Devin CLI adapter + decision extraction | DIFERIDO — adaptador nuevo de Devin CLI: 1332 lineas, 12 archivos nuevos, 4 tests que no tocan lo existente. Superficie pura, no un fix: la pregunta es si el fork quiere soportar Devin, y eso no lo responde una revision de diff |

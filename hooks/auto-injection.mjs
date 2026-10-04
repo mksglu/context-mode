@@ -24,10 +24,30 @@ export function estimateTokens(text) {
 
 /**
  * Build auto-injection block from session events.
+ *
+ * `source` is REQUIRED and has no default, so no caller can silently inherit a
+ * label it did not earn. The block is injected on ordinary turns as well as
+ * after a compaction, and the two mean different things to the model: only one
+ * of them means history was summarized away. Labelling a routine per-turn
+ * injection "compaction" tells the agent its transcript is gone when it is
+ * intact, and it may go looking for state that never needed restoring.
+ *
  * @param {Array<{category: string, data: string}>} events
+ * @param {"compaction"|"active_memory"} source
  * @returns {string} XML block or empty string
  */
-export function buildAutoInjection(events) {
+export function buildAutoInjection(events, source) {
+  // Checked at runtime, not just by the JSDoc type: the callers under hooks/
+  // are plain .mjs, where a missing argument arrives as `undefined` and would
+  // otherwise be interpolated straight into the label. Failing here drops the
+  // injection, which callers already treat as an expected outcome, and beats
+  // shipping the model a source it cannot trust.
+  if (source !== "compaction" && source !== "active_memory") {
+    throw new Error(
+      `buildAutoInjection: source must be "compaction" or "active_memory", got ${String(source)}`,
+    );
+  }
+
   // Single O(N) pass instead of 4× O(N) Array.filter() loops. UserPromptSubmit
   // fires this on every prompt; with N up to 100 events the prior implementation
   // walked the array 4 times per prompt — wasteful on macOS, painful on Windows
@@ -98,5 +118,12 @@ export function buildAutoInjection(events) {
   }
 
   if (parts.length === 0) return "";
-  return `<session_state source="compaction">\n\n${parts.join("\n\n")}\n\n</session_state>`;
+  // The fidelity line earns its tokens only after a real compaction, where it
+  // tells the model where its history actually lives. On a routine turn it is
+  // noise, and the wrapper is outside the 500-token content budget, so an
+  // always-on line would tax every turn to say nothing.
+  const fidelity = source === "compaction"
+    ? "Context was compacted; full history persists in the session transcript.\n\n"
+    : "";
+  return `<session_state source="${source}">\n\n${fidelity}${parts.join("\n\n")}\n\n</session_state>`;
 }

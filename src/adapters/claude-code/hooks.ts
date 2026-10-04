@@ -90,6 +90,30 @@ export const PRE_TOOL_USE_MATCHERS = [
 ] as const;
 
 /**
+ * Seconds a command hook may run before the host kills it (Claude Code #1226).
+ * Without a bound, a hook stuck on stdin or in a loop blocks the CLI with no
+ * way out — the user cannot interrupt a turn that never yields.
+ *
+ * The values live in the config the host reads (shipped `hooks/hooks.json` and
+ * the `generateHookConfig` output written into settings.json), because
+ * `ctx upgrade` rewrites those; patching the plugin cache by hand is undone on
+ * the next update.
+ *
+ * PreToolUse gets the tight bound because it sits on the critical path of every
+ * tool call — its work is in-process routing, so a slow one means something is
+ * wrong, not that it needs longer. The rest fire at most once per turn and open
+ * a SQLite handle, so they get room to finish a cold start.
+ */
+export const HOOK_TIMEOUT_SECONDS: Record<string, number> = {
+  PreToolUse: 10,
+  PostToolUse: 30,
+  PreCompact: 30,
+  UserPromptSubmit: 30,
+  SessionStart: 30,
+  Stop: 30,
+};
+
+/**
  * Combined matcher pattern for settings.json (pipe-separated).
  * Used by the upgrade command when writing a single consolidated entry.
  *

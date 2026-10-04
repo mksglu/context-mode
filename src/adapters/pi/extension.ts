@@ -155,10 +155,19 @@ let _mcpBridge: BridgeHandle | null = null;
 export let _mcpBridgeReady: Promise<void> = Promise.resolve();
 
 // Cached buildAutoInjection (500-token cap, prioritized).
-let _buildAutoInjection:
-  | ((events: Array<{ category: string; data: string }>) => string)
-  | null
-  | undefined = undefined;
+type AutoInjectionBuilder = (
+  events: Array<{ category: string; data: string }>,
+  source: "compaction" | "active_memory",
+) => string;
+
+let _buildAutoInjection: AutoInjectionBuilder | null | undefined = undefined;
+
+// Set by session_compact, consumed by the next before_agent_start so the FIRST
+// post-compact injection is honestly labelled "compaction" (and carries the
+// fidelity line saying where the history went). Read-and-cleared at the top of
+// the handler, so a turn that injects nothing still burns the flag: it can never
+// strand true and mislabel a later, unrelated turn.
+let _pendingCompactLabel = false;
 
 // Pending context to inject via the 'context' hook (avoiding systemPrompt mutation
 // which breaks prefix prompt cache on DeepSeek/Anthropic/OpenAI).
@@ -168,7 +177,7 @@ let _pendingContextIndex: number | null = null;
 let _pendingContextGeneration = 0;
 async function getAutoInjection(
   pluginRoot: string,
-): Promise<((events: Array<{ category: string; data: string }>) => string) | null> {
+): Promise<AutoInjectionBuilder | null> {
   if (_buildAutoInjection !== undefined) return _buildAutoInjection;
   try {
     const mod = await import(
@@ -614,6 +623,13 @@ export default function piExtension(pi: any): void {
     try {
       _pendingContext = ""; // Reset — will be filled below if events exist
       _pendingContextIndex = null;
+      // Consume any pending real-compaction label FIRST. Cleared before the
+      // bridge await so a turn that ends up injecting nothing still burns it —
+      // the flag can never strand true and mislabel a later, unrelated turn.
+      const injectSource: "compaction" | "active_memory" = _pendingCompactLabel
+        ? "compaction"
+        : "active_memory";
+      _pendingCompactLabel = false;
       // Lazily start and await the MCP bridge only when Pi is about to
       // dispatch a real agent turn. This is the non-brittle #534/#809 guard:
       // help/version/package/config CLI paths may load the extension, but they
@@ -700,6 +716,7 @@ export default function piExtension(pi: any): void {
               category: String(e.category ?? ""),
               data: String(e.data ?? ""),
             })),
+            injectSource,
           );
         }
         // Fallback (or if helper produced empty output): inline 500-token cap.
@@ -878,6 +895,8 @@ export default function piExtension(pi: any): void {
     try {
       if (!_sessionId) return;
       db.incrementCompactCount(_sessionId);
+      // Arm the honest label for the next turn's injection.
+      _pendingCompactLabel = true;
     } catch {
       // best effort
     }
@@ -889,6 +908,7 @@ export default function piExtension(pi: any): void {
     _pendingContext = "";
     _pendingContextGeneration++;
     _pendingContextIndex = null;
+    _pendingCompactLabel = false;
     try {
       if (_db) {
         _db.cleanupOldSessions(7);

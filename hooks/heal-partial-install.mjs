@@ -445,8 +445,10 @@ function logHealResult(result) {
  *                          from pluginRoot when omitted.
  *   log                  - when true (default), appends a JSON line to
  *                          ~/.claude/context-mode/heal-partial-install.log
- *                          on every run, including skipped ones, so an
- *                          operator can grep for evidence the hook fired.
+ *                          on every run that reaches a Claude Code install, so
+ *                          an operator can grep for evidence the hook fired.
+ *                          The `no-plugin-root` and `not-claude-code` skips
+ *                          are deliberately NOT logged — see those branches.
  *
  * Returns an object whose exact shape depends on the branch taken.
  * Common fields:
@@ -479,7 +481,11 @@ export function healPartialInstallFromMarketplace(opts = {}) {
       stillMissing: [],
       skipped: "no-plugin-root",
     };
-    if (log) logHealResult(result);
+    // Deliberately NOT logged. Reaching this branch proves nothing about a
+    // Claude Code install — start.mjs is launched by the Codex plugin too
+    // (.codex-plugin/mcp.json sets CONTEXT_MODE_PLATFORM=codex) — so writing
+    // a diagnostic here would create ~/.claude for users who do not have one.
+    // The skip reason is still in the return value for callers that want it.
     return result;
   }
 
@@ -492,9 +498,7 @@ export function healPartialInstallFromMarketplace(opts = {}) {
   // cache layout either. deriveMarketplaceClonePath returns null for
   // anything that isn't a CC cache pluginRoot. Bailing here keeps the
   // healthy-case fast path cheap for non-CC contexts (no isPartialInstall
-  // probe, no filesystem reads) and makes the scope intent explicit in
-  // the log: a "not-claude-code" line is the signal that the heal saw
-  // a non-CC pluginRoot.
+  // probe, no filesystem reads).
   const marketplaceClonePath =
     opts.marketplaceClonePath ?? deriveMarketplaceClonePath(pluginRoot);
   if (!marketplaceClonePath) {
@@ -504,7 +508,9 @@ export function healPartialInstallFromMarketplace(opts = {}) {
       skipped: "not-claude-code",
       pluginRoot,
     };
-    if (log) logHealResult(result);
+    // Same reasoning as no-plugin-root, and stronger: this branch positively
+    // establishes the caller is not a Claude Code install, so a log line
+    // would plant evidence of one in Claude's config tree.
     return result;
   }
 
