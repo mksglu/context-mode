@@ -328,6 +328,138 @@ describe("routePreToolUse", () => {
     });
   });
 
+  // ─── PowerShell routing (#1212) ─────────────────────────
+
+  describe("PowerShell tool (#1212)", () => {
+    it("routes the PowerShell tool through the Bash stage", () => {
+      // Unbounded PowerShell command → the same routing nudge Bash gets.
+      const result = routePreToolUse("PowerShell", { command: "Get-ChildItem -Recurse" });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("context");
+      expect(result!.additionalContext).toBeDefined();
+    });
+
+    it("redirects PowerShell curl to the sandbox like Bash", () => {
+      const result = routePreToolUse("PowerShell", {
+        command: "curl https://example.com",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+      expect((result!.updatedInput as Record<string, string>).command).toContain(
+        "curl/wget redirected",
+      );
+    });
+
+    it("bypasses structurally-bounded PowerShell commands (#463 allowlist)", () => {
+      const result = routePreToolUse("PowerShell", { command: "git status" });
+      expect(result).toBeNull();
+    });
+
+    it("accepts the lowercase pwsh alias tool name", () => {
+      resetGuidanceThrottle("core-routing-pwsh-alias");
+      const result = routePreToolUse(
+        "pwsh",
+        { command: "Get-ChildItem -Recurse" },
+        undefined,
+        "claude-code",
+        "core-routing-pwsh-alias",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("context");
+    });
+  });
+
+  // ─── Bash nudge cadence (#1212) ────────────────────────
+
+  describe("Bash nudge cadence (#1212)", () => {
+    it("re-fires the Bash nudge every N calls (default cadence = 10)", () => {
+      resetGuidanceThrottle("core-routing-bash-cadence");
+      const calls = Array.from({ length: 22 }, () =>
+        routePreToolUse(
+          "Bash",
+          { command: "npm install" },
+          undefined,
+          "claude-code",
+          "core-routing-bash-cadence",
+        ),
+      );
+
+      // Fires on the 1st, 11th, 21st calls — null in between.
+      const fired = calls.map((c) => c?.action === "context");
+      expect(fired).toEqual(calls.map((_, i) => i % 10 === 0));
+    });
+
+    it("honors CONTEXT_MODE_BASH_NUDGE_EVERY to tune cadence", () => {
+      const prev = process.env.CONTEXT_MODE_BASH_NUDGE_EVERY;
+      try {
+        process.env.CONTEXT_MODE_BASH_NUDGE_EVERY = "3";
+        resetGuidanceThrottle("core-routing-bash-cadence-env");
+        const calls = Array.from({ length: 7 }, () =>
+          routePreToolUse(
+            "Bash",
+            { command: "npm install" },
+            undefined,
+            "claude-code",
+            "core-routing-bash-cadence-env",
+          ),
+        );
+        const fired = calls.map((c) => c?.action === "context");
+        // period=3 → fires on calls 1, 4, 7 (indices 0, 3, 6).
+        expect(fired).toEqual([true, false, false, true, false, false, true]);
+      } finally {
+        if (prev === undefined) delete process.env.CONTEXT_MODE_BASH_NUDGE_EVERY;
+        else process.env.CONTEXT_MODE_BASH_NUDGE_EVERY = prev;
+      }
+    });
+
+    it("falls back to the default cadence on invalid env values", () => {
+      const prev = process.env.CONTEXT_MODE_BASH_NUDGE_EVERY;
+      try {
+        for (const v of ["0", "-1", "9999", "not-a-number", ""]) {
+          process.env.CONTEXT_MODE_BASH_NUDGE_EVERY = v;
+          resetGuidanceThrottle();
+          const first = routePreToolUse("Bash", { command: "npm install" });
+          const second = routePreToolUse("Bash", { command: "npm install" });
+          expect(first?.action, `value=${JSON.stringify(v)}`).toBe("context");
+          // With default=10, the 2nd call must NOT fire.
+          expect(second, `value=${JSON.stringify(v)}`).toBeNull();
+        }
+      } finally {
+        if (prev === undefined) delete process.env.CONTEXT_MODE_BASH_NUDGE_EVERY;
+        else process.env.CONTEXT_MODE_BASH_NUDGE_EVERY = prev;
+      }
+    });
+
+    it("applies the PowerShell nudge on the same cadence as Bash", () => {
+      const prev = process.env.CONTEXT_MODE_BASH_NUDGE_EVERY;
+      try {
+        process.env.CONTEXT_MODE_BASH_NUDGE_EVERY = "2";
+        resetGuidanceThrottle("core-routing-pwsh-cadence");
+        const calls = Array.from({ length: 5 }, () =>
+          routePreToolUse(
+            "PowerShell",
+            { command: "Get-ChildItem -Recurse" },
+            undefined,
+            "claude-code",
+            "core-routing-pwsh-cadence",
+          ),
+        );
+        // period=2 → fires on calls 1, 3, 5 (indices 0, 2, 4). PowerShell
+        // canonicalizes to Bash, so it shares the bash nudge counter.
+        expect(calls.map((c) => c?.action === "context")).toEqual([
+          true,
+          false,
+          true,
+          false,
+          true,
+        ]);
+      } finally {
+        if (prev === undefined) delete process.env.CONTEXT_MODE_BASH_NUDGE_EVERY;
+        else process.env.CONTEXT_MODE_BASH_NUDGE_EVERY = prev;
+      }
+    });
+  });
+
   // ─── Read routing ──────────────────────────────────────
 
   describe("Read tool", () => {
