@@ -2972,7 +2972,7 @@ describe("FS read instrumentation", () => {
 
   test("wrapper instruments readFile (async) to count bytes", () => {
     expect(serverSrc).toMatch(/readFile/);
-    expect(serverSrc).toContain("__cm_fs+=d.length");
+    expect(serverSrc).toContain("__cm_fs+=__cm_tb(d)");
   });
 
   test("parses __CM_FS__ from stderr and adds to bytesSandboxed", () => {
@@ -3044,6 +3044,85 @@ describe("batch_execute FS read tracking", () => {
     expect(serverSrc).toMatch(/4-8\s+(for I\/O-bound|I\/O-bound batches)/);
     expect(serverSrc).toContain("CPU-bound or stateful");
     expect(serverSrc).toContain("keep concurrency at 1");
+  });
+});
+
+import { buildJsInstrumentedCode, CM_FS_PRELOAD_SRC } from "../../src/server.js";
+import { createServer, type Server } from "node:http";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sandbox byte accounting must not count binary payloads (#1151)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("sandbox byte accounting skips binary payloads (#1151)", () => {
+  // 1200 bytes of text, and a PNG-like binary buffer full of NUL bytes.
+  const text = "hello world\n".repeat(100);
+  const bin = Buffer.concat([Buffer.from("\x89PNG\r\n\x1a\n", "latin1"), Buffer.alloc(4088)]);
+  let dir: string;
+  let textPath: string;
+  let binPath: string;
+  let server: Server;
+  let base: string;
+
+  const marker = (stderr: string, tag: "FS" | "NET"): number =>
+    Number(stderr.match(new RegExp(`__CM_${tag}__:(\\d+)`))?.[1] ?? 0);
+
+  const runNode = (args: string[]): Promise<string> =>
+    new Promise((res, rej) => {
+      const child = spawn(process.execPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+      let stderr = "";
+      child.stderr.on("data", (c) => { stderr += c; });
+      child.on("error", rej);
+      child.on("close", () => res(stderr));
+    });
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "cm-1151-"));
+    textPath = join(dir, "a.txt");
+    binPath = join(dir, "a.png");
+    writeFileSync(textPath, text);
+    writeFileSync(binPath, bin);
+    server = createServer((req, res) => res.end(req.url === "/bin" ? bin : text));
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const addr = server.address();
+    base = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}`;
+  });
+
+  afterAll(async () => {
+    await new Promise((r) => server.close(r));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("ctx_execute wrapper counts text file reads, not binary ones", async () => {
+    const t = JSON.stringify(textPath);
+    const b = JSON.stringify(binPath);
+    const user = [
+      "const fs = require('fs');",
+      `fs.readFileSync(${b});`,
+      `fs.readFileSync(${t}, 'utf8');`,
+      `await new Promise((r) => fs.readFile(${b}, () => r()));`,
+    ].join("\n");
+    const stderr = await runNode(["-e", buildJsInstrumentedCode(user, false)]);
+    expect(marker(stderr, "FS")).toBe(Buffer.byteLength(text));
+  });
+
+  test("ctx_execute wrapper counts text responses, not binary ones (fetch + http)", async () => {
+    const user = [
+      "const http = require('http');",
+      `await (await fetch('${base}/bin')).arrayBuffer();`,
+      `await (await fetch('${base}/text')).text();`,
+      `await new Promise((r) => http.get('${base}/bin', (res) => { res.resume(); res.on('end', r); }));`,
+    ].join("\n");
+    const stderr = await runNode(["-e", buildJsInstrumentedCode(user, false)]);
+    expect(marker(stderr, "NET")).toBe(Buffer.byteLength(text));
+  });
+
+  test("ctx_batch_execute preload counts text file reads, not binary ones", async () => {
+    const preload = join(dir, "preload.js");
+    writeFileSync(preload, CM_FS_PRELOAD_SRC);
+    const code = `const fs=require('fs');fs.readFileSync(${JSON.stringify(binPath)});fs.readFileSync(${JSON.stringify(textPath)});`;
+    const stderr = await runNode(["--require", preload, "-e", code]);
+    expect(marker(stderr, "FS")).toBe(Buffer.byteLength(text));
   });
 });
 
