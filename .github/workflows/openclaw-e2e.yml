@@ -55,6 +55,8 @@ jobs:
         # Repo is pnpm-managed (see ci.yml); `npm install` crashes with an
         # arborist error because package-lock.json no longer exists.
         run: |
+          # Old corepack lacks the rotated npm signing keys (see ci.yml).
+          npm install -g corepack@latest
           corepack enable
           pnpm install --frozen-lockfile
           npm run build

@@ -48,6 +48,9 @@ jobs:
         # fresh `npm install` could resolve a different tree than the one the suite
         # was verified against. corepack honours the declared version.
         run: |
+          # Node 22.5's bundled corepack predates the npm signing-key rotation
+          # and crashes with "Cannot find matching keyid" — update it first.
+          npm install -g corepack@latest
           corepack enable
           pnpm install --frozen-lockfile
 
