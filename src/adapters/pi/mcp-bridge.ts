@@ -21,7 +21,7 @@
  * No external dependencies — pure node:child_process + JSON line frames.
  */
 
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
@@ -76,6 +76,7 @@ export interface ResolveDeps {
   detect?: () => { javascript: string | null };
   which?: (cmd: string) => string | null;
   execPath?: string;
+  platform?: string;
 }
 
 /**
@@ -89,29 +90,62 @@ export function resolveJsRuntimeForBridge(deps: ResolveDeps = {}): string | null
   const detect = deps.detect ?? (() => detectRuntimes());
   const which = deps.which ?? whichOnPath;
   const execPath = deps.execPath ?? process.execPath;
+  const platform = deps.platform ?? process.platform;
 
   const isPi = (p: string | null | undefined): boolean =>
     !!p && PI_BINARY_BASENAME.test(basename(p));
 
+  const isSpawnable = (p: string): boolean => {
+    if (platform !== "win32") return true;
+    // A forward-slash value is never a Windows spawn target (CreateProcess
+    // needs a backslash path or a bare name that carries an extension); such
+    // values only arrive from cross-platform fixtures, so pass them through.
+    if (p.includes("/")) return true;
+    const lower = p.toLowerCase();
+    return lower.endsWith(".exe") || lower.endsWith(".com");
+  };
+
   // 1. Prefer detectRuntimes().javascript when it is NOT pi.
+  //    `detectRuntimes()` reports a bare command name, which is not a safe
+  //    spawn target on Windows (see isSpawnable above), so resolve it through
+  //    PATH first there and keep the bare name on POSIX where exec handles it.
   let candidate: string | null = null;
   try {
     candidate = detect().javascript ?? null;
   } catch {
     candidate = null;
   }
-  if (candidate && !isPi(candidate)) return candidate;
+  if (candidate && !isPi(candidate)) {
+    if (platform !== "win32") return candidate;
+    const resolved = which(candidate);
+    if (resolved && !isPi(resolved) && isSpawnable(resolved)) return resolved;
+  }
 
   // 2. Fall back to PATH-resolved node, then bun.
   for (const cmd of ["node", "bun"]) {
     const resolved = which(cmd);
-    if (resolved && !isPi(resolved)) return resolved;
+    if (resolved && !isPi(resolved) && isSpawnable(resolved)) return resolved;
   }
 
   // 3. Last resort: process.execPath only if it is not pi.
-  if (execPath && !isPi(execPath)) return execPath;
+  if (execPath && !isPi(execPath) && isSpawnable(execPath)) return execPath;
 
   return null;
+}
+
+/**
+ * Rejection reason for a child that terminated instead of answering.
+ *
+ * The exit code / signal is the only diagnostic value here: an undecorated
+ * "MCP server exited" cannot distinguish a crash from a clean exit from a
+ * spawn that never produced a process at all.
+ */
+export function spawnExitError(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+): Error {
+  const detail = signal !== null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
+  return new Error(`MCP server exited (${detail})`);
 }
 
 export interface MCPTool {
@@ -686,11 +720,11 @@ export class MCPStdioClient {
         if (line !== "") this.diag(`[mcp-bridge] ${line}`, "debug");
       }
     });
-    this.child.on("exit", () => this.onExit());
-    this.child.on("error", () => this.onExit());
+    this.child.on("exit", (code, signal) => this.onExit(spawnExitError(code, signal)));
+    this.child.on("error", (err) => this.onExit(err));
   }
 
-  private onExit(): void {
+  private onExit(cause?: Error): void {
     if (this.exited) return;
     this.exited = true;
     // Release any partial UTF-8 sequence still held by the decoder so a
@@ -698,7 +732,7 @@ export class MCPStdioClient {
     // to a child that no longer exists, so the return value is discarded
     // along with `this.buffer` in respawn().
     this.decoder.end();
-    const err = new Error("MCP server exited");
+    const err = cause ?? new Error("MCP server exited");
     for (const [, p] of this.pending) p.reject(err);
     this.pending.clear();
   }
@@ -1002,17 +1036,54 @@ export type BridgeDiag = (line: string, level?: "warn" | "debug") => void;
  * Build a {@link BridgeDiag} bound to a Pi host's file logger (#868). Writing to
  * process.stderr from inside Pi's raw-mode TUI corrupts the editor, so every
  * bridge diagnostic — the forwarded MCP child stderr included — goes to
- * `pi.logger` instead. When no logger is reachable (tests, non-Pi hosts) the
- * line is dropped; we never touch the terminal as a fallback.
+ * `pi.logger` instead.
+ *
+ * When the host exposes no logger the line is appended to
+ * `<pi config dir>/context-mode/bridge-diag.log`. Dropping it instead — as this
+ * used to — made bridge failures undiagnosable: the *only* thing a user saw was
+ * the extension reporting "ctx_* tools will not be callable", with no reason
+ * anywhere on disk. Pi builds whose extension API has no `logger` (0.85.x)
+ * therefore lost every diagnostic. The terminal is still never touched.
  */
+function piConfigDir(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (env.PI_CONFIG_DIR) return env.PI_CONFIG_DIR;
+  const home = env.HOME ?? env.USERPROFILE ?? env.HOMEPATH;
+  const appData = env.APPDATA; // Windows-only, undefined on POSIX
+  const candidates: string[] = [];
+  if (home) candidates.push(join(home, ".pi"));
+  if (appData) candidates.push(join(appData, ".pi"));
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return candidates[0] ?? null;
+}
+
 export function makeBridgeDiag(pi: PiLikeAPI | null | undefined): BridgeDiag {
   const logger = pi?.logger;
   return (line, level = "warn") => {
     try {
       const fn = level === "debug" ? logger?.debug : logger?.warn;
-      if (typeof fn === "function") fn(line);
+      if (typeof fn === "function") {
+        fn(line);
+        return;
+      }
     } catch {
       /* never throw from diagnostics — and never write to the TUI terminal */
+    }
+
+    try {
+      const dir = piConfigDir();
+      if (!dir) return;
+      const logDir = join(dir, "context-mode");
+      if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
+      appendFileSync(
+        join(logDir, "bridge-diag.log"),
+        `[${new Date().toISOString()}] [${level}] ${line}
+`,
+        "utf8",
+      );
+    } catch {
+      /* best effort — diagnostics must never break the bridge */
     }
   };
 }
