@@ -134,3 +134,28 @@ sections. Only the per-conversation `%` bar's semantic is corrected.
 The 22× multiplier represents the actual context-window runway
 extension this conversation got from context-mode's redirects —
 the metric the user intuitively expected to see.
+
+## Amendment — the zero-denominator case (2026-10-04)
+
+This ADR's only-avoided case is **upheld, not reversed**. With
+`bytesReturned === 0` and `bytesAvoided > 0`, the 100% kept out is a true
+statement: every measured byte was diverted and none re-entered the window.
+An earlier attempt to suppress the bar in that state would have reverted this
+decision on the strength of an issue report alone, and was withdrawn.
+
+What the decision did not cover is the pair of figures derived from the
+`Math.max(1, …)` floor used to avoid a division by zero. That floor turned a
+measured zero into a fabricated 1-byte baseline, and the duration multiple
+divided by it — `498528×` on a real session, a number no measurement produced.
+Both are artefacts of the guard, not consequences of the formula.
+
+The bar therefore still renders in this state, with:
+
+- **With context-mode: 0 B** rather than a fabricated 1 B;
+- the percentage, which remains 100.0% and remains honest;
+- an explicit statement that no duration multiple applies, rather than a
+  multiple computed from a placeholder.
+
+A duration multiple is a claim about how much longer the session ran. It has
+no value when nothing was re-served, and printing one anyway is the same class
+of defect as printing a byte count that was never measured.

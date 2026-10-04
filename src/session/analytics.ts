@@ -2200,23 +2200,38 @@ function renderNarrative5Section(args: {
   const measuredAvoided  = realConv?.bytesAvoided   ?? 0;
   const measuredReturned = realConv?.bytesReturned  ?? 0;
 
+  // The redirect measurement, and the only figure that may be called "kept out":
+  // eventDataBytes is the raw hook payload and never reaches the model.
+  const convBytesWithout  = measuredAvoided + measuredReturned;
+
   if (measuredAvoided + measuredReturned === 0) {
     // No measurable redirect activity yet — captures may exist, but
     // nothing has been diverted from the model context window.
     out.push("  No measurable redirect activity captured yet — bars will appear once context-mode diverts its first payload.");
     out.push("");
   } else {
-    const convBytesWithout  = measuredAvoided + measuredReturned;
-    const convBytesWith     = Math.max(1, measuredReturned);
+    // Nothing re-served yet is a real, common state, and the 100% that follows is
+    // honest: every measured byte was diverted and none came back (ADR-0004,
+    // v1.0.148 "Bug G"). The Math.max(1, …) floors around it were not honest —
+    // they turned a zero into a fabricated 1-byte baseline and produced a duration
+    // multiple of 498528x, neither of which any measurement produced (#950). The
+    // ratio survives; the two artefacts derived from it do not.
+    const hasReturned       = measuredReturned > 0;
+    const convBytesWith     = measuredReturned;
     const convTokensWithout = Math.max(1, Math.floor(convBytesWithout / 4));
-    const convTokensWith    = Math.max(1, Math.floor(convBytesWith    / 4));
+    const convTokensWith    = hasReturned ? Math.max(1, Math.floor(convBytesWith / 4)) : 0;
     const withoutBar = dataBar(convTokensWithout, convTokensWithout, 32);
     const withBar    = dataBar(convTokensWith,    convTokensWithout, 32);
-    const convPct    = (1 - convTokensWith / convTokensWithout) * 100;
-    const convMult   = Math.max(1, Math.round(convTokensWithout / convTokensWith));
+    const convPct    = (1 - (hasReturned ? convTokensWith / convTokensWithout : 0)) * 100;
+    const convMult   = hasReturned ? Math.max(1, Math.round(convTokensWithout / convTokensWith)) : 0;
     out.push(`  Without context-mode  ${kb(convBytesWithout).padStart(8)}  ${withoutBar}   ${fmtNum(convTokensWithout).padStart(7)} tokens`);
     out.push(`  With context-mode     ${kb(convBytesWith).padStart(8)}  ${withBar}   ${fmtNum(convTokensWith).padStart(7)} tokens`);
-    out.push(`                          ${convPct.toFixed(1)}% kept out of context · your AI ran ${convMult}× longer before /compact fired`);
+    out.push(
+      `                          ${convPct.toFixed(1)}% kept out of context · ` +
+        (hasReturned
+          ? `your AI ran ${convMult}× longer before /compact fired`
+          : `nothing has been re-served yet, so no duration multiple applies`),
+    );
     out.push("");
   }
 
@@ -2225,7 +2240,11 @@ function renderNarrative5Section(args: {
     const totalConvDays = conversation.lastEventMs && conversation.firstEventMs
       ? Math.max(1, Math.round((conversation.lastEventMs - conversation.firstEventMs) / 86_400_000) + 1)
       : conversation.byDay.length;
-    out.push(`  How that ${kb(convBytes)} built up — ${totalConvDays} days, ${conversation.byDay.length} active:`);
+    // Same numerator as the bar above. convBytes also carries eventDataBytes —
+    // the raw hook payload, which is analytics infrastructure and never reaches
+    // the model — so using it here made the caption disagree with the bar it
+    // describes (#950).
+    out.push(`  How that ${kb(convBytesWithout)} built up — ${totalConvDays} days, ${conversation.byDay.length} active:`);
     out.push("");
     out.push(...renderHorizontalTimeline(conversation.byDay, locale, tz));
   }
@@ -2265,10 +2284,18 @@ function renderNarrative5Section(args: {
   const distinctProj = lifetime?.distinctProjects ?? 0;
   const allCaps = lifetime?.totalEvents ?? multiAdapter?.totalEvents ?? 0;
   out.push(
-    `  This chat: ${kb(convBytes)} kept out · ${conversation.events.toLocaleString(locale)} captures${convStartedYMD ? ` · started ${convStartedYMD}` : ""}.`,
+    `  This chat: ${kb(convBytesWithout)} kept out · ${conversation.events.toLocaleString(locale)} captures${convStartedYMD ? ` · started ${convStartedYMD}` : ""}.`,
   );
   out.push(
-    `  All your work: ${kb(lifetimeBytes)} kept out · ${allCaps.toLocaleString(locale)} captures across ${distinctProj} project${distinctProj === 1 ? "" : "s"}${lifeStartedYMD ? ` · since ${lifeStartedYMD}` : ""}.`,
+    // Deliberately NOT labelled "kept out": multiAdapter.totalBytes is
+    // SUM(LENGTH(data)) + rescueBytes and carries no bytes_avoided column,
+    // while the per-chat line above is mostly bytes_avoided. Two figures from
+    // disjoint columns cannot be compared, and printing them under the same
+    // words is how a per-chat total came to exceed the all-work total (#950).
+    // The honest fix is to thread bytes_avoided through the multi-adapter
+    // aggregation; until then this line reports captured session bytes and
+    // says so.
+    `  All your work: ${kb(lifetimeBytes)} in session data · ${allCaps.toLocaleString(locale)} captures across ${distinctProj} project${distinctProj === 1 ? "" : "s"}${lifeStartedYMD ? ` · since ${lifeStartedYMD}` : ""}.`,
   );
   out.push("");
   out.push("");
