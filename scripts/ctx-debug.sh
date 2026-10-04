@@ -182,7 +182,7 @@ config_file() {
         console.log(JSON.stringify(c.slice(0,3000)));
       " 2>/dev/null || echo '""')"
     fi
-    printf '{"t":"cfg","s":"%s","k":"%s","path":"%s","exists":true,"content":%s}\n' "$CURRENT_SECTION" "$(_jesc "$label")" "$(_jesc "$display")" "$content_json" >> "$JSONL_FILE"
+    printf '{"t":"cfg","s":"%s","k":"%s","path":"%s","exists":true,"redacted":true,"content":%s}\n' "$CURRENT_SECTION" "$(_jesc "$label")" "$(_jesc "$display")" "$content_json" >> "$JSONL_FILE"
   else
     kv "$label" "$display (not found)"
   fi
@@ -1087,7 +1087,7 @@ node -e "
       } else if (e.t === 'd') {
         sec.details.push(e.m);
       } else if (e.t === 'cfg') {
-        sec.configs.push({ name: e.k, path: e.path, exists: e.exists, content: e.content || null });
+        sec.configs.push({ name: e.k, path: e.path, exists: e.exists, redacted: !!(e.content && e.redacted), content: e.content || null });
       }
     } catch {}
   }

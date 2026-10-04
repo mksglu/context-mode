@@ -72,11 +72,42 @@ export function redactJson(value, { inEnvBlock = false } = {}) {
   return out;
 }
 
+/**
+ * `key = value` in a config file that is not JSON. Codex reads
+ * ~/.codex/config.toml and ctx-debug.sh copies it into the report, so the
+ * unquoted-key form has to be covered: KEYED_VALUE_RE above needs a quoted
+ * key and would let the whole line through.
+ */
+const TOML_ASSIGNMENT_RE = /^(\s*)([A-Za-z0-9_.-]+)(\s*=\s*)(\S+)(\s*(?:#.*)?)$/;
+const QUOTED_VALUE_RE = /^(['"])([\s\S]*)\1$/;
+
+/** Redact the value of a `key = value` line when the key looks like a credential. */
+function maskAssignmentLine(line) {
+  const m = line.match(TOML_ASSIGNMENT_RE);
+  if (!m) return line;
+  const [, indent, key, eq, value, tail] = m;
+  if (!isSecretKey(key)) return line;
+  // Already handled by the shape pass above, and re-masking would drop the
+  // shape's own prefix — `ghp_abcd***REDACTED***` would become a bare marker.
+  if (value.includes(REDACTED)) return line;
+  const quoted = QUOTED_VALUE_RE.exec(value);
+  const inner = quoted ? quoted[2] : value;
+  if (inner === "") return line;
+  // Keep the original quoting so the file still parses as TOML/INI after
+  // redaction — a bare marker where a string was would not.
+  const masked = quoted ? `${quoted[1]}${REDACTED}${quoted[1]}` : REDACTED;
+  return `${indent}${key}${eq}${masked}${tail}`;
+}
+
 /** Redact token and connection-string shapes in arbitrary text. */
 export function redactText(text) {
   let out = String(text);
   for (const [pattern, replacement] of TEXT_PATTERNS) out = out.replace(pattern, replacement);
-  return out.replace(KEYED_VALUE_RE, (_m, prefix, value, suffix) => `${prefix}${value ? REDACTED : ""}${suffix}`);
+  out = out.replace(KEYED_VALUE_RE, (_m, prefix, value, suffix) => `${prefix}${value ? REDACTED : ""}${suffix}`);
+  return out
+    .split("\n")
+    .map((line) => maskAssignmentLine(line))
+    .join("\n");
 }
 
 /**

@@ -21,7 +21,12 @@ const settings = {
   },
   model: "opus",
   hooks: {
-    PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "node hook.mjs" }] }],
+    PreToolUse: [
+      {
+        matcher: "Bash",
+        hooks: [{ type: "command", command: "node hook.mjs" }],
+      },
+    ],
   },
   apiKey: "sk-proj-abcdefghijklmnop",
   nested: {
@@ -32,7 +37,9 @@ const settings = {
 };
 
 describe("redactConfigContent on JSON", () => {
-  const out = JSON.parse(redactConfigContent(JSON.stringify(settings, null, 2)));
+  const out = JSON.parse(
+    redactConfigContent(JSON.stringify(settings, null, 2)),
+  );
 
   it("redacts every value under the env block, secret-looking or not", () => {
     expect(out.env).toEqual({
@@ -52,7 +59,13 @@ describe("redactConfigContent on JSON", () => {
     expect(out.model).toBe("opus");
     expect(out.hooks.PreToolUse[0].hooks[0].command).toBe("node hook.mjs");
     expect(out.nested.plain).toBe("keep me");
-    expect(Object.keys(out)).toEqual(["env", "model", "hooks", "apiKey", "nested"]);
+    expect(Object.keys(out)).toEqual([
+      "env",
+      "model",
+      "hooks",
+      "apiKey",
+      "nested",
+    ]);
   });
 
   it("strips passwords out of connection strings", () => {
@@ -61,14 +74,28 @@ describe("redactConfigContent on JSON", () => {
 
   it("does not turn empty or non-string values into markers", () => {
     const value = JSON.parse(
-      redactConfigContent(JSON.stringify({ env: { EMPTY: "", PORT: 8080, DEBUG: true, NONE: null } })),
+      redactConfigContent(
+        JSON.stringify({
+          env: { EMPTY: "", PORT: 8080, DEBUG: true, NONE: null },
+        }),
+      ),
     );
-    expect(value.env).toEqual({ EMPTY: "", PORT: 8080, DEBUG: true, NONE: null });
+    expect(value.env).toEqual({
+      EMPTY: "",
+      PORT: 8080,
+      DEBUG: true,
+      NONE: null,
+    });
   });
 
   it("cuts to the size limit only after redacting", () => {
-    const padded = { filler: "x".repeat(4000), env: { LATE_TOKEN: "leak-me-please" } };
-    const text = redactConfigContent(JSON.stringify(padded), { maxChars: 3000 });
+    const padded = {
+      filler: "x".repeat(4000),
+      env: { LATE_TOKEN: "leak-me-please" },
+    };
+    const text = redactConfigContent(JSON.stringify(padded), {
+      maxChars: 3000,
+    });
     expect(text.length).toBe(3000);
     expect(text).not.toContain("leak-me-please");
   });
@@ -101,14 +128,67 @@ describe("redactConfigContent on non-JSON text", () => {
     expect(out).toContain(`eyJhbGc${REDACTED}`);
     expect(out).toContain(`https://me:${REDACTED}@host/`);
   });
+
+  // Codex reads ~/.codex/config.toml, and ctx-debug.sh copies it into a report
+  // meant to be pasted into a public bug. The JSON-shaped keyed-value pattern
+  // needs a quoted key, so an unquoted TOML key sailed through with the secret
+  // intact — the same value is redacted when the file happens to be JSON.
+  it("redacts credential-shaped TOML keys, which have no quotes", () => {
+    const toml = [
+      'model = "gpt-5"',
+      'openai_api_key = "abcdef1234567890abcdef"',
+      'ANTHROPIC_AUTH_TOKEN = "plain-value-1234"',
+      'password = "hunter2hunter2"',
+    ].join("\n");
+    const out = redactConfigContent(toml);
+    expect(out).toContain(`openai_api_key = "${REDACTED}"`);
+    expect(out).toContain(`ANTHROPIC_AUTH_TOKEN = "${REDACTED}"`);
+    expect(out).toContain(`password = "${REDACTED}"`);
+    expect(out).toContain('model = "gpt-5"');
+    expect(out).not.toContain("abcdef1234567890abcdef");
+    expect(out).not.toContain("plain-value-1234");
+    expect(out).not.toContain("hunter2hunter2");
+  });
+
+  it("redacts unquoted TOML values too", () => {
+    const out = redactConfigContent(
+      ["api_key = abcdef1234567890", "model = gpt-5"].join("\n"),
+    );
+    expect(out).toContain(`api_key = ${REDACTED}`);
+    expect(out).toContain("model = gpt-5");
+  });
+
+  it("leaves a short non-credential TOML value alone", () => {
+    const out = redactConfigContent(
+      ["approval_policy = on-request"].join("\n"),
+    );
+    expect(out).toBe("approval_policy = on-request");
+  });
 });
 
 describe("isSecretKey", () => {
   it("recognises credential-shaped names and nothing else", () => {
-    for (const key of ["apiKey", "api_key", "SONAR_TOKEN", "password", "passwd", "clientSecret", "AUTHORIZATION", "aws_access_key_id", "dsn"]) {
+    for (const key of [
+      "apiKey",
+      "api_key",
+      "SONAR_TOKEN",
+      "password",
+      "passwd",
+      "clientSecret",
+      "AUTHORIZATION",
+      "aws_access_key_id",
+      "dsn",
+    ]) {
       expect(isSecretKey(key), key).toBe(true);
     }
-    for (const key of ["model", "hooks", "command", "AWS_PROFILE", "endpoint", "timeout"]) {
+    for (const key of [
+      "model",
+      "hooks",
+      "command",
+      "AWS_PROFILE",
+      "endpoint",
+      "timeout",
+    ]) {
       expect(isSecretKey(key), key).toBe(false);
     }
   });
