@@ -2,7 +2,7 @@
 
 **The other half of the context problem.**
 
-[![users](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.message&label=users&color=brightgreen)](https://www.npmjs.com/package/context-mode) [![npm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.npm&label=npm&color=blue)](https://www.npmjs.com/package/context-mode) [![marketplace](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.marketplace&label=marketplace&color=blue)](https://github.com/mksglu/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode/stargazers) [![GitHub forks](https://img.shields.io/github/forks/mksglu/context-mode?style=flat&color=blue)](https://github.com/mksglu/context-mode/network/members) [![Last commit](https://img.shields.io/github/last-commit/mksglu/context-mode?color=green)](https://github.com/mksglu/context-mode/commits) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
+[![users](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fzademy%2Fcontext-mode%40main%2Fstats.json&query=%24.message&label=users&color=brightgreen)](https://github.com/zademy/context-mode) [![GitHub stars](https://img.shields.io/github/stars/zademy/context-mode?style=flat&color=yellow)](https://github.com/zademy/context-mode/stargazers) [![GitHub forks](https://img.shields.io/github/forks/zademy/context-mode?style=flat&color=blue)](https://github.com/zademy/context-mode/network/members) [![Last commit](https://img.shields.io/github/last-commit/zademy/context-mode?color=green)](https://github.com/zademy/context-mode/commits) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v)
 [![Hacker News #1](https://img.shields.io/badge/Hacker%20News-%231%20%E2%80%A2%20570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064)
 
@@ -1209,6 +1209,8 @@ npm install -g context-mode
 ## How the Sandbox Works
 
 Each `ctx_execute` call spawns an isolated subprocess with its own process boundary. Scripts can't access each other's memory or state. The subprocess runs your code, captures stdout, and only that stdout enters the conversation context. The raw data — log files, API responses, snapshots — never leaves the sandbox.
+
+Host-driven cancellation is supported end to end: when the MCP client aborts a request, the abort signal reaches `ctx_execute`/`ctx_execute_file` and kills the entire spawned process tree (children and grandchildren — via the dedicated process group on Unix, `taskkill /T` on Windows), never a broad name/port sweep. The per-call `.ctx-mode-*` temp directory is removed afterward, including its `ownership.json` sidecar — a metadata-only manifest (nonce, script path/hash, PIDs, language) that deliberately never contains the executed code, command, cwd, or environment.
 
 Twelve language runtimes are available: JavaScript, TypeScript, Python, Shell, Ruby, Go, Rust, PHP, Perl, R, Elixir, and C#. Bun is auto-detected for 3-5x faster JS/TS execution.
 
