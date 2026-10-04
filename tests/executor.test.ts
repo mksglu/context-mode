@@ -1,7 +1,12 @@
 import { describe, test, expect, afterAll } from "vitest";
 import { strict as assert } from "node:assert";
+<<<<<<< ours
 import { existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
+=======
+import { existsSync, writeFileSync, mkdirSync, rmSync, mkdtempSync } from "node:fs";
+import { join, dirname, basename, isAbsolute } from "node:path";
+>>>>>>> theirs
 import { tmpdir } from "node:os";
 import {
   PolyglotExecutor,
@@ -20,6 +25,113 @@ import {
 
 const runtimes = detectRuntimes();
 const executor = new PolyglotExecutor({ runtimes });
+
+describe("Rust execution lifecycle", () => {
+  function sandboxForScript(script: string): string {
+    assert.equal(basename(script), "script.rs");
+    const sandbox = dirname(script);
+    assert.ok(isAbsolute(sandbox), "Rust reports an absolute compiled source path");
+    assert.ok(basename(sandbox).startsWith(".ctx-mode-"), "only clean this executor's sandbox");
+    return sandbox;
+  }
+
+  test.runIf(runtimes.rust)("Rust reads relative project files and removes its sandbox", async () => {
+    const owned = mkdtempSync(join(tmpdir(), "context-mode-rust-project-"));
+    const projectRoot = join(owned, "project with spaces");
+    mkdirSync(projectRoot);
+    writeFileSync(join(projectRoot, "evidence.txt"), "project evidence");
+    let sandbox: string | undefined;
+    try {
+      const rustExecutor = new PolyglotExecutor({ runtimes, projectRoot });
+      const result = await rustExecutor.execute({
+        language: "rust",
+        code: 'fn main() { println!("script={}", file!()); println!("{}", std::fs::read_to_string("evidence.txt").unwrap()); }',
+        timeout: 10_000,
+      });
+      const script = result.stdout.split("\n").find(line => line.startsWith("script="));
+      if (script) sandbox = sandboxForScript(script.substring("script=".length));
+      assert.equal(result.exitCode, 0, result.stderr);
+      assert.ok(result.stdout.includes("project evidence"), result.stdout);
+      assert.ok(sandbox, "Rust reports its compiled source path");
+      assert.equal(existsSync(sandbox), false, "completed Rust sandbox is removed");
+    } finally {
+      rmSync(owned, { recursive: true, force: true });
+      if (sandbox) rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  test.runIf(runtimes.rust)("Rust honors a per-call cwd override", async () => {
+    const owned = mkdtempSync(join(tmpdir(), "context-mode-rust-cwd-"));
+    const override = join(owned, "override with spaces");
+    mkdirSync(override);
+    writeFileSync(join(owned, "evidence.txt"), "default project");
+    writeFileSync(join(override, "evidence.txt"), "override project");
+    try {
+      const result = await new PolyglotExecutor({ runtimes, projectRoot: owned }).execute({
+        language: "rust",
+        code: 'fn main() { println!("{}", std::fs::read_to_string("evidence.txt").unwrap()); }',
+        cwd: override,
+        timeout: 10_000,
+      });
+      assert.equal(result.exitCode, 0, result.stderr);
+      assert.equal(result.stdout.trim(), "override project");
+    } finally {
+      rmSync(owned, { recursive: true, force: true });
+    }
+  });
+
+  test.runIf(runtimes.rust)("Rust compile failures remove their sandbox", async () => {
+    const result = await executor.execute({
+      language: "rust",
+      code: 'compile_error!(concat!("CTX_SCRIPT=", file!())); fn main() {}',
+      timeout: 10_000,
+    });
+    const diagnostic = result.stderr.split("\n").find(line => line.startsWith("error: CTX_SCRIPT="));
+    assert.ok(diagnostic, result.stderr);
+    const sandbox = sandboxForScript(diagnostic.substring("error: CTX_SCRIPT=".length));
+    try {
+      assert.equal(result.exitCode, 1);
+      assert.equal(existsSync(sandbox), false, "failed Rust compilation sandbox is removed");
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  test.runIf(runtimes.rust)("Rust nonzero exits keep their status and remove their sandbox", async () => {
+    const result = await executor.execute({
+      language: "rust",
+      code: 'fn main() { println!("{}", file!()); std::process::exit(7); }',
+      timeout: 10_000,
+    });
+    const sandbox = sandboxForScript(result.stdout.trim());
+    try {
+      assert.equal(result.exitCode, 7, result.stderr);
+      assert.equal(existsSync(sandbox), false, "nonzero Rust sandbox is removed");
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  test.runIf(runtimes.rust)("background Rust execution keeps its sandbox until the caller cleans up", async () => {
+    const backgroundExecutor = new PolyglotExecutor({ runtimes });
+    let sandbox: string | undefined;
+    try {
+      const result = await backgroundExecutor.execute({
+        language: "rust",
+        code: 'fn main() { println!("{}", file!()); std::thread::sleep(std::time::Duration::from_secs(60)); }',
+        timeout: 5_000,
+        background: true,
+      });
+      sandbox = sandboxForScript(result.stdout.trim());
+      assert.equal(result.backgrounded, true, result.stderr);
+      assert.equal(existsSync(sandbox), true, "a running Rust process keeps its sandbox");
+    } finally {
+      backgroundExecutor.cleanupBackgrounded();
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (sandbox) rmSync(sandbox, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
+    }
+  });
+});
 
 function findWindowsGitBash(): string | null {
   if (process.platform !== "win32") return null;
