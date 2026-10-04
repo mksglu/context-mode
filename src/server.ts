@@ -55,6 +55,7 @@ import {
   emitSandboxExecuteEvent,
 } from "./session/event-emit.js";
 import { persistToolCallCounter, restoreSessionStats } from "./session/persist-tool-calls.js";
+import { resolveCallerSessionId } from "./session/caller-session.js";
 import { appendRetrievalBytes } from "./session/retrieval-marker.js";
 import { searchAllSources } from "./search/unified.js";
 import {
@@ -463,13 +464,14 @@ export function currentAttribution(): { sessionId?: string } | undefined {
   const override = projectDirOverride.getStore();
   if (override?.sessionId) return { sessionId: override.sessionId };
 
-  // CLAUDE_SESSION_ID env var is NOT propagated to MCP servers (only to hooks).
+  // Claude Code's caller session is resolved from the per-process session
+  // file first (it tracks /clear and resume); env vars may be stale snapshots.
   // Cross-adapter resolution: every adapter (15 of them) sets *_PROJECT_DIR env
   // and writes session_events via hooks. Read the most-recent session_id from
   // THIS project's session DB. Works for claude-code/cursor/gemini-cli/codex/
   // kiro/opencode/zed/kilo/openclaw/qwen-code/vscode-copilot/jetbrains-copilot/
   // omp/pi/antigravity — no adapter-specific transcript path required.
-  const sessionId = process.env.CLAUDE_SESSION_ID ?? resolveSessionIdFromSessionDB();
+  const sessionId = resolveCallerSessionId() ?? resolveSessionIdFromSessionDB();
   if (!sessionId) return undefined;
   return { sessionId };
 }
@@ -4143,12 +4145,12 @@ server.registerTool(
           // narrative 5-section "kitap gibi" layout (timeline, ladder, receipt,
           // example cost, auto-memory). Without these, formatReport falls back
           // to the legacy active-session header. Best-effort — failures absorbed.
-          // Resolve session_id: prefer env (CLAUDE_SESSION_ID), else most-recent
+          // Resolve the caller's session before the most-recent fallback:
           // UUID session_id from session_events in this DB.
           let conversation;
           let realBytes;
           try {
-            let sid = process.env.CLAUDE_SESSION_ID;
+            let sid = resolveCallerSessionId();
             if (!sid) {
               const row = sdb.prepare(
                 "SELECT session_id FROM session_events WHERE session_id LIKE '________-____-____-____-____________' ORDER BY created_at DESC LIMIT 1"

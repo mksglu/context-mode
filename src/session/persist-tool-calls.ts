@@ -20,6 +20,7 @@
 
 import { existsSync } from "node:fs";
 import { SessionDB } from "./db.js";
+import { resolveCallerSessionId } from "./caller-session.js";
 
 /**
  * Shape returned by {@link restoreSessionStats}. Subset of the in-memory
@@ -40,8 +41,8 @@ export interface RestoredSessionStats {
 }
 
 /**
- * Increment the persistent tool-call counter for `toolName` under whatever
- * session_id `session_meta` currently treats as the most recent. This is
+ * Increment the persistent tool-call counter for `toolName` under the
+ * caller's session id, falling back to the most recent session. This is
  * called from {@link trackResponse} on every tool response and must be
  * cheap, non-throwing, and best-effort — a stats failure must never break
  * the MCP tool call.
@@ -55,7 +56,7 @@ export function persistToolCallCounter(
     if (!existsSync(sessionDbPath)) return;
     const sdb = new SessionDB({ dbPath: sessionDbPath });
     try {
-      const sid = sdb.getLatestSessionId();
+      const sid = resolveCallerSessionId() ?? sdb.getLatestSessionId();
       if (!sid) return;
       sdb.incrementToolCall(sid, toolName, bytes);
     } finally {
@@ -67,7 +68,7 @@ export function persistToolCallCounter(
 }
 
 /**
- * Read the latest session's tool-call totals back out of SessionDB so the
+ * Read the caller's tool-call totals back out of SessionDB so the
  * MCP server can hydrate its in-memory `sessionStats` on startup. Returns
  * `null` when the DB is missing or empty so the caller can keep the
  * default zero-state without branching twice.
@@ -82,7 +83,7 @@ export function restoreSessionStats(
     if (!existsSync(sessionDbPath)) return null;
     const sdb = new SessionDB({ dbPath: sessionDbPath });
     try {
-      const sid = sdb.getLatestSessionId();
+      const sid = resolveCallerSessionId() ?? sdb.getLatestSessionId();
       if (!sid) return null;
 
       const stats = sdb.getToolCallStats(sid);
