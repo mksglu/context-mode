@@ -21,6 +21,22 @@ function makeEvent(overrides: Partial<StoredEvent> & Pick<StoredEvent, "type" | 
 // SLICE 1: Empty events -> valid XML
 // ════════════════════════════════════════════
 
+
+function hasLoneSurrogate(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      const prev = text.charCodeAt(i - 1);
+      if (!(prev >= 0xd800 && prev <= 0xdbff)) return true;
+    }
+  }
+  return false;
+}
+
 describe("Slice 1: Empty Events", () => {
   test("buildResumeSnapshot with empty events returns valid XML with events=0", () => {
     const xml = buildResumeSnapshot([]);
@@ -384,6 +400,21 @@ describe("Slice 14: Search Tool Calls in Sections", () => {
     const xml = buildResumeSnapshot(events, { searchTool: "custom_search" });
     assert.ok(xml.includes("custom_search"), `should contain custom tool name, got: ${xml.slice(0, 500)}`);
     assert.ok(!xml.includes("ctx_search"), "should NOT contain default tool name when custom is set");
+  });
+
+  test("#903: generated query prefixes do not split surrogate pairs", () => {
+    const events: StoredEvent[] = [
+      makeEvent({
+        type: "error_tool",
+        category: "error",
+        data: `${"x".repeat(79)}🟡 query tail`,
+        priority: 2,
+      }),
+    ];
+    const xml = buildResumeSnapshot(events);
+
+    assert.equal(hasLoneSurrogate(xml), false, "snapshot XML should not contain orphan surrogates");
+    assert.ok(xml.includes("<errors"), "should include the error section");
   });
 });
 

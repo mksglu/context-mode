@@ -13,7 +13,7 @@
  * the snapshot is a table of contents.
  */
 
-import { escapeXML } from "../truncate.js";
+import { charSafePrefix, escapeXML } from "../truncate.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,8 +45,7 @@ function buildQueries(items: string[], maxQueries = 4): string[] {
   const selected = unique.slice(0, maxQueries);
   return selected.map(s => {
     // Take the first ~80 chars as a query — enough for BM25 matching
-    const trimmed = s.length > 80 ? s.slice(0, 80) : s;
-    return trimmed;
+    return charSafePrefix(s, 80);
   });
 }
 

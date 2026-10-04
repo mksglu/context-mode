@@ -13,6 +13,8 @@
  * Hard cap: 500 tokens (~2000 chars at 4 chars/token).
  */
 
+import { charSafePrefix } from "./safe-prefix.mjs";
+
 /**
  * Rough token estimate: ~4 chars per token.
  * @param {string} text
@@ -82,7 +84,7 @@ export function buildAutoInjection(events, source) {
 
   // P1: Role (always first, never truncated from output)
   if (role) {
-    const text = `<behavioral_directive>\n${role.data.slice(0, 400)}\n</behavioral_directive>`;
+    const text = `<behavioral_directive>\n${charSafePrefix(role.data, 400)}\n</behavioral_directive>`;
     parts.push(text);
     budget -= estimateTokens(text);
   }
@@ -90,7 +92,7 @@ export function buildAutoInjection(events, source) {
   // P2: Decisions (latest 5)
   const decisions = decisionsAll.slice(-5);
   if (decisions.length > 0) {
-    const lines = decisions.map(d => `- ${d.data.slice(0, 100)}`).join("\n");
+    const lines = decisions.map(d => `- ${charSafePrefix(d.data, 100)}`).join("\n");
     const text = `<rules>\nFollow these decisions:\n${lines}\n</rules>`;
     const cost = estimateTokens(text);
     if (cost <= budget) {
@@ -98,7 +100,7 @@ export function buildAutoInjection(events, source) {
       budget -= cost;
     } else {
       // Overflow: reduce to 3 decisions
-      const reduced = decisions.slice(-3).map(d => `- ${d.data.slice(0, 100)}`).join("\n");
+      const reduced = decisions.slice(-3).map(d => `- ${charSafePrefix(d.data, 100)}`).join("\n");
       const fallback = `<rules>\nFollow these decisions:\n${reduced}\n</rules>`;
       parts.push(fallback);
       budget -= estimateTokens(fallback);
