@@ -78,7 +78,7 @@ const isWindows = process.platform === "win32";
 function commandExists(cmd: string): boolean {
   try {
     const check = isWindows ? `where ${cmd}` : `command -v ${cmd}`;
-    execSync(check, { stdio: "pipe" });
+    execSync(check, { stdio: "pipe", windowsHide: isWindows });
     return true;
   } catch {
     return false;
@@ -97,7 +97,7 @@ function runnableExists(cmd: string): boolean {
   if (isWindows) {
     // Reject if every `where` hit lives under Microsoft\WindowsApps (Store stubs).
     try {
-      const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe" });
+      const out = execSync(`where ${cmd}`, { encoding: "utf-8", stdio: "pipe", windowsHide: true });
       const hits = out.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
       if (hits.length === 0) return false;
       const realHits = hits.filter(p => !/\\Microsoft\\WindowsApps\\/i.test(p));
@@ -116,7 +116,7 @@ function runnableExists(cmd: string): boolean {
     // Use execSync with a command string when shell is required;
     // keep execFileSync (no shell) on POSIX.
     if (isWindows) {
-      execSync(`"${cmd}" --version`, { stdio: "pipe", timeout: 5000 });
+      execSync(`"${cmd}" --version`, { stdio: "pipe", timeout: 5000, windowsHide: true });
     } else {
       execFileSync(cmd, ["--version"], { stdio: "pipe", timeout: 1500 });
     }
@@ -198,7 +198,7 @@ const KNOWN_GIT_BASH_PATHS = [
 function resolveWindowsBash(): string | null {
   let candidates: string[];
   try {
-    const result = execSync("where bash", { encoding: "utf-8", stdio: "pipe" });
+    const result = execSync("where bash", { encoding: "utf-8", stdio: "pipe", windowsHide: true });
     candidates = result.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
   } catch {
     // bash not on PATH → genuinely unavailable. Fall through to pwsh/etc.
@@ -250,6 +250,7 @@ function getVersion(cmd: string, args: string[] = ["--version"]): string {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 5000,
+        windowsHide: true,
       })
         .trim()
         .split(/\r?\n/)[0];
@@ -522,6 +523,7 @@ export function resolveHookRuntime(): HookRuntime {
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "pipe"],
           timeout: 5000,
+          windowsHide: true,
         });
         versionOutput = String(out);
       } else {

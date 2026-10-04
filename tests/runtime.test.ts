@@ -186,7 +186,7 @@ describe("SHELL env var override", () => {
     const originalShell = process.env.SHELL;
     delete process.env.SHELL;
 
-    const execSync = vi.fn((cmd: string) => {
+    const execSync = vi.fn((cmd: string, _opts?: unknown) => {
       if (cmd === "where bash") throw new Error("no bash");
       if (cmd === "where pwsh") return "C:\\Program Files\\PowerShell\\7\\pwsh.exe\r\n";
       if (cmd === '"pwsh" --version') return "v7.4.0\n";
@@ -385,7 +385,7 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
     whereResults: Record<string, string[] | "throw">;
     versionExits: Record<string, "ok" | "throw" | { code: number }>;
   }) {
-    const execSync = vi.fn((cmd: string) => {
+    const execSync = vi.fn((cmd: string, _opts?: unknown) => {
       // `where <tool>` and `command -v <tool>` (defensive) lookups.
       const whereMatch = cmd.match(/^(?:where|command -v)\s+(.+)$/);
       if (whereMatch) {
@@ -610,6 +610,81 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
     for (const call of probeCalls) {
       const opts = call[2] as { timeout?: number };
       expect(opts.timeout).toBe(1500);
+    }
+  });
+
+  test("Windows probes hide child process console windows", async () => {
+    const savedHome = process.env.HOME;
+    const savedUserProfile = process.env.USERPROFILE;
+    const savedLocalAppData = process.env.LOCALAPPDATA;
+    const savedAppData = process.env.APPDATA;
+    const bunExe = "C:\\Users\\X\\.bun\\bin\\bun.exe";
+    delete process.env.HOME;
+    process.env.USERPROFILE = "C:\\Users\\X";
+    delete process.env.LOCALAPPDATA;
+    delete process.env.APPDATA;
+
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd === "where bun") throw new Error("bun not on PATH");
+      if (cmd === "where bash") throw new Error("bash not found");
+      if (cmd === "where sh") throw new Error("sh not found");
+      if (cmd === "where pwsh") return "C:\\Program Files\\PowerShell\\7\\pwsh.exe\r\n";
+      if (cmd === "where node") return "C:\\Program Files\\nodejs\\node.exe\r\n";
+      if (cmd === "where python3") return "C:\\Python311\\python3.exe\r\n";
+      if (/^where\s/.test(cmd)) throw new Error(`not found: ${cmd}`);
+
+      if (cmd === '"python3" --version') return "Python 3.11.0\n";
+      if (cmd === "python3 --version") return "Python 3.11.0\n";
+      if (cmd === "pwsh --version") return "PowerShell 7.4.0\n";
+      if (cmd === "node --version") return "v24.16.0\n";
+      if (cmd === `${bunExe} --version`) return "1.1.0\n";
+      if (cmd === `"${bunExe}" --version`) return "1.1.0\n";
+
+      throw new Error(`unmocked execSync: ${cmd}`);
+    });
+    const execFileSync = vi.fn(() => Buffer.from("ok\n"));
+    const existsSync = vi.fn((p: string | URL) => String(p) === bunExe);
+
+    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
+    vi.doMock("node:fs", async () => {
+      const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+      return { ...actual, existsSync };
+    });
+
+    try {
+      const {
+        detectRuntimes,
+        getRuntimeSummary,
+        resetHookRuntimeCache,
+        resolveHookRuntime,
+      } = await import("../src/runtime.js");
+
+      const runtimes = detectRuntimes();
+      expect(runtimes.javascript).toBe(bunExe);
+      expect(runtimes.python).toBe("python3");
+      expect(runtimes.shell).toBe("pwsh");
+
+      getRuntimeSummary(runtimes);
+      resetHookRuntimeCache();
+      expect(resolveHookRuntime()).toEqual({ path: bunExe, isBun: true });
+
+      const optionCalls = execSync.mock.calls.filter((call) =>
+        call[1] && typeof call[1] === "object"
+      );
+      expect(optionCalls.length).toBeGreaterThan(0);
+      for (const [, opts] of optionCalls) {
+        expect(opts).toEqual(expect.objectContaining({ windowsHide: true }));
+      }
+    } finally {
+      if (savedHome === undefined) delete process.env.HOME;
+      else process.env.HOME = savedHome;
+      if (savedUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = savedUserProfile;
+      if (savedLocalAppData === undefined) delete process.env.LOCALAPPDATA;
+      else process.env.LOCALAPPDATA = savedLocalAppData;
+      if (savedAppData === undefined) delete process.env.APPDATA;
+      else process.env.APPDATA = savedAppData;
+      vi.doUnmock("node:fs");
     }
   });
 });
