@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from "vitest";
 import { strict as assert } from "node:assert";
-import { existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -1710,29 +1710,39 @@ describe("Edge Cases", () => {
 
 describe("Temp Cleanup Resilience", () => {
   test("concurrent executions all return valid results (EBUSY resilience)", async () => {
-    const count = 15;
-    const promises = Array.from({ length: count }, (_, i) =>
-      executor.execute({
-        language: "javascript",
-        code: `
-          const fs = require('fs');
-          const path = require('path');
-          for (let j = 0; j < 3; j++) {
-            fs.writeFileSync(path.join(process.cwd(), 'f' + j + '.tmp'), 'data');
-          }
-          console.log("ok-${i}");
-        `,
-      }),
-    );
-    const results = await Promise.all(promises);
-    for (let i = 0; i < results.length; i++) {
-      const r = results[i];
-      assert.equal(typeof r.exitCode, "number", `Execution ${i}: exitCode not a number`);
-      assert.equal(typeof r.stdout, "string", `Execution ${i}: stdout not a string`);
-      assert.equal(typeof r.stderr, "string", `Execution ${i}: stderr not a string`);
-      assert.equal(typeof r.timedOut, "boolean", `Execution ${i}: timedOut not a boolean`);
-      assert.equal(r.exitCode, 0, `Execution ${i} failed with stderr: ${r.stderr}`);
-      assert.ok(r.stdout.includes(`ok-${i}`), `Missing output for execution ${i}`);
+    // 15 executions must contend for the SAME three files — that is what exercises
+    // EBUSY. The old code reached them via process.cwd(), which under vitest is
+    // the repo root, so every run left f0-f2.tmp untracked in the working tree.
+    // An absolute path in a throwaway dir keeps the contention identical and the
+    // tree clean.
+    const dir = mkdtempSync(join(tmpdir(), "ctx-ebusy-"));
+    try {
+      const count = 15;
+      const promises = Array.from({ length: count }, (_, i) =>
+        executor.execute({
+          language: "javascript",
+          code: `
+            const fs = require('fs');
+            const path = require('path');
+            for (let j = 0; j < 3; j++) {
+              fs.writeFileSync(path.join(${JSON.stringify(dir)}, 'f' + j + '.tmp'), 'data');
+            }
+            console.log("ok-${i}");
+          `,
+        }),
+      );
+      const results = await Promise.all(promises);
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        assert.equal(typeof r.exitCode, "number", `Execution ${i}: exitCode not a number`);
+        assert.equal(typeof r.stdout, "string", `Execution ${i}: stdout not a string`);
+        assert.equal(typeof r.stderr, "string", `Execution ${i}: stderr not a string`);
+        assert.equal(typeof r.timedOut, "boolean", `Execution ${i}: timedOut not a boolean`);
+        assert.equal(r.exitCode, 0, `Execution ${i} failed with stderr: ${r.stderr}`);
+        assert.ok(r.stdout.includes(`ok-${i}`), `Missing output for execution ${i}`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 
