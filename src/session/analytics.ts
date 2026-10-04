@@ -622,13 +622,8 @@ export interface AdapterDirEntry {
  * scanner functions filter to existing dirs. That keeps the enumeration
  * pure / testable without filesystem dependencies.
  */
-export function enumerateAdapterDirs(opts?: {
-  home?: string;
-  /** Config dir for claude-code; defaults to resolveClaudeConfigDir() so $CLAUDE_CONFIG_DIR is honored (#865). */
-  claudeConfigDir?: string;
-}): AdapterDirEntry[] {
+export function enumerateAdapterDirs(opts?: { home?: string }): AdapterDirEntry[] {
   const home = opts?.home ?? homedir();
-  const claudeConfigDir = opts?.claudeConfigDir ?? resolveClaudeConfigDir();
   // Mirrors `getSessionDirSegments` in src/adapters/detect.ts:92-111.
   const map: ReadonlyArray<readonly [string, readonly string[]]> = [
     ["claude-code",      [".claude"]],
@@ -650,11 +645,7 @@ export function enumerateAdapterDirs(opts?: {
     ["jetbrains-copilot", [".config", "JetBrains"]],
   ];
   return map.map(([name, segments]) => {
-    // claude-code honors $CLAUDE_CONFIG_DIR via resolveClaudeConfigDir (#865);
-    // every other adapter stays rooted at $HOME.
-    const base = name === "claude-code"
-      ? join(claudeConfigDir, "context-mode")
-      : join(home, ...segments, "context-mode");
+    const base = join(home, ...segments, "context-mode");
     return {
       name,
       sessionsDir: join(base, "sessions"),
@@ -1651,11 +1642,10 @@ export interface MultiAdapterLifetimeStats {
  */
 export function getMultiAdapterLifetimeStats(opts?: {
   home?: string;
-  claudeConfigDir?: string;
   loadDatabase?: () => unknown;
   filter?: RealUsageFilter;
 }): MultiAdapterLifetimeStats {
-  const dirs = enumerateAdapterDirs({ home: opts?.home, claudeConfigDir: opts?.claudeConfigDir });
+  const dirs = enumerateAdapterDirs({ home: opts?.home });
   const loadDb = opts?.loadDatabase ?? loadDatabaseImpl;
   const filter = {
     ...DEFAULT_REAL_USAGE_FILTER,
@@ -1694,12 +1684,11 @@ export interface MultiAdapterRealBytesStats extends RealBytesStats {
  */
 export function getMultiAdapterRealBytesStats(opts?: {
   home?: string;
-  claudeConfigDir?: string;
   sessionId?: string;
   worktreeHash?: string;
   loadDatabase?: () => unknown;
 }): MultiAdapterRealBytesStats {
-  const dirs = enumerateAdapterDirs({ home: opts?.home, claudeConfigDir: opts?.claudeConfigDir });
+  const dirs = enumerateAdapterDirs({ home: opts?.home });
 
   const sum: RealBytesStats = {
     eventDataBytes: 0,
