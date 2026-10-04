@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Render 3 OG preview banners at 1200x630 (X / LinkedIn / Slack / iMessage standard).
-// Usage: cd /Users/mksglu/Server/Mert/context-mode/web/og && node render-og.mjs
+// Usage: cd web/og && node render-og.mjs
 
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'url';
@@ -16,7 +16,7 @@ const ASSETS = [
 ];
 
 const W = 1200, H = 630;
-const STATS_URL = 'https://raw.githubusercontent.com/mksglu/context-mode/main/stats.json';
+const STATS_URL = 'https://raw.githubusercontent.com/zademy/context-mode/main/stats.json';
 
 function toLongForm(short) {
   if (!short) return null;

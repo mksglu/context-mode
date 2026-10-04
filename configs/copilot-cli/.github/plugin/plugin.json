@@ -1,7 +1,7 @@
 {
   "name": "context-mode",
   "description": "context-mode for GitHub Copilot CLI: sandboxed code execution in 11 languages, an FTS5 knowledge base with BM25 ranking, and session capture. Saves your context window by keeping raw bytes out of the conversation.",
-  "version": "1.0.169",
+  "version": "1.0.170",
   "keywords": [
     "mcp",
     "context-window",

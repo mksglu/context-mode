@@ -1,6 +1,6 @@
 {
   "name": "context-mode",
-  "version": "1.0.169",
+  "version": "1.0.170",
   "description": "context-mode for Antigravity CLI (agy): sandboxed code execution, FTS5 knowledge base, and session capture. Saves your context window by keeping raw bytes out of the conversation.",
   "author": {
     "name": "Mert Koseoğlu",
