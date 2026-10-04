@@ -26,6 +26,12 @@ import { existsSync, mkdirSync, rmSync, rmdirSync, readdirSync, unlinkSync, open
  * are unavailable. Applies to deny and modify actions that mention MCP alternatives.
  */
 function mcpRedirect(result, mcpToolsAvailable = true) {
+  // #1037: an operator can turn every redirect off. The redirect exists to
+  // protect the context window; it must never be the reason a caller cannot
+  // reach the network at all. A subagent whose tool set does not include the
+  // ctx_* tools is redirected to tools it cannot call, and the caller is left
+  // with no way to do web research and no way to say so.
+  if (process.env.CONTEXT_MODE_ALLOW_WEBFETCH === "1") return null;
   if (!mcpToolsAvailable) return null;
   if (!isMCPReady()) return null;
   return result;

@@ -1591,6 +1591,16 @@ export CTX_FETCH_STRICT=1
 
 That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. Useful when context-mode runs as a shared service, not on a developer's own machine.
 
+#### Opting out of redirects
+
+`PreToolUse` rewrites `curl`, `wget`, inline `fetch()` and `WebFetch` into the equivalent `ctx_*` call, because those tools return far more to the context window than the sandboxed equivalent. If that rewrite is wrong for your setup — a subagent whose tool set does not include the `ctx_*` tools, for instance, which is redirected to tools it cannot call — turn it off entirely:
+
+```bash
+export CONTEXT_MODE_ALLOW_WEBFETCH=1
+```
+
+Every redirect then becomes a passthrough and the tool runs as written. This is all-or-nothing: the only value accepted is exactly `1`, and there is no per-domain or per-tool exclusion. The redirect is also skipped automatically when no context-mode MCP server is reachable, so this is only needed for the case where a server *is* running.
+
 #### Corporate proxies
 
 The fetch subprocess strips `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` (both cases) and the `npm_config_*_proxy` pair before it runs, because a proxy resolves DNS on its own side and the in-subprocess rebinding check above would never see the address it actually connected to.

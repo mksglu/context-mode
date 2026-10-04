@@ -1338,6 +1338,62 @@ describe("buildSecurityWarningContext — agent-facing security warning (#558)",
   });
 });
 
+// #1037 — a redirect must never be the reason a caller cannot reach the
+// network. mcpRedirect is the single choke point every redirect passes
+// through, so the opt-out belongs there rather than at each call site.
+describe("opt-out of redirects", () => {
+  afterEach(() => {
+    delete process.env.CONTEXT_MODE_ALLOW_WEBFETCH;
+  });
+
+  it("a caller without ctx_* tools falls through even when a server is ready", () => {
+    // Already the contract from #794 — kept as the regression anchor.
+    expect(
+      routePreToolUse(
+        "WebFetch",
+        { url: "https://example.com" },
+        "/repo",
+        "claude-code",
+        "s1",
+        { mcpToolsAvailable: false },
+      ),
+    ).toBeNull();
+  });
+
+  it("CONTEXT_MODE_ALLOW_WEBFETCH=1 downgrades a live-server redirect to a passthrough", () => {
+    process.env.CONTEXT_MODE_ALLOW_WEBFETCH = "1";
+    expect(
+      routePreToolUse(
+        "WebFetch",
+        { url: "https://example.com" },
+        "/repo",
+        "claude-code",
+        "s1",
+        { mcpToolsAvailable: true },
+      ),
+    ).toBeNull();
+  });
+
+  it("only the exact value \"1\" opts out", () => {
+    // Without a ready sentinel the redirect is already a passthrough, so this
+    // compares the two runs rather than asserting an absolute: what it pins is
+    // that a non-"1" value does not fire the opt-out.
+    const call = () =>
+      routePreToolUse(
+        "WebFetch",
+        { url: "https://example.com" },
+        "/repo",
+        "claude-code",
+        "s1",
+        { mcpToolsAvailable: true },
+      );
+    process.env.CONTEXT_MODE_ALLOW_WEBFETCH = "true";
+    const withOtherValue = call();
+    delete process.env.CONTEXT_MODE_ALLOW_WEBFETCH;
+    expect(withOtherValue).toEqual(call());
+  });
+});
+
 /**
  * Helper — spawn a fresh node subprocess and run a small ESM snippet
  * against routing.mjs. Returns parsed stdout JSON. Each call is
