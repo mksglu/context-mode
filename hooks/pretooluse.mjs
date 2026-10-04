@@ -186,7 +186,10 @@ await runHook(async () => {
   // ─── Write rejected-approach marker for PostToolUse to pick up ───
   // PreToolUse cannot safely load SessionDB (native module loading breaks hook stdout).
   // Write a marker file instead; PostToolUse reads it and writes the event.
-  if (decision && (decision.action === "deny" || decision.action === "modify")) {
+  // Keyed off the RESPONSE, not the decision: a headless passthrough returns
+  // null for a decision that was made, and recording that as a rejection
+  // would charge the session for a redirect it never received (#979).
+  if (response !== null && decision && (decision.action === "deny" || decision.action === "modify")) {
     try {
       const sessionId = getSessionId(input);
       const reason = decision.action === "deny"
@@ -203,7 +206,7 @@ await runHook(async () => {
   // PostToolUse reads this marker to emit a `category=redirect` event with the
   // estimated `bytes_avoided`. PreToolUse cannot load SessionDB safely (native
   // module load breaks hook stdout), hence the marker indirection.
-  if (decision && decision.redirectMeta) {
+  if (response !== null && decision && decision.redirectMeta) {
     try {
       const sessionId = getSessionId(input);
       const meta = decision.redirectMeta;
