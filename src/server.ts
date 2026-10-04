@@ -42,6 +42,7 @@ import {
   resolveContentStorageDir,
   resolveDefaultSessionDir,
   resolveSessionDbPath,
+  resolveSessionPath,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
   SessionDB,
@@ -511,25 +512,39 @@ export function resolveSessionIdFromSessionDB(opts?: {
 }
 
 /**
- * Auto-index session events files written by SessionStart hook.
- * Scans ~/.claude/context-mode/sessions/ for *-events.md files.
- * CLAUDE_PROJECT_DIR is NOT available to MCP servers — only to hooks —
- * so we glob-scan instead of computing a specific hash.
- * Files are consumed (deleted) after indexing to prevent double-indexing.
- * Called on every getStore() — readdirSync is sub-millisecond when no files match.
+ * Auto-index the session events file written by the SessionStart hook.
+ *
+ * Scoped to THIS project only (issue #1214). The previous implementation
+ * glob-scanned every `*-events.md` in the shared sessions directory, indexed
+ * them all into whichever project's store happened to be open, and unlinked
+ * them. On a machine running several projects that meant one project's session
+ * events were indexed into another project's context, and the rightful project
+ * never received them because the file had already been consumed.
+ *
+ * The old comment said CLAUDE_PROJECT_DIR is unavailable to MCP servers. That
+ * is true of the env var but not of the server: `getProjectDir()` below has a
+ * full resolution chain, and `getStorePath()` already uses it to hash the
+ * content DB path. The events filename carries the same project hash, so
+ * `resolveSessionPath` (the generalised resolver that also powers `.db` and
+ * `.cleanup`) gives us exactly one path, and hooks and server cannot drift.
+ *
+ * The file is consumed (deleted) after indexing to prevent double-indexing.
+ * Called on every getStore(); one existsSync is cheaper than the old readdir.
  */
-function maybeIndexSessionEvents(store: ContentStore): void {
+export function maybeIndexSessionEvents(store: ContentStore): void {
   try {
     const sessionsDir = getSessionDir();
     if (!existsSync(sessionsDir)) return;
-    const files = readdirSync(sessionsDir).filter(f => f.endsWith("-events.md"));
-    for (const file of files) {
-      const filePath = join(sessionsDir, file);
-      try {
-        store.index({ path: filePath, source: "session-events", attribution: currentAttribution() });
-        unlinkSync(filePath);
-      } catch { /* best-effort per file */ }
-    }
+    const filePath = resolveSessionPath({
+      projectDir: getProjectDir(),
+      sessionsDir,
+      ext: "-events.md",
+    });
+    if (!existsSync(filePath)) return;
+    try {
+      store.index({ path: filePath, source: "session-events", attribution: currentAttribution() });
+      unlinkSync(filePath);
+    } catch { /* best-effort — a bad events file never blocks tools */ }
   } catch { /* best-effort — session continuity never blocks tools */ }
 }
 
