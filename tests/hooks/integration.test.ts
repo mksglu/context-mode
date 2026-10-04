@@ -53,6 +53,21 @@ const _guidanceSuffix = _wid ? `${process.pid}-w${_wid}` : String(process.pid);
 const _guidanceDir = resolve(tmpdir(), `context-mode-guidance-${_guidanceSuffix}`);
 const _sessionGuidanceDir = resolve(tmpdir(), `context-mode-guidance-s-pid-${process.pid}`);
 
+function hasLoneSurrogate(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      const prev = text.charCodeAt(i - 1);
+      if (!(prev >= 0xd800 && prev <= 0xdbff)) return true;
+    }
+  }
+  return false;
+}
+
 // MCP readiness sentinel — subprocess hooks check process.ppid (= this test's pid)
 // Use the same sentinel directory that isMCPReady() scans: /tmp on Unix, tmpdir() on Windows.
 // On macOS, tmpdir() returns /var/folders/... but isMCPReady() hardcodes /tmp — if we write
@@ -1207,6 +1222,18 @@ describe("buildAutoInjection", () => {
     // The budget is 500 tokens. Role (P1) is never truncated but decisions
     // overflow to 3. Total should stay near or under budget.
     expect(tokens).toBeLessThanOrEqual(600); // allow small overshoot from structural XML
+  });
+
+  test("does not split surrogate pairs when capping role and decision text", () => {
+    const events = [
+      { category: "role", data: `${"r".repeat(399)}🟡 role` },
+      { category: "decision", data: `${"d".repeat(99)}🟡 decision` },
+    ];
+    const result = buildAutoInjection(events);
+
+    expect(hasLoneSurrogate(result)).toBe(false);
+    expect(result).toContain("<behavioral_directive>");
+    expect(result).toContain("<rules>");
   });
 });
 

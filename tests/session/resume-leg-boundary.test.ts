@@ -38,6 +38,21 @@ function ev(
 
 const T = (n: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, n)).toISOString();
 
+function hasLoneSurrogate(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      const prev = text.charCodeAt(i - 1);
+      if (!(prev >= 0xd800 && prev <= 0xdbff)) return true;
+    }
+  }
+  return false;
+}
+
 describe("#780 — leg boundary: prior-leg volatile events are not re-injected as current", () => {
   test("buildSessionDirective does NOT present a prior-leg [completed] subagent as a current Subagent Task", () => {
     // Leg 1: an agent completed. Leg 2 starts (session_start boundary). Nothing
@@ -125,5 +140,26 @@ describe("#840 — Data References: reference (not inline) large tool-outputs", 
     const meta = groupEvents(events);
     const block = buildSessionDirective("resume", meta, (n: string) => n);
     expect(block).toContain("indexed 12 rows from build.log");
+  });
+});
+
+describe("#903 — SessionStart summaries keep surrogate pairs well-formed", () => {
+  test("buildSessionDirective does not emit orphan surrogates at truncation boundaries", () => {
+    const events = [
+      ev("prompt", `${"p".repeat(296)}🟡 continue this`, T(1), "prompt"),
+      ev("decision", `${"d".repeat(146)}🟡 use this decision`, T(2), "decision"),
+      ev("error", `${"e".repeat(146)}🟡 stack trace`, T(3), "error_tool"),
+      ev("subagent", `${"s".repeat(116)}🟡 finished`, T(4), "subagent_completed"),
+      ev("data", `${"x".repeat(146)}🟡 large capture`, T(5), "data"),
+    ];
+    const meta = groupEvents(events);
+    const block = buildSessionDirective("compact", meta, (n: string) => n);
+
+    expect(hasLoneSurrogate(block)).toBe(false);
+    expect(block).toContain("## Last Request");
+    expect(block).toContain("## Key Decisions");
+    expect(block).toContain("## Unresolved Errors");
+    expect(block).toContain("## Subagent Tasks");
+    expect(block).toContain("## Data References");
   });
 });
