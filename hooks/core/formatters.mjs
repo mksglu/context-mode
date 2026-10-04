@@ -3,16 +3,25 @@
  * Takes normalized decision from routing.mjs -> platform-specific JSON output.
  */
 
+// In `claude --print` there is no TTY to surface an "ask" and no UI to
+// reconsider a "deny", so a blocking decision either hangs the run or is
+// unactionable. Launchers set CLAUDE_CODE_HEADLESS=1; pass the tool through
+// instead. This gate used to live in hooks/formatters/claude-code.mjs, which
+// nothing in hooks/ imports — the active entrypoint (hooks/pretooluse.mjs)
+// loads this module — so the passthrough never ran in production (#979).
+// "context" stays unconditional: it is informational and never blocks.
+const isClaudeHeadless = () => process.env.CLAUDE_CODE_HEADLESS === "1";
+
 export const formatters = {
   "claude-code": {
-    deny: (reason) => ({
+    deny: (reason) => (isClaudeHeadless() ? null : {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
         permissionDecisionReason: reason,
       },
     }),
-    ask: () => ({
+    ask: () => (isClaudeHeadless() ? null : {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "ask",
@@ -36,12 +45,21 @@ export const formatters = {
     // Other adapters (gemini-cli, vscode-copilot, etc.) keep their own modify
     // semantics — their hosts implement updatedInput differently or not at all.
     modify: (updatedInput) => {
+      if (isClaudeHeadless()) return null;
       const ui = updatedInput ?? {};
       const isBashCommandRedirect = "command" in ui;
       if (!isBashCommandRedirect) {
+        // Pair the rewrite with an explicit allow. Claude Code honours
+        // updatedInput alongside permissionDecision "allow"; emitted on its own
+        // the rewrite is ignored and the call falls through to the permission
+        // prompt, which is what made the ctx_execute cwd pin defeat a
+        // permissions.allow rule and prompt on every shell call (#1142).
         return {
           hookSpecificOutput: {
             hookEventName: "PreToolUse",
+            permissionDecision: "allow",
+            permissionDecisionReason:
+              "context-mode: tool input normalized by the PreToolUse hook",
             updatedInput: ui,
           },
         };
