@@ -3849,7 +3849,6 @@ import { buildFetchCode } from "../../src/server.js";
 describe("buildFetchCode — embedded SSRF guard contract", () => {
   const generated = buildFetchCode("https://example.com/x", "/tmp/x");
 
-<<<<<<< ours
   test("strips proxy env vars (HTTP_PROXY / HTTPS_PROXY / ALL_PROXY) by default (#476 pinning)", () => {
     // Default must delete proxy env vars so the in-subprocess DNS guard runs (#476).
     const prev = process.env.CTX_FETCH_ALLOW_PROXY;
@@ -3913,30 +3912,6 @@ describe("buildFetchCode — embedded SSRF guard contract", () => {
       if (prev === undefined) delete process.env.CTX_FETCH_ALLOW_PROXY;
       else process.env.CTX_FETCH_ALLOW_PROXY = prev;
     }
-=======
-  test("failed fetch reports its cause without a Node crash stack", () => {
-    const code = buildFetchCode("http://127.0.0.1:59999", join(tmpdir(), "ctx-fetch-refused-test.dat"));
-    const result = spawnSync(process.execPath, ["--input-type=commonjs", "-"], {
-      input: code, encoding: "utf8", timeout: 5_000,
-    });
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/ECONNREFUSED/);
-    expect(result.stderr).not.toMatch(/node:internal|\n\s+at\s|Node\.js v/);
-  });
-
-  test("strips proxy env vars (HTTP_PROXY / HTTPS_PROXY / ALL_PROXY)", () => {
-    // A configured outbound proxy would route fetch through an arbitrary
-    // target; DNS resolution would happen at the proxy and the in-subprocess
-    // DNS guard would never see the rebound IP. The generated subprocess
-    // source must delete every proxy env var before any fetch can run.
-    expect(generated).toMatch(/delete process\.env\.HTTP_PROXY/);
-    expect(generated).toMatch(/delete process\.env\.HTTPS_PROXY/);
-    expect(generated).toMatch(/delete process\.env\.ALL_PROXY/);
-    expect(generated).toMatch(/delete process\.env\.http_proxy/);
-    expect(generated).toMatch(/delete process\.env\.https_proxy/);
-    expect(generated).toMatch(/delete process\.env\.all_proxy/);
->>>>>>> theirs
   });
 
   test("embedded SSRF classifier is callable as `classifyIp` even when bundler renames the export (#bug-v1.0.133)", () => {

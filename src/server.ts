@@ -3170,10 +3170,7 @@ async function main() {
   const text = await safeText(resp);
   emit('text', text);
 }
-main().catch((err) => {
-  console.error(err?.cause?.message ?? err?.message ?? String(err));
-  process.exitCode = 1;
-});
+main();
 `;
 }
 

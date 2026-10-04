@@ -6,7 +6,6 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { charSafePrefix } from "./safe-prefix.mjs";
 
 // ── Leg-boundary helpers (#780) ──
 // The current Claude Code session_id persists across `--continue` legs, so the
@@ -55,16 +54,12 @@ function mostRecent(entries, n) {
 const DATA_REF_INLINE_MAX = 8; // most-recent captures rendered inline
 const DATA_REF_ENTRY_MAX = 150; // per-entry char cap before it is referenced
 
-function charSafeSummary(str, maxChars) {
-  return str.length > maxChars ? `${charSafePrefix(str, maxChars - 3)}...` : str;
-}
-
 function renderDataReferences(entries, push, searchHint) {
   const recent = entries.slice(-DATA_REF_INLINE_MAX);
   for (const ev of recent) {
     const raw = ev.data ?? "";
     const text = raw.length > DATA_REF_ENTRY_MAX
-      ? `${charSafePrefix(raw, DATA_REF_ENTRY_MAX - 3)}… (${raw.length} bytes — query ${searchHint})`
+      ? `${raw.substring(0, DATA_REF_ENTRY_MAX - 3)}… (${raw.length} bytes — query ${searchHint})`
       : raw;
     push(`- ${text}`);
   }
@@ -308,7 +303,9 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
   // 1. Last request — most critical for continuation
   if (lastPrompt) {
     // Truncate overly long prompts — keep first 300 chars as summary
-    const displayPrompt = charSafeSummary(lastPrompt, 300);
+    const displayPrompt = lastPrompt.length > 300
+      ? lastPrompt.substring(0, 297) + "..."
+      : lastPrompt;
     block += `\n## Last Request`;
     block += `\n${displayPrompt}`;
     block += `\n`;
@@ -358,15 +355,10 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
   // 3. Key decisions
   if (grouped.decision?.length > 0) {
     block += `\n## Key Decisions`;
-<<<<<<< ours
     const { shown, hidden } = mostRecent(grouped.decision, SECTION_MAX_DECISIONS);
     for (const ev of shown) {
       const text = ev.data.length > 150 ? ev.data.substring(0, 147) + "..." : ev.data;
       block += `\n- ${text}`;
-=======
-    for (const ev of grouped.decision) {
-      block += `\n- ${charSafeSummary(ev.data, 150)}`;
->>>>>>> theirs
     }
     if (hidden > 0) block += `\n- … and ${hidden} earlier decisions — ${dataSearchHint} for the full list.`;
     block += `\n`;
@@ -382,15 +374,10 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
   // 5. Errors
   if (grouped.error?.length > 0) {
     block += `\n## Unresolved Errors`;
-<<<<<<< ours
     const { shown, hidden } = mostRecent(grouped.error, SECTION_MAX_ERRORS);
     for (const ev of shown) {
       const text = ev.data.length > 150 ? ev.data.substring(0, 147) + "..." : ev.data;
       block += `\n- ${text}`;
-=======
-    for (const ev of grouped.error) {
-      block += `\n- ${charSafeSummary(ev.data, 150)}`;
->>>>>>> theirs
     }
     if (hidden > 0) block += `\n- … and ${hidden} earlier errors — ${dataSearchHint} for the full list.`;
     block += `\n`;
@@ -437,7 +424,7 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
   //    only current-leg subagents under "Subagent Tasks"; reframe prior-leg
   //    ones so stale [completed]/[launched] labels don't read as this leg's.
   if (grouped.subagent?.length > 0) {
-    const fmt = (ev) => charSafeSummary(ev.data, 120);
+    const fmt = (ev) => ev.data.length > 120 ? ev.data.substring(0, 117) + "..." : ev.data;
     const currentSub = grouped.subagent.filter(ev => !isPriorLeg(ev, legBoundary));
     const priorSub = grouped.subagent.filter(ev => isPriorLeg(ev, legBoundary));
     if (currentSub.length > 0) {
