@@ -32,6 +32,25 @@ function isPriorLeg(ev, boundary) {
 // raw-bytes-stay-out principle. Inline only a small recent window; reference
 // large blobs with a one-line pointer. The full payloads stay queryable in
 // FTS5 via ctx_search(source: "session-events").
+// Per-section caps for the post-compaction restore (#1173). Per-item char
+// caps bound one entry but not the section, so output grew linearly with the
+// event count — measured 1000 error events at 153 KB, enough to push the
+// context straight back over the compaction threshold that produced it. These
+// keep every section bounded and say what was dropped, so the model is told
+// the data exists instead of silently losing it.
+const SECTION_MAX_ERRORS = 10;
+const SECTION_MAX_DECISIONS = 15;
+const SECTION_MAX_ENV = 10;
+const SECTION_MAX_GIT_OPS = 20;
+const SECTION_MAX_SUBAGENT = 10;
+
+/** The most recent `n` entries, plus how many were left out. */
+function mostRecent(entries, n) {
+  return entries.length <= n
+    ? { shown: entries, hidden: 0 }
+    : { shown: entries.slice(-n), hidden: entries.length - n };
+}
+
 const DATA_REF_INLINE_MAX = 8; // most-recent captures rendered inline
 const DATA_REF_ENTRY_MAX = 150; // per-entry char cap before it is referenced
 
@@ -336,10 +355,12 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
   // 3. Key decisions
   if (grouped.decision?.length > 0) {
     block += `\n## Key Decisions`;
-    for (const ev of grouped.decision) {
+    const { shown, hidden } = mostRecent(grouped.decision, SECTION_MAX_DECISIONS);
+    for (const ev of shown) {
       const text = ev.data.length > 150 ? ev.data.substring(0, 147) + "..." : ev.data;
       block += `\n- ${text}`;
     }
+    if (hidden > 0) block += `\n- … and ${hidden} earlier decisions — ${dataSearchHint} for the full list.`;
     block += `\n`;
   }
 
@@ -353,18 +374,21 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
   // 5. Errors
   if (grouped.error?.length > 0) {
     block += `\n## Unresolved Errors`;
-    for (const ev of grouped.error) {
+    const { shown, hidden } = mostRecent(grouped.error, SECTION_MAX_ERRORS);
+    for (const ev of shown) {
       const text = ev.data.length > 150 ? ev.data.substring(0, 147) + "..." : ev.data;
       block += `\n- ${text}`;
     }
+    if (hidden > 0) block += `\n- … and ${hidden} earlier errors — ${dataSearchHint} for the full list.`;
     block += `\n`;
   }
 
   // 6. Git state
   if (grouped.git?.length > 0) {
-    const uniqueOps = [...new Set(grouped.git.map(e => e.data))];
+    const { shown, hidden } = mostRecent([...new Set(grouped.git.map(e => e.data))], SECTION_MAX_GIT_OPS);
     block += `\n## Git`;
-    block += `\n${uniqueOps.join(", ")}`;
+    block += `\n${shown.join(", ")}`;
+    if (hidden > 0) block += `\n… and ${hidden} other operations — ${dataSearchHint} for the full list.`;
     block += `\n`;
   }
 
@@ -429,9 +453,11 @@ export function buildSessionDirective(source, eventMeta, toolNamer) {
     if (grouped.cwd?.length > 0) {
       block += `\ncwd: ${grouped.cwd[grouped.cwd.length - 1].data}`;
     }
-    for (const ev of (grouped.env || [])) {
+    const { shown, hidden } = mostRecent(grouped.env || [], SECTION_MAX_ENV);
+    for (const ev of shown) {
       block += `\n${ev.data}`;
     }
+    if (hidden > 0) block += `\n… and ${hidden} earlier variables — ${dataSearchHint} for the full list.`;
     block += `\n`;
   }
 

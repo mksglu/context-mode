@@ -21,6 +21,9 @@
 
 import { runHook } from "./run-hook.mjs";
 
+// Budget for the post-compaction restore, in characters. See the guard below.
+const RESTORE_INJECTION_MAX_CHARS = 20000;
+
 await runHook(async () => {
   const { createRoutingBlock } = await import("./routing-block.mjs");
   const { createToolNamer } = await import("./core/tool-naming.mjs");
@@ -209,6 +212,27 @@ await runHook(async () => {
         const autoInjection = buildAutoInjection(events);
         if (autoInjection) {
           additionalContext += "\n\n" + autoInjection;
+        }
+
+        // #1173: a restore that re-crosses the compaction threshold triggers
+        // another compaction, which restores again — each cycle costing a full
+        // model turn until the token quota is gone. The per-section caps in
+        // buildSessionDirective bound the growth but cannot rule out the loop
+        // on their own, so the whole injection is held to a budget. Well below
+        // the ~31 KB measured at 251 events, so the guard engages long before
+        // the threshold is reached again.
+        if (additionalContext.length > RESTORE_INJECTION_MAX_CHARS) {
+          additionalContext =
+            `<context_window_protection>\n` +
+            `  <priority_instructions>\n` +
+            `  This session was just compacted. The session guide measured ` +
+            `${additionalContext.length} characters, above the ` +
+            `${RESTORE_INJECTION_MAX_CHARS}-character restore budget, and was dropped so the ` +
+            `restore cannot immediately trigger another compaction. The events are all still ` +
+            `on disk — reconstruct prior state with ` +
+            `${toolNamer("ctx_search")}(queries: [...], source: "session-events").\n` +
+            `  </priority_instructions>\n` +
+            `</context_window_protection>`;
         }
 
         // D2 PRD Phase 6.2: emit snapshot-consumed with bytes_returned=snapshot.length.
