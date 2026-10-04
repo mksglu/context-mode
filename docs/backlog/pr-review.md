@@ -43,7 +43,7 @@ Ya resueltos antes de la revisión individual:
 | 892 | 2 | +4/-4 | main | dirty | 97 | Fix typo in README verification instructions | DESCARTAR — la 'correccion' es peor ingles, y arrastra un stats.json rancio que baja el badge 280k |
 | 920 | 2 | +8/-6 | next | clean | 53 | fix: state ctx_search throttle thresholds as absolute call numbers | ADAPTAR — el texto mejora pero los 4 tests son regex sobre el fuente |
 | 948 | 2 | +10/-1 | next | clean | 53 | docs(codex): make JavaScript the default ctx_execute runtime | DESCARTAR — cambia 1 de 14 configs, convirtiendo un invariante cross-adapter en excepcion |
-| 932 | 2 | +10/-4 | next | clean | 53 | fix(runPool): don't report capped when pool is larger than workload (#915) | ADOPTAR |
+| 932 | 2 | +10/-4 | next | clean | 53 | fix(runPool): don't report capped when pool is larger than workload (#915) | ADOPTADO |
 | 906 | 2 | +10/-0 | next | clean | 53 | docs(codex): pin platform env in manual config | ADAPTAR — anade [mcp_servers.context-mode.env] pero removeTomlSections empareja exacto y dejaria huerfana esa subtabla |
 | 1250 | 2 | +16/-1 | next | unstable | 1 | fix: classify shell exit 1 with stderr as an error | ADOPTAR |
 | 1059 | 2 | +17/-0 | next | clean | 47 | fix(opencode): route webfetch through the WebFetch redirect (#1052) | ADOPTAR |
