@@ -93,7 +93,7 @@ Ya resueltos antes de la revisión individual:
 | 1093 | 2 | +265/-3 | next | clean | 38 | feat(pi): interrupt support (Esc) for in-flight ctx_* tool calls | DESCARTAR — superseded por #1164: matar el bridge no detiene el executor, que es justo el incidente que describe |
 | 1092 | 2 | +362/-13 | next | clean | 38 | feat(pi): live command preview and result tail in the Pi TUI | ADOPTAR |
 | 1164 | 2 | +433/-6 | main | unstable | 19 | fix(pi): propagate Pi's AbortSignal — kill the bridge server tree to stop runaway executors | ADAPTAR — portar el guard de stdin error desde #1093 y encadenar spawnExitError de #1166 |
-| 1211 | 2 | +979/-53 | next | unstable | 1 | perf(analytics): stop re-reading every sidecar in getLifetimeStats | ADOPTAR |
+| 1211 | 2 | +979/-53 | next | unstable | 1 | perf(analytics): stop re-reading every sidecar in getLifetimeStats | REVERTIDO — idem |
 | 928 | 3 | +27/-4 | next | clean | 49 | fix: avoid deprecated gh issue project cards query | DESCARTAR — el Fixes #890 es falso (no toca pricing.js) y el defecto no se reproduce |
 | 910 | 3 | +32/-2 | next | clean | 53 | fix(codex): omit empty additionalContext in hook output | DESCARTAR — duplicado exacto de #971, con tests mas debiles |
 | 971 | 3 | +39/-6 | next | clean | 40 | fix(codex): omit empty hook context | ADOPTAR |
@@ -125,7 +125,7 @@ Ya resueltos antes de la revisión individual:
 | 871 | 4 | +294/-7 | next | clean | 53 | fix(db-base): extend withRetry to catch mid-session SQLITE_CORRUPT with lossless heal (#867) | ADAPTAR — limpia dbPath-wal/-shh en vez de backupPath-*: en multi-writer el WAL sobrevive y vuelve a corromper |
 | 1209 | 4 | +330/-19 | next | unstable | 8 | fix(executor): run extensionless POSIX-shim python/node via Git Bash on Windows (#1208) | ADAPTAR — el override de commandExists acepta cualquier nombre sin probe --version; reutilizar runnableExists |
 | 1009 | 4 | +400/-14 | main | clean | 68 | fix(executor): terminate abandoned execution trees | ADOPTAR — aplazar ownership.json: nada lo lee y es especulativo |
-| 898 | 4 | +420/-318 | next | dirty | 53 | fix(store): cap oversized markdown chunks | ADOPTAR |
+| 898 | 4 | +420/-318 | next | dirty | 53 | fix(store): cap oversized markdown chunks | REVERTIDO — el hunk entra, pero el lote entera dejo 117 fallos; queda pendiente reaplicar aislado |
 | 991 | 4 | +435/-318 | next | dirty | 53 | fix: auto-index mid-size exec output for ctx_search without intent | ADAPTAR — tomar solo indexForSearch; el shortHash(code) relabela sources y dispara crecimiento de filas |
 | 963 | 4 | +834/-389 | next | dirty | 53 | fix(store): bound FTS search result hydration for oversized rows | DUDOSO — convierte una busqueda limit:20 de 1 consulta en 21-41, en el camino de lectura mas caliente, por filas legacy |
 | 1104 | 5 | +7/-5 | main | clean | 35 | fix(codex): route Code Mode exec through PreToolUse | ADOPTAR |
@@ -146,7 +146,7 @@ Ya resueltos antes de la revisión individual:
 | 1231 | 5 | +317/-49 | main | unstable | 4 | fix(claude-code): restore external-MCP hook routing with `mcp__.*` (#1222) | ADOPTAR — tambien falta en src/adapters/codex/hooks.ts:60 y configs/codex/hooks.json:5 |
 | 1111 | 5 | +332/-174 | next | unstable | 25 | fix(stats): stop heartbeat lifetime scans | ADAPTAR — lifetimeTokens queda en 0 para quien nunca llama ctx_stats: el statusline ve $0.00 permanente |
 | 884 | 5 | +372/-198 | next | clean | 53 | docs: sync adapter install/usage/debugging with the code (v1.0.167) | DUDOSO — 250 lineas de observaciones de campo del autor presentadas como hecho, en hardware no especificado |
-| 1167 | 5 | +1193/-572 | next | unstable | 18 | fix(windows): resolve runtime probes in-process instead of spawning where | ADOPTAR |
+| 1167 | 5 | +1193/-572 | next | unstable | 18 | fix(windows): resolve runtime probes in-process instead of spawning where | REVERTIDO — rompe los seams de test que inyectan un where falso: el indice se construye de otra fuente. Windows-especifico e imposible de verificar en macOS |
 | 1148 | 6 | +101/-10 | next | unstable | 16 | fix: bundle bin/statusline.mjs's analytics import (marketplace installs never get build/) | ADAPTAR — anadir bin/analytics.bundle.mjs a assert-bundles-committed o el guard no lo vera |
 | 955 | 6 | +172/-19 | next | clean | 53 | feat(codex): load Windows guidance as a platform overlay | ADAPTAR |
 | 939 | 6 | +200/-1 | main | clean | 87 | feat: add ctx_forget for per-source knowledge-base eviction | ADOPTAR |
@@ -160,7 +160,7 @@ Ya resueltos antes de la revisión individual:
 | 907 | 8 | +141/-31 | next | clean | 17 | fix(session): keep SessionStart truncation surrogate-safe | ADOPTAR — complementar #1176 (que ya tomamos) en los call sites que este no alcanzo; anadir el par a assert-asymmetric-drift |
 | 1082 | 8 | +242/-33 | next | clean | 7 | mcp: name execution timeout in milliseconds | ADAPTAR — el rename sin alias daria runs sin limite; el .passthrough lo evita. Regenerar bundle;/docsgrep |
 | 995 | 8 | +362/-299 | next | dirty | 53 | Fix Vitest Windows CI EPERM Hang | DESCARTAR — ademas del churn (afterEach entre imports, 6 espacios, push x3), bumpea stats.json |
-| 866 | 8 | +479/-386 | next | dirty | 53 | fix(analytics): honor $CLAUDE_CONFIG_DIR in enumerateAdapterDirs (ctx_stats conversation count) | ADOPTAR |
+| 866 | 8 | +479/-386 | next | dirty | 53 | fix(analytics): honor $CLAUDE_CONFIG_DIR in enumerateAdapterDirs (ctx_stats conversation count) | REVERTIDO — idem |
 | 1029 | 8 | +613/-398 | next | dirty | 32 | fix(pi): propagate MCP cancellation to executor | DUDOSO — superseded en espirito por #904? no: #904 es el mas temprano y mas estrecho; #1029 es el general. Conflicto con #1121/#1082 |
 | 980 | 8 | +2064/-462 | next | dirty | 53 | fix(batch): enforce indexed byte and chunk budgets | DUDOSO — borra formatCommandOutput y tests/core/echo-commands.test.ts deja de compilar; ademas structuredContent es un campo nuevo sin consumidor |
 | 1060 | 9 | +79/-0 | next | clean | 47 | fix(snapshot): pass platform tool name into PreCompact resume snapshot (#1028) | DESCARTAR — subconjunto estricto de #1043, que ademas trae tests |
