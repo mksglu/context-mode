@@ -12,119 +12,101 @@ La caída de v1 **no es una palanca grande sobre el backlog**:
 
 | | total | toca la caída de v1 |
 |---|---|---|
-| Issues `PENDIENTE` | 106 | **7** |
-| PRs no adoptados | 111 | **6** |
+| Issues `PENDIENTE` | 103 | **0** (4 se re-enmarcaron, ninguna murió) |
+| PRs accionables | 63 | **2** (#1160, #1040 — ambos ya cerrados) |
 
-Las otras 98 issues pendientes son agnósticos de plataforma (linux, windows,
+Las otras 99 issues pendientes son agnósticos de plataforma (linux, windows,
 store, executor, sesion, stats, core). Decidir "ya no suporto v1" no las mueve.
 
 Donde sí muerde es en dos sitios: (1) handful de ítems que quedan **muertos**,
 (2) trabajo **nuevo** que la caída crea y que ningún ledger registra todavía.
 
-## Issues: 7 abiertas, contra la caída de v1
+> Las cifras de arriba se recalcularon contando la tabla, no copiando el
+> encabezado: el encabezado decía 27/104 y la tabla tenía 28/103. La sección
+> "Decidido" de este documento tiene el detalle.
 
-### Cerrar ahora — la caída las resolvió
+## Issues: 4 vivas, contra la caída de v1
 
-| # | título | por qué |
-|---|---|---|
-| 1199 | `OpenCode 2.x plugin fails to load (needs a V2 adapter: { id, effect \| setup })` | Es literalmente el error que desbloqueamos. El `setup` ya existe y el plugin carga. → `RESUELTO-AQUI` |
-| 1187 | `[Feature]: Opencode V2 support` | Ídem. → `RESUELTO-AQUI` |
+Ninguna muere. Ver la sección "Decidido" más abajo para el veredicto con nota.
 
-### Aplican — re-enmarcar, no descartar
+**Ya cerradas por el port** (no por la decisión): #1187, #1199 (el plugin
+cargaba), #1036 (el bug de contabilidad de uso). Las tres están
+`RESUELTO-AQUI` en `issue-review.md`.
 
-| # | título | estado tras el port |
-|---|---|---|
-| 1036 | opencode adapter appends cumulative turn cost once per step, over-counting multi-step turns | **CONFIRMADO y corregido.** Medido en vivo: un turno de 3 pasos emitió `session.usage.updated` con `tokens.input` subiendo 1279918 → 1280031 → 1280078. El payload es el acumulado del turno y el evento dispara **una vez por paso**, así que insertarlo literal sobreregistra ~3x. Corregido con `usageDelta()`. Ojo: en v1 el bug era solo de `.cost` (tokens era last-step); en v2 **ambos** lados son acumulados y ambos necesitan delta. |
-| 1085 | `[OpenCode adapter] experimental.chat.system.transform injects extra system-role messages` | El hook v1 ya no existe, pero el defecto **no**: el port hace el mismo `splice(1, 0, …)` dentro de `SystemPart[]`. Reetiquetar a `ctx.session.hook("context")` y verificar contra Qwen estricto. |
-| 1255 | `"opencode" missing from the MCP clientInfo map` — platform detection silently resolves | Aplica tal cual. La detección de plataforma no cambió. |
-| 1053 | `isMCPReady() gate swallows all redirects in plugin-only embedded mode` | Aplica: el modo embebido sin MCP (`CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS`) sigue siendo el caminho del plugin en v2. |
-| 1254 | `ctx_stats reports OpenCode as "Skipped / no real chat activity"` | Aplica, y con más urgency: el importador multi-adapter no reconoce los eventos v2. |
+**Siguen abiertas y re-enmarcadas:**
 
-### Descartar
+| # | por qué no muere con v1 |
+|---|---|
+| 1085 | El hook v1 (`experimental.chat.system.transform`) ya no existe, pero el defecto sí: el port hace el mismo `splice(1, 0, …)` dentro de `SystemPart[]`. Verificar contra Qwen estricto sobre `ctx.session.hook("context")`. |
+| 1255 | Detección de plataforma, agnóstico de la versión del plugin. |
+| 1053 | El modo embebido sin MCP (`CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS`) es el camino del plugin en v2. |
+| 1254 | El importador multi-adapter no reconoce `session.usage.updated`. Más urgente ahora que la contabilidad de uso vive en v2. |
 
-Ninguna de las 7. Ni una sola muere por la caída de v1 — o se cierra, o se
-re-enmarca. Esto es lo contrario de lo que el enunciado sugiere, y conviene
-decirlo antes de borrar nada.
-
-## PRs: 6 abiertas, contra la caída de v1
+## PRs: 2 cerradas, contra la caída de v1
 
 ### Muere — el objeto del trabajo desaparece
 
-| # | título | veredicto actual | nuevo |
-|---|---|---|---|
-| 1160 | `fix(opencode): merge sibling config plugin arrays when writing opencode.jsonc` | ADAPTAR | **DESCARTAR.** Arregla la escritura de la key `plugin` (v1) al fusionar configs. Si v1 deja de escribirse, no hay array que fusionar. |
-| 935 | `feat(opencode): add /ctx slash command to TUI for session stats` | DESCARTAR | **DESCARTAR (doble).** Además de lo que ya se dijo del artefacto, es un TUI plugin de opencode — y los TUI plugins son justo lo que se eliminó al migrar a v2. |
-
-### Sube de prioridad
-
-| # | título | por qué |
+| # | veredicto | por qué |
 |---|---|---|
-| 1040 | `fix(cost): emit opencode multi-step usage as deltas (#1036)` | Era `ADAPTAR` de media prioridad; con #1036 siendo ahora código nuestro, es el fix que lo cierra. Mantener la regla del ledger: conservar el bloque de comentarios que documenta `.tokens` = last-step / `.cost` = acumulado. La honestidad de las etiquetas es invariante de este fork. |
+| 1160 | ADOPTAR → **DESCARTADO** | Su objeto es fusionar el array `plugin` de `opencode.jsonc`. Solo importa si algo escribe ese array, y en v2 la key no se lee y el install ya no la escribe. El síntoma (arrays siblings pisándose) desaparece con la causa. |
+| 1040 | ADAPTAR → **DESCARTADO** | Su objeto era #1036, que ya no es una issue abierta: es código de este fork. Además su premisa es falsa en v2 (`.tokens` también es acumulado, no last-step), así que el diff upstream no aplica. |
 
-### Sin cambio
-
-| # | título | por qué |
-|---|---|---|
-| 1001 | `fix(pricing): add MiniMax catalog entries` | Agnóstico de plataforma. Las tarifas de MiniMax-M3 están al doble, y este fork corre con MiniMax. Barato, independiente. |
-| 1148 | `fix: bundle bin/statusline.mjs's analytics import` | Empaquetado, no opencode. |
+#935 (TUI `/ctx`) ya estaba `DESCARTAR` por un motivo independiente, y
+#1001 / #1148 no son de opencode.
 
 ### Ya descartadas, pero la razón quedó obsoleta
-
 | # | veredicto actual | nota |
 |---|---|---|
 | 1194 | DESCARTAR — "el trabajo ya está" | La razón era `#1161 ya usa los nombres ctx_*`. Ahora es literalmente cierta, pero por *otro* motivo: el port propio. Actualizar la nota o el ledger miente sobre por qué se descartó. |
-| 1171 | DESCARTAR — superseded por #1194 | Igual. Además su crítica ("pone `@opencode/plugin` en dependencies sin que el código de producción lo importe") sigue siendo válida: el port evita el import de runtime, pero `@opencode/plugin` debe ser **devDependency** para el typecheck de los tipos `Plugin`/`Context`. Hoy no lo está. |
+| 1171 | DESCARTAR — superseded por #1194 | Igual. Además su crítica ("pone `@opencode/plugin` en dependencies sin que el código de producción lo importe") **quedó satisfecha**: el port lo usa con `import type` y está en devDependencies, no en dependencies. |
 
 ## Trabajo NUEVO que la caída crea (no está en ningún ledger)
 
-Esto es lo que ningún ledger registra y es el coste real de la decisión:
+Los 6 ítems, con el estado real verificado en el código (no estimado):
 
-1. **`configs/opencode/opencode.json` sigue sirviendo `"plugin": ["context-mode"]`.**
-   En v2 esa entrada hace que opencode intente instalar `context-mode` desde npm
-   — la versión **sin portar** de upstream. Un usuario que siga la doc del repo
-   recibe el plugin roto. Hay que cambiarlo a instalación por descubrimiento
-   (`plugins/context-mode.{ts,js}`) o documentar el shim.
-
-2. **`ctx_upgrade` / el path de install siguen escribiendo la key `plugin` v1**
-   en la config del usuario. Con v1 muerto, `context-mode upgrade` reintroduce
-   una entrada que v2 no lee. `src/cli.ts`, `src/lifecycle.ts`, `src/runtime.ts`.
-
-3. **Nombres de hook v1 vivos en el código:**
-   `src/adapters/types.ts`, `src/adapters/opencode/{plugin,index,hooks}.ts`
-   siguen exportando `OPENCODE_HOOK_NAMES` con `tool.execute.before`,
-   `chat.message`, `experimental.session.compacting`. Con v1 muerto, el mapa
-   `Hooks` de v1 y `createContextModePlugin` sobran (~200 líneas de
-   `plugin.ts` + el andamiaje de tipos).
-
-4. **KiloCode comparte el adapter entero.** `src/adapters/opencode/index.ts:86`
-   declara `Extract<PlatformId, "opencode" | "kilo">` y `getPlatform()` resuelve
-   `kilo` antes que `opencode`. KiloCode es un fork de OpenCode con la API v1.
-   **Caer de v1 = perder KiloCode.** Es decisión de producto, no técnica, y no
-   está escrita en ningún sitio. Decidirlo explícitamente antes de tocar código.
-
-5. **125 tests v1 se quedan sin consumidor.** `tests/opencode-plugin.test.ts`
-   ejercita exclusivamente `ContextModePlugin()` con la firma v1
-   (`{ directory, client: { app: { log } } }`) y un hook map v1. Al caer v1 hay
-   que borrarlos o reescribirlos contra `setup(ctx)`. `tests/adapters/opencode-v2.test.ts`
-   (11 tests) es la superficie v2 y ya existe.
-
-6. **`ctx_upgrade` y el doctor Asumen el array `plugin`.** El doctor ya se
-   corrigió para aceptar descubrimiento (`hasContextModePlugin` →
-   `hasDiscoveredContextModePlugin` en `src/adapters/opencode/index.ts`), pero
-   el mensaje y el resto del path de install siguen asumiendo v1.
+1. ~~**`configs/opencode/opencode.json` sirviendo `"plugin": ["context-mode"]`**~~
+   **HECHO.** Borrado en `8b1d52d` y sustituido por
+   `configs/opencode/plugins/context-mode.ts` (mecanismo de descubrimiento).
+2. **VIVO, y es un solo sitio, no tres.** `configureAllHooks()` en
+   `src/adapters/opencode/index.ts:500-513` sigue haciendo
+   `settings.plugin = ["context-mode", ...]`. Con v2 esa key no se lee: lo que
+   produce es una entrada que opencode ignora, y en el peor caso una
+   instalación desde npm del upstream **sin portar**. `grep -rnE "settings\.plugin *="`
+   devuelve **una** línea en todo `src/`. La nota anterior apuntaba a
+   `src/cli.ts`, `src/lifecycle.ts` y `src/runtime.ts`: ninguno escribe la key.
+3. **VIVO, y más barato de lo que decía.** Lo que sobra con v1 muerto:
+   - `HOOK_TYPES` en `src/adapters/opencode/hooks.ts` — 3 nombres v1
+     (`tool.execute.before`, `tool.execute.after`, `experimental.session.compacting`)
+     y `REQUIRED_HOOKS`, usados por `index.ts:80,312,323,334`.
+   - `createContextModePlugin` (`plugin.ts:934-982`) — **~50 líneas**, adaptador
+     delgado sobre `initState()`.
+   - Tipos `PluginClient` / `PluginContext` / `PluginClientApp*` (`plugin.ts:63-85`)
+     — **~25 líneas**, solo los usa el factory v1.
+   - El campo `server` del export dual (`plugin.ts:1276`).
+   Total **~90 líneas**, no ~200. La cifra anterior era una suposición.
+4. **KiloCode comparte el adapter entero — SIN RESOLVER.** Ver la sección final.
+5. **VIVO, y la cifra era falsa.** `tests/opencode-plugin.test.ts` tiene **57**
+   tests (no 125), todos invocando `ContextModePlugin` (8 referencias). Todos
+   pasan hoy. `tests/adapters/opencode-v2.test.ts` (19 tests) es la superficie v2.
+6. **PARCIAL.** El doctor ya acepta descubrimiento
+   (`hasDiscoveredContextModePlugin`, `index.ts:585`), pero
+   `configureAllHooks` (ítem 2) y el mensaje de `validateHooks`
+   (`index.ts:415`, `Array.isArray(settings.plugin)`) siguen asumiendo v1.
 
 ## Orden sugerido
 
-1. Decidir KiloCode (ítem 4). Bloquea todo lo demás: cambia el alcance del
-   andamiaje v1 que hay que tirar.
-2. #1036 + PR #1040 — el único bug **introducido** por el port. Primero.
-3. Marcar #1187 y #1199 como `RESUELTO-AQUI` en `issue-review.md`.
-4. Correr `configs/opencode/opencode.json` (ítem 1) antes de que alguien más lo
-   lea y ejecute la instrucción equivocada.
-5. Luego la limpieza de v1 (ítems 2, 3, 5, 6) como un commit aparte, porque
-   borra ~200 líneas y =~125 tests y no debe mezclarse con fixes de bug.
-6. #1085, #1255, #1053, #1254 — independientes, en cualquier orden.
+Actualizado tras la decisión. Lo de v1 ya no bloquea el resto del backlog:
 
+1. **ítem 2** — que `configureAllHooks` deje de escribir la key `plugin`.
+   Es el único sitio, son 4 líneas, y mientras siga ahí `context-mode upgrade`
+   reintroduce en cada máquina una entrada que v2 no lee. Lo primero porque es
+   lo único con consecuencia en el usuario.
+2. **Lo que sí es agnostic de plataforma** — la lista "Siguiente tanda" de
+   `pr-review.md`, que no espera a ninguna decisión de producto:
+   #1089 → #1220 → #913 → #1155 → #1256 → #1241.
+3. **ítems 3 y 5** — la limpieza de v1 (90 líneas + 57 tests) como un commit
+   aparte. Borrado grande, no se mezcla con fixes de bug.
+4. **#1085, #1255, #1053, #1254** — independientes, en cualquier orden.
 
 ## Ejecutado (2026-10-04)
 
@@ -133,18 +115,73 @@ Esto es lo que ningún ledger registra y es el coste real de la decisión:
   `readUsageSnapshot()` en el path v2, con 8 tests que fijan los valores medidos.
   `@opencode/plugin@2.0.22` añadido a devDependencies (solo tipos; el import es
   `import type` y el host resuelve el módulo en runtime).
-- **#1187, #1199** — marcadas `RESUELTO-AQUI` en `issue-review.md`. Resumen actualizado a
-  27 / 104.
+- **#1036** — el port la arregló pero la fila seguía en `PENDIENTE` (la nota estaba
+  escrita, el estado no). Corregido a `RESUELTO-AQUI`. El recuento del encabezado
+  mentía por dos: **28 `RESUELTO-AQUI` / 103 `PENDIENTE`**, no 27/104. Verificado
+  recontando la tabla, no la cifra escrita a mano.
+- **#1187, #1199** — marcadas `RESUELTO-AQUI` en `issue-review.md`.
 - **Config harmful** — `configs/opencode/opencode.json` borrado (en v2 hacía que opencode
   instalara el upstream sin portar desde npm). Sustituido por
   `configs/opencode/plugins/context-mode.ts`, que usa el mecanismo de descubrimiento
   que sí funciona. README actualizado en el paso de install y en el link.
 
+## Decidido: no hay soporte de OpenCode v1 (2026-10-04)
+
+Cerrado por decisión de producto. Dos PRs y cuatro issues revisados contra esa
+decisión. Resultado: **el filtro mueve 2 PRs y 0 issues**.
+
+### PRs que cierra la decisión
+
+| # | veredicto | por qué |
+|---|---|---|
+| 1160 | ADOPTAR → **DESCARTADO** | Su objeto es fusionar el array `plugin` de `opencode.jsonc`. Solo importa si algo escribe ese array, y en v2 la key no se lee y el install ya no la escribe. El síntoma (arrays siblings pisándose) desaparece con la causa. |
+| 1040 | ADAPTAR → **DESCARTADO** | Su objeto era #1036, que ya no es una issue abierta: es código de este fork. Además su premisa es falsa en v2 (`.tokens` también es acumulado, no last-step), así que el diff upstream no aplica. La nota de "conservar el bloque de comentarios que documenta la semántica" quedó satisfecha: `usageDelta()` lo documenta junto a la tabla de valores medidos. |
+
+### Issues: ninguna muere, y conviene decir por qué
+
+Las cuatro que nombran opencode **no son v1-only**. Descartarlas por el nombre
+del hook habría sido el error:
+
+- **#1085** — re-enmarcada. El hook v1 (`experimental.chat.system.transform`) ya no
+  existe, pero el defecto **sí**: el port hace el mismo `splice(1, 0, …)` dentro de
+  `SystemPart[]`. Verificar contra Qwen estricto sobre `ctx.session.hook("context")`.
+- **#1053, #1255, #1254** — sin cambio. El modo embebido sin MCP, la detección de
+  plataforma y el importador multi-adapter agnósticos de la versión del plugin.
+  #1254 sube de urgencia: la contabilidad de uso vive ahora en v2 y el importador
+  sigue sin reconocer `session.usage.updated`.
+
+**Las otras 99 issues pendientes tampoco las mueve.** Decidir "no hay soporte de
+v1" no toca linux (15), windows (7), store (6), executor (6), sesión (13),
+stats (2), empaquetado (4) ni core (13). La caída de v1 no es una palanca grande
+sobre el backlog: 2 de 63 PRs accionables, 0 de 103 issues.
+
+### Dos notas del triage anterior que la verificación desmintió
+
+Las había escrito sin comprobar y eran falsas:
+
+- **"`tests/opencode-plugin.test.ts` = 125 tests v1"** → son **57**, y la cifra de
+  125 no aparece en el fichero. Todos invocan `ContextModePlugin` (8 referencias),
+  así que la conclusión (superficie v1-only) se sostiene, el número no.
+- **"~200 líneas de andamiaje v1"** → sin medir. `createContextModePlugin` ocupa
+  ~50 líneas (`plugin.ts:934-982`) y es un adaptador delgado sobre `initState()`.
+  Lo que sí pesa es `HOOK_TYPES` en `hooks.ts` con sus 3 nombres v1, más el
+  andamiaje de `PluginClient`/`PluginContext` (~40 líneas de tipos). Borrar v1 es
+  mucho más barato de lo que decía este documento.
+
 ## Pendiente de decisión: KiloCode
 
-Todo lo de abajo queda **bloqueado** hasta que decidas KiloCode:
+**Sin resolver, y la pregunta sigue siendo la misma.** KiloCode es un fork de
+OpenCode sobre la API v1: `getPlatform()` (`plugin.ts:346`) resuelve `kilo` antes
+que `opencode`, y los dos leen el mismo factory v1. No v1 = no KiloCode. El
+nombre `kilo` sobrevive en 4 sitios (env detection, `TOOL_PREFIXES`, `index.ts:86`,
+tipos). Nada de eso se tocó.
 
-- #1160 → DESCARTAR (el objeto, la fusión del array `plugin` v1, desaparece)
-- limpieza de `OPENCODE_HOOK_NAMES` y el `Hooks` map v1 (~200 líneas)
-- borrar o reescribir `tests/opencode-plugin.test.ts` (125 tests, solo v1)
-- `ctx_upgrade` / install dejando de escribir la key v1
+Queda bloqueado hasta que decidas:
+
+- limpieza de `HOOK_TYPES` v1 en `hooks.ts` + los tipos `PluginClient`/`PluginContext`
+  (~90 líneas, no ~200)
+- borrar o reescribir `tests/opencode-plugin.test.ts` (57 tests, solo v1)
+- `createContextModePlugin` y el campo `server` del export dual (~50 líneas)
+
+Lo que **no** depende de esa decisión y se puede hacer ya: el resto de la lista
+de `pr-review.md` ("Siguiente tanda"), que es agnóstico de plataforma.

@@ -47,7 +47,8 @@ respetada):
 3. #1155 — ampliar la redaction de `ctx-debug.sh` (superconjunto del #1144 ya
    adoptado). Subir solo la capa node: la capa `sed` de este fork no existe
    upstream.
-4. #1256 → #1241 → #1040 — el racimo de atribucion de sesion. #1241 trae un
+4. #1256 → #1241 — el racimo de atribucion de sesion. (#1040 se salio de la
+   cadena: su objeto, #1036, lo resolvio el port a v2 — ver la fila.) #1241 trae un
    bug de orden: consulta el env antes que el fichero que justamente existe
    porque el env queda stale.
 5. #897, #1178, #1029 — #1029 es la pieza real de Pi AbortSignal (#1182 es su
@@ -131,7 +132,7 @@ pura. La pregunta "¿queremos soportar X?" no la responde una revisión de diff.
 | 1228 | 2 | +89/-14 | next | unstable | 0 | fix(hooks): ship default timeouts so a hung hook cannot block the CLI | ADAPTADO — timeout en las 15 entradas de `hooks/hooks.json` (PreToolUse 10s por ser el camino critico de cada tool call, resto 30s) Y en `generateHookConfig`, que upstream no toco y es la ruta de los installs standalone: sin ahi un hook colgado sigue bloqueando el CLI. Constante unica en `claude-code/hooks.ts` + test que ata ambos ficheros |
 | 1086 | 2 | +90/-3 | next | clean | 40 | fix(hooks): scan quotes left to right so prose apostrophes cannot expose a command | ADOPTADO |
 | 1056 | 2 | +94/-12 | next | clean | 50 | fix(db): stop mutating shared DB files across processes (close-time TRUNCATE checkpoint + default mmap) | ADOPTAR — corregir dos comentarios: el timer PASSIVE de #988 no existe todavia y el mmap por defecto se perdia por rendimiento |
-| 1160 | 2 | +95/-2 | next | unstable | 20 | fix(opencode): merge sibling config plugin arrays when writing opencode.jsonc | ADOPTAR — anadir guarda Array.isArray en (settings.plugin ?? []) |
+| 1160 | 2 | +95/-2 | next | unstable | 20 | fix(opencode): merge sibling config plugin arrays when writing opencode.jsonc | DESCARTADO — la caida de OpenCode v1 le quita el objeto: fusionar el array `plugin` de opencode.jsonc solo importa si algo escribe ese array. En v2 la key `plugin` no se lee (resuelve npm specifiers) y el install ya no la escribe. El sintoma (arrays siblings que se pisan al escribir la config) desaparece con la causa. Anotado antes como ADOPTAR bajo el supuesto de que v1 seguia vivo.|
 | 1238 | 2 | +96/-4 | next | unstable | 3 | fix(fetch): keep nested fenced examples intact during extraction | DESCARTAR — src/fetch/ no existe en este fork; es solo de next |
 | 1129 | 2 | +110/-9 | next | unstable | 8 | fix(hooks): pin ABI healing to the running Node | CONFLICTO — hooks/ensure-deps.mjs, que tocamos en 45d5185 |
 | 929 | 2 | +110/-1 | next | clean | 49 | fix(packaging): guard packaged helper scripts | ADOPTADO |
@@ -162,7 +163,7 @@ pura. La pregunta "¿queremos soportar X?" no la responde una revisión de diff.
 | 1172 | 3 | +177/-160 | next | unstable | 17 | fix(fetch): report concise subprocess errors | CONFLICTO — src/server.ts |
 | 1155 | 3 | +181/-12 | main | unstable | 21 | Redact secrets from the debug report before it leaves the machine | ADAPTAR — superconjunto del #1144 que ya se adopto: la capa node pasa de 3 regex a un walk JSON-aware (bloques `env` completos, claves con forma de credencial) + masking de lineas TOML + mas formas de token (AKIA, dt0c, eyJ, Bearer, squ_). CONFLICTO: este fork ya tiene una capa `sed` en `config_file` que upstream no tiene; subir solo la capa node, no reemplazar el bloque entero |
 | 1145 | 3 | +187/-11 | next | unstable | 24 | fix: skip Claude self-healing for non-Claude launches | ADAPTADO — dos mitades. (a) Los skips `no-plugin-root` y `not-claude-code` ya no loggean: son justo las ramas que prueban que NO es Claude Code, asi que escribir ahi plantaba evidencia de un install CC. (b) `isClaudeLaunch` en start.mjs, porque el plugin de Codex tambien lanza start.mjs con CONTEXT_MODE_PLATFORM=codex y creaba `~/.claude/hooks/` para quien no tiene Claude Code. Sin plataforma declarada se mantiene el heal: Claude Code nunca pone la var |
-| 1040 | 3 | +214/-20 | main | clean | 58 | fix(cost): emit opencode multi-step usage as deltas (#1036) | ADAPTAR — el delta de coste acumulativo→por paso es correcto, pero borra el bloque de comentarios que documenta que `.tokens` es last-step y `.cost` es acumulativo por turno. Conservarlo: en este fork la honestidad de las etiquetas es invariante (mismo motivo que #996) |
+| 1040 | 3 | +214/-20 | main | clean | 58 | fix(cost): emit opencode multi-step usage as deltas (#1036) | DESCARTADO — su objeto era #1036, y #1036 ya no es una issue abierta: es codigo de este fork. El port a v2 lo encontro y lo corrigio (usageDelta), verificado contra la DB real de sesion. Ademas la premisa del PR es falsa en v2: aqui .tokens tambien es acumulado, no last-step, asi que el diff upstream no aplica. La nota de conservar el bloque de comentarios que documenta la semantica quedo satisfecha: usageDelta lo documenta junto a la tabla de valores medidos.|
 | 1127 | 3 | +220/-19 | next | unstable | 27 | feat(server): make echo budgets configurable per host | ADOPTADO |
 | 1019 | 3 | +228/-26 | next | clean | 53 | fix(security): honor Pi project permission settings | CONFLICTO — reaplicar a mano sobre src/security.ts |
 | 1144 | 3 | +239/-10 | main | unstable | 24 | fix(ctx-debug): redact env blocks and credential-shaped keys in captured configs | ADOPTADO — ver commit |

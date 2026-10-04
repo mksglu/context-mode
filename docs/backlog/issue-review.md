@@ -11,9 +11,9 @@ cruzados con las PRs que este fork ya adoptó.
 ## Resumen
 
 - **CUBIERTO-POR-PR**: 29 — la issue tiene una PR de las 34 adoptadas aquí.
-- **RESUELTO-AQUI**: 27 — (+2: #1187 y #1199, resueltas por el port a OpenCode v2) corregido directamente en `fix/backlog-takeover`, con el commit.
+- **RESUELTO-AQUI**: 28 — (+3: #1036, #1187 y #1199, resueltas por el port a OpenCode v2) corregido directamente en `fix/backlog-takeover`, con el commit.
 - **RUIDO**: 3 — duplicado, pregunta o promoción; no se corrige con código.
-- **PENDIENTE**: 104 — requiere trabajo.
+- **PENDIENTE**: 103 — requiere trabajo.
 
 ## Pendientes por subsistema
 
@@ -64,7 +64,7 @@ cruzados con las PRs que este fork ya adoptó.
 | 1048 | adaptadores | bug | 2 | PENDIENTE |  | Claude Code plan mode blocks ctx_batch_execute: no read-only gather path since the #851 annotations |
 | 1050 | adaptadores | feature | 2 | PENDIENTE |  | Feature: zero-gap single-row collapsed rendering for Pi tools |
 | 1052 | adaptadores | bug | 0 | CUBIERTO-POR-PR |  | [Bug]: OpenCode webfetch alias missing - TOOL_ALIASES maps "fetch" but opencode tool is "webfetch" |
-| 1053 | adaptadores | bug | 1 | PENDIENTE |  | [Bug]: isMCPReady() gate swallows all redirects in plugin-only embedded mode (OpenCode) |
+| 1053 | adaptadores | bug | 1 | PENDIENTE | SIGUE — el modo embebido sin MCP (CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS) es el camino del plugin en v2. La deteccion de plataforma no cambio. | [Bug]: isMCPReady() gate swallows all redirects in plugin-only embedded mode (OpenCode) |
 | 1078 | adaptadores | bug | 0 | RESUELTO-AQUI | fix(db) erratas | [Bug]: cache-heal gates on "context-mode@context-mode" but the registry key is "context-mode@claude-context-mo |
 | 1083 | adaptadores | feature | 1 | PENDIENTE |  | [Feature]: Codex root-context hygiene for recursive home searches and routing escapes |
 | 1088 | adaptadores | feature | 1 | PENDIENTE |  | [Feature]: show tool input in `pi` with `Tool output: expanded` |
@@ -86,7 +86,7 @@ cruzados con las PRs que este fork ya adoptó.
 | 1215 | adaptadores | bug | 0 | PENDIENTE |  | [Bug]: A project-scope Claude plugin install enables context-mode globally (start.mjs writes enabledPlugins an |
 | 1219 | adaptadores | bug | 0 | PENDIENTE |  | Cannot find a documented way to install context-mode in Codex Desktop |
 | 1222 | adaptadores | bug | 0 | CUBIERTO-POR-PR |  | Claude Code: bare `mcp__` hook matchers match nothing since CC v2.1.195 (exact-match semantics) |
-| 1255 | adaptadores | bug | 0 | PENDIENTE |  | [Bug]: "opencode" missing from the MCP clientInfo map and probed 14th of 15 — platform detection silently reso |
+| 1255 | adaptadores | bug | 0 | PENDIENTE | SIGUE — platform detection, agnostico de la version del plugin. Aplica tal cual. | [Bug]: "opencode" missing from the MCP clientInfo map and probed 14th of 15 — platform detection silently reso |
 | 1258 | adaptadores | feature | 0 | PENDIENTE |  | [Feature]: Please release a version compatible with DeepSeekHarness as soon as possible. |
 | 45 | core/otros | bug | 100 | PENDIENTE |  | Beta testers wanted — 15 platforms × 3 operating systems |
 | 915 | core/otros | bug | 0 | PENDIENTE |  | runPool: `capped` is true when jobs.length < concurrency (not a real cap) |
@@ -133,10 +133,10 @@ cruzados con las PRs que este fork ya adoptó.
 | 874 | linux | bug | 1 | PENDIENTE |  | [BUG] OMP plugin tool_result captures metadata but never replaces output — bytes_avoided always 0 |
 | 895 | linux | bug | 1 | PENDIENTE |  | ctx_search ranks stale cross-session memory above fresh same-session captures |
 | 959 | linux | bug | 6 | PENDIENTE |  | Pi adapter: hung ctx_execute cannot be aborted; Esc/Ctrl+C does nothing |
-| 1036 | linux | bug | 1 | PENDIENTE | v2: delta por paso via usageDelta (medido: usage.updated es por paso con payload ACUMULADO) |  | opencode adapter appends cumulative turn cost once per step, over-counting multi-step turns |
+| 1036 | linux | bug | 1 | RESUELTO-AQUI | port v2 (8b1d52d) — usageDelta() + readUsageSnapshot(). MEDIDO en el stream real: session.usage.updated dispara una vez por PASO con el payload ACUMULADO del turno (tokens.input 1279918 -> 1280031 -> 1280078 en un turno de 3 pasos), o sea ~3x de sobre-conteo. Ojo: en v1 solo .cost era acumulado y .tokens last-step; en v2 ambos son acumulados. Verificado contra la DB real, no solo en tests: filas post-fix = deltas (94, 649, 7085). |  | opencode adapter appends cumulative turn cost once per step, over-counting multi-step turns |
 | 1067 | linux | bug | 0 | PENDIENTE |  | pi adapter: collapsed tool status line shows the code-echo fence line (```javascript) instead of actual output |
 | 1069 | linux | bug | 1 | PENDIENTE |  | Pi adapter does not enforce mandatory context-mode routing for read-only tools |
-| 1085 | linux | bug | 0 | PENDIENTE |  | [OpenCode adapter] `experimental.chat.system.transform` injects extra system-role messages - strict Qwen singl |
+| 1085 | linux | bug | 0 | PENDIENTE | RE-ENMARCADA v2 — el hook v1 (experimental.chat.system.transform) ya no existe, pero el defecto sigue: el port hace el mismo splice(1, 0, ...) dentro de SystemPart[]. Verificar contra Qwen estricto sobre ctx.session.hook("context"). No es v1-only. | [OpenCode adapter] `experimental.chat.system.transform` injects extra system-role messages - strict Qwen singl |
 | 1094 | linux | bug | 0 | PENDIENTE |  | [Bug]: Pi adapter: ctx_execute renders blank in collapsed TUI — shows only code fence opening |
 | 1112 | linux | bug | 0 | CUBIERTO-POR-PR |  | Pi adapter: ephemeral context injection invalidates Anthropic prompt cache once per turn |
 | 1150 | linux | bug | 0 | PENDIENTE |  | Pi adapter: renderCall drops tool args — every ctx_* call row renders as a bare tool name |
@@ -147,7 +147,7 @@ cruzados con las PRs que este fork ya adoptó.
 | 1199 | linux | bug | 2 | RESUELTO-AQUI | port v2: `setup` + descubrimiento en `plugins/` |  | OpenCode 2.x plugin fails to load (needs a V2 adapter: { id, effect\|setup }) |
 | 1201 | linux | bug | 0 | PENDIENTE |  | [Bug]: OpenClaw 2026.9.x — adapter fails to load from the plugin capture (computed import paths), unhandled re |
 | 1221 | linux | docs | 0 | CUBIERTO-POR-PR |  | [Bug]: OMP adapter hard-blocks curl/wget/fetch( inside quotes, grep patterns and heredocs (Pi fix from #625 ne |
-| 1254 | linux | bug | 0 | PENDIENTE |  | [Bug]: ctx_stats reports OpenCode as "Skipped / no real chat activity" — multi-adapter importer only knows the |
+| 1254 | linux | bug | 0 | PENDIENTE | SIGUE — el importador multi-adapter no reconoce los eventos v2 (session.usage.updated), asi que ctx_stats sigue reportando OpenCode como sin actividad. Mas urgente ahora que la contabilidad de uso esta en v2. | [Bug]: ctx_stats reports OpenCode as "Skipped / no real chat activity" — multi-adapter importer only knows the |
 | 1174 | macos | bug | 0 | CUBIERTO-POR-PR |  | start.mjs background install of turndown/better-sqlite3 dies on the #1139 Arborist "edgesOut" crash on macOS — |
 | 1196 | macos | bug | 2 | PENDIENTE |  | ensure-deps: fast path re-copies and re-codesigns better_sqlite3.node on every hook call (macOS disk churn) |
 | 1213 | macos | bug | 0 | CUBIERTO-POR-PR |  | Stats path opens every session DB (not read-only), causing sustained fsevents/AV load on macOS |
