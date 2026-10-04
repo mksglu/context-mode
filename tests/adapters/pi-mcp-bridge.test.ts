@@ -1130,3 +1130,134 @@ describe("foreground keep-alive — idle reaper scoped by session kind (#868)", 
     client.shutdown();
   });
 });
+
+// ── UTF-8 decoding across stdout chunk boundaries (silent data corruption) ──
+//
+// src/adapters/pi/mcp-bridge.ts:531 decoded every stdout chunk in isolation:
+//
+//     this.buffer += chunk.toString("utf-8");
+//
+// A Node stream delivers bytes in arbitrary chunks that are NOT aligned to
+// UTF-8 code-point boundaries. When a chunk ends mid-sequence,
+// Buffer#toString("utf-8") substitutes U+FFFD for the incomplete tail — and
+// because the decoded text is appended immediately, that U+FFFD is baked
+// permanently into this.buffer. The real bytes arriving in the next chunk can
+// no longer repair it.
+//
+// The failure is SILENT rather than loud. U+FFFD is a legal character inside a
+// JSON string, so JSON.parse(line) still succeeds and the `catch { continue }`
+// never fires. The corrupted text goes straight to handler.resolve(msg.result).
+// Every ctx_execute / ctx_search / ctx_fetch_and_index result containing CJK,
+// emoji, or accented text silently loses characters on the Pi/OMP path, and
+// the agent has no way to detect it.
+//
+// This is a DIFFERENT defect class from the slice-boundary lone-surrogate
+// issues (#1163 / PR #1176, #903, #659): those truncate a Buffer at a chosen
+// byte offset, this one corrupts on the stream-chunk boundary.
+//
+// src/executor.ts:496 already gets this right (Buffer.concat(...).toString),
+// but a concat refactor is not available here: the bridge is long-lived and
+// cannot know which chunk is the last one. A StringDecoder holds the
+// incomplete trailing sequence back across chunks instead.
+describe("MCPStdioClient — multi-byte UTF-8 split across stdout chunks", () => {
+  // 日本語 is 3 bytes per code point; ✅ and 🎉 are 3 and 4 bytes; é is 2.
+  // Every one of them is a candidate for landing on a chunk boundary.
+  const CJK = "\u65e5\u672c\u8a9e";
+  const TOOL_TEXT = `\u2705 ${CJK}\u306e\u30c6\u30ad\u30b9\u30c8 \u2014 caf\u00e9 \ud83c\udf89`;
+
+  /** Inert stdin stub — same shape the #643 slice uses. No child process. */
+  function stubStdin(client: unknown): void {
+    (client as unknown as { child: unknown }).child = {
+      stdin: {
+        destroyed: false,
+        writableEnded: false,
+        closed: false,
+        write: (_data: string, cb?: (err?: Error) => void) => {
+          cb?.();
+          return true;
+        },
+      },
+    };
+  }
+
+  /** A newline-terminated tools/call JSON-RPC response carrying `text`. */
+  function responseLine(id: number, text: string): Buffer {
+    return Buffer.from(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id,
+        result: { content: [{ type: "text", text }] },
+      }) + "\n",
+      "utf-8",
+    );
+  }
+
+  const feed =
+    (client: unknown) =>
+    (chunk: Buffer): void =>
+      (client as unknown as { onData: (b: Buffer) => void }).onData(chunk);
+
+  it("resolves the exact tool text when a chunk ends mid-code-point", async () => {
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient("/unused/server.mjs");
+    stubStdin(client);
+
+    const inFlight = client.callTool("ctx_execute", {});
+    const id = (client as unknown as { requestId: number }).requestId;
+    const line = responseLine(id, TOOL_TEXT);
+
+    // Cut inside the first 3-byte CJK character, after its first byte.
+    const at = line.indexOf(Buffer.from(CJK, "utf-8"));
+    expect(at).toBeGreaterThan(0);
+    const cut = at + 1;
+
+    feed(client)(line.subarray(0, cut));
+    feed(client)(line.subarray(cut));
+
+    const result = await inFlight;
+    // Before the fix the first 日 arrives as U+FFFD, so this fails with a
+    // single-character diff that is invisible to the calling agent.
+    expect(result.content?.[0]?.text).toBe(TOOL_TEXT);
+  });
+
+  it("holds an incomplete trailing sequence instead of baking U+FFFD into the buffer", async () => {
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient("/unused/server.mjs");
+    stubStdin(client);
+
+    const inFlight = client.callTool("ctx_execute", {});
+    const id = (client as unknown as { requestId: number }).requestId;
+    const line = responseLine(id, TOOL_TEXT);
+    const cut = line.indexOf(Buffer.from(CJK, "utf-8")) + 1;
+
+    feed(client)(line.subarray(0, cut));
+
+    // A correct incremental decoder withholds the incomplete tail instead of
+    // emitting a replacement character for bytes it has not seen the rest of.
+    const buffered = (client as unknown as { buffer: string }).buffer;
+    expect(buffered).not.toContain("\uFFFD");
+
+    // The withheld bytes must still arrive intact once the rest shows up.
+    feed(client)(line.subarray(cut));
+    const result = await inFlight;
+    expect(result.content?.[0]?.text).toBe(TOOL_TEXT);
+  });
+
+  it("reassembles the payload byte-for-byte when the stream delivers one byte per chunk", async () => {
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient("/unused/server.mjs");
+    stubStdin(client);
+
+    const inFlight = client.callTool("ctx_execute", {});
+    const id = (client as unknown as { requestId: number }).requestId;
+    const line = responseLine(id, TOOL_TEXT);
+
+    // Worst-case framing: every code point is split across chunks. This is the
+    // OS pipe scheduler's freedom, not a synthetic shape — a large CJK payload
+    // lands on arbitrary boundaries in normal operation.
+    for (let i = 0; i < line.length; i++) feed(client)(line.subarray(i, i + 1));
+
+    const result = await inFlight;
+    expect(result.content?.[0]?.text).toBe(TOOL_TEXT);
+  });
+});
