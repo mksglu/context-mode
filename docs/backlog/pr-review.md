@@ -30,9 +30,9 @@ Ya resueltos antes de la revisión individual:
 
 | PR |-arch | +add/-del | base | merge | act. | título | veredicto |
 |---|---|---|---|---|---|---|---|
-| 1137 | 1 | +1/-1 | next | unstable | 25 | docs: align session continuity guidance | PENDIENTE |
-| 972 | 1 | +1/-1 | next | clean | 53 | fix(gitSetupShell): do not hardcode bash location | PENDIENTE |
-| 1245 | 1 | +2/-2 | next | unstable | 2 | fix(deps): refresh express-rate-limit to pull in patched ip-address | PENDIENTE |
+| 1137 | 1 | +1/-1 | next | unstable | 25 | docs: align session continuity guidance | ADOPTADO |
+| 972 | 1 | +1/-1 | next | clean | 53 | fix(gitSetupShell): do not hardcode bash location | ADOPTADO — el titulo exagera: el hardcode solo existia en el test, nunca en el producto |
+| 1245 | 1 | +2/-2 | next | unstable | 2 | fix(deps): refresh express-rate-limit to pull in patched ip-address | DESCARTADO — el fix ya esta en efecto via pnpm-lock.yaml (ip-address@10.7.3, express-rate-limit@8.7.0); bun.lock es vestigial |
 | 1244 | 1 | +2/-1 | main | unstable | 1 | Add website URL to plugin.json | PENDIENTE |
 | 975 | 1 | +2/-2 | main | clean | 77 | fix(ctx_execute): prevent hang when background=true without timeout | PENDIENTE |
 | 1061 | 1 | +4/-4 | next | clean | 47 | docs(readme): correct Pi session completeness from High to Full (#1021) | PENDIENTE |
@@ -48,13 +48,13 @@ Ya resueltos antes de la revisión individual:
 | 1250 | 2 | +16/-1 | next | unstable | 1 | fix: classify shell exit 1 with stderr as an error | PENDIENTE |
 | 1059 | 2 | +17/-0 | next | clean | 47 | fix(opencode): route webfetch through the WebFetch redirect (#1052) | PENDIENTE |
 | 930 | 2 | +18/-1 | next | clean | 49 | fix(docs): avoid GraphQL issue listing | PENDIENTE |
-| 1180 | 2 | +22/-0 | next | unstable | 16 | fix(pi): stamp the context-hook message with a timestamp so Radius accepts it | PENDIENTE |
+| 1180 | 2 | +22/-0 | next | unstable | 16 | fix(pi): stamp the context-hook message with a timestamp so Radius accepts it | DESCARTADO — superseded por #1149 (mismo cambio, test mas debil) |
 | 974 | 2 | +23/-1 | next | clean | 53 | fix(start.mjs): remove chdir | PENDIENTE |
 | 934 | 2 | +23/-2 | next | clean | 53 | fix(batch): export NODE_OPTIONS as a statement so compound shell commands work (#925) | PENDIENTE |
 | 1097 | 2 | +26/-1 | main | clean | 37 | feat(server): CONTEXT_MODE_MAX_LIMIT env-var override | PENDIENTE |
 | 1062 | 2 | +28/-1 | next | clean | 47 | fix(analytics): replace time-language with byte-ratio wording (#1023) | PENDIENTE |
 | 1138 | 2 | +29/-0 | next | unstable | 25 | fix(fetch): handle HTML tables without rows | PENDIENTE |
-| 1149 | 2 | +30/-0 | next | unstable | 22 | fix(pi): timestamp injected context messages for Radius | PENDIENTE |
+| 1149 | 2 | +30/-0 | next | unstable | 22 | fix(pi): timestamp injected context messages for Radius | ADOPTADO — mismo fix de una linea que #1180 pero con test mas fuerte: serializa el payload como hace un gateway |
 | 1177 | 2 | +32/-6 | next | unstable | 16 | fix(batch): export NODE_OPTIONS so compound shell commands work (#1117) | PENDIENTE |
 | 931 | 2 | +37/-16 | next | clean | 49 | fix: surface statusline analytics import failures (#894) | PENDIENTE |
 | 969 | 2 | +40/-5 | next | clean | 53 | fix(batch): re-create the fs-preload temp file if an OS cleaner removed it (#951) | PENDIENTE |
