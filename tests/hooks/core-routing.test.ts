@@ -1411,6 +1411,68 @@ describe("mcp-ready: PPID-independence (regression for #347)", () => {
   });
 });
 
+// #1055: MCP tools are registered per session. With several Claude Code
+// sessions on one machine, a sibling session's live server used to satisfy
+// isMCPReady(), so a session without its own server got WebFetch denied with a
+// redirect to ctx_* tools it cannot call. The server now writes its host PID
+// on the sentinel's second line; the scoped check requires that host to be an
+// ancestor of the hook process.
+describe.skipIf(POLLUTED || process.platform === "win32")("mcp-ready: session scoping (#1055)", () => {
+  let sibling: ReturnType<typeof spawn>;
+
+  beforeAll(() => {
+    // Stands in for a sibling session's MCP client: alive, not our ancestor.
+    sibling = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  });
+
+  afterAll(async () => {
+    sibling.kill("SIGTERM");
+    await new Promise<void>((r) => sibling.on("exit", () => r()));
+  });
+
+  beforeEach(() => {
+    // The file-level legacy sentinel would answer every scan; remove it.
+    try { unlinkSync(mcpSentinel); } catch {}
+  });
+
+  afterEach(() => {
+    for (const p of fixtures) {
+      try { unlinkSync(p); } catch { /* already gone */ }
+    }
+    fixtures.clear();
+  });
+
+  it("counts a live server whose host is this process's ancestor", () => {
+    createSentinel("own-1055", `${process.pid}\n${process.ppid}`);
+    expect(isMCPReady({ sessionScoped: true })).toBe(true);
+  });
+
+  it("ignores a live server hosted by a sibling session", () => {
+    createSentinel("sibling-1055", `${process.pid}\n${sibling.pid}`);
+    expect(isMCPReady({ sessionScoped: true })).toBe(false);
+    // Unscoped callers (non-Claude-Code hosts) keep the machine-wide answer.
+    expect(isMCPReady()).toBe(true);
+  });
+
+  it("finds this session's server behind a sibling's in the same scan", () => {
+    createSentinel("sibling-1055", `${process.pid}\n${sibling.pid}`);
+    createSentinel("own-1055", `${process.pid}\n${process.ppid}`);
+    expect(isMCPReady({ sessionScoped: true })).toBe(true);
+  });
+
+  it("trusts a legacy sentinel without a host line", () => {
+    createSentinel("legacy-1055", String(process.pid));
+    expect(isMCPReady({ sessionScoped: true })).toBe(true);
+  });
+
+  it("does not deny WebFetch in Claude Code when only a sibling's server is up", () => {
+    createSentinel("sibling-1055", `${process.pid}\n${sibling.pid}`);
+    expect(routePreToolUse("WebFetch", { url: "https://example.com" }, undefined, "claude-code")).toBeNull();
+    createSentinel("own-1055", `${process.pid}\n${process.ppid}`);
+    expect(routePreToolUse("WebFetch", { url: "https://example.com" }, undefined, "claude-code")?.action).toBe("deny");
+  });
+});
+
 // ─────────────────────────────────────────────────────────
 // Slice 4 — additionalContext surfacing on security init fail (#558)
 // ─────────────────────────────────────────────────────────

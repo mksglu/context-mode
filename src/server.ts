@@ -5012,6 +5012,12 @@ async function main() {
   // Hardcoded /tmp on Unix to avoid TMPDIR mismatch (#347).
   const mcpSentinelDir = process.platform === "win32" ? tmpdir() : "/tmp";
   const mcpSentinel = join(mcpSentinelDir, `context-mode-mcp-ready-${process.pid}`);
+  // #1055: second line = host PID (the MCP client that launched us), so a
+  // Claude Code hook can tell its own session's server from a sibling's.
+  // start.mjs passes the real host when it re-execs us under Bun (#564).
+  // Removed from env so sandboxed children never inherit a stale host.
+  const mcpSentinelBody = `${process.pid}\n${process.env.CONTEXT_MODE_HOST_PID || process.ppid}`;
+  delete process.env.CONTEXT_MODE_HOST_PID;
   // #844: handle to the periodic sentinel refresh timer (started after connect).
   let sentinelRefresh: ReturnType<typeof setInterval> | undefined;
 
@@ -5073,7 +5079,7 @@ async function main() {
   );
 
   // Write MCP readiness sentinel (#230)
-  try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
+  try { writeFileSync(mcpSentinel, mcpSentinelBody); } catch { /* best effort */ }
 
   // #844: refresh the sentinel mtime while the server is alive so readiness
   // probes from a foreign PID namespace (shared /tmp) can trust a recent
@@ -5081,7 +5087,7 @@ async function main() {
   // freshness window is 90s (hooks/core/mcp-ready.mjs); refresh at 30s (3x).
   // unref() so this timer never keeps the event loop alive on its own.
   sentinelRefresh = setInterval(() => {
-    try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
+    try { writeFileSync(mcpSentinel, mcpSentinelBody); } catch { /* best effort */ }
   }, 30_000);
   sentinelRefresh.unref();
 

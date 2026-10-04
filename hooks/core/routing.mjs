@@ -25,7 +25,7 @@ import { existsSync, mkdirSync, rmSync, rmdirSync, readdirSync, unlinkSync, open
  * redirect action — prevents agent from getting stuck when MCP tools
  * are unavailable. Applies to deny and modify actions that mention MCP alternatives.
  */
-function mcpRedirect(result, mcpToolsAvailable = true) {
+function mcpRedirect(result, mcpToolsAvailable = true, platform) {
   // #1037: an operator can turn every redirect off. The redirect exists to
   // protect the context window; it must never be the reason a caller cannot
   // reach the network at all. A subagent whose tool set does not include the
@@ -33,7 +33,11 @@ function mcpRedirect(result, mcpToolsAvailable = true) {
   // with no way to do web research and no way to say so.
   if (process.env.CONTEXT_MODE_ALLOW_WEBFETCH === "1") return null;
   if (!mcpToolsAvailable) return null;
-  if (!isMCPReady()) return null;
+  // Claude Code launches the MCP server and the hooks from the same session
+  // process, so the server's host must be one of our ancestors. A live server
+  // from a sibling session does not make ctx_* callable here (#1055). Other
+  // hosts keep the machine-wide check: their spawn topology is not verified.
+  if (!isMCPReady({ sessionScoped: platform === "claude-code" })) return null;
   return result;
 }
 import { homedir, tmpdir } from "node:os";
@@ -886,7 +890,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
             bytesAvoided: 8192,
             commandSummary: command.slice(0, 200),
           },
-        }, mcpToolsAvailable);
+        }, mcpToolsAvailable, platform);
       }
       // All segments safe → allow through
       return null;
@@ -908,7 +912,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         updatedInput: {
           command: `echo "context-mode: Inline HTTP redirected. Call ${t("ctx_execute")}(language, code) to fetch, derive your answer in code, and console.log() only the result — the raw response body stays in the sandbox instead of entering your conversation. Full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH)."`,
         },
-      }, mcpToolsAvailable);
+      }, mcpToolsAvailable, platform);
     }
 
     // Build tools (gradle, maven, sbt) → redirect to execute sandbox (Issue #38, #406).
@@ -921,7 +925,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         updatedInput: {
           command: `echo "context-mode: Build tool redirected. Call ${t("ctx_execute")}(language: \\"shell\\", code: \\"${safeCmd} 2>&1 | tail -30\\") to run the build and print only the tail — the verbose build log stays in the sandbox instead of entering your conversation. For more targeted output, replace \\"tail -30\\" with \\"grep -E '(error|warning|FAIL|✗|×)'\\" or similar, so only the lines that matter come back."`,
         },
-      }, mcpToolsAvailable);
+      }, mcpToolsAvailable, platform);
     }
 
     // Skip the routing nudge for commands whose output is structurally
@@ -997,7 +1001,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         bytesAvoided: 16384,
         commandSummary: String(url).slice(0, 200),
       },
-    }, mcpToolsAvailable);
+    }, mcpToolsAvailable, platform);
   }
 
   // ─── Agent: inject context-mode routing into subagent prompts ───
