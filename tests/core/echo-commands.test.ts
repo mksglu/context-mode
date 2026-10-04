@@ -16,10 +16,15 @@
  *      code before stdout
  *   5. ctx_execute_file prepends a header naming the path + a fenced
  *      `${language}` block carrying the source code before stdout
+ *   6. ctx_batch_execute summary lists every command in a "## Commands"
+ *      inventory placed before "## Indexed Sections"
+ *   7. Both echo budgets are tunable via CONTEXT_MODE_COMMAND_ECHO_MAX /
+ *      CONTEXT_MODE_CODE_ECHO_MAX; `0` suppresses the echo for hosts that
+ *      already render the tool input, invalid values keep the default
  *
  * Tests 1-3 hit the pure runBatchCommands/formatCommandOutput surface (fast,
- * no spawn). Tests 4-5 hit the live MCP server over JSON-RPC (covers the
- * tool handler wiring end-to-end).
+ * no spawn). Tests 4-6 hit the live MCP server over JSON-RPC (covers the
+ * tool handler wiring end-to-end). Behaviour 7 spans both harnesses.
  *
  * Run: npx vitest run tests/core/echo-commands.test.ts
  */
@@ -29,9 +34,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 
 import {
+  DEFAULT_COMMAND_ECHO_MAX,
   runBatchCommands,
   type BatchCommand,
 } from "../../src/server.js";
@@ -310,6 +316,158 @@ describe("issue #717 — ctx_execute_file echoes the path + code it ran", () => 
       // Stdout still arrives, AFTER the echo
       expect(text).toContain(marker);
       expect(text.indexOf("```javascript")).toBeLessThan(text.indexOf(marker));
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+    }
+  }, 30_000);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Behaviour 7 — echo budgets are tunable per host. Issues #717/#736 came from
+//               Pi and OpenCode, whose UIs do not render the MCP tool input,
+//               so the echo is the only way to see what ran. Hosts that DO
+//               render the input carry the code twice, once as tool_input and
+//               once in the result. CONTEXT_MODE_CODE_ECHO_MAX /
+//               CONTEXT_MODE_COMMAND_ECHO_MAX let those hosts opt out without
+//               changing the default anywhere else.
+// ════════════════════════════════════════════════════════════════════════════
+describe("echo budgets honour CONTEXT_MODE_COMMAND_ECHO_MAX", () => {
+  const original = process.env.CONTEXT_MODE_COMMAND_ECHO_MAX;
+  afterEach(() => {
+    if (original === undefined) delete process.env.CONTEXT_MODE_COMMAND_ECHO_MAX;
+    else process.env.CONTEXT_MODE_COMMAND_ECHO_MAX = original;
+  });
+
+  async function runOne(command: string): Promise<string> {
+    const exec = mkMockExecutor(() => ({ stdout: "STDOUT-MARKER\n" }));
+    const { outputs } = await runBatchCommands(
+      [{ label: "probe", command }],
+      { timeout: 5000, concurrency: 1, nodeOptsPrefix: NOOP_PREFIX },
+      exec,
+    );
+    return outputs[0];
+  }
+
+  test("0 drops the `$ <command>` line but keeps the heading and stdout", async () => {
+    process.env.CONTEXT_MODE_COMMAND_ECHO_MAX = "0";
+    const section = await runOne("git status --short");
+    expect(section).toContain("# probe");
+    expect(section).toContain("STDOUT-MARKER");
+    expect(section).not.toContain("$ git status --short");
+    expect(section.split("\n").some((l) => l.startsWith("$ "))).toBe(false);
+  });
+
+  test("a smaller budget clips the echo at that length", async () => {
+    process.env.CONTEXT_MODE_COMMAND_ECHO_MAX = "10";
+    const section = await runOne("git log --all --grep='niri' --regexp-ignore-case");
+    const dollarLine = section.split("\n").find((l) => l.startsWith("$ "))!;
+    expect(dollarLine).toBe("$ git log --…");
+  });
+
+  test("non-numeric, negative, whitespace and non-decimal values fall back to the default", async () => {
+    const command = "x".repeat(600);
+    // " " matters most: Number(" ") is 0, so a lax parse would silently
+    // suppress the echo instead of keeping the documented default.
+    for (const bad of ["nope", "-1", "1.5", " ", "\t", "1e3", "0x10"]) {
+      process.env.CONTEXT_MODE_COMMAND_ECHO_MAX = bad;
+      const dollarLine = (await runOne(command)).split("\n").find((l) => l.startsWith("$ "))!;
+      expect(dollarLine, `value ${JSON.stringify(bad)} should keep the default`)
+        .toHaveLength(2 + DEFAULT_COMMAND_ECHO_MAX + 1);
+    }
+  });
+
+  test("unset keeps the documented default", async () => {
+    delete process.env.CONTEXT_MODE_COMMAND_ECHO_MAX;
+    const section = await runOne("git status --short");
+    expect(section).toContain("$ git status --short");
+  });
+});
+
+describe("echo budgets honour CONTEXT_MODE_CODE_ECHO_MAX", () => {
+  let projectDir: string;
+  beforeAll(() => {
+    projectDir = mkdtempSync(join(tmpdir(), "echo-budget-"));
+  });
+  afterAll(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  async function execWith(env: Record<string, string>, code: string): Promise<string> {
+    const proc = spawnServer({ CLAUDE_PROJECT_DIR: projectDir, ...env });
+    try {
+      await initServer(proc);
+      const resp = await awaitRpc(proc, 102, {
+        jsonrpc: "2.0", id: 102, method: "tools/call",
+        params: { name: "ctx_execute", arguments: { language: "javascript", code } },
+      });
+      expect(resp?.error).toBeUndefined();
+      return resp?.result?.content?.[0]?.text ?? "";
+    } finally {
+      try { proc.kill("SIGTERM"); } catch { /* best effort */ }
+    }
+  }
+
+  test("0 drops the fenced source block but keeps stdout", async () => {
+    const marker = `BUDGET-OFF-${Math.random().toString(36).slice(2)}`;
+    const code = `console.log("${marker}");`;
+    const text = await execWith({ CONTEXT_MODE_CODE_ECHO_MAX: "0" }, code);
+    expect(text).toContain(marker);
+    expect(text).not.toContain("```javascript");
+    expect(text).not.toContain(code);
+  }, 30_000);
+
+  test("a smaller budget clips the source block and marks the truncation", async () => {
+    const marker = `BUDGET-CLIP-${Math.random().toString(36).slice(2)}`;
+    const filler = "// ".concat("y".repeat(200));
+    const code = `${filler}\nconsole.log("${marker}");`;
+    const text = await execWith({ CONTEXT_MODE_CODE_ECHO_MAX: "40" }, code);
+    expect(text).toContain("```javascript");
+    expect(text).toContain("… (truncated)");
+    expect(text).not.toContain(code);
+    expect(text).toContain(marker);
+  }, 30_000);
+
+  test("an invalid value keeps the echo at the default budget", async () => {
+    const marker = `BUDGET-BAD-${Math.random().toString(36).slice(2)}`;
+    const code = `console.log("${marker}");`;
+    const text = await execWith({ CONTEXT_MODE_CODE_ECHO_MAX: " " }, code);
+    expect(text).toContain("```javascript");
+    expect(text).toContain(code);
+    expect(text).toContain(marker);
+  }, 30_000);
+});
+
+// Budget 0 must also drop the `## Commands` inventory from the
+// ctx_batch_execute summary, the one place this change touches output layout.
+describe("CONTEXT_MODE_COMMAND_ECHO_MAX=0 drops the batch Commands inventory", () => {
+  let projectDir: string;
+  beforeAll(() => {
+    projectDir = mkdtempSync(join(tmpdir(), "echo-batch-off-"));
+  });
+  afterAll(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  test("summary keeps `## Indexed Sections` and stdout but carries no `## Commands`", async () => {
+    const proc = spawnServer({ CLAUDE_PROJECT_DIR: projectDir, CONTEXT_MODE_COMMAND_ECHO_MAX: "0" });
+    try {
+      await initServer(proc);
+      const resp = await awaitRpc(proc, 103, {
+        jsonrpc: "2.0", id: 103, method: "tools/call",
+        params: {
+          name: "ctx_batch_execute",
+          arguments: {
+            commands: [{ label: "alpha", command: "echo alpha-output" }],
+            queries: ["alpha"],
+          },
+        },
+      });
+      expect(resp?.error).toBeUndefined();
+      const text = resp?.result?.content?.[0]?.text ?? "";
+      expect(text).not.toContain("## Commands");
+      expect(text).not.toContain("$ echo alpha-output");
+      expect(text).toContain("## Indexed Sections");
+      expect(text).toContain("Executed 1 commands");
     } finally {
       try { proc.kill("SIGTERM"); } catch { /* best effort */ }
     }
