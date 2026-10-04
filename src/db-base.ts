@@ -429,6 +429,23 @@ export function defaultDBPath(prefix: string = "context-mode"): string {
  * If all retries fail, throws a descriptive error.
  * Pass custom delays for testing (e.g., [0, 0, 0] to skip waits).
  */
+// Shared 4-byte cell for Atomics.wait; the value is never read.
+const _sleepCell = new Int32Array(new SharedArrayBuffer(4));
+
+/**
+ * Block the calling thread for `ms` without consuming CPU.
+ *
+ * withRetry has to stay synchronous — it wraps prepared-statement calls that
+ * are synchronous — but the previous backoff spun on Date.now() for the whole
+ * delay. On a contended database that pegged a core for 100 + 500 + 2000 ms
+ * per operation, inside the event loop, with every statement queued behind it
+ * (#985). Atomics.wait parks the thread instead.
+ */
+function sleepSync(ms: number): void {
+  if (!(ms > 0)) return;
+  Atomics.wait(_sleepCell, 0, 0, ms);
+}
+
 export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): T {
   let lastError: Error | undefined;
   for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -440,11 +457,7 @@ export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): 
         throw err;
       }
       lastError = err instanceof Error ? err : new Error(msg);
-      if (attempt < delays.length) {
-        const delay = delays[attempt];
-        const start = Date.now();
-        while (Date.now() - start < delay) { /* busy-wait for sync retry */ }
-      }
+      if (attempt < delays.length) sleepSync(delays[attempt]);
     }
   }
   throw new Error(
