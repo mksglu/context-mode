@@ -76,6 +76,27 @@ function getExternalMcpNudgeEvery() {
   return parsed;
 }
 
+// Bash nudge cadence — fire every N unbounded shell calls (#1212).
+// Same shape as the external-MCP knob above: the one-shot Bash nudge is lost
+// in long edit → run → inspect-error → retry loops (the exact workflow where
+// raw output floods context), so the advisory re-fires on a cadence instead of
+// only on the first call. Bounds [1, 100]; invalid env values fall back to the
+// default. period=1 means "fire every call" (opt-in only).
+const BASH_NUDGE_EVERY_DEFAULT = 10;
+const BASH_NUDGE_EVERY_MIN = 1;
+const BASH_NUDGE_EVERY_MAX = 100;
+const BASH_NUDGE_EVERY_ENV = "CONTEXT_MODE_BASH_NUDGE_EVERY";
+
+function getBashNudgeEvery() {
+  const raw = process.env[BASH_NUDGE_EVERY_ENV];
+  if (raw == null || raw === "") return BASH_NUDGE_EVERY_DEFAULT;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < BASH_NUDGE_EVERY_MIN || parsed > BASH_NUDGE_EVERY_MAX) {
+    return BASH_NUDGE_EVERY_DEFAULT;
+  }
+  return parsed;
+}
+
 // #817: size threshold so small Bash calls skip the routing nudge.
 //
 // PreToolUse fires BEFORE the command runs, so the actual output size is
@@ -555,6 +576,12 @@ const TOOL_ALIASES = {
   "fs_read": "Read",
   "fs_write": "Write",
   "execute_bash": "Bash",
+  // Claude Code on Windows exposes a distinct `PowerShell` tool, separate from
+  // `Bash` (#1212). Without these keys its commands bypass every routing branch
+  // — no redirect, no nudge — so raw PowerShell output enters context unchecked.
+  "PowerShell": "Bash",
+  "powershell": "Bash",
+  "pwsh": "Bash",
 };
 
 function toolLeafName(toolName) {
@@ -836,8 +863,11 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
       return null;
     }
 
-    // allow all other Bash commands, but inject routing nudge (once per session)
-    return guidanceOnce("bash", bashGuidance, sessionId);
+    // allow all other Bash commands, but inject the routing nudge on a cadence
+    // (every CONTEXT_MODE_BASH_NUDGE_EVERY calls, default 10) — a one-shot nudge
+    // is lost in long edit → run → inspect-error → retry loops, exactly where raw
+    // output floods context (#1212).
+    return guidancePeriodic("bash", bashGuidance, sessionId, getBashNudgeEvery());
   }
 
   // ─── Read: nudge toward execute_file + large-file byte accounting ───

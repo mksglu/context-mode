@@ -57,6 +57,10 @@ export const EXTERNAL_MCP_MATCHER_PATTERN = "mcp__";
 export const PRE_TOOL_USE_MATCHERS = [
   "Bash",
   "WebFetch",
+  // Claude Code on Windows exposes a distinct `PowerShell` tool alongside
+  // `Bash` (#1212). Without this matcher entry the PreToolUse hook never fires
+  // for it, so routing.mjs cannot apply the Bash stage.
+  "PowerShell",
   "Read",
   "Grep",
   "Agent",

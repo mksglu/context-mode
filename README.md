@@ -1606,6 +1606,7 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 | Variable | Default | Purpose |
 |---|---|---|
 | `CONTEXT_MODE_EXTERNAL_MCP_NUDGE_EVERY` | `10` | Cadence (in tool calls) at which the PreToolUse hook re-injects the "wrap large external-MCP payloads in `ctx_execute`" guidance. The original implementation ([#529](https://github.com/mksglu/context-mode/pull/529)) fired only once per session, which got lost after context compaction in MCP-heavy sessions (e.g. 50+ Jira/Slack/Notion calls — see [#567](https://github.com/mksglu/context-mode/issues/567) follow-up). The default re-fires every 10th matching call, keeping the guidance in the model's recent window. Range `[1, 100]`; invalid values fall back to `10`. Set to `1` for "every call" (most aggressive — adds ~250 tokens/call) or to a larger value for less frequent reminders. |
+| `CONTEXT_MODE_BASH_NUDGE_EVERY` | `10` | Cadence (in tool calls) at which the PreToolUse hook re-injects the shell routing nudge ("prefer `ctx_execute` for large output"). The original implementation fired only once per session, so in iterative debugging loops (edit, run, inspect error, retry) only the first large-output shell call was reminded while every later one dumped raw output into context. The default re-fires every 10th unbounded shell call. Range `[1, 100]`; invalid values fall back to `10`. Set to `1` for "every call". Covers the `Bash` tool and the Windows-only `PowerShell` tool, which canonicalizes to the same stage. |
 
 ## Contributing
 
