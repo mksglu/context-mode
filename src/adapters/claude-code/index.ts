@@ -194,6 +194,17 @@ export class ClaudeCodeAdapter extends ClaudeCodeBaseAdapter implements HookAdap
           ],
         },
       ],
+      SubagentStart: [
+        {
+          matcher: "",
+          hooks: [
+            {
+              type: "command",
+              command: buildHookRuntimeCommand(`${pluginRoot}/hooks/subagentstart.mjs`),
+            },
+          ],
+        },
+      ],
     };
   }
 
@@ -557,10 +568,13 @@ export class ClaudeCodeAdapter extends ClaudeCodeBaseAdapter implements HookAdap
       }
     }
 
-    // Register fresh hooks for required hook types
+    // Register fresh hooks for required hook types, plus SubagentStart: it is
+    // the only path for subagent routing on Claude Code since PreToolUse stopped
+    // rewriting Agent prompts (#911, #967).
     const hookTypes: HookType[] = [
       HOOK_TYPES.PRE_TOOL_USE,
       HOOK_TYPES.SESSION_START,
+      HOOK_TYPES.SUBAGENT_START,
     ];
 
     for (const hookType of hookTypes) {

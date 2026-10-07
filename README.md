@@ -1606,6 +1606,7 @@ That blocks loopback + RFC1918 + ULA in addition to the always-blocked ranges. U
 | Variable | Default | Purpose |
 |---|---|---|
 | `CONTEXT_MODE_EXTERNAL_MCP_NUDGE_EVERY` | `10` | Cadence (in tool calls) at which the PreToolUse hook re-injects the "wrap large external-MCP payloads in `ctx_execute`" guidance. The original implementation ([#529](https://github.com/mksglu/context-mode/pull/529)) fired only once per session, which got lost after context compaction in MCP-heavy sessions (e.g. 50+ Jira/Slack/Notion calls — see [#567](https://github.com/mksglu/context-mode/issues/567) follow-up). The default re-fires every 10th matching call, keeping the guidance in the model's recent window. Range `[1, 100]`; invalid values fall back to `10`. Set to `1` for "every call" (most aggressive — adds ~250 tokens/call) or to a larger value for less frequent reminders. |
+| `CONTEXT_MODE_NO_AGENT_INJECTION` | unset | Set to `1` to stop giving subagents the context-mode routing block. On Claude Code this disables the SubagentStart hook's context; on other platforms the PreToolUse hook stops appending the block to Agent prompts and stops upgrading Bash-type subagents. Claude Code no longer rewrites Agent prompts at all, because a rewritten Agent input trips the auto-mode permission classifier ([#911](https://github.com/mksglu/context-mode/issues/911), [#946](https://github.com/mksglu/context-mode/issues/946), [#967](https://github.com/mksglu/context-mode/issues/967)). |
 
 ## Contributing
 

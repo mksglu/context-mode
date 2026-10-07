@@ -563,6 +563,15 @@ describe("routePreToolUse", () => {
       expect(prompt).not.toContain("<ctx_commands>");
     });
 
+    it("Bash-type subagent is upgraded to general-purpose by default", () => {
+      const result = routePreToolUse("Agent", {
+        prompt: "Run the build",
+        subagent_type: "Bash",
+      });
+      expect(result!.action).toBe("modify");
+      expect(result!.updatedInput!.subagent_type).toBe("general-purpose");
+    });
+
     it("ROUTING_BLOCK constant includes ctx_commands for main session", () => {
       expect(ROUTING_BLOCK).toContain("<ctx_commands>");
       expect(ROUTING_BLOCK).toContain("ctx stats");
@@ -579,6 +588,62 @@ describe("routePreToolUse", () => {
       const t = (name: string) => `mcp__test__${name}`;
       const block = createRoutingBlock(t);
       expect(block).toContain("<ctx_commands>");
+    });
+  });
+
+  // ─── Agent prompt injection opt-out (#911, #946, #967) ──────────────
+  // Rewriting the Agent tool input trips Claude Code's auto-mode classifier
+  // ("[Auto-Mode Bypass]" / "a hook changed this call's input"). Claude Code
+  // receives the routing block via the SubagentStart hook instead, so the
+  // claude-code PreToolUse hook disables injection; any platform can opt out
+  // with CONTEXT_MODE_NO_AGENT_INJECTION=1.
+
+  describe("Agent prompt injection opt-out (#911, #946, #967)", () => {
+    const ENV = "CONTEXT_MODE_NO_AGENT_INJECTION";
+    let saved: string | undefined;
+    beforeEach(() => { saved = process.env[ENV]; delete process.env[ENV]; });
+    afterEach(() => {
+      if (saved === undefined) delete process.env[ENV];
+      else process.env[ENV] = saved;
+    });
+
+    it("agentPromptInjection: false passes the Agent call through unmodified", () => {
+      const result = routePreToolUse(
+        "Agent",
+        { prompt: "Review Task 3", subagent_type: "general-purpose" },
+        undefined, "claude-code", "s1",
+        { agentPromptInjection: false },
+      );
+      expect(result).toBeNull();
+    });
+
+    it("agentPromptInjection: false also skips the Bash → general-purpose rewrite", () => {
+      const result = routePreToolUse(
+        "Agent",
+        { prompt: "Run the build", subagent_type: "Bash" },
+        undefined, "claude-code", "s1",
+        { agentPromptInjection: false },
+      );
+      expect(result).toBeNull();
+    });
+
+    it(`${ENV}=1 passes the Agent call through unmodified on every platform`, () => {
+      process.env[ENV] = "1";
+      for (const platform of [undefined, "claude-code", "qwen-code", "gemini-cli"]) {
+        const result = routePreToolUse(
+          "Agent",
+          { prompt: "Review Task 3", subagent_type: "Bash" },
+          undefined, platform,
+        );
+        expect(result, `platform=${platform}`).toBeNull();
+      }
+    });
+
+    it(`${ENV}=0 keeps the default injection`, () => {
+      process.env[ENV] = "0";
+      const result = routePreToolUse("Agent", { prompt: "Review Task 3" });
+      expect(result!.action).toBe("modify");
+      expect((result!.updatedInput as Record<string, string>).prompt).toContain("<tool_selection_hierarchy>");
     });
   });
 

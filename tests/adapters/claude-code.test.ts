@@ -547,6 +547,9 @@ describe("ClaudeCodeAdapter", () => {
       const settings = JSON.parse(readFileSync(join(tempDir, "settings.json"), "utf-8"));
       expect(settings.hooks.PreToolUse).toHaveLength(1);
       expect(settings.hooks.SessionStart).toHaveLength(1);
+      // Only path for subagent routing on standalone installs (#911, #967).
+      expect(settings.hooks.SubagentStart).toHaveLength(1);
+      expect(settings.hooks.SubagentStart[0].hooks[0].command).toContain("subagentstart.mjs");
       expect(changes.some((c: string) => c.includes("stale"))).toBe(false);
     });
 
@@ -960,6 +963,7 @@ describe("ClaudeCodeAdapter", () => {
         UserPromptSubmit: "userpromptsubmit.mjs",
         SessionStart: "sessionstart.mjs",
         Stop: "stop.mjs",
+        SubagentStart: "subagentstart.mjs",
       };
       for (const [eventType, script] of Object.entries(expectedScripts)) {
         const entries = config[eventType];
@@ -1085,6 +1089,19 @@ describe("ClaudeCodeAdapter", () => {
       expect(parsed.hooks.Stop![0].hooks[0].command).toContain("stop.mjs");
     });
 
+    // Subagent routing moved from Agent prompt rewriting to SubagentStart
+    // additionalContext (#911, #946, #967).
+    it("hooks/hooks.json registers SubagentStart for subagent routing", () => {
+      const repoRoot = resolve(__dirname, "..", "..");
+      const parsed = JSON.parse(readFileSync(join(repoRoot, "hooks", "hooks.json"), "utf8")) as {
+        hooks: Record<string, Array<{ matcher: string; hooks: Array<{ command: string }> }>>;
+      };
+      expect(parsed.hooks.SubagentStart, "SubagentStart hook missing from hooks.json").toHaveLength(1);
+      expect(parsed.hooks.SubagentStart[0].matcher).toBe("");
+      expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain("subagentstart.mjs");
+    });
+
+
     it("POST_TOOL_USE_MATCHERS contains all tools that extractEvents handles", () => {
       const required = [
         "Bash", "Read", "Write", "Edit", "NotebookEdit", "Glob", "Grep",
@@ -1137,7 +1154,7 @@ describe("ClaudeCodeAdapter", () => {
     });
 
     it("returns one HealthCheck per HOOK_SCRIPTS entry (Algo-D1)", () => {
-      // All six hook scripts present on disk → all six hook-script
+      // All seven hook scripts present on disk → all seven hook-script
       // checks PASS. The check iterates HOOK_SCRIPTS keys (the canonical
       // list) so adding a new event auto-extends doctor coverage — no
       // parallel hardcoded list to maintain. Filter to hook-script
@@ -1150,6 +1167,7 @@ describe("ClaudeCodeAdapter", () => {
         "sessionstart.mjs",
         "userpromptsubmit.mjs",
         "stop.mjs",
+        "subagentstart.mjs",
       ];
       for (const s of scripts) writeFileSync(join(pluginRoot, "hooks", s), "");
 
@@ -1163,7 +1181,7 @@ describe("ClaudeCodeAdapter", () => {
     });
 
     it("reports FAIL with missing path detail when a script is absent (Algo-D1)", () => {
-      // Only sessionstart.mjs present → 5 hook-script FAILs + 1 OK. The
+      // Only sessionstart.mjs present → 6 hook-script FAILs + 1 OK. The
       // FAIL detail must reference the exact missing absolute path (not
       // a regex capture artifact like ".../Services/AppData/...").
       // Filter to hook-script checks so this test is independent of
@@ -1179,7 +1197,7 @@ describe("ClaudeCodeAdapter", () => {
       const failed = hookResults.filter((r) => r.status === "FAIL");
       const ok = hookResults.filter((r) => r.status === "OK");
       expect(ok.length).toBe(1);
-      expect(failed.length).toBe(5);
+      expect(failed.length).toBe(6);
       for (const r of failed) {
         expect(r.detail).toContain(pluginRoot);
         expect(r.detail!.endsWith(".mjs")).toBe(true);
@@ -1256,6 +1274,7 @@ describe("ClaudeCodeAdapter", () => {
         "sessionstart.mjs",
         "userpromptsubmit.mjs",
         "stop.mjs",
+        "subagentstart.mjs",
       ];
       for (const s of scripts) writeFileSync(join(pluginRoot, "hooks", s), "");
 

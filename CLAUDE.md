@@ -53,7 +53,7 @@ GitHub API rate-limit: cap at 4 for `gh` calls.
 
 ## Subagent routing
 
-Routing block auto-injected into subagent prompts. Bash-type subagents upgraded to general-purpose. No manual instruction needed.
+On Claude Code, a SubagentStart hook gives every subagent the routing block as context; the Agent prompt is not rewritten. Other platforms append the routing block to subagent prompts and upgrade Bash-type subagents to general-purpose. No manual instruction needed. Set `CONTEXT_MODE_NO_AGENT_INJECTION=1` to turn subagent routing off.
 
 ## Output
 

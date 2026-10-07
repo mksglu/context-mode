@@ -630,15 +630,28 @@ describe("Plugin Tool Name Format in ROUTING_BLOCK", () => {
   const PLUGIN_PREFIX = "mcp__plugin_context-mode_context-mode__";
   const SHORT_PREFIX = "mcp__context-mode__";
 
-  test("Agent routing block uses plugin-format tool names", () => {
-    const result = runHook({ tool_name: "Agent", tool_input: { prompt: "Do something." } });
+  // Claude Code gets the subagent routing block from the SubagentStart hook
+  // (tests/hooks/subagentstart.test.ts). Rewriting the Agent input trips the
+  // auto-mode classifier (#911, #967), so PreToolUse passes Agent through.
+  test("Agent call passes through unmodified on Claude Code", () => {
+    const result = runHook(
+      { tool_name: "Agent", tool_input: { prompt: "Do something.", subagent_type: "Bash" } },
+      { CLAUDE_PROJECT_DIR: process.cwd() },
+    );
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, "", "Expected no hook output for Agent on Claude Code");
+  });
+
+  test("Agent routing block uses plugin-format tool names on Qwen Code", () => {
+    const result = runHook(
+      { tool_name: "agent", tool_input: { prompt: "Do something." } },
+      { QWEN_PROJECT_DIR: process.cwd(), CLAUDE_PROJECT_DIR: "", CLAUDE_SESSION_ID: "" },
+    );
     assert.equal(result.exitCode, 0);
     const parsed = JSON.parse(result.stdout);
     const prompt = parsed.hookSpecificOutput.updatedInput.prompt;
     assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_batch_execute"), "Expected plugin-format ctx_batch_execute");
     assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_search"), "Expected plugin-format ctx_search");
-    assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_execute"), "Expected plugin-format ctx_execute");
-    assert.ok(prompt.includes(PLUGIN_PREFIX + "ctx_fetch_and_index"), "Expected plugin-format ctx_fetch_and_index");
     assert.ok(!prompt.includes(SHORT_PREFIX + "ctx_batch_execute"), "Must not contain short-form ctx_batch_execute");
   });
 

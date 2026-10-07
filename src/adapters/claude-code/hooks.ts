@@ -30,6 +30,7 @@ export const HOOK_TYPES = {
   SESSION_START: "SessionStart",
   USER_PROMPT_SUBMIT: "UserPromptSubmit",
   STOP: "Stop",
+  SUBAGENT_START: "SubagentStart",
 } as const;
 
 export type HookType = (typeof HOOK_TYPES)[keyof typeof HOOK_TYPES];
@@ -118,6 +119,7 @@ export const HOOK_SCRIPTS: Record<HookType, string> = {
   SessionStart: "sessionstart.mjs",
   UserPromptSubmit: "userpromptsubmit.mjs",
   Stop: "stop.mjs",
+  SubagentStart: "subagentstart.mjs",
 };
 
 // ─────────────────────────────────────────────────────────
@@ -136,6 +138,7 @@ export const OPTIONAL_HOOKS: HookType[] = [
   HOOK_TYPES.PRE_COMPACT,
   HOOK_TYPES.USER_PROMPT_SUBMIT,
   HOOK_TYPES.STOP,
+  HOOK_TYPES.SUBAGENT_START,
 ];
 
 /**
