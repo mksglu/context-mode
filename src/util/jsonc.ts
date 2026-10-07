@@ -23,13 +23,14 @@ export function stripJsonComments(str: string): string {
     if (c === "\\") { out += c; escaped = inString; continue; }
     if (c === '"') { inString = !inString; out += c; continue; }
     if (!inString && c === "/" && next === "/") {
-      while (i < str.length && str[i] !== "\n") i++;
-      if (i < str.length) out += "\n";
+      while (i < str.length && str[i] !== "\n" && str[i] !== "\r") i++;
+      if (i < str.length) out += str[i];
       continue;
     }
-    if (!inString && c === "/" && next === "*") { inBlockComment = true; i++; continue; }
+    if (!inString && c === "/" && next === "*") { inBlockComment = true; out += " "; i++; continue; }
     out += c;
   }
+  if (inBlockComment) return str; // Keep unterminated comments invalid.
   // Trailing-comma removal, string-aware. The scan above already removed
   // comments, so this second pass over `out` only needs to track string state:
   // a comma is "trailing" when the next significant char is `}` or `]`. Doing

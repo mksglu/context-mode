@@ -5141,6 +5141,19 @@ test("server.ts delegates JSONC stripping to string-aware src/util/jsonc (#787 i
 // literals ("[1, ]" -> "[1 ]", the 386a196 regression). These tests pin the
 // shared util that replaced both.
 describe("parseJsonc / stripJsonComments (src/util/jsonc)", () => {
+  test("ends line comments at a carriage return", () => {
+    expect(parseJsonc('{\r// note\r"a": 1\r}')).toEqual({ a: 1 });
+  });
+
+  test("block comments cannot splice separate tokens into valid JSON", () => {
+    expect(parseJsonc('{"limit": 1/* note */000}')).toBeUndefined();
+    expect(parseJsonc('{"enabled": tr/* note */ue}')).toBeUndefined();
+  });
+
+  test("rejects unterminated trailing block comments", () => {
+    expect(parseJsonc('{"a":1} /* unfinished')).toBeUndefined();
+  });
+
   test("preserves // inside string values (URLs) while stripping line comments", () => {
     const jsonc = '{\n  // strip me\n  "url": "https://mcp.context7.com/mcp"\n}';
     expect(parseJsonc<{ url: string }>(jsonc)?.url).toBe("https://mcp.context7.com/mcp");
