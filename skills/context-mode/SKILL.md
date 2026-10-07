@@ -275,7 +275,7 @@ browser_network_requests(includeStatic: false, filename: "/tmp/network.md")
 
 ## Subagent Usage
 
-Subagents automatically receive context-mode tool routing via a PreToolUse hook. You do NOT need to manually add tool names to subagent prompts — the hook injects them. Just write natural task descriptions.
+Subagents automatically receive context-mode tool routing: on Claude Code through a SubagentStart hook, on other platforms through a PreToolUse hook that appends it to the subagent prompt. You do NOT need to manually add tool names to subagent prompts. Just write natural task descriptions.
 
 ## Anti-Patterns
 

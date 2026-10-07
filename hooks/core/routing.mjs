@@ -892,6 +892,16 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
   // ─── Agent: inject context-mode routing into subagent prompts ───
   // Subagents cannot use ctx commands (stats/doctor/upgrade/purge) — omit that section (#233)
   if (canonical === "Agent") {
+    // Rewriting the Agent input trips Claude Code's auto-mode permission
+    // classifier: it reads the appended block as instruction injection and
+    // denies the spawn ("[Auto-Mode Bypass]", or "a hook changed this call's
+    // input"), sticky for the rest of the turn (#911, #967). Claude Code gets
+    // the same block via the SubagentStart hook instead, so its PreToolUse
+    // hook passes agentPromptInjection: false. CONTEXT_MODE_NO_AGENT_INJECTION=1
+    // opts out on every platform (#946).
+    if (options.agentPromptInjection === false || process.env.CONTEXT_MODE_NO_AGENT_INJECTION === "1") {
+      return null;
+    }
     const subagentType = toolInput.subagent_type ?? "";
     // Detect the correct field name for the prompt/request/objective/question/query
     const fieldName = ["prompt", "request", "objective", "question", "query", "task"].find(f => f in toolInput) ?? "prompt";

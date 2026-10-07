@@ -82,6 +82,7 @@ const HOOK_MAP: Record<string, Record<string, string>> = {
     sessionstart: "hooks/sessionstart.mjs",
     userpromptsubmit: "hooks/userpromptsubmit.mjs",
     stop: "hooks/stop.mjs",
+    subagentstart: "hooks/subagentstart.mjs",
   },
   "gemini-cli": {
     beforeagent: "hooks/gemini-cli/beforeagent.mjs",

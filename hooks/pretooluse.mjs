@@ -167,8 +167,13 @@ await runHook(async () => {
   const isSubagentContext = input.agent_id != null || input.agent_type != null;
 
   // ─── Route and format response ───
+  // Claude Code gets the subagent routing block from hooks/subagentstart.mjs
+  // (#911, #967). Qwen Code shares this hook without that one, so it keeps
+  // the Agent prompt injection.
+  const { detectPlatformFromEnv } = await import("./core/platform-detect.mjs");
   const decision = routePreToolUse(tool, toolInput, projectDir, "claude-code", getSessionId(input), {
     mcpToolsAvailable: !isSubagentContext,
+    agentPromptInjection: detectPlatformFromEnv() !== "claude-code",
   });
   const response = formatDecision("claude-code", decision);
 
