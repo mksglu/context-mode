@@ -24,6 +24,7 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 
 import { loadDatabase } from "../../src/db-base.js";
+import { getRealBytesStats } from "../../src/session/analytics.js";
 
 
 const _hashCanonical = (p: string) => createHash("sha256").update(
@@ -110,34 +111,70 @@ describe("D2 Phase 4 — read-redirected marker pattern", () => {
     try { unlinkSync(mcpSentinel); } catch {}
   });
 
-  function runPre(filePath: string) {
+  function runPre(filePath: string, activeSessionId = sessionId) {
     return spawnSync("node", [PRETOOL_PATH], {
       input: JSON.stringify({
-        session_id: sessionId,
+        session_id: activeSessionId,
         tool_name: "Read",
         tool_input: { file_path: filePath },
       }),
       encoding: "utf-8",
       timeout: 30_000,
-      env: { ...process.env, ...env },
+      windowsHide: true,
+      env: { ...process.env, ...env, CLAUDE_SESSION_ID: activeSessionId },
     });
   }
 
-  function runPost(filePath: string, response: string) {
+  function runPost(filePath: string, response: string, activeSessionId = sessionId) {
     return spawnSync("node", [POSTTOOL_PATH], {
       input: JSON.stringify({
-        session_id: sessionId,
+        session_id: activeSessionId,
         tool_name: "Read",
         tool_input: { file_path: filePath },
         tool_response: response,
       }),
       encoding: "utf-8",
       timeout: 30_000,
-      env: { ...process.env, ...env },
+      windowsHide: true,
+      env: { ...process.env, ...env, CLAUDE_SESSION_ID: activeSessionId },
     });
   }
 
   // ─── Slice 4.4 ───────────────────────────────────────────
+  test("repeated large Reads emit one tip and preserve marker-to-stats accounting (#1267)", () => {
+    const activeSessionId = `read-guidance-once-${Date.now()}`;
+    const firstPath = join(fakeProject, "once-first.txt");
+    const secondPath = join(fakeProject, "once-second.txt");
+    const fileSize = 50_001;
+    writeFileSync(firstPath, "a".repeat(fileSize));
+    writeFileSync(secondPath, "b".repeat(fileSize));
+    const markerPath = resolve(tmpdir(), `context-mode-redirect-${activeSessionId}.txt`);
+    const guidancePath = resolve(tmpdir(), `context-mode-guidance-s-${activeSessionId}`);
+    try {
+      const first = runPre(firstPath, activeSessionId);
+      expect(first.status, first.stderr).toBe(0);
+      expect(JSON.parse(first.stdout).hookSpecificOutput.additionalContext).toContain("Reading to Edit");
+      const firstPost = runPost(firstPath, "a".repeat(fileSize), activeSessionId);
+      expect(firstPost.status, firstPost.stderr).toBe(0);
+
+      const second = runPre(secondPath, activeSessionId);
+      expect(second.status, second.stderr).toBe(0);
+      expect(second.stdout).toBe("");
+      expect(readFileSync(markerPath, "utf8")).toBe(`Read:read-redirected:${fileSize}:${secondPath}`);
+      const secondPost = runPost(secondPath, "b".repeat(fileSize), activeSessionId);
+      expect(secondPost.status, secondPost.stderr).toBe(0);
+      expect(existsSync(markerPath)).toBe(false);
+
+      const rows = readEvents(dbPath, activeSessionId, "read-redirected");
+      expect(rows.map((row) => row.bytes_avoided)).toEqual([fileSize, fileSize]);
+      const stats = getRealBytesStats({ sessionId: activeSessionId, sessionsDir: dirname(dbPath) });
+      expect(stats.bytesAvoided).toBe(100_002);
+    } finally {
+      try { unlinkSync(markerPath); } catch {}
+      rmSync(guidancePath, { recursive: true, force: true });
+    }
+  });
+
   test("4.4: Read on large file (>50KB) writes redirect marker", () => {
     const r = runPre(largeFilePath);
     assert.equal(r.status, 0, `pretooluse non-zero. stderr: ${r.stderr}`);

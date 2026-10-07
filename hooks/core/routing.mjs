@@ -852,7 +852,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
         const st = statSync(filePath);
         if (st.isFile() && st.size > 50_000) {
           const decision = guidanceOnce("read", readGuidance, sessionId)
-            ?? { action: "context", additionalContext: readGuidance };
+            ?? { action: "allow" };
           decision.redirectMeta = {
             tool: "Read",
             type: "read-redirected",

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   writeFileSync,
   mkdirSync,
@@ -33,6 +33,7 @@ let routePreToolUse: (
   reason?: string;
   updatedInput?: Record<string, unknown>;
   additionalContext?: string;
+  redirectMeta?: { tool: string; type: string; bytesAvoided: number; commandSummary: string };
 } | null;
 
 let resetGuidanceThrottle: (sessionId?: string) => void;
@@ -331,6 +332,59 @@ describe("routePreToolUse", () => {
   // ─── Read routing ──────────────────────────────────────
 
   describe("Read tool", () => {
+    it.each(["large", "small"])(
+      "does not repeat guidance after a %s Read, while retaining large-read accounting (#1267)",
+      async (firstRead) => {
+        const root = mkdtempSync(join(tmpdir(), "ctx-read-guidance-"));
+        const largePath = join(root, "large.txt");
+        const smallPath = join(root, "small.txt");
+        writeFileSync(largePath, "x".repeat(50_001));
+        writeFileSync(smallPath, "small");
+        const { formatDecision } = await import("../../hooks/core/formatters.mjs");
+        try {
+          const first = routePreToolUse("Read", { file_path: firstRead === "large" ? largePath : smallPath });
+          expect(first?.additionalContext).toBe(READ_GUIDANCE);
+
+          const second = routePreToolUse("Read", { file_path: largePath });
+          expect(second?.redirectMeta).toEqual({
+            tool: "Read", type: "read-redirected", bytesAvoided: 50_001, commandSummary: largePath,
+          });
+          expect(formatDecision("claude-code", second)).toBeNull();
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      },
+    );
+
+    it("does not repeat large-read guidance across hook processes in one session (#1267)", () => {
+      const root = mkdtempSync(join(tmpdir(), "ctx-read-guidance-process-"));
+      const filePath = join(root, "large.txt");
+      writeFileSync(filePath, "x".repeat(50_001));
+      const routingUrl = new URL("../../hooks/core/routing.mjs", import.meta.url).href;
+      const formattersUrl = new URL("../../hooks/core/formatters.mjs", import.meta.url).href;
+      const code = `import { routePreToolUse } from ${JSON.stringify(routingUrl)};
+        import { formatDecision } from ${JSON.stringify(formattersUrl)};
+        const decision = routePreToolUse("Read", {file_path:${JSON.stringify(filePath)}}, undefined, "claude-code", "read-guidance-process-test");
+        console.log(JSON.stringify({ formatted: formatDecision("claude-code", decision), metadata: decision?.redirectMeta }));`;
+      const runRead = () => {
+        const child = spawnSync(process.execPath, ["--input-type=module", "-e", code], {
+          env: { ...process.env, TMP: root, TEMP: root, TMPDIR: root },
+          encoding: "utf8", timeout: 10_000, windowsHide: true,
+        });
+        expect(child.status, child.stderr).toBe(0);
+        return JSON.parse(child.stdout);
+      };
+      try {
+        const first = runRead();
+        expect(first.formatted?.hookSpecificOutput?.additionalContext).toBe(READ_GUIDANCE);
+        const second = runRead();
+        expect(second.metadata.bytesAvoided).toBe(50_001);
+        expect(second.formatted).toBeNull();
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
     it("returns context action with READ_GUIDANCE", () => {
       const result = routePreToolUse("Read", {
         file_path: "/some/file.ts",
