@@ -530,10 +530,10 @@ describe("ensure-deps: better-sqlite3 binding self-heal (#408)", () => {
   });
 
   test("calls healBetterSqlite3Binding(...) inside the missing-binding branch", () => {
-    // The else-if guarding against a missing native binary must invoke the
+    // The branch guarding against a missing native binary must invoke the
     // shared helper (not inline its own copy).
     const anchor = ENSURE_DEPS_SRC.indexOf(
-      "!existsSync(resolve(pkgDir, ...NATIVE_BINARIES[pkg]))",
+      "if (!existsSync(binaryPath))",
     );
     expect(anchor).toBeGreaterThan(-1);
     const end = ENSURE_DEPS_SRC.indexOf("\nexport function ensureNativeCompat", anchor);

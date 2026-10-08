@@ -19,7 +19,7 @@
  * @see https://github.com/mksglu/context-mode/issues/203
  */
 
-import { existsSync, copyFileSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, copyFileSync, renameSync, unlinkSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -49,6 +49,27 @@ const NATIVE_DEPS = ["better-sqlite3"];
 const NATIVE_BINARIES = {
   "better-sqlite3": ["build", "Release", "better_sqlite3.node"],
 };
+const INSTALL_RETRY_DELAY_MS = 15 * 60 * 1000;
+
+export function shouldRetryDependencyInstall(pluginRoot, now = Date.now()) {
+  try {
+    return now - statSync(resolve(pluginRoot, "node_modules", ".ctx-install-failed")).mtimeMs >= INSTALL_RETRY_DELAY_MS;
+  } catch {
+    return true;
+  }
+}
+
+function recordDependencyInstallFailure(pluginRoot) {
+  try {
+    const nodeModules = resolve(pluginRoot, "node_modules");
+    mkdirSync(nodeModules, { recursive: true });
+    writeFileSync(resolve(nodeModules, ".ctx-install-failed"), "Dependency install failed; retry after 15 minutes.\n");
+  } catch { /* read-only plugin cache: keep the hook best-effort */ }
+}
+
+function clearDependencyInstallFailure(pluginRoot) {
+  try { unlinkSync(resolve(pluginRoot, "node_modules", ".ctx-install-failed")); } catch { /* no marker */ }
+}
 
 /**
  * Check if the current runtime has built-in SQLite support.
@@ -69,6 +90,12 @@ export async function ensureDeps() {
   if (typeof globalThis.Bun !== "undefined") return;
   for (const pkg of NATIVE_DEPS) {
     const pkgDir = resolve(root, "node_modules", pkg);
+    const binaryPath = resolve(pkgDir, ...NATIVE_BINARIES[pkg]);
+    if (existsSync(binaryPath)) {
+      clearDependencyInstallFailure(root);
+      continue;
+    }
+    if (!shouldRetryDependencyInstall(root)) continue;
     if (!existsSync(pkgDir)) {
       // Package not installed at all
       try {
@@ -77,14 +104,22 @@ export async function ensureDeps() {
           stdio: "pipe",
           timeout: 120000,
           shell: true,
+          windowsHide: true,
         });
-      } catch { /* best effort — hook degrades gracefully without DB */ }
-    } else if (!existsSync(resolve(pkgDir, ...NATIVE_BINARIES[pkg]))) {
+      } catch {
+        recordDependencyInstallFailure(root);
+        continue; // Hook degrades gracefully without DB.
+      }
+    }
+    if (!existsSync(binaryPath)) {
       // Package installed but native binary missing (e.g., npm ignore-scripts=true,
       // or Windows where `npm rebuild` falls through to node-gyp without MSVC — #408).
       // Delegate to the shared 3-layer heal (single source of truth, also used by
       // scripts/postinstall.mjs).
-      try { await healBetterSqlite3Binding(root); } catch { /* helper already best-effort */ }
+      try {
+        await healBetterSqlite3Binding(root);
+        if (!existsSync(binaryPath)) recordDependencyInstallFailure(root);
+      } catch { recordDependencyInstallFailure(root); /* helper already best-effort */ }
     }
   }
 }
@@ -105,6 +140,7 @@ function probeNativeInChildProcess(pluginRoot) {
       cwd: pluginRoot,
       stdio: "pipe",
       timeout: 10000,
+      windowsHide: true,
     });
     return true;
   } catch {
@@ -195,6 +231,7 @@ export function ensureNativeCompat(pluginRoot) {
         stdio: "pipe",
         timeout: 60000,
         shell: true,
+        windowsHide: true,
       });
       codesignBinary(binaryPath);
       if (existsSync(binaryPath)) {
@@ -214,6 +251,7 @@ export function ensureNativeCompat(pluginRoot) {
         stdio: "pipe",
         timeout: 60000,
         shell: true,
+        windowsHide: true,
       });
       codesignBinary(binaryPath);
       if (existsSync(binaryPath) && probeNativeInChildProcess(pluginRoot)) {

@@ -335,6 +335,7 @@ export function healBetterSqlite3Binding(pkgRoot) {
             stdio: "pipe",
             timeout: 180000,
             shell: process.platform === "win32",
+            windowsHide: true,
             env: childEnv,
           },
         );
@@ -385,7 +386,7 @@ export function healBetterSqlite3Binding(pkgRoot) {
         const r = spawnSync(
           process.execPath,
           [prebuildBin, "--target", process.versions.node, "--runtime", "node"],
-          { cwd: bsqRoot, stdio: "pipe", timeout: 120000, env: childEnv },
+          { cwd: bsqRoot, stdio: "pipe", timeout: 120000, env: childEnv, windowsHide: true },
         );
         if (r.status === 0 && fsExistsSync(bindingPath)) {
           return { healed: true, reason: "prebuild-install" };
@@ -399,7 +400,7 @@ export function healBetterSqlite3Binding(pkgRoot) {
     try {
       execSync(
         `${npmBin} install better-sqlite3 --no-package-lock --no-save --silent`,
-        { cwd: pkgRoot, stdio: "pipe", timeout: 120000, shell: true, env: childEnv },
+        { cwd: pkgRoot, stdio: "pipe", timeout: 120000, shell: true, env: childEnv, windowsHide: true },
       );
       if (fsExistsSync(bindingPath)) {
         return { healed: true, reason: "npm-install" };
