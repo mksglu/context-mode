@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
-import { startLifecycleGuard, makeDefaultIsParentAlive, bridgeChildIdleTimeoutMs, noteMcpActivity, noteRequestStart, noteRequestEnd, attachMcpActivityTap, idleReapMessage } from "../src/lifecycle.js";
+import { startLifecycleGuard, makeDefaultIsParentAlive, parentPidFromProcStat, bridgeChildIdleTimeoutMs, noteMcpActivity, noteRequestStart, noteRequestEnd, attachMcpActivityTap, idleReapMessage } from "../src/lifecycle.js";
 
 // Resolve the tsx binary. Prefer the local devDep so the test doesn't depend
 // on a global tsx install or on Git Bash's `which` being on PATH; the PATH
@@ -278,6 +278,19 @@ describe("Lifecycle Guard", () => {
     await new Promise((r) => setTimeout(r, 80));
     cleanup();
     assert.equal(shutdownCalled, true);
+  });
+});
+
+describe("Linux proc stat parent parsing", () => {
+  test("reads the parent after a command name containing spaces and parentheses", () => {
+    assert.equal(parentPidFromProcStat("123 (npm (worker)) S 456 1 2 3"), 456);
+    assert.equal(parentPidFromProcStat("123 (worker) R 1 1 2 3"), 1);
+  });
+
+  test("rejects malformed or missing parent fields", () => {
+    assert.ok(Number.isNaN(parentPidFromProcStat("123 (worker) S")));
+    assert.ok(Number.isNaN(parentPidFromProcStat("123 worker S 456")));
+    assert.ok(Number.isNaN(parentPidFromProcStat("123 (worker) S nope")));
   });
 });
 

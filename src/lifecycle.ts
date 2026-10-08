@@ -21,6 +21,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 export interface LifecycleGuardOptions {
   /** Interval in ms to check parent liveness. Default: 30_000 */
@@ -37,11 +38,27 @@ export interface LifecycleGuardOptions {
   bridgeIdleMs?: number;
 }
 
-/** Read grandparent PID via `ps -o ppid= -p $PPID`. Returns NaN on failure or Windows. */
+/** Parse ppid from `/proc/<pid>/stat`; the parenthesized command may contain spaces or `)`. */
+export function parentPidFromProcStat(stat: string): number {
+  const closing = stat.lastIndexOf(")");
+  if (closing < 0 || !/^\d+ \(/.test(stat)) return NaN;
+  const fields = stat.slice(closing + 1).trim().split(/\s+/);
+  if (fields[0]?.length !== 1 || !/^\d+$/.test(fields[1] ?? "")) return NaN;
+  const ppid = Number(fields[1]);
+  return Number.isSafeInteger(ppid) && ppid > 0 ? ppid : NaN;
+}
+
+/** Read grandparent PID from procfs on Linux, with `ps` as a fallback. */
 function readGrandparentPpidImpl(): number {
   if (process.platform === "win32") return NaN;
   const ppid = process.ppid;
   if (!ppid || ppid <= 1) return NaN;
+  if (process.platform === "linux") {
+    try {
+      const grandparent = parentPidFromProcStat(readFileSync(`/proc/${ppid}/stat`, "utf-8"));
+      if (!Number.isNaN(grandparent)) return grandparent;
+    } catch { /* procfs unavailable; use the existing ps probe */ }
+  }
   try {
     const out = execFileSync("ps", ["-o", "ppid=", "-p", String(ppid)], {
       encoding: "utf-8",
@@ -59,7 +76,7 @@ function readGrandparentPpidImpl(): number {
 export interface IsParentAliveDeps {
   /** Read the current ppid. Default: `() => process.ppid`. */
   getPpid?: () => number;
-  /** Read the grandparent ppid. Default: ps-based POSIX probe, NaN on Windows. */
+  /** Read the grandparent ppid. Default: procfs on Linux, ps fallback, NaN on Windows. */
   readGrandparentPpid?: () => number;
 }
 
