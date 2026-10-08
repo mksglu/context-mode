@@ -676,6 +676,7 @@ const S = {
   incrementCompactCount: "incrementCompactCount",
   getUsageCursor: "getUsageCursor",
   setUsageCursor: "setUsageCursor",
+  markFirstSystemTransform: "markFirstSystemTransform",
   upsertResume: "upsertResume",
   getResume: "getResume",
   markResumeConsumed: "markResumeConsumed",
@@ -852,7 +853,8 @@ export class SessionDB extends SQLiteBase {
         started_at TEXT NOT NULL DEFAULT (datetime('now')),
         last_event_at TEXT,
         event_count INTEGER NOT NULL DEFAULT 0,
-        compact_count INTEGER NOT NULL DEFAULT 0
+        compact_count INTEGER NOT NULL DEFAULT 0,
+        resume_checked INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS session_resume (
@@ -897,6 +899,12 @@ export class SessionDB extends SQLiteBase {
       const metaCols = this.db.pragma("table_xinfo(session_meta)") as Array<{ name: string }>;
       if (!metaCols.some((c) => c.name === "usage_cursor")) {
         this.db.exec("ALTER TABLE session_meta ADD COLUMN usage_cursor TEXT");
+      }
+      if (!metaCols.some((c) => c.name === "resume_checked")) {
+        this.db.exec("ALTER TABLE session_meta ADD COLUMN resume_checked INTEGER NOT NULL DEFAULT 0");
+        // Sessions that predate this gate have already run: do not let them
+        // claim an unrelated snapshot on their first turn after upgrade.
+        this.db.exec("UPDATE session_meta SET resume_checked = 1");
       }
     } catch {
       // best-effort migration only
@@ -981,6 +989,11 @@ export class SessionDB extends SQLiteBase {
     // ── Meta ──
     p(S.ensureSession,
       `INSERT OR IGNORE INTO session_meta (session_id, project_dir) VALUES (?, ?)`);
+
+    p(S.markFirstSystemTransform,
+      `UPDATE session_meta SET resume_checked = 1
+       WHERE session_id = ? AND resume_checked = 0
+       RETURNING session_id`);
 
     p(S.getSessionStats,
       `SELECT session_id, project_dir, started_at, last_event_at, event_count, compact_count
@@ -1550,6 +1563,12 @@ export class SessionDB extends SQLiteBase {
    */
   setUsageCursor(sessionId: string, uuid: string): void {
     this.stmt(S.setUsageCursor).run(uuid, sessionId);
+  }
+
+  /** Allow cross-session resume only on this session's first system transform. */
+  markFirstSystemTransform(sessionId: string, projectDir: string): boolean {
+    this.ensureSession(sessionId, projectDir);
+    return !!this.stmt(S.markFirstSystemTransform).get(sessionId);
   }
 
   // ═══════════════════════════════════════════

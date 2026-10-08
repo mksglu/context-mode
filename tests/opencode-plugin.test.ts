@@ -764,10 +764,7 @@ describe("ContextModePlugin", () => {
       expect(out.system[1]).toContain("<context_window_protection>");
     });
 
-    // v1.0.106 — when no row exists, do NOT mark sessionId as injected,
-    // so a later call within the same session can still pick up a snapshot
-    // that arrived after the first attempt.
-    it("retries on next turn when no row exists (no premature gate)", async () => {
+    it("does not inject a later snapshot into an already-running session", async () => {
       const projectDir = join(tempDir, "sysxform-retry");
       const plugin = await createTestPlugin(projectDir);
 
@@ -790,16 +787,23 @@ describe("ContextModePlugin", () => {
         { context: [] as string[], prompt: undefined },
       );
 
-      // C's next turn — routing block re-injects (every turn), plus resume
-      // snapshot from donor (no premature gate — DB claim still available).
+      // A new plugin instance must respect the first-turn gate stored in DB.
+      const restartedPlugin = await createTestPlugin(projectDir);
       const out2 = { system: ["HEADER"] };
-      await plugin["experimental.chat.system.transform"](
+      await restartedPlugin["experimental.chat.system.transform"](
         { sessionID: "C", model: {} } as any,
         out2,
       );
-      expect(out2.system.length).toBe(3); // HEADER + snapshot + routing
-      expect(out2.system[1]).toContain("session_resume");
-      expect(out2.system[2]).toContain("<context_window_protection>");
+      expect(out2.system.length).toBe(2);
+      expect(out2.system.join("\n")).not.toContain("session_resume");
+
+      // The unclaimed snapshot remains available to a fresh session.
+      const out3 = { system: ["HEADER"] };
+      await restartedPlugin["experimental.chat.system.transform"](
+        { sessionID: "fresh", model: {} } as any,
+        out3,
+      );
+      expect(out3.system.some((s) => s.includes("session_resume"))).toBe(true);
     });
 
     // v1.0.106 — prefer next session over self-injection
