@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { execSync, spawnSync } from "node:child_process";
 import { toUnixPath } from "../../src/cli.js";
 import { findMissingLaunchFiles } from "../../src/util/plugin-cache-integrity.js";
+import { FETCH_DEPENDENCIES, fetchDependencyInstallCommand, findMissingFetchDependencies, readDepsInstallErrors } from "../../src/util/fetch-deps.js";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 
@@ -927,6 +928,65 @@ describe("node:sqlite adapter (#228)", () => {
 });
 
 // ── Shared dep bootstrap (#172) ──────────────────────────────────────
+
+describe("fetch dependency diagnostics (#1280)", () => {
+  it("reports every fetch dependency as missing when the plugin has no node_modules", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-fetch-deps-"));
+    try {
+      expect(findMissingFetchDependencies(dir)).toEqual([...FETCH_DEPENDENCIES]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("finds no missing fetch dependencies in a checkout where npm install has run", () => {
+    expect(findMissingFetchDependencies(ROOT)).toEqual([]);
+  });
+
+  it("scopes the install command to the plugin root and names every dependency", () => {
+    const cmd = fetchDependencyInstallCommand("/plugin/root");
+    expect(cmd).toContain('--prefix "/plugin/root"');
+    for (const name of FETCH_DEPENDENCIES) expect(cmd).toContain(name);
+  });
+
+  it("returns only the error lines from the installer log", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-deps-log-"));
+    try {
+      writeFileSync(
+        join(dir, "deps-install.log"),
+        [
+          "npm warn ERESOLVE overriding peer dependency",
+          "npm error code EEXIST",
+          "npm error Invalid response body while trying to fetch https://registry.npmjs.org/x: EACCES: permission denied",
+        ].join("\n"),
+      );
+      const errors = readDepsInstallErrors(dir);
+      expect(errors).toHaveLength(2);
+      expect(errors[1]).toContain("EACCES");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns no installer errors when no log exists", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-deps-nolog-"));
+    try {
+      expect(readDepsInstallErrors(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the boot-time installer output in deps-install.log", () => {
+    expect(readFileSync(resolve(ROOT, "start.mjs"), "utf-8")).toContain('"deps-install.log"');
+  });
+
+  it("does not silence npm errors in the boot-time installer, which would leave the log empty", () => {
+    const startSource = readFileSync(resolve(ROOT, "start.mjs"), "utf-8");
+    expect(startSource).not.toMatch(/NPM_FLAGS = \[[^\]]*"--silent"/);
+    expect(startSource).toContain('"--loglevel=error"');
+  });
+});
 
 describe("hooks/ensure-deps.mjs — shared bootstrap", () => {
   it("ensure-deps.mjs exists and exports ensureDeps function", async () => {

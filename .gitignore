@@ -44,3 +44,5 @@ context-mode-guidance-*/
 tools/pricing/litellm-catalog.json
 /.cocoindex_code/
 /.kilo/
+# Written by the boot-time dependency installer in start.mjs (#1280)
+deps-install.log
