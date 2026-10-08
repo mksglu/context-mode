@@ -30,6 +30,10 @@ describe("CLIENT_NAME_TO_PLATFORM", () => {
     expect(CLIENT_NAME_TO_PLATFORM["codex-mcp-client"]).toBe("codex");
   });
 
+  it("maps opencode → opencode", () => {
+    expect(CLIENT_NAME_TO_PLATFORM["opencode"]).toBe("opencode");
+  });
+
   it('maps "Kiro CLI" to "kiro"', () => {
     expect(CLIENT_NAME_TO_PLATFORM["Kiro CLI"]).toBe("kiro");
   });

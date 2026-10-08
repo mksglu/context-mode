@@ -402,6 +402,14 @@ describe("detectPlatform", () => {
     expect(signal.confidence).toBe("high");
   });
 
+  it("prefers OpenCode clientInfo over another installed agent", () => {
+    process.env.CLAUDE_PROJECT_DIR = "/some/claude/project";
+    const signal = detectPlatform({ name: "opencode", version: "2.0.20" });
+    expect(signal.platform).toBe("opencode");
+    expect(signal.confidence).toBe("high");
+    expect(signal.reason).toContain("clientInfo");
+  });
+
   it("returns kimi when clientInfo name is kimi-code", () => {
     const signal = detectPlatform({ name: "kimi-code", version: "1.0" });
     expect(signal.platform).toBe("kimi");
