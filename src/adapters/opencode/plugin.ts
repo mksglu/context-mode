@@ -676,8 +676,9 @@ async function createContextModePlugin(ctx: PluginContext) {
     // surrogate is `experimental.chat.system.transform` — verified shape:
     //   input:  { sessionID?: string; model: Model }
     //   output: { system: string[] }
-    // We claim the most-recent unconsumed resume snapshot atomically (race-
-    // safe across concurrent processes) and prepend it to the system prompt.
+    // Only the first transform for a session may claim a cross-session resume.
+    // The gate is persisted so another plugin process cannot inject a later
+    // snapshot into an already-running session.
     "experimental.chat.system.transform": async (
       input: SystemTransformHookInput,
       output: SystemTransformHookOutput,
@@ -714,6 +715,8 @@ async function createContextModePlugin(ctx: PluginContext) {
       }
 
       try {
+        if (!Array.isArray(output?.system)) return;
+        if (!db.markFirstSystemTransform(sessionId, projectDir)) return;
         // Pass current sessionId so SQL excludes self-injection (v1.0.106 — Mickey #376
         // follow-up): if Session B compacts mid-flight and produces its own row,
         // B's next system.transform must NOT claim that row back into B's prompt.
@@ -739,7 +742,6 @@ async function createContextModePlugin(ctx: PluginContext) {
           // Inserting at index 1 keeps the header invariant and lets the
           // snapshot ride along inside the cached body block.
           output.system.splice(1, 0, row.snapshot);
-          // Mark consumed only AFTER successful splice so failed paths can retry
           if (process.env.OPENCODE_DEBUG) {
             await safeLog(output.system[1], { sessionId, source: "on resume" });
           }

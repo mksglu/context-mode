@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { afterAll, describe, expect, test } from "vitest";
+import Database from "better-sqlite3";
 import { SessionDB } from "../../src/session/db.js";
 import {
   cleanOrphanedWALFiles,
@@ -50,6 +51,33 @@ function makeEvent(overrides: Partial<{
     data_hash: overrides.data_hash ?? "",
   };
 }
+
+test("first system transform is claimed once across DB connections", () => {
+  const db = createTestDB();
+  const sessionId = "opencode-running-session";
+  expect(db.markFirstSystemTransform(sessionId, "/project")).toBe(true);
+
+  const otherConnection = new SessionDB({ dbPath: db.dbPath });
+  cleanups.push(() => otherConnection.cleanup());
+  expect(otherConnection.markFirstSystemTransform(sessionId, "/project")).toBe(false);
+  expect(otherConnection.markFirstSystemTransform("new-session", "/project")).toBe(true);
+});
+
+test("existing sessions are gated when an older DB is migrated", () => {
+  const dbPath = join(tmpdir(), `session-test-${randomUUID()}.db`);
+  const oldDb = new Database(dbPath);
+  oldDb.exec(`CREATE TABLE session_meta (
+    session_id TEXT PRIMARY KEY, project_dir TEXT NOT NULL,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')), last_event_at TEXT,
+    event_count INTEGER NOT NULL DEFAULT 0, compact_count INTEGER NOT NULL DEFAULT 0
+  ); INSERT INTO session_meta (session_id, project_dir) VALUES ('existing', '/project');`);
+  oldDb.close();
+
+  const db = new SessionDB({ dbPath });
+  cleanups.push(() => db.cleanup());
+  expect(db.markFirstSystemTransform("existing", "/project")).toBe(false);
+  expect(db.markFirstSystemTransform("fresh", "/project")).toBe(true);
+});
 
 // ════════════════════════════════════════════
 // SLICE 0: BYTES ACCOUNTING (D2 PRD Phase 2)
