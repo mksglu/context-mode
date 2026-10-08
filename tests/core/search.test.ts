@@ -765,6 +765,125 @@ describe("Multi-source isolation (batch_execute path)", () => {
 
     store.close();
   });
+
+  // ── identical-excerpt suppression ───────────────────────────────────────────────
+  // extractSnippet returns the content VERBATIM when it is shorter than its 3000-char window, so a
+  // short section's excerpt does not depend on the query. Every query whose top-3 includes that
+  // section therefore re-emits the same bytes; these tests pin the resulting behaviour.
+
+  test("batch_execute formatter emits a byte-identical excerpt once and points back", () => {
+    const store = createStore();
+    store.index({
+      content: "# Shared Section\n\nzebra corridor and quokka latency both live in this one section.",
+      source: "batch: dedupe",
+    });
+
+    const output = formatBatchQueryResults(
+      store,
+      ["zebra corridor", "quokka latency"],
+      "batch: dedupe",
+    ).join("\n");
+
+    assert.equal(
+      (output.match(/zebra corridor and quokka latency both live in this one section/g) ?? []).length,
+      1,
+      "A byte-identical excerpt must be emitted exactly once",
+    );
+    assert.ok(
+      output.includes("identical excerpt already shown under"),
+      "A later query matching the same section should point back to the first",
+    );
+
+    store.close();
+  });
+
+  test("batch_execute formatter still lists the section under every query that matched it", () => {
+    const store = createStore();
+    store.index({
+      content: "# Shared Section\n\nzebra corridor and quokka latency both live in this one section.",
+      source: "batch: listed",
+    });
+
+    const output = formatBatchQueryResults(
+      store,
+      ["zebra corridor", "quokka latency"],
+      "batch: listed",
+    ).join("\n");
+
+    assert.equal(
+      (output.match(/### Shared Section/g) ?? []).length,
+      2,
+      "The heading must appear under both queries, so the match is not hidden",
+    );
+    assert.ok(output.includes("## zebra corridor"), "First query heading present");
+    assert.ok(output.includes("## quokka latency"), "Second query heading present");
+
+    store.close();
+  });
+
+  test("batch_execute formatter does not suppress when the excerpt differs", () => {
+    const store = createStore();
+    // Longer than the 3000-char window, so extractSnippet windows around the query and the two
+    // excerpts genuinely differ. (Note: a long section is NOT automatically exempt -- two queries
+    // whose windows coincide still dedupe. The invariant is identical-excerpt, not short-section.)
+    const filler = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(70);
+    store.index({
+      content: `# Long Section\n\nalphauniqueterm ${filler} omegauniqueterm`,
+      source: "batch: long",
+    });
+
+    const output = formatBatchQueryResults(
+      store,
+      ["alphauniqueterm", "omegauniqueterm"],
+      "batch: long",
+    ).join("\n");
+
+    assert.ok(output.includes("alphauniqueterm"), "First excerpt must be present");
+    assert.ok(output.includes("omegauniqueterm"), "Second excerpt must be present");
+    assert.ok(
+      !output.includes("identical excerpt already shown under"),
+      "Differing excerpts must both be emitted in full",
+    );
+
+    store.close();
+  });
+
+  test("batch_execute formatter charges a pointer its ACTUAL length, not a fixed cost", () => {
+    const store = createStore();
+    // The pointer names the query that first showed the section, so a long query name makes the
+    // pointer long. A fixed per-pointer cost undercounts it.
+    const word = "alphaterm ";
+    const longQuery = word.repeat(150); // ~1500 chars; every token matches the body below
+    // The sentinel appears ONLY in the body: queries are echoed in their heading and again inside
+    // the cap message, so a sentinel that appears in any query would be counted more than once.
+    store.index({
+      content: `# Cap Section\n\n${word.repeat(20)}bodyonlysentinel`,
+      source: "batch: cap",
+    });
+
+    const capped = formatBatchQueryResults(
+      store,
+      [longQuery, "alphaterm", "alphaterm alphaterm"],
+      "batch: cap",
+      1200,
+    ).join("\n");
+
+    assert.equal((capped.match(/bodyonlysentinel/g) ?? []).length, 1, "Body emitted exactly once");
+    assert.ok(
+      capped.includes("identical excerpt already shown under"),
+      "Later queries matching the same section should point back",
+    );
+    // The emitted pointer carries a ~1500-char query name, so charging its real length pushes
+    // outputSize past the 1200 cap and query 3 reports the cap. Charging a fixed 56 leaves the batch
+    // far under 1200 and this assertion fails -- which is what makes it a regression test for the
+    // accounting rather than for deduplication itself.
+    assert.ok(
+      capped.includes("output cap reached"),
+      "A pointer must be charged its actual length, so a long query name trips the cap",
+    );
+
+    store.close();
+  });
 });
 
 describe("getDistinctiveTerms consistency (fix #9)", () => {
