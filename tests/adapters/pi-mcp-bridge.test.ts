@@ -1113,6 +1113,51 @@ describe("foreground keep-alive — idle reaper scoped by session kind (#868)", 
     expect(sub.CONTEXT_MODE_BRIDGE_IDLE_MS).toBeUndefined(); // #854: sub keeps the reaper
   });
 
+  it("CONTEXT_MODE_FOREGROUND_IDLE_MS opts the foreground child into the idle reaper; junk values keep it off", async () => {
+    const { foregroundBridgeEnv } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const withKnob = (v: string) =>
+      foregroundBridgeEnv({ CONTEXT_MODE_FOREGROUND_IDLE_MS: v }, true).CONTEXT_MODE_BRIDGE_IDLE_MS;
+    expect(withKnob("300000")).toBe("300000"); // opted in
+    for (const junk of ["", "abc", "0", "-5"]) expect(withKnob(junk)).toBe("0"); // today's behaviour
+    expect(foregroundBridgeEnv({}, true).CONTEXT_MODE_BRIDGE_IDLE_MS).toBe("0"); // unset
+    const base = { CONTEXT_MODE_FOREGROUND_IDLE_MS: "2000" };
+    expect(foregroundBridgeEnv(base, false)).toBe(base); // sub-contexts untouched
+    expect((base as NodeJS.ProcessEnv).CONTEXT_MODE_BRIDGE_IDLE_MS).toBeUndefined(); // no mutation
+  });
+
+  it("a foreground child with the knob set exits on idle and the client respawns it on the next call", async () => {
+    const { MCPStdioClient, foregroundBridgeEnv } = await import("../../src/adapters/pi/mcp-bridge.js");
+    // Minimal MCP server that honours CONTEXT_MODE_BRIDGE_IDLE_MS like lifecycle.ts does.
+    const serverPath = join(scratch, "fake-idle-exit-server.mjs");
+    writeFileSync(
+      serverPath,
+      `const idle = Number(process.env.CONTEXT_MODE_BRIDGE_IDLE_MS || 0);
+let buf = "", last = Date.now();
+process.stdin.on("data", (d) => {
+  last = Date.now(); buf += d;
+  let i;
+  while ((i = buf.indexOf("\\n")) >= 0) {
+    const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+    if (m.id !== undefined) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: { pid: process.pid } }) + "\\n");
+  }
+});
+if (idle > 0) setInterval(() => { if (Date.now() - last >= idle) process.exit(0); }, 100).unref();
+setInterval(() => {}, 1 << 30);
+`,
+    );
+    const env = foregroundBridgeEnv({ ...process.env, CONTEXT_MODE_FOREGROUND_IDLE_MS: "500" }, true);
+    const client = new MCPStdioClient(serverPath, env, process.execPath);
+    try {
+      client.start();
+      const first = (await client.request("ping", {})) as { pid: number };
+      await new Promise((r) => setTimeout(r, 1500));
+      const second = (await client.request("ping", {})) as { pid: number };
+      expect(second.pid).not.toBe(first.pid); // old child idled out, a new one answered
+    } finally {
+      client.shutdown();
+    }
+  });
+
   it("a foreground bridge child inherits CONTEXT_MODE_BRIDGE_IDLE_MS=0 in its spawn env", async () => {
     const { MCPStdioClient, foregroundBridgeEnv } = await import(
       "../../src/adapters/pi/mcp-bridge.js"

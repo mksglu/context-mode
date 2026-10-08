@@ -880,13 +880,23 @@ export function isForegroundSession(ctx: unknown): boolean {
  * children still can't accumulate (#854). The foreground child is still reaped
  * on actual parent death by the ppid/​signal watchdog (#311/#388) — only the
  * idle-time path is disabled. Pure; does not mutate the input env.
+ *
+ * Opt-in: set `CONTEXT_MODE_FOREGROUND_IDLE_MS` to a positive number of ms and
+ * the foreground child is reaped after that much inactivity too. The bridge
+ * respawns it on the next ctx_* call (#583), so the only cost of an idle drop is
+ * one cold start; the benefit is that parked interactive sessions stop holding a
+ * 50-110 MB server each. Unset / non-positive / non-numeric = unchanged (0).
  */
 export function foregroundBridgeEnv(
   baseEnv: NodeJS.ProcessEnv,
   foreground: boolean,
 ): NodeJS.ProcessEnv {
   if (!foreground) return baseEnv;
-  return { ...baseEnv, CONTEXT_MODE_BRIDGE_IDLE_MS: "0" };
+  const fgIdle = Number.parseInt(baseEnv.CONTEXT_MODE_FOREGROUND_IDLE_MS ?? "", 10);
+  return {
+    ...baseEnv,
+    CONTEXT_MODE_BRIDGE_IDLE_MS: Number.isFinite(fgIdle) && fgIdle > 0 ? String(fgIdle) : "0",
+  };
 }
 
 /** Result of bootstrapping the bridge. */
