@@ -44,6 +44,7 @@ import {
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
+import { requireFetchDependency } from "../../src/util/fetch-deps.js";
 import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
@@ -624,6 +625,31 @@ td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
 console.log(td.turndown(${JSON.stringify(html)}));
 `;
 }
+
+describe("ctx_fetch_and_index missing-dependency error (#1280)", () => {
+  test("returns the resolved path when the dependency is installed", () => {
+    const path = "/plugin/node_modules/turndown/lib/turndown.cjs.js";
+    expect(requireFetchDependency("turndown", () => path)).toBe(path);
+  });
+
+  test("tells the user how to fix a missing dependency", () => {
+    const missing = Object.assign(new Error("Cannot find module 'turndown'"), { code: "MODULE_NOT_FOUND" });
+    expect(() =>
+      requireFetchDependency("turndown", () => {
+        throw missing;
+      }),
+    ).toThrow('ctx_fetch_and_index needs "turndown", which is not installed. Run "ctx doctor" for the install command.');
+  });
+
+  test("rethrows errors that are not a missing module", () => {
+    const other = new Error("EACCES: permission denied");
+    expect(() =>
+      requireFetchDependency("turndown", () => {
+        throw other;
+      }),
+    ).toThrow(other);
+  });
+});
 
 describe("turndown HTML-to-markdown conversion tests", () => {
   test("converts headings", async () => {

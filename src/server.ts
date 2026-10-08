@@ -14,6 +14,7 @@ import { PolyglotExecutor } from "./executor.js";
 import { runPool, type PoolJob } from "./runPool.js";
 import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, type SearchResult, type IndexResult } from "./store.js";
 import { composeFetchCacheKey } from "./fetch-cache.js";
+import { requireFetchDependency, findMissingFetchDependencies, fetchDependencyInstallCommand, readDepsInstallErrors } from "./util/fetch-deps.js";
 import { PageStore } from "./fetch/page-store.js";
 import { extractAndStore, routeSkipsExtraction, type FetchRoute, type Relabelled } from "./fetch/extract.js";
 import {
@@ -2805,7 +2806,7 @@ let _gfmPluginPath: string | null = null;
 function resolveTurndownPath(): string {
   if (!_turndownPath) {
     const require = createRequire(import.meta.url);
-    _turndownPath = require.resolve("turndown");
+    _turndownPath = requireFetchDependency("turndown", (id) => require.resolve(id));
   }
   return _turndownPath;
 }
@@ -2813,7 +2814,7 @@ function resolveTurndownPath(): string {
 function resolveGfmPluginPath(): string {
   if (!_gfmPluginPath) {
     const require = createRequire(import.meta.url);
-    _gfmPluginPath = require.resolve("turndown-plugin-gfm");
+    _gfmPluginPath = requireFetchDependency("turndown-plugin-gfm", (id) => require.resolve(id));
   }
   return _gfmPluginPath;
 }
@@ -4692,6 +4693,16 @@ server.registerTool(
       } finally {
         try { testDb!?.close(); } catch { /* best effort */ }
       }
+    }
+
+    // Fetch dependencies: ctx_fetch_and_index loads these at call time (#1280)
+    const missingFetchDeps = findMissingFetchDependencies(pluginRoot);
+    if (missingFetchDeps.length === 0) {
+      lines.push("[OK] Fetch dependencies: PASS — turndown, turndown-plugin-gfm, @mixmark-io/domino installed");
+    } else {
+      lines.push(`[FAIL] Fetch dependencies: FAIL — missing ${missingFetchDeps.join(", ")}`);
+      lines.push(`       fix: ${fetchDependencyInstallCommand(pluginRoot)}`);
+      for (const err of readDepsInstallErrors(pluginRoot)) lines.push(`       installer log: ${err}`);
     }
 
     // Hooks

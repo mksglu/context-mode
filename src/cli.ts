@@ -30,6 +30,7 @@ import {
 } from "./runtime.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
+import { findMissingFetchDependencies, fetchDependencyInstallCommand, readDepsInstallErrors } from "./util/fetch-deps.js";
 import {
   ensureWritableStorageDir,
   formatStorageDirectoryError,
@@ -878,6 +879,18 @@ async function doctor(): Promise<number> {
         }
       }
     }
+  }
+
+  // Fetch dependencies: ctx_fetch_and_index loads these at call time (#1280).
+  // Reported as an error without counting as critical: the MCP server still boots.
+  const fetchPluginRoot = getPluginRoot();
+  const missingFetchDeps = findMissingFetchDependencies(fetchPluginRoot);
+  if (missingFetchDeps.length === 0) {
+    p.log.success(color.green("Fetch dependencies: PASS") + color.dim(" — turndown, turndown-plugin-gfm, @mixmark-io/domino installed"));
+  } else {
+    p.log.error(color.red("Fetch dependencies: FAIL") + ` — missing ${missingFetchDeps.join(", ")}`);
+    p.log.info(color.dim(`fix: ${fetchDependencyInstallCommand(fetchPluginRoot)}`));
+    for (const err of readDepsInstallErrors(fetchPluginRoot)) p.log.info(color.dim(`installer log: ${err}`));
   }
 
   // Plugin registration — adapter-aware

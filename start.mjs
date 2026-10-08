@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execSync, spawn } from "node:child_process";
-import { existsSync, chmodSync, readFileSync, writeFileSync, readdirSync, symlinkSync, mkdirSync, lstatSync, unlinkSync } from "node:fs";
+import { existsSync, chmodSync, readFileSync, writeFileSync, readdirSync, symlinkSync, mkdirSync, lstatSync, unlinkSync, openSync, closeSync } from "node:fs";
 import { dirname, resolve, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -487,7 +487,9 @@ import "./hooks/ensure-deps.mjs";
   const NPM_INSTALL_BG_PKGS = ["turndown", "turndown-plugin-gfm", "@mixmark-io/domino"];
   const IS_WIN32 = process.platform === "win32";
   const NPM_BIN = IS_WIN32 ? "npm.cmd" : "npm";
-  const NPM_FLAGS = ["--no-package-lock", "--no-save", "--silent", "--no-audit", "--no-fund"];
+  // --loglevel=error keeps npm's error lines (EACCES, ECONNREFUSED, ...) for
+  // deps-install.log. --silent would suppress them and leave the log empty.
+  const NPM_FLAGS = ["--no-package-lock", "--no-save", "--loglevel=error", "--no-audit", "--no-fund"];
   // #861: on Windows the npm shim is `npm.cmd`, which needs `shell: true` to
   // run — but Node DROPS the `cwd` option when `shell: true`, so the spawned
   // cmd.exe inherits an arbitrary working dir (C:\Windows under Claude Code).
@@ -499,20 +501,27 @@ import "./hooks/ensure-deps.mjs";
   // POSIX layout where npm-cli.js isn't beside node) can never regress.
   const NPM_CLI_JS = resolve(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
   const useNodeCli = existsSync(NPM_CLI_JS);
-  for (const pkg of NPM_INSTALL_BG_PKGS) {
-    if (existsSync(resolve(__dirname, "node_modules", pkg))) continue;
+  // Keep npm's output so `ctx doctor` can show why an install failed. The log is
+  // only rewritten when something is missing, so a healthy boot never truncates the
+  // previous failure.
+  const bgMissing = NPM_INSTALL_BG_PKGS.filter((pkg) => !existsSync(resolve(__dirname, "node_modules", pkg)));
+  let bgLogFd = "ignore";
+  if (bgMissing.length) {
+    try { bgLogFd = openSync(resolve(__dirname, "deps-install.log"), "w"); } catch { /* read-only plugin dir: keep discarding output */ }
+  }
+  for (const pkg of bgMissing) {
     try {
       const child = useNodeCli
         ? spawn(process.execPath, [NPM_CLI_JS, "install", pkg, ...NPM_FLAGS], {
             cwd: __dirname,
-            stdio: "ignore",
+            stdio: ["ignore", bgLogFd, bgLogFd],
             detached: true,
             shell: false,
             windowsHide: true,
           })
         : spawn(NPM_BIN, ["install", pkg, ...NPM_FLAGS], {
             cwd: __dirname,
-            stdio: "ignore",
+            stdio: ["ignore", bgLogFd, bgLogFd],
             detached: true,
             // npm on Windows ships as a `.cmd` shim — must go through cmd.exe.
             shell: IS_WIN32,
@@ -528,13 +537,14 @@ import "./hooks/ensure-deps.mjs";
       child.on("exit", (code) => {
         if (code) {
           process.stderr.write(
-            `[context-mode] background install of ${pkg} exited with code ${code}\n`,
+            `[context-mode] background install of ${pkg} exited with code ${code} (details: deps-install.log)\n`,
           );
         }
       });
       child.unref();
     } catch { /* best effort — never block MCP boot */ }
   }
+  if (typeof bgLogFd === "number") closeSync(bgLogFd);
 }
 
 // Self-heal: create CLI shim if cli.bundle.mjs is missing (marketplace installs)
