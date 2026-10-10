@@ -206,6 +206,69 @@ describe("routePreToolUse", () => {
       expect(result).toBeNull();
     });
 
+    // ─── curl/wget command-position guard (#679) ────────────
+    // "curl"/"wget" mentioned as someone else's argument, or inside a
+    // comment, is not an invocation and must pass through untouched.
+
+    it("allows curl mentioned as a grep pattern, not invoked", () => {
+      const result = routePreToolUse("Bash", {
+        command: "grep -rn curl ./scripts",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows curl mentioned inside a trailing shell comment", () => {
+      const result = routePreToolUse("Bash", {
+        command: "cat notes.md # notes.md talks about curl usage",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows curl mentioned on a comment-only line", () => {
+      const result = routePreToolUse("Bash", {
+        command: "# uses curl internally\nls",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows curl --version (metadata probe, no fetch)", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl --version",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows wget --version (metadata probe, no fetch)", () => {
+      const result = routePreToolUse("Bash", {
+        command: "wget --version",
+      });
+      expect(result).toBeNull();
+    });
+
+    it("still blocks a real curl invocation on the command line", () => {
+      const result = routePreToolUse("Bash", {
+        command: "curl https://example.com",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("still blocks curl wrapped in sudo", () => {
+      const result = routePreToolUse("Bash", {
+        command: "sudo curl https://evil.example.com",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
+    it("still blocks a chained real wget invocation after `;`", () => {
+      const result = routePreToolUse("Bash", {
+        command: "true; wget https://evil.example.com",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.action).toBe("modify");
+    });
+
     it("denies inline fetch() with modify action", () => {
       const result = routePreToolUse("Bash", {
         command: 'node -e "fetch(\'https://api.example.com/data\')"',
