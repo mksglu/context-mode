@@ -8,7 +8,7 @@ import "./setup-home";
  *   - experimental.session.compacting (snapshot generation)
  */
 
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -58,6 +58,495 @@ describe("ContextModePlugin", () => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
     } catch { /* cleanup best effort */ }
+  });
+
+  // ── OpenCode 2 compatibility (V1/V2 dual export) ──────
+  // OpenCode 2's plugin loader ignores the V1 `{ id, server }` shape
+  // entirely (opencode.ai/v2/docs/migrate-v1: "V1 plugin implementations
+  // do not run in V2") and instead requires a default export produced by
+  // `Plugin.define({ id, setup })` from `@opencode/plugin`. Verified against
+  // a real opencode@2.0.3 install: the plain `{ id, server }` object is
+  // silently skipped, while `Plugin.define({ id, setup })` loads and its
+  // setup() runs. This does not exercise setup() itself (that requires a
+  // live OpenCode 2 host) — it locks in the export *shape* OpenCode 2's
+  // loader inspects, per its own "support V1 and V2 from one package"
+  // pattern (opencode.ai/v2/docs/build/plugins#support-v1).
+  describe("OpenCode 2 plugin export shape", () => {
+    it("default export keeps the V1 { id, server } shape for OpenCode 1.x/KiloCode", async () => {
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      expect(mod.default).toHaveProperty("id", "context-mode");
+      expect(typeof mod.default.server).toBe("function");
+    });
+
+    it("default export also carries a V2 setup() when @opencode/plugin is installed", async () => {
+      // Confirms the dual-export carries `setup` (built inline, no dependency
+      // on `@opencode/plugin` resolving).
+      await import("@opencode/plugin");
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      expect(typeof (mod.default as any).setup).toBe("function");
+    });
+
+    // #1171: two distinct shapes produce the same OpenCode 2 rejection
+    // ("Plugin must export a default definition with an id and an effect or
+    // setup function"):
+    // - Published `context-mode@1.0.169` (imyu37, opencode 2.0.10 Windows,
+    //   `opencode plugin add`): V2 export entirely absent. Entry ends with
+    //   `export default { id, server }`, no `setup`, no `@opencode/plugin`
+    //   reference. Fixed by merging/releasing this PR.
+    // - Pre-fix branch: V2 shape built via dynamic `import("@opencode/plugin")`
+    //   → `Plugin.define({ id, setup })`. Since `Plugin.define()` is the
+    //   identity function, the import added no behavior, only a resolution
+    //   failure mode that silently fell back to V1-only. Hardened here by
+    //   building `{ id, setup }` inline with no import.
+    // This test locks the hardening: `setup` stays present even when
+    // `@opencode/plugin` fails to resolve.
+    it("default export still carries a working V2 setup() when @opencode/plugin fails to resolve", async () => {
+      vi.resetModules();
+      vi.doMock("@opencode/plugin", () => {
+        throw new Error("Cannot find module '@opencode/plugin'");
+      });
+      try {
+        const mod = await import("../src/adapters/opencode/plugin.js");
+        expect(typeof (mod.default as any).setup).toBe("function");
+      } finally {
+        vi.doUnmock("@opencode/plugin");
+        vi.resetModules();
+      }
+    });
+
+    // Runs the real V2 setup() against a minimal fake OpenCode 2 context and
+    // records what it registers. Two things only a live host exposed:
+    // - `editor.add` defaults to `codemode: true`, which keeps a tool out of the
+    //   model's direct tool list (reachable only through the `execute` tool's
+    //   catalog), while routing enforcement tells the model to call ctx_* tools
+    //   directly;
+    // - the redirect messages and routing block name tools via
+    //   `createToolNamer(platform)`, so registration must use the same names or
+    //   the model is pointed at tools that do not exist.
+    it("V2 setup() registers ctx_* tools as direct tools under the routed names", async () => {
+      await import("@opencode/plugin");
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      const { createToolNamer } = await import("../hooks/core/tool-naming.mjs");
+      const namer = createToolNamer("opencode");
+
+      type Added = { name: string; options?: { codemode?: boolean; namespace?: string } };
+      const added: Added[] = [];
+      const controller = new AbortController();
+      const ctx = {
+        location: { directory: tempDir },
+        tool: {
+          transform: async (fn: (editor: unknown) => unknown) => {
+            await fn({ add: (tool: Added) => added.push(tool) });
+          },
+          hook: async () => {},
+        },
+        session: { hook: async () => {} },
+        event: {
+          subscribe: () => ({
+            async *[Symbol.asyncIterator]() {
+              await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+            },
+          }),
+        },
+      };
+
+      const dispose = await (mod.default as any).setup(ctx);
+      try {
+        expect(added.length).toBeGreaterThan(0);
+        for (const tool of added) {
+          expect(tool.options?.codemode).toBe(false);
+        }
+        // OpenCode 2 shows `<namespace>_<name>` to the model: that visible name
+        // must be exactly the routed name for every registered tool.
+        for (const tool of added) {
+          const visible = tool.options?.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name;
+          expect(tool.name.startsWith("ctx_")).toBe(true);
+          expect(visible).toBe(namer(tool.name));
+        }
+        expect(added.map((t) => t.name)).toContain("ctx_execute");
+      } finally {
+        controller.abort();
+        if (typeof dispose === "function") await dispose();
+      }
+    });
+  });
+
+  // Routing (hooks/core/routing.mjs) only redirects curl/wget/large output when
+  // isMCPReady() finds a live readiness sentinel -- written by the stdio MCP
+  // server's main(). With native V2 tools there is no MCP server, so unless the
+  // plugin marks itself ready, routing silently depends on some unrelated
+  // context-mode MCP process (e.g. another client's) happening to be alive.
+  describe("OpenCode 2 readiness sentinel", () => {
+    it("V2 setup() writes a readiness sentinel for its own process and removes it on dispose", async () => {
+      const sentinelDir = mkdtempSync(join(tmpdir(), "cm-v2-sentinel-"));
+      const prev = process.env.CONTEXT_MODE_MCP_SENTINEL_DIR;
+      process.env.CONTEXT_MODE_MCP_SENTINEL_DIR = sentinelDir;
+      const sentinel = join(sentinelDir, `context-mode-mcp-ready-${process.pid}`);
+      const controller = new AbortController();
+      try {
+        await import("@opencode/plugin");
+        const mod = await import("../src/adapters/opencode/plugin.js");
+        const ctx = {
+          location: { directory: tempDir },
+          tool: { transform: async (fn: (e: unknown) => unknown) => { await fn({ add: () => {} }); }, hook: async () => {} },
+          session: { hook: async () => {} },
+          event: {
+            subscribe: () => ({
+              async *[Symbol.asyncIterator]() {
+                await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+              },
+            }),
+          },
+        };
+        expect(existsSync(sentinel)).toBe(false);
+        const dispose = await (mod.default as any).setup(ctx);
+        expect(existsSync(sentinel)).toBe(true);
+        const { isMCPReady } = await import("../hooks/core/mcp-ready.mjs");
+        expect(isMCPReady()).toBe(true);
+        controller.abort();
+        await dispose();
+        expect(existsSync(sentinel)).toBe(false);
+      } finally {
+        controller.abort();
+        if (prev === undefined) delete process.env.CONTEXT_MODE_MCP_SENTINEL_DIR;
+        else process.env.CONTEXT_MODE_MCP_SENTINEL_DIR = prev;
+        rmSync(sentinelDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("v2ToolIdentity", () => {
+    it("maps a <prefix>_<tool> namer onto OpenCode 2's namespace option", async () => {
+      const { v2ToolIdentity } = await import("../src/adapters/opencode/plugin.js");
+      expect(v2ToolIdentity("ctx_execute", (t) => `context-mode_${t}`)).toEqual({
+        name: "ctx_execute",
+        namespace: "context-mode",
+      });
+    });
+
+    it("uses any other namer shape verbatim, with no namespace", async () => {
+      const { v2ToolIdentity } = await import("../src/adapters/opencode/plugin.js");
+      expect(v2ToolIdentity("ctx_execute", (t) => t)).toEqual({ name: "ctx_execute" });
+      expect(v2ToolIdentity("ctx_execute", (t) => `mcp__context-mode__${t}`)).toEqual({
+        name: "mcp__context-mode__ctx_execute",
+      });
+    });
+  });
+
+  describe("OpenCode 2 step usage capture", () => {
+    it("correlates session.step.started model with step.ended usage into the session DB", async () => {
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      const { OpenCodeAdapter } = await import("../src/adapters/opencode/index.js");
+      const { resolveSessionDbPath, SessionDB } = await import("../src/session/db.js");
+      const projectDir = join(tempDir, `v2-usage-${Date.now()}`);
+      const sessionId = "v2-usage-session";
+      const busEvents = [
+        {
+          type: "session.step.started",
+          data: { assistantMessageID: "msg-1", model: { id: "claude-sonnet-4", providerID: "anthropic" } },
+        },
+        {
+          type: "session.step.ended",
+          data: {
+            sessionID: sessionId,
+            assistantMessageID: "msg-1",
+            tokens: { input: 100, output: 50, reasoning: 25, cache: { read: 10, write: 5 } },
+            cost: 0.0042,
+          },
+        },
+      ];
+      const added: unknown[] = [];
+      const controller = new AbortController();
+      let consumed = 0;
+      const ctx = {
+        location: { directory: projectDir },
+        tool: {
+          transform: async (fn: (editor: unknown) => unknown) => {
+            await fn({ add: (tool: unknown) => added.push(tool) });
+          },
+          hook: async () => {},
+        },
+        session: { hook: async () => {} },
+        event: {
+          subscribe: () => ({
+            async *[Symbol.asyncIterator]() {
+              for (const ev of busEvents) { consumed += 1; yield ev; }
+              await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+            },
+          }),
+        },
+      };
+      const dispose = await (mod.default as unknown as { setup: (c: unknown) => Promise<() => void> }).setup(ctx);
+      try {
+        await new Promise((r) => setTimeout(r, 500));
+        expect(consumed).toBe(2);
+        const adapter = new OpenCodeAdapter("opencode");
+        const db = new SessionDB({
+          dbPath: resolveSessionDbPath({ projectDir, sessionsDir: adapter.getSessionDir() }),
+        });
+        const events = db.getEvents(sessionId);
+        const usage = events.filter((e) => (e as { type?: string }).type === "agent_usage");
+        expect(usage.length).toBeGreaterThan(0);
+        // Stored rows carry the colon-string summary (model_id lives on the
+        // built event, pinned at parser level): reasoning folded into output,
+        // native cost verbatim.
+        const first = usage[0] as unknown as { data?: unknown };
+        const data = String(first.data ?? "");
+        expect(data).toContain("tokens_out:75");
+        expect(data).toContain("cost_usd:0.0042");
+      } finally {
+        controller.abort();
+        await dispose();
+      }
+    });
+  });
+
+  // ── Plugin platform pin + V2 registration lifecycle (jfayad #1171) ──
+
+  describe("plugin platform pin", () => {
+    it("withPinnedPlatform sets CONTEXT_MODE_PLATFORM for the call and restores afterwards", async () => {
+      const { withPinnedPlatform } = await import("../src/adapters/opencode/plugin.js");
+      const prev = process.env.CONTEXT_MODE_PLATFORM;
+      delete process.env.CONTEXT_MODE_PLATFORM;
+      try {
+        let seen: string | undefined;
+        const out = await withPinnedPlatform("opencode", async () => {
+          seen = process.env.CONTEXT_MODE_PLATFORM;
+          return 42;
+        });
+        expect(out).toBe(42);
+        expect(seen).toBe("opencode");
+        expect(process.env.CONTEXT_MODE_PLATFORM).toBeUndefined();
+      } finally {
+        if (prev === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
+        else process.env.CONTEXT_MODE_PLATFORM = prev;
+      }
+    });
+
+    it("withPinnedPlatform leaves an explicit user override untouched", async () => {
+      const { withPinnedPlatform } = await import("../src/adapters/opencode/plugin.js");
+      const prev = process.env.CONTEXT_MODE_PLATFORM;
+      process.env.CONTEXT_MODE_PLATFORM = "kilo";
+      try {
+        let seen: string | undefined;
+        await withPinnedPlatform("opencode", async () => {
+          seen = process.env.CONTEXT_MODE_PLATFORM;
+        });
+        expect(seen).toBe("kilo");
+        expect(process.env.CONTEXT_MODE_PLATFORM).toBe("kilo");
+      } finally {
+        if (prev === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
+        else process.env.CONTEXT_MODE_PLATFORM = prev;
+      }
+    });
+
+    it("withPinnedPlatform restores after a throw", async () => {
+      const { withPinnedPlatform } = await import("../src/adapters/opencode/plugin.js");
+      const prev = process.env.CONTEXT_MODE_PLATFORM;
+      delete process.env.CONTEXT_MODE_PLATFORM;
+      try {
+        await expect(
+          withPinnedPlatform("opencode", async () => {
+            throw new Error("boom");
+          }),
+        ).rejects.toThrow("boom");
+        expect(process.env.CONTEXT_MODE_PLATFORM).toBeUndefined();
+      } finally {
+        if (prev === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
+        else process.env.CONTEXT_MODE_PLATFORM = prev;
+      }
+    });
+  });
+
+  describe("V2 registration lifecycle", () => {
+    // Fake V2 host ctx whose hook/transform return real `{ dispose }`
+    // registrations (per the SDK) and record their release.
+    function lifecycleCtx(projectDir: string, opts: { failHook?: string } = {}) {
+      const disposed: string[] = [];
+      const reg = (name: string) => ({
+        dispose: async () => {
+          disposed.push(name);
+        },
+      });
+      const controller = new AbortController();
+      const ctx = {
+        location: { directory: projectDir },
+        options: {},
+        tool: {
+          transform: async (fn: (editor: unknown) => unknown) => {
+            await fn({ add: () => {} });
+            return reg("transform");
+          },
+          hook: async (name: string) => reg(`tool:${name}`),
+        },
+        session: {
+          hook: async (name: string) => {
+            if (opts.failHook === name) throw new Error(`hook ${name} failed`);
+            return reg(`session:${name}`);
+          },
+          get: async () => undefined,
+        },
+        event: {
+          subscribe: () => ({
+            async *[Symbol.asyncIterator]() {
+              await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+            },
+          }),
+        },
+      };
+      return { ctx, disposed, controller };
+    }
+
+    it("setup() dispose releases every hook/transform registration", async () => {
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      const projectDir = join(tempDir, `v2-lifecycle-${Date.now()}`);
+      const { ctx, disposed, controller } = lifecycleCtx(projectDir);
+      const dispose = await (mod.default as unknown as { setup: (c: unknown) => Promise<() => void> }).setup(ctx);
+      await dispose();
+      controller.abort();
+      expect(disposed.sort()).toEqual(
+        ["session:compaction", "session:context", "session:prompt", "tool:execute.after", "tool:execute.before", "transform"].sort(),
+      );
+    });
+
+    it("setup() tears down partial registrations when a hook fails", async () => {
+      const mod = await import("../src/adapters/opencode/plugin.js");
+      const projectDir = join(tempDir, `v2-lifecycle-fail-${Date.now()}`);
+      const { ctx, disposed, controller } = lifecycleCtx(projectDir, { failHook: "compaction" });
+      try {
+        await expect(
+          (mod.default as unknown as { setup: (c: unknown) => Promise<() => void> }).setup(ctx),
+        ).rejects.toThrow("hook compaction failed");
+        expect(disposed.sort()).toEqual(
+          ["session:prompt", "tool:execute.after", "tool:execute.before", "transform"].sort(),
+        );
+      } finally {
+        controller.abort();
+      }
+    });
+  });
+
+  describe("platform pin wiring (jfayad #1171)", () => {
+    // Deterministic decoy: scrub every platform marker, then set ONLY
+    // GEMINI_PROJECT_DIR, so unpinned detectPlatform() is gemini-cli by env
+    // (env beats config dirs). The plugin pin must still report opencode.
+    // vi.resetModules() per test gives a pristine module graph (no cached
+    // _detectedAdapter), so the handler's detection runs live under the pin.
+    // (Deliberately no withIsolatedEnv: it cannot survive the registry reset
+    // — the node:os mock keeps reading the pre-reset isolated-env-state
+    // instance — while pure-env markers can.)
+    let savedEnv: Record<string, string | undefined> = {};
+    let platformKeys: string[] = [];
+
+    beforeEach(async () => {
+      const detect = await import("../src/adapters/detect.js");
+      platformKeys = [];
+      for (const [, vars] of detect.PLATFORM_ENV_VARS) {
+        for (const v of vars) platformKeys.push(v.name);
+      }
+      savedEnv = {};
+      for (const k of [
+        "CONTEXT_MODE_PLATFORM",
+        "CONTEXT_MODE_DATA_DIR",
+        "CONTEXT_MODE_DIR",
+        "CONTEXT_MODE_SESSION_DIR",
+        "CONTEXT_MODE_SESSION_SUFFIX",
+        "CONTEXT_MODE_SESSION_DB",
+        ...platformKeys,
+      ]) {
+        savedEnv[k] = process.env[k];
+        delete process.env[k];
+      }
+      process.env.GEMINI_PROJECT_DIR = join(tempDir, "fake-gemini-proj");
+    });
+
+    afterEach(() => {
+      delete process.env.GEMINI_PROJECT_DIR;
+      for (const [k, v] of Object.entries(savedEnv)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+      savedEnv = {};
+      platformKeys = [];
+    });
+
+    function storageSessionsLine(text: string): string {
+      const line = text.split("\n").find((l) => l.includes("Storage sessions:"));
+      expect(line).toBeDefined();
+      return line!;
+    }
+
+    it("V2: ctx_doctor executed through the plugin reports opencode storage, not the env fallback", async () => {
+      vi.resetModules();
+      try {
+        const detect = await import("../src/adapters/detect.js");
+        // Control: without the pin this environment detects gemini-cli.
+        expect(detect.detectPlatform().platform).toBe("gemini-cli");
+
+        const mod = await import("../src/adapters/opencode/plugin.js");
+        const added: Array<{ name: string; execute?: (input: unknown) => Promise<unknown> }> = [];
+        const controller = new AbortController();
+        const projectDir = join(tempDir, `v2-pin-${Date.now()}`);
+        const ctx = {
+          location: { directory: projectDir },
+          options: {},
+          tool: {
+            transform: async (fn: (editor: unknown) => unknown) => {
+              await fn({ add: (tool: (typeof added)[number]) => added.push(tool) });
+            },
+            hook: async () => ({ dispose: async () => {} }),
+          },
+          session: {
+            hook: async () => ({ dispose: async () => {} }),
+            get: async () => undefined,
+          },
+          event: {
+            subscribe: () => ({
+              async *[Symbol.asyncIterator]() {
+                await new Promise((r) => controller.signal.addEventListener("abort", r, { once: true }));
+              },
+            }),
+          },
+        };
+        const dispose = await (mod.default as unknown as { setup: (c: unknown) => Promise<() => void> }).setup(ctx);
+        try {
+          const doctor = added.find((t) => t.name === "ctx_doctor");
+          expect(doctor?.execute).toBeDefined();
+          const out = (await doctor!.execute!({})) as { content?: string };
+          const text = typeof out?.content === "string" ? out.content : JSON.stringify(out);
+          expect(storageSessionsLine(text)).toContain("opencode");
+        } finally {
+          controller.abort();
+          await dispose();
+        }
+        // Pin is scoped: nothing leaks into the host env.
+        expect(process.env.CONTEXT_MODE_PLATFORM).toBeUndefined();
+      } finally {
+        vi.resetModules();
+      }
+    }, 60000);
+
+    it("V1: ctx_doctor executed through the plugin reports opencode storage, not the env fallback", async () => {
+      vi.resetModules();
+      try {
+        const detect = await import("../src/adapters/detect.js");
+        expect(detect.detectPlatform().platform).toBe("gemini-cli");
+
+        const { ContextModePlugin } = await import("../src/adapters/opencode/plugin.js");
+        const projectDir = join(tempDir, `v1-pin-${Date.now()}`);
+        const plugin = await ContextModePlugin({
+          directory: projectDir,
+          client: { app: { log: async () => {} } },
+        });
+        const doctor = (plugin.tool as Record<string, { execute: (args: unknown, toolCtx: unknown) => Promise<{ output: string }> }>)["ctx_doctor"];
+        expect(doctor?.execute).toBeDefined();
+        const res = await doctor.execute({}, { sessionID: "pin-test", messageID: "m1", agent: "build", directory: projectDir });
+        expect(storageSessionsLine(res.output)).toContain("opencode");
+        expect(process.env.CONTEXT_MODE_PLATFORM).toBeUndefined();
+      } finally {
+        vi.resetModules();
+      }
+    }, 60000);
   });
 
   // ── Factory ───────────────────────────────────────────

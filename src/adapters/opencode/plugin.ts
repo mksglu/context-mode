@@ -19,14 +19,23 @@
  *   - context injection now via chat.system.transform surrogate (OC-1)
  *   - No routing file auto-write (avoid dirtying project trees)
  *   - Session cleanup happens at plugin init (no SessionStart)
+ *
+ * OpenCode 2 note: V1 plugin implementations (the `server()` shape above) do
+ * not run under OpenCode 2 — its plugin loader only recognizes a default
+ * export produced by `Plugin.define({ id, setup })` from `@opencode/plugin`.
+ * The bottom of this file exports BOTH shapes from one object, per OpenCode's
+ * own documented "support V1 and V2 from one package" pattern
+ * (opencode.ai/v2/docs/build/plugins#support-v1): OpenCode 1.x / KiloCode call
+ * `server()` and use its returned hooks; OpenCode 2 reads `id`/`setup` off the
+ * same object and ignores `server()`. See `setupContextModePluginV2` below.
  */
 
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
-import { extractEvents, extractUserEvents, parseOpencodeUsage, buildAgentUsageEvent } from "../../session/extract.js";
+import { extractEvents, extractUserEvents, parseOpencodeUsage, parseOpencodeV2StepUsage, buildAgentUsageEvent } from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
 import { buildResumeSnapshot } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
@@ -252,17 +261,15 @@ function getPlatform(): AdapterPlatformType {
   return "opencode";
 }
 
-// ── Plugin Factory ────────────────────────────────────────
+// ── Shared runtime (V1 + V2) ─────────────────────────────────
+//
+// Everything below is pure initialization — same steps, same order, same
+// side effects as the original single-shape createContextModePlugin. It is
+// extracted only so the V2 entrypoint (added for OpenCode 2 compatibility)
+// can reuse it instead of duplicating ~40 lines of module loading; it does
+// not change V1/KiloCode behavior.
 
-/**
- * Plugin factory. Called once when KiloCode/OpenCode loads the plugin.
- * Returns an object mapping hook event names to async handler functions.
- *
- * KiloCode expects: export default { id: string, server: (input) => Promise<Hooks> }
- * OpenCode expects: export const ContextModePlugin = (ctx) => Promise<Hooks>
- */
-async function createContextModePlugin(ctx: PluginContext) {
-  // Resolve build dir from compiled JS location
+async function createContextModeRuntime(directory: string) {
   const platform = getPlatform();
   const adapter = new OpenCodeAdapter(platform);
   const buildDir = dirname(fileURLToPath(import.meta.url));
@@ -295,7 +302,7 @@ async function createContextModePlugin(ctx: PluginContext) {
   // OpenCode/Kilo provide the real `input.sessionID` on every hook, and a
   // process-global UUID would (a) never match prior-session resume rows and
   // (b) collide across multi-session reuse (Mickey / PR #376 root cause).
-  const projectDir = ctx?.directory ?? process.cwd();
+  const projectDir = directory || process.cwd();
   // C2 narrowing: resolve DB path through the canonical helper directly.
   // BaseAdapter no longer exposes getSessionDBPath; the adapter only owns
   // the sessions DIR (per-platform), the helper owns the per-project FILE
@@ -307,23 +314,27 @@ async function createContextModePlugin(ctx: PluginContext) {
   // Clean up old sessions on startup (no SessionStart hook to do this).
   db.cleanupOldSessions(7);
 
-  // OC-4 (#487 follow-up): per-session capture gate. PR #487 trusted the host
-  // to deliver AGENTS.md events, but OpenCode only fires `rule_content` events
-  // when the user explicitly reads the file. snapshot.ts:172 + analytics.ts:152
-  // CONSUME `rule_content` to render rules into the resume snapshot — without
-  // this capture path, AGENTS.md is silently absent from continuity output.
-  // Keyed by sessionId (NOT projectDir) so multi-session reuse within a long-
-  // lived plugin process still gets per-session capture exactly once.
-  const agentsMdCaptured = new Set<string>();
+  return { platform, adapter, routing, autoInjectionMod, toolNamer, routingBlock, projectDir, db };
+}
 
-  /**
-   * OC-4: Read AGENTS.md (with CLAUDE.md / CONTEXT.md fallbacks) from the
-   * project directory and persist as `rule` + `rule_content` events. Mirrors
-   * the CC SessionStart pattern at hooks/sessionstart.mjs:121-132 and the
-   * OpenCode instruction.ts FILES order. Idempotent via `agentsMdCaptured`
-   * Set keyed by sessionId. Fail-soft: missing/unreadable files do not throw.
-   */
-  function captureAgentsMd(sessionId: string): void {
+/**
+ * OC-4 (#487 follow-up): per-session capture gate. PR #487 trusted the host
+ * to deliver AGENTS.md events, but OpenCode only fires `rule_content` events
+ * when the user explicitly reads the file. snapshot.ts:172 + analytics.ts:152
+ * CONSUME `rule_content` to render rules into the resume snapshot — without
+ * this capture path, AGENTS.md is silently absent from continuity output.
+ * Keyed by sessionId (NOT projectDir) so multi-session reuse within a long-
+ * lived plugin process still gets per-session capture exactly once.
+ *
+ * Read AGENTS.md (with CLAUDE.md / CONTEXT.md fallbacks) from the project
+ * directory and persist as `rule` + `rule_content` events. Mirrors the CC
+ * SessionStart pattern at hooks/sessionstart.mjs:121-132 and the OpenCode
+ * instruction.ts FILES order. Idempotent via the returned closure's Set,
+ * keyed by sessionId. Fail-soft: missing/unreadable files do not throw.
+ */
+function makeAgentsMdCapture(projectDir: string, db: SessionDB): (sessionId: string) => void {
+  const agentsMdCaptured = new Set<string>();
+  return function captureAgentsMd(sessionId: string): void {
     if (agentsMdCaptured.has(sessionId)) return;
     agentsMdCaptured.add(sessionId);
     const candidates = ["AGENTS.md", "CLAUDE.md", "CONTEXT.md"];
@@ -349,7 +360,54 @@ async function createContextModePlugin(ctx: PluginContext) {
         // file missing or unreadable — skip silently
       }
     }
+  };
+}
+
+/**
+ * Import the registered ctx_* tool registry without starting its stdio MCP
+ * transport. Shared by the V1 native-tool bridge (#574) and the V2
+ * `ctx.tool.transform` registration below.
+ */
+async function loadCtxToolRegistry(): Promise<typeof import("../../server.js")> {
+  const prevEmbedded = process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
+  process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS = "1";
+  try {
+    return await import("../../server.js");
+  } finally {
+    if (prevEmbedded === undefined) delete process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
+    else process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS = prevEmbedded;
   }
+}
+
+/** Extract a registered tool's Zod v3 shape (map of field name → Zod schema). */
+function extractToolShape(config: Record<string, unknown>): Record<string, unknown> {
+  const inputSchema = config.inputSchema as
+    | { shape?: unknown; _def?: { shape?: unknown } }
+    | undefined;
+  if (typeof inputSchema?.shape === "object" && inputSchema.shape !== null) {
+    return inputSchema.shape as Record<string, unknown>;
+  }
+  if (typeof inputSchema?._def?.shape === "function") {
+    return (inputSchema._def.shape as () => unknown)() as Record<string, unknown>;
+  }
+  return {};
+}
+
+// ── Plugin Factory (V1 — OpenCode 1.x / KiloCode) ────────────
+
+/**
+ * Plugin factory. Called once when KiloCode/OpenCode loads the plugin.
+ * Returns an object mapping hook event names to async handler functions.
+ *
+ * KiloCode expects: export default { id: string, server: (input) => Promise<Hooks> }
+ * OpenCode expects: export const ContextModePlugin = (ctx) => Promise<Hooks>
+ */
+async function createContextModePlugin(ctx: PluginContext) {
+  const projectDir = ctx?.directory ?? process.cwd();
+  const { platform, routing, autoInjectionMod, routingBlock, db } =
+    await createContextModeRuntime(projectDir);
+
+  const captureAgentsMd = makeAgentsMdCapture(projectDir, db);
 
   function logger(
     message = "context-mode debug log",
@@ -390,15 +448,7 @@ async function createContextModePlugin(ctx: PluginContext) {
     // transport. This is the plugin-only bridge for #574: OpenCode/Kilo
     // call ctx_* tools in-process through Hooks.tool instead of spawning
     // a separate MCP child per session.
-    const prevEmbedded = process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
-    process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS = "1";
-    let mod: typeof import("../../server.js");
-    try {
-      mod = await import("../../server.js");
-    } finally {
-      if (prevEmbedded === undefined) delete process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS;
-      else process.env.CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS = prevEmbedded;
-    }
+    const mod = await loadCtxToolRegistry();
     const tools: Record<string, NativeToolDefinition> = {};
 
     for (const registered of mod.REGISTERED_CTX_TOOLS) {
@@ -411,14 +461,9 @@ async function createContextModePlugin(ctx: PluginContext) {
       // (coerceCommandsArray / coerceJsonArray in server.ts) and defaults
       // never fire. Fixes #621.
       const inputSchema = config.inputSchema as
-        | { shape?: unknown; _def?: { shape?: unknown }; parse?: (input: unknown) => unknown }
+        | { parse?: (input: unknown) => unknown }
         | undefined;
-      const shape =
-        typeof inputSchema?.shape === "object" && inputSchema.shape !== null
-          ? inputSchema.shape
-          : typeof inputSchema?._def?.shape === "function"
-            ? (inputSchema._def.shape as () => unknown)()
-            : {};
+      const shape = extractToolShape(config);
 
       // Both KiloCode and recent OpenCode bundle Zod v4 in-host; v3 schemas
       // crash with `n._zod.def` undefined. Gate widened from kilo-only (#632)
@@ -451,8 +496,10 @@ async function createContextModePlugin(ctx: PluginContext) {
             }
           }
 
-          const result = await mod.withProjectDirOverride({ projectDir: project, sessionId: toolCtx.sessionID }, async () =>
-            registered.handler(parsedArgs),
+          const result = await withPinnedPlatform(platform, () =>
+            mod.withProjectDirOverride({ projectDir: project, sessionId: toolCtx.sessionID }, async () =>
+              registered.handler(parsedArgs),
+            ),
           );
 
           const r = result as {
@@ -751,10 +798,480 @@ async function createContextModePlugin(ctx: PluginContext) {
   };
 }
 
+// ── Plugin Factory (V2 — OpenCode 2) ─────────────────────────
+//
+// OpenCode 2's plugin loader ignores the `server()` shape above entirely
+// (opencode.ai/v2/docs/migrate-v1: "V1 plugin implementations do not run in
+// V2"). Verified empirically against opencode@2.0.3: a `{ id, server }`
+// default export is silently skipped by both `opencode plugin list` and a
+// live session (no load attempt logged at any --log-level), while a
+// `Plugin.define({ id, setup })` export from `@opencode/plugin` loads and
+// runs its setup() correctly. This mirrors the hook-for-hook mapping in
+// OpenCode's own migration guide (opencode.ai/v2/docs/build/plugins/migrate-v1):
+//
+//   V1 hook                              V2 API
+//   tool.execute.before                  ctx.tool.hook("execute.before", ...)
+//   tool.execute.after                   ctx.tool.hook("execute.after", ...)
+//   event (message.updated)              ctx.event.subscribe()
+//   chat.message                         ctx.session.hook("prompt", ...)
+//   experimental.session.compacting      ctx.session.hook("compaction", ...)
+//   experimental.chat.system.transform   ctx.session.hook("context", ...)
+//   tool map                             ctx.tool.transform(editor => editor.add(...))
+//
+// V2's session-request hooks ("context" and "compaction") share one
+// `system: SystemPart[]` field for model-visible context — there is no
+// separate `context: string[]` array like V1's compacting hook had, so both
+// the resume snapshot and the auto-injection block are pushed onto
+// `event.system` as `{ type: "text", text }` parts in both hooks.
+//
+// Confidence note for reviewers: the config/dual-export mechanics and the
+// hook-name mapping above come directly from OpenCode's published migration
+// guide and were confirmed against a real opencode@2.0.3 install (plugin
+// loads, setup() runs, config keys parsed). The exact field names on
+// `ToolExecuteBefore`/`ToolExecuteCompleted`/`ToolExecuteFailed` (assumed:
+// `tool`, `input`, `status`, `result`, `error`, and — by analogy with every
+// other hook interface OpenCode documents — `sessionID`) are not spelled out
+// in the public docs beyond the short examples reproduced above, so the
+// session-attribution path in `tool.execute.after` should be exercised
+// against a live OpenCode 2 agent turn before release.
+
+/**
+ * Register context-mode's ctx_* tools through the V2 tool-transform API.
+ *
+ * Two V2-specific details, both observed on OpenCode 2.0.7:
+ * - Tools added via `editor.add` default to `codemode: true`, which hides them
+ *   from the model's direct tool list: they are only reachable by writing code
+ *   against the `execute` tool's catalog. Routing enforcement tells the model
+ *   to *call* these tools directly, so they are registered with
+ *   `codemode: false`.
+ * - Their model-visible names must equal `toolNamer(name)` — the names the
+ *   routing block and the `execute.before` redirect messages use — so the
+ *   guidance the model receives always names a tool that exists. OpenCode 2
+ *   composes the visible name as `<namespace>_<name>`, so a namer of the form
+ *   `<prefix>_<tool>` maps onto its native `namespace` option (see
+ *   `v2ToolIdentity`); any other namer shape is used verbatim as the name.
+ */
+/**
+ * Split a routed tool name into OpenCode 2's `{ name, namespace }` so the
+ * host-composed `<namespace>_<name>` equals exactly what the router tells the
+ * model to call. Exported for tests.
+ */
+export function v2ToolIdentity(
+  bareTool: string,
+  toolNamer: (bareTool: string) => string,
+): { name: string; namespace?: string } {
+  const routed = toolNamer(bareTool);
+  const suffix = `_${bareTool}`;
+  if (routed.endsWith(suffix)) {
+    const namespace = routed.slice(0, -suffix.length);
+    // Only a clean `<prefix>_<tool>` shape; anything else (e.g. `mcp__x__tool`)
+    // is registered verbatim so the host never sees an odd namespace.
+    if (namespace && !namespace.endsWith("_")) return { name: bareTool, namespace };
+  }
+  return { name: routed };
+}
+
+/**
+ * Pin platform detection for in-plugin tool execution (jfayad, #1171).
+ *
+ * Inside an OpenCode/KiloCode plugin host process none of the `OPENCODE_*` /
+ * `KILO_*` env markers are guaranteed to be set, so `detectPlatform()` falls
+ * through to config-dir fallbacks (`~/.claude`, `~/.gemini`, …) and tools like
+ * `ctx_doctor` misreport the platform. The plugin already knows its platform
+ * (see `getPlatform()` / `createContextModeRuntime`), so pin it via the
+ * `CONTEXT_MODE_PLATFORM` override that `detectPlatform()` honors — scoped to
+ * the handler call only.
+ *
+ * An explicit user-set `CONTEXT_MODE_PLATFORM` wins and is left untouched.
+ * Note: the pin is process-global env, so genuinely concurrent tool executions
+ * share it — same trade-off as the existing `CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS`
+ * scoping in `loadCtxToolRegistry()`. In practice the value pinned here is
+ * always this host's own platform, so interleaving is harmless.
+ */
+export async function withPinnedPlatform<T>(platform: string, fn: () => Promise<T>): Promise<T> {
+  const key = "CONTEXT_MODE_PLATFORM";
+  const prev = process.env[key];
+  const owned = prev === undefined || prev === "";
+  if (owned) process.env[key] = platform;
+  try {
+    return await fn();
+  } finally {
+    if (owned) delete process.env[key];
+  }
+}
+
+async function registerNativeToolsV2(
+  ctx: any,
+  projectDir: string,
+  toolNamer: (bareTool: string) => string,
+  platform: string,
+): Promise<{ dispose: () => Promise<void> }> {
+  const mod = await loadCtxToolRegistry();
+  const zod4 = await import("zod/v4");
+
+  return ctx.tool.transform((editor: any) => {
+    for (const registered of mod.REGISTERED_CTX_TOOLS) {
+      const config = registered.config as Record<string, unknown>;
+      const inputSchema = config.inputSchema as
+        | { parse?: (input: unknown) => unknown }
+        | undefined;
+      const shape = extractToolShape(config);
+      // V2 tools declare JSON Schema, not a Zod shape — reuse the existing
+      // Zod v3→v4 shape conversion (already required for the V1 native-tool
+      // bridge, #574) and let Zod v4's own toJSONSchema() do the rest.
+      const v4Shape = zod3ShapeToV4(shape) as Record<string, InstanceType<typeof zod4.ZodType>>;
+      const jsonSchema = zod4.toJSONSchema(zod4.object(v4Shape));
+
+      const identity = v2ToolIdentity(registered.name, toolNamer);
+      editor.add({
+        name: identity.name,
+        description: String(config.description ?? ""),
+        input: jsonSchema,
+        options: identity.namespace
+          ? { namespace: identity.namespace, codemode: false }
+          : { codemode: false },
+        async execute(input: Record<string, unknown>) {
+          let parsedArgs: Record<string, unknown> = input ?? {};
+          if (typeof inputSchema?.parse === "function") {
+            try {
+              parsedArgs = inputSchema.parse(input ?? {}) as Record<string, unknown>;
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              throw new Error(`Invalid arguments for ${registered.name}: ${message}`);
+            }
+          }
+
+          const result = await withPinnedPlatform(platform, () =>
+            mod.withProjectDirOverride({ projectDir }, async () =>
+              registered.handler(parsedArgs),
+            ),
+          );
+
+          const r = result as {
+            content?: Array<{ type?: string; text?: string }>;
+            isError?: boolean;
+          };
+          const text = Array.isArray(r?.content)
+            ? r.content
+                .filter((c) => c?.type === "text" && typeof c.text === "string")
+                .map((c) => c.text)
+                .join("\n")
+            : typeof result === "string"
+              ? result
+              : JSON.stringify(result ?? "");
+
+          if (r?.isError) throw new Error(text || `${registered.name} returned an error`);
+          return { content: text };
+        },
+      });
+    }
+  });
+}
+
+/**
+ * Mark this process as a ready context-mode tool provider.
+ *
+ * Routing (hooks/core/routing.mjs) redirects curl/wget and large-output
+ * commands only when `isMCPReady()` finds a live readiness sentinel. The
+ * stdio MCP server writes one from its main(); with native V2 tools there is
+ * no MCP server, so without this the redirects silently depend on some
+ * unrelated context-mode MCP process (another client's) being alive. Mirrors
+ * the server's sentinel: this process's PID, refreshed every 30s (the reader's
+ * freshness window is 90s), removed on dispose.
+ */
+async function startReadinessSentinel(): Promise<() => void> {
+  const buildDir = dirname(fileURLToPath(import.meta.url));
+  const mcpReadyPath = resolve(buildDir, "..", "..", "..", "hooks", "core", "mcp-ready.mjs");
+  const { sentinelPathForPid } = await import(pathToFileURL(mcpReadyPath).href);
+  const sentinel: string = sentinelPathForPid(process.pid);
+  const write = () => {
+    try { writeFileSync(sentinel, String(process.pid)); } catch { /* best effort */ }
+  };
+  write();
+  const refresh = setInterval(write, 30_000);
+  refresh.unref();
+  return () => {
+    clearInterval(refresh);
+    try { unlinkSync(sentinel); } catch { /* best effort */ }
+  };
+}
+
+/** V2 `Plugin.define({ id, setup })` body. `ctx` is the OpenCode 2 plugin context. */
+async function setupContextModePluginV2(ctx: any): Promise<() => void> {
+  const directory = ctx?.location?.directory ?? process.cwd();
+  const { platform, routing, autoInjectionMod, toolNamer, routingBlock, projectDir, db } =
+    await createContextModeRuntime(directory);
+
+  const captureAgentsMd = makeAgentsMdCapture(projectDir, db);
+
+  // Every hook/transform registration returns a `{ dispose }` Registration
+  // per the SDK (verified against @opencode/plugin@2.0.16 types) — collect
+  // them so setup failure AND plugin cleanup release what was acquired
+  // instead of leaking stale hooks into the host. Fake hosts in tests may
+  // return undefined; only real registrations are tracked.
+  const disposers: Array<() => Promise<void>> = [];
+  const track = (reg: unknown): void => {
+    const dispose = (reg as { dispose?: unknown })?.dispose;
+    if (typeof dispose === "function") disposers.push(dispose as () => Promise<void>);
+  };
+  const teardownRegistrations = async (): Promise<void> => {
+    for (const dispose of disposers.splice(0)) {
+      try {
+        await dispose();
+      } catch {
+        // Best-effort teardown — never break cleanup.
+      }
+    }
+  };
+
+  const usageController = new AbortController();
+
+  track(await registerNativeToolsV2(ctx, projectDir, toolNamer, platform));
+  const stopReadinessSentinel = await startReadinessSentinel();
+  try {
+  // ── tool.execute.before → routing enforcement ──────────
+  track(await ctx.tool.hook("execute.before", (event: any) => {
+    const toolName = event?.tool ?? "";
+    const toolInput = event?.input ?? {};
+
+    let decision;
+    try {
+      decision = routing.routePreToolUse(toolName, toolInput, projectDir, platform);
+    } catch {
+      return;
+    }
+    if (!decision) return;
+
+    if (decision.action === "deny" || decision.action === "ask") {
+      throw new Error(decision.reason ?? "Blocked by context-mode");
+    }
+    if (decision.action === "modify" && decision.updatedInput && event?.input) {
+      Object.assign(event.input, decision.updatedInput);
+    }
+    if (decision.action === "context" && decision.additionalContext && event?.input) {
+      event.input.additionalContext = decision.additionalContext;
+    }
+  }));
+
+  // ── tool.execute.after → session event capture ─────────
+  track(await ctx.tool.hook("execute.after", async (event: any) => {
+    const sessionId = event?.sessionID;
+    if (!sessionId) return;
+    try {
+      db.ensureSession(sessionId, projectDir);
+      captureAgentsMd(sessionId);
+
+      const output =
+        event.status === "error"
+          ? String(event.error?.message ?? "")
+          : typeof event.result === "string"
+            ? event.result
+            : Array.isArray(event.result?.content)
+              ? event.result.content
+                  .filter((c: any) => c?.type === "text" && typeof c.text === "string")
+                  .map((c: any) => c.text)
+                  .join("\n")
+              : JSON.stringify(event.result ?? "");
+
+      const hookInput: HookInput = {
+        tool_name: event.tool ?? "",
+        tool_input: event.input ?? {},
+        tool_response: output,
+        tool_output: undefined,
+      };
+      const events = extractEvents(hookInput);
+      for (const ev of events) {
+        db.insertEvent(sessionId, ev as SessionEvent, "PostToolUse");
+      }
+    } catch {
+      // Silent — session capture must never break the tool call
+    }
+  }));
+
+  // ── ctx.event.subscribe → per-step / per-turn token + cost capture ─
+  // v2 bus correlation: the model is observed on `session.step.started`
+  // keyed by `assistantMessageID`, and the matching `session.step.ended`
+  // (which omits the model) is attributed via that key — shapes verified
+  // against the published @opencode/plugin@2.0.16 + @opencode/schema@2.0.16
+  // types. The legacy `message.updated` path is kept as a fallback, but note
+  // it is absent from the v2 bus schema, so on OpenCode 2 the step
+  // correlation is the live path.
+  const modelByMessage = new Map<string, string>();
+  void (async () => {
+    try {
+      for await (const busEvent of ctx.event.subscribe({ signal: usageController.signal }) as AsyncIterable<any>) {
+        try {
+          if (!busEvent || typeof busEvent.type !== "string") continue;
+
+          if (busEvent.type === "session.step.started") {
+            const data = busEvent.data as
+              | { assistantMessageID?: unknown; model?: { id?: unknown; providerID?: unknown } }
+              | undefined;
+            const msgId = data?.assistantMessageID;
+            const model = data?.model;
+            if (typeof msgId === "string" && model) {
+              const id = typeof model.id === "string" ? model.id : "";
+              const providerID = typeof model.providerID === "string" ? model.providerID : "";
+              modelByMessage.set(msgId, providerID && id ? `${providerID}/${id}` : id || providerID);
+            }
+            continue;
+          }
+
+          if (busEvent.type === "session.step.ended") {
+            const data = busEvent.data as
+              | { sessionID?: unknown; assistantMessageID?: unknown }
+              | undefined;
+            const sessionId = data?.sessionID;
+            if (!sessionId || typeof sessionId !== "string") continue;
+            const msgId = typeof data?.assistantMessageID === "string" ? data.assistantMessageID : "";
+            const counts = parseOpencodeV2StepUsage(data, modelByMessage.get(msgId) ?? "");
+            if (msgId) modelByMessage.delete(msgId);
+            if (!counts) continue;
+            const usageEvent = buildAgentUsageEvent(counts);
+            if (!usageEvent) continue;
+
+            db.ensureSession(sessionId, projectDir);
+            db.insertEvent(sessionId, usageEvent, "StepEnded");
+            continue;
+          }
+
+          if (busEvent.type !== "message.updated") continue;
+          const sessionId = busEvent.properties?.info?.sessionID;
+          if (!sessionId || typeof sessionId !== "string") continue;
+
+          const counts = parseOpencodeUsage(busEvent);
+          if (!counts) continue;
+          const usageEvent = buildAgentUsageEvent(counts);
+          if (!usageEvent) continue;
+
+          db.ensureSession(sessionId, projectDir);
+          db.insertEvent(sessionId, usageEvent, "MessageUpdated");
+        } catch {
+          // Silent — usage capture must never break the session.
+        }
+      }
+    } catch {
+      // Stream aborted on cleanup, or the connection dropped — nothing to do.
+    }
+  })();
+
+  // ── chat.message → session "prompt" hook ────────────────
+  track(await ctx.session.hook("prompt", (event: any) => {
+    const sessionId = event?.sessionID;
+    if (!sessionId) return;
+    try {
+      const message = event?.prompt?.text;
+      if (!message) return;
+      if (isSyntheticMessage(message)) return;
+
+      db.ensureSession(sessionId, projectDir);
+      captureAgentsMd(sessionId);
+
+      db.insertEvent(sessionId, {
+        type: "user_prompt",
+        category: "user-prompt",
+        data: message,
+        priority: 1,
+      } as SessionEvent, "UserPromptSubmit");
+
+      const userEvents = extractUserEvents(message);
+      for (const ev of userEvents) {
+        db.insertEvent(sessionId, ev as SessionEvent, "UserPromptSubmit");
+      }
+    } catch {
+      // Silent — prompt admission must never fail because of capture
+    }
+  }));
+
+  // ── experimental.session.compacting → session "compaction" hook ─
+  track(await ctx.session.hook("compaction", async (event: any) => {
+    const sessionId = event?.sessionID;
+    if (!sessionId || !Array.isArray(event?.system)) return;
+    try {
+      db.ensureSession(sessionId, projectDir);
+      const dbEvents = db.getEvents(sessionId);
+      if (dbEvents.length === 0) return;
+
+      const stats = db.getSessionStats(sessionId);
+      const snapshot = buildResumeSnapshot(dbEvents, {
+        compactCount: (stats?.compact_count ?? 0) + 1,
+      });
+
+      db.upsertResume(sessionId, snapshot, dbEvents.length);
+      db.incrementCompactCount(sessionId);
+
+      event.system.push({ type: "text", text: snapshot });
+
+      try {
+        const autoBlock: string = autoInjectionMod.buildAutoInjection(dbEvents);
+        if (autoBlock && autoBlock.length > 0) {
+          event.system.push({ type: "text", text: autoBlock });
+        }
+      } catch {
+        // Auto-injection failure must NOT break the snapshot path.
+      }
+    } catch {
+      // Silent — never break compaction
+    }
+  }));
+
+  // ── experimental.chat.system.transform → session "context" hook ─
+  track(await ctx.session.hook("context", (event: any) => {
+    const sessionId = event?.sessionID;
+    if (!sessionId || !Array.isArray(event?.system)) return;
+
+    const asText = (part: unknown): string =>
+      typeof part === "string" ? part : (part as { text?: string })?.text ?? "";
+
+    try {
+      const systemTexts = event.system.map(asText).filter(Boolean);
+      if (!systemHasRoutingInstructions(systemTexts)) {
+        event.system.splice(1, 0, { type: "text", text: routingBlock });
+      }
+    } catch {
+      // Never break the chat turn on routing-block injection failure.
+    }
+
+    try {
+      const row = db.claimLatestUnconsumedResume(sessionId);
+      if (!row || !row.snapshot) return;
+      event.system.splice(1, 0, { type: "text", text: row.snapshot });
+    } catch {
+      // Silent — never break the chat turn
+    }
+  }));
+  } catch (err) {
+    // A failed registration must not leave the earlier hooks behind.
+    usageController.abort();
+    stopReadinessSentinel();
+    await teardownRegistrations();
+    throw err;
+  }
+
+  return async () => {
+    usageController.abort();
+    stopReadinessSentinel();
+    await teardownRegistrations();
+  };
+}
+
 // ── Exports ──────────────────────────────────────────────
 // KiloCode PluginModule: default export with { server } shape
 // OpenCode compat: named export for direct import("context-mode/plugin")
-export default { id:"context-mode", server: createContextModePlugin };
+//
+// OpenCode 2 support (V1/V2 dual export, per opencode.ai/v2/docs/build/
+// plugins#support-v1): spread the V2 shape into the default export alongside
+// `server`. OpenCode 1.x/KiloCode call server() and ignore `id`/`setup`;
+// OpenCode 2 reads `id`/`setup` and ignores `server`. This is built without
+// importing `@opencode/plugin` — `Plugin.define()` in that package is just
+// `(plugin) => plugin` (the identity function), so calling it added no
+// behavior, only a dependency that isn't guaranteed to resolve on every host
+// (#1171: `opencode plugin add` installs don't always run full dependency
+// resolution, so the dynamic import used to fail and silently drop `setup`,
+// which made OpenCode 2 reject the whole plugin).
+const v2PluginShape = { id: "context-mode" as const, setup: setupContextModePluginV2 };
+
+export default { ...v2PluginShape, server: createContextModePlugin };
 export { createContextModePlugin as ContextModePlugin };
 // Test surface — exported for unit testing the quorum substring fix (#487).
 export { systemHasRoutingInstructions, ROUTING_MARKERS };

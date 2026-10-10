@@ -23,6 +23,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseOpencodeUsage,
+  parseOpencodeV2StepUsage,
   buildAgentUsageEvent,
 } from "../../src/session/extract.js";
 
@@ -167,5 +168,79 @@ describe("parseOpencodeUsage", () => {
     expect(event?.cache_creation_tokens).toBe(80);
     expect(event?.model_id).toBe("anthropic/claude-sonnet-4");
     expect(event?.data).toContain("cost_usd:");
+  });
+});
+
+/**
+ * parseOpencodeV2StepUsage — OpenCode v2 `session.step.ended` capture
+ * (ported from mksglu/context-mode#1194).
+ *
+ * v2 usage lives under `data` (not `properties.info`), the model arrives
+ * separately from the correlated `session.step.started`, and there is an
+ * extra `reasoning` bucket folded into output. Native USD cost passes through
+ * verbatim. These tests pin that mapping before it flows into
+ * buildAgentUsageEvent.
+ */
+describe("parseOpencodeV2StepUsage", () => {
+  function stepData(overrides: Record<string, unknown> = {}) {
+    return {
+      sessionID: "ses-1",
+      assistantMessageID: "msg-1",
+      tokens: { input: 100, output: 50, reasoning: 25, cache: { read: 10, write: 5 } },
+      cost: 0.0042,
+      ...overrides,
+    };
+  }
+
+  it("maps buckets, folds reasoning into output, passes cost and model through", () => {
+    const counts = parseOpencodeV2StepUsage(stepData(), "openai/gpt-4");
+    expect(counts).toEqual({
+      model_id: "openai/gpt-4",
+      input_tokens: 100,
+      output_tokens: 75,
+      cache_read_tokens: 10,
+      cache_creation_tokens: 5,
+      native_cost_usd: 0.0042,
+    });
+  });
+
+  it("tolerates missing model, cache, cost, and reasoning", () => {
+    const counts = parseOpencodeV2StepUsage(
+      stepData({ tokens: { input: 7, output: 3 }, cost: undefined }),
+      "",
+    );
+    expect(counts).toEqual({
+      model_id: "",
+      input_tokens: 7,
+      output_tokens: 3,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 0,
+      native_cost_usd: null,
+    });
+  });
+
+  it("returns null when every bucket is zero/absent or tokens missing", () => {
+    expect(parseOpencodeV2StepUsage(stepData({ tokens: { input: 0, output: 0 } }), "m")).toBeNull();
+    expect(parseOpencodeV2StepUsage(stepData({ tokens: undefined }), "m")).toBeNull();
+    expect(parseOpencodeV2StepUsage({ sessionID: "s" }, "m")).toBeNull();
+  });
+
+  it("returns null for non-object payloads and ignores non-numeric buckets", () => {
+    expect(parseOpencodeV2StepUsage(null, "m")).toBeNull();
+    expect(parseOpencodeV2StepUsage("nope", "m")).toBeNull();
+    const counts = parseOpencodeV2StepUsage(
+      stepData({ tokens: { input: "lots", output: NaN, reasoning: -5 } }),
+      "m",
+    );
+    expect(counts).toBeNull();
+  });
+
+  it("feeds buildAgentUsageEvent with the native cost", () => {
+    const counts = parseOpencodeV2StepUsage(stepData(), "openai/gpt-4");
+    const event = buildAgentUsageEvent(counts!);
+    expect(event?.type).toBe("agent_usage");
+    expect(event?.cost_usd).toBe(0.0042);
+    expect(event?.output_tokens).toBe(75);
+    expect(event?.model_id).toBe("openai/gpt-4");
   });
 });
