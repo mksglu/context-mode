@@ -30,7 +30,7 @@ try {
   const input = parseStdin(raw);
   const projectDir = getInputProjectDir(input, OPTS);
 
-  const { buildResumeSnapshot } = await loadSnapshot();
+  const { buildResumeSnapshot, RESUME_SNAPSHOT_MAX_BYTES } = await loadSnapshot();
   const { SessionDB } = await loadSessionDB();
 
   const dbPath = getSessionDBPath(OPTS, projectDir);
@@ -43,6 +43,7 @@ try {
     const stats = db.getSessionStats(sessionId);
     const snapshot = buildResumeSnapshot(events, {
       compactCount: (stats?.compact_count ?? 0) + 1,
+      maxBytes: RESUME_SNAPSHOT_MAX_BYTES,
     });
 
     db.upsertResume(sessionId, snapshot, events.length);
