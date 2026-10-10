@@ -1406,6 +1406,7 @@ describe("Safety — safeString preserves full data", () => {
       tool_name: "Bash",
       tool_input: { command: "npm test" },
       tool_response: longError,
+      tool_output: { isError: true },
     };
 
     const events = extractEvents(input);
@@ -2257,6 +2258,51 @@ describe("Category 28 — Permission (architectural limitation)", () => {
     // rejected-approach is written by pretooluse.mjs directly to DB, not via extractEvents
     const rejectedEvents = events.filter(e => e.category === "rejected-approach");
     assert.equal(rejectedEvents.length, 0, "extractEvents does not produce rejected-approach — that's pretooluse.mjs's job");
+  });
+});
+
+// ════════════════════════════════════════════
+// CATEGORY 5: ERROR TOOL
+// ════════════════════════════════════════════
+
+describe("Error Tool Events", () => {
+  test("does not classify successful Bash output as an error just because it mentions Error or FAIL", () => {
+    resetErrorResolutionState();
+
+    const events = extractEvents({
+      tool_name: "Bash",
+      tool_input: { command: "rg 'Error|FAIL' docs/" },
+      tool_response: "docs/troubleshooting.md: Error: literal text\ndocs/test-output.md: FAIL literal text",
+      tool_output: { isError: false },
+    });
+
+    assert.equal(events.some(e => e.type === "error_tool"), false);
+    assert.equal(events.some(e => e.type === "constraint_discovered"), false);
+  });
+
+  test("does not classify unflagged successful Bash output as an error from lexical matches alone", () => {
+    resetErrorResolutionState();
+
+    const events = extractEvents({
+      tool_name: "Bash",
+      tool_input: { command: "printf 'Error: literal\nFAIL literal\n'" },
+      tool_response: "Error: literal\nFAIL literal",
+    });
+
+    assert.equal(events.some(e => e.type === "error_tool"), false);
+    assert.equal(events.some(e => e.type === "constraint_discovered"), false);
+  });
+
+  test("still classifies nonzero Bash exit markers as errors", () => {
+    resetErrorResolutionState();
+
+    const events = extractEvents({
+      tool_name: "Bash",
+      tool_input: { command: "npm test" },
+      tool_response: "FAIL src/store.test.ts\nProcess exited with code 1",
+    });
+
+    assert.equal(events.some(e => e.type === "error_tool"), true);
   });
 });
 
