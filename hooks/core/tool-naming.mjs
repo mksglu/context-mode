@@ -34,6 +34,7 @@ const TOOL_PREFIXES = {
   "openclaw":       (tool) => tool,
   "pi":             (tool) => tool,
   "qwen-code":      (tool) => `mcp__context-mode__${tool}`,
+  "mistral-vibe":   (tool) => `context-mode_${tool}`,
 };
 
 /**
