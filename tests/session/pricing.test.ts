@@ -48,6 +48,21 @@ describe("session/pricing — lookupPrice", () => {
     expect(lookupPrice("deepseek-v3")).not.toBeNull();
   });
 
+  test("(a) MiniMax curated hits use the target model ids", () => {
+    expect(lookupPrice("MiniMax-M3")).toEqual({
+      input_per_mtok: 0.6,
+      output_per_mtok: 2.4,
+      cache_read_per_mtok: 0.12,
+      cache_write_per_mtok: null,
+    });
+    expect(lookupPrice("minimax/MiniMax-M2.7")).toEqual({
+      input_per_mtok: 0.3,
+      output_per_mtok: 1.2,
+      cache_read_per_mtok: 0.06,
+      cache_write_per_mtok: 0.375,
+    });
+  });
+
   test("(a) Other vendor curated hit", () => {
     expect(lookupPrice("grok-4")).not.toBeNull();
   });
@@ -97,6 +112,21 @@ describe("session/pricing — computeCostUsd", () => {
       input_tokens: 1000,
       output_tokens: 500,
     })).toBeCloseTo(0.00155, 8);
+  });
+
+  test("(c) MiniMax models use their curated rates", () => {
+    expect(computeCostUsd("MiniMax-M3", {
+      input_tokens: 1000,
+      output_tokens: 500,
+      cache_read_tokens: 1000,
+      cache_creation_tokens: 1000,
+    })).toBeCloseTo(0.00252, 8);
+    expect(computeCostUsd("minimax/MiniMax-M2.7", {
+      input_tokens: 1000,
+      output_tokens: 500,
+      cache_read_tokens: 500,
+      cache_creation_tokens: 1000,
+    })).toBeCloseTo(0.001305, 8);
   });
 
   // opus-4-8 regression — must match the old hardcoded table exactly.
