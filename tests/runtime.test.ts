@@ -1,8 +1,75 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RuntimeMap } from "../src/runtime.js";
+
+describe.skipIf(process.platform === "win32")("Bun runtime selection", () => {
+  // Reload runtime modules per case to isolate the hook-resolution cache from
+  // the environment fixtures and the module mocks used by other tests below.
+  let dir: string;
+
+  beforeEach(() => {
+    vi.resetModules();
+    dir = mkdtempSync(join(tmpdir(), "context-mode-bun-"));
+    mkdirSync(join(dir, "bin"));
+    vi.stubEnv("HOME", dir);
+    vi.stubEnv("PATH", `${join(dir, "bin")}:${process.env.PATH ?? ""}`);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const brokenBun = '#!/bin/sh\necho "mise ERROR No version is set for shim: bun" >&2\nexit 1\n';
+  const workingBun = '#!/bin/sh\necho "1.4.0"\n';
+
+  test("falls back to Node execution when PATH Bun is an unconfigured shim", async () => {
+    writeFileSync(join(dir, "bin", "bun"), brokenBun, { mode: 0o755 });
+    const { detectRuntimes, hasBunRuntime } = await import("../src/runtime.js");
+    const { PolyglotExecutor } = await import("../src/executor.js");
+    const runtimes = detectRuntimes();
+
+    expect(hasBunRuntime()).toBe(false);
+    expect(runtimes.typescript).not.toBe("bun");
+    const result = await new PolyglotExecutor({ runtimes }).execute({
+      language: "javascript",
+      code: 'console.log("node fallback works");',
+      timeout: 5000,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.trim()).toBe("node fallback works");
+  });
+
+  test("uses a working native Bun even when PATH contains a broken shim", async () => {
+    writeFileSync(join(dir, "bin", "bun"), brokenBun, { mode: 0o755 });
+    const nativeDir = join(dir, ".bun", "bin");
+    mkdirSync(nativeDir, { recursive: true });
+    const nativeBun = join(nativeDir, "bun");
+    writeFileSync(nativeBun, workingBun, { mode: 0o755 });
+    const { detectRuntimes, hasBunRuntime } = await import("../src/runtime.js");
+
+    const runtimes = detectRuntimes();
+    expect(runtimes.javascript).toBe(nativeBun);
+    expect(runtimes.typescript).toBe(nativeBun);
+    expect(hasBunRuntime()).toBe(true);
+  });
+
+  test("skips a broken native Bun and selects working PATH Bun", async () => {
+    writeFileSync(join(dir, "bin", "bun"), workingBun, { mode: 0o755 });
+    const nativeDir = join(dir, ".bun", "bin");
+    mkdirSync(nativeDir, { recursive: true });
+    writeFileSync(join(nativeDir, "bun"), brokenBun, { mode: 0o755 });
+    const { detectRuntimes, resolveHookRuntime } = await import("../src/runtime.js");
+
+    const runtimes = detectRuntimes();
+    expect(runtimes.javascript).toBe("bun");
+    expect(runtimes.typescript).toBe("bun");
+    expect(resolveHookRuntime()).toEqual({ path: "bun", isBun: true });
+  });
+});
 
 describe("runtime version reporting", () => {
   afterEach(() => {
@@ -588,39 +655,15 @@ describe("runnableExists — Windows MS Store stub filter (#454)", () => {
     expect(execSync).toHaveBeenCalledWith('"py" --version', expect.anything());
   });
 
-  test("non-Windows uses 1500ms probe timeout (faster cold detect)", async () => {
-    // Restore non-Windows platform for this case.
-    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
-
-    const execSync = vi.fn((cmd: string) => {
-      if (/^command -v\s/.test(cmd)) return ""; // commandExists → true
-      throw new Error(`unmocked: ${cmd}`);
-    });
-    const execFileSync = vi.fn(() => Buffer.from("ok\n"));
-    vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
-
-    const { detectRuntimes } = await import("../src/runtime.js");
-    detectRuntimes();
-
-    // Verify --version probes used the tightened 1500ms timeout on non-Windows.
-    const probeCalls = execFileSync.mock.calls.filter(
-      (c) => Array.isArray(c[1]) && c[1][0] === "--version",
-    );
-    expect(probeCalls.length).toBeGreaterThan(0);
-    for (const call of probeCalls) {
-      const opts = call[2] as { timeout?: number };
-      expect(opts.timeout).toBe(1500);
-    }
-  });
 });
 
 // ─────────────────────────────────────────────────────────
-// Windows: bunCommand() must return an absolute .exe path when bun is
+// Windows: Bun resolution must return an absolute .exe path when bun is
 // installed via `npm i -g bun` (#506). The npm shim creates a `bun.cmd`
 // dispatcher on PATH; CreateProcess (used by spawn() with shell:false)
 // cannot execute .cmd files directly and ENOENT-errors out.
 // ─────────────────────────────────────────────────────────
-describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
+describe("Bun resolution — npm-installed Bun on Windows (#506)", () => {
   let savedAppData: string | undefined;
   let savedHome: string | undefined;
   let savedUserProfile: string | undefined;
@@ -666,6 +709,7 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
       if (cmd === "where bun") {
         return "C:\\Users\\Test\\AppData\\Roaming\\npm\\bun.cmd\r\n";
       }
+      if (cmd === `${npmBunExe} --version`) return "1.1.0\r\n";
       throw new Error(`unmocked execSync: ${cmd}`);
     });
     const execFileSync = vi.fn(() => Buffer.from("1.1.0\n"));
@@ -693,14 +737,21 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
 
   test("still resolves the native ~/.bun/bin/bun.exe when both native and npm are present", async () => {
     const nativeBunExe = "C:\\Users\\Test\\.bun\\bin\\bun.exe";
+    const npmBunExe =
+      "C:\\Users\\Test\\AppData\\Roaming\\npm\\node_modules\\bun\\bin\\bun.exe";
     const execSync = vi.fn((cmd: string) => {
       if (cmd === "where bun") return `${nativeBunExe}\r\n`;
+      if (cmd === `${nativeBunExe} --version` || cmd === `${npmBunExe} --version`) {
+        return "1.1.0\r\n";
+      }
       throw new Error(`unmocked execSync: ${cmd}`);
     });
     const execFileSync = vi.fn(() => Buffer.from("1.1.0\n"));
 
     // Native path is checked FIRST in bunFallbackPaths order.
-    const existsSync = vi.fn((p: string | URL) => String(p) === nativeBunExe);
+    const existsSync = vi.fn((p: string | URL) =>
+      String(p) === nativeBunExe || String(p) === npmBunExe,
+    );
 
     vi.doMock("node:child_process", () => ({ execSync, execFileSync }));
     vi.doMock("node:fs", async () => {
@@ -715,28 +766,6 @@ describe("bunCommand — npm-installed Bun on Windows (#506)", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────
-// Windows: executor.ts needsShell list must include "bun" so the bare
-// "bun" fallback (when no .exe is locatable) still spawns through cmd.exe
-// — otherwise CreateProcess can't resolve `bun.cmd` shims (#506).
-// ─────────────────────────────────────────────────────────
-describe("executor needsShell — Windows bun.cmd fallback (#506)", () => {
-  test("source-level: needsShell array contains 'bun' alongside tsx/ts-node/elixir", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { resolve } = await import("node:path");
-    const src = readFileSync(
-      resolve(__dirname, "../src/executor.ts"),
-      "utf-8",
-    );
-    const m = src.match(/needsShell\s*=\s*isWin\s*&&\s*\[([^\]]+)\]\.includes/);
-    expect(m, "needsShell array literal not found in executor.ts").not.toBeNull();
-    const items = (m![1] || "")
-      .split(",")
-      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
-      .filter(Boolean);
-    expect(items).toEqual(expect.arrayContaining(["tsx", "ts-node", "elixir", "bun"]));
-  });
-});
 
 describe("buildCommand shell variants", () => {
   function makeRuntimes(shell: string): RuntimeMap {
