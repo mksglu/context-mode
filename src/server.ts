@@ -1753,6 +1753,7 @@ EXAMPLE: ctx_execute(language: "javascript", code: "const out = require('child_p
     try {
       // For JS/TS: wrap in async IIFE with fetch + http/https interceptors to track network bytes
       let instrumentedCode = code;
+      const effTimeout = resolveExecTimeout(timeout);
       if (language === "javascript" || language === "typescript") {
         // Wrap user code in a closure that shadows CJS require with http/https interceptor.
         // globalThis.require does NOT work because CJS require is module-scoped, not global.
@@ -1815,10 +1816,9 @@ if(__cm_req.cache)require.cache=__cm_req.cache;}
 async function __cm_main(){
 ${code}
 }
-__cm_main().catch(e=>{console.error(e);process.exitCode=1});${background ? '\nsetInterval(()=>{},2147483647);' : ''}
+__cm_main().catch(e=>{console.error(e);process.exitCode=1});${background && effTimeout !== undefined ? '\nsetInterval(()=>{},2147483647);' : ''}
 })(typeof require!=='undefined'?require:null);`;
       }
-      const effTimeout = resolveExecTimeout(timeout);
       const result = await executor.execute({ language, code: instrumentedCode, timeout: effTimeout, background, cwd });
 
       // Echo the executed source code before stdout so users can audit
