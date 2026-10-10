@@ -4,15 +4,29 @@ This document provides a comprehensive comparison of all platforms supported by 
 
 ## Overview
 
-context-mode supports 17 client platforms, plus the OpenClaw gateway integration, across three hook paradigms:
+context-mode supports Hermes Agent plus 17 client platforms and the OpenClaw gateway integration across four hook paradigms:
 
 | Paradigm | Platforms |
 |----------|-----------|
 | **JSON stdin/stdout** | Claude Code, Gemini CLI, VS Code Copilot, JetBrains Copilot, GitHub Copilot CLI, Cursor, Codex CLI, Qwen Code, Kimi Code, Antigravity CLI (`agy`), Kiro |
 | **TS Plugin** | OpenCode, KiloCode, OpenClaw |
+| **Python plugin + JSON hook bridge** | Hermes Agent |
 | **MCP-only** | Antigravity, Zed, Pi, OMP (Oh My Pi) |
 
 The MCP server layer is 100% portable and needs no adapter. Only the hook layer requires platform-specific adapters.
+
+### Hermes Agent
+
+Hermes uses a Git-installed Python plugin (`hermes plugins install mksglu/context-mode --enable`) and a separately configured `context_mode` MCP server. The globally installed `context-mode` executable is required for both stdio MCP and bounded, fail-open `context-mode hook hermes <event>` dispatch. Hermes tool names are exactly `mcp__context_mode__<tool>`, storage is `$HERMES_HOME/context-mode/sessions/` (normally `~/.hermes/context-mode/sessions/`), and its `pre_llm_call` compaction flag drives the normal `SessionStart(source=compact)` continuity path. Pre-tool argument rewriting is unavailable; modify decisions are therefore converted to blocking guidance rather than silently allowing the original arguments.
+
+| Hermes capability | Support |
+|---|---|
+| Pre/post tool hooks | `pre_tool_call` / `post_tool_call` |
+| Compaction continuity | Exact `compaction_applied` signal in `pre_llm_call` |
+| Result replacement | Confirmed MCP indexing for conservative read-only tools only |
+| Argument rewriting | No; converted to an enforceable block with routing guidance |
+| Session boundaries | `on_session_end`, `on_session_finalize`, `on_session_reset` |
+| Distribution | Git-installed Python plugin plus npm-global MCP/hook runtime |
 
 ## Prerequisites
 

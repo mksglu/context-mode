@@ -39,6 +39,7 @@ const PLATFORM_ENV_VARS_MIRROR = [
 ];
 
 export function detectPlatformFromEnv(env = process.env) {
+  if (env.CONTEXT_MODE_PLATFORM === "hermes") return "hermes";
   for (const [platform, vars] of PLATFORM_ENV_VARS_MIRROR) {
     if (vars.some((v) => env[v])) return platform;
   }

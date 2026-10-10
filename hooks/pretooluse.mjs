@@ -164,13 +164,14 @@ await runHook(async () => {
   const tool = input.tool_name ?? "";
   const toolInput = input.tool_input ?? {};
   const projectDir = getInputProjectDir(input);
+  const platform = process.env.CONTEXT_MODE_PLATFORM === "hermes" ? "hermes" : "claude-code";
   const isSubagentContext = input.agent_id != null || input.agent_type != null;
 
   // ─── Route and format response ───
-  const decision = routePreToolUse(tool, toolInput, projectDir, "claude-code", getSessionId(input), {
+  const decision = routePreToolUse(tool, toolInput, projectDir, platform, getSessionId(input), {
     mcpToolsAvailable: !isSubagentContext,
   });
-  const response = formatDecision("claude-code", decision);
+  const response = formatDecision(platform, decision);
 
   // ─── Write latency marker for cross-hook timing (Category 27) ───
   // Marker writes MUST happen before stdout write — stdout is the last action
