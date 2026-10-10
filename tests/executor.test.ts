@@ -1748,6 +1748,28 @@ describe("Temp Cleanup Resilience", () => {
   });
 });
 
+describe("AbortSignal cancellation", () => {
+  test("foreground execution is killed when the host request aborts", async () => {
+    const abortExecutor = new PolyglotExecutor({ runtimes });
+    const controller = new AbortController();
+    const inFlight = abortExecutor.execute({
+      language: "javascript",
+      code: `process.stdout.write("started"); setInterval(() => {}, 1000);`,
+      signal: controller.signal,
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+    controller.abort(new Error("user cancelled"));
+
+    const result = await inFlight;
+    assert.equal(result.aborted, true, "AbortSignal should mark the result as aborted");
+    assert.equal(result.timedOut, false, "AbortSignal cancellation is not a timeout");
+    assert.equal(result.exitCode, 1, "Aborted foreground executions return a failing exit code");
+    assert.ok(result.stdout.includes("started"), `Expected partial stdout, got: ${result.stdout}`);
+    assert.ok(result.stderr.includes("[aborted]"), `Expected abort marker in stderr, got: ${result.stderr}`);
+  }, 10_000);
+});
+
 describe("Background Mode", () => {
   test("background: true returns partial output with backgrounded flag", async () => {
     const bgExecutor = new PolyglotExecutor({ runtimes });

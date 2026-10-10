@@ -628,6 +628,32 @@ describe("MCPStdioClient — request() respawns for any method after idle exit (
 // >120s while a `tools/call` is in flight MUST NOT reject it. The
 // initialize path still rejects at 60s by default (regression guard).
 describe("MCPStdioClient — callTool has no bridge-imposed timeout (#643)", () => {
+  it("callTool rejects promptly on AbortSignal and sends an MCP cancellation notification", async () => {
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const writes: string[] = [];
+    const client = new MCPStdioClient("/unused/server.mjs");
+    const stdin = {
+      destroyed: false,
+      writableEnded: false,
+      closed: false,
+      write: (data: string, cb?: (err?: Error) => void) => {
+        writes.push(data);
+        cb?.();
+        return true;
+      },
+    };
+    (client as unknown as { child: unknown }).child = { stdin };
+
+    const controller = new AbortController();
+    const inFlight = client.callTool("slow", {}, { signal: controller.signal });
+    controller.abort(new Error("user cancelled"));
+
+    await expect(inFlight).rejects.toThrow("user cancelled");
+    const frames = writes.map((line) => JSON.parse(line));
+    expect(frames.some((frame) => frame.method === "tools/call")).toBe(true);
+    expect(frames.some((frame) => frame.method === "notifications/cancelled")).toBe(true);
+  });
+
   it("callTool does not reject when bridge clock advances past the old 120s ceiling", async () => {
     const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
     const client = new MCPStdioClient("/unused/server.mjs");

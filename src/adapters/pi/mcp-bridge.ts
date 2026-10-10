@@ -552,6 +552,7 @@ export class MCPStdioClient {
     method: string,
     params: unknown,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+    options?: { signal?: AbortSignal },
   ): Promise<T> {
     // Respawn-on-idle-exit (#583, #583-followup).
     //
@@ -567,6 +568,10 @@ export class MCPStdioClient {
     // because by the time we re-enter, `exited` is false again. We use a
     // single-flight `respawnPromise` so concurrent callers share the same
     // respawn (orphan-child guard, see field comment).
+    const signal = options?.signal;
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "MCP request aborted"));
+    }
     if (this.exited) {
       if (!this.respawnPromise) {
         this.respawnPromise = this.respawn().finally(() => {
@@ -574,6 +579,9 @@ export class MCPStdioClient {
         });
       }
       await this.respawnPromise;
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "MCP request aborted"));
+      }
     }
     if (!this.child) throw new Error("MCP client not started");
     const id = ++this.requestId;
@@ -584,20 +592,44 @@ export class MCPStdioClient {
       // (TimeoutOverflowWarning), so we can't just pass them through —
       // we must skip the setTimeout entirely. tools/call uses this path
       // because long-running ctx_execute must not be bounded here.
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+      };
+      const rejectPending = (error: unknown) => {
+        const handler = this.pending.get(id);
+        if (!handler) return;
+        this.pending.delete(id);
+        handler.reject(error);
+      };
+      const onAbort = () => {
+        this.notify("notifications/cancelled", {
+          requestId: id,
+          reason: signal?.reason instanceof Error ? signal.reason.message : String(signal?.reason ?? "cancelled"),
+        });
+        rejectPending(signal?.reason instanceof Error ? signal.reason : new Error(String(signal?.reason ?? "MCP request aborted")));
+      };
       const timer = Number.isFinite(timeoutMs)
         ? setTimeout(() => {
             if (!this.pending.has(id)) return;
             this.pending.delete(id);
+            cleanup();
             reject(new Error(`MCP request timeout after ${timeoutMs}ms: ${method}`));
           }, timeoutMs)
         : null;
+      if (signal?.aborted) {
+        if (timer) clearTimeout(timer);
+        reject(signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "MCP request aborted")));
+        return;
+      }
+      signal?.addEventListener("abort", onAbort, { once: true });
       this.pending.set(id, {
         resolve: (v) => {
-          if (timer) clearTimeout(timer);
+          cleanup();
           resolve(v as T);
         },
         reject: (e) => {
-          if (timer) clearTimeout(timer);
+          cleanup();
           reject(e);
         },
       });
@@ -679,7 +711,7 @@ export class MCPStdioClient {
     return Array.isArray(result.tools) ? result.tools : [];
   }
 
-  async callTool(name: string, args: unknown): Promise<MCPCallResult> {
+  async callTool(name: string, args: unknown, options?: { signal?: AbortSignal }): Promise<MCPCallResult> {
     // Respawn-on-idle-exit is now handled centrally in `request()`
     // (#583 follow-up). Originally patched here in #583 — moving it up
     // one layer covers `listTools` / `initialize` paths too, with a
@@ -697,6 +729,7 @@ export class MCPStdioClient {
       "tools/call",
       { name, arguments: args ?? {} },
       Number.POSITIVE_INFINITY,
+      options,
     );
   }
 
@@ -784,6 +817,7 @@ export interface PiToolRegistration {
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
+    signal?: AbortSignal,
   ) => Promise<{
     content: Array<{ type: "text"; text: string }>;
     details: Record<string, unknown>;
@@ -1031,8 +1065,8 @@ export async function bootstrapMCPTools(
       parameters: tool.inputSchema ?? { type: "object", properties: {} },
       renderCall: createContextModeCallRenderer(tool.name),
       renderResult: createContextModeResultRenderer(tool.name),
-      async execute(_toolCallId, params) {
-        const result = await client.callTool(tool.name, params ?? {});
+      async execute(_toolCallId, params, signal) {
+        const result = await client.callTool(tool.name, params ?? {}, { signal });
         const text = (result.content ?? [])
           .filter((c) => c?.type === "text" && typeof c.text === "string")
           .map((c) => c.text as string)
