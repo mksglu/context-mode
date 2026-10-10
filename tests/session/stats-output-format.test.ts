@@ -308,7 +308,8 @@ describe("formatReport — Bugs #5/#6/#7/#8", () => {
     // Opener — the headline tally.
     expect(text).toMatch(/Across\s+\d+\s+days you ran\s+\d+\s+conversations/);
     // Single-unit auto-decimals: >= 100 drops the decimal (356 MB, not 356.0 MB).
-    expect(text).toMatch(/context-mode kept\s+356 MB[^\n]*out of your context window/);
+    // Honest-savings fix: capture volume is labelled as capture, not "kept out".
+    expect(text).toMatch(/context-mode captured\s+356 MB[^\n]*of session knowledge for recall/);
 
     // Section 1 — datetime + days alive + rescue.
     expect(text).toMatch(/started.*\d{4}.*at \d{2}:\d{2}/);
@@ -327,7 +328,10 @@ describe("formatReport — Bugs #5/#6/#7/#8", () => {
     expect(text).toMatch(/17,493 captures across 123 projects/);
 
     // Section 4 — cost example + EXAMPLES disclaimer.
-    expect(text).toMatch(/\$466\.58 of Opus 4\.7 tokens your team didn't burn/);
+    // Honest-savings fix: $ derives from kept-out tokens (without − with),
+    // not from the raw "without" total — 466.58 × 0.98-ish → 356.25 here
+    // because this fixture's realBytes measurement is authoritative.
+    expect(text).toMatch(/\$356\.25 of Opus 4\.7 tokens your team didn't burn/);
     expect(text).toMatch(/Opus rates shown for context/);
 
     // Section 5 — auto-memory tally.

@@ -4064,21 +4064,17 @@ server.registerTool(
                 convReal = getConversationWindowStats({ sessionId: sid, worktreeHash: dbHash, sessionsDir: getSessionDir(), contentDbPath });
               }
               const lifeRealBase = getRealBytesStats({ sessionsDir: getSessionDir() });
-              // v1.0.134 SLICE C: lifetime tier sums ALL chunks (no
-              // session_id filter). Without this fold, lifetime "kept out"
-              // only counts session_events.bytes_avoided and ignores the
-              // bulk of indexed payload across every prior conversation.
+              // Honest-savings fix (reverts v1.0.134 SLICE C fold): indexed
+              // chunks are content captured for recall — the bulk of it
+              // entered past context windows through the original tool
+              // results, so counting it as "kept out" double-counts. Chunks
+              // stay visible as contentBytes ("indexed for recall");
+              // bytesAvoided counts only recorded redirect events.
               const lifeContentBytes = getContentBytesAllSessions(contentDbPath);
               const lifeReal = {
                 ...lifeRealBase,
                 contentBytes: lifeRealBase.contentBytes + lifeContentBytes,
-                bytesAvoided: lifeRealBase.bytesAvoided + lifeContentBytes,
-                totalSavedTokens: Math.floor(
-                  (lifeRealBase.eventDataBytes
-                    + lifeRealBase.bytesAvoided
-                    + lifeContentBytes
-                    + lifeRealBase.snapshotBytes) / 4,
-                ),
+                totalSavedTokens: Math.floor(lifeRealBase.bytesAvoided / 4),
               };
               realBytes = { conversation: convReal, lifetime: lifeReal };
             }
