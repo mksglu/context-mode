@@ -24,6 +24,9 @@ import { describe, it, expect } from "vitest";
 import {
   parseOpencodeUsage,
   buildAgentUsageEvent,
+  toOpencodeUsageStepDelta,
+  rememberOpencodeCumulativeCost,
+  OPENCODE_CUMULATIVE_COST_MAP_CAP,
 } from "../../src/session/extract.js";
 
 /** Minimal opencode `message.updated` bus-event fixture. */
@@ -167,5 +170,118 @@ describe("parseOpencodeUsage", () => {
     expect(event?.cache_creation_tokens).toBe(80);
     expect(event?.model_id).toBe("anthropic/claude-sonnet-4");
     expect(event?.data).toContain("cost_usd:");
+  });
+});
+
+/**
+ * #1036 — multi-step cumulative cost must become deltas that sum to the final cost.
+ */
+describe("toOpencodeUsageStepDelta (#1036 cumulative multi-step)", () => {
+  it("converts a 2-step cumulative turn (0.02 then 0.05) into deltas that sum to 0.05", () => {
+    const step1 = parseOpencodeUsage(
+      busEvent({
+        cost: 0.02,
+        tokens: { input: 100, output: 20, cache: { read: 0, write: 0 } },
+      }),
+    );
+    const step2 = parseOpencodeUsage(
+      busEvent({
+        cost: 0.05,
+        tokens: { input: 200, output: 40, cache: { read: 0, write: 0 } },
+      }),
+    );
+    expect(step1).not.toBeNull();
+    expect(step2).not.toBeNull();
+
+    // Without delta: naive sum of native costs over-counts (the bug).
+    expect((step1!.native_cost_usd ?? 0) + (step2!.native_cost_usd ?? 0)).toBeCloseTo(0.07, 10);
+
+    const d1 = toOpencodeUsageStepDelta(step1!, null);
+    expect(d1).not.toBeNull();
+    expect(d1!.counts.native_cost_usd).toBeCloseTo(0.02, 10);
+    expect(d1!.nextCumulativeCost).toBeCloseTo(0.02, 10);
+
+    const d2 = toOpencodeUsageStepDelta(step2!, d1!.nextCumulativeCost);
+    expect(d2).not.toBeNull();
+    expect(d2!.counts.native_cost_usd).toBeCloseTo(0.03, 10);
+    expect(d2!.nextCumulativeCost).toBeCloseTo(0.05, 10);
+
+    const e1 = buildAgentUsageEvent(d1!.counts);
+    const e2 = buildAgentUsageEvent(d2!.counts);
+    expect(e1?.cost_usd).toBeCloseTo(0.02, 10);
+    expect(e2?.cost_usd).toBeCloseTo(0.03, 10);
+    // Additive aggregation across step rows equals the true turn cost.
+    expect((e1!.cost_usd ?? 0) + (e2!.cost_usd ?? 0)).toBeCloseTo(0.05, 10);
+  });
+
+  it("skips a no-op refresh when cumulative cost does not advance", () => {
+    const first = parseOpencodeUsage(busEvent({ cost: 0.05 }));
+    const same = parseOpencodeUsage(busEvent({ cost: 0.05 }));
+    expect(first).not.toBeNull();
+    expect(same).not.toBeNull();
+
+    const d1 = toOpencodeUsageStepDelta(first!, null);
+    expect(d1).not.toBeNull();
+    const d2 = toOpencodeUsageStepDelta(same!, d1!.nextCumulativeCost);
+    expect(d2).toBeNull();
+  });
+
+  it("emits catalog-priced rows only once when native cost is absent", () => {
+    const a = parseOpencodeUsage(busEvent({ cost: undefined }));
+    const b = parseOpencodeUsage(busEvent({ cost: undefined }));
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a!.native_cost_usd).toBeNull();
+
+    const d1 = toOpencodeUsageStepDelta(a!, null);
+    expect(d1).not.toBeNull();
+    const d2 = toOpencodeUsageStepDelta(b!, d1!.nextCumulativeCost);
+    expect(d2).toBeNull();
+  });
+});
+
+/**
+ * #1036 follow-up — bound lastCumulativeCostByMessage so a long-lived plugin
+ * process cannot unbounded-grow the in-memory Map. Plugin lifecycle has no
+ * message-completion event to delete-on-finish; insertion-order FIFO cap.
+ */
+describe("rememberOpencodeCumulativeCost (#1036 map eviction)", () => {
+  it("evicts the oldest key when inserting past maxSize (insertion-order FIFO)", () => {
+    const map = new Map<string, number>();
+    const maxSize = 3;
+    rememberOpencodeCumulativeCost(map, "a", 0.01, maxSize);
+    rememberOpencodeCumulativeCost(map, "b", 0.02, maxSize);
+    rememberOpencodeCumulativeCost(map, "c", 0.03, maxSize);
+    expect(map.size).toBe(3);
+    expect([...map.keys()]).toEqual(["a", "b", "c"]);
+
+    rememberOpencodeCumulativeCost(map, "d", 0.04, maxSize);
+    expect(map.size).toBe(3);
+    expect(map.has("a")).toBe(false);
+    expect([...map.keys()]).toEqual(["b", "c", "d"]);
+    expect(map.get("d")).toBe(0.04);
+  });
+
+  it("updating an existing key does not grow the map or evict others", () => {
+    const map = new Map<string, number>();
+    const maxSize = 2;
+    rememberOpencodeCumulativeCost(map, "a", 0.01, maxSize);
+    rememberOpencodeCumulativeCost(map, "b", 0.02, maxSize);
+    rememberOpencodeCumulativeCost(map, "a", 0.05, maxSize);
+    expect(map.size).toBe(2);
+    expect(map.get("a")).toBe(0.05);
+    expect(map.has("b")).toBe(true);
+  });
+
+  it(`defaults maxSize to OPENCODE_CUMULATIVE_COST_MAP_CAP (${OPENCODE_CUMULATIVE_COST_MAP_CAP})`, () => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < OPENCODE_CUMULATIVE_COST_MAP_CAP; i++) {
+      rememberOpencodeCumulativeCost(map, `k${i}`, i);
+    }
+    expect(map.size).toBe(OPENCODE_CUMULATIVE_COST_MAP_CAP);
+    rememberOpencodeCumulativeCost(map, "overflow", 1);
+    expect(map.size).toBe(OPENCODE_CUMULATIVE_COST_MAP_CAP);
+    expect(map.has("k0")).toBe(false);
+    expect(map.has("overflow")).toBe(true);
   });
 });
