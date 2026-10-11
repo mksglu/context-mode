@@ -678,6 +678,26 @@ Cursor uses native lower-camel hook names and flat hook entries in `.cursor/hook
 - MCP config: `.cursor/mcp.json` or `~/.cursor/mcp.json`
 - **Marketplace plugin (recommended):** `.cursor-plugin/plugin.json` at the repo root auto-registers MCP, hooks, rules, and skills. Manifest explicitly points `hooks` at `./hooks/cursor/hooks.json` to avoid colliding with the Claude-format `./hooks/hooks.json`. Local install: `ln -s <repo> ~/.cursor/plugins/local/context-mode`. Plugin hook commands use `npx -y context-mode hook cursor <event>` so no global install is required.
 
+#### Windows PATH troubleshooting
+
+The plugin's MCP server and all five plugin hooks launch through `npx`, so Node.js >= 22.5 with npm/npx must be available on the `PATH` visible to Cursor Desktop. Installing `context-mode` globally does not change those launch commands.
+
+Before installing, check your Node/npm installation in PowerShell:
+
+```powershell
+node --version
+npm --version
+npx --version
+where.exe node
+where.exe npx
+```
+
+These checks describe that shell's environment only. [Windows child processes normally inherit their parent's environment](https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables), so a separately launched Cursor Desktop may see a different `PATH`. Ensure the actual Node/npm directories found on your machine are in the user or system `PATH` used to launch Cursor; shell-profile-only additions may not reach the GUI.
+
+After changing `PATH`, fully quit and relaunch Cursor, then check **Output → MCP Logs** for startup errors as described in the [Cursor MCP documentation](https://cursor.com/docs/mcp). If `'npx' is not recognized` persists, shell checks or `context-mode doctor` from a shell do not establish that the plugin's MCP server or hooks can start in Cursor.
+
+The manual configuration instead invokes `context-mode` directly. Its global executable directory must also be on Cursor's `PATH`; on Windows, find it with `npm prefix -g` (see [npm's executable locations](https://docs.npmjs.com/cli/v11/configuring-npm/folders/#executables)).
+
 **Plugin/native duplication:** `context-mode doctor` warns when both the plugin and `.cursor/hooks.json` register context-mode hooks (each event would otherwise fire twice). Remove one configuration to keep events single-fire.
 
 **Hook Commands:**

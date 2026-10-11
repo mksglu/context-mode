@@ -12,15 +12,11 @@ context-mode is an MCP server + hook bundle that keeps long-running Cursor agent
 
 ## Install
 
+**Prerequisites:** Node.js >= 22.5 with npm/npx available on the `PATH` visible to Cursor Desktop. Both the plugin's MCP server and its five hooks invoke `npx`. On Windows, finding `npx` in PowerShell does not confirm that Cursor can find it; check the [Windows PATH troubleshooting](../docs/platform-support.md#windows-path-troubleshooting) before installing.
+
 After clicking **Install** in the Cursor Plugins panel, the plugin registers an MCP server that runs `npx -y context-mode`. The first invocation downloads the package from npm; subsequent invocations are cached.
 
-If you prefer pinning a global install (faster cold start):
-
-```bash
-npm i -g context-mode
-```
-
-The plugin manifest will pick up the global binary automatically.
+Installing `context-mode` globally is optional. It does not change the manifest's `npx` command or remove the Cursor-visible `PATH` requirement.
 
 ## Try it locally before Marketplace acceptance
 
@@ -99,7 +95,7 @@ Each event runs `npx -y context-mode hook cursor <event>`. Cold start is ~4-5s; 
 ## Known limitations
 
 - **`additional_context` not surfaced** — Cursor's hook payload accepts `additional_context` but does not currently inject it into the model's context (forum [#155689](https://forum.cursor.com/t/native-posttooluse-hooks-accept-and-log-additional-context-successfully-but-the-injected-context-is-not-surfaced-to-the-model/155689), [#156157](https://forum.cursor.com/t/cursor-hooks-additional-context-not-injected-in-agent-context-in-posttooluse/156157)). The `.mdc` rule file is the primary routing channel until Cursor fixes this upstream.
-- **No `${PLUGIN_ROOT}` env var** — Cursor manifests cannot reference the plugin install dir, so the MCP server still requires `npm` or `npx` on `PATH`. Documented in the project's [platform-support.md](https://github.com/mksglu/context-mode/blob/next/docs/platform-support.md).
+- **Cursor-visible `PATH` required** — the MCP server and all five plugin hooks require `npx` on Cursor Desktop's `PATH`, even with a global `context-mode` install. See [Windows PATH troubleshooting](../docs/platform-support.md#windows-path-troubleshooting).
 
 ## Links
 

@@ -371,6 +371,8 @@ See [`docs/platform-support.md`](docs/platform-support.md#github-copilot-cli) fo
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Cursor with agent mode.
 
+The plugin in Option A requires Node.js >= 22.5 with npm/npx on the `PATH` visible to Cursor Desktop for both MCP and hooks. A global `context-mode` install does not remove this requirement. Windows users should check [Windows PATH troubleshooting](docs/platform-support.md#windows-path-troubleshooting) before installing.
+
 > **🚧 Work in progress** — the Marketplace plugin is **awaiting Cursor team review**. Until it's listed, install via the local-folder path described in Option A. Tracking in [#485](https://github.com/mksglu/context-mode/issues/485) / [#489](https://github.com/mksglu/context-mode/pull/489).
 
 ### Option A — Marketplace plugin (recommended once published)
