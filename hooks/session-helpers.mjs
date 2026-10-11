@@ -223,6 +223,14 @@ export const JETBRAINS_OPTS = {
   sessionIdEnv: undefined,
 };
 
+/** Qoder IDE platform options. */
+export const QODER_OPTS = {
+  configDir: ".qoder",
+  configDirEnv: undefined,
+  projectDirEnv: undefined,
+  sessionIdEnv: undefined,
+};
+
 /**
  * Resolve the platform config directory, respecting env var overrides.
  * Platforms like Claude Code (CLAUDE_CONFIG_DIR), Gemini CLI (GEMINI_CLI_HOME),

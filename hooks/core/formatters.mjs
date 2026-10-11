@@ -271,6 +271,36 @@ export const formatters = {
       agent_message: additionalContext,
     }),
   },
+
+  "qoder": {
+    deny: (reason) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: reason,
+      },
+    }),
+    ask: () => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "ask",
+      },
+    }),
+    modify: (updatedInput) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        permissionDecisionReason: "Routed to context-mode sandbox",
+        updatedInput: updatedInput ?? {},
+      },
+    }),
+    context: (additionalContext) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        additionalContext,
+      },
+    }),
+  },
 };
 
 // Keep in sync with the identical agyContextReason in
