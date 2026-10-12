@@ -36,6 +36,55 @@ export interface AutoMemoryAdapter {
   getMemoryDir(projectDir?: string): string;
 }
 
+const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
+
+/** Split query whitespace structurally, retaining the existing minimum length. */
+function queryTerms(query: string): string[] {
+  const terms: string[] = [];
+  let term = "";
+  for (const character of query) {
+    if (character.trim() === "") {
+      if (term.length >= 3) terms.push(term);
+      term = "";
+    } else term += character;
+  }
+  if (term.length >= 3) terms.push(term);
+  return terms;
+}
+
+/** Literal whole-term matching with Unicode-aware word boundaries. */
+function createTermMatcher(content: string): (term: string) => boolean {
+  let graphemes: ReturnType<typeof GRAPHEME_SEGMENTER.segment> | undefined;
+  const classes = new Map<string, boolean>();
+  function isWordAt(index: number): boolean {
+    if (index < 0 || index >= content.length) return false;
+    const code = content.charCodeAt(index);
+    // Preserve ASCII word/identifier boundaries, including apostrophes.
+    if (code < 128) return code === 95 || (code >= 48 && code <= 57)
+      || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+    // Lazily ask the Unicode parser only at a non-ASCII match boundary.
+    // Graphemes keep combining marks and supplementary letters together.
+    graphemes ??= GRAPHEME_SEGMENTER.segment(content);
+    const grapheme = graphemes.containing(index)!.segment;
+    const known = classes.get(grapheme);
+    if (known !== undefined) return known;
+    let word = false;
+    for (const part of WORD_SEGMENTER.segment(grapheme)) {
+      if (part.isWordLike) { word = true; break; }
+    }
+    classes.set(grapheme, word);
+    return word;
+  }
+  const isBoundary = (index: number): boolean => isWordAt(index - 1) !== isWordAt(index);
+  return (term: string): boolean => {
+    for (let index = content.indexOf(term); index >= 0; index = content.indexOf(term, index + 1)) {
+      if (isBoundary(index) && isBoundary(index + term.length)) return true;
+    }
+    return false;
+  };
+}
+
 /**
  * Search auto-memory files for content matching any of the given queries.
  *
@@ -139,20 +188,15 @@ export function searchAutoMemory(
       } catch { continue; }
       const content = readFileSync(candidate.path, "utf-8");
       const contentLower = content.toLowerCase();
+      const matchesTerm = createTermMatcher(contentLower);
 
       for (const query of queries) {
         if (results.length >= limit) break;
 
         const queryLower = query.toLowerCase();
         // Split query into terms, match if any term is found
-        const terms = queryLower.split(/\s+/).filter(t => t.length >= 3);
-        const matched = terms.some(term => {
-          try {
-            return new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, "i").test(content);
-          } catch {
-            return contentLower.includes(term); // fallback for invalid regex
-          }
-        });
+        const terms = queryTerms(queryLower);
+        const matched = terms.some(matchesTerm);
 
         if (matched) {
           // Extract a relevant section around the first match

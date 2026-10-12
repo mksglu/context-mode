@@ -86,3 +86,30 @@ describe("searchAutoMemory CLAUDE_CONFIG_DIR fallback (#460 round-3)", () => {
     expect(results).toEqual([]);
   });
 });
+
+describe("auto-memory Unicode term boundaries", () => {
+const roots: string[] = [];
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+function search(content: string, query: string) {
+  const root = mkdtempSync(join(tmpdir(), "ctx-memory-language-"));
+  roots.push(root);
+  const config = join(root, "config"); mkdirSync(config);
+  writeFileSync(join(root, "CLAUDE.md"), content);
+  return searchAutoMemory([query], 5, root, config);
+}
+for (const [content, query] of [
+  ["Решение: сохранять журнал.", "решение"],
+  ["قرار: حفظ السجل.", "السجل"],
+  ["निर्णय: रिकॉर्ड सुरक्षित रखें।", "निर्णय"],
+  ["Préférer le café au thé.", "café"],
+]) {
+  it(`finds an instruction term in ${query}`, () => expect(search(content, query).map(result => result.source)).toEqual(["project/CLAUDE.md"]));
+}
+it("does not mistake an ASCII substring of a Unicode word for a whole term", () => expect(search("caféapi configuration", "api")).toEqual([]));
+it("keeps ASCII identifier and apostrophe boundaries", () => {
+  expect(search("Use foo-bar. We can't use builder.", "\tfoo-bar\n").length).toBe(1);
+  expect(search("We can't use builder.", "can").length).toBe(1);
+  expect(search("We can't use builder.", "build")).toEqual([]);
+});
+
+});
