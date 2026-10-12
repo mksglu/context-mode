@@ -597,6 +597,16 @@ if (!process.env.VITEST) {
   }
 }
 
+// Restore original CWD before importing server — ES module imports resolve
+// relative to import.meta.url, not process.cwd(), so this is safe. Without
+// this, any tool that resolves a directory from the foreground process cwd
+// (VTE terminals reading /proc/<pid>/cwd, pane/workspace managers) sees the
+// plugin cache dir instead of the project.
+// Restore safeOriginalCwd, not originalCwd: on respawn after /ctx-upgrade the
+// launch cwd is itself the plugin install dir, which would reintroduce the bug.
+// See: https://github.com/mksglu/context-mode/issues/923
+try { process.chdir(safeOriginalCwd ?? homedir()); } catch { /* best effort — restore cwd for foreground-cwd inheritance */ }
+
 // Bundle exists (CI-built) — start instantly
 if (existsSync(resolve(__dirname, "server.bundle.mjs"))) {
   await import("./server.bundle.mjs");
