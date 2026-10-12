@@ -1031,11 +1031,15 @@ export function getConversationStats(opts: {
  * - `bytesAvoided`    = SUM(bytes_avoided)     FROM session_events
  * - `bytesReturned`   = SUM(bytes_returned)    FROM session_events
  * - `snapshotBytes`   = SUM(LENGTH(snapshot))  FROM session_resume
- * - `totalSavedTokens` = (eventDataBytes + bytesAvoided + snapshotBytes) / 4
+ * - `totalSavedTokens` = bytesAvoided / 4
  *
  * `bytesReturned` is reported but NOT folded into `totalSavedTokens`
  * because it represents bytes the model already paid for — adding it
- * would double-count what's already on the user's invoice.
+ * would double-count what's already on the user's invoice. The same
+ * rationale excludes `eventDataBytes` and `snapshotBytes` (analytics /
+ * resume infrastructure that never enters the context window) and
+ * `contentBytes` (captured for recall; the original bytes were already
+ * seen by the model when the tool ran).
  */
 export interface RealBytesStats {
   eventDataBytes: number;
@@ -1365,12 +1369,13 @@ export function getRealBytesStats(opts: {
     } catch { /* missing tables / corrupt — skip */ }
   }
 
-  // v1.0.133 Slice 3: fold content DB chunk bytes for this session into
-  // bytesAvoided. Skipped silently when caller didn't pass contentDbPath
-  // (lifetime / project tiers, or pre-Slice-3 callers). Treated as
-  // "avoided" because indexed chunks are bytes that would have been
-  // re-inflated into context on every search if the model had to
-  // re-read raw files.
+  // Honest-savings fix: indexed chunk bytes are content captured FOR RECALL —
+  // most of it already entered the context window through the original tool
+  // result, so folding it into bytesAvoided double-counts. Report it as
+  // contentBytes ("indexed for recall") only; bytesAvoided stays strictly
+  // SUM(bytes_avoided) from recorded redirect events.
+  // TODO(recall-attribution): credit a chunk as avoided only when a later
+  // ctx_search hit returns its snippet instead of a re-read (chunk − snippet).
   let contentBytes = 0;
   if (opts.sessionId && opts.contentDbPath) {
     contentBytes = getContentBytesForSession(
@@ -1378,12 +1383,12 @@ export function getRealBytesStats(opts: {
       opts.contentDbPath,
       { loadDatabase: opts.loadDatabase },
     );
-    bytesAvoided += contentBytes;
   }
 
-  const totalSavedTokens = Math.floor(
-    (eventDataBytes + bytesAvoided + snapshotBytes) / 4,
-  );
+  // eventDataBytes and snapshotBytes are analytics/resume infrastructure —
+  // they never enter the model context window (ADR-0004 rationale for the
+  // Section 1 bar) — so they are excluded from the savings estimate too.
+  const totalSavedTokens = Math.floor(bytesAvoided / 4);
 
   return { eventDataBytes, bytesAvoided, bytesReturned, snapshotBytes, contentBytes, totalSavedTokens };
 }
@@ -1391,24 +1396,15 @@ export function getRealBytesStats(opts: {
 /**
  * v1.0.169 — Section 1 "Where you are now" = the LIVE conversation window.
  *
- * A single live conversation fans out into sub-agents and ctx_execute
- * sub-process sessions. Each runs in its OWN, disposable context window (its
- * own session_id) — but all under the SAME worktree DB, because the worktree
- * hash is sha256(cwd) and they share the cwd. Their retrieval (ctx_search /
- * ctx_fetch_and_index returns) entered THOSE windows and was thrown away when
- * each returned its short summary; it never touched the window the user is
- * reading now. So the live-window savings bar must split the worktree by
- * which retrieval actually landed in the user's window:
- *
  *   bytesReturned ("With context-mode")  = THIS session's retrieval only —
  *       what genuinely entered the live window.
- *   bytesAvoided  ("kept out")           = everything the whole worktree moved
- *       (avoided + every session's retrieval) MINUS what landed in your window.
+ *   bytesAvoided  ("kept out")           = redirects recorded for THIS
+ *       session_id only (SUM(bytes_avoided) of its events).
  *
- * Scoping by `worktreeHash` (not project-root + time) means the user's OTHER
- * parallel worktrees never bleed in — a different worktree is a different
- * cwd-hash, hence a different DB file the prefix filter excludes — while the
- * sub-agent fan-out this conversation actually spawned is fully credited.
+ * Sub-agent / sub-process sessions sharing the worktree DB are NOT credited
+ * here: their session_ids are different conversations, and crediting the
+ * whole worktree pool to the live chat inflated sessions that never called
+ * a ctx_* tool. Worktree/lifetime aggregates belong to the lifetime tier.
  */
 export function getConversationWindowStats(opts: {
   sessionId: string;
@@ -1416,13 +1412,15 @@ export function getConversationWindowStats(opts: {
   sessionsDir?: string;
   contentDbPath?: string;
 }): RealBytesStats {
-  // Whole current worktree: every session that shares this cwd-hash DB.
-  const pool = getRealBytesStats({
-    worktreeHash: opts.worktreeHash,
-    sessionsDir: opts.sessionsDir,
-  });
-  // Just the live window: this session_id (folds its own ctx_search/ctx_fetch
-  // retrieval + content chunks).
+  // Honest-savings fix: the Section 1 bar claims to describe THIS
+  // conversation, so it must only count redirects recorded for THIS
+  // session_id. The previous worktree-pool arithmetic
+  // (pool.bytesAvoided + pool.bytesReturned − mine.bytesReturned) credited
+  // every other session sharing the cwd — including weeks of unrelated
+  // conversations and their retrieval bytes that DID enter those windows —
+  // to the live chat, so a session with zero ctx_* calls still displayed
+  // megabytes "kept out" and a 100% bar. Worktree-wide totals remain
+  // available to the renderer via the lifetime tier.
   const mine = getRealBytesStats({
     sessionId: opts.sessionId,
     worktreeHash: opts.worktreeHash,
@@ -1430,22 +1428,13 @@ export function getConversationWindowStats(opts: {
     contentDbPath: opts.contentDbPath,
   });
 
-  const windowReturned = mine.bytesReturned;
-  const movedTotal = pool.bytesAvoided + pool.bytesReturned;
-  // What context-mode kept OUT of the live window = everything moved across the
-  // worktree minus the slice that actually entered this window. Clamp at 0 so a
-  // stale/edge DB can never produce a negative bar.
-  const keptOut = Math.max(0, movedTotal - windowReturned);
-
   return {
-    eventDataBytes: pool.eventDataBytes,
-    bytesAvoided: keptOut,
-    bytesReturned: windowReturned,
-    snapshotBytes: pool.snapshotBytes,
+    eventDataBytes: mine.eventDataBytes,
+    bytesAvoided: mine.bytesAvoided,
+    bytesReturned: mine.bytesReturned,
+    snapshotBytes: mine.snapshotBytes,
     contentBytes: mine.contentBytes,
-    totalSavedTokens: Math.floor(
-      (pool.eventDataBytes + keptOut + pool.snapshotBytes) / 4,
-    ),
+    totalSavedTokens: Math.floor(mine.bytesAvoided / 4),
   };
 }
 
@@ -1729,9 +1718,8 @@ export function getMultiAdapterRealBytesStats(opts?: {
     sum.bytesReturned  += one.bytesReturned;
     sum.snapshotBytes  += one.snapshotBytes;
   }
-  sum.totalSavedTokens = Math.floor(
-    (sum.eventDataBytes + sum.bytesAvoided + sum.snapshotBytes) / 4,
-  );
+  // Honest-savings fix: only recorded redirects count (see getRealBytesStats).
+  sum.totalSavedTokens = Math.floor(sum.bytesAvoided / 4);
 
   return { ...sum, perAdapter };
 }
@@ -2086,16 +2074,20 @@ function renderNarrative5Section(args: {
   const lifetimeEventsTokens = (lifetime?.totalEvents ?? 0) * TOKENS_PER_EVENT;
   const lifetimeRescueTokens = Math.round((lifetime?.rescueBytes ?? 0) / 4);
   const lifetimeLegacyTokens = lifetimeEventsTokens + lifetimeRescueTokens;
-  const lifetimeRealTokens   = realBytes?.lifetime?.totalSavedTokens ?? 0;
-  const lifetimeTokensWithout = Math.max(lifetimeLegacyTokens, lifetimeRealTokens);
-  // Lifetime "with" — measured when available, else legacy 0.02 fallback.
+  // Lifetime "with"/"without" — measured when available, else legacy fallback.
   // Honest definition (matches conversation bar below):
   //   "with"    = bytes_returned (what the model actually re-saw)
   //   "without" = bytes_returned + bytes_avoided
-  // When the schema has measurement, derive `with` from `bytes_returned/4`.
+  // Honest-savings fix: when measurement exists it is AUTHORITATIVE — the
+  // old Math.max(legacy, real) let the events×256 heuristic (capture volume,
+  // not savings) override real measurements and inflate the hero + $ lines.
   const lifeRet = realBytes?.lifetime?.bytesReturned ?? 0;
   const lifeAv  = realBytes?.lifetime?.bytesAvoided  ?? 0;
-  const lifetimeTokensWith = (lifeRet + lifeAv) > 0
+  const hasMeasured = (lifeRet + lifeAv) > 0;
+  const lifetimeTokensWithout = hasMeasured
+    ? Math.max(1, Math.floor((lifeRet + lifeAv) / 4))
+    : lifetimeLegacyTokens;
+  const lifetimeTokensWith = hasMeasured
     ? Math.max(1, Math.floor(lifeRet / 4))
     : Math.max(1, Math.round(lifetimeTokensWithout * 0.02));
 
@@ -2139,8 +2131,11 @@ function renderNarrative5Section(args: {
   }
   // Daily-average sub-line — never tease users with a tiny number when the
   // average is sub-MB (still informative); fall back to KB display.
+  // Honest-savings fix: totalBytes is CAPTURE volume (event payloads +
+  // rescue snapshots indexed for recall) — label it as such; "kept out"
+  // is reserved for measured redirects (savedBytes below).
   const dailyBytes = lifetimeDays > 0 ? lifetimeBytes / lifetimeDays : 0;
-  out.push(`  context-mode kept ${kb(lifetimeBytes)} out of your context window — about ${kb(dailyBytes)} every single day.`);
+  out.push(`  context-mode captured ${kb(lifetimeBytes)} of session knowledge for recall — about ${kb(dailyBytes)} every single day.`);
   out.push("");
   out.push("");
 
@@ -2264,11 +2259,12 @@ function renderNarrative5Section(args: {
     : "";
   const distinctProj = lifetime?.distinctProjects ?? 0;
   const allCaps = lifetime?.totalEvents ?? multiAdapter?.totalEvents ?? 0;
+  // Honest-savings fix: these tallies are CAPTURE volume, not context savings.
   out.push(
-    `  This chat: ${kb(convBytes)} kept out · ${conversation.events.toLocaleString(locale)} captures${convStartedYMD ? ` · started ${convStartedYMD}` : ""}.`,
+    `  This chat: ${kb(convBytes)} captured · ${conversation.events.toLocaleString(locale)} captures${convStartedYMD ? ` · started ${convStartedYMD}` : ""}.`,
   );
   out.push(
-    `  All your work: ${kb(lifetimeBytes)} kept out · ${allCaps.toLocaleString(locale)} captures across ${distinctProj} project${distinctProj === 1 ? "" : "s"}${lifeStartedYMD ? ` · since ${lifeStartedYMD}` : ""}.`,
+    `  All your work: ${kb(lifetimeBytes)} captured · ${allCaps.toLocaleString(locale)} captures across ${distinctProj} project${distinctProj === 1 ? "" : "s"}${lifeStartedYMD ? ` · since ${lifeStartedYMD}` : ""}.`,
   );
   out.push("");
   out.push("");
@@ -2278,7 +2274,10 @@ function renderNarrative5Section(args: {
   // optional team-scale callout, no scaling table, no math footnotes.
   out.push("  ─── 4. The bottom line ───");
   out.push("");
-  out.push(...renderCostExample(lifetimeBytes, lifetimeTokensWithout, lifetimeDays));
+  // Honest-savings fix: the $ line advertises tokens NOT burned, so it must
+  // use measured kept-out tokens (without − with), not capture volume.
+  const lifetimeKeptTokens = Math.max(0, lifetimeTokensWithout - lifetimeTokensWith);
+  out.push(...renderCostExample(lifetimeKeptTokens * 4, lifetimeKeptTokens, lifetimeDays));
   out.push("");
   out.push("");
 
