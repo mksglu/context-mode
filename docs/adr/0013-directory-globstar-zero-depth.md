@@ -26,3 +26,7 @@ A direct Node regression against the frozen upstream revision failed with
 `0 !== 1` for `docs/top.md` under `docs/**/*.md`. Added Vitest regressions cover
 zero/multiple directory levels, exclusions, and single-star behavior. Full
 suite/typecheck/live checks are recorded separately and are not claimed here.
+
+## Test organization correction
+
+Regression cases now reside in the existing directory walker suite as required by CONTRIBUTING.md. Earlier frozen revision 3f7940c2b0c0653dbdf0fc374b66b9eccb3a8d29 and its baseline receipts remain in campaign history. The reorganized suite passed 10 tests on Node23.6.0/Vitest4.1.11, and typecheck and diff whitespace checks passed. Source behavior is unchanged.
