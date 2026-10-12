@@ -200,7 +200,6 @@ export function walkDirectoryDetailed(rootPath: string, opts: WalkOptions = {}):
   const excludes = [
     ...DEFAULT_EXCLUDES,
     ...(exclude ?? []),
-    ...(respectGitignore ? parseGitignore(rootReal) : []),
   ];
   const includes = include ?? [];
 
@@ -209,9 +208,13 @@ export function walkDirectoryDetailed(rootPath: string, opts: WalkOptions = {}):
   let totalSeen = 0;
   let capped = false;
 
-  function walk(absDir: string, depth: number): void {
+  function walk(absDir: string, depth: number, inheritedIgnores: Array<{ root: string; patterns: string[] }> = []): void {
     if (capped) return;
     if (depth > maxDepth) return;
+    const localPatterns = respectGitignore ? parseGitignore(absDir) : [];
+    const ignores = localPatterns.length > 0
+      ? [...inheritedIgnores, { root: absDir, patterns: localPatterns }]
+      : inheritedIgnores;
     let entries: import("node:fs").Dirent[];
     try {
       entries = readdirSync(absDir, { withFileTypes: true });
@@ -225,6 +228,7 @@ export function walkDirectoryDetailed(rootPath: string, opts: WalkOptions = {}):
 
       // Exclude check applies to both files and dirs — early prune.
       if (matchesAny(relPosix, excludes)) continue;
+      if (ignores.some(rule => matchesAny(toPosixRel(rule.root, absChild), rule.patterns))) continue;
       // Include filter applies to files only — see below.
 
       // Resolve symlinks once; reject escapes; track for cycle detection.
@@ -264,7 +268,7 @@ export function walkDirectoryDetailed(rootPath: string, opts: WalkOptions = {}):
       }
 
       if (isDirChild) {
-        walk(absChild, depth + 1);
+        walk(absChild, depth + 1, ignores);
         continue;
       }
       if (!isFileChild) continue;
