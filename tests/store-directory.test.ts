@@ -10,7 +10,7 @@
  * Reported by @matiasduartee across 4 clients × Windows 11.
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { strict as assert } from "node:assert";
 import {
   mkdtempSync,
@@ -148,4 +148,24 @@ describe("walkDirectory — cross-OS path separators (#687)", () => {
       expect(f.includes(sep)).toBe(true);
     }
   });
+});
+
+const roots: string[] = [];
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+test("a contained symlink target beginning with two dots is not a parent-directory escape", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "ctx-dot-link-")));
+  roots.push(root);
+  mkdirSync(join(root, "..notes"));
+  writeFileSync(join(root, "..notes", "content.md"), "owned content");
+  symlinkSync(join(root, "..notes"), join(root, "alias"), process.platform === "win32" ? "junction" : "dir");
+  expect(walkDirectory(root, { followSymlinks: true, include: ["alias/*.md"] })).toEqual([join(root, "alias", "content.md")]);
+});
+test("an actual parent-directory symlink remains rejected", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "ctx-parent-link-")));
+  roots.push(root);
+  const project = join(root, "project");
+  mkdirSync(project);
+  writeFileSync(join(root, "outside.md"), "outside the walk root");
+  symlinkSync(root, join(project, "alias"), process.platform === "win32" ? "junction" : "dir");
+  expect(walkDirectory(project, { followSymlinks: true, include: ["alias/*.md"] })).toEqual([]);
 });

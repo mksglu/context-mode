@@ -24,3 +24,6 @@ Frozen next regression fixture1pass1fail. Candidate includes this fixture and
 the existing directory walker suite. The fixture selects the alias path, so
 traversing the real directory cannot conceal the missed link. An actual parent
 link is the rejection control. Exact check outcomes are recorded separately.
+
+## Test organization correction
+The regression cases now reside in the existing `tests/store-directory.test.ts` suite, as required by CONTRIBUTING.md. The earlier frozen implementation revision 5f71f27031db0b82362db2895357ade14c0f4103 and its baseline evidence are retained in campaign history. Node24.19.0/Vitest4.1.11 organized directory suite: 6 pass, 0 fail, 0 skip. TypeScript `tsc --noEmit` passes. Generated bundles from unrelated local build activity are excluded from this correction. No live client behavior is claimed.
