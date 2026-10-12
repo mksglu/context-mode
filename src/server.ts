@@ -2864,6 +2864,20 @@ export function buildFetchCode(url: string, outputPath: string): string {
       ? `var classifyIp = ${classifyIpInner};`
       : `var ${classifyIpFnName} = ${classifyIpInner};\nvar classifyIp = ${classifyIpFnName};`;
   const strictMode = process.env.CTX_FETCH_STRICT === "1";
+  // Default strips proxy env so the connect-time rebinding guard runs (#476/#1039).
+  // Opt-in is exact string "1" only (any other value keeps the strip path).
+  const allowProxy = process.env.CTX_FETCH_ALLOW_PROXY === "1";
+  const proxyEnvBlock = allowProxy
+    ? `// Proxy env vars preserved under CTX_FETCH_ALLOW_PROXY=1 (issue #1039).`
+    : `// Strip proxy env by default so DNS rebinding guard sees connect-time IPs (#1039).
+delete process.env.HTTP_PROXY;
+delete process.env.HTTPS_PROXY;
+delete process.env.ALL_PROXY;
+delete process.env.http_proxy;
+delete process.env.https_proxy;
+delete process.env.all_proxy;
+delete process.env.npm_config_proxy;
+delete process.env.npm_config_https_proxy;`;
   return `
 const TurndownService = require(${turndownPath});
 const { gfm } = require(${gfmPath});
@@ -2873,19 +2887,7 @@ const dnsPromises = require('no' + 'de:dns/promises');
 const url = ${JSON.stringify(url)};
 const outputPath = ${escapedOutputPath};
 
-// Strip proxy env vars from this subprocess only. A configured outbound
-// proxy (HTTP_PROXY / HTTPS_PROXY / ALL_PROXY) would route fetch through
-// an arbitrary target — DNS resolution happens at the proxy and the
-// in-subprocess DNS rebinding guard never sees the rebound IP. The
-// sandbox fetch path has no legitimate need for an upstream proxy.
-delete process.env.HTTP_PROXY;
-delete process.env.HTTPS_PROXY;
-delete process.env.ALL_PROXY;
-delete process.env.http_proxy;
-delete process.env.https_proxy;
-delete process.env.all_proxy;
-delete process.env.npm_config_proxy;
-delete process.env.npm_config_https_proxy;
+${proxyEnvBlock}
 
 ${classifyIpSrc}
 
