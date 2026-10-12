@@ -488,6 +488,7 @@ export type PlatformId =
   | "pi"
   | "omp"
   | "kimi"
+  | "mistral-vibe"
   | "zed"
   | "qwen-code"
   | "unknown";
