@@ -114,11 +114,16 @@ function isToolError(input: HookInput): boolean {
   ) {
     return false;
   }
+  const hasErrorFlag = input.tool_output && (
+    "isError" in input.tool_output || "is_error" in input.tool_output
+  );
   const isErrorFlag = input.tool_output?.isError === true || input.tool_output?.is_error === true;
+  if (hasErrorFlag) return isErrorFlag;
+
   const isBashError =
     input.tool_name === "Bash" &&
-    /exit code [1-9]|error:|Error:|FAIL|failed/i.test(response);
-  return isBashError || isErrorFlag;
+    /(?:process exited with code|exited with code|exit code:?)[\s:]*[1-9]/i.test(response);
+  return isBashError;
 }
 
 interface ApplyPatchTarget {
@@ -869,7 +874,7 @@ function extractSkill(input: HookInput): SessionEvent[] {
  */
 function extractConstraint(input: HookInput): SessionEvent[] {
   // Only fire on error events — constraints are discovered through failures
-  if (!input.tool_response?.includes("Error") && !input.tool_output?.isError) return [];
+  if (!isToolError(input)) return [];
 
   const response = String(input.tool_response || "");
   const patterns = [/not supported/i, /cannot/i, /does not support/i, /FAIL/i, /refused/i, /permission denied/i, /incompatible/i];
