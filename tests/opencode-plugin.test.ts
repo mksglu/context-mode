@@ -94,6 +94,7 @@ describe("ContextModePlugin", () => {
         "ctx_execute",
         "ctx_execute_file",
         "ctx_fetch_and_index",
+        "ctx_forget",
         "ctx_index",
         "ctx_insight",
         "ctx_purge",
@@ -101,6 +102,69 @@ describe("ContextModePlugin", () => {
         "ctx_stats",
         "ctx_upgrade",
       ]);
+    });
+
+    describe("ctx_forget handler branches", () => {
+      const ctx = (projectDir: string) => ({
+        sessionID: "ctx-forget-sess",
+        messageID: "ctx-forget-msg",
+        agent: "test-agent",
+        directory: projectDir,
+        worktree: projectDir,
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: (() => ({}) as any) as any,
+      });
+      const textOf = (r: unknown) =>
+        typeof r === "string" ? r : ((r as { output?: string }).output ?? "");
+
+      it("lists, cancels without confirm, deletes with confirm, and reports unknown labels", async () => {
+        const projectDir = join(tempDir, "ctx-forget-branches");
+        const plugin = await createTestPlugin(projectDir);
+
+        // Empty knowledge base: list mode reports nothing indexed.
+        expect(textOf(await plugin.tool!.ctx_forget.execute({}, ctx(projectDir)))).toContain(
+          "No indexed sources",
+        );
+
+        // Seed one source; list mode now surfaces its label.
+        await plugin.tool!.ctx_index.execute(
+          { content: "# Doc\n\nForget me later.", source: "to-forget" },
+          ctx(projectDir),
+        );
+        expect(textOf(await plugin.tool!.ctx_forget.execute({}, ctx(projectDir)))).toContain(
+          "to-forget",
+        );
+
+        // A source without confirm is a no-op cancel.
+        expect(
+          textOf(await plugin.tool!.ctx_forget.execute({ source: "to-forget" }, ctx(projectDir))),
+        ).toContain("Cancelled");
+
+        // An unknown label is an error (opencode maps the isError response to a
+        // throw) whose message lists what exists.
+        await expect(
+          plugin.tool!.ctx_forget.execute(
+            { source: "never-indexed", confirm: true },
+            ctx(projectDir),
+          ),
+        ).rejects.toThrow(/No such source[\s\S]*to-forget/);
+
+        // Confirm deletes and reports the removed chunk count.
+        expect(
+          textOf(
+            await plugin.tool!.ctx_forget.execute(
+              { source: "to-forget", confirm: true },
+              ctx(projectDir),
+            ),
+          ),
+        ).toMatch(/Forgot source 'to-forget': removed \d+ chunk/);
+
+        // The source is gone from the listing afterward.
+        expect(textOf(await plugin.tool!.ctx_forget.execute({}, ctx(projectDir)))).toContain(
+          "No indexed sources",
+        );
+      });
     });
 
     // Both KiloCode and recent OpenCode (≥ ~1.14.x) bundle Zod v4 in their
