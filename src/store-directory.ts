@@ -28,7 +28,7 @@ import {
   existsSync,
   readFileSync,
 } from "node:fs";
-import { join, extname, relative, sep, resolve } from "node:path";
+import { join, extname, relative, sep } from "node:path";
 
 export interface WalkOptions {
   /** Glob-ish include patterns. Empty/undefined means include all (subject to extensions). */
@@ -248,10 +248,9 @@ export function walkDirectoryDetailed(rootPath: string, opts: WalkOptions = {}):
         }
         // Symlink-escape: refuse to follow if the resolved target leaves rootReal.
         const escapeRel = relative(rootReal, resolved);
-        if (escapeRel.startsWith("..") || resolve(escapeRel) === resolved) {
-          // resolve(absolute) === absolute → target is absolute outside root
-          if (escapeRel.startsWith("..")) continue;
-        }
+        // Reject a parent-directory component, not contained names such as
+        // "..notes" that merely share its first two characters.
+        if (escapeRel === ".." || escapeRel.startsWith(`..${sep}`)) continue;
         if (visited.has(resolved)) continue;
         visited.add(resolved);
         try {
