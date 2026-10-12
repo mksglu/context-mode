@@ -1314,3 +1314,36 @@ describe("Issue #636: legacy settings.json rewrite quotes spaced paths", () => {
     },
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// PreToolUse import cost (#1261) — keep the session-db bundle off the
+// per-tool-call path
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("PreToolUse input helpers skip the session-db bundle (#1261)", () => {
+  const HOOKS_DIR = join(__dirname, "..", "..", "hooks");
+  const INPUT_PATH = join(HOOKS_DIR, "session-input.mjs");
+  const HELPERS_PATH = join(HOOKS_DIR, "session-helpers.mjs");
+
+  test("pretooluse.mjs does not import session-helpers.mjs", () => {
+    const source = readFileSync(HOOK_PATH, "utf-8");
+    expect(source).not.toContain("session-helpers.mjs");
+    expect(source).toContain("./session-input.mjs");
+  });
+
+  test("session-input.mjs imports only node: built-ins", () => {
+    const source = readFileSync(INPUT_PATH, "utf-8");
+    const specifiers = [...source.matchAll(/from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']/g)]
+      .map((match) => match[1] ?? match[2]);
+    expect(specifiers.length).toBeGreaterThan(0);
+    expect(specifiers.every((specifier) => specifier.startsWith("node:"))).toBe(true);
+  });
+
+  test("session-helpers.mjs re-exports the same input helpers", async () => {
+    const input = await import(pathToFileURL(INPUT_PATH).href);
+    const helpers = await import(pathToFileURL(HELPERS_PATH).href);
+    for (const name of ["resolveConfigDir", "parseStdin", "getProjectDir", "getInputProjectDir", "getSessionId"]) {
+      expect(helpers[name]).toBe(input[name]);
+    }
+  });
+});
