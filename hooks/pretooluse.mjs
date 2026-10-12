@@ -28,7 +28,7 @@ await runHook(async () => {
   const { readStdin } = await import("./core/stdin.mjs");
   const { routePreToolUse, initSecurity } = await import("./core/routing.mjs");
   const { formatDecision } = await import("./core/formatters.mjs");
-  const { parseStdin, getInputProjectDir, getSessionId, resolveConfigDir } = await import("./session-helpers.mjs");
+  const { parseStdin, getInputProjectDir, getSessionId, resolveConfigDir } = await import("./session-input.mjs");
 
   // ─── Manual recursive copy (avoids cpSync libuv crash on non-ASCII paths, Windows + Node 24) ───
   function copyDirSync(src, dest) {
