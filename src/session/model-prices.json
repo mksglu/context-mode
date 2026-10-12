@@ -377,6 +377,20 @@
     "cache_write_per_mtok": null,
     "source": "https://mistral.ai/pricing"
   },
+  "minimax-m3": {
+    "input_per_mtok": 0.6,
+    "output_per_mtok": 2.4,
+    "cache_read_per_mtok": 0.12,
+    "cache_write_per_mtok": null,
+    "source": "https://platform.minimax.io/docs/api-reference/api-overview"
+  },
+  "minimax-m2.7": {
+    "input_per_mtok": 0.3,
+    "output_per_mtok": 1.2,
+    "cache_read_per_mtok": 0.06,
+    "cache_write_per_mtok": 0.375,
+    "source": "https://platform.minimax.io/docs/api-reference/api-overview"
+  },
   "llama-4-maverick": {
     "input_per_mtok": 0.27,
     "output_per_mtok": 0.85,
