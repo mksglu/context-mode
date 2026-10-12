@@ -2665,9 +2665,11 @@ EXAMPLE: ctx_search(queries: ["last user prompt", "active skills", "open blocker
       }
 
       // Determine per-query result limit based on throttle level
+      const parsed = parseInt(process.env.CONTEXT_MODE_MAX_LIMIT ?? '2', 10);
+      const MAX_PER_QUERY = Number.isFinite(parsed) ? Math.min(50, Math.max(2, parsed)) : 2;
       const effectiveLimit = flood.softCapped
         ? 1 // after soft cap: only 1 result per query
-        : Math.min(limit, 2); // normal: max 2
+        : Math.min(limit, MAX_PER_QUERY); // normal: max 2
 
       const MAX_TOTAL = 40 * 1024; // 40KB total cap
       let totalSize = 0;
