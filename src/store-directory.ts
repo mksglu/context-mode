@@ -87,33 +87,40 @@ const DEFAULT_EXTENSIONS = [
 const DEFAULT_MAX_DEPTH = 5;
 const DEFAULT_MAX_FILES = 200;
 
-/**
- * Convert a simple glob pattern (`*`, `**`, `?`) to a RegExp. Anchors at
- * boundaries so `node_modules` matches `node_modules` AND `node_modules/pkg`.
- * Patterns are matched against POSIX-style relative paths (forward slashes)
- * to give consistent behavior across macOS / Windows.
- */
-function globToRegExp(pattern: string): RegExp {
-  // Escape regex metachars except glob ones.
-  let re = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const c = pattern[i]!;
-    if (c === "*") {
-      if (pattern[i + 1] === "*") {
-        re += ".*";
-        i++;
-      } else {
-        re += "[^/]*";
+/** Match the supported glob grammar structurally, without regex. */
+function matchesGlob(value: string, pattern: string): boolean {
+  // Preserve the legacy matcher's UTF-16 code-unit meaning of ?.
+  const chars = value.split("");
+  const glob = pattern.split("");
+  let previous = new Uint8Array(chars.length + 1);
+  previous[0] = 1;
+  for (let i = 0; i < glob.length; i++) {
+    const token = glob[i];
+    const next = new Uint8Array(chars.length + 1);
+    if (token === "*") {
+      const globstar = glob[i + 1] === "*";
+      const directories = globstar && glob[i + 2] === "/";
+      if (globstar) i += directories ? 2 : 1;
+      next[0] = previous[0];
+      let earlierMatch = previous[0] === 1;
+      for (let j = 1; j <= chars.length; j++) {
+        if (directories) {
+          // **/ consumes nothing, or any prefix ending at a separator.
+          next[j] = previous[j] || (earlierMatch && chars[j - 1] === "/" ? 1 : 0);
+          earlierMatch ||= previous[j] === 1;
+        } else {
+          next[j] = previous[j] || (next[j - 1] && (globstar || chars[j - 1] !== "/") ? 1 : 0);
+        }
       }
-    } else if (c === "?") {
-      re += "[^/]";
-    } else if ("\\^$.|+()[]{}".includes(c)) {
-      re += "\\" + c;
     } else {
-      re += c;
+      for (let j = 1; j <= chars.length; j++) {
+        const matches = token === "?" ? chars[j - 1] !== "/" : token === chars[j - 1];
+        next[j] = previous[j - 1] && matches ? 1 : 0;
+      }
     }
+    previous = next;
   }
-  return new RegExp(`^${re}$`);
+  return previous[chars.length] === 1;
 }
 
 /** Match a posix-style relative path against any of the patterns. */
@@ -127,9 +134,8 @@ function matchesAny(relPosix: string, patterns: string[]): boolean {
       if (relPosix.split("/").includes(p)) return true;
       continue;
     }
-    const re = globToRegExp(p);
-    if (re.test(relPosix)) return true;
-    if (re.test(basename)) return true;
+    if (matchesGlob(relPosix, p)) return true;
+    if (matchesGlob(basename, p)) return true;
   }
   return false;
 }
