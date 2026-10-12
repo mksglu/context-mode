@@ -16,8 +16,8 @@
  *     JetBrains            —     8.6 MB          8.6 MB
  *
  *     Skipped (7): Cursor, Codex CLI, Pi, Kiro, Gemini CLI, Openclaw
- *     These adapters have DBs on disk but only test fixtures, dev skeletons,
- *     or detection probes — no real chat activity.
+ *     No real chat activity: Kiro, Gemini CLI, Openclaw
+ *     Some activity, but below the real-usage threshold: Cursor, Codex CLI, Pi
  *
  * Slice 3.5 backward compat is asserted indirectly: this file passes the
  * `multiAdapter` opt and asserts new behaviour. The pre-existing
@@ -159,14 +159,14 @@ describe("Slice 3.2 — formatReport renders 'Where it came from' sub-block", ()
 });
 
 describe("Slice 3.3 — Skipped adapters disclosure", () => {
-  test("lists skipped adapter names with count and 'no real chat activity' rationale", () => {
+  test("lists skipped adapter names with count and a separate rationale per group", () => {
     const text = formatReport(baseReport(), "1.0.111", null, {
       lifetime: lifetime(),
       multiAdapter: multi([
         adapter("claude-code", { events: 17_413, data: 276_700_000, projects: new Array(12).fill(0).map((_, i) => `/p/${i}`), isReal: true }),
         adapter("cursor",      { events: 5, data: 100, projects: ["/p/c"], isReal: false }),
         adapter("codex",       { events: 2, data: 50,  projects: ["/p/cdx"], isReal: false }),
-        adapter("pi",          { events: 1, data: 20,  projects: ["/p/pi"], isReal: false }),
+        adapter("pi",          { events: 0, data: 0,  projects: ["/p/pi"], isReal: false }),
       ]),
     });
     expect(text).toMatch(/Skipped \(3\):/);
@@ -175,8 +175,20 @@ describe("Slice 3.3 — Skipped adapters disclosure", () => {
     expect(text).toMatch(/Codex/);
     expect(text).toMatch(/Pi/);
     // Disclosure rationale.
-    expect(text).toMatch(/no real chat activity/i);
+    expect(text).toMatch(/ No real chat activity: Pi/);
+    expect(text).toMatch(/below the real-usage threshold: Cursor, Codex CLI/);
   });
+  test("skipped adapter with some events is not described as 'no real chat activity'", () => {
+    const text = formatReport(baseReport(), "1.0.111", null, {
+      lifetime: lifetime(),
+      multiAdapter: multi([
+        adapter("claude-code", { events: 17_413, data: 276_700_000, projects: new Array(12).fill(0).map((_, i) => `/p/${i}`), isReal: true }),
+        adapter("cursor",      { events: 40, data: 100, projects: ["/p/c"], isReal: false }),
+      ]),
+    });
+    expect(text).not.toMatch(/no real chat activity/i);
+    expect(text).toMatch('below the real-usage threshold');
+  })
 
   test("when no adapters are skipped, no 'Skipped' line appears", () => {
     const text = formatReport(baseReport(), "1.0.111", null, {

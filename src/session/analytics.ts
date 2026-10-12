@@ -2762,6 +2762,9 @@ function renderConversation(c: ConversationStats, conversationUsd: string, contr
  *  2. Filtered adapters (`isReal=false` but with at least one .db on disk)
  *     become a single "Skipped (N): name1, name2, ..." disclosure line so
  *     the user sees that fixtures/probes were intentionally hidden.
+ *     Below that line, adapters with zero events are listed under
+ *     "No real chat activity", and adapters with some events are listed
+ *     under "Some activity, but below the real-usage threshold".
  *
  * Returns [] when `multiAdapter` is undefined OR when there are no real
  * adapters AND nothing skipped — keeping the renderer additive (Slice 3.5).
@@ -2806,9 +2809,17 @@ function renderMultiAdapter(multiAdapter: MultiAdapterLifetimeStats | undefined)
   if (skipped.length > 0) {
     if (real.length > 0) out.push("");
     const names = skipped.map((a) => adapterLabel(a.name)).join(", ");
+    const empty = skipped.filter((a) => a.eventCount === 0);
+    const belowThreshold = skipped.filter((a) => a.eventCount > 0);
     out.push(`  Skipped (${skipped.length}): ${names}`);
-    out.push("  These adapters have DBs on disk but only test fixtures, dev skeletons,");
-    out.push("  or detection probes — no real chat activity.");
+    if (empty.length > 0) {
+      const emptyNames = empty.map((a) => adapterLabel(a.name)).join(", ");
+      out.push(`  No real chat activity: ${emptyNames}`);
+    }
+    if (belowThreshold.length > 0) {
+      const belowNames = belowThreshold.map((a) => adapterLabel(a.name)).join(", ");
+      out.push(`  Some activity, but below the real-usage threshold: ${belowNames}`);
+    }
   }
 
   return out;
