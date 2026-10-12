@@ -410,7 +410,10 @@ await runHook(async () => {
                   }
                 }
                 if (danglingBreadcrumb || now - st.mtimeMs > ONE_HOUR) {
-                  rmSync(oldDir, { recursive: true, force: true });
+                  // Remove the link itself: rmSync(force) can leave a dangling
+                  // symlink untouched on supported Node/macOS combinations.
+                  if (st.isSymbolicLink()) unlinkSync(oldDir);
+                  else rmSync(oldDir, { recursive: true, force: true });
                   // Leave a breadcrumb symlink (junction on Windows) in the
                   // removed version's place so sessions that loaded hooks
                   // from it before an auto-update keep resolving their
@@ -432,7 +435,8 @@ await runHook(async () => {
                 // its own mtime. Treat that as a stale breadcrumb and try to
                 // repoint it at the live root; failures remain best-effort.
                 try {
-                  rmSync(oldDir, { recursive: true, force: true });
+                  try { unlinkSync(oldDir); }
+                  catch { rmSync(oldDir, { recursive: true, force: true }); }
                   symlinkSync(pluginRoot, oldDir, process.platform === "win32" ? "junction" : undefined);
                 } catch { /* skip */ }
               }

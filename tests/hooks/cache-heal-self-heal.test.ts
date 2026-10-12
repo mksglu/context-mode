@@ -785,6 +785,18 @@ describe("Issues #814/#807 — cleanup leaves a breadcrumb to the live version",
     expect(realpathSync(oldLink)).toBe(realpathSync(currentDir));
   });
 
+  test("a fresh dangling breadcrumb is repaired without waiting for the age gate", () => {
+    const oldLink = join(cacheParent, "1.0.075");
+    symlinkSync(join(cacheParent, "missing-version"), oldLink,
+      process.platform === "win32" ? "junction" : undefined);
+
+    const result = runSessionStart("breadcrumb-fresh-dangling");
+    expect(result.status).toBe(0);
+    expect(lstatSync(oldLink).isSymbolicLink()).toBe(true);
+    expect(realpathSync(oldLink)).toBe(realpathSync(currentDir));
+    expect(existsSync(join(oldLink, "hooks", "sessionstart.mjs"))).toBe(true);
+  });
+
   test("a fresh version dir is left alone (#644 age gate still respected)", () => {
     const freshDir = join(cacheParent, "1.0.199");
     mkdirSync(freshDir, { recursive: true });
