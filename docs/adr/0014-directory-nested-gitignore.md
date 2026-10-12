@@ -23,3 +23,7 @@ security gates remain unchanged.
 Frozen next regression: 1 fail, 2 pass. The candidate is checked with the same
 fixture for nested rules, sibling independence, inheritance, and the disable
 option. Live client and full-suite results are tracked separately.
+
+## Test organization correction
+
+Regression cases now reside in the existing directory walker suite as required by CONTRIBUTING.md. Earlier frozen revision b206aca7099bc1d818ed3d1ea80f210a74e37e47 and its baseline receipts remain in campaign history. The reorganized suite passed 7 tests on Node23.6.0/Vitest4.1.11, and typecheck and diff whitespace checks passed. Source behavior is unchanged.
