@@ -267,7 +267,7 @@ async function probe(clientName: string | null, delayed: boolean) {
     if (delayed || clientName === null) {
       // The readiness sentinel proves connect() has completed. Wait a little
       // longer to catch the old post-connect adapter-selection/restore path.
-      const sentinel = join(process.platform === "win32" ? tmpdir() : "/tmp", `context-mode-mcp-ready-${child.pid}`);
+      const sentinel = join(tmpdir(), `context-mode-mcp-ready-${child.pid}`);
       const deadline = Date.now() + 10_000;
       while (!existsSync(sentinel) && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 20));
