@@ -4819,7 +4819,8 @@ server.registerTool(
         `console.log("- [x] Starting inline upgrade (no CLI found)");`,
         `execFileSync("git",["clone","--depth","1","${repoUrl}",T],{stdio:"inherit"});`,
         `console.log("- [x] Cloned latest source");`,
-        `execFileSync(process.platform==="win32"?"npm.cmd":"npm",["install"],{cwd:T,stdio:"inherit",shell:process.platform==="win32"});`,
+        // --legacy-peer-deps: npm 10.9's Arborist crashes on vitest >= 4.1's peer set (#1174).
+        `execFileSync(process.platform==="win32"?"npm.cmd":"npm",["install","--legacy-peer-deps"],{cwd:T,stdio:"inherit",shell:process.platform==="win32"});`,
         `execFileSync(process.platform==="win32"?"npm.cmd":"npm",["run","build"],{cwd:T,stdio:"inherit",shell:process.platform==="win32"});`,
         `console.log("- [x] Built from source");`,
         `const pkg=JSON.parse(readFileSync(join(T,"package.json"),"utf8"));`,
@@ -4841,7 +4842,7 @@ server.registerTool(
         // per-version .mcp.json file is a stale-write vector. Same architectural
         // fix as the cli.ts upgrade() path; both writers were the only producers.
         `console.log("- [x] Copied package files");`,
-        `execFileSync(process.platform==="win32"?"npm.cmd":"npm",["install","--production"],{cwd:P,stdio:"inherit",shell:process.platform==="win32"});`,
+        `execFileSync(process.platform==="win32"?"npm.cmd":"npm",["install","--production","--legacy-peer-deps"],{cwd:P,stdio:"inherit",shell:process.platform==="win32"});`,
         `console.log("- [x] Installed production dependencies");`,
         `console.log("## context-mode upgrade complete");`,
         `}catch(e){`,

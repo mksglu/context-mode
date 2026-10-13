@@ -61,6 +61,22 @@ describe("heal-better-sqlite3.mjs — package-missing branch (#514)", () => {
     expect(HEAL_SRC).toMatch(/"install"|'install'|\bnpm\s+install\b/);
   });
 
+  it("passes --legacy-peer-deps to every package-missing install (#1174)", () => {
+    // npm 10.x Arborist crashes while loading peer sets of devDependencies
+    // (vitest) when building the ideal tree for the plugin root, so a plain
+    // `npm install better-sqlite3` fails there. --legacy-peer-deps avoids it.
+    // Both install invocations must carry the flag: the execFileSync argument
+    // array and the Layer B shell-string fallback.
+    const execFileArgs = HEAL_SRC.match(/execFileSync\(\s*npmBin,\s*\[([\s\S]*?)\]/);
+    expect(execFileArgs).not.toBeNull();
+    expect(execFileArgs![1]).toContain('"--legacy-peer-deps"');
+    const layerB = HEAL_SRC.match(/\$\{npmBin\} install better-sqlite3 ([^`]*)`/);
+    expect(layerB).not.toBeNull();
+    expect(layerB![1]).toContain("--legacy-peer-deps");
+    // The printed manual workaround hits the same crash, so it needs it too.
+    expect(HEAL_SRC).toMatch(/Workaround: run `npm install better-sqlite3 --legacy-peer-deps`/);
+  });
+
   it("uses execFileSync (or spawnSync) with a timeout for the package install", () => {
     // Shell injection guard + bounded execution. execSync alone with a
     // shell:true string is the historical pattern in this file but it's

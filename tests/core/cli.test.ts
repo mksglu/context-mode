@@ -3956,3 +3956,24 @@ describe("PR #620 slice 4 — doctor() surfaces persistence-tier bug class", () 
     expect(window_).not.toMatch(/["']~\//);
   });
 });
+
+describe("plugin-root npm installs pass --legacy-peer-deps (#1174)", () => {
+  // npm 10.9.x Arborist crashes ("Cannot read properties of null (reading
+  // 'edgesOut')") loading vitest >= 4.1's peer set, which lists vite as a
+  // peer. Any install rooted at context-mode's package.json hits it, including
+  // --production installs, so every install the CLI runs or prints needs it.
+  const CLI_SRC = readFileSync(resolve(ROOT, "src", "cli.ts"), "utf-8");
+
+  it("every printed better-sqlite3 repair command includes the flag", () => {
+    const hints = CLI_SRC.match(/Try \(primary\):[^\n]*npm install better-sqlite3[^\n]*/g) ?? [];
+    expect(hints.length).toBeGreaterThan(0);
+    for (const hint of hints) expect(hint).toContain("--legacy-peer-deps");
+  });
+
+  it("upgrade() local npm installs include the flag", () => {
+    const installs = (CLI_SRC.match(/npmExecFile\(\[\s*"install"[^\]]*\]/g) ?? [])
+      .filter((call) => !call.includes('"-g"'));
+    expect(installs.length).toBeGreaterThan(0);
+    for (const call of installs) expect(call).toContain('"--legacy-peer-deps"');
+  });
+});

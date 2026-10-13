@@ -509,6 +509,22 @@ console.log(JSON.stringify({ ok: true }));
 import { readFileSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
+describe("ensure-deps: npm install passes --legacy-peer-deps (#1174)", () => {
+  const ENSURE_DEPS_SRC = readFileSync(
+    resolvePath(fileURLToPath(import.meta.url), "..", "..", "..", "hooks", "ensure-deps.mjs"),
+    "utf-8",
+  );
+
+  test("package-missing npm install includes --legacy-peer-deps", () => {
+    // npm 10.x Arborist crashes while loading peer sets of devDependencies
+    // (vitest) when building the ideal tree for the plugin root. Without the
+    // flag the install fails and better-sqlite3 is never written to disk.
+    const install = ENSURE_DEPS_SRC.match(/install \$\{pkg\} ([^`]*)`/);
+    expect(install).not.toBeNull();
+    expect(install![1]).toContain("--legacy-peer-deps");
+  });
+});
+
 describe("ensure-deps: better-sqlite3 binding self-heal (#408)", () => {
   const ENSURE_DEPS_SRC = readFileSync(
     resolvePath(fileURLToPath(import.meta.url), "..", "..", "..", "hooks", "ensure-deps.mjs"),

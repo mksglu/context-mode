@@ -6716,3 +6716,14 @@ describe("ctx_* MCP tool annotations (#846)", () => {
     }
   });
 });
+
+describe("inline ctx_upgrade script: npm installs pass --legacy-peer-deps (#1174)", () => {
+  test("both generated npm install calls include the flag", () => {
+    // npm 10.9.x Arborist crashes loading vitest >= 4.1's peer set in any
+    // install rooted at context-mode's package.json, including --production.
+    const serverSrc = readFileSync(resolve(__dirname, "../../src/server.ts"), "utf-8");
+    const installs = serverSrc.match(/"npm",\["install"[^\]]*\]/g) ?? [];
+    expect(installs.length).toBeGreaterThan(0);
+    for (const call of installs) expect(call).toContain('"--legacy-peer-deps"');
+  });
+});

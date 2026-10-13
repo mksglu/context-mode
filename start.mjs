@@ -487,7 +487,8 @@ import "./hooks/ensure-deps.mjs";
   const NPM_INSTALL_BG_PKGS = ["turndown", "turndown-plugin-gfm", "@mixmark-io/domino"];
   const IS_WIN32 = process.platform === "win32";
   const NPM_BIN = IS_WIN32 ? "npm.cmd" : "npm";
-  const NPM_FLAGS = ["--no-package-lock", "--no-save", "--silent", "--no-audit", "--no-fund"];
+  // --legacy-peer-deps: npm 10.9's Arborist crashes on vitest >= 4.1's peer set (#1174).
+  const NPM_FLAGS = ["--no-package-lock", "--no-save", "--silent", "--no-audit", "--no-fund", "--legacy-peer-deps"];
   // #861: on Windows the npm shim is `npm.cmd`, which needs `shell: true` to
   // run — but Node DROPS the `cwd` option when `shell: true`, so the spawned
   // cmd.exe inherits an arbitrary working dir (C:\Windows under Claude Code).
@@ -604,7 +605,7 @@ if (existsSync(resolve(__dirname, "server.bundle.mjs"))) {
   // Dev or npm install — full build
   if (!existsSync(resolve(__dirname, "node_modules"))) {
     try {
-      execSync("npm install --silent", { cwd: __dirname, stdio: "pipe", timeout: 60000 });
+      execSync("npm install --silent --legacy-peer-deps", { cwd: __dirname, stdio: "pipe", timeout: 60000 });
     } catch { /* best effort */ }
   }
   if (!existsSync(resolve(__dirname, "build", "server.js"))) {

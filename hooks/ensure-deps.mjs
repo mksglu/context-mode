@@ -72,7 +72,8 @@ export async function ensureDeps() {
     if (!existsSync(pkgDir)) {
       // Package not installed at all
       try {
-        execSync(`${process.platform === "win32" ? "npm.cmd" : "npm"} install ${pkg} --no-package-lock --no-save --silent`, {
+        // --legacy-peer-deps: npm 10.9's Arborist crashes on vitest >= 4.1's peer set (#1174).
+        execSync(`${process.platform === "win32" ? "npm.cmd" : "npm"} install ${pkg} --no-package-lock --no-save --silent --legacy-peer-deps`, {
           cwd: root,
           stdio: "pipe",
           timeout: 120000,
