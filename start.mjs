@@ -325,10 +325,11 @@ try {
 // Honors CLAUDE_CONFIG_DIR (#577) — checked at this script's runtime so users
 // who set CLAUDE_CONFIG_DIR after install still get healed correctly.
 // Pure Node.js — no bash/shell dependency.
-import{existsSync,readdirSync,statSync,symlinkSync,lstatSync,unlinkSync,readFileSync}from"node:fs";
+import{existsSync,readdirSync,statSync,symlinkSync,lstatSync,unlinkSync,readFileSync,mkdirSync,appendFileSync}from"node:fs";
 import{dirname,join,resolve,sep}from"node:path";
 import{homedir}from"node:os";
 function cfgDir(){const e=process.env.CLAUDE_CONFIG_DIR;if(e&&e.trim()!==""){return e.startsWith("~")?resolve(homedir(),e.replace(/^~[/\\\\]?/,"")):resolve(e)}return resolve(homedir(),".claude")}
+function logHeal(p,why){try{const d=join(cfgDir(),"context-mode");mkdirSync(d,{recursive:true});appendFileSync(join(d,"hook-errors.log"),"["+new Date().toISOString()+"] cache-heal "+why+" "+p+"\\n")}catch{}}
 try{
   const f=resolve(cfgDir(),"plugins","installed_plugins.json");
   if(!existsSync(f))process.exit(0);
@@ -360,8 +361,8 @@ try{
       const parent=dirname(p);
       if(!existsSync(parent))continue;
       try{if(lstatSync(p).isSymbolicLink())unlinkSync(p)}catch{}
-      const dirs=readdirSync(parent).filter(d=>/^\\d+\\.\\d+/.test(d)&&statSync(join(parent,d)).isDirectory());
-      if(!dirs.length)continue;
+      const dirs=readdirSync(parent).filter(d=>/^\\d+\\.\\d+(\\.\\d+)?$/.test(d)&&statSync(join(parent,d)).isDirectory());
+      if(!dirs.length){logHeal(p,"no version directory");continue;}
       dirs.sort((a,b)=>{const pa=a.split(".").map(Number),pb=b.split(".").map(Number);for(let i=0;i<3;i++){if((pa[i]||0)!==(pb[i]||0))return(pa[i]||0)-(pb[i]||0)}return 0});
       try{symlinkSync(join(parent,dirs[dirs.length-1]),p,process.platform==="win32"?"junction":undefined)}catch{}
     }
