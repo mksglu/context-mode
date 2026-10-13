@@ -24,7 +24,7 @@ import {
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
 
@@ -40,11 +40,12 @@ import {
   resolveContentStorageDir,
   resolveDefaultSessionDir,
   resolveSessionStorageDir,
+  resolveSessionPath,
   resolveStatsStorageDir,
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
-import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
+import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS, withProjectDirOverride } from "../../src/server.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
@@ -52,6 +53,161 @@ const runtimes = detectRuntimes();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STORAGE_ENV_KEY = "CONTEXT_MODE_DIR";
 const savedStorageEnv = process.env[STORAGE_ENV_KEY];
+
+test("shell policies use the request project for shell and embedded commands", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ctx-policy-isolation-"));
+  process.env[STORAGE_ENV_KEY] = join(root, "storage");
+  const projects = [join(root, "restricted"), join(root, "other")];
+  const foreignProject = process.env.CLAUDE_PROJECT_DIR;
+  projects.forEach(project => mkdirSync(join(project, ".claude"), { recursive: true }));
+  writeFileSync(join(projects[0], ".claude", "settings.local.json"), JSON.stringify({ permissions: { deny: ["Bash(echo isolation-policy-marker)"] } }));
+  writeFileSync(join(projects[1], ".claude", "settings.local.json"), JSON.stringify({ permissions: { deny: ["Bash(echo unrelated-marker)"] } }));
+  process.env.CLAUDE_PROJECT_DIR = projects[1];
+  const execute = REGISTERED_CTX_TOOLS.find(t => t.name === "ctx_execute")!.handler;
+  try {
+    for (const args of [
+      { language: "shell", code: "echo isolation-policy-marker" },
+      { language: "javascript", code: "require('node:child_process').execSync('echo isolation-policy-marker')" },
+    ]) {
+      const denied = await withProjectDirOverride(projects[0], async () => execute(args));
+      expect(denied).toHaveProperty("isError", true);
+      expect(JSON.stringify(denied)).toContain("security policy");
+      const allowed = await withProjectDirOverride(projects[1], async () => execute(args));
+      expect(allowed).not.toHaveProperty("isError", true);
+    }
+  } finally {
+    if (foreignProject === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = foreignProject;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("session event sidecars are consumed only by their owning project", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ctx-sidecar-isolation-"));
+  const storage = join(root, "storage");
+  process.env[STORAGE_ENV_KEY] = storage;
+  const sessionsDir = join(storage, "sessions");
+  mkdirSync(sessionsDir, { recursive: true });
+  const projects = [join(root, "first"), join(root, "second")];
+  projects.forEach(project => mkdirSync(project));
+  const sidecars = projects.map(projectDir => resolveSessionPath({ projectDir, sessionsDir, ext: "-events.md" }));
+  writeFileSync(sidecars[0], "first-private-marker");
+  writeFileSync(sidecars[1], "second-private-marker");
+  const search = REGISTERED_CTX_TOOLS.find(t => t.name === "ctx_search")!.handler;
+  try {
+    const first = await withProjectDirOverride({ projectDir: projects[0], sessionId: "first-sidecar" }, async () =>
+      search({ queries: ["private"], source: "session-events" }));
+    expect(JSON.stringify(first)).toContain("first-private-marker");
+    expect(JSON.stringify(first)).not.toContain("second-private-marker");
+    expect(existsSync(sidecars[0])).toBe(false);
+    expect(existsSync(sidecars[1])).toBe(true);
+    const second = await withProjectDirOverride({ projectDir: projects[1], sessionId: "second-sidecar" }, async () =>
+      search({ queries: ["private"], source: "session-events" }));
+    expect(JSON.stringify(second)).toContain("second-private-marker");
+    expect(JSON.stringify(second)).not.toContain("first-private-marker");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP transport advertises and forwards Codex workspace metadata", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+  const root = mkdtempSync(join(tmpdir(), "ctx-codex-wire-"));
+  const project = join(root, "project with spaces");
+  mkdirSync(project);
+  writeFileSync(join(project, "data.txt"), "wire-project-marker");
+  const client = new Client({ name: "codex-mcp-client", version: "1" });
+  const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  try {
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [resolve(__dirname, "../../build/server.js")],
+      cwd: root,
+      env: {
+        ...env, CONTEXT_MODE_PLATFORM: "claude-code", CONTEXT_MODE_EMBEDDED_PLUGIN_TOOLS: "0", CONTEXT_MODE_DIR: "",
+        CODEX_HOME: join(root, "codex"), CLAUDE_CONFIG_DIR: join(root, "claude"),
+      },
+    }));
+    expect(client.getServerCapabilities()?.experimental).toHaveProperty("codex/sandbox-state-meta");
+    const result = await client.callTool({
+      name: "ctx_execute_file",
+      arguments: { path: "data.txt", language: "javascript", code: "console.log(FILE_CONTENT)" },
+      _meta: { threadId: "wire-thread", "codex/sandbox-state-meta": { sandboxCwd: pathToFileURL(project).href } },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(JSON.stringify(result)).toContain("wire-project-marker");
+    await client.callTool({
+      name: "ctx_index", arguments: { content: "wire-index-marker", source: "wire" },
+      _meta: { threadId: "wire-thread", "codex/sandbox-state-meta": { sandboxCwd: pathToFileURL(project).href } },
+    });
+    expect(existsSync(join(root, "codex", "context-mode", "content"))).toBe(true);
+    expect(existsSync(join(root, "claude", "context-mode", "content"))).toBe(false);
+  } finally {
+    await client.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 15_000);
+
+test("Codex tool requests use their own workspace metadata and retain file containment", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ctx-codex-requests-"));
+  process.env[STORAGE_ENV_KEY] = join(root, "storage");
+  const platform = process.env.CONTEXT_MODE_PLATFORM;
+  process.env.CONTEXT_MODE_PLATFORM = "codex";
+  const projects = [join(root, "first"), join(root, "second")];
+  projects.forEach((project, i) => {
+    mkdirSync(project);
+    writeFileSync(join(project, "data.txt"), `project-${i}`);
+  });
+  const handler = REGISTERED_CTX_TOOLS.find(t => t.name === "ctx_execute_file")!.handler;
+  try {
+    const results = await Promise.all(projects.map((project, i) => handler({
+      path: "data.txt", language: "javascript", code: "console.log(FILE_CONTENT)",
+    }, { _meta: { threadId: `thread-${i}`, "codex/sandbox-state-meta": { sandboxCwd: pathToFileURL(project).href } } })));
+    results.forEach((result, i) => {
+      expect(JSON.stringify(result)).toContain(`project-${i}`);
+      expect(result).not.toHaveProperty("isError", true);
+    });
+    const denied = await handler({
+      path: join(projects[1], "data.txt"), language: "javascript", code: "console.log(FILE_CONTENT)",
+    }, { _meta: { threadId: "thread-0", "codex/sandbox-state-meta": { sandboxCwd: pathToFileURL(projects[0]).href } } });
+    expect(denied).toHaveProperty("isError", true);
+    expect(JSON.stringify(denied)).toContain("outside the project root");
+  } finally {
+    if (platform === undefined) delete process.env.CONTEXT_MODE_PLATFORM;
+    else process.env.CONTEXT_MODE_PLATFORM = platform;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("content stores remain isolated when concurrent requests belong to different projects", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ctx-project-isolation-"));
+  process.env[STORAGE_ENV_KEY] = join(root, "storage");
+  const first = join(root, "first");
+  const second = join(root, "second");
+  mkdirSync(first);
+  mkdirSync(second);
+  const index = REGISTERED_CTX_TOOLS.find(t => t.name === "ctx_index")!.handler;
+  const search = REGISTERED_CTX_TOOLS.find(t => t.name === "ctx_search")!.handler;
+  const invoke = (projectDir: string, fn: () => Promise<unknown>) =>
+    withProjectDirOverride({ projectDir, sessionId: "isolation-check" }, fn);
+  try {
+    await Promise.all([
+      invoke(first, async () => index({ content: "first-project-marker", source: "isolation" })),
+      invoke(second, async () => index({ content: "second-project-marker", source: "isolation" })),
+    ]);
+    const [firstResult, secondResult] = await Promise.all([
+      invoke(first, async () => search({ queries: ["marker"], source: "isolation" })),
+      invoke(second, async () => search({ queries: ["marker"], source: "isolation" })),
+    ]);
+    expect(JSON.stringify(firstResult)).toContain("first-project-marker");
+    expect(JSON.stringify(firstResult)).not.toContain("second-project-marker");
+    expect(JSON.stringify(secondResult)).toContain("second-project-marker");
+    expect(JSON.stringify(secondResult)).not.toContain("first-project-marker");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 afterEach(() => {
   if (savedStorageEnv === undefined) delete process.env[STORAGE_ENV_KEY];
@@ -2370,8 +2526,8 @@ describe("ctx_purge is the sole reset/wipe mechanism", () => {
     expect(purgeMatch).not.toBeNull();
     const purgeBody = purgeMatch![0];
     // 1. Closes the FTS5 knowledge base BEFORE wiping (releases Windows lock)
-    expect(purgeBody).toContain("_store.cleanup()");
-    expect(purgeBody).toContain("_store = null");
+    expect(purgeBody).toContain("store.cleanup()");
+    expect(purgeBody).toContain("stores.delete(storePathForPurge)");
     // 2. Delegates the on-disk wipe to the purgeSession deep module so all
     //    file-kind sweeps (session DB, events.md, cleanup flag, FTS5 store,
     //    legacy content) flow through ONE code path with uniform dual-hash.
@@ -2872,7 +3028,7 @@ describe("ContentStore purge behavior", () => {
     // Handler resolves storePath BEFORE the optional _store.cleanup() so
     // the disk wipe runs whether _store was open or not.
     const storePathIdx = purgeBody.indexOf("getStorePath()");
-    const storeCleanupIdx = purgeBody.indexOf("_store.cleanup()");
+    const storeCleanupIdx = purgeBody.indexOf("store.cleanup()");
     expect(storePathIdx).toBeGreaterThan(-1);
     expect(storePathIdx).toBeLessThan(storeCleanupIdx === -1 ? Infinity : storeCleanupIdx);
     // Handler always passes storePath into the deep module — that is what

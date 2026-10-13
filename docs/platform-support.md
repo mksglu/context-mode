@@ -192,6 +192,8 @@ When OpenCode triggers `experimental.session.compacting` (auto on context overfl
 
 **Status:** Supported (MCP active, hooks require `[features].hooks = true`)
 
+**Workspace isolation:** MCP calls use Codex's host-provided `threadId` metadata and the `codex/sandbox-state-meta` capability's `sandboxCwd` file URI. Older hosts without workspace metadata resolve only the transcript matching that thread ID. Another chat's transcript timestamp never selects the workspace. Requests with a thread identity but no resolvable workspace fail instead of borrowing another project's root. Content stores and file permission checks remain scoped to each request's project, including concurrent calls through one MCP process.
+
 **Hook Paradigm:** JSON stdin/stdout
 
 Codex CLI's Rust backend (codex-rs) includes a hook system using the same JSON stdin/stdout wire protocol as Claude Code. Hooks are configured via `hooks.json`.

@@ -199,7 +199,7 @@ describe("getProjectDir() under Codex platform detection (issue #45)", () => {
     }
   });
 
-  it("recovers cwd from Codex session log when env is empty and Codex is the detected platform", async () => {
+  it("does not borrow an unidentified Codex session log when env is empty", async () => {
     // Fixture: tmp CODEX_HOME with one fresh session.jsonl carrying meta.cwd.
     const tmpHome = mkdtempSync(join(tmpdir(), "ctx-codex-server-"));
     cleanup.push(tmpHome);
@@ -223,6 +223,6 @@ describe("getProjectDir() under Codex platform detection (issue #45)", () => {
     // server.ts captures `detectPlatform()` + env vars at call time
     // inside getProjectDir(), so a single static import + per-test env
     // setup is enough.
-    expect(getProjectDir()).toBe(expectedCwd);
+    expect(getProjectDir()).toBe(process.cwd());
   });
 });

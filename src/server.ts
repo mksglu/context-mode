@@ -42,6 +42,7 @@ import {
   resolveContentStorageDir,
   resolveDefaultSessionDir,
   resolveSessionDbPath,
+  resolveSessionPath,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
   SessionDB,
@@ -68,7 +69,7 @@ import { parseCodexContextModePluginRoot } from "./adapters/codex/index.js";
 import { getHookScriptPaths } from "./util/hook-config.js";
 import { stripJsonComments } from "./util/jsonc.js";
 import { resolveClaudeConfigDir } from "./util/claude-config.js";
-import { resolveProjectDir } from "./util/project-dir.js";
+import { resolveProjectDir, resolveCodexToolContext } from "./util/project-dir.js";
 import { loadDatabase } from "./db-base.js";
 import { AnalyticsEngine, formatReport, getConversationStats, getContentBytesAllSessions, getConversationWindowStats, getLifetimeStats, getMultiAdapterLifetimeStats, getRealBytesStats, pricePerToken } from "./session/analytics.js";
 const __pkg_dir = dirname(fileURLToPath(import.meta.url));
@@ -144,12 +145,15 @@ export const server = new McpServer({
   name: "context-mode",
   version: VERSION,
 });
+server.server.registerCapabilities({ experimental: { "codex/sandbox-state-meta": {} } });
 
 export interface RegisteredCtxTool {
   name: string;
   config: Record<string, unknown>;
-  handler: (args: Record<string, unknown>) => Promise<unknown> | unknown;
+  handler: (args: Record<string, unknown>, extra?: ToolRequestExtra) => Promise<unknown> | unknown;
 }
+
+type ToolRequestExtra = { _meta?: Record<string, unknown> };
 
 export const REGISTERED_CTX_TOOLS: RegisteredCtxTool[] = [];
 
@@ -294,13 +298,17 @@ const originalRegisterTool = server.registerTool.bind(server);
 function wrapToolHandler(
   name: string,
   handler: (toolArgs: Record<string, unknown>) => Promise<unknown> | unknown,
-): (toolArgs: Record<string, unknown>) => Promise<unknown> {
-  return async (toolArgs: Record<string, unknown>) => {
+): (toolArgs: Record<string, unknown>, extra?: ToolRequestExtra) => Promise<unknown> {
+  return async (toolArgs: Record<string, unknown>, extra?: ToolRequestExtra) => {
     // #854: mark a tool call in-flight so the bridge-child idle reaper never
     // shuts the server down mid-execution during a long ctx_execute/batch that
     // emits no further inbound messages. Symmetric end in finally (success+error).
     noteRequestStart();
     try {
+      if (detectPlatform(server.server.getClientVersion() ?? undefined).platform === "codex") {
+        const context = resolveCodexToolContext(extra?._meta);
+        if (context) return await withProjectDirOverride(context, async () => handler(toolArgs));
+      }
       return await handler(toolArgs);
     } catch (err) {
       const result = storageErrorResult(err);
@@ -434,8 +442,7 @@ writeFileSync(
 // snippets under /tmp when the host process exits.
 process.on("exit", () => { try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ } });
 
-// Lazy singleton — no DB overhead unless index/search is used
-let _store: ContentStore | null = null;
+const stores = new Map<string, ContentStore>();
 
 /**
  * Build the FK-attribution object passed to every ContentStore.index*() call
@@ -497,26 +504,14 @@ export function resolveSessionIdFromSessionDB(opts?: {
   }
 }
 
-/**
- * Auto-index session events files written by SessionStart hook.
- * Scans ~/.claude/context-mode/sessions/ for *-events.md files.
- * CLAUDE_PROJECT_DIR is NOT available to MCP servers — only to hooks —
- * so we glob-scan instead of computing a specific hash.
- * Files are consumed (deleted) after indexing to prevent double-indexing.
- * Called on every getStore() — readdirSync is sub-millisecond when no files match.
- */
 function maybeIndexSessionEvents(store: ContentStore): void {
   try {
-    const sessionsDir = getSessionDir();
-    if (!existsSync(sessionsDir)) return;
-    const files = readdirSync(sessionsDir).filter(f => f.endsWith("-events.md"));
-    for (const file of files) {
-      const filePath = join(sessionsDir, file);
-      try {
-        store.index({ path: filePath, source: "session-events", attribution: currentAttribution() });
-        unlinkSync(filePath);
-      } catch { /* best-effort per file */ }
-    }
+    const filePath = resolveSessionPath({
+      projectDir: getProjectDir(), sessionsDir: getSessionDir(), ext: "-events.md",
+    });
+    if (!existsSync(filePath)) return;
+    store.index({ path: filePath, source: "session-events", attribution: currentAttribution() });
+    unlinkSync(filePath);
   } catch { /* best-effort — session continuity never blocks tools */ }
 }
 
@@ -526,6 +521,7 @@ function maybeIndexSessionEvents(store: ContentStore): void {
 // hardcoded configDir detection in tool handlers.
 
 let _detectedAdapter: HookAdapter | null = null;
+let detectedAdapterPlatform: PlatformId | undefined;
 
 /**
  * Resolve the Claude Code config root, honoring `CLAUDE_CONFIG_DIR` (incl.
@@ -538,10 +534,10 @@ let _detectedAdapter: HookAdapter | null = null;
  * env values fall back instead of poisoning downstream `join()` calls.
  */
 async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
-  if (_detectedAdapter) return _detectedAdapter;
+  const signal = detectPlatform(server.server.getClientVersion() ?? undefined);
+  if (_detectedAdapter && detectedAdapterPlatform === signal.platform) return _detectedAdapter;
   try {
     const { getAdapter } = await import("./adapters/detect.js");
-    const signal = detectPlatform();
     return await getAdapter(signal.platform);
   } catch {
     return null;
@@ -553,7 +549,8 @@ async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
  * Falls back to the detected platform config root before adapter detection.
  */
 function getDefaultSessionDir(): string {
-  if (_detectedAdapter) return _detectedAdapter.getSessionDir();
+  const signal = detectPlatform(server.server.getClientVersion() ?? undefined);
+  if (_detectedAdapter && detectedAdapterPlatform === signal.platform) return _detectedAdapter.getSessionDir();
   // Pre-detection path (race window before MCP `initialize` completes):
   // call detectPlatform() (sync, env-var-based) and look up segments via
   // getSessionDirSegments() (sync map, no adapter instantiation). This keeps
@@ -561,7 +558,6 @@ function getDefaultSessionDir(): string {
   // Code/Codex (single-segment roots), reroute through their config-dir
   // contracts so the pre-detection window does not split-state with hooks.
   try {
-    const signal = detectPlatform();
     const segments = getSessionDirSegments(signal.platform);
     if (segments) {
       return resolveDefaultSessionDir({
@@ -629,19 +625,11 @@ export function getProjectDir(): string {
   // and the legacy literal cascade is preserved there for semver safety.
   let transcriptsRoot: string | undefined;
   let strictPlatform: PlatformId | undefined;
-  let codexHome: string | undefined;
   try {
-    const detected = detectPlatform().platform;
+    const detected = detectPlatform(server.server.getClientVersion() ?? undefined).platform;
     strictPlatform = detected;
     if (detected === "claude-code") {
       transcriptsRoot = join(homedir(), ".claude", "projects");
-    }
-    // Issue #45 — Codex publishes no workspace env var, so the resolver
-    // reads `meta.cwd` from the most-recently-modified session.jsonl under
-    // `${codexHome}/sessions/`. Wire codexHome at the call site so the
-    // resolver can be exercised under test without process-level mutation.
-    if (detected === "codex") {
-      codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
     }
   } catch { /* detection failure — leave undefined, resolver uses legacy cascade */ }
   return resolveProjectDir({
@@ -651,7 +639,6 @@ export function getProjectDir(): string {
     transcriptsRoot,
     transcriptMaxAgeMs: 5 * 60 * 1000,
     strictPlatform,
-    codexHome,
   });
 }
 
@@ -697,18 +684,20 @@ function getStorePath(): string {
 }
 
 function getStore(): ContentStore {
-  if (!_store) {
+  const dbPath = getStorePath();
+  let store = stores.get(dbPath);
+  if (!store) {
     // Content DB cleanup on fresh start is handled by SessionStart hook.
     // Server just opens whatever DB exists (or creates new if hook deleted it).
-    const dbPath = getStorePath();
-    _store = new ContentStore(dbPath);
+    store = new ContentStore(dbPath);
+    stores.set(dbPath, store);
+    const projectDir = getProjectDir();
 
     // Wire deny-policy hook: store re-checks the Read deny list before
     // re-reading any file_path during auto-refresh. Catches policy edits
     // made after a file was originally indexed. See #442 round-3.
-    _store.setDenyChecker((filePath: string) => {
+    store.setDenyChecker((filePath: string) => {
       try {
-        const projectDir = getProjectDir();
         const denyGlobs = readToolDenyPatterns("Read", projectDir);
         const r = evaluateFilePath(
           filePath,
@@ -727,7 +716,7 @@ function getStore(): ContentStore {
     try {
       const contentDir = dirname(getStorePath());
       cleanupStaleContentDBs(contentDir, 14);
-      _store.cleanupStaleSources(14);
+      store.cleanupStaleSources(14);
       // Also clean legacy shared dir from before platform isolation
       const legacyDir = join(homedir(), ".context-mode", "content");
       if (existsSync(legacyDir)) cleanupStaleContentDBs(legacyDir, 0);
@@ -736,8 +725,8 @@ function getStore(): ContentStore {
     // Also clean old PID-based DBs from migration
     cleanupStaleDBs();
   }
-  maybeIndexSessionEvents(_store);
-  return _store;
+  maybeIndexSessionEvents(store);
+  return store;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1113,7 +1102,7 @@ function checkDenyPolicy(
   toolName: string,
 ): ToolResult | null {
   try {
-    const policies = readBashPolicies(process.env.CLAUDE_PROJECT_DIR);
+    const policies = readBashPolicies(getProjectDir());
     const result = evaluateCommandDenyOnly(command, policies);
     if (result.decision === "deny") {
       return trackResponse(toolName, {
@@ -1142,7 +1131,7 @@ function checkNonShellDenyPolicy(
   try {
     const commands = extractShellCommands(code, language);
     if (commands.length === 0) return null;
-    const policies = readBashPolicies(process.env.CLAUDE_PROJECT_DIR);
+    const policies = readBashPolicies(getProjectDir());
     for (const cmd of commands) {
       const result = evaluateCommandDenyOnly(cmd, policies);
       if (result.decision === "deny") {
@@ -4549,9 +4538,10 @@ EXAMPLE: ctx_purge(confirm: true, scope: "project")`,
     try {
       storePathForPurge = getStorePath();
     } catch { /* best effort — store path may be unresolvable on fresh install */ }
-    if (_store) {
-      try { _store.cleanup(); } catch { /* best effort */ }
-      _store = null;
+    const store = storePathForPurge ? stores.get(storePathForPurge) : undefined;
+    if (store && storePathForPurge) {
+      try { store.cleanup(); } catch { /* best effort */ }
+      stores.delete(storePathForPurge);
     }
 
     // FTS5 store: pass contentDir so purgeSession sweeps BOTH canonical
@@ -4866,7 +4856,8 @@ async function main() {
   // Clean up own DB + backgrounded processes + preload script on shutdown
   const shutdown = () => {
     executor.cleanupBackgrounded();
-    if (_store) _store.close(); // persist DB for --continue sessions
+    for (const store of stores.values()) store.close();
+    stores.clear();
     try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ }
     // Remove MCP readiness sentinel (#230)
     try { unlinkSync(mcpSentinel); } catch { /* best effort */ }
@@ -4921,6 +4912,7 @@ async function main() {
     const clientInfo = server.server.getClientVersion();
     const signal = detectPlatform(clientInfo ?? undefined);
     _detectedAdapter = await getAdapter(signal.platform);
+    detectedAdapterPlatform = signal.platform;
     if (clientInfo) {
       console.error(`MCP client: ${clientInfo.name} v${clientInfo.version} → ${signal.platform}`);
     }

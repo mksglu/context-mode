@@ -4,20 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   resolveCodexSessionCwd,
+  resolveCodexToolContext,
   resolveProjectDir,
 } from "../../src/util/project-dir.js";
-
-// ─────────────────────────────────────────────────────────
-// Issue #45 / c4529042182 — Codex MCP servers do NOT receive any
-// workspace env var (CODEX has no workspace-role env in PLATFORM_ENV_VARS).
-// When Codex CLI is launched from a non-project cwd (e.g. ~), the spawned
-// MCP child inherits that cwd and every project-aware tool (ctx_stats,
-// SessionDB, hash) ends up rooted at $HOME instead of the user's project.
-//
-// Mitigation: read meta.cwd from the most-recently-modified Codex session
-// log (`${CODEX_HOME ?? ~/.codex}/sessions/<uuid>.jsonl`, line 1 is the
-// SessionMeta JSON struct per refs/platforms/codex/codex-rs).
-// ─────────────────────────────────────────────────────────
+import { pathToFileURL } from "node:url";
 
 const cleanup: string[] = [];
 
@@ -70,7 +60,7 @@ function writeDesktopSession(
   mkdirSync(sessionsDir, { recursive: true });
   const file = join(sessionsDir, `${name}.jsonl`);
   const lines = [
-    JSON.stringify({ type: "session_meta", payload: { cwd, ...extraPayload } }),
+    JSON.stringify({ type: "session_meta", payload: { id: name, cwd, ...extraPayload } }),
     JSON.stringify({ type: "turn_context", payload: { cwd } }),
   ];
   writeFileSync(file, lines.join("\n") + "\n");
@@ -79,12 +69,73 @@ function writeDesktopSession(
 }
 
 describe("resolveCodexSessionCwd", () => {
-  it("returns meta.cwd from the most-recently-modified session.jsonl", () => {
+  it("uses the host's request workspace URI and thread identity without scanning other sessions", () => {
+    const codexHome = makeCodexHome();
+    writeSession(codexHome, "other-session", "/project/other");
+    const projectDir = join(codexHome, "own with spaces");
+    expect(resolveCodexToolContext({
+      threadId: "own-session",
+      "codex/sandbox-state-meta": { sandboxCwd: pathToFileURL(projectDir).href },
+    }, codexHome)).toEqual({ projectDir, sessionId: "own-session" });
+  });
+
+  it("rejects invalid host workspace URIs instead of falling back to another project", () => {
+    expect(() => resolveCodexToolContext({ threadId: "own-session", "codex/sandbox-state-meta": { sandboxCwd: "https://example.com/project" } })).toThrow(/workspace/i);
+  });
+
+  it("uses only the matching thread transcript when the host does not provide a workspace URI", () => {
+    const codexHome = makeCodexHome();
+    writeSession(codexHome, "own-session", "/project/own", new Date(0));
+    writeSession(codexHome, "other-session", "/project/other");
+    expect(resolveCodexToolContext({ threadId: "own-session" }, codexHome)).toEqual({ projectDir: "/project/own", sessionId: "own-session" });
+    expect(() => resolveCodexToolContext({ threadId: "missing-session" }, codexHome)).toThrow(/workspace/i);
+  });
+
+  it("resolves the requesting session even while another project has the newest transcript", () => {
+    const codexHome = makeCodexHome();
+    const own = writeSession(codexHome, "own-session", "/project/own", new Date(0));
+    const other = writeSession(codexHome, "other-session", "/project/other", new Date());
+
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "own-session" })).toBe("/project/own");
+    utimesSync(other, new Date(Date.now() + 60_000), new Date(Date.now() + 60_000));
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "own-session" })).toBe("/project/own");
+    expect(own).not.toBe(other);
+  });
+
+  it("does not borrow another project's transcript when the requesting session is unknown", () => {
+    const codexHome = makeCodexHome();
+    writeSession(codexHome, "other-session", "/project/other", new Date());
+
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "missing-session" })).toBeNull();
+  });
+
+  it("does not infer a requesting project from global transcript recency", () => {
+    const codexHome = makeCodexHome();
+    writeSession(codexHome, "other-session", "/project/other", new Date());
+
+    expect(resolveProjectDir({
+      env: {}, cwd: "/project/own", pwd: "/project/own", strictPlatform: "codex", codexHome,
+    })).toBe("/project/own");
+  });
+
+  it("requires a requesting session identity before reading transcripts", () => {
+    const codexHome = makeCodexHome();
+    writeSession(codexHome, "other-session", "/project/other");
+    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+  });
+
+  it("rejects a filename match whose metadata belongs to a different session", () => {
+    const codexHome = makeCodexHome();
+    writeDesktopSession(codexHome, "own-session", "/project/other", undefined, { id: "other-session" });
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "own-session" })).toBeNull();
+  });
+
+  it("returns meta.cwd from the identified session.jsonl", () => {
     const codexHome = makeCodexHome();
     writeSession(codexHome, "old-uuid", "/project/old", new Date(Date.now() - 60_000));
     writeSession(codexHome, "new-uuid", "/project/new", new Date());
 
-    expect(resolveCodexSessionCwd({ codexHome })).toBe("/project/new");
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "new-uuid" })).toBe("/project/new");
   });
 
   it("returns payload.cwd from Codex Desktop's dated rollout session layout", () => {
@@ -96,7 +147,7 @@ describe("resolveCodexSessionCwd", () => {
       new Date(),
     );
 
-    expect(resolveCodexSessionCwd({ codexHome })).toBe("/Users/x/Work/Dev/ucw");
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "rollout-2026-05-28T12-00-00-000Z" })).toBe("/Users/x/Work/Dev/ucw");
   });
 
   it("handles Codex Desktop session_meta lines larger than the old 8KB head read", () => {
@@ -109,10 +160,10 @@ describe("resolveCodexSessionCwd", () => {
       { dynamic_tools: "x".repeat(16_000) },
     );
 
-    expect(resolveCodexSessionCwd({ codexHome })).toBe("/project/large-meta");
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "rollout-large-meta" })).toBe("/project/large-meta");
   });
 
-  it("prefers the most-recently-modified Codex Desktop session recursively", () => {
+  it("finds an identified Codex Desktop session recursively", () => {
     const codexHome = makeCodexHome();
     writeDesktopSession(
       codexHome,
@@ -122,29 +173,31 @@ describe("resolveCodexSessionCwd", () => {
     );
     writeDesktopSession(codexHome, "rollout-new", "/project/new", new Date());
 
-    expect(resolveCodexSessionCwd({ codexHome })).toBe("/project/new");
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "rollout-new" })).toBe("/project/new");
   });
 
-  it("ignores session.jsonl older than transcriptMaxAgeMs", () => {
+  it("keeps an identified inactive session bound to its project", () => {
     const codexHome = makeCodexHome();
     const now = Date.now();
     writeSession(codexHome, "stale", "/project/stale", new Date(now - 60_000));
 
     const result = resolveCodexSessionCwd({
       codexHome,
+      sessionId: "stale",
       transcriptMaxAgeMs: 30_000,
       now,
     });
-    expect(result).toBeNull();
+    expect(result).toBe("/project/stale");
   });
 
-  it("returns meta.cwd when newest session is within transcriptMaxAgeMs", () => {
+  it("returns meta.cwd for the identified active session", () => {
     const codexHome = makeCodexHome();
     const now = Date.now();
     writeSession(codexHome, "fresh", "/project/fresh", new Date(now - 10_000));
 
     const result = resolveCodexSessionCwd({
       codexHome,
+      sessionId: "fresh",
       transcriptMaxAgeMs: 30_000,
       now,
     });
@@ -158,7 +211,7 @@ describe("resolveCodexSessionCwd", () => {
       "poisoned",
       "/Users/x/.claude/plugins/cache/context-mode/context-mode/1.0.148",
     );
-    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "poisoned" })).toBeNull();
   });
 
   it("rejects when meta.cwd points to Codex plugin install path (isPluginInstallPath)", () => {
@@ -168,7 +221,7 @@ describe("resolveCodexSessionCwd", () => {
       "poisoned-codex",
       "/Users/x/.codex/plugins/cache/context-mode/context-mode/1.0.151",
     );
-    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "poisoned-codex" })).toBeNull();
   });
 
   it("rejects when Codex Desktop payload.cwd points to Codex plugin install path", () => {
@@ -178,7 +231,7 @@ describe("resolveCodexSessionCwd", () => {
       "rollout-poisoned",
       "/Users/x/.codex/plugins/cache/context-mode/context-mode/1.0.151",
     );
-    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "rollout-poisoned" })).toBeNull();
   });
 
   it("returns null when sessions dir does not exist", () => {
@@ -200,14 +253,14 @@ describe("resolveCodexSessionCwd", () => {
   it("handles malformed session.jsonl gracefully (no throw)", () => {
     const codexHome = makeCodexHome();
     writeSession(codexHome, "broken", null, undefined, /* malformed */ true);
-    expect(() => resolveCodexSessionCwd({ codexHome })).not.toThrow();
-    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+    expect(() => resolveCodexSessionCwd({ codexHome, sessionId: "broken" })).not.toThrow();
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "broken" })).toBeNull();
   });
 
   it("returns null when meta.cwd is missing from the SessionMeta line", () => {
     const codexHome = makeCodexHome();
     writeSession(codexHome, "no-cwd", null);
-    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "no-cwd" })).toBeNull();
   });
 
   it("returns null when meta.cwd is non-string", () => {
@@ -218,7 +271,7 @@ describe("resolveCodexSessionCwd", () => {
       join(sessionsDir, "weird.jsonl"),
       JSON.stringify({ meta: { cwd: 123 } }) + "\n",
     );
-    expect(resolveCodexSessionCwd({ codexHome })).toBeNull();
+    expect(resolveCodexSessionCwd({ codexHome, sessionId: "weird" })).toBeNull();
   });
 });
 
@@ -237,7 +290,7 @@ describe("resolveProjectDir({strictPlatform: 'codex'})", () => {
     expect(result).toBe("/from/env");
   });
 
-  it("falls back to Codex session log when no workspace env is set", () => {
+  it("uses launch cwd when no requesting thread identity is available", () => {
     const codexHome = makeCodexHome();
     writeSession(codexHome, "fresh", "/project/from-session", new Date());
 
@@ -248,10 +301,10 @@ describe("resolveProjectDir({strictPlatform: 'codex'})", () => {
       strictPlatform: "codex",
       codexHome,
     });
-    expect(result).toBe("/project/from-session");
+    expect(result).toBe("/should-not-win");
   });
 
-  it("falls back to Codex Desktop session log before poisoned plugin cwd", () => {
+  it("does not recover a plugin cwd from an unidentified desktop session", () => {
     const codexHome = makeCodexHome();
     writeDesktopSession(codexHome, "rollout-active", "/project/from-desktop", new Date());
 
@@ -262,7 +315,7 @@ describe("resolveProjectDir({strictPlatform: 'codex'})", () => {
       strictPlatform: "codex",
       codexHome,
     });
-    expect(result).toBe("/project/from-desktop");
+    expect(result).toBe("/Users/x/.codex/plugins/cache/context-mode/context-mode/1.0.151");
   });
 
   it("falls through to PWD when no env and no session log", () => {
@@ -290,7 +343,7 @@ describe("resolveProjectDir({strictPlatform: 'codex'})", () => {
       strictPlatform: "codex",
       codexHome,
     });
-    expect(result).toBe("/project/from-session");
+    expect(result).toBe("/cwd");
   });
 
   it("rejects stale codex session log via transcriptMaxAgeMs", () => {
