@@ -161,6 +161,49 @@ export function probeCodexCliVersion(runCommand: CodexVersionRunner = execFileSy
   }
 }
 
+/**
+ * Whether the installed Codex CLI reports the `hooks` feature as on, or `null` when it
+ * cannot be asked.
+ *
+ * `[features].hooks` in config.toml is an OVERRIDE, not the state. Codex ships the
+ * feature enabled, so a config without the key is the ordinary shape for a current CLI,
+ * and reading only the file turned that into a failed check plus an upgrade
+ * recommendation for an installation that was already working (issue #1152).
+ *
+ * `codex features list` prints one row per feature as `<name> <stage> <enabled>`, and
+ * the `hooks` row is the effective answer. A missing CLI, an unreadable row or an
+ * unexpected value all answer `null`, which leaves the file-based verdict exactly as it
+ * was before this existed.
+ */
+export function probeCodexHooksFeature(
+  runCommand: CodexVersionRunner = execFileSync,
+): boolean | null {
+  try {
+    const output = process.platform === "win32"
+      ? runCommand("cmd.exe", ["/d", "/s", "/c", "codex features list"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 5000,
+      })
+      : runCommand("codex", ["features", "list"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 1500,
+      });
+    for (const line of String(output).split("\n")) {
+      const fields = line.trim().split(/\s+/);
+      if (fields[0] !== "hooks" || fields.length < 2) continue;
+      const enabled = fields[fields.length - 1].toLowerCase();
+      if (enabled === "true") return true;
+      if (enabled === "false") return false;
+      return null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseCodexContextModePluginRoot(raw: string): string | null {
   for (const line of raw.split(/\r?\n/)) {
     const match = line.match(/^\s*context-mode@context-mode\s+installed,\s+enabled\s+\S+\s+(.+?)\s*$/);
@@ -575,7 +618,13 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
 
   // ── Diagnostics (doctor) ─────────────────────────────────
 
-  validateHooks(pluginRoot: string): DiagnosticResult[] {
+  // `probeHooksFeature` is injected the way `probeCodexCliVersion` takes its runner:
+  // the CLI probe is the one part of this check that cannot be set up from a fixture.
+  // Optional, so the `DiagnosticAdapter` signature is unchanged for every caller.
+  validateHooks(
+    pluginRoot: string,
+    probeHooksFeature: () => boolean | null = probeCodexHooksFeature,
+  ): DiagnosticResult[] {
     const results: DiagnosticResult[] = [];
     const codexCliVersion = probeCodexCliVersion();
     let settingsRaw = "";
@@ -593,17 +642,23 @@ export class CodexAdapter extends BaseAdapter implements HookAdapter {
     try {
       settingsRaw = readFileSync(this.getSettingsPath(), "utf-8");
       settingsReadable = true;
-      const enabled = hasCodexHooksFeature(settingsRaw);
-      const deprecatedOnly = !enabled && hasDeprecatedCodexHooksFeature(settingsRaw);
+      const configured = hasCodexHooksFeature(settingsRaw);
+      const deprecatedOnly = !configured && hasDeprecatedCodexHooksFeature(settingsRaw);
+      // The file carries an override, the CLI carries the state. Only asked when the
+      // override is absent, so a configured install pays nothing for the probe.
+      const effective = configured ? true : probeHooksFeature();
+      const enabled = configured || effective === true;
 
       results.push({
         check: "Codex hooks feature flag",
         status: enabled ? "pass" : "fail",
-        message: enabled
+        message: configured
           ? `[features].hooks enabled in ${this.getSettingsPath()}`
-          : deprecatedOnly
-            ? `[features].codex_hooks is deprecated; [features].hooks is missing in ${this.getSettingsPath()}`
-            : `[features].hooks missing from ${this.getSettingsPath()}`,
+          : effective === true
+            ? `[features].hooks is not set in ${this.getSettingsPath()}; the installed Codex CLI reports hooks enabled`
+            : deprecatedOnly
+              ? `[features].codex_hooks is deprecated; [features].hooks is missing in ${this.getSettingsPath()}`
+              : `[features].hooks missing from ${this.getSettingsPath()}`,
         ...(enabled ? {} : { fix: "context-mode upgrade" }),
       });
     } catch {

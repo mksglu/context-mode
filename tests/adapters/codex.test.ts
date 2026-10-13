@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { CodexAdapter, parseCodexContextModePluginRoot, probeCodexCliVersion } from "../../src/adapters/codex/index.js";
+import { CodexAdapter, parseCodexContextModePluginRoot, probeCodexCliVersion, probeCodexHooksFeature } from "../../src/adapters/codex/index.js";
 import { resolveSessionDbPath, SessionDB } from "../../src/session/db.js";
 
 function writeCodexPluginManifest(pluginRoot: string): void {
@@ -719,6 +719,31 @@ trusted_hash = "sha256:stale"
       expect(results.some((result) => result.check === "Codex hooks feature flag")).toBe(true);
     });
 
+    it("does not fail the feature flag when the CLI reports hooks enabled", () => {
+      // config.toml without [features].hooks is the ordinary shape for a current
+      // Codex, which ships the feature on. Reading only the file reported a failure
+      // and recommended an upgrade for an installation that was working (#1152).
+      adapter.configureAllHooks("/ignored/plugin/root");
+      writeFileSync(join(codexDir, "config.toml"), "[some_other_section]\nkey = 1\n");
+
+      const enabled = adapter
+        .validateHooks("/ignored/plugin/root", () => true)
+        .find((result) => result.check === "Codex hooks feature flag");
+      expect(enabled?.status).toBe("pass");
+      expect(enabled?.message).toContain("Codex CLI reports hooks enabled");
+      expect(enabled?.fix).toBeUndefined();
+
+      // Unknown or disabled keeps the old verdict, so a genuinely-off feature is
+      // still reported with its fix.
+      for (const probe of [() => null, () => false] as Array<() => boolean | null>) {
+        const unknown = adapter
+          .validateHooks("/ignored/plugin/root", probe)
+          .find((result) => result.check === "Codex hooks feature flag");
+        expect(unknown?.status).toBe("fail");
+        expect(unknown?.fix).toBe("context-mode upgrade");
+      }
+    });
+
     it("passes when all required Codex hooks are configured", () => {
       adapter.configureAllHooks("/ignored/plugin/root");
       const results = adapter.validateHooks("/ignored/plugin/root");
@@ -1258,5 +1283,40 @@ describe("Codex matcher #547 — is_exact_matcher charset compliance", () => {
     );
     expect(mcpCatchAll, "expected an mcp__ catch-all matcher in hooks.json").toBeDefined();
     expect(mcpCatchAll).toMatch(EXACT_MATCHER_CHARSET);
+  });
+});
+
+// #1152: `[features].hooks` in config.toml is an override, not the state. Codex ships
+// the feature on, so a config without the key is the ordinary shape for a current CLI,
+// and reading only the file reported a failed check plus an upgrade recommendation for
+// an installation that was already working.
+describe("probeCodexHooksFeature", () => {
+  const FEATURES_LIST = [
+    "hooks          stable   true",
+    "plugin_hooks   removed  false",
+  ].join("\n") + "\n";
+
+  it("reads the hooks row from `codex features list`", () => {
+    expect(probeCodexHooksFeature(() => FEATURES_LIST)).toBe(true);
+  });
+
+  it("reports a disabled feature as disabled", () => {
+    expect(probeCodexHooksFeature(() => "hooks   stable   false\n")).toBe(false);
+  });
+
+  it("is not fooled by a similarly named feature", () => {
+    // `plugin_hooks` is a different row and must not answer for `hooks`.
+    expect(probeCodexHooksFeature(() => "plugin_hooks   removed  true\n")).toBeNull();
+  });
+
+  it("answers null when the CLI cannot be run", () => {
+    expect(probeCodexHooksFeature(() => {
+      throw new Error("codex: command not found");
+    })).toBeNull();
+  });
+
+  it("answers null for output it does not recognise", () => {
+    expect(probeCodexHooksFeature(() => "hooks   stable   maybe\n")).toBeNull();
+    expect(probeCodexHooksFeature(() => "")).toBeNull();
   });
 });
