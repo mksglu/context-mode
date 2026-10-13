@@ -1,6 +1,6 @@
-import { describe, test, expect, afterAll } from "vitest";
+import { describe, test, expect, afterAll, beforeAll } from "vitest";
 import { strict as assert } from "node:assert";
-import { existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, rmSync, mkdtempSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -1718,7 +1718,9 @@ describe("Temp Cleanup Resilience", () => {
           const fs = require('fs');
           const path = require('path');
           for (let j = 0; j < 3; j++) {
-            fs.writeFileSync(path.join(process.cwd(), 'f' + j + '.tmp'), 'data');
+            // TMPDIR is the per-run sandbox, which cleanup must remove; cwd is the
+            // project root since #788, so writing there would litter the repository.
+            fs.writeFileSync(path.join(process.env.TMPDIR, 'f' + j + '.tmp'), 'data');
           }
           console.log("ok-${i}");
         `,
@@ -2080,5 +2082,75 @@ describe("killSiblingMcpServers (#559)", () => {
     });
     // Process was already dead — counts as 0 since we never observed it alive.
     assert.equal(report.totalKilled, 0);
+  });
+});
+
+// A session's project directory can be removed while the MCP server keeps running
+// (the user deletes or moves the checkout). Node then fails every spawn with
+// "spawn <runtime> ENOENT", which wrongly blames the runtime binary.
+describe("executor with a project directory that no longer exists", () => {
+  const removed = mkdtempSync(join(tmpdir(), "ctx-gone-"));
+  rmSync(removed, { recursive: true, force: true });
+  const executor = new PolyglotExecutor({ runtimes, projectRoot: removed });
+
+  test("still runs code, in a temporary directory, and says why", async () => {
+    const result = await executor.execute({ language: "javascript", code: "console.log(process.cwd())", timeout: 20_000 });
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).not.toMatch(/ENOENT/);
+    expect(result.stderr).toContain(`project directory ${removed} no longer exists`);
+    // The sandbox is removed after the run, so compare the printed path, not a resolved one.
+    const ranIn = result.stdout.trim();
+    expect(ranIn).not.toBe(removed);
+    expect(ranIn.startsWith(realpathSync(tmpdir()))).toBe(true);
+    expect(ranIn).toContain(".ctx-mode-");
+  });
+
+  test("an explicit cwd override that is missing is reported the same way", async () => {
+    const live = new PolyglotExecutor({ runtimes });
+    const result = await live.execute({ language: "shell", code: "pwd", timeout: 20_000, cwd: removed });
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain(`project directory ${removed} no longer exists`);
+  });
+
+  test("an existing project directory is still used unchanged, with no note", async () => {
+    const here = mkdtempSync(join(tmpdir(), "ctx-here-"));
+    try {
+      const result = await new PolyglotExecutor({ runtimes, projectRoot: here })
+        .execute({ language: "shell", code: "pwd", timeout: 20_000 });
+      expect(realpathSync(result.stdout.trim())).toBe(realpathSync(here));
+      expect(result.stderr).not.toContain("no longer exists");
+    } finally {
+      rmSync(here, { recursive: true, force: true });
+    }
+  });
+});
+
+// The sandbox sets NO_COLOR=1 so tool output reaches the model as plain text. A parent
+// terminal that exports FORCE_COLOR (or CLICOLOR_FORCE) overrides NO_COLOR in Bun, Node
+// and most CLIs, so ANSI escapes leaked into results ("even sum: \x1b[33m2550\x1b[0m").
+describe("sandboxed output stays plain when the parent forces colour", () => {
+  const saved = { FORCE_COLOR: process.env.FORCE_COLOR, CLICOLOR_FORCE: process.env.CLICOLOR_FORCE };
+  beforeAll(() => {
+    process.env.FORCE_COLOR = "3";
+    process.env.CLICOLOR_FORCE = "1";
+  });
+  afterAll(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  test("javascript console.log of a number has no escape codes", async () => {
+    const r = await new PolyglotExecutor({ runtimes: detectRuntimes() })
+      .execute({ language: "javascript", code: 'console.log("even sum:", 2550)', timeout: 20_000 });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toBe("even sum: 2550\n");
+  });
+
+  test("the child sees no colour-forcing variables", async () => {
+    const r = await new PolyglotExecutor({ runtimes: detectRuntimes() })
+      .execute({ language: "shell", code: 'echo "[${FORCE_COLOR-unset}] [${CLICOLOR_FORCE-unset}] [$NO_COLOR]"', timeout: 20_000 });
+    expect(r.stdout.trim()).toBe("[unset] [unset] [1]");
   });
 });
