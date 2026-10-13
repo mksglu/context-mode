@@ -92,7 +92,7 @@ export const OPENCLAW_TOOL_DEFS: readonly OpenClawToolDef[] = [
       properties: {
         language: { type: "string", description: "Runtime language" },
         code: { type: "string", description: "Source code to execute" },
-        timeout: { type: "number", description: "Max execution time in ms" },
+        timeoutMs: { type: "number", description: "Max execution time in milliseconds" },
       },
       required: ["language", "code"],
       additionalProperties: true,

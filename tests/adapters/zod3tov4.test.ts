@@ -166,7 +166,7 @@ describe("zod3ShapeToV4", () => {
     const z3Shape = {
       language: z.enum(["javascript", "typescript", "python", "shell"]),
       code: z.string().describe("Source code"),
-      timeout: z.number().optional(),
+      timeoutMs: z.number().optional(),
       background: z.boolean().default(false),
       intent: z.string().optional().describe("Search intent"),
     };

@@ -78,7 +78,7 @@ allIssues
   .forEach(i => console.log(`  #${i.number} (${i.created_at.slice(0,10)}): ${i.title}`));
 ```
 > summary_prompt: "Summarize issue distribution by label, highlight stale issues, suggest priorities"
-> timeout_ms: 30000
+> timeoutMs: 30000
 
 ---
 
@@ -295,4 +295,4 @@ try {
 }
 ```
 > summary_prompt: "Report test pass/fail counts, list each failing test with its error message"
-> timeout_ms: 60000
+> timeoutMs: 60000
