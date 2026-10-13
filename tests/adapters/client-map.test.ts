@@ -78,6 +78,10 @@ describe("CLIENT_NAME_TO_PLATFORM", () => {
     expect(CLIENT_NAME_TO_PLATFORM["Kimi Code"]).toBe("kimi");
   });
 
+  it("maps opencode → opencode (#1255)", () => {
+    expect(CLIENT_NAME_TO_PLATFORM["opencode"]).toBe("opencode");
+  });
+
   it("returns undefined for unknown client name", () => {
     expect(CLIENT_NAME_TO_PLATFORM["some-unknown-client"]).toBeUndefined();
   });
