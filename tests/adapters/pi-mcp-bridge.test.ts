@@ -24,7 +24,7 @@ import "../setup-home";
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1129,4 +1129,283 @@ describe("foreground keep-alive — idle reaper scoped by session kind (#868)", 
     expect(live?.CONTEXT_MODE_BRIDGE_IDLE_MS).toBe("0");
     client.shutdown();
   });
+});
+// ── Abort propagation: execute() honors Pi's AbortSignal ──
+//
+// Real-world incident (2026-09-15): a model-generated ctx_execute script
+// entered an infinite loop; the executor grandchild burned a full core for
+// 14+ minutes while the bridge kept the tools/call pending forever, because
+// execute() dropped the AbortSignal Pi passes as its third argument ("the
+// current abort signal, or undefined when the agent is not streaming"). The
+// server's own graceful shutdown does not kill RUNNING foreground executors
+// either (it only reaps backgrounded pids), so the only reliable host-side
+// stop is killing the bridge server's process tree — executors are its
+// children.
+//
+// These tests pin four guarantees:
+//   1. A signal aborting mid-call kills the server tree (grandchild executor
+//      included) and rejects execute() with an abort-aware message instead
+//      of hanging forever.
+//   2. An already-aborted signal short-circuits without touching a healthy
+//      server.
+//   3. A signal that aborts AFTER the call settled must NOT kill the server
+//      (listener hygiene — the next turn keeps its bridge).
+//   4. killTree() settles in-flight requests via onExit() and the next
+//      request respawns (#583 self-heal applies to tree kills too).
+describe("bootstrapMCPTools — execute() abort signal propagation", () => {
+  const pidAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const waitForPidFile = async (path: string, timeoutMs = 10_000): Promise<number> => {
+    const start = Date.now();
+    for (;;) {
+      try {
+        const pid = Number(readFileSync(path, "utf-8").trim());
+        if (Number.isInteger(pid) && pid > 0) return pid;
+      } catch {
+        /* pid file not written yet */
+      }
+      if (Date.now() - start > timeoutMs) {
+        throw new Error(`pid file never appeared: ${path}`);
+      }
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  };
+
+  const waitForDead = async (pid: number, timeoutMs = 5_000): Promise<void> => {
+    const start = Date.now();
+    while (pidAlive(pid)) {
+      if (Date.now() - start > timeoutMs) {
+        throw new Error(`process ${pid} still alive after ${timeoutMs}ms`);
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  };
+
+  /** Fake MCP server that answers everything normally ("pong" tool). */
+  const writeGoodServer = (dir: string): string => {
+    const fakePath = join(dir, "good-server.mjs");
+    writeFileSync(
+      fakePath,
+      `
+      let line = "";
+      process.stdin.on("data", (chunk) => {
+        line += chunk.toString("utf-8");
+        let idx;
+        while ((idx = line.indexOf("\\n")) >= 0) {
+          const raw = line.slice(0, idx).trim();
+          line = line.slice(idx + 1);
+          if (!raw) continue;
+          let msg;
+          try { msg = JSON.parse(raw); } catch { continue; }
+          if (msg.method === "initialize") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: {} } }) + "\\n");
+          } else if (msg.method === "tools/list") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "pong", description: "p", inputSchema: { type: "object" } }] } }) + "\\n");
+          } else if (msg.method === "tools/call") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "pong" }] } }) + "\\n");
+          }
+        }
+      });
+      setInterval(() => {}, 60000);
+      `,
+      "utf-8",
+    );
+    return fakePath;
+  };
+
+  /**
+   * Fake MCP server reproducing the incident shape: on tools/call it
+   * spawns an idle GRANDCHILD process (standing in for a runaway
+   * executor), writes its pid to a file, and then never responds.
+   */
+  const writeStuckServer = (dir: string): { fakePath: string; serverPidFile: string; gcPidFile: string } => {
+    const fakePath = join(dir, "stuck-server.mjs");
+    const serverPidFile = join(dir, "stuck-server.pid");
+    const gcPidFile = join(dir, "executor.pid");
+    writeFileSync(
+      fakePath,
+      `
+      import { spawn } from "node:child_process";
+      import { writeFileSync } from "node:fs";
+      const SERVER_PID = ${JSON.stringify(serverPidFile)};
+      const GRANDCHILD_PID = ${JSON.stringify(gcPidFile)};
+      writeFileSync(SERVER_PID, String(process.pid));
+      let line = "";
+      process.stdin.on("data", (chunk) => {
+        line += chunk.toString("utf-8");
+        let idx;
+        while ((idx = line.indexOf("\\n")) >= 0) {
+          const raw = line.slice(0, idx).trim();
+          line = line.slice(idx + 1);
+          if (!raw) continue;
+          let msg;
+          try { msg = JSON.parse(raw); } catch { continue; }
+          if (msg.method === "initialize") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: {} } }) + "\\n");
+          } else if (msg.method === "tools/list") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "stuck", description: "s", inputSchema: { type: "object" } }] } }) + "\\n");
+          } else if (msg.method === "tools/call") {
+            // Spawn the "executor" grandchild, report its pid, and never
+            // respond — tools/call stays pending forever exactly like the
+            // incident.
+            const gc = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], { stdio: "ignore" });
+            writeFileSync(GRANDCHILD_PID, String(gc.pid));
+          }
+        }
+      });
+      setInterval(() => {}, 60000);
+      `,
+      "utf-8",
+    );
+    return { fakePath, serverPidFile, gcPidFile };
+  };
+
+  /** Fake MCP server whose FIRST incarnation hangs on tools/call and whose
+   *  respawned incarnation answers normally (for the #583 self-heal pin). */
+  const writeHangThenGoodServer = (dir: string): string => {
+    const fakePath = join(dir, "hang-then-good.mjs");
+    const markerPath = join(dir, "first-incarnation-marker");
+    writeFileSync(
+      fakePath,
+      `
+      import { existsSync, writeFileSync } from "node:fs";
+      const MARKER = ${JSON.stringify(markerPath)};
+      const isFirst = !existsSync(MARKER);
+      let line = "";
+      process.stdin.on("data", (chunk) => {
+        line += chunk.toString("utf-8");
+        let idx;
+        while ((idx = line.indexOf("\\n")) >= 0) {
+          const raw = line.slice(0, idx).trim();
+          line = line.slice(idx + 1);
+          if (!raw) continue;
+          let msg;
+          try { msg = JSON.parse(raw); } catch { continue; }
+          if (msg.method === "initialize") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: {} } }) + "\\n");
+          } else if (msg.method === "tools/list") {
+            process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "ping", description: "p", inputSchema: { type: "object" } }] } }) + "\\n");
+          } else if (msg.method === "tools/call") {
+            if (isFirst) {
+              // First incarnation: hang forever (the kill target).
+              writeFileSync(MARKER, "1");
+            } else {
+              process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "pong" }] } }) + "\\n");
+            }
+          }
+        }
+      });
+      setInterval(() => {}, 60000);
+      `,
+      "utf-8",
+    );
+    return fakePath;
+  };
+
+  const bootstrapWith = async (fakePath: string) => {
+    const { bootstrapMCPTools } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const registered: Array<{
+      name: string;
+      execute: (
+        toolCallId: string,
+        params: Record<string, unknown>,
+        signal?: AbortSignal,
+      ) => Promise<{ content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }>;
+    }> = [];
+    const pi = {
+      registerTool: (t: unknown) => registered.push(t as (typeof registered)[number]),
+    };
+    const handle = await bootstrapMCPTools(
+      pi as unknown as Parameters<typeof bootstrapMCPTools>[0],
+      fakePath,
+    );
+    return { handle, tool: (name: string) => registered.find((t) => t.name === name) };
+  };
+
+  it("aborts a stuck tools/call by killing the server tree, executor grandchild included", async () => {
+    const { fakePath, serverPidFile, gcPidFile } = writeStuckServer(scratch);
+    const { handle, tool } = await bootstrapWith(fakePath);
+    try {
+      const stuck = tool("stuck");
+      expect(stuck).toBeDefined();
+      const serverPid = await waitForPidFile(serverPidFile);
+      const controller = new AbortController();
+      const inFlight = stuck!.execute("t1", {}, controller.signal);
+      const gcPid = await waitForPidFile(gcPidFile);
+      expect(pidAlive(serverPid)).toBe(true);
+      expect(pidAlive(gcPid)).toBe(true);
+
+      controller.abort();
+      await expect(inFlight).rejects.toThrow(
+        /aborted: the MCP server process tree was killed/,
+      );
+      await waitForDead(serverPid);
+      await waitForDead(gcPid);
+    } finally {
+      handle.shutdown();
+    }
+  }, 30_000);
+
+  it("short-circuits an already-aborted signal without touching a healthy server", async () => {
+    const fakePath = writeGoodServer(scratch);
+    const { handle, tool } = await bootstrapWith(fakePath);
+    try {
+      const pong = tool("pong");
+      expect(pong).toBeDefined();
+      const controller = new AbortController();
+      controller.abort();
+      await expect(pong!.execute("t1", {}, controller.signal)).rejects.toThrow(
+        /aborted before execution/,
+      );
+      // The healthy bridge must survive: a follow-up call succeeds.
+      const r = await pong!.execute("t2", {}, undefined);
+      expect(r.content[0]?.text).toBe("pong");
+    } finally {
+      handle.shutdown();
+    }
+  }, 15_000);
+
+  it("does not kill the server when the signal aborts after the call settled", async () => {
+    const fakePath = writeGoodServer(scratch);
+    const { handle, tool } = await bootstrapWith(fakePath);
+    try {
+      const pong = tool("pong")!;
+      const controller = new AbortController();
+      await pong.execute("t1", {}, controller.signal);
+      // Late abort (a stale signal from a finished turn) must not kill
+      // the healthy bridge — listener hygiene in execute().
+      controller.abort();
+      await new Promise((r) => setTimeout(r, 150));
+      const r2 = await pong.execute("t2", {}, undefined);
+      expect(r2.content[0]?.text).toBe("pong");
+    } finally {
+      handle.shutdown();
+    }
+  }, 15_000);
+
+  it("killTree() settles in-flight requests and the next call respawns (#583 self-heal)", async () => {
+    const fakePath = writeHangThenGoodServer(scratch);
+    const { MCPStdioClient } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const client = new MCPStdioClient(fakePath);
+    client.start();
+    await client.initialize();
+
+    const inFlight = client.callTool("ping", {});
+    // Give the frame time to reach the first (hanging) incarnation.
+    await new Promise((r) => setTimeout(r, 200));
+    client.killTree();
+    await expect(inFlight).rejects.toThrow(/MCP server exited/);
+
+    // Self-heal: the next request respawns a fresh server that answers.
+    const r = await client.callTool("ping", {});
+    expect(r.content?.[0]?.text).toBe("pong");
+    client.shutdown();
+  }, 30_000);
 });
