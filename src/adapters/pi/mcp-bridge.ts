@@ -552,6 +552,7 @@ export class MCPStdioClient {
     method: string,
     params: unknown,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+    signal?: AbortSignal,
   ): Promise<T> {
     // Respawn-on-idle-exit (#583, #583-followup).
     //
@@ -601,6 +602,27 @@ export class MCPStdioClient {
           reject(e);
         },
       });
+      const onAbort = () => {
+        const handler = this.pending.get(id);
+        if (handler) {
+          this.pending.delete(id);
+          handler.reject(new Error(`MCP request cancelled: ${method}`));
+        } else {
+          reject(new Error(`MCP request cancelled: ${method}`));
+        }
+        try {
+          this.notify("notifications/cancelled", {
+            requestId: id,
+            reason: "Client cancelled request",
+          });
+        } catch {
+          // fire-and-forget
+        }
+      };
+      if (signal) {
+        if (signal.aborted) onAbort();
+        else signal.addEventListener("abort", onAbort, { once: true });
+      }
       const frame = JSON.stringify({ jsonrpc: "2.0", id, method, params });
       const rejectWrite = (err: Error) => {
         const handler = this.pending.get(id);
@@ -679,7 +701,11 @@ export class MCPStdioClient {
     return Array.isArray(result.tools) ? result.tools : [];
   }
 
-  async callTool(name: string, args: unknown): Promise<MCPCallResult> {
+  async callTool(
+    name: string,
+    args: unknown,
+    signal?: AbortSignal,
+  ): Promise<MCPCallResult> {
     // Respawn-on-idle-exit is now handled centrally in `request()`
     // (#583 follow-up). Originally patched here in #583 — moving it up
     // one layer covers `listTools` / `initialize` paths too, with a
@@ -697,6 +723,7 @@ export class MCPStdioClient {
       "tools/call",
       { name, arguments: args ?? {} },
       Number.POSITIVE_INFINITY,
+      signal,
     );
   }
 
@@ -784,6 +811,7 @@ export interface PiToolRegistration {
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
+    signal?: AbortSignal,
   ) => Promise<{
     content: Array<{ type: "text"; text: string }>;
     details: Record<string, unknown>;
@@ -1031,8 +1059,8 @@ export async function bootstrapMCPTools(
       parameters: tool.inputSchema ?? { type: "object", properties: {} },
       renderCall: createContextModeCallRenderer(tool.name),
       renderResult: createContextModeResultRenderer(tool.name),
-      async execute(_toolCallId, params) {
-        const result = await client.callTool(tool.name, params ?? {});
+      async execute(_toolCallId, params, signal: AbortSignal | undefined) {
+        const result = await client.callTool(tool.name, params ?? {}, signal);
         const text = (result.content ?? [])
           .filter((c) => c?.type === "text" && typeof c.text === "string")
           .map((c) => c.text as string)
