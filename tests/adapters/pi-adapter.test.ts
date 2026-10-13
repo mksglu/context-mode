@@ -1,11 +1,14 @@
 import "../setup-home";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { PiAdapter } from "../../src/adapters/pi/index.js";
 import { ClaudeCodeAdapter } from "../../src/adapters/claude-code/index.js";
 import { getAdapter, getSessionDirSegments } from "../../src/adapters/detect.js";
 import { hashProjectDirCanonical, resolveSessionDbPath } from "../../src/session/db.js";
+import { withIsolatedEnv } from "../util/isolated-env.js";
 
 describe("PiAdapter — Pi platform adapter", () => {
   let adapter: PiAdapter;
@@ -87,9 +90,9 @@ describe("PiAdapter — Pi platform adapter", () => {
       expect(eventsPath).not.toContain(".claude");
     });
 
-    it("settings path is ~/.pi/settings.json", () => {
+    it("settings path is ~/.pi/agent/settings.json", () => {
       expect(adapter.getSettingsPath()).toBe(
-        resolve(homedir(), ".pi", "settings.json"),
+        resolve(homedir(), ".pi", "agent", "settings.json"),
       );
     });
 
@@ -131,13 +134,79 @@ describe("PiAdapter — Pi platform adapter", () => {
 
   describe("settings I/O", () => {
     it("readSettings returns null when file missing (graceful)", () => {
-      // Fresh fake HOME — no ~/.pi/settings.json yet
+      // Fresh fake HOME — no ~/.pi/agent/settings.json yet
       expect(adapter.readSettings()).toBeNull();
     });
 
     it("writeSettings then readSettings round-trips", () => {
       adapter.writeSettings({ foo: "bar" });
       expect(adapter.readSettings()).toEqual({ foo: "bar" });
+    });
+  });
+
+  // ── Doctor diagnostics — issue #1168 (legacy ~/.pi/ paths) ──────
+  // Pi's settings live at ~/.pi/agent/settings.json and the extension is
+  // installed from the npm package (`pi install npm:context-mode`).
+  // ~/.pi/extensions/ is not a Pi discovery location and
+  // ~/.pi/settings.json is never read by Pi, so doctor checks that used
+  // either path always lied. Each test gets a fresh isolated HOME.
+
+  describe("doctor diagnostics (issue #1168)", () => {
+    let restore: () => void;
+
+    beforeEach(() => {
+      ({ restore } = withIsolatedEnv());
+    });
+
+    afterEach(() => {
+      restore();
+    });
+
+    function writePiSettings(content: unknown): void {
+      const dir = join(homedir(), ".pi", "agent");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "settings.json"), JSON.stringify(content), "utf-8");
+    }
+
+    it("validateHooks names the real install model, not ~/.pi/extensions/", () => {
+      const [result] = adapter.validateHooks("/irrelevant");
+      expect(result.status).toBe("pass");
+      expect(result.message).toContain("pi install npm:context-mode");
+      expect(result.message).not.toContain("~/.pi/extensions/");
+    });
+
+    it("checkPluginRegistration passes when packages lists context-mode", () => {
+      writePiSettings({ packages: ["npm:context-mode"] });
+      const result = adapter.checkPluginRegistration();
+      expect(result.status).toBe("pass");
+      expect(result.check).toBe("Pi extension registration");
+      expect(result.message).toContain("packages");
+    });
+
+    it("checkPluginRegistration fails with an actionable fix when unregistered", () => {
+      writePiSettings({ packages: ["npm:some-other-package"] });
+      const result = adapter.checkPluginRegistration();
+      expect(result.status).toBe("fail");
+      expect(result.fix).toContain("pi install npm:context-mode");
+    });
+
+    it("checkPluginRegistration warns (not fails) when Pi settings are unreadable", () => {
+      // Fresh isolated HOME — no ~/.pi/agent/settings.json at all.
+      const result = adapter.checkPluginRegistration();
+      expect(result.status).toBe("warn");
+      expect(result.message).toContain("settings.json");
+    });
+
+    it("getInstalledVersion reports the version of the running package", () => {
+      // The adapter resolves package.json relative to its own module, so
+      // the reported version is the version of the code that is actually
+      // running — not a manifest at a path Pi never creates. Derived from
+      // the repo's own package.json so the assertion survives version bumps.
+      const testDir = dirname(fileURLToPath(import.meta.url));
+      const expected = JSON.parse(
+        readFileSync(resolve(testDir, "..", "..", "package.json"), "utf-8"),
+      ).version;
+      expect(adapter.getInstalledVersion()).toBe(expected);
     });
   });
 });

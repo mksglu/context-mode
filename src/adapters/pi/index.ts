@@ -11,9 +11,10 @@
  *     capabilities so harness paths that walk the JSON-stdio matrix do not
  *     try to register stdio hooks for Pi.
  *   - Config root: ~/.pi/
- *   - Settings: ~/.pi/settings.json (kept lightweight — Pi does not
- *     prescribe a canonical settings file, but several internal tools
- *     write one; using settings.json keeps parity with Claude Code).
+ *   - Settings: ~/.pi/agent/settings.json (README's Pi section; `.pi/settings.json`
+ *     for project-local installs). Pi does not prescribe JSON-stdio hook entries;
+ *     the extension entry point is declared in the npm package's `pi.extensions`
+ *     manifest field and installed with `pi install npm:context-mode`.
  *   - Session dir: ~/.pi/context-mode/sessions/  (parallel to ~/.claude/,
  *     ~/.omp/) — this is the data-isolation contract from issue #473.
  *   - Instruction file: AGENTS.md (per configs/pi/AGENTS.md).
@@ -34,6 +35,7 @@ import {
   mkdirSync,
 } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
 import { BaseAdapter } from "../base.js";
@@ -119,7 +121,7 @@ export class PiAdapter extends BaseAdapter implements HookAdapter {
   // ── Configuration ──────────────────────────────────────
 
   getSettingsPath(): string {
-    return resolve(homedir(), ".pi", "settings.json");
+    return resolve(homedir(), ".pi", "agent", "settings.json");
   }
 
   getInstructionFiles(): string[] {
@@ -154,57 +156,62 @@ export class PiAdapter extends BaseAdapter implements HookAdapter {
         status: "pass",
         message:
           "Pi hooks are wired via the context-mode Pi extension " +
-          "(~/.pi/extensions/context-mode/), not via JSON-stdio.",
+          "(installed with `pi install npm:context-mode`), not via JSON-stdio.",
       },
     ];
   }
 
   checkPluginRegistration(): DiagnosticResult {
-    // Pi registers extensions by directory presence; the version-sync
-    // script writes ~/.pi/extensions/context-mode/package.json. We treat
-    // that file as the registration signal.
-    const pkgPath = resolve(
-      homedir(),
-      ".pi",
-      "extensions",
-      "context-mode",
-      "package.json",
-    );
+    // Pi installs the extension from the npm package declared in its
+    // `packages` config (README: `pi install npm:context-mode`, or
+    // `"packages": ["npm:context-mode"]` in ~/.pi/agent/settings.json).
+    // The registration signal is that `packages` entry — Pi has no
+    // ~/.pi/extensions/ discovery location, so a directory check there
+    // can never pass on a real install (issue #1168).
+    const settingsPath = this.getSettingsPath();
     try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-      if (pkg?.name === "context-mode") {
+      const raw = readFileSync(settingsPath, "utf-8");
+      const config = JSON.parse(raw) as { packages?: unknown };
+      const packages = Array.isArray(config.packages) ? config.packages : [];
+      const registered = packages.some(
+        (p) => typeof p === "string" && p.includes("context-mode"),
+      );
+      if (registered) {
         return {
           check: "Pi extension registration",
           status: "pass",
-          message: `context-mode extension installed at ${pkgPath}`,
+          message: `context-mode is registered in Pi packages (${settingsPath})`,
         };
       }
       return {
         check: "Pi extension registration",
-        status: "warn",
-        message: `Unexpected package at ${pkgPath}`,
+        status: "fail",
+        message: `context-mode is not listed in "packages" in ${settingsPath}`,
+        fix: "Run: pi install npm:context-mode",
       };
     } catch {
       return {
         check: "Pi extension registration",
-        status: "fail",
-        message: `context-mode not found at ${pkgPath}`,
-        fix: "Run: context-mode upgrade",
+        status: "warn",
+        message: `Could not read ${settingsPath}`,
       };
     }
   }
 
   getInstalledVersion(): string {
+    // Report the version of the context-mode package this adapter code
+    // ships with. The old code read ~/.pi/extensions/context-mode/package.json,
+    // which Pi never creates — the published npm package does not ship .pi/
+    // (issue #1168). The name check keeps a bundled or relocated copy from
+    // reporting some unrelated package.json it happens to sit under.
     try {
-      const pkgPath = resolve(
-        homedir(),
-        ".pi",
-        "extensions",
-        "context-mode",
-        "package.json",
-      );
+      const here = dirname(fileURLToPath(import.meta.url));
+      const pkgPath = resolve(here, "..", "..", "..", "package.json");
       const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-      return pkg.version ?? "unknown";
+      if (pkg?.name === "context-mode" && typeof pkg.version === "string") {
+        return pkg.version;
+      }
+      return "unknown";
     } catch {
       return "not installed";
     }
@@ -212,8 +219,9 @@ export class PiAdapter extends BaseAdapter implements HookAdapter {
 
   // ── Upgrade ────────────────────────────────────────────
   // Pi does NOT use settings.json hook entries. The extension is the
-  // integration point — there is nothing for the harness to register
-  // beyond copying the extension into ~/.pi/extensions/context-mode/.
+  // integration point — installed with `pi install npm:context-mode`,
+  // which wires the `pi.extensions` entry point from the npm package.
+  // There is nothing for the harness to register beyond that.
 
   configureAllHooks(_pluginRoot: string): string[] {
     return [];
@@ -224,8 +232,9 @@ export class PiAdapter extends BaseAdapter implements HookAdapter {
   }
 
   updatePluginRegistry(_pluginRoot: string, _version: string): void {
-    // Pi extension version is managed by scripts/version-sync.mjs writing
-    // to ~/.pi/extensions/context-mode/package.json. No-op here.
+    // Pi extension version tracks the npm package version; the repo's
+    // .pi/extensions/context-mode/ is the project-local dev extension,
+    // not an install target. No-op here.
   }
 
   getRoutingInstructions(): string {
