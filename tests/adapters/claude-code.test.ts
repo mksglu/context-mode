@@ -8,8 +8,10 @@ import { hashProjectDirCanonical, resolveSessionDbPath } from "../../src/session
 import { fakeHome, realHome } from "../setup-home";
 import {
   PRE_TOOL_USE_MATCHERS,
+  PRE_TOOL_USE_MATCHER_PATTERN,
   POST_TOOL_USE_MATCHERS,
   POST_TOOL_USE_MATCHER_PATTERN,
+  POST_TOOL_USE_MCP_CATCH_ALL_MATCHER,
   EXTERNAL_MCP_MATCHER_PATTERN,
 } from "../../src/adapters/claude-code/hooks.js";
 
@@ -490,9 +492,24 @@ describe("ClaudeCodeAdapter", () => {
 
       const settings = JSON.parse(readFileSync(join(tempDir, "settings.json"), "utf-8"));
       const preToolUseEntries = settings.hooks.PreToolUse;
-      // Should have the other plugin's hook + the fresh context-mode hook
-      expect(preToolUseEntries.length).toBe(2);
+      // The other plugin's hook is preserved verbatim, and the stale
+      // context-mode entry is replaced (not duplicated) by the fresh one.
+      // Since #1222 context-mode registers TWO PreToolUse entries — the joined
+      // tool-name list and the standalone external-MCP catch-all — so the
+      // total is the other plugin's hook plus those two.
       expect(preToolUseEntries[0]).toEqual(otherPluginHook);
+      const ctxEntries = preToolUseEntries.filter((e: { hooks: Array<{ command: string }> }) =>
+        e.hooks[0]?.command.includes("pretooluse.mjs"),
+      );
+      expect(ctxEntries.length).toBe(2);
+      expect(ctxEntries.map((e: { matcher: string }) => e.matcher)).toEqual([
+        PRE_TOOL_USE_MATCHER_PATTERN,
+        EXTERNAL_MCP_MATCHER_PATTERN,
+      ]);
+      // No stale path survives.
+      for (const entry of ctxEntries) {
+        expect(entry.hooks[0].command).not.toContain(staleRoot);
+      }
     });
 
     it("handles multiple stale versions from upgrade chains", () => {
@@ -545,9 +562,48 @@ describe("ClaudeCodeAdapter", () => {
       const changes = adapter.configureAllHooks(pluginRoot);
 
       const settings = JSON.parse(readFileSync(join(tempDir, "settings.json"), "utf-8"));
-      expect(settings.hooks.PreToolUse).toHaveLength(1);
+      // Two PreToolUse entries since #1222: the joined tool-name list and the
+      // standalone external-MCP catch-all.
+      expect(settings.hooks.PreToolUse.map((e: { matcher: string }) => e.matcher)).toEqual([
+        PRE_TOOL_USE_MATCHER_PATTERN,
+        EXTERNAL_MCP_MATCHER_PATTERN,
+      ]);
       expect(settings.hooks.SessionStart).toHaveLength(1);
       expect(changes.some((c: string) => c.includes("stale"))).toBe(false);
+    });
+
+    it("replaces a pre-#1222 bare `mcp__` settings entry instead of duplicating it", () => {
+      // A settings.json written before #1222 carries the dead bare `mcp__`
+      // matcher, which matches no tool on Claude Code v2.1.195+. Re-running
+      // setup/upgrade must heal it to `mcp__.*` rather than leave both.
+      writeFileSync(
+        join(tempDir, "settings.json"),
+        JSON.stringify({
+          hooks: {
+            PreToolUse: [
+              {
+                matcher: "Bash",
+                hooks: [{ type: "command", command: `node "${pluginRoot}/hooks/pretooluse.mjs"` }],
+              },
+              {
+                matcher: "mcp__",
+                hooks: [{ type: "command", command: `node "${pluginRoot}/hooks/pretooluse.mjs"` }],
+              },
+            ],
+          },
+        }),
+      );
+
+      adapter.configureAllHooks(pluginRoot);
+
+      const settings = JSON.parse(readFileSync(join(tempDir, "settings.json"), "utf-8"));
+      const matchers = settings.hooks.PreToolUse.map((e: { matcher: string }) => e.matcher);
+      expect(matchers).not.toContain("mcp__");
+      expect(matchers.filter((m: string) => m === EXTERNAL_MCP_MATCHER_PATTERN)).toHaveLength(1);
+      expect(matchers).toEqual([
+        PRE_TOOL_USE_MATCHER_PATTERN,
+        EXTERNAL_MCP_MATCHER_PATTERN,
+      ]);
     });
 
     it("skips settings.json registration when plugin hooks.json already has all required hooks", () => {
@@ -790,21 +846,67 @@ describe("ClaudeCodeAdapter", () => {
       expect(PRE_TOOL_USE_MATCHERS).toContain(EXTERNAL_MCP_MATCHER_PATTERN);
     });
 
-    it("EXTERNAL_MCP_MATCHER_PATTERN is the literal `mcp__` substring (#529, #547 hotfix)", () => {
+    it("EXTERNAL_MCP_MATCHER_PATTERN is `mcp__.*` — a regex, not the bare `mcp__` literal (#529, #547, #1222)", () => {
       // v1.0.124 used `mcp__(?!plugin_context-mode_)` — the same hooks.json
       // is bundled to Codex CLI whose Rust `regex` crate rejects look-around
-      // at boot. v1.0.125 drops the lookaround on both adapters; the hook
-      // BODY (`isExternalMcpTool()` in hooks/core/routing.mjs) filters
-      // context-mode's own MCP tools, so semantics are preserved.
-      expect(EXTERNAL_MCP_MATCHER_PATTERN).toBe("mcp__");
-      expect(EXTERNAL_MCP_MATCHER_PATTERN).toMatch(/^[A-Za-z0-9_|]+$/);
+      // at boot. v1.0.125 dropped the lookaround but left the bare literal
+      // `mcp__`, and #1222 is the consequence: since Claude Code v2.1.195 a
+      // matcher made only of `[A-Za-z0-9_|]` is compared as an EXACT string,
+      // so `mcp__` matches the tool literally named `mcp__` — which does not
+      // exist. The documented spelling for "every tool from any server" is
+      // `mcp__.*`, which puts the matcher on the unanchored-regex path.
+      // The hook BODY (`isExternalMcpTool()` in hooks/core/routing.mjs)
+      // filters context-mode's own MCP tools, so semantics are preserved.
+      expect(EXTERNAL_MCP_MATCHER_PATTERN).toBe("mcp__.*");
 
-      // Substring semantics: every external MCP tool name starts with `mcp__`.
-      expect("mcp__slack__list_channels".startsWith(EXTERNAL_MCP_MATCHER_PATTERN)).toBe(true);
-      expect("mcp__plugin_telegram__list_messages".startsWith(EXTERNAL_MCP_MATCHER_PATTERN)).toBe(true);
-      // Bare non-MCP tool names do not contain the prefix.
-      expect("Bash".startsWith(EXTERNAL_MCP_MATCHER_PATTERN)).toBe(false);
-      expect("Read".startsWith(EXTERNAL_MCP_MATCHER_PATTERN)).toBe(false);
+      // No look-around: the shared hooks.json must stay loadable by Codex's
+      // Rust `regex` crate, which rejects `(?!...)` at boot (#547).
+      expect(EXTERNAL_MCP_MATCHER_PATTERN).not.toMatch(/\(\?<?[=!]/);
+
+      // Unanchored-regex semantics: every external MCP tool name matches.
+      const re = new RegExp(EXTERNAL_MCP_MATCHER_PATTERN);
+      expect(re.test("mcp__slack__list_channels")).toBe(true);
+      expect(re.test("mcp__plugin_telegram__list_messages")).toBe(true);
+      expect(re.test("mcp__plugin_context-mode_context-mode__ctx_execute")).toBe(true);
+      // Bare non-MCP tool names do not match.
+      expect(re.test("Bash")).toBe(false);
+      expect(re.test("Read")).toBe(false);
+      expect(re.test("NotebookEdit")).toBe(false);
+    });
+
+    it("the catch-all is its OWN matcher entry, never a member of a joined list (#1222)", () => {
+      // Folding `mcp__.*` into `Bash|Read|...|mcp__.*` would push that whole
+      // list onto the unanchored-regex path, where `Read` also matches
+      // `NotebookRead` and `Edit` also matches `MultiEdit`. Both the
+      // PreToolUse and PostToolUse catch-alls must stay standalone entries.
+      // No entry in a shared tool-name list may contain regex
+      // metacharacters — that is what would drag the whole list onto the
+      // regex path. The catch-all is exempt only in PreToolUse, where it IS
+      // the list (one standalone entry per matcher).
+      for (const list of [PRE_TOOL_USE_MATCHERS, POST_TOOL_USE_MATCHERS]) {
+        for (const entry of list) {
+          if (entry === EXTERNAL_MCP_MATCHER_PATTERN) continue;
+          expect(entry, `${entry} would flip the whole matcher to regex`).toMatch(
+            /^[A-Za-z0-9_.-]+$/,
+          );
+        }
+      }
+      // PreToolUse registers the catch-all as a standalone entry; PostToolUse
+      // keeps it in its own separate group instead of the shared list.
+      expect(PRE_TOOL_USE_MATCHERS).toContain(EXTERNAL_MCP_MATCHER_PATTERN);
+      expect(POST_TOOL_USE_MATCHERS).not.toContain(EXTERNAL_MCP_MATCHER_PATTERN);
+      expect(POST_TOOL_USE_MCP_CATCH_ALL_MATCHER).toBe(EXTERNAL_MCP_MATCHER_PATTERN);
+
+      // Both joined patterns stay on Claude Code's exact-match path: they may
+      // contain only letters, digits, `_`, `-` and the `|` separator — no
+      // regex metacharacter. (`-` is exact-match-safe per the hooks
+      // reference; the plugin-scoped `mcp__plugin_…` names rely on it.)
+      const NO_REGEX_METACHARS = /^[A-Za-z0-9_|-]+$/;
+      expect(PRE_TOOL_USE_MATCHER_PATTERN).toMatch(NO_REGEX_METACHARS);
+      expect(POST_TOOL_USE_MATCHER_PATTERN).toMatch(NO_REGEX_METACHARS);
+      // Neither joined pattern may carry the catch-all's regex syntax.
+      expect(PRE_TOOL_USE_MATCHER_PATTERN).not.toContain(".*");
+      expect(POST_TOOL_USE_MATCHER_PATTERN).not.toContain("mcp__");
     });
 
     it("generateHookConfig includes the external MCP matcher entry (#529)", () => {
@@ -1042,6 +1144,83 @@ describe("ClaudeCodeAdapter", () => {
       expect(jsonMatchers).toEqual([...PRE_TOOL_USE_MATCHERS]);
     });
 
+    it("hooks/hooks.json PostToolUse keeps the catch-all out of the tool-name list (#1222 drift guard)", () => {
+      const repoRoot = resolve(__dirname, "..", "..");
+      const hooksJsonPath = join(repoRoot, "hooks", "hooks.json");
+      const parsed = JSON.parse(readFileSync(hooksJsonPath, "utf8")) as {
+        hooks: {
+          PostToolUse: Array<{
+            matcher: string;
+            hooks: Array<{ type: string; command: string }>;
+          }>;
+        };
+      };
+      const groups = parsed.hooks.PostToolUse;
+      const jsonMatchers = groups.map((entry) => entry.matcher);
+
+      // The external-MCP catch-all must be its own group, and the tool-name
+      // list must be exactly the joined POST_TOOL_USE_MATCHER_PATTERN.
+      expect(jsonMatchers).toContain(POST_TOOL_USE_MCP_CATCH_ALL_MATCHER);
+      expect(jsonMatchers).toContain(POST_TOOL_USE_MATCHER_PATTERN);
+      // Exactly one group carries the catch-all; it must not also appear as
+      // a member of the tool-name list.
+      expect(POST_TOOL_USE_MATCHER_PATTERN).not.toContain("mcp__");
+      expect(jsonMatchers.filter((m) => m === POST_TOOL_USE_MCP_CATCH_ALL_MATCHER))
+        .toHaveLength(1);
+
+      // Every group must point at posttooluse.mjs — a group that lost its
+      // wiring would silently stop capturing.
+      for (const entry of groups) {
+        expect(entry.hooks[0]?.command).toContain("posttooluse.mjs");
+      }
+    });
+
+    it("hooks/hooks.json catch-alls actually match real MCP tool names (#1222)", () => {
+      // The regression this guards: Claude Code v2.1.195+ evaluates a matcher
+      // made only of [A-Za-z0-9_|] as an EXACT string. The shipped bare
+      // `mcp__` therefore matched nothing. Evaluate every shipped group the
+      // way Claude Code does — exact-list when the charset is clean, else
+      // unanchored JS regex — and assert a real MCP tool name is selected.
+      const repoRoot = resolve(__dirname, "..", "..");
+      const parsed = JSON.parse(
+        readFileSync(join(repoRoot, "hooks", "hooks.json"), "utf8"),
+      ) as { hooks: Record<string, Array<{ matcher: string }>> };
+
+      const EXACT = /^[A-Za-z0-9_|]+$/;
+      const matches = (matcher: string, toolName: string): boolean => {
+        if (matcher === "" || matcher === "*") return true;
+        if (EXACT.test(matcher)) {
+          return matcher
+            .split(/[|,]/)
+            .some((part) => part.trim() === toolName);
+        }
+        return new RegExp(matcher).test(toolName);
+      };
+
+      const MCP_TOOL = "mcp__slack__list_channels";
+      for (const event of ["PreToolUse", "PostToolUse"]) {
+        const groups = parsed.hooks[event] ?? [];
+        expect(
+          groups.some((g) => matches(g.matcher, MCP_TOOL)),
+          `${event} has no group that matches ${MCP_TOOL}`,
+        ).toBe(true);
+      }
+
+      // And the exact-match tool groups must NOT over-match now that the
+      // catch-all lives on its own regex entry.
+      const postGroups = parsed.hooks.PostToolUse ?? [];
+      const exactGroups = postGroups.filter((g) => EXACT.test(g.matcher) && g.matcher !== "");
+      expect(exactGroups.length).toBeGreaterThan(0);
+      for (const group of exactGroups) {
+        for (const tool of ["NotebookRead", "MultiEdit", "BashOutput"]) {
+          expect(
+            matches(group.matcher, tool),
+            `${group.matcher} should not match ${tool}`,
+          ).toBe(false);
+        }
+      }
+    });
+
     it("hooks/hooks.json external MCP entry wires to pretooluse.mjs (#529)", () => {
       const repoRoot = resolve(__dirname, "..", "..");
       const hooksJsonPath = join(repoRoot, "hooks", "hooks.json");
@@ -1091,11 +1270,15 @@ describe("ClaudeCodeAdapter", () => {
         "TodoWrite", "TaskCreate", "TaskUpdate",
         "EnterPlanMode", "ExitPlanMode",
         "Skill", "Agent", "AskUserQuestion", "EnterWorktree",
-        "mcp__",
       ];
       for (const tool of required) {
         expect(POST_TOOL_USE_MATCHERS).toContain(tool);
       }
+      // The external-MCP catch-all moved out of this list into its own
+      // matcher group in #1222 — it is a regex, so joining it here would
+      // drag every name above onto the unanchored-regex path.
+      expect(POST_TOOL_USE_MATCHERS).not.toContain(EXTERNAL_MCP_MATCHER_PATTERN);
+      expect(POST_TOOL_USE_MCP_CATCH_ALL_MATCHER).toBe(EXTERNAL_MCP_MATCHER_PATTERN);
     });
 
     it("POST_TOOL_USE_MATCHERS does NOT contain tools that produce zero events (#229)", () => {

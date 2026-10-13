@@ -45,6 +45,7 @@ import {
   REQUIRED_HOOKS,
   PRE_TOOL_USE_MATCHERS,
   PRE_TOOL_USE_MATCHER_PATTERN,
+  EXTERNAL_MCP_MATCHER_PATTERN,
   isContextModeHook,
   isAnyContextModeHook,
   extractHookScriptPath,
@@ -567,25 +568,46 @@ export class ClaudeCodeAdapter extends ClaudeCodeBaseAdapter implements HookAdap
       const command = buildHookCommand(hookType, pluginRoot);
 
       if (hookType === HOOK_TYPES.PRE_TOOL_USE) {
-        const entry = {
-          matcher: PRE_TOOL_USE_MATCHER_PATTERN,
-          hooks: [{ type: "command", command }],
-        };
+        // The tool-name list and the external-MCP catch-all are registered as
+        // SEPARATE matcher entries (#1222). Joining them would put the whole
+        // pattern on Claude Code's unanchored-regex path, where `Read` also
+        // matches `NotebookRead` and `Edit` also matches `MultiEdit`. This
+        // mirrors hooks/hooks.json, which is the plugin-mode equivalent.
+        const entries = [
+          {
+            matcher: PRE_TOOL_USE_MATCHER_PATTERN,
+            hooks: [{ type: "command", command }],
+          },
+          {
+            matcher: EXTERNAL_MCP_MATCHER_PATTERN,
+            hooks: [{ type: "command", command }],
+          },
+        ];
         const existing = hooks.PreToolUse as Array<Record<string, unknown>> | undefined;
         if (existing && Array.isArray(existing)) {
-          const idx = existing.findIndex((e) =>
+          // Replace (or create) the context-mode-owned entry, then make sure
+          // the catch-all entry is present exactly once — a stale settings.json
+          // from before #1222 still carries the dead bare `mcp__` matcher.
+          const isCatchAll = (e: Record<string, unknown>): boolean =>
+            typeof e.matcher === "string" &&
+            (e.matcher === EXTERNAL_MCP_MATCHER_PATTERN || e.matcher === "mcp__");
+          const kept = existing.filter((e) => !isCatchAll(e));
+          let updated = false;
+          const idx = kept.findIndex((e) =>
             isContextModeHook(e as { hooks?: Array<{ command?: string }> }, hookType),
           );
           if (idx >= 0) {
-            existing[idx] = entry;
-            changes.push(`Updated existing ${hookType} hook entry`);
-          } else {
-            existing.push(entry);
-            changes.push(`Added ${hookType} hook entry`);
+            kept.splice(idx, 1, entries[0]);
+            updated = true;
           }
-          hooks.PreToolUse = existing;
+          hooks.PreToolUse = [...kept, ...entries.slice(updated ? 1 : 0)];
+          changes.push(
+            updated
+              ? `Updated existing ${hookType} hook entry`
+              : `Added ${hookType} hook entry`,
+          );
         } else {
-          hooks.PreToolUse = [entry];
+          hooks.PreToolUse = entries;
           changes.push(`Created ${hookType} hooks section`);
         }
       } else {
