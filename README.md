@@ -581,6 +581,42 @@ Full documentation: [`docs/adapters/openclaw.md`](docs/adapters/openclaw.md)
 </details>
 
 <details>
+<summary><strong>Hermes Agent</strong> — MCP data plane + native Python hooks</summary>
+
+**Prerequisites:** Node.js >= 22.5 and the published CLI (`npm install -g context-mode`).
+
+```bash
+hermes plugins install mksglu/context-mode --enable
+```
+
+Configure the canonical MCP server in `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  context_mode:
+    command: context-mode
+    args: []
+    enabled: true
+```
+
+Restart Hermes, then verify with `/ctx-doctor` and
+`/ctx-stats`; `/ctx-search <query>` searches the same MCP index.
+
+Hermes receives exact MCP names such as `mcp__context_mode__ctx_search`. The
+root plugin uses only public lifecycle hooks and `dispatch_tool`: it captures
+prompts/tool events in the existing SessionDB pipeline and replaces eligible
+oversized read-only results only after `mcp__context_mode__ctx_index` confirms
+success. All bridge subprocesses are bounded and fail open. Tool-input
+rewrites are not exposed by Hermes' public plugin API, so redirects become
+enforceable denials. Hermes reports compaction on `pre_llm_call`; the plugin
+runs the exact `compact` session-start path and injects its continuity context
+into that same model call. Storage is isolated at
+`$HERMES_HOME/context-mode` (normally `~/.hermes/context-mode`). Memory-provider
+and context-engine APIs are not used.
+
+</details>
+
+<details>
 <summary><strong>Codex CLI</strong> — MCP + hooks</summary>
 
 **Prerequisites:** Node.js >= 22.5 (or Bun), Codex CLI installed.

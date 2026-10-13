@@ -130,6 +130,7 @@ export interface PlatformEnvEntry {
  * `getEnvVarNames(p)` to get just the names (legacy `string[]` shape).
  */
 const _PLATFORM_ENV_VARS_RAW: ReadonlyArray<readonly [PlatformId, readonly PlatformEnvEntry[]]> = [
+
   // Order matters: forks listed BEFORE the fork's parent so collision
   // detection works. Every entry verified against platform's own runtime
   // source code (PR #376 follow-up: full audit, May 2026 — see git blame).
@@ -336,6 +337,7 @@ export function foreignIdentificationEnv(platform: PlatformId): Set<string> {
  */
 export function getSessionDirSegments(platform: string): string[] | null {
   switch (platform) {
+    case "hermes":           return [".hermes"];
     case "claude-code":      return [".claude"];
     case "gemini-cli":       return [".gemini"];
     case "antigravity":      return [".gemini"];
@@ -389,7 +391,7 @@ export function detectPlatform(clientInfo?: { name: string; version?: string }):
   const platformOverride = process.env.CONTEXT_MODE_PLATFORM;
   if (platformOverride) {
     const validPlatforms: PlatformId[] = [
-      "claude-code", "gemini-cli", "kilo", "opencode", "codex",
+      "hermes", "claude-code", "gemini-cli", "kilo", "opencode", "codex",
       "vscode-copilot", "jetbrains-copilot", "copilot-cli", "cursor", "antigravity", "antigravity-cli", "kiro", "pi", "omp", "zed", "qwen-code", "kimi",
     ];
     if (validPlatforms.includes(platformOverride as PlatformId)) {
@@ -638,6 +640,10 @@ export async function getAdapter(platform?: PlatformId): Promise<HookAdapter> {
   const target = platform ?? detectPlatform().platform;
 
   switch (target) {
+    case "hermes": {
+      const { HermesAdapter } = await import("./hermes/index.js");
+      return new HermesAdapter();
+    }
     case "claude-code": {
       const { ClaudeCodeAdapter } = await import("./claude-code/index.js");
       return new ClaudeCodeAdapter();
