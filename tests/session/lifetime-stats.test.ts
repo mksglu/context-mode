@@ -135,3 +135,50 @@ describe("getLifetimeStats — cross-session totals + auto-memory", () => {
     expect(stats.categoryCounts.rule).toBe(1);
   });
 });
+
+// Issue #1248: the stats heartbeat must not re-open a SessionDB whose files are unchanged,
+// because opening a WAL database, even read-only, rewrites its -shm file.
+describe("getLifetimeStats — skips unchanged SessionDBs (#1248)", () => {
+  test("re-opens only a DB whose .db/-wal stat changed, with the same totals", async () => {
+    const { loadDatabase } = await import("../../src/db-base.js");
+    const Real = loadDatabase() as any;
+    const opened: string[] = [];
+    const Counting = function (this: unknown, path: string, opts: unknown) {
+      opened.push(path);
+      return new Real(path, opts);
+    } as unknown as typeof Real;
+
+    const sessionsDir = tmpDir("sessions-cache");
+    const memoryRoot = tmpDir("projects-cache");
+    const pathA = tmpDbPath(sessionsDir, "proj-a");
+    const pathB = tmpDbPath(sessionsDir, "proj-b");
+    const dbA = new SessionDB({ dbPath: pathA });
+    cleanups.push(() => dbA.cleanup());
+    dbA.ensureSession("sa", "/p/a");
+    dbA.insertEvent("sa", makeEvent("/p/a/x.ts"), "PostToolUse");
+    dbA.close();
+    const dbB = new SessionDB({ dbPath: pathB });
+    cleanups.push(() => dbB.cleanup());
+    dbB.ensureSession("sb", "/p/b");
+    dbB.insertEvent("sb", makeEvent("/p/b/x.ts"), "PostToolUse");
+    dbB.close();
+
+    const opts = { sessionsDir, memoryRoot, loadDatabase: () => Counting };
+    const first = getLifetimeStats(opts);
+    expect(first.totalEvents).toBe(2);
+    expect(opened.sort()).toEqual([pathA, pathB].sort());
+
+    opened.length = 0;
+    const second = getLifetimeStats(opts);
+    expect(opened).toEqual([]);
+    expect(second).toEqual(first);
+
+    const dbB2 = new SessionDB({ dbPath: pathB });
+    dbB2.insertEvent("sb", makeEvent("/p/b/y.ts"), "PostToolUse");
+    dbB2.close();
+    opened.length = 0;
+    const third = getLifetimeStats(opts);
+    expect(opened).toEqual([pathB]);
+    expect(third.totalEvents).toBe(3);
+  });
+});

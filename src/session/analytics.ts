@@ -12,7 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { loadDatabase as loadDatabaseImpl } from "../db-base.js";
 import { ensureSessionEventsSchema } from "./db.js";
 import { resolveClaudeConfigDir } from "../util/claude-config.js";
@@ -700,6 +700,34 @@ function autoMemoryPrefix(filename: string): string {
   return m ? m[1].toLowerCase() : "other";
 }
 
+interface LifetimeDbTotals {
+  key: string | null;
+  events: number;
+  sessions: number;
+  categories: Record<string, number>;
+  rescueBytes: number;
+  firstEventMs: number;
+  projects: string[];
+}
+
+/** Per-SessionDB totals from the last scan, keyed by DB path (#1248). */
+const lifetimeDbCache = new Map<string, LifetimeDbTotals>();
+
+/** The .db and -wal size and mtime, or null when the .db cannot be stat'ed. statSync never writes. */
+function sessionDbStatKey(dbPath: string): string | null {
+  try {
+    const db = statSync(dbPath);
+    let wal = "-";
+    try {
+      const w = statSync(dbPath + "-wal");
+      wal = `${w.size}:${w.mtimeMs}`;
+    } catch { /* no WAL file */ }
+    return `${db.size}:${db.mtimeMs}|${wal}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Aggregate lifetime stats from all SessionDB files in `sessionsDir` and
  * all auto-memory markdown files under `memoryRoot/<project>/memory/`.
@@ -747,62 +775,86 @@ export function getLifetimeStats(opts?: {
       } catch { /* sqlite unavailable */ }
 
       if (DatabaseCtor) {
+        const seen = new Set<string>();
         for (const file of dbFiles) {
           const dbPath = join(sessionsDir, file);
-          try {
-            const sdb = new DatabaseCtor(dbPath, { readonly: true });
+          seen.add(dbPath);
+          // Issue #1248: opening a WAL database, even read-only, rewrites its -shm
+          // file. Reuse the totals of a DB whose .db and -wal stat is unchanged.
+          const key = sessionDbStatKey(dbPath);
+          let t = key === null ? undefined : lifetimeDbCache.get(dbPath);
+          if (!t || t.key !== key) {
+            t = { key, events: 0, sessions: 0, categories: {}, rescueBytes: 0, firstEventMs: Number.POSITIVE_INFINITY, projects: [] };
             try {
-              const ev = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_events").get() as { cnt: number } | undefined;
-              const ss = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_meta").get() as { cnt: number } | undefined;
-              totalEvents += ev?.cnt ?? 0;
-              totalSessions += ss?.cnt ?? 0;
-              // Per-category aggregation across every sidecar so the
-              // Persistent memory bars stay populated even when the
-              // current project's local DB is fresh / empty.
+              const sdb = new DatabaseCtor(dbPath, { readonly: true });
               try {
-                const catRows = sdb.prepare(
-                  "SELECT category, COUNT(*) AS cnt FROM session_events GROUP BY category",
-                ).all() as Array<{ category: string; cnt: number }>;
-                for (const row of catRows) {
-                  if (!row.category) continue;
-                  categoryCounts[row.category] = (categoryCounts[row.category] ?? 0) + (row.cnt ?? 0);
+                const ev = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_events").get() as { cnt: number } | undefined;
+                const ss = sdb.prepare("SELECT COUNT(*) AS cnt FROM session_meta").get() as { cnt: number } | undefined;
+                t.events += ev?.cnt ?? 0;
+                t.sessions += ss?.cnt ?? 0;
+                // Per-category aggregation across every sidecar so the
+                // Persistent memory bars stay populated even when the
+                // current project's local DB is fresh / empty.
+                try {
+                  const catRows = sdb.prepare(
+                    "SELECT category, COUNT(*) AS cnt FROM session_events GROUP BY category",
+                  ).all() as Array<{ category: string; cnt: number }>;
+                  for (const row of catRows) {
+                    if (!row.category) continue;
+                    t.categories[row.category] = (t.categories[row.category] ?? 0) + (row.cnt ?? 0);
+                  }
+                } catch {
+                  // older schema / no category column — ignore
                 }
-              } catch {
-                // older schema / no category column — ignore
+                // Lifetime rescue: compact-snapshot bytes restored across every DB.
+                // Without this, the lifetime $ silently undercounts the killer
+                // continuity-after-/compact feature.
+                try {
+                  const snap = sdb.prepare(
+                    "SELECT COALESCE(SUM(length(snapshot)), 0) AS bytes FROM session_resume WHERE consumed = 1",
+                  ).get() as { bytes: number } | undefined;
+                  if (snap?.bytes) t.rescueBytes += snap.bytes;
+                } catch { /* old schema */ }
+                // Earliest event timestamp + distinct project_dirs for the
+                // "since X · Y projects" lifetime narrative.
+                try {
+                  const mn = sdb.prepare(
+                    "SELECT MIN(created_at) AS t FROM session_events",
+                  ).get() as { t: string | null } | undefined;
+                  if (mn?.t) {
+                    const stamp = mn.t.endsWith("Z") ? mn.t : mn.t + "Z";
+                    const ms = Date.parse(stamp);
+                    if (Number.isFinite(ms) && ms < t.firstEventMs) t.firstEventMs = ms;
+                  }
+                } catch { /* old schema */ }
+                try {
+                  const projRows = sdb.prepare(
+                    "SELECT DISTINCT project_dir AS p FROM session_events WHERE project_dir != ''",
+                  ).all() as Array<{ p: string }>;
+                  for (const row of projRows) if (row.p) t.projects.push(row.p);
+                } catch { /* old schema */ }
+              } finally {
+                sdb.close();
               }
-              // Lifetime rescue: compact-snapshot bytes restored across every DB.
-              // Without this, the lifetime $ silently undercounts the killer
-              // continuity-after-/compact feature.
-              try {
-                const snap = sdb.prepare(
-                  "SELECT COALESCE(SUM(length(snapshot)), 0) AS bytes FROM session_resume WHERE consumed = 1",
-                ).get() as { bytes: number } | undefined;
-                if (snap?.bytes) rescueBytes += snap.bytes;
-              } catch { /* old schema */ }
-              // Earliest event timestamp + distinct project_dirs for the
-              // "since X · Y projects" lifetime narrative.
-              try {
-                const mn = sdb.prepare(
-                  "SELECT MIN(created_at) AS t FROM session_events",
-                ).get() as { t: string | null } | undefined;
-                if (mn?.t) {
-                  const stamp = mn.t.endsWith("Z") ? mn.t : mn.t + "Z";
-                  const ms = Date.parse(stamp);
-                  if (Number.isFinite(ms) && ms < firstEventMs) firstEventMs = ms;
-                }
-              } catch { /* old schema */ }
-              try {
-                const projRows = sdb.prepare(
-                  "SELECT DISTINCT project_dir AS p FROM session_events WHERE project_dir != ''",
-                ).all() as Array<{ p: string }>;
-                for (const row of projRows) if (row.p) distinctProjectsSet.add(row.p);
-              } catch { /* old schema */ }
-            } finally {
-              sdb.close();
+            } catch {
+              // missing tables / corrupt file — skip
             }
-          } catch {
-            // missing tables / corrupt file — skip
+            // Stat again after the read: opening the DB can itself create or touch its -wal.
+            t.key = sessionDbStatKey(dbPath);
+            if (t.key !== null) lifetimeDbCache.set(dbPath, t);
+            else lifetimeDbCache.delete(dbPath);
           }
+          totalEvents += t.events;
+          totalSessions += t.sessions;
+          for (const [cat, cnt] of Object.entries(t.categories)) {
+            categoryCounts[cat] = (categoryCounts[cat] ?? 0) + cnt;
+          }
+          rescueBytes += t.rescueBytes;
+          if (t.firstEventMs < firstEventMs) firstEventMs = t.firstEventMs;
+          for (const proj of t.projects) distinctProjectsSet.add(proj);
+        }
+        for (const cached of [...lifetimeDbCache.keys()]) {
+          if (dirname(cached) === sessionsDir && !seen.has(cached)) lifetimeDbCache.delete(cached);
         }
       }
     }
