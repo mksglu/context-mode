@@ -64,13 +64,43 @@ function quoteForPosixShell(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-/** Pure helper — exported for unit testing. Restores parent PATH after shell startup. */
+/**
+ * Convert a single Windows-style path fragment ("C:\\Program Files\\GitHub CLI")
+ * to the POSIX form Git Bash/MSYS resolves ("/c/Program Files/GitHub CLI").
+ * Exported for unit testing. See issue #1217.
+ */
+export function windowsPathToPosix(winPath: string): string {
+  const m = /^([A-Za-z]):[\\/](.*)$/.exec(winPath);
+  if (!m) return winPath.replace(/\\/g, "/");
+  return `/${m[1].toLowerCase()}/${m[2].replace(/\\/g, "/")}`;
+}
+
+/**
+ * Pure helper — exported for unit testing. Restores parent PATH after shell
+ * startup.
+ *
+ * Issue #1217: on win32, Git Bash's own profile-driven PATH reset (a
+ * minimal `/usr/bin:/bin`) shadows the real Windows PATH for any
+ * script-mediated (non-login) spawn — the sandbox's own
+ * `#buildSafeEnv()` already puts the real PATH on the child process env,
+ * but Git Bash's startup does not use it for command resolution inside a
+ * non-login script. Windows-only CLIs (e.g. `gh`) then silently fail to
+ * resolve. The Windows-style inherited PATH (semicolon-separated,
+ * backslashes) must be converted to POSIX form and *appended* to bash's
+ * own PATH — not substituted for it — so Git Bash's core utilities in
+ * /usr/bin keep resolving too.
+ */
 export function buildShellScriptContent(
   code: string,
   inheritedPath: string | undefined,
   platform: NodeJS.Platform,
 ): string {
-  if (platform === "win32" || !inheritedPath) return code;
+  if (!inheritedPath) return code;
+  if (platform === "win32") {
+    const posixPath = inheritedPath.split(";").filter(Boolean).map(windowsPathToPosix).join(":");
+    if (!posixPath) return code;
+    return `export PATH="$PATH:"${quoteForPosixShell(posixPath)}\n${code}`;
+  }
   return `export PATH=${quoteForPosixShell(inheritedPath)}\n${code}`;
 }
 
@@ -360,12 +390,17 @@ export class PolyglotExecutor {
       // uses its native Windows launcher (correct path handling) instead of
       // the broken mingw shell branch. No-op on non-Windows.
       const rewritten = rewriteWindowsBuildTools(code, process.platform);
-      const shellCode = isWin && isPowerShell(shellPath)
+      // Issue #1217: buildShellScriptContent's win32 PATH restoration is
+      // bash syntax (`export PATH=...`) — only apply it when the resolved
+      // shell runtime is actually bash-like. When it's PowerShell, leave
+      // the PowerShell-wrapped content untouched (as before #1217).
+      const usesPowerShell = isWin && isPowerShell(shellPath);
+      const shellCode = usesPowerShell
         ? buildPowerShellScriptContent(rewritten)
-        : rewritten;
+        : buildShellScriptContent(rewritten, process.env.PATH, process.platform);
       writeFileSync(
         fp,
-        buildShellScriptContent(shellCode, process.env.PATH, process.platform),
+        shellCode,
         { encoding: "utf-8", mode: 0o700 },
       );
     } else {
