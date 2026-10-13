@@ -234,10 +234,17 @@ function stripHeredocs(cmd) {
  * Removes heredocs, single-quoted strings, and double-quoted strings.
  * This prevents false positives like: gh issue edit --body "text with curl in it"
  */
-function stripQuotedContent(cmd) {
+function stripQuotedContent(cmd, preserveStdoutAliases = false) {
+  const strip = (quoted) => {
+    const value = quoted.slice(1, -1);
+    // Quoting does not change these destinations into files. Keep only these
+    // exact literals for output checks; other quoted arguments stay hidden.
+    if (preserveStdoutAliases && (value === "-" || value === "/dev/stdout")) return value;
+    return quoted[0] + quoted[0];
+  };
   return stripHeredocs(cmd)
-    .replace(/'[^']*'/g, "''")                    // single-quoted strings
-    .replace(/"[^"]*"/g, '""');                   // double-quoted strings
+    .replace(/'[^']*'/g, strip)                    // single-quoted strings
+    .replace(/"[^"]*"/g, strip);                  // double-quoted strings
 }
 
 /**
@@ -732,7 +739,7 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     // Algorithm: split chained commands, evaluate each segment independently.
     if (/(^|\s|&&|\||\;)(curl|wget)\s/i.test(stripped)) {
       // Split on chain operators (&&, ||, ;) to evaluate each segment
-      const segments = stripped.split(/\s*(?:&&|\|\||;)\s*/);
+      const segments = stripQuotedContent(command, true).split(/\s*(?:&&|\|\||;)\s*/);
       const hasDangerousSegment = segments.some(seg => {
         const s = seg.trim();
         // Only evaluate segments that contain curl or wget
