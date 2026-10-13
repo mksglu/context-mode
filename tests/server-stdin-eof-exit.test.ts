@@ -233,6 +233,7 @@ async function probe(clientName: string | null, delayed: boolean) {
     env: {
       HOME: home, USERPROFILE: home, PATH: process.env.PATH,
       SystemRoot: process.env.SystemRoot,
+      TMPDIR: process.env.TMPDIR, TEMP: process.env.TEMP, TMP: process.env.TMP,
       APPDATA: join(home, ".config"), LOCALAPPDATA: join(home, ".local"),
       XDG_CONFIG_HOME: join(home, ".config"),
     },
