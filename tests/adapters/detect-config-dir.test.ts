@@ -81,6 +81,18 @@ describe("detectPlatform — config directory branches", () => {
     expect(signal.reason).toContain(segs.join("/"));
   });
 
+  it("OpenCode clientInfo bypasses co-installed agent directories (#1255)", () => {
+    // Model the issue's home containing every conflicting marker. No
+    // filesystem lookup should happen when the handshake identifies the host.
+    existsSyncMock.mockReturnValue(true);
+    expect(detectPlatform({ name: "opencode" })).toEqual({
+      platform: "opencode",
+      confidence: "high",
+      reason: 'MCP clientInfo.name="opencode"',
+    });
+    expect(existsSyncMock).not.toHaveBeenCalled();
+  });
+
   it("falls back to claude-code low-confidence when no dirs exist", () => {
     existsSyncMock.mockReturnValue(false);
     const signal = detectPlatform();

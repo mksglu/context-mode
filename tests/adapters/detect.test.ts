@@ -415,6 +415,16 @@ describe("detectPlatform", () => {
     expect(signal.platform).toBe("antigravity");
   });
 
+  it("OpenCode clientInfo beats foreign env markers and explicit overrides (#1255)", async () => {
+    process.env.CLAUDE_PROJECT_DIR = "/some/project";
+    process.env.CONTEXT_MODE_PLATFORM = "antigravity-cli";
+    const signal = detectPlatform({ name: "opencode", version: "2.0.20" });
+    expect(signal.platform).toBe("opencode");
+    expect(signal.confidence).toBe("high");
+    expect(signal.reason).toContain('clientInfo.name="opencode"');
+    expect(await getAdapter(signal.platform)).toBeInstanceOf(OpenCodeAdapter);
+  });
+
   it("unknown clientInfo falls through to env var detection", () => {
     process.env.CLAUDE_PROJECT_DIR = "/some/project";
     const signal = detectPlatform({ name: "some-unknown-client", version: "1.0" });

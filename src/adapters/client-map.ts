@@ -26,6 +26,7 @@ export const CLIENT_NAME_TO_PLATFORM: Record<string, PlatformId> = {
   "Codex": "codex",
   "codex-mcp-client": "codex",
   "Kilo Code": "kilo",
+  "opencode": "opencode",
   "Kiro CLI": "kiro",
   "Pi CLI": "pi",
   "Pi Coding Agent": "pi",

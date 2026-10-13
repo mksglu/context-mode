@@ -302,6 +302,9 @@ function wrapToolHandler(
     // emits no further inbound messages. Symmetric end in finally (success+error).
     noteRequestStart();
     try {
+      // Stdio tools must not race async adapter detection after the handshake.
+      // Embedded plugin tools have no MCP handshake and leave this null.
+      await _mcpPlatformReady;
       return await handler(toolArgs);
     } catch (err) {
       const result = storageErrorResult(err);
@@ -527,6 +530,8 @@ function maybeIndexSessionEvents(store: ContentStore): void {
 // hardcoded configDir detection in tool handlers.
 
 let _detectedAdapter: HookAdapter | null = null;
+let _mcpPlatformReady: Promise<void> | null = null;
+let _mcpPlatformInitialized = false;
 
 /**
  * Resolve the Claude Code config root, honoring `CLAUDE_CONFIG_DIR` (incl.
@@ -542,7 +547,7 @@ async function getDiagnosticAdapter(): Promise<HookAdapter | null> {
   if (_detectedAdapter) return _detectedAdapter;
   try {
     const { getAdapter } = await import("./adapters/detect.js");
-    const signal = detectPlatform();
+    const signal = detectPlatform(server.server.getClientVersion() ?? undefined);
     return await getAdapter(signal.platform);
   } catch {
     return null;
@@ -562,7 +567,7 @@ function getDefaultSessionDir(): string {
   // Code/Codex (single-segment roots), reroute through their config-dir
   // contracts so the pre-detection window does not split-state with hooks.
   try {
-    const signal = detectPlatform();
+    const signal = detectPlatform(server.server.getClientVersion() ?? undefined);
     const segments = getSessionDirSegments(signal.platform);
     if (segments) {
       return resolveDefaultSessionDir({
@@ -632,7 +637,7 @@ export function getProjectDir(): string {
   let strictPlatform: PlatformId | undefined;
   let codexHome: string | undefined;
   try {
-    const detected = detectPlatform().platform;
+    const detected = detectPlatform(server.server.getClientVersion() ?? undefined).platform;
     strictPlatform = detected;
     if (detected === "claude-code") {
       transcriptsRoot = join(homedir(), ".claude", "projects");
@@ -5310,73 +5315,7 @@ server.registerTool(
 // Server startup
 // ─────────────────────────────────────────────────────────
 
-async function main() {
-  // Clean up stale DB files from previous sessions
-  const cleaned = cleanupStaleDBs();
-  if (cleaned > 0) {
-    console.error(`Cleaned up ${cleaned} stale DB file(s) from previous sessions`);
-  }
-
-  // MCP readiness sentinel path (#230, #347)
-  // Uses process.pid (not ppid) — hooks use directory-scan to find any live sentinel.
-  // Hardcoded /tmp on Unix to avoid TMPDIR mismatch (#347).
-  const mcpSentinelDir = process.platform === "win32" ? tmpdir() : "/tmp";
-  const mcpSentinel = join(mcpSentinelDir, `context-mode-mcp-ready-${process.pid}`);
-  // #844: handle to the periodic sentinel refresh timer (started after connect).
-  let sentinelRefresh: ReturnType<typeof setInterval> | undefined;
-
-  // Clean up own DB + backgrounded processes + preload script on shutdown
-  const shutdown = () => {
-    executor.cleanupBackgrounded();
-    if (_store) _store.close(); // persist DB for --continue sessions
-    try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ }
-    // Remove MCP readiness sentinel (#230)
-    try { unlinkSync(mcpSentinel); } catch { /* best effort */ }
-    // #844: stop refreshing the sentinel mtime on shutdown.
-    if (sentinelRefresh) clearInterval(sentinelRefresh);
-  };
-  const gracefulShutdown = async () => {
-    // Final stats flush — bypass throttle so the last 0-500ms of
-    // bytes_indexed / bytes_returned aren't silently lost on SIGTERM/SIGINT
-    // (PR #401 grill-me review B1: persistStats early-returns inside throttle
-    // window; gracefulShutdown previously did NOT bypass).
-    try {
-      _lastStatsPersist = 0;
-      persistStats();
-    } catch { /* best effort — never block shutdown */ }
-    shutdown();
-    process.exit(0);
-  };
-  process.on("exit", shutdown);
-  process.on("SIGINT", () => { gracefulShutdown(); });
-  process.on("SIGTERM", () => { gracefulShutdown(); });
-
-  // Lifecycle guard: detect parent death + stdin close to prevent orphaned processes (#103)
-  startLifecycleGuard({ onShutdown: () => gracefulShutdown() });
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-
-  // #854: refresh the bridge-child idle clock on each inbound MCP message so an
-  // abandoned bridge child (CONTEXT_MODE_BRIDGE_DEPTH>0) self-terminates instead
-  // of accumulating under a long-lived Pi/omp parent. Best-effort; no stdin touch.
-  attachMcpActivityTap(
-    transport as unknown as { onmessage?: (message: unknown, extra?: unknown) => unknown },
-  );
-
-  // Write MCP readiness sentinel (#230)
-  try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
-
-  // #844: refresh the sentinel mtime while the server is alive so readiness
-  // probes from a foreign PID namespace (shared /tmp) can trust a recent
-  // sentinel even when process.kill(pid, 0) cannot see this PID. The reader's
-  // freshness window is 90s (hooks/core/mcp-ready.mjs); refresh at 30s (3x).
-  // unref() so this timer never keeps the event loop alive on its own.
-  sentinelRefresh = setInterval(() => {
-    try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
-  }, 30_000);
-  sentinelRefresh.unref();
-
+async function initializeMcpPlatform(): Promise<void> {
   // Detect platform adapter — stored for platform-aware session paths
   try {
     const { detectPlatform, getAdapter } = await import("./adapters/detect.js");
@@ -5409,6 +5348,96 @@ async function main() {
       }
     }
   } catch { /* best effort — never block startup on a stats restore failure */ }
+}
+
+async function main() {
+  // Clean up stale DB files from previous sessions
+  const cleaned = cleanupStaleDBs();
+  if (cleaned > 0) {
+    console.error(`Cleaned up ${cleaned} stale DB file(s) from previous sessions`);
+  }
+
+  // MCP readiness sentinel path (#230, #347)
+  // Uses process.pid (not ppid) — hooks use directory-scan to find any live sentinel.
+  // Hardcoded /tmp on Unix to avoid TMPDIR mismatch (#347).
+  const mcpSentinelDir = process.platform === "win32" ? tmpdir() : "/tmp";
+  const mcpSentinel = join(mcpSentinelDir, `context-mode-mcp-ready-${process.pid}`);
+  // #844: handle to the periodic sentinel refresh timer (started after connect).
+  let sentinelRefresh: ReturnType<typeof setInterval> | undefined;
+
+  // Clean up own DB + backgrounded processes + preload script on shutdown
+  const shutdown = () => {
+    executor.cleanupBackgrounded();
+    if (_store) _store.close(); // persist DB for --continue sessions
+    try { unlinkSync(CM_FS_PRELOAD); } catch { /* best effort */ }
+    // Remove MCP readiness sentinel (#230)
+    try { unlinkSync(mcpSentinel); } catch { /* best effort */ }
+    // #844: stop refreshing the sentinel mtime on shutdown.
+    if (sentinelRefresh) clearInterval(sentinelRefresh);
+  };
+  const gracefulShutdown = async () => {
+    // Final stats flush — bypass throttle so the last 0-500ms of
+    // bytes_indexed / bytes_returned aren't silently lost on SIGTERM/SIGINT
+    // (PR #401 grill-me review B1: persistStats early-returns inside throttle
+    // window; gracefulShutdown previously did NOT bypass).
+    try {
+      if (_mcpPlatformInitialized) {
+        _lastStatsPersist = 0;
+        persistStats();
+      }
+    } catch { /* best effort — never block shutdown */ }
+    shutdown();
+    process.exit(0);
+  };
+  process.on("exit", shutdown);
+  process.on("SIGINT", () => { gracefulShutdown(); });
+  process.on("SIGTERM", () => { gracefulShutdown(); });
+
+  // Lifecycle guard: detect parent death + stdin close to prevent orphaned processes (#103)
+  startLifecycleGuard({ onShutdown: () => gracefulShutdown() });
+
+  // SDK connect() only starts the transport; getClientVersion() is not
+  // populated until initialize arrives (#1255). Register before connect so
+  // both immediate and delayed clients select the same canonical adapter.
+  let initializationStarted = false;
+  _mcpPlatformReady = new Promise<void>((resolveReady) => {
+    server.server.oninitialized = () => {
+      if (initializationStarted) return;
+      initializationStarted = true;
+      void initializeMcpPlatform().finally(() => {
+        _mcpPlatformInitialized = true;
+        resolveReady();
+      });
+    };
+  });
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+
+  // #854: refresh the bridge-child idle clock on each inbound MCP message so an
+  // abandoned bridge child (CONTEXT_MODE_BRIDGE_DEPTH>0) self-terminates instead
+  // of accumulating under a long-lived Pi/omp parent. Best-effort; no stdin touch.
+  attachMcpActivityTap(
+    transport as unknown as { onmessage?: (message: unknown, extra?: unknown) => unknown },
+  );
+
+  // Write MCP readiness sentinel (#230)
+  try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
+
+  // #844: refresh the sentinel mtime while the server is alive so readiness
+  // probes from a foreign PID namespace (shared /tmp) can trust a recent
+  // sentinel even when process.kill(pid, 0) cannot see this PID. The reader's
+  // freshness window is 90s (hooks/core/mcp-ready.mjs); refresh at 30s (3x).
+  // unref() so this timer never keeps the event loop alive on its own.
+  sentinelRefresh = setInterval(() => {
+    try { writeFileSync(mcpSentinel, String(process.pid)); } catch { /* best effort */ }
+  }, 30_000);
+  sentinelRefresh.unref();
+
+  // Transport connection does not wait for MCP initialize. Defer all
+  // platform-owned storage (including stats restore/heartbeat) until the
+  // handshake supplies clientInfo and the adapter is ready.
+  await _mcpPlatformReady;
 
   // Non-blocking version check — result stored for trackResponse warnings.
   // First fetch at startup, then refresh every hour so long-running sessions
