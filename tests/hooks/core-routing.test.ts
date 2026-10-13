@@ -175,6 +175,36 @@ describe("routePreToolUse", () => {
       expect(result!.action).toBe("modify");
     });
 
+    it.each([
+      ["curl -s -o", "-"],
+      ["curl -s --output", "/dev/stdout"],
+      ["wget -q -O", "-"],
+      ["wget -q --output-document", "/dev/stdout"],
+    ])("routes quoted stdout destinations for %s %s", (prefix, destination) => {
+      for (const quote of ["'", '"']) {
+        const result = routePreToolUse("Bash", {
+          command: `${prefix} ${quote}${destination}${quote} https://example.com`,
+        });
+        expect(result?.action).toBe("modify");
+      }
+    });
+
+    it.each([
+      'curl -s -o "/tmp/result.json" https://example.com',
+      "wget -q -O '/tmp/result.json' https://example.com",
+      `curl -s -o /tmp/result.json -H "literal -o /dev/stdout" https://example.com`,
+      `curl -s -o /tmp/result.json https://example.com && echo 'curl -s -o /dev/stdout'`,
+    ])("preserves quoted file-output and argument controls: %s", (command) => {
+      expect(routePreToolUse("Bash", { command })).toBeNull();
+    });
+
+    it("routes a quoted stdout destination after a safe download", () => {
+      const result = routePreToolUse("Bash", {
+        command: `curl -s -o /tmp/result.json https://example.com && wget -q -O "-" https://example.com`,
+      });
+      expect(result?.action).toBe("modify");
+    });
+
     it("blocks curl -o file WITHOUT silent flag", () => {
       const result = routePreToolUse("Bash", {
         command: "curl -L -o /tmp/file.tar.gz https://example.com/file.tar.gz",
