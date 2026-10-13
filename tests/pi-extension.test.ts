@@ -596,7 +596,7 @@ describe("Pi Extension", () => {
       // Verify the session was initialised with the file-derived ID by checking
       // that before_agent_start doesn't blow up (it needs a valid _sessionId).
       // In the new behavior, before_agent_start no longer returns systemPrompt;
-      // it stores context in _pendingContext for the context hook to inject.
+      // it stores context in _pendingContext for the context_with_system hook to inject.
       const result = await api._trigger("before_agent_start", {
         systemPrompt: "Base.",
       });
@@ -637,7 +637,7 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 5: Resume injection", () => {
-    it("delivers resume snapshot through context hook, not systemPrompt", async () => {
+    it('delivers resume snapshot through context_with_system hook (role:"system", issue #1263), not systemPrompt', async () => {
       await registerPiExtension(api);
 
       // Build up session state: capture events → compact → build resume
@@ -668,9 +668,9 @@ describe("Pi Extension", () => {
       });
       expect(result?.systemPrompt ?? null).toBe(null);
 
-      // The context hook should deliver the resume as a trailing user message.
+      // The context_with_system hook should deliver the resume as a trailing system message (issue #1263: previously role:"user", indistinguishable from real user input).
       const messages = [{ role: "system", content: "You are a helpful assistant." }];
-      const ctxResult = await api._trigger("context", { messages });
+      const ctxResult = await api._trigger("context_with_system", { messages });
 
       expect(ctxResult?.messages).toBe(messages);
       expect(messages).toHaveLength(2);
@@ -678,7 +678,7 @@ describe("Pi Extension", () => {
         role: "system",
         content: "You are a helpful assistant.",
       });
-      expect(messages[1].role).toBe("user");
+      expect(messages[1].role).toBe("system");
       expect(String(messages[1].content)).toContain("session_resume");
       expect(String(messages[1].content)).not.toContain("You are a helpful assistant.");
     });
@@ -716,13 +716,13 @@ describe("Pi Extension", () => {
         { role: "system", content: "Stable system prompt." },
         { role: "user", content: "Continue with the refactor." },
       ];
-      const ctxResult = await api._trigger("context", { messages });
+      const ctxResult = await api._trigger("context_with_system", { messages });
 
       expect(ctxResult?.messages).toBe(messages);
       expect(messages).toHaveLength(3);
       expect(messages[0]).toEqual({ role: "system", content: "Stable system prompt." });
       expect(messages[1]).toEqual({ role: "user", content: "Continue with the refactor." });
-      expect(messages[2].role).toBe("user");
+      expect(messages[2].role).toBe("system");
 
       const trailing = String(messages[2].content);
       expect(trailing).toContain("context-mode active");
@@ -901,7 +901,7 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 7: Routing block injection", () => {
-    it("injects lightweight routing anchor via context hook on first before_agent_start", async () => {
+    it('injects lightweight routing anchor via context_with_system hook (role:"system", #1263) on first before_agent_start', async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
         sessionManager: { getSessionFile: () => `routing-1-${Date.now()}-${Math.random()}` },
@@ -912,18 +912,18 @@ describe("Pi Extension", () => {
         systemPrompt: "Base prompt.",
       });
 
-      // context hook now injects the routing anchor as a user message at message end
+      // context_with_system hook now injects the routing anchor as a system message (#1263) at message end
       const messages: any[] = [];
-      const ctxResult = await api._trigger("context", { messages });
+      const ctxResult = await api._trigger("context_with_system", { messages });
 
       expect(ctxResult?.messages).toBeDefined();
       expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0].role).toBe("user");
+      expect(ctxResult.messages[0].role).toBe("system");
       expect(ctxResult.messages[0].content).toContain("context-mode active");
       expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
     });
 
-    it("re-injects the anchor via context hook on every subsequent call", async () => {
+    it("re-injects the anchor via context_with_system hook on every subsequent call", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {}, {
         sessionManager: { getSessionFile: () => `routing-2-${Date.now()}-${Math.random()}` },
@@ -936,7 +936,7 @@ describe("Pi Extension", () => {
 
       for (let call = 0; call < 3; call++) {
         await api._trigger("before_agent_start", { systemPrompt: "Base." });
-        const ctxResult = await api._trigger("context", { messages: [] });
+        const ctxResult = await api._trigger("context_with_system", { messages: [] });
         expect(ctxResult?.messages).toBeDefined();
         expect(ctxResult.messages[0]?.content).toContain(ANCHOR);
       }
@@ -984,7 +984,7 @@ describe("Pi Extension", () => {
   // ═══════════════════════════════════════════════════════════
 
   describe("Slice 9: active_memory injection", () => {
-    it("injects context every turn via context hook even when compact_count is 0", async () => {
+    it("injects context every turn via context_with_system hook even when compact_count is 0", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {
         sessionManager: { getSessionFile: () => `active-mem-1-${Date.now()}-${Math.random()}` },
@@ -1001,12 +1001,12 @@ describe("Pi Extension", () => {
         systemPrompt: "Base 2.",
       });
 
-      // context hook injects the pending context as a user message
-      const ctxResult = await api._trigger("context", { messages: [] });
+      // context_with_system hook injects the pending context as a system message (#1263)
+      const ctxResult = await api._trigger("context_with_system", { messages: [] });
 
       expect(ctxResult?.messages).toBeDefined();
       expect(ctxResult.messages.length).toBe(1);
-      expect(ctxResult.messages[0].role).toBe("user");
+      expect(ctxResult.messages[0].role).toBe("system");
       // The always-on injection path fires every turn — the routing anchor
       // proves context reaches the model even with compact_count 0.
       const content = String(ctxResult.messages[0].content);
@@ -1015,7 +1015,7 @@ describe("Pi Extension", () => {
       expect(content).not.toContain("<behavioral_directive>");
     });
 
-    it("caps active_memory at ≤ 2000 characters (via context hook)", async () => {
+    it("caps active_memory at ≤ 2000 characters (via context_with_system hook)", async () => {
       await registerPiExtension(api);
       await api._trigger("session_start", {
         sessionManager: { getSessionFile: () => `active-mem-2-${Date.now()}-${Math.random()}` },
@@ -1034,7 +1034,7 @@ describe("Pi Extension", () => {
         systemPrompt: "Base final.",
       });
 
-      const ctxResult = await api._trigger("context", { messages: [] });
+      const ctxResult = await api._trigger("context_with_system", { messages: [] });
       const content = String(ctxResult?.messages?.[0]?.content ?? "");
       // Issue #856 — flooding with role prompts must NOT accumulate any
       // behavioral_directive, and the per-turn injection must stay bounded
@@ -1069,7 +1069,7 @@ describe("Pi Extension", () => {
 
       // Subsequent turn rebuilds context.
       await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
-      const ctxResult = await api._trigger("context", { messages: [] });
+      const ctxResult = await api._trigger("context_with_system", { messages: [] });
       const content = String(ctxResult?.messages?.[0]?.content ?? "");
 
       // The stale role must NOT be pinned as a standing behavioral_directive.
@@ -1088,7 +1088,7 @@ describe("Pi Extension", () => {
         systemPrompt: "Base.",
       });
       await api._trigger("before_agent_start", { systemPrompt: "Base 2." });
-      const ctxResult = await api._trigger("context", { messages: [] });
+      const ctxResult = await api._trigger("context_with_system", { messages: [] });
       const content = String(ctxResult?.messages?.[0]?.content ?? "");
 
       // Role filtered out…
@@ -1097,6 +1097,60 @@ describe("Pi Extension", () => {
       // still reaches the model every turn (filter is role-specific, not a
       // blanket drop of the whole context injection).
       expect(content).toContain("context-mode active");
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // Slice 10 (#1263): injected context must be role:"system", not role:"user",
+  // so it is structurally distinguishable from real user input — not just
+  // relying on the model to read fixed banner wording correctly.
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Slice 10 (#1263): injected context is role:"system", not role:"user"', () => {
+    it('tags the injected routing anchor / active_memory / resume content as role:"system"', async () => {
+      await registerPiExtension(api);
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => `role-tag-1263-${Date.now()}-${Math.random()}` },
+      });
+
+      await api._trigger("before_agent_start", { systemPrompt: "Base." });
+
+      const messages: any[] = [];
+      const ctxResult = await api._trigger("context_with_system", { messages });
+
+      expect(ctxResult?.messages).toBeDefined();
+      expect(ctxResult.messages).toHaveLength(1);
+      // Root-cause regression: this MUST be "system", not "user" — a "user"
+      // tag here is indistinguishable from the human operator's own words
+      // once flattened into the transcript, which produced repeated false
+      // "this looks like prompt injection" reads from the model (#1263).
+      expect(ctxResult.messages[0].role).toBe("system");
+      expect(ctxResult.messages[0].role).not.toBe("user");
+    });
+
+    it("never reclassifies a real preceding user message — only the trailing injected entry changes", async () => {
+      await registerPiExtension(api);
+      await api._trigger("session_start", {}, {
+        sessionManager: { getSessionFile: () => `role-tag-1263-mixed-${Date.now()}-${Math.random()}` },
+      });
+
+      await api._trigger("before_agent_start", {
+        systemPrompt: "Base.",
+        prompt: "please fix the bug",
+      });
+
+      const messages: any[] = [
+        { role: "system", content: "Base." },
+        { role: "user", content: "please fix the bug" },
+      ];
+      const ctxResult = await api._trigger("context_with_system", { messages });
+
+      expect(ctxResult.messages).toHaveLength(3);
+      // Real user message: untouched, still role "user", content unchanged.
+      expect(ctxResult.messages[1]).toEqual({ role: "user", content: "please fix the bug" });
+      // Only the trailing synthetic entry context-mode appended is reclassified.
+      expect(ctxResult.messages[2].role).toBe("system");
+      expect(String(ctxResult.messages[2].content)).toContain("context-mode active");
     });
   });
 

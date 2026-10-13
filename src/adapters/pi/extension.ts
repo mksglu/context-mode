@@ -733,18 +733,38 @@ export default function piExtension(pi: any): void {
     }
   });
 
-  // ── 4a2. context — Inject active_memory + resume + behavioralDirective as message ──
-  // Uses the 'context' hook (like hindsight does) to append context at the END of
-  // messages rather than mutating systemPrompt at the beginning. This preserves
-  // prefix prompt cache for DeepSeek, Anthropic, and OpenAI.
-  pi.on("context", (event: any) => {
+  // ── 4a2. context_with_system — Inject active_memory + resume + behavioralDirective ──
+  // Issue #1263: this content (routing anchor, active_memory replay, resume
+  // snapshot, behavioralDirective) originates entirely from context-mode itself —
+  // never from real user input (see before_agent_start above: `_pendingContext` is
+  // built from `parts.slice(baseLen)`, which explicitly excludes `existingPrompt`).
+  // It was previously injected with role:"user" via the 'context' hook, which made
+  // it structurally indistinguishable from genuine user-authored text once
+  // flattened into the transcript — the root cause of repeated false "this looks
+  // like prompt injection" reads from the model, compounding the stale-replay
+  // defects tracked separately in #856 and #1259.
+  //
+  // Fix: inject as role:"system" via 'context_with_system' instead. That hook
+  // fires after every 'context' handler has already run (so ordering relative to
+  // other extensions doesn't matter) and its result is used as returned — unlike
+  // 'context', it is not scoped to "conversation messages" only, so a system-role
+  // entry here is not stripped when Pi restores prompt/tool state afterward. Mid-
+  // conversation system messages are a first-class, provider-handled Pi pattern
+  // (see SystemMessage in pi-coding-agent's extension types: "Later system
+  // messages change it: `content` adds instructions from that point on").
+  //
+  // This still appends at the END of the transcript rather than mutating the
+  // leading system message (messages[0]), so prefix prompt caching on DeepSeek,
+  // Anthropic, and OpenAI is preserved exactly as before — only the tag changes.
+  pi.on("context_with_system", (event: any) => {
     try {
       if (!_pendingContext) return;
       const ctx = _pendingContext;
       _pendingContext = "";
       event.messages.push({
-        role: "user",
+        role: "system",
         content: ctx,
+        timestamp: Date.now(),
       });
       return { messages: event.messages };
     } catch {
