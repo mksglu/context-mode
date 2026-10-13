@@ -1,5 +1,7 @@
 node_modules/
 build/
+# hooks/ensure-deps.mjs install backoff marker (runtime state)
+.ensure-deps-*.install-state.json
 packages/*/dist/
 *.tsbuildinfo
 .DS_Store

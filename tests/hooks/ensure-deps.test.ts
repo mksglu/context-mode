@@ -12,10 +12,10 @@
 
 import { describe, test, expect, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // ── Test harness script ──
 // Replicates ensure-deps.mjs logic but captures commands instead of executing.
@@ -576,5 +576,100 @@ describe("ensure-deps: better-sqlite3 binding self-heal (#408)", () => {
     expect(branch).toContain("copyFileSync(binaryPath, abiCachePath)");
     expect(branch).not.toMatch(/if\s*\(\s*!\s*existsSync\(binaryPath\)\s*\)/);
     expect(branch).not.toContain("binding present");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Install failure backoff — a failed `npm install` must not be retried on
+// every hook invocation (#1139, #1174: npm's Arborist can crash inside the
+// plugin dir; offline / registry errors fail the same way). Without a
+// backoff every hook call spawns a synchronous install that never converges.
+// Runs the REAL ensure-deps.mjs against a fake `npm` on PATH.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe.skipIf(process.platform === "win32")("ensure-deps: install failure backoff", () => {
+  const MARKER = ".ensure-deps-better-sqlite3.install-state.json";
+
+  function makePluginRoot(npmBody: string) {
+    const root = createTempRoot();
+    mkdirSync(join(root, "hooks"), { recursive: true });
+    writeFileSync(join(root, "hooks", "ensure-deps.mjs"), readFileSync(ensureDepsAbsPath, "utf-8"));
+    writeFileSync(join(root, "package.json"), '{"name":"fixture","version":"0.0.0"}');
+    const bin = join(root, "fake-bin");
+    mkdirSync(bin);
+    const log = join(root, "npm-calls.log");
+    writeFileSync(join(bin, "npm"), `#!/bin/sh\necho "$*" >> "${log}"\n${npmBody}\n`);
+    chmodSync(join(bin, "npm"), 0o755);
+    const hookUrl = pathToFileURL(join(root, "hooks", "ensure-deps.mjs")).href;
+    const run = () => {
+      const r = spawnSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(hookUrl)})`], {
+        cwd: root,
+        encoding: "utf-8",
+        timeout: 30_000,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+      expect(r.status).toBe(0);
+    };
+    const calls = () =>
+      existsSync(log) ? readFileSync(log, "utf-8").split("\n").filter(Boolean).length : 0;
+    return { run, calls, marker: join(root, MARKER) };
+  }
+
+  test("a failed install is attempted once, then skipped on later hook calls", () => {
+    const p = makePluginRoot(`echo "npm error Cannot read properties of null (reading 'edgesOut')" >&2; exit 1`);
+    p.run();
+    expect(p.calls()).toBe(1);
+    expect(existsSync(p.marker)).toBe(true);
+    const m = JSON.parse(readFileSync(p.marker, "utf-8"));
+    expect(m.node).toBe(process.version);
+    expect(m.error).toContain("edgesOut");
+    p.run();
+    p.run();
+    expect(p.calls()).toBe(1);
+  });
+
+  test("an install that exits 0 but leaves the package missing also backs off", () => {
+    const p = makePluginRoot("exit 0");
+    p.run();
+    p.run();
+    expect(p.calls()).toBe(1);
+  });
+
+  test("retries after the backoff window expires", () => {
+    const p = makePluginRoot("exit 1");
+    p.run();
+    const m = JSON.parse(readFileSync(p.marker, "utf-8"));
+    writeFileSync(p.marker, JSON.stringify({ ...m, at: m.at - 2 * 60 * 60 * 1000 }));
+    p.run();
+    expect(p.calls()).toBe(2);
+  });
+
+  test("retries immediately under a different Node version", () => {
+    const p = makePluginRoot("exit 1");
+    p.run();
+    const m = JSON.parse(readFileSync(p.marker, "utf-8"));
+    writeFileSync(p.marker, JSON.stringify({ ...m, node: "v0.0.0-other" }));
+    p.run();
+    expect(p.calls()).toBe(2);
+  });
+
+  test("an in-flight install is not duplicated; a stale in-flight marker is ignored", () => {
+    const p = makePluginRoot("exit 1");
+    writeFileSync(p.marker, JSON.stringify({ at: Date.now(), node: process.version, pending: true }));
+    p.run();
+    expect(p.calls()).toBe(0);
+    writeFileSync(p.marker, JSON.stringify({ at: Date.now() - 10 * 60 * 1000, node: process.version, pending: true }));
+    p.run();
+    expect(p.calls()).toBe(1);
+  });
+
+  test("a successful install clears the marker and stops further installs", () => {
+    const p = makePluginRoot(`mkdir -p node_modules/better-sqlite3 && echo "{}" > node_modules/better-sqlite3/package.json`);
+    writeFileSync(p.marker, JSON.stringify({ at: Date.now() - 2 * 60 * 60 * 1000, node: process.version, error: "old" }));
+    p.run();
+    expect(p.calls()).toBe(1);
+    expect(existsSync(p.marker)).toBe(false);
+    p.run();
+    expect(p.calls()).toBe(1);
   });
 });
