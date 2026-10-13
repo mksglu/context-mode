@@ -1177,6 +1177,8 @@ npm install -g context-mode
 
 Each `ctx_execute` call spawns an isolated subprocess with its own process boundary. Scripts can't access each other's memory or state. The subprocess runs your code, captures stdout, and only that stdout enters the conversation context. The raw data — log files, API responses, snapshots — never leaves the sandbox.
 
+Host-driven cancellation is supported end to end: when the MCP client aborts a request, the abort signal reaches `ctx_execute`/`ctx_execute_file` and kills the entire spawned process tree (children and grandchildren — via the dedicated process group on Unix, `taskkill /T` on Windows), never a broad name/port sweep. The per-call `.ctx-mode-*` temp directory is removed afterward, including its `ownership.json` sidecar — a metadata-only manifest (nonce, script path/hash, PIDs, language) that deliberately never contains the executed code, command, cwd, or environment.
+
 Twelve language runtimes are available: JavaScript, TypeScript, Python, Shell, Ruby, Go, Rust, PHP, Perl, R, Elixir, and C#. Bun is auto-detected for 3-5x faster JS/TS execution.
 
 Authenticated CLIs work through credential passthrough — `gh`, `aws`, `gcloud`, `kubectl`, `docker` inherit environment variables and config paths without exposing them to the conversation.
