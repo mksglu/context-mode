@@ -126,28 +126,23 @@ function runnableExists(cmd: string): boolean {
   }
 }
 
-function bunExists(): boolean {
-  if (commandExists("bun")) return true;
-  for (const p of bunFallbackPaths()) {
-    if (existsSync(p)) return true;
+/**
+ * Resolve a runnable Bun, not merely a file or version-manager shim.
+ * Prefer native installation paths (including Windows .exe paths, #506),
+ * but continue to PATH when an installed candidate no longer works.
+ */
+function resolveBunRuntime(): { command: string; version: string } | null {
+  for (const command of bunFallbackPaths()) {
+    if (!existsSync(command)) continue;
+    const version = getVersion(command);
+    if (version !== "unknown") return { command, version };
   }
-  return false;
-}
-
-function bunCommand(): string {
-  // Prefer absolute .exe paths so spawn() can run with shell:false on Windows.
-  // `where bun` may resolve to a `bun.cmd` npm shim (#506) which CreateProcess
-  // cannot execute directly — return the real .exe wherever we can find one.
-  for (const p of bunFallbackPaths()) {
-    if (existsSync(p)) return p;
+  // mise/asdf can leave a discoverable shim with no selected Bun version.
+  if (commandExists("bun")) {
+    const version = getVersion("bun");
+    if (version !== "unknown") return { command: "bun", version };
   }
-  // Bare name only if PATH resolution confirms it. On Windows this is
-  // typically a .cmd shim — the executor's needsShell list (which now
-  // includes "bun" — see #506) ensures shell:true so cmd.exe can resolve it.
-  if (commandExists("bun")) return "bun";
-  // Synthetic last-resort path for diagnostics/error messages.
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-  return isWindows ? `${home}\\.bun\\bin\\bun.exe` : `${home}/.bun/bin/bun`;
+  return null;
 }
 
 /** Fallback paths where Bun may be installed but not on PATH. */
@@ -246,19 +241,19 @@ function getVersion(cmd: string, args: string[] = ["--version"]): string {
       const cmdStr = [cmd, ...args]
         .map(a => /[\s"&|<>^()%!]/.test(a) ? JSON.stringify(a) : a)
         .join(" ");
-      return execSync(cmdStr, {
+      return String(execSync(cmdStr, {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 5000,
-      })
+      }))
         .trim()
         .split(/\r?\n/)[0];
     } else {
-      return execFileSync(cmd, args, {
+      return String(execFileSync(cmd, args, {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 5000,
-      })
+      }))
         .trim()
         .split(/\r?\n/)[0];
     }
@@ -332,8 +327,7 @@ export function resolveJavascriptRuntime(
 }
 
 export function detectRuntimes(): RuntimeMap {
-  const hasBun = bunExists();
-  const bun = hasBun ? bunCommand() : null;
+  const bun = resolveBunRuntime()?.command ?? null;
 
   // Honor SHELL env var when it points at a real binary AND the basename is
   // an allowlisted shell. Lets users with non-standard setups (custom bash,
@@ -392,7 +386,7 @@ export function detectRuntimes(): RuntimeMap {
 }
 
 export function hasBunRuntime(): boolean {
-  return bunExists();
+  return resolveBunRuntime() !== null;
 }
 
 /**
@@ -441,8 +435,8 @@ function bunVersionAtLeast1(versionOutput: string): boolean {
  * Resolve the JS runtime to use for spawning hook scripts (issue #738).
  *
  * Returns Bun when:
- *   - a bun binary is located via {@link bunCommand} (already handles the
- *     Windows .cmd shim trap from #506 + absolute path fallbacks), AND
+ *   - a runnable bun is located via {@link resolveBunRuntime} (including
+ *     the Windows .cmd shim trap from #506 + absolute path fallbacks), AND
  *   - `bun --version` exits 0 within the probe timeout, AND
  *   - the reported semver major is ≥1.
  *
@@ -508,39 +502,12 @@ export function resolveHookRuntime(): HookRuntime {
   if (_hookRuntimeCache) return _hookRuntimeCache;
   const nodeFallback: HookRuntime = liveNodeRuntime();
   try {
-    if (!bunExists()) {
+    const bun = resolveBunRuntime();
+    if (!bun || !bunVersionAtLeast1(bun.version)) {
       _hookRuntimeCache = nodeFallback;
       return _hookRuntimeCache;
     }
-    const bun = bunCommand();
-    // Re-use the same probe shape as getVersion (POSIX execFile, Windows
-    // execSync quoted string for DEP0190 compliance).
-    let versionOutput: string;
-    try {
-      if (process.platform === "win32") {
-        const out = execSync(`"${bun}" --version`, {
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-          timeout: 5000,
-        });
-        versionOutput = String(out);
-      } else {
-        const out = execFileSync(bun, ["--version"], {
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-          timeout: 5000,
-        });
-        versionOutput = String(out);
-      }
-    } catch {
-      _hookRuntimeCache = nodeFallback;
-      return _hookRuntimeCache;
-    }
-    if (!bunVersionAtLeast1(versionOutput)) {
-      _hookRuntimeCache = nodeFallback;
-      return _hookRuntimeCache;
-    }
-    _hookRuntimeCache = { path: bun, isBun: true };
+    _hookRuntimeCache = { path: bun.command, isBun: true };
     return _hookRuntimeCache;
   } catch {
     _hookRuntimeCache = nodeFallback;
