@@ -329,6 +329,8 @@ export function healBetterSqlite3Binding(pkgRoot) {
             "--no-save",
             "--no-audit",
             "--no-fund",
+            // --legacy-peer-deps: avoids the Arborist peer-set crash (#1174)
+            "--legacy-peer-deps",
           ],
           {
             cwd: pkgRoot,
@@ -398,7 +400,7 @@ export function healBetterSqlite3Binding(pkgRoot) {
     // own install script. Avoids the rebuild → node-gyp fall-through.
     try {
       execSync(
-        `${npmBin} install better-sqlite3 --no-package-lock --no-save --silent`,
+        `${npmBin} install better-sqlite3 --no-package-lock --no-save --silent --legacy-peer-deps`,
         { cwd: pkgRoot, stdio: "pipe", timeout: 120000, shell: true, env: childEnv },
       );
       if (fsExistsSync(bindingPath)) {
@@ -416,7 +418,7 @@ export function healBetterSqlite3Binding(pkgRoot) {
         "\n[context-mode] better-sqlite3 native binding could not be installed automatically.\n" +
         "  This is a known issue on Windows when prebuild-install is not on PATH (#408).\n" +
         condaHint +
-        "  Workaround: run `npm install better-sqlite3` from the plugin directory.\n\n",
+        "  Workaround: run `npm install better-sqlite3 --legacy-peer-deps` from the plugin directory.\n\n",
       );
     } catch { /* stderr unavailable — give up silently */ }
     if (condaActive && !safePython) {

@@ -73,4 +73,13 @@ describe("start.mjs MCP boot path", () => {
       ).toContain(`"${pkg}"`);
     }
   });
+
+  it("passes --legacy-peer-deps to every npm install it runs (#1174)", () => {
+    // npm 10.9.x Arborist crashes loading vitest >= 4.1's peer set in any
+    // install rooted at the plugin's package.json. Without the flag the
+    // detached installs die silently, and so does the full-build install that
+    // runs when server.bundle.mjs is missing.
+    expect(START_MJS).toMatch(/NPM_FLAGS\s*=\s*\[[^\]]*"--legacy-peer-deps"[^\]]*\]/);
+    expect(START_MJS).toMatch(/execSync\("npm install[^"]*--legacy-peer-deps[^"]*"/);
+  });
 });

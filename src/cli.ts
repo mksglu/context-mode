@@ -1108,7 +1108,7 @@ async function doctor(): Promise<number> {
           color.dim(
             `\n  Path: ${bsqPackageDir}` +
             "\n  Root cause: npm silently skipped better-sqlite3 because the package's `engines` field excluded the running Node (issue #514, e.g. Node 26 vs better-sqlite3@12.x)." +
-            `\n  Try (primary): cd "${pluginRootForDoctor}" && npm install better-sqlite3 --no-optional` +
+            `\n  Try (primary): cd "${pluginRootForDoctor}" && npm install better-sqlite3 --no-optional --legacy-peer-deps` +
             "\n  Try (fallback): /context-mode:ctx-upgrade",
           ),
       );
@@ -1131,7 +1131,7 @@ async function doctor(): Promise<number> {
             ` — ${message}` +
             color.dim(
               "\n  Root cause: prebuild-install was likely not on PATH, so install fell through to node-gyp without an MSVC toolchain (Windows)." +
-              "\n  Try (primary): npm install better-sqlite3   # re-resolves the dep tree and re-links the prebuild-install bin shim to fetch a prebuilt binary" +
+              "\n  Try (primary): npm install better-sqlite3 --legacy-peer-deps   # re-resolves the dep tree and re-links the prebuild-install bin shim to fetch a prebuilt binary" +
               "\n  Try (fallback): npm rebuild better-sqlite3",
             ),
         );
@@ -1360,7 +1360,8 @@ async function upgrade(opts?: { platform?: string }) {
       // Step 2: Install dependencies + build
       s.start("Installing dependencies & building");
       const vsYear = detectWindowsVsYear();
-      npmExecFile(["install", "--no-audit", "--no-fund"], {
+      // --legacy-peer-deps: npm 10.9's Arborist crashes on vitest >= 4.1's peer set (#1174).
+      npmExecFile(["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
         cwd: srcDir,
         stdio: "pipe",
         timeout: 120000,
@@ -1670,7 +1671,7 @@ async function upgrade(opts?: { platform?: string }) {
 
       // Install production deps
       s.start("Installing production dependencies");
-      npmExecFile(["install", "--production", "--no-audit", "--no-fund"], {
+      npmExecFile(["install", "--production", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
         cwd: pluginRoot,
         stdio: "pipe",
         timeout: 60000,
@@ -1755,7 +1756,7 @@ async function upgrade(opts?: { platform?: string }) {
             color.red("better-sqlite3 native binding: MISSING") +
               color.dim(`\n  Path: ${bsqBindingPath}`) +
               color.dim("\n  Cause: npm silently skipped the package (Node engine mismatch, issue #514)") +
-              color.dim(`\n  Try (primary): cd "${pluginRoot}" && npm install better-sqlite3 --no-optional`) +
+              color.dim(`\n  Try (primary): cd "${pluginRoot}" && npm install better-sqlite3 --no-optional --legacy-peer-deps`) +
               color.dim("\n  Try (fallback): /context-mode:ctx-doctor"),
           );
         }
