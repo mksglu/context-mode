@@ -6,11 +6,11 @@
 // release-out/server.mjs only (no src/ import, GS4). The windows-* cases skip on POSIX (D-M2-arch-1).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const IS_WIN = process.platform === "win32";
 
@@ -92,28 +92,64 @@ test("[M2] GP4/cancel-kills-child-tree-1s", async () => {
 });
 
 test("[M2] GP4/cold-start-no-path-probes", async () => {
-  // Skeptic-M2: a bare "< 1s" timing is a proxy, not a check of the named behaviour — any fast
-  // cold start passes it even if path probing happens, and a one-off slow CI box fails it even if
-  // there are none. Make the claim ("no synchronous PATH probing") the thing under test: pad PATH
-  // with many non-existent directories; a handler that statSyncs each PATH entry at cold start
-  // scales with PATH length, one that doesn't stays flat.
-  const bloatedPath = Array.from({ length: 400 }, (_, i) => path.join(tmpdir(), `cm-gp4-nonexistent-path-entry-${i}`)).join(path.delimiter);
-  const bloatedEnv = { ...ENV, PATH: `${bloatedPath}${path.delimiter}${ENV.PATH ?? ""}` };
-  const start = Date.now();
+  // #1159: no PATH probing at cold start. A wall-clock bound ("< 1s") is a proxy that a loaded
+  // machine fails even with no probes (D-M2-F1-4), so the probes themselves are counted: a preload
+  // in the server process logs every node:fs call on a path under one of 400 bogus PATH entries.
+  // initialize must log none; the first ctx_execute (lazy lookup, impl/03 §2) must log some, which
+  // proves the counter sees real probes.
+  const marker = "cm-gp4-nonexistent-path-entry-";
+  const bloatedPath = Array.from({ length: 400 }, (_, i) => path.join(tmpdir(), `${marker}${i}`)).join(path.delimiter);
+  const scratch = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-gp4-probe-")));
+  const probeLog = path.join(scratch, "probes.log");
+  const preload = path.join(scratch, "probe.mjs");
+  writeFileSync(probeLog, "");
+  writeFileSync(preload, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+const append = fs.appendFileSync;
+const MARK = ${JSON.stringify(marker)};
+const LOG = ${JSON.stringify(probeLog)};
+// The calls a PATH probe can make: stat/access/exists on a candidate file, sync or async.
+for (const key of ["statSync", "lstatSync", "accessSync", "existsSync", "stat", "lstat", "access"]) {
+  const fn = fs[key];
+  fs[key] = function (...args) {
+    if (typeof args[0] === "string" && args[0].includes(MARK)) append(LOG, key + "\\n");
+    return fn.apply(this, args);
+  };
+}
+syncBuiltinESMExports();
+`);
+  const bloatedEnv = {
+    ...ENV,
+    PATH: `${bloatedPath}${path.delimiter}${ENV.PATH ?? ""}`,
+    NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`,
+  };
   const client = spawnBundle(SERVER_BUNDLE, bloatedEnv);
-  await client.request("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "e2e", version: "0.0.0" } });
-  const elapsedMs = Date.now() - start;
-  await client.close();
-  assert.ok(elapsedMs < 1000, `cold start with a 400-entry bogus PATH must still reply in < 1s (no per-entry sync probing), took ${elapsedMs}ms`);
+  try {
+    await client.request("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "e2e", version: "0.0.0" } });
+    const atBoot = readFileSync(probeLog, "utf8");
+    assert.equal(atBoot, "", `cold start probed PATH entries before the initialize reply: ${atBoot.split("\n").length - 1} calls`);
+    const reply = await client.request("tools/call", { name: "ctx_execute", arguments: { language: "shell", code: "echo hi" } });
+    assert.equal(reply.isError, false, `first ctx_execute failed: ${reply.content?.[0]?.text}`);
+    assert.notEqual(readFileSync(probeLog, "utf8"), "", "probe counter saw no PATH lookup on first use; the check is blind");
+  } finally {
+    await client.close();
+  }
 });
 
-test("[M2] GP4/background-no-timeout-hang", async () => {
-  // Skeptic-M2: the reply shape alone does not prove the call didn't block. A handler that waits
-  // out the full "sleep 2" before replying would still match this golden byte-for-byte. Time it.
-  const start = Date.now();
-  const reply = await callExecute({ language: "shell", code: "sleep 2", background: true });
-  const elapsedMs = Date.now() - start;
-  assert.ok(elapsedMs < 1500, `background:true must return well before the 2s sleep finishes, took ${elapsedMs}ms`);
+test("[M2] GP4/background-no-timeout-hang", async (t) => {
+  // #975: background:true returns without waiting for the child. Event order, not a stopwatch on the
+  // reply (D-M2-F1-4): the child blocks until the test creates `go` and only then writes `done`. A
+  // handler that waits for the child can reply only after the child's own release (`go`, or its
+  // 600-step self-release as a hang guard), so `done` would exist at reply time. A correct handler
+  // replies while the child is still blocked.
+  const scratch = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-gp4-bg-")));
+  const go = path.join(scratch, "go");
+  const done = path.join(scratch, "done");
+  t.after(() => writeFileSync(go, ""));
+  const code = `i=0; while [ ! -e '${go}' ] && [ $i -lt 600 ]; do sleep 0.05; i=$((i+1)); done; : > '${done}'`;
+  const reply = await callExecute({ language: "shell", code, background: true });
+  assert.equal(existsSync(done), false, "background:true replied only after the child finished");
   assert.match(reply.content?.[0]?.text ?? "", /^started in background, pid \d+$/);
   const pid = (reply.content?.[0]?.text ?? "").slice("started in background, pid ".length);
   checkGolden("GP4", "background-no-timeout-hang", normalize(reply, { pid, home: HOME, proj: PROJECT }));

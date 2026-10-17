@@ -44,17 +44,26 @@ function makeFakeStdin(): NodeJS.ReadStream {
   return ee;
 }
 
-function waitForClose(
+// Resolves on the first of two events: the child closes, or the child's
+// preload prints `aliveMarker` (the storm ran and the process survived it).
+// No wall-clock bound: both outcomes are signals from the child itself.
+function waitForCloseOrMarker(
   child: ReturnType<typeof spawn>,
-  timeoutMs: number,
+  aliveMarker: string,
 ): Promise<{ closed: boolean; code: number | null; signal: NodeJS.Signals | null }> {
-  return new Promise((resolveClose) => {
-    const timer = setTimeout(() => {
-      resolveClose({ closed: false, code: child.exitCode, signal: child.signalCode });
-    }, timeoutMs);
+  return new Promise((resolveWait) => {
+    let stderr = "";
+    const onData = (chunk: Buffer) => {
+      stderr += chunk.toString();
+      if (stderr.includes(aliveMarker)) {
+        child.stderr?.off("data", onData);
+        resolveWait({ closed: false, code: child.exitCode, signal: child.signalCode });
+      }
+    };
+    child.stderr?.on("data", onData);
     child.once("close", (code, signal) => {
-      clearTimeout(timer);
-      resolveClose({ closed: true, code, signal });
+      child.stderr?.off("data", onData);
+      resolveWait({ closed: true, code, signal });
     });
   });
 }
@@ -162,30 +171,32 @@ describe("standalone MCP server fatal exception handling (#830)", () => {
 
     const scratch = mkdtempSync(join(tmpdir(), "ctx-issue-830-"));
     const preload = join(scratch, "storm.mjs");
+    const aliveMarker = "[issue-830] still alive after uncaught exception storm";
+    // The storm starts on the event "server registered its uncaughtException
+    // handler" (newListener), not on a poll with a deadline. If the process is
+    // still running after STORM_THROWS throws, the handler swallowed them:
+    // the preload prints the marker and the test fails at once.
     writeFileSync(preload, `
 const originalWrite = process.stderr.write.bind(process.stderr);
-process.stderr.write = (chunk, ...args) => {
-  if (String(chunk).includes("[context-mode] uncaughtException")) return true;
-  return true;
-};
+process.stderr.write = () => true;
 
+const STORM_THROWS = 200;
+let throws = 0;
 function storm() {
+  throws++;
+  if (throws > STORM_THROWS) {
+    originalWrite(${JSON.stringify(aliveMarker + "\n")});
+    return;
+  }
   setImmediate(storm);
   throw new Error("issue-830-storm");
 }
 
-function waitForHandler(deadline = Date.now() + 1500) {
-  if (process.listenerCount("uncaughtException") > 0 || Date.now() > deadline) {
-    setImmediate(storm);
-    return;
-  }
-  setTimeout(() => waitForHandler(deadline), 10);
-}
-
-waitForHandler();
-setTimeout(() => {
-  originalWrite("[issue-830] still alive after uncaught exception storm\\\\n");
-}, 1000);
+process.on("newListener", function onListener(event) {
+  if (event !== "uncaughtException") return;
+  process.off("newListener", onListener);
+  setImmediate(storm);
+});
 `);
 
     const child = spawn(process.execPath, ["--import", preload, serverBundle], {
@@ -194,11 +205,7 @@ setTimeout(() => {
     });
 
     try {
-      const result = await waitForClose(child, 2_000);
-      if (!result.closed) {
-        child.kill("SIGTERM");
-        await waitForClose(child, 1_000);
-      }
+      const result = await waitForCloseOrMarker(child, aliveMarker);
 
       expect(result.closed, "server survived the uncaught exception storm").toBe(true);
       expect(result.code, "fatal exception should not exit successfully").not.toBe(0);

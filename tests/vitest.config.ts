@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import v1Config from "../vitest.config.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
@@ -12,11 +13,27 @@ const LIST_PATH = resolve(__dirname, "keep-pass.list.json");
 // else included. root is pinned to the repo root since the paths in the
 // list (e.g. "tests/session/classifier.test.ts") are repo-relative, not
 // relative to this config file's own directory.
+//
+// The run envelope (pool: forks, maxWorkers cap from #258, test/hook/teardown
+// timeouts) comes from the v1 root config these 131 files were written
+// against. Without it vitest starts one fork per CPU and the spawn-heavy
+// files starve each other. retry is forced to 0: the gate must see a flake,
+// not absorb it (DEVIATIONS D-M2-F1-1).
 const keepPassList: string[] = JSON.parse(readFileSync(LIST_PATH, "utf8"));
+
+// Only the run-envelope fields are copied: a mergeConfig would concatenate
+// the v1 `include` glob with this list and run all 210 v1 files.
+const v1 = v1Config.test ?? {};
 
 export default defineConfig({
   root: REPO_ROOT,
   test: {
     include: keepPassList,
+    pool: v1.pool,
+    maxWorkers: v1.maxWorkers,
+    testTimeout: v1.testTimeout,
+    hookTimeout: v1.hookTimeout,
+    teardownTimeout: v1.teardownTimeout,
+    retry: 0,
   },
 });
