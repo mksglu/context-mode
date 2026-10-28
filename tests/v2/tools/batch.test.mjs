@@ -1,7 +1,7 @@
 // Unit tests for src/core/tools/batch.ts (impl/04 §3). ctx_batch: {commands[], queries[]}.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ctxBatch } from "../../../src/core/tools/batch.ts";
@@ -81,17 +81,24 @@ test("runPool capped === (jobs >= concurrency) (TECH-SPEC §5, #915, #932)", asy
   assert.equal(r.capped, true);
 });
 
-test("ctx_batch: one deadline bounds the whole handler, later commands never start (Q8, #947)", async () => {
+// D-CI-BATCH-DEADLINE-1: no wall-clock budget decides this test (a loaded Windows runner needs 2-3.5 s to start
+// Git Bash, run taskkill and drain the pipes, CI run 40613700600). The child sleeps CHILD_SLEEP_S, so "bounded"
+// means the handler returned while the child still had that long to run; "never start" is proven by a marker
+// file the third command would write. The test timeout only ends a run whose deadline never fires.
+const CHILD_SLEEP_S = 3600;
+test("ctx_batch: one deadline bounds the whole handler, later commands never start (Q8, #947)", { timeout: 120000 }, async () => {
   const { runBatch } = await import("../../../src/core/tools/batch.ts");
   const root = mkdtempSync(join(tmpdir(), "cm-ba6-"));
+  const marker = join(root, "third-command-ran");
   try {
     const start = Date.now();
-    const out = await runBatch({ commands: ["echo before-xyz", "sleep 5", "echo after-xyz"], queries: ["before-xyz", "after-xyz"] }, ctxFor(root), 800, C.RETENTION_SIZE_CAP_BYTES);
-    assert.ok(Date.now() - start < 3000);
+    const out = await runBatch({ commands: ["echo before-xyz", "sleep " + CHILD_SLEEP_S, "echo after-xyz; echo ran > '" + marker.split("\\").join("/") + "'"], queries: ["before-xyz", "after-xyz"] }, ctxFor(root), 800, C.RETENTION_SIZE_CAP_BYTES);
+    assert.ok(Date.now() - start < CHILD_SLEEP_S * 1000);
     assert.equal(out.isError, false);
     assert.ok(out.text.includes("Timed out after 800 ms"));
     assert.ok(out.text.includes("before-xyz"));
     assert.equal(out.text.includes("\nafter-xyz"), false);
+    assert.equal(existsSync(marker), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
