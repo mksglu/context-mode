@@ -37,7 +37,7 @@ import { closeSync } from "node:fs";
 if (process.env.CM_FAKE_BROKEN) process.exit(3);
 // CM_FAKE_NOSTDIN: a server that closes its input and then answers initialize. The CLI's next write hits a closed pipe
 // (EPIPE), the same thing a server that dies right after start does on a fast or loaded host.
-if (process.env.CM_FAKE_NOSTDIN) { closeSync(0); process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "context-mode", version: "2.0.0" } } }) + "\\n"); setTimeout(() => {}, 30000); }
+if (process.env.CM_FAKE_NOSTDIN) { try { closeSync(0); } catch { /* Windows may refuse; the server then never reads again anyway */ } process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "context-mode", version: "2.0.0" } } }) + "\\n"); await new Promise((r) => setTimeout(r, 30000)); process.exit(0); } // never reads again: no tools/list answer on any OS
 const tools = ${JSON.stringify([...TOOL_ORDER])};
 const delay = process.env.CM_FAKE_SLOW ? 4000 : 0;
 const rl = createInterface({ input: process.stdin });
@@ -402,11 +402,13 @@ test("[M7] cli/report-no-input: a FAIL without a TTY writes the redacted report,
 test("[M7] cli/report-server-closes-stdin: a server that closes its input is a FAIL row with a report, not a crash (D-CLI-EPIPE-1)", (t) => {
   const s = sandbox(t);
   codexHome(s);
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < (process.platform === "win32" ? 1 : 5); i++) { // win32 waits the 10 s verify timeout per run
     const r = run(s, ["setup", "--yes", "--agents", "codex"], { env: { CM_FAKE_NOSTDIN: "1" } });
     assert.equal(r.status, 1, r.stderr);
     assert.ok(!r.stderr.includes("node:events") && !r.stderr.includes("Unhandled"), r.stderr); // a thrown error, not a FAIL row
-    assert.match(r.stderr, /codex: FAIL \(mcp: server closed its input/, r.stderr);
+    assert.match(r.stderr, /codex: FAIL \(mcp: /, r.stderr);
+    // POSIX: closeSync(0) closes the read end for certain, so the CLI write is an EPIPE. Windows keeps the pipe: it times out.
+    if (process.platform !== "win32") assert.match(r.stderr, /mcp: server closed its input/, r.stderr);
     assert.match(r.stderr, /Debug report \(redacted\)/, r.stderr);
     assert.match(r.stderr, /gh issue create --repo mksglu\/context-mode/);
     assert.ok(readdirSync(path.join(s.home, ".context-mode", "reports")).length >= 1);
