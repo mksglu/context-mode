@@ -195,22 +195,3 @@ test("openDb from 8 processes at once on a fresh project: no 'database is locked
     rmSync(root, { recursive: true, force: true });
   }
 });
-
-// H5 (win-flaky): on Windows every COMMIT in WAL mode with the default synchronous=FULL is an fsync: 6 ms idle and
-// 25-86 ms on a loaded runner, about 5 commits per hook call (profile on windows-latest, DEVIATIONS D-HOOK-SYNC-1).
-// A writable connection must run synchronous=NORMAL (1): in WAL mode that keeps the file consistent after any crash.
-test("openDb: a writable connection runs synchronous=NORMAL (no fsync per commit), a fresh and an existing db", async () => {
-  const root = mkdtempSync(join(tmpdir(), "cm-db-"));
-  try {
-    const project = fakeProject(root, "b".repeat(16));
-    const fresh = await openDb(project);
-    assert.equal(fresh.raw.prepare("PRAGMA synchronous").get().synchronous, 1, "fresh db");
-    closeDb(fresh);
-    const again = await openDb(project);
-    assert.equal(again.raw.prepare("PRAGMA synchronous").get().synchronous, 1, "existing db");
-    assert.equal(again.raw.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
-    closeDb(again);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});

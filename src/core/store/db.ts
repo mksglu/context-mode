@@ -56,12 +56,6 @@ async function loadSqlite(): Promise<SqliteModule> {
   }
 }
 
-// H5 (DEVIATIONS D-HOOK-SYNC-1): synchronous is per connection, so every writable connection sets it, also on a db that
-// is already at SCHEMA_VERSION (the PRAGMAS block runs only on a migration). In WAL mode NORMAL syncs the WAL at
-// checkpoint, not at each COMMIT: no corruption after any crash, only the last commits can be lost on an OS crash or
-// power loss. FULL made each COMMIT an fsync: 6 ms idle and 25-86 ms loaded on windows-latest, about 5 per hook call.
-const SYNC_NORMAL = "PRAGMA synchronous = NORMAL";
-
 function readUserVersion(raw: DatabaseSync): number {
   const row = raw.prepare("PRAGMA user_version").get() as { user_version: number };
   return row.user_version;
@@ -78,7 +72,6 @@ function createAtomically(sqlite: SqliteModule, path: string): void {
   try {
     const raw = new sqlite.DatabaseSync(tmp, { timeout: DB_TIMEOUT_MS });
     try {
-      raw.exec(SYNC_NORMAL);
       applyMigrations(raw, readUserVersion(raw));
     } finally {
       raw.close(); // last connection: SQLite checkpoints and removes the temp -wal/-shm
@@ -99,7 +92,6 @@ function openWritable(sqlite: SqliteModule, path: string): DatabaseSync {
   try {
     if (!existsSync(path)) createAtomically(sqlite, path);
     raw = new sqlite.DatabaseSync(path, { timeout: DB_TIMEOUT_MS });
-    raw.exec(SYNC_NORMAL);
     applyMigrations(raw, readUserVersion(raw));
     return raw;
   } catch (err) {
