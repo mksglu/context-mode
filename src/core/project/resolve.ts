@@ -72,7 +72,8 @@ function dirOf(kind: ProjectSourceKind, src: ProjectSourceInput): string | undef
 // submodule). The common dir is <gitdir>/commondir when that file exists (linked worktree), else the
 // git dir. worktree = <d>. Same answers as `git rev-parse --git-common-dir --show-toplevel`.
 // D-M7-NG-1: no .git up to the filesystem root -> null; the caller keys the project by realpath(dir).
-function gitDirs(dir: string): { commonDir: string; worktree: string } | null {
+// D-CI-PERF-8: also returns the realpath of dir (`start`), so the non-git case does not realpath it twice.
+function gitDirs(dir: string): { commonDir: string; worktree: string; start: string } | { commonDir: null; start: string } {
   let cur: string;
   try {
     // .native: one canonical letter case, so one repo always hashes to one projectKey (review-M1 #1).
@@ -80,14 +81,15 @@ function gitDirs(dir: string): { commonDir: string; worktree: string } | null {
   } catch {
     throw new CtxError("NO_GIT_DIR", { path: dir });
   }
+  const start = cur;
   for (;;) {
     const gitDir = gitDirAt(join(cur, GIT_DIR_NAME));
     if (gitDir !== null) {
       const common = firstLine(join(gitDir, GIT_COMMONDIR_FILE));
-      return { commonDir: realpathSync.native(common === null ? gitDir : resolve(gitDir, common)), worktree: cur };
+      return { commonDir: realpathSync.native(common === null ? gitDir : resolve(gitDir, common)), worktree: cur, start };
     }
     const up = dirname(cur);
-    if (up === cur) return null;
+    if (up === cur) return { commonDir: null, start };
     cur = up;
   }
 }
@@ -151,20 +153,31 @@ export function resolveProject(agent: AgentId, src: ProjectSourceInput): Project
   // dir and worktree is the dir that holds the .git. None -> the project is realpath(dir) itself:
   // worktree and containmentRoot are that dir, and no git process runs.
   const repo = gitDirs(dir);
-  const plain = repo === null ? realpathSync.native(dir) : undefined;
-  const commonDir = repo?.commonDir ?? (plain as string);
-  const worktree = repo?.worktree ?? (plain as string);
-  // D-M7-HP-2 (GS6): plain-JS SHA-256, so the hook never loads node:crypto (~3 ms of process start).
-  const projectKey = sha256Hex(commonDir).slice(0, PROJECT_KEY_HEX_LEN);
-  // D-M1-T3-5: the config dir comes from the process env, not src.env (src.env picks the project only).
-  const projectDir = join(resolveConfigDir(process.env), PROJECTS_DIR_NAME, projectKey);
+  const plain = repo.commonDir === null ? repo.start : undefined;
+  const commonDir = repo.commonDir ?? repo.start;
+  const worktree = repo.commonDir === null ? repo.start : repo.worktree;
+  // D-CI-PERF-8: the store fields (key, dir, db path) are computed on first read and kept. A PreToolUse hook call
+  // reads only worktree, so it no longer hashes the key, creates the data root or realpaths it (3 fs calls, one
+  // mkdir with recursive, on every tool call). A missing HOME now throws NO_HOME at the first read, not here.
+  let key: string | undefined;
+  let pdir: string | undefined;
   // D-M3-F-3 (GS6): `git worktree list` runs on the first read of containmentRoot, not here. Only the
   // tools that check a path read it; the hook never does, so a hook call spawns git once, not twice.
   let root: string | undefined;
   return {
-    projectKey,
-    projectDir,
-    dbPath: join(projectDir, DB_FILE_NAME),
+    get projectKey(): string {
+      // D-M7-HP-2 (GS6): plain-JS SHA-256, so the hook never loads node:crypto (~3 ms of process start).
+      key ??= sha256Hex(commonDir).slice(0, PROJECT_KEY_HEX_LEN);
+      return key;
+    },
+    get projectDir(): string {
+      // D-M1-T3-5: the config dir comes from the process env, not src.env (src.env picks the project only).
+      pdir ??= join(resolveConfigDir(process.env), PROJECTS_DIR_NAME, this.projectKey);
+      return pdir;
+    },
+    get dbPath(): string {
+      return join(this.projectDir, DB_FILE_NAME);
+    },
     worktree,
     get containmentRoot(): string {
       root ??= plain ?? containmentRootOf(dir, commonDir);
