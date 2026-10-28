@@ -4,7 +4,8 @@
 //   plugins/claude-code/            the Claude Code plugin (package tree without its own marketplace file;
 //                                   SHA256SUMS rewritten for that tree, so ctx_upgrade verifies it)
 //   .claude-plugin/marketplace.json source "./plugins/claude-code" (/plugin marketplace add mksglu/context-mode)
-//   .agents/plugins/marketplace.json npm entry at this version (codex plugin marketplace add mksglu/context-mode)
+//   .agents/plugins/marketplace.json local source "./plugins/claude-code", the same built copy (codex plugin marketplace
+//                                   add mksglu/context-mode; owner decision 2026-10-28, context7 style, no npm entry)
 //   gemini-extension.json, hooks/hooks.json   Gemini CLI reads the repo root of the tagged release commit (no subfolder
 //   qwen-extension.json, hooks/qwen.json       option); Qwen reads the root when installed from the repo. Their paths point
 //                                              into the one built copy under plugins/claude-code (D-MO-1).
@@ -77,7 +78,7 @@ export function writeMainTree(pkg, repo, version) {
     interface: { displayName: SERVER_KEY },
     plugins: [{
       name: SERVER_KEY,
-      source: { source: "npm", package: SERVER_KEY, version },
+      source: { source: "local", path: PLUGIN_SOURCE },
       policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
       category: "Productivity",
     }],

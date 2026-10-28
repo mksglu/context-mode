@@ -38,11 +38,28 @@ else if (a[1] === "install") { const p = s.mkt.plugins[0]; const dir = path.join
 else if (a[1] === "list") process.stdout.write(JSON.stringify(s.id ? [{ id: s.id, installPath: s.dir }] : []));
 else if (a[1] === "validate") process.exit(fs.existsSync(path.join(a[2], ".claude-plugin", "plugin.json")) ? 0 : 1);
 else process.exit(2);`,
+  // codex: `plugin marketplace add <dir>`, `plugin add <id>`, `plugin list --json` (installed copy of a local source) and
+  // `mcp list --json` (reads the installed plugin's .codex-plugin/mcp.json, else the config.toml entry of the release layout).
+  // Every call is logged to $TMPDIR/codex-argv.log. An npm source cannot install here (exit 3), as with an offline registry.
   codex: `const fs = require("fs"), path = require("path");
-fs.writeFileSync(path.join(process.env.TMPDIR, "probe-codex.json"), JSON.stringify({ home: process.env.HOME, codexHome: process.env.CODEX_HOME }));
-const lines = fs.readFileSync(path.join(process.env.CODEX_HOME, "config.toml"), "utf8").split("\\n");
-const val = (k) => JSON.parse(lines.find((l) => l.startsWith(k + " = ")).slice(k.length + 3));
-process.stdout.write(JSON.stringify([{ name: lines[0].slice(1, -1).split(".")[1], transport: { type: "stdio", command: val("command"), args: val("args") } }]));`,
+const a = process.argv.slice(2), CH = process.env.CODEX_HOME;
+fs.writeFileSync(path.join(process.env.TMPDIR, "probe-codex.json"), JSON.stringify({ home: process.env.HOME, codexHome: CH }));
+fs.appendFileSync(path.join(process.env.TMPDIR, "codex-argv.log"), JSON.stringify(a) + "\\n");
+const st = path.join(CH, "stub-plugin.json");
+const s = fs.existsSync(st) ? JSON.parse(fs.readFileSync(st, "utf8")) : {};
+const save = () => fs.writeFileSync(st, JSON.stringify(s));
+if (a[0] === "plugin" && a[1] === "marketplace" && a[2] === "add") { s.root = a[3]; s.mkt = JSON.parse(fs.readFileSync(path.join(a[3], ".agents", "plugins", "marketplace.json"), "utf8")); save(); }
+else if (a[0] === "plugin" && a[1] === "add") { const e = s.mkt.plugins[0]; if (e.source.source !== "local") { process.stderr.write("unsupported source " + e.source.source + "\\n"); process.exit(3); }
+  const src = path.join(s.root, e.source.path), dir = path.join(CH, "plugins", "cache", s.mkt.name, e.name, "v");
+  fs.cpSync(src, dir, { recursive: true }); s.id = e.name + "@" + s.mkt.name; s.src = src; s.dir = dir; save(); }
+else if (a[0] === "plugin" && a[1] === "list") { const v = s.dir ? JSON.parse(fs.readFileSync(path.join(s.dir, ".codex-plugin", "plugin.json"), "utf8")).version : null;
+  process.stdout.write(JSON.stringify({ installed: s.id ? [{ pluginId: s.id, name: "context-mode", version: v, installed: true, enabled: true, source: { source: "local", path: s.src } }] : [] })); }
+else if (a[0] === "mcp" && s.dir) { const m = JSON.parse(fs.readFileSync(path.join(s.dir, ".codex-plugin", "mcp.json"), "utf8")).mcpServers["context-mode"];
+  process.stdout.write(JSON.stringify([{ name: "context-mode", transport: { type: "stdio", command: m.command, args: m.args, cwd: path.join(s.dir, m.cwd) } }])); }
+else if (a[0] === "mcp") { const lines = fs.readFileSync(path.join(CH, "config.toml"), "utf8").split("\\n");
+  const val = (k) => JSON.parse(lines.find((l) => l.startsWith(k + " = ")).slice(k.length + 3));
+  process.stdout.write(JSON.stringify([{ name: lines[0].slice(1, -1).split(".")[1], transport: { type: "stdio", command: val("command"), args: val("args") } }])); }
+else process.exit(2);`,
   gemini: `process.stderr.write("not logged in\\n"); process.exit(41);`,
   // qwen: `extensions install <dir>:<plugin> --consent` copies <dir> to $HOME/.qwen/extensions/<plugin>
   qwen: `const fs = require("fs"), path = require("path");
@@ -318,6 +335,12 @@ function mainFixture(t, opts) {
   mkdirSync(path.join(seed, ".claude-plugin"));
   writeFileSync(path.join(seed, ".claude-plugin", "marketplace.json"),
     JSON.stringify({ name: "context-mode", owner: { name: "o" }, plugins: [{ name: "context-mode", source: "./plugins/claude-code" }] }));
+  mkdirSync(path.join(plugin, ".codex-plugin"));
+  writeFileSync(path.join(plugin, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "context-mode", version: "0.0.0-dev", mcpServers: "./.codex-plugin/mcp.json" }));
+  writeFileSync(path.join(plugin, ".codex-plugin", "mcp.json"), JSON.stringify({ mcpServers: { "context-mode": { command: "node", args: ["./server.mjs", "--agent", "codex"], cwd: "." } } }));
+  mkdirSync(path.join(seed, ".agents", "plugins"), { recursive: true });
+  writeFileSync(path.join(seed, ".agents", "plugins", "marketplace.json"), JSON.stringify({ name: "context-mode", plugins: [{ name: "context-mode",
+    source: opts?.codexSource ?? { source: "local", path: "./plugins/claude-code" } }] }));
   writeFileSync(path.join(seed, "qwen-extension.json"), JSON.stringify({ name: "context-mode", mcpServers: { "context-mode": { command: "node", args: ["x/plugins/claude-code/server.mjs", "--agent", fx.qwenAgent ?? "qwen"] } } }));
   git(seed, "add", "-A");
   git(seed, "commit", "-q", "-m", "chore(release): v0.0.0");
@@ -332,11 +355,32 @@ test("[MAIN-ONLY] release/smoke --layout main: claude-code adds the cloned repo 
   assert.ok(r.out.startsWith("claude-code: PASS: installed context-mode@context-mode"), r.out);
 });
 
-test("[MAIN-ONLY] release/smoke --layout main: codex finds the server under plugins/claude-code and it answers initialize", { skip: !POSIX }, (t) => {
+// Owner decision 2026-10-28: Codex is installed the native way from the cloned main tree: marketplace add, plugin add
+// (a local subfolder source), then the installed copy is listed and its MCP server answers initialize.
+test("[MAIN-ONLY] release/smoke --layout main: codex runs marketplace add + plugin add on the clone, lists the local source, installed server answers initialize", { skip: !POSIX }, (t) => {
   const fx = mainFixture(t, { stubs: ["codex"] });
   const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "codex", "--repo", fx.repo);
   assert.equal(r.status, 0, r.err);
-  assert.ok(r.out.startsWith("codex: PASS: codex reads the context-mode entry"), r.out);
+  assert.ok(r.out.startsWith("codex: PASS: installed context-mode@context-mode"), r.out);
+  const calls = readFileSync(path.join(fx.tmp, "codex-argv.log"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(calls.slice(0, 2).map((c) => c.slice(0, 3).join(" ")), ["plugin marketplace add", "plugin add context-mode@context-mode"]);
+  assert.ok(calls.some((c) => c[0] === "plugin" && c[1] === "list"), "plugin list read back");
+  const probe = JSON.parse(readFileSync(path.join(fx.tmp, "probe-codex.json"), "utf8"));
+  assert.ok(!existsSync(path.join(probe.codexHome, "config.toml")), "no hand-written config.toml entry (native install only)");
+});
+
+test("[MAIN-ONLY] release/smoke --layout main: codex FAIL when the marketplace entry is an npm source", { skip: !POSIX }, (t) => {
+  const fx = mainFixture(t, { stubs: ["codex"], codexSource: { source: "npm", package: "context-mode", version: "0.0.0" } });
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "codex", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith("codex: FAIL: "), r.err);
+});
+
+test("[MAIN-ONLY] release/smoke --layout main: codex FAIL when the installed server does not answer as context-mode", { skip: !POSIX }, (t) => {
+  const fx = mainFixture(t, { stubs: ["codex"], serverName: "other" });
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "codex", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith("codex: FAIL: "), r.err);
 });
 
 test("[MAIN-ONLY] release/smoke --layout main: qwen installs <clone>:context-mode and the installed server runs --agent qwen", { skip: !POSIX }, (t) => {

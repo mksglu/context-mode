@@ -4,7 +4,7 @@
 // Usage: node scripts/release/smoke.mjs --ref <branch> --agent <claude-code|codex|gemini|qwen> [--repo <git url>] [--layout release|main]
 // --layout main (MAIN-ONLY, D-MO-1): the ref holds the main tree (built plugin in plugins/claude-code, root manifests
 // for Gemini and Qwen, marketplace on the repo root). claude-code adds a clone of the ref as marketplace, codex
-// reads the server under plugins/claude-code, qwen installs <clone>:context-mode and checks --agent qwen.
+// runs `plugin marketplace add` + `plugin add` on the clone (local subfolder source) and starts the installed server, qwen installs <clone>:context-mode and checks --agent qwen.
 // Exit 0 = PASS or SKIPPED (gemini CLI absent or failing, tier-2 per GS2); exit 1 = FAIL.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -145,9 +145,32 @@ function handshake(env, cwd, command, args) {
 }
 
 // codex (§11.2 step 2, A2): a git checkout of <repo>@<ref> plus a plain config.toml entry under CODEX_HOME.
-function codex(env, home, a) {
+// --layout main (owner decision 2026-10-28, context7 style): the native commands run on a clone of the ref. The marketplace
+// entry is a local subfolder source; `plugin list --json` must show it installed and enabled, and the MCP server of the
+// installed copy (read back by `mcp list --json`, started in its own cwd) must answer initialize.
+function codexMain(env, home, a) {
   const dir = cloneRef(env, home, a, SERVER_KEY);
-  const server = path.join(dir, ...(a.layout === MAIN_LAYOUT ? [MAIN_PLUGIN_DIR] : []), SERVER_ENTRY_FILE);
+  const codexHome = path.join(home, ...AGENT_HOME_DIR.codex);
+  fs.mkdirSync(codexHome, { recursive: true });
+  const cenv = { ...env, CODEX_HOME: codexHome };
+  const id = PLUGIN_NAME + PLUGIN_KEY_SEPARATOR + PLUGIN_MARKETPLACE_NAME;
+  must(run(cenv, home, "codex", ["plugin", "marketplace", "add", dir]));
+  must(run(cenv, home, "codex", ["plugin", "add", id]));
+  const listed = JSON.parse(must(run(cenv, home, "codex", ["plugin", "list", "--json"])).out);
+  const entry = (listed.installed ?? []).find((p) => p.pluginId === id);
+  if (!entry?.installed || !entry.enabled) throw new StepFailed(`codex plugin list --json: ${id} not installed and enabled`);
+  if (entry.source?.source !== "local") throw new StepFailed(`codex plugin list --json: ${id} source is ${entry.source?.source}, not local`);
+  const servers = JSON.parse(must(run(cenv, home, "codex", ["mcp", "list", "--json"])).out);
+  const server = servers.find((s) => s.name === SERVER_KEY);
+  if (!server) throw new StepFailed(`codex mcp list --json: ${SERVER_KEY} not listed`);
+  const result = handshake(cenv, server.transport.cwd ?? home, server.transport.command, server.transport.args);
+  return `installed ${id} ${entry.version ?? ""} from ${entry.source.path}; initialize answered (protocol ${result.protocolVersion})`;
+}
+
+function codex(env, home, a) {
+  if (a.layout === MAIN_LAYOUT) return codexMain(env, home, a);
+  const dir = cloneRef(env, home, a, SERVER_KEY);
+  const server = path.join(dir, SERVER_ENTRY_FILE);
   const args = [server, AGENT_ARG, "codex"];
   const codexHome = path.join(home, ...AGENT_HOME_DIR.codex);
   fs.mkdirSync(codexHome, { recursive: true });

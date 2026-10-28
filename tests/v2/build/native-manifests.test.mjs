@@ -183,13 +183,26 @@ test("[ADR-0023] native/claude-code-main: main tree marketplace points at plugin
   assert.ok(!existsSync(path.join(root, ".claude-plugin", "marketplace.json")), "no nested marketplace inside the plugin folder");
 });
 
-test("[ADR-0023] native/codex-main: main tree .agents/plugins/marketplace.json installs the npm package at this version", () => {
+// Owner decision 2026-10-28 (final): Codex uses the context7 style too. codex-cli 0.156.1 reads a marketplace entry
+// {"source":"local","path":"./plugins/<dir>"} (bundled marketplace ~/.codex/.tmp/bundled-marketplaces/openai-bundled/.agents/plugins/marketplace.json;
+// `codex plugin list --json` prints source.source "local"). The entry points at the one built copy; no npm entry.
+test("[ADR-0023] native/codex-main: main tree .agents/plugins/marketplace.json points at the built plugin subfolder (local source, no npm)", () => {
   const mk = json(main, ".agents/plugins/marketplace.json");
   assert.equal(mk.name, "context-mode");
   assert.equal(mk.plugins.length, 1);
   const [entry] = mk.plugins;
   assert.equal(entry.name, "context-mode", "codex plugin add context-mode@context-mode");
-  assert.deepEqual(entry.source, { source: "npm", package: "context-mode", version: VERSION });
+  assert.deepEqual(entry.source, { source: "local", path: "./plugins/claude-code" });
+  assert.ok(!JSON.stringify(mk).includes('"npm"'), "no npm entry");
+  const root = path.join(main, "plugins", "claude-code");
+  const m = json(root, ".codex-plugin/plugin.json");
+  assert.equal(m.name, entry.name, "plugin.json name equals the marketplace entry name");
+  assert.equal(m.version, VERSION);
+  const mcp = json(root, stripRoot(m.mcpServers));
+  assertServers(root, mcp.mcpServers, "codex-main");
+  assert.ok(mcp.mcpServers["context-mode"].args.includes("codex"), "codex-main: server runs with --agent codex");
+  assertHooks(root, stripRoot(m.hooks), "codex-main");
+  assertSkills(root, m.skills, "mcp__context_mode__", "codex-main");
 });
 
 // MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): Gemini and Qwen install the repo root of the tagged release commit.
