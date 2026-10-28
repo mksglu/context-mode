@@ -51,4 +51,20 @@ for (let i = 0; i < cpus().length * 2; i++) busy.push(spawn(process.execPath, ["
 await new Promise((r) => setTimeout(r, 500));
 for (const k of ["bundle", "src"]) for (let i = 0; i < 3; i++) run(entries[k], ["--import", pre], `${k} loaded${i}`);
 for (const b of busy) b.kill();
-flush();
+// commit cost: FULL (default) vs NORMAL in WAL, same file system, 20 write transactions each
+{
+  const { DatabaseSync } = await import("node:sqlite");
+  const out = [];
+  for (const mode of ["FULL", "NORMAL", "FULL", "NORMAL", "OFF"]) {
+    const f = path.join(root, "m-" + mode + "-" + out.length + ".db");
+    const d = new DatabaseSync(f, { timeout: 5000 });
+    d.exec("PRAGMA journal_mode = WAL; CREATE TABLE t(a)");
+    d.exec("PRAGMA synchronous = " + mode);
+    const ts = [];
+    for (let i = 0; i < 20; i++) { const t = performance.now(); d.exec("BEGIN IMMEDIATE"); d.exec("INSERT INTO t VALUES (1)"); d.exec("COMMIT"); ts.push(performance.now() - t); }
+    d.close();
+    ts.sort((a, b) => a - b);
+    say(`commit ${mode}: median=${ts[10].toFixed(1)}ms max=${ts[19].toFixed(1)}ms sum=${ts.reduce((a, b) => a + b, 0).toFixed(0)}ms`);
+  }
+  flush();
+}
