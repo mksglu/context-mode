@@ -3,6 +3,9 @@
 # Started by the /release skill with `gh workflow run`. mode=rollback runs only ci -> rollback.
 # A pushed v2.* tag also starts it: the tag is the version, stage/promote reuse it, a x.y.z-<pre> version is a
 # GitHub prerelease, never Latest, and npm gets dist-tag next (D-RN-TAG-1).
+# MAIN-ONLY (docs/v2/release/MAIN-ONLY.md, D-MO-2): a dispatch on main takes the main-* jobs (one click: channel next or
+# latest; version from the commits since the last tag on main; npm; one release commit and tag on main; GitHub release).
+# Every other start keeps the old jobs until merge day. Job route decides; the merge-day checklist deletes the old jobs.
 # Every ${{ }} value a shell reads goes through env, never into the run text.
 # publish-npm: ADR-0019 D2, DEVIATIONS D-NPM-PUB-1.
 # DEVIATIONS D-M6-arch-3, D-M6-arch-5, D-M6-Y1-1..5.
@@ -22,6 +25,17 @@ on:
         description: "release: commit to release (empty = branch tip); rollback: prior release commit"
         required: false
         type: string
+      channel:
+        description: "next = prerelease, npm dist-tag next. latest = stable, npm dist-tag latest (needs confirm_latest)"
+        required: false
+        type: choice
+        options: [next, latest]
+        default: next
+      confirm_latest:
+        description: "type latest here to release the channel latest"
+        required: false
+        type: string
+        default: ""
       mode:
         description: "release or rollback"
         required: false
@@ -41,9 +55,26 @@ env:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      layout: ${{ steps.route.outputs.layout }}
+    steps:
+      - id: route
+        name: layout main for a dispatch on main, else the old release-branch path
+        env:
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$REF" = "refs/heads/main" ]; then
+            echo "layout=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "layout=release" >> "$GITHUB_OUTPUT"
+          fi
   plan:
-    needs: ci
-    if: ${{ inputs.mode != 'rollback' }}
+    needs: [ci, route]
+    if: ${{ needs.route.outputs.layout == 'release' && inputs.mode != 'rollback' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -249,8 +280,8 @@ jobs:
           NOTES: ${{ needs.plan.outputs.notes }}
         run: node scripts/release/publish.mjs --github-release --version "$VERSION" --notes "$NOTES"
   rollback:
-    needs: ci
-    if: ${{ inputs.mode == 'rollback' }}
+    needs: [ci, route]
+    if: ${{ needs.route.outputs.layout == 'release' && inputs.mode == 'rollback' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -266,3 +297,218 @@ jobs:
         env:
           SHA: ${{ inputs.sha }}
         run: node scripts/release/rollback.mjs --sha "$SHA"
+  # ---- MAIN-ONLY path (D-MO-2): only branch named is main ----
+  main-plan:
+    needs: [ci, route]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      version: ${{ steps.plan.outputs.version }}
+      notes: ${{ steps.plan.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - id: plan
+        name: version and notes from the commits since the last tag on main; latest needs confirm_latest
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          CONFIRM: ${{ inputs.confirm_latest }}
+        run: |
+          node scripts/release/plan.mjs --main --channel "$CHANNEL" --confirm "$CONFIRM" >> "$GITHUB_OUTPUT"
+  main-build:
+    needs: [route, main-plan]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.main-plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - run: npm install
+        name: dev tooling (npm is dev-only, never shipped)
+      - name: build, manifests, 3 skills, SHA256SUMS
+        env:
+          SHA: ${{ needs.main-plan.outputs.sha }}
+          VERSION: ${{ needs.main-plan.outputs.version }}
+        run: node build/build.mjs --out release-out --sha "$SHA" --version "$VERSION"
+      - run: node docs/v2/prompt/lint.mjs --out release-out
+      - run: npm install -g "$CLAUDE_CODE_NPM"
+      - run: claude plugin validate release-out
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "release-out/**"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-out
+          path: release-out
+          include-hidden-files: true
+          if-no-files-found: error
+  main-smoke:
+    needs: [route, main-plan, main-build]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.main-plan.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - run: npm install
+        name: dev tooling (npm is dev-only, never shipped)
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-out
+          path: release-out
+      - run: npm install -g "$CLAUDE_CODE_NPM" @openai/codex
+      - name: the exact release commit, made in a local repo (the tree main will hold)
+        env:
+          VERSION: ${{ needs.main-plan.outputs.version }}
+        run: |
+          bare="$RUNNER_TEMP/origin.git"
+          git init -q --bare "$bare"
+          git push -q "$bare" HEAD:refs/heads/main
+          echo "bare=$bare" >> "$GITHUB_ENV"
+          node scripts/release/commit-main.mjs --pkg release-out --version "$VERSION" --remote "$bare"
+      - run: node scripts/release/smoke.mjs --ref main --layout main --repo "$bare" --agent claude-code
+      - run: node scripts/release/smoke.mjs --ref main --layout main --repo "$bare" --agent codex
+      - run: npm install -g @google/gemini-cli @qwen-code/qwen-code
+        continue-on-error: true   # tier-2 per GS2
+      - run: node scripts/release/smoke.mjs --ref main --layout main --repo "$bare" --agent gemini
+        timeout-minutes: 5
+        continue-on-error: true   # tier-2 per GS2
+      - run: node scripts/release/smoke.mjs --ref main --layout main --repo "$bare" --agent qwen
+        timeout-minutes: 5
+        continue-on-error: true   # tier-2 per GS2
+  main-npm:
+    needs: [route, main-plan, main-smoke]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.main-plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-out
+          path: release-out
+      - name: npm must be 11.5.1 or newer (trusted publishing)
+        run: |
+          v="$(npm -v)"
+          if [ "$(printf '%s\n11.5.1\n' "$v" | sort -V | head -1)" != "11.5.1" ]; then npm i -g npm@^11.5.1; fi
+          npm -v
+      - id: exists
+        name: a re-run after a later job failed must not publish twice
+        env:
+          VERSION: ${{ needs.main-plan.outputs.version }}
+        run: |
+          if [ "$(npm view "context-mode@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: tarball must equal SHA256SUMS
+        if: steps.exists.outputs.published != 'true'
+        run: node scripts/release/check-npm-tarball.mjs release-out
+      - name: publish with provenance, dist-tag = channel
+        if: steps.exists.outputs.published != 'true'
+        working-directory: release-out
+        env:
+          NPM_TAG: ${{ inputs.channel }}
+        run: |
+          npm publish --provenance --access public --tag "$NPM_TAG"
+  main-commit:
+    needs: [route, main-plan, main-npm]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-out
+          path: release-out
+      - name: release commit and tag on main, one push
+        env:
+          VERSION: ${{ needs.main-plan.outputs.version }}
+        run: node scripts/release/commit-main.mjs --pkg release-out --version "$VERSION"
+  main-github-release:
+    needs: [route, main-plan, main-commit]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-out
+          path: release-out
+      - name: GitHub Release with SHA256SUMS, after npm and the release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.main-plan.outputs.version }}
+          NOTES: ${{ needs.main-plan.outputs.notes }}
+        run: node scripts/release/publish.mjs --github-release --version "$VERSION" --notes "$NOTES"
+  main-rollback:
+    needs: [ci, route]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode == 'rollback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: forward commit that restores the generated paths from a prior release commit
+        env:
+          SHA: ${{ inputs.sha }}
+        run: node scripts/release/commit-main.mjs --rollback-to "$SHA"

@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const yml = readFileSync(path.join(REPO, ".github", "workflows", "release.yml"), "utf8");
+// D-MO-2: the old jobs end where the main-only jobs begin; the old-path checks below read only the old jobs.
+const oldJobs = yml.slice(yml.indexOf("\njobs:"), yml.indexOf("# ---- MAIN-ONLY path"));
 const job = yml.slice(yml.indexOf("\n  publish-npm:"), yml.indexOf("\n  rollback:"));
 
 test("release.yml: publish-npm job has the ADR-0019 shape", () => {
@@ -75,8 +77,8 @@ test("[RN] release.yml: plan step passes --tag \"$REF_NAME\" on a tag push, plai
 test("[RN] release.yml: publish-npm stays --tag next and never names latest", () => {
   const npmLines = job.split("\n").filter((l) => l.includes("npm publish"));
   assert.deepEqual(npmLines.map((l) => l.trim()), ["run: npm publish --provenance --access public --tag next"]);
-  assert.ok(!yml.includes("npm dist-tag"), "CI never runs npm dist-tag");
-  const latest = yml.split("\n").filter((l) => l.includes("latest") && !l.includes("-latest") && !l.trim().startsWith("- name:"));
+  assert.ok(!oldJobs.includes("npm dist-tag"), "CI never runs npm dist-tag");
+  const latest = oldJobs.split("\n").filter((l) => l.includes("latest") && !l.includes("-latest") && !l.trim().startsWith("- name:"));
   assert.deepEqual(latest, [], "no release.yml command names latest (runner labels and step names aside)");
 });
 
@@ -108,5 +110,5 @@ test("[N5] release.yml: github-release job needs publish-npm and runs only when 
   for (const r of gh.split("\n").filter((l) => l.trim().startsWith("run:"))) assert.ok(!r.includes("${{"), r);
   assert.ok(!gh.includes("environment:"), "no npm-publish environment: no second approval for the GitHub release");
   assert.ok(yml.indexOf("\n  publish-npm:") < yml.indexOf("\n  github-release:"), "job order in the file follows the run order");
-  assert.equal(yml.split("--github-release").length - 1, 1, "one place makes the GitHub release");
+  assert.equal(oldJobs.split("--github-release").length - 1, 1, "one place makes the GitHub release (old path)");
 });
