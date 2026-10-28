@@ -17,6 +17,8 @@ import { spawnBundle } from "../harness/mcp-client.mjs";
 const RUNS = 10;
 // Harness-local wait for the child to write the grandchild PID (not a runtime constant, D-M0-4).
 const PID_WAIT_MS = 15000;
+// Harness-local diagnostic poll after a failed run (not a runtime constant, D-M0-4).
+const LATE_POLL_MS = 8000;
 
 if (process.platform !== "win32") {
   console.log(JSON.stringify({ ok: true, result: "SKIPPED", reason: "windows only" }));
@@ -69,8 +71,18 @@ for (let i = 0; i < RUNS; i++) {
   client.notify("notifications/cancelled", { requestId: 2 }); // id 1 = initialize, id 2 = this tools/call
   await sleep(graceMs);
   const left = Number.isInteger(gpid) && gpid > 0 ? alive(gpid) : null;
-  results.push({ run: i + 1, gpid, alive: left });
-  if (left) spawnSync("taskkill", ["/F", "/PID", String(gpid)], { shell: false });
+  // Diagnosis only (the pass rule above is unchanged): a grandchild still alive at KILL_GRACE_MS is polled for
+  // up to LATE_POLL_MS. `diedAfterMs` set = the tree kill was only slow; null = it never reached the grandchild.
+  let diedAfterMs = null;
+  if (left) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < LATE_POLL_MS) {
+      await sleep(100);
+      if (!alive(gpid)) { diedAfterMs = graceMs + (Date.now() - t0); break; }
+    }
+  }
+  results.push(left ? { run: i + 1, gpid, alive: left, diedAfterMs } : { run: i + 1, gpid, alive: left });
+  if (left && diedAfterMs === null) spawnSync("taskkill", ["/F", "/PID", String(gpid)], { shell: false });
   await client.close();
 }
 
