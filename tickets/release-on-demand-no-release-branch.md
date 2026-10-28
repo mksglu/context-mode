@@ -36,3 +36,8 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - Work: `docs/v2/review/main-only-release.workflow.js`.
 
 - Target (owner, 2026-10-28): merge v2-design into main in about 2 weeks (around 2026-11-11), then one-click release. Until then: next releases from the release branch for testers; owner docs review before the merge.
+
+## Update 2026-10-28: context7 style, final (owner decision)
+- The marketplaces on `main` point at a plugin subfolder that holds the built files, like upstash/context7 (`source: "./plugins/claude/context7"`). No npm source for the marketplace.
+- The one-click release builds the subfolder and commits it to `main` itself. No manual step.
+- Each host keeps its own install command (ADR-0023). Gemini CLI and Qwen Code install from the same repo; if a host cannot read a subfolder, record the evidence and the host's documented alternative here before choosing it.
