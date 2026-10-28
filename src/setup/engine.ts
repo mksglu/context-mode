@@ -351,6 +351,9 @@ function mcpCheck(cmd: string[], env: SetupContext["env"]): Promise<Check> {
     const timer = setTimeout(() => done(false, "no MCP answer before timeout"), VERIFY_TIMEOUT_MS);
     child.on("error", (e) => done(false, e.message));
     child.on("exit", (code) => done(false, `server exited (${code}) before tools/list`));
+    // D-CLI-EPIPE-1: a server that dies or closes its input makes the next stdin write fail with EPIPE. With no
+    // listener Node throws it as an uncaught error: the CLI exits 1 before it writes the report.
+    child.stdin.on("error", (e) => done(false, `server closed its input: ${e.message}`));
     child.stdout.on("data", (d: Buffer) => {
       buf += d.toString();
       let nl;

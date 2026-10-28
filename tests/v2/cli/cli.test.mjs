@@ -33,7 +33,11 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 
 const FAKE_SERVER = `
 import { createInterface } from "node:readline";
+import { closeSync } from "node:fs";
 if (process.env.CM_FAKE_BROKEN) process.exit(3);
+// CM_FAKE_NOSTDIN: a server that closes its input and then answers initialize. The CLI's next write hits a closed pipe
+// (EPIPE), the same thing a server that dies right after start does on a fast or loaded host.
+if (process.env.CM_FAKE_NOSTDIN) { closeSync(0); process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "context-mode", version: "2.0.0" } } }) + "\\n"); setTimeout(() => {}, 30000); }
 const tools = ${JSON.stringify([...TOOL_ORDER])};
 const delay = process.env.CM_FAKE_SLOW ? 4000 : 0;
 const rl = createInterface({ input: process.stdin });
@@ -384,7 +388,7 @@ test("[M7] cli/report-no-input: a FAIL without a TTY writes the redacted report,
   codexHome(s);
   fakeBin(s, "gh", `echo "gh $*" >> "$LOG"\nexit 0`);
   const r = run(s, ["setup", "--yes", "--agents", "codex"], { env: { CM_FAKE_BROKEN: "1" } });
-  assert.equal(r.status, 1);
+  assert.equal(r.status, 1, r.stderr); // release.yml next.10 failed here with no report; stderr shows why
   assert.ok(!existsSync(s.env.LOG) || !readFileSync(s.env.LOG, "utf8").includes("issue"), "never sends without a keypress");
   const dir = path.join(s.home, ".context-mode", "reports");
   const [file] = readdirSync(dir);
@@ -393,6 +397,20 @@ test("[M7] cli/report-no-input: a FAIL without a TTY writes the redacted report,
   assert.match(report, /fingerprint: [0-9a-f]{12}/);
   assert.match(report, /codex/);
   assert.match(r.stderr, /gh issue create --repo mksglu\/context-mode/);
+});
+
+test("[M7] cli/report-server-closes-stdin: a server that closes its input is a FAIL row with a report, not a crash (D-CLI-EPIPE-1)", (t) => {
+  const s = sandbox(t);
+  codexHome(s);
+  for (let i = 0; i < 5; i++) {
+    const r = run(s, ["setup", "--yes", "--agents", "codex"], { env: { CM_FAKE_NOSTDIN: "1" } });
+    assert.equal(r.status, 1, r.stderr);
+    assert.ok(!r.stderr.includes("node:events") && !r.stderr.includes("Unhandled"), r.stderr); // a thrown error, not a FAIL row
+    assert.match(r.stderr, /codex: FAIL \(mcp: server closed its input/, r.stderr);
+    assert.match(r.stderr, /Debug report \(redacted\)/, r.stderr);
+    assert.match(r.stderr, /gh issue create --repo mksglu\/context-mode/);
+    assert.ok(readdirSync(path.join(s.home, ".context-mode", "reports")).length >= 1);
+  }
 });
 
 // ---------- pty: interactive flow, D6 consent, Ctrl-C ----------
