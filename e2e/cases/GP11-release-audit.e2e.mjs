@@ -20,7 +20,9 @@ function names(dir, out = []) {
 // (name, version, bin, type, engines, files, pi). It must carry no dependency key, no scripts and no private (D1
 // publishes it); no package.json below the root.
 // D-RN-REPO-1: repository (npm provenance needs repository.url to match the source repo).
-const ALLOWED_ROOT_KEYS = ["bin", "engines", "files", "main", "name", "pi", "repository", "type", "version"]; // main: D-NI-OPENCODE-1
+// D-PKG-META-1: description, keywords, license, homepage, bugs are copied from the repo package.json.
+const ALLOWED_ROOT_KEYS = ["bin", "bugs", "description", "engines", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"]; // main: D-NI-OPENCODE-1
+const DEV = JSON.parse(readFileSync(path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."), "package.json"), "utf8"));
 
 test("[M6] GP11/npm-audit-zero-high-critical: release-out has no runtime dependencies, no node_modules, no nested package.json (#1225)", () => {
   assert.ok(existsSync(OUT), "release-out missing (run build/build.mjs first)");
@@ -39,5 +41,6 @@ test("[M6] GP11/npm-audit-zero-high-critical: release-out has no runtime depende
     assert.deepEqual(pkg.bin, { "context-mode": "cli.mjs" }, "release-out/package.json bin");
     assert.deepEqual(pkg.engines, { node: ">=24.15.0" }, "release-out/package.json engines");
     assert.deepEqual(pkg.repository, { type: "git", url: "git+https://github.com/mksglu/context-mode.git" }, "release-out/package.json repository");
+    for (const k of ["description", "keywords", "license", "homepage", "bugs"]) assert.deepEqual(pkg[k], DEV[k], `release-out/package.json ${k} differs from package.json`);
   }
 });
