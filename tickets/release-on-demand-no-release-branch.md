@@ -51,3 +51,11 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - Qwen Code: reads the same Claude marketplace (`:context-mode`); gap: converted plugin runs with `--agent claude-code`. Fix to probe: own entry `./plugins/qwen`.
 - One click: inputs channel next|latest (+ confirm_latest), version from commits since last v2 tag on main, build, smoke, npm publish, one release commit + tag on main, GitHub release after. Rollback = forward commit, no reset of main.
 - Open for owner: Codex on npm; bot push to main allowed.
+
+## Built 2026-10-28 on v2-design (not on main yet)
+- One click path is in `release.yml` (jobs `route`, `main-plan`, `main-build`, `main-smoke`, `main-npm`, `main-commit`, `main-github-release`, `main-rollback`). A dispatch on `main` takes it; tag push and other refs keep the release-branch path until merge day, so testers are not affected.
+- Scripts: `plan.mjs --main`, `commit-main.mjs`, `smoke.mjs --layout main`, `build/main-tree.mjs`. Tests are red-first and green; DEVIATIONS D-MO-1, D-MO-2.
+- Only branch named in the main path: `main`. Rollback is a forward commit.
+- Not proven until the first real run: Gemini hooks from the subfolder, Qwen install from the real repo, bot push to `main`.
+- Merge-day checklist: docs/v2/release/MAIN-ONLY.md.
+- Still open for owner: Codex stays on npm; allow the bot to push to `main`.

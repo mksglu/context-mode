@@ -61,3 +61,16 @@ Rollback (a forward commit, `main` is never reset or force-pushed): `mode=rollba
 
 - Confirm Codex stays on npm (above).
 - Confirm that `main` allows the bot push (no branch protection on the release commit, or a bypass for github-actions).
+
+## Built on v2-design (state 2026-10-28)
+
+Done and tested, not yet on `main`: `plan.mjs --main`, `build/main-tree.mjs` (Claude subfolder, Codex npm pin, root Gemini and Qwen manifests), `commit-main.mjs` (release commit, tag, push; rollback), `smoke.mjs --layout main` with a Qwen leg, and the `route` + `main-*` jobs in `release.yml` (DEVIATIONS D-MO-1, D-MO-2). One copy of the built plugin (`plugins/claude-code/`) serves all three hosts; the design's `plugins/gemini/` was dropped for that reason.
+
+## Merge-day checklist
+
+1. Merge `v2-design` into `main` (no other change needed: the dispatch on `main` takes the main path by itself).
+2. In repo settings: allow github-actions to push to `main` (branch protection bypass for the bot). Without it `main-commit` fails; npm is already published then, so re-run: the npm step skips an existing version.
+3. Actions > Release > Run workflow on `main`, channel `next`. Check: tag `vX-next.N` on `main`, `plugins/claude-code/` on `main`, npm `next`, GitHub prerelease.
+4. Probe the installs from a temp HOME: `claude plugin marketplace add mksglu/context-mode`, `codex plugin marketplace add mksglu/context-mode`, `gemini extensions install https://github.com/mksglu/context-mode --pre-release`, `qwen extensions install mksglu/context-mode:context-mode`. Record the Gemini hook run and the Qwen `--agent` result.
+5. Delete the `release` and `release-staging` branches. Then delete the old jobs (`plan`, `build`, `publish-*`, `smoke`, `github-release`, `rollback`) and the `route` job from `release.yml`, `publish.mjs --stage/--promote`, `rollback.mjs`, `RELEASE_BRANCH`, and the old-path tests. Update the `/release` skill.
+6. Stable: Run workflow with channel `latest` and `confirm_latest` = `latest`.
