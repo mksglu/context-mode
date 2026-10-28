@@ -6,7 +6,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { sampleText, hookSample, SAMPLE_FILE } from "../src/setup/hook-sample.ts";
 const REPO = path.resolve(import.meta.dirname, "..");
-const say = (m) => { console.log(m); console.log("::notice::H5P " + m); };
+const LINES = [];
+const say = (m) => { console.log(m); LINES.push(m); };
+const flush = () => { for (let i = 0; i < LINES.length; i += 6) console.log("::notice::H5P " + LINES.slice(i, i + 6).join("%0A")); };
 const root = mkdtempSync(path.join(tmpdir(), "h5p-"));
 const home = path.join(root, "home"), proj = path.join(root, "proj");
 mkdirSync(home); mkdirSync(proj);
@@ -49,3 +51,4 @@ for (let i = 0; i < cpus().length * 2; i++) busy.push(spawn(process.execPath, ["
 await new Promise((r) => setTimeout(r, 500));
 for (const k of ["bundle", "src"]) for (let i = 0; i < 3; i++) run(entries[k], ["--import", pre], `${k} loaded${i}`);
 for (const b of busy) b.kill();
+flush();
