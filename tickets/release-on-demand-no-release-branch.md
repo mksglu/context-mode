@@ -28,3 +28,9 @@ None of them uses a separate release branch.
 
 Decision: when v2 is on `main`, the Claude Code marketplace lives on `main` and points at a plugin subfolder (context7 style, e.g. `./plugins/claude-code`) that holds the built files. The release workflow writes that folder in the release commit, so `main` serves the last released build. Users run `/plugin marketplace add mksglu/context-mode` and `/plugin install context-mode@context-mode` (native). The `release` branch is removed then.
 Until v2 is on `main`, `release` stays as the temporary source for testing `next` (`/plugin marketplace add mksglu/context-mode#release`).
+
+## Update 2026-10-28: only main, everything automatic (owner decision)
+- Only `main` exists. No `release` branch, no other long-lived branch.
+- Everything is automatic: merge into `main`, then one click (Actions > Release > Run workflow). The workflow picks the version, tags, publishes to npm, writes the GitHub release with notes from the commits, and updates what the marketplaces read. No manual step.
+- Prepared now on `v2-design` (v2 is not ready for `main` yet). The `release` branch stays only for testers until merge day, then it is deleted.
+- Work: `docs/v2/review/main-only-release.workflow.js`.
