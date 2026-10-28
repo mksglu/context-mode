@@ -14,12 +14,18 @@
 // never a bump. The tag must be on origin at HEAD. Notes: commits since the newest older v2+ tag on origin
 // (prereleases count): a tag on a HEAD ancestor starts the range at its commit, a tag in `release` at its
 // Source-Commit trailer; none -> all history.
+// --main --channel next|latest [--confirm latest] (main-only release, docs/v2/release/MAIN-ONLY.md): no release
+// branch. Base = newest stable v2+ tag that is in HEAD's history (none: 2.0.0), bumped by the conventional commits
+// since it. latest = the base; next = <base>-next.<N>, N = 1 + the highest N of that base among all tags on origin.
+// Notes and the "releasable" check cover the commits since the newest tag (any kind) in HEAD's history. latest
+// needs --confirm latest, and refuses a version whose tag is already on origin.
 // Failure: one stderr line `release failed: <reason>` and exit 1 (impl/13 §1).
 import { spawnSync } from "node:child_process";
 import { GIT_REMOTE_NAME, RELEASE_BRANCH } from "../../src/core/contracts/constants.ts";
 import { compareReleaseVersions, parseReleaseTag, parseTaggedReleases, tagCommit } from "./release-tags.mjs";
 
 const FIRST_VERSION = "2.0.0";
+const FIRST_CORE = Object.freeze([2, 0, 0]);
 const TRAILER = "Source-Commit: ";
 const MANIFEST = ".claude-plugin/plugin.json";
 const SKIP_LIVE_LINE = "Live E2E skipped for this release.";
@@ -139,14 +145,62 @@ function notesFor(subjects, skipLive) {
   return blocks.join("\n\n");
 }
 
+const CHANNELS = Object.freeze(["next", "latest"]);
+const NEXT_PRE = "next";
+
+const rankOf = (subjects) => {
+  let rank = 0;
+  for (const s of subjects) {
+    const c = parseSubject(s);
+    if (c) rank = Math.max(rank, c.breaking ? MAJOR : (RANK_BY_TYPE[c.type] ?? 0));
+  }
+  return rank;
+};
+const subjectsIn = (range) => mustGit("log", "--format=%s", range).split("\n").filter((s) => s.length > 0);
+const bumpCore = ([major, minor, patch], rank) => (rank === MAJOR ? [major + 1, 0, 0] : rank === 2 ? [major, minor + 1, 0] : [major, minor, patch + 1]);
+const sameCore = (a, b) => a.core.every((n, i) => n === b[i]);
+
+// Main-only mode: { version, subjects }.
+function planFromMain(channel, confirm) {
+  if (!CHANNELS.includes(channel)) fail(`--channel must be one of ${CHANNELS.join(", ")}`);
+  if (channel === "latest" && confirm !== "latest") fail("channel latest needs --confirm latest");
+  const ls = lsRemoteTags();
+  const all = parseTaggedReleases(ls, { prerelease: true }).map((t) => ({ ...t, v: parseReleaseTag(t.tag, { prerelease: true }) }));
+  const inMain = all.filter((t) => git("merge-base", "--is-ancestor", t.commit, "HEAD").ok);
+  const stable = inMain.find((t) => t.v.pre === null); // parseTaggedReleases sorts newest first
+  const newest = inMain[0];
+  let core = FIRST_CORE;
+  if (stable) {
+    const rank = rankOf(subjectsIn(`${stable.commit}..HEAD`));
+    if (rank === 0) fail(`no releasable commits since ${stable.tag}`);
+    core = bumpCore(stable.v.core, rank);
+  }
+  const subjects = subjectsIn(newest ? `${newest.commit}..HEAD` : "HEAD");
+  if (newest && rankOf(subjects) === 0) fail(`no releasable commits since ${newest.tag}`);
+  const base = core.join(".");
+  let version = base;
+  if (channel === "next") {
+    const n = Math.max(0, ...all.filter((t) => t.v.pre !== null && t.v.pre[0] === NEXT_PRE && sameCore(t.v, core)).map((t) => Number(t.v.pre[1]) || 0));
+    version = `${base}-${NEXT_PRE}.${n + 1}`;
+  }
+  if (tagCommit(ls, TAG_PREFIX + version) !== "") fail(`tag ${TAG_PREFIX}${version} is already on ${GIT_REMOTE_NAME}`);
+  return { version, subjects };
+}
+
 function main() {
   const args = process.argv.slice(2);
   let tag = null;
+  let mainMode = false;
+  let channel = "";
+  let confirm = "";
   const flags = [];
   for (let i = 0; i < args.length; i++) {
-    if (args[i] !== TAG_FLAG) { flags.push(args[i]); continue; }
-    if (i + 1 >= args.length) fail(`${TAG_FLAG} needs a value`);
-    tag = args[++i];
+    if (args[i] === "--main") { mainMode = true; continue; }
+    if (args[i] !== TAG_FLAG && args[i] !== "--channel" && args[i] !== "--confirm") { flags.push(args[i]); continue; }
+    if (i + 1 >= args.length) fail(`${args[i]} needs a value`);
+    if (args[i] === TAG_FLAG) tag = args[++i];
+    else if (args[i] === "--channel") channel = args[++i];
+    else confirm = args[++i];
   }
   const unknown = flags.find((a) => !FLAGS.includes(a));
   if (unknown) fail(`unknown argument ${unknown}`);
@@ -155,8 +209,10 @@ function main() {
 
   let version;
   let subjects;
-  const last = tag === null ? lastRelease() : undefined;
-  if (tag !== null) {
+  const last = tag === null && !mainMode ? lastRelease() : undefined;
+  if (mainMode) {
+    ({ version, subjects } = planFromMain(channel, confirm));
+  } else if (tag !== null) {
     ({ version, subjects } = planFromTag(tag));
   } else if (last === null) {
     version = FIRST_VERSION;
