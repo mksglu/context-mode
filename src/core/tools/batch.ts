@@ -5,7 +5,7 @@
 // D-M2-T11-1, D-M2-R4-1 (ingest byte budget, #961).
 import { z } from "zod/v4";
 import {
-  CANCELLED_LINE, EXEC_TIMEOUT_MS, INDEX_WRITE_CHUNK, OUTPUT_CAP, RETENTION_SIZE_CAP_BYTES, SEARCH_PAGE_SIZE,
+  CANCELLED_LINE, ECHO_MAX_BYTES, EXEC_TIMEOUT_MS, INDEX_WRITE_CHUNK, OUTPUT_CAP, RETENTION_SIZE_CAP_BYTES, SEARCH_PAGE_SIZE,
 } from "../contracts/constants.ts";
 import { CtxError, formatError } from "../contracts/errors.ts";
 import type { BatchInput, Chunk, DbHandle, ToolContext, ToolReply } from "../contracts/types.ts";
@@ -187,12 +187,12 @@ function bytes(s: string): number {
 function answer(db: DbHandle, ctx: ToolContext, label: string, queries: string[], share: number, own: Map<string, string>): string[] {
   const seen = new Set<string>(); // step 7: a (sourceId, ord) already shown is not shown again
   const lines: string[] = [];
-  for (const q of queries) {
+  for (const [qi, q] of queries.entries()) {
     if (ctx.signal.aborted) break;
     // Step 6, A15: this call's own label first; the whole session scope only when that is empty.
     let hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0, label);
     if (hits.length === 0) hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0);
-    const head = "## " + q;
+    const head = "## " + (bytes(q) > ECHO_MAX_BYTES ? "query " + (qi + 1) : q); // D-NO-LOSSY-CUT-2: a long query is named by position
     let used = bytes(head) + 1;
     const body: string[] = [];
     for (const h of hits) {

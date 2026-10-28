@@ -1,6 +1,6 @@
 // impl/07 §4, ADR-0010 (FAIL string), ADR-0014 §2-§3 (cap, redaction by structure), 14a GP11
 // redact-secrets-in-debug-report (#1144) and redact-secrets-in-doctor-output (#1141); DEVIATIONS D-M5-O3-1..3.
-// Pure function: renders the ctx_doctor table plus typed env lines, then cuts the whole at REPORT_CAP.
+// Pure function: renders the ctx_doctor table plus typed env lines, ; buildReportHead shortens the reply, never the stored report.
 import {
   DOCTOR_FAIL_LINE,
   REPORT_CAP,
@@ -10,10 +10,10 @@ import {
   REPORT_HEADER,
   REPORT_HEADER_RULE,
   REPORT_INVALID,
-  REPORT_TRUNCATED_LINE,
+  REPORT_POINTER,
+  REPORT_REST_PREFIX,
 } from "../contracts/constants.ts";
 import type { AgentId, DoctorRow } from "../contracts/types.ts";
-import { capBytes } from "../sandbox/cap.ts";
 
 export interface ReportInput {
   agent: AgentId; // <host> in the ADR-0010 FAIL string
@@ -46,18 +46,34 @@ function rowLine(agent: AgentId, row: DoctorRow): string {
   return "| " + [row.id + " " + row.label, row.status, row.detail, fix].join(" | ") + " |";
 }
 
+// The whole report: every row, then the command line, then the typed env lines. Never cut (D-NO-LOSSY-CUT-1).
 export function buildReport(input: ReportInput): string {
-  const lines = [
+  return [
     REPORT_HEADER,
     REPORT_HEADER_RULE,
     ...input.rows.map((row) => rowLine(input.agent, row)),
     ...(input.command === undefined ? [] : [REPORT_COMMAND_PREFIX + input.command]),
     ...Object.keys(input.env).sort().map((key) => envLine(key, input.env[key])),
+  ].join("\n");
+}
+
+// D-NO-LOSSY-CUT-1: the reply when the whole report is over REPORT_CAP (ADR-0014: a report pasted into an issue
+// stays small). The caller has stored the whole report; this keeps the header, the FAIL rows and the command
+// line, then the pointer that reads the rest. A FAIL row that does not fit is in the stored report.
+export function buildReportHead(input: ReportInput): string {
+  const tail = [
+    ...(input.command === undefined ? [] : [REPORT_COMMAND_PREFIX + input.command]),
+    REPORT_REST_PREFIX + REPORT_POINTER,
   ];
-  const text = lines.join("\n");
-  // D-M5-O3-2: the cut leaves room for the truncation line, so the whole report stays <= REPORT_CAP.
-  const tail = "\n" + REPORT_TRUNCATED_LINE;
-  const fit = capBytes(text, REPORT_CAP);
-  if (!fit.cut) return text;
-  return capBytes(text, REPORT_CAP - Buffer.byteLength(tail, "utf8")).text + tail;
+  const lines = [REPORT_HEADER, REPORT_HEADER_RULE];
+  let used = Buffer.byteLength(lines.concat(tail).join("\n"), "utf8");
+  for (const row of input.rows) {
+    if (row.status !== "FAIL") continue;
+    const line = rowLine(input.agent, row);
+    const cost = Buffer.byteLength(line, "utf8") + 1;
+    if (used + cost > REPORT_CAP) break;
+    lines.push(line);
+    used += cost;
+  }
+  return lines.concat(tail).join("\n");
 }

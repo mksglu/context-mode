@@ -12,7 +12,7 @@ import {
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { ExecuteInput, JournalFacts, ToolContext, ToolReply } from "../contracts/types.ts";
-import { selectChunks } from "../index/select.ts";
+import { moreLine, selectChunks } from "../index/select.ts";
 import { canonicalKey } from "../journal/append.ts";
 import { isInside } from "../project/contain.ts";
 import { capBytes } from "../sandbox/cap.ts";
@@ -127,7 +127,7 @@ function sourceLabel(code: string): string {
 
 // Same text as select.ts moreLine; reserved in the budget so the reply always ends with it (D-M2-6).
 function moreReserve(intent: string, label: string): number {
-  return Buffer.byteLength("ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(label) + "})", "utf8");
+  return Buffer.byteLength(moreLine(intent, label), "utf8");
 }
 
 function spawnFailed(argv0: string, cwd: string): string {

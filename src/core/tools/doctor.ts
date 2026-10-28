@@ -8,7 +8,7 @@ import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
   DOCTOR_CHECK_ORDER, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
-  PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA,
+  PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type {
@@ -19,8 +19,9 @@ import { checkDb, checkIndex } from "../ops/doctor-db.ts";
 import { checkMcp, checkMode, checkNode, checkProject, checkShell, checkVersion } from "../ops/doctor-env.ts";
 import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
 import { healD8 } from "../ops/db-heal.ts";
-import { buildReport } from "../ops/report.ts";
+import { buildReport, buildReportHead } from "../ops/report.ts";
 import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
+import { indexText } from "../index/text.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
 import { closeDb, openDb } from "../store/db.ts";
 
@@ -138,8 +139,19 @@ async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolRe
   const rows = await runDoctorChecks(ctx, adapter, host); // step 2
   // ADR-0019 D7: name the CLI command; setup when a row failed (it repairs and verifies), else doctor.
   const command = `context-mode ${rows.some((r) => r.status === "FAIL") ? "setup" : "doctor"} --agents ${adapter.id}`;
-  const text = buildReport({ agent: adapter.id, rows, env: reportEnv(process.env), command }); // step 3
-  return { text, isError: false, sandboxBytes: Buffer.byteLength(text, "utf8") }; // step 4
+  const input = { agent: adapter.id, rows, env: reportEnv(process.env), command };
+  const whole = buildReport(input); // step 3
+  const bytes = Buffer.byteLength(whole, "utf8");
+  if (bytes <= REPORT_CAP) return { text: whole, isError: false, sandboxBytes: bytes }; // step 4
+  // D-NO-LOSSY-CUT-1: over the cap, the whole report is stored first; the reply holds the FAIL rows and the pointer.
+  const db = await openDb(ctx.project);
+  try {
+    indexText(db, ctx.project, ctx.sessionId, REPORT_SOURCE_LABEL, whole, "text");
+  } finally {
+    closeDb(db);
+  }
+  const text = buildReportHead(input);
+  return { text, isError: false, sandboxBytes: bytes };
 }
 
 export const ctxDoctor = Object.freeze({

@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { z } from "zod/v4";
-import { DECISION_SOURCE, DECISION_USER_LABEL, EXEC_TIMEOUT_MS, OUTPUT_CAP } from "../contracts/constants.ts";
+import { DECISION_SOURCE, DECISION_USER_LABEL, ECHO_MAX_BYTES, EXEC_TIMEOUT_MS, OUTPUT_CAP } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { CtxIndexInput, DbHandle, ProjectContext, SourceKind, ToolContext, ToolReply } from "../contracts/types.ts";
 import { walkDir } from "../index/walk.ts";
@@ -14,6 +14,7 @@ import { capBytes } from "../sandbox/cap.ts";
 import { safeFetch } from "../sandbox/fetch.ts";
 import { unknownField } from "./search.ts";
 import { closeDb, openDb } from "../store/db.ts";
+import { sourceHandle } from "../store/fts.ts";
 import { indexText, storeText, type ChunkKind } from "../index/text.ts";
 import { hasMdStructure } from "../index/chunk.ts";
 
@@ -123,11 +124,14 @@ async function handler(input: CtxIndexInput, ctx: ToolContext): Promise<ToolRepl
     let sources = 0;
     let chunks = 0;
     let bytes = 0;
+    let lastId = 0;
     try {
       for (const it of items) {
         const text = it.read();
         if (text === undefined) continue;
-        chunks += storeText(db, ctx.project, ctx.sessionId, it.sourceKind, it.label, text, it.kind).chunks;
+        const stored = storeText(db, ctx.project, ctx.sessionId, it.sourceKind, it.label, text, it.kind);
+        chunks += stored.chunks;
+        lastId = stored.sourceId;
         bytes += Buffer.byteLength(text, "utf8");
         sources += 1;
       }
@@ -135,7 +139,9 @@ async function handler(input: CtxIndexInput, ctx: ToolContext): Promise<ToolRepl
       closeDb(db);
     }
     // Step 6; step 5 is the server's one journal row, fed by `journal` (D-M2-2).
-    const line = "Indexed " + sources + " source(s), " + chunks + " chunk(s) from " + from + ".";
+    // D-NO-LOSSY-CUT-2: a long label is stored whole; the reply names it by its handle (ctx_search source accepts it).
+    const shown = Buffer.byteLength(from, "utf8") > ECHO_MAX_BYTES ? sourceHandle(lastId) : from;
+    const line = "Indexed " + sources + " source(s), " + chunks + " chunk(s) from " + shown + ".";
     return {
       text: capBytes(line, OUTPUT_CAP).text,
       isError: false,

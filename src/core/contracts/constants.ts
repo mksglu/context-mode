@@ -349,7 +349,10 @@ export const HOOK_ENTRY_FILE = "hook.mjs"; // D5 runs this next to the server bu
 export const REPORT_HEADER = "| Check | Status | Detail | Fix |"; // impl/07 §4 Output
 export const REPORT_HEADER_RULE = "|---|---|---|---|";
 export const REPORT_COMMAND_PREFIX = "Run in a terminal: "; // ADR-0019 D7: one keyless line after the rows, before env lines
-export const REPORT_TRUNCATED_LINE = `(report truncated at ${REPORT_CAP} B; run ctx_doctor again after the first fix)`; // impl/07 §4 step 4
+export const ECHO_MAX_BYTES = 256; // D-NO-LOSSY-CUT-2: a caller input echoed in a reply (intent, query, source) longer than this is named by position or id, so a pointer or head always fits OUTPUT_CAP
+export const REPORT_SOURCE_LABEL = "ctx_doctor:report"; // D-NO-LOSSY-CUT-1: the full report is stored under this label when it is over REPORT_CAP
+export const REPORT_REST_PREFIX = "Rows not shown here are stored in full. Read them with: "; // + moreLine(...) pointer
+export const REPORT_POINTER = `ctx_search({queries:["FAIL","PASS","UNKNOWN"], source:${JSON.stringify(REPORT_SOURCE_LABEL)}})`; // every row holds one status word, so these three queries reach every stored row
 export function DOCTOR_FAIL_LINE(host: string, check: string, cause: string, command: string): string {
   return `FAIL ${host}: ${check} — ${cause}. Fix: ${command}`; // ADR-0010 per-host FAIL string, impl/07 §4 step 2
 }
@@ -682,7 +685,7 @@ export const OWN_MCP_ENTRY: Readonly<Partial<Record<AgentId, OwnMcpEntry>>> = Ob
 });
 
 // ctx_doctor report env lines (impl/07 §4, ADR-0014 §3; DEVIATIONS D-M5-O3-1). Header, rule, FAIL string and
-// truncation line are REPORT_HEADER, REPORT_HEADER_RULE, DOCTOR_FAIL_LINE, REPORT_TRUNCATED_LINE above.
+// stored-report pointer are REPORT_HEADER, REPORT_HEADER_RULE, DOCTOR_FAIL_LINE, REPORT_REST_PREFIX above.
 export const REPORT_INVALID = "<invalid>"; // ADR-0014 §3: a value that fails the typed scanner is dropped whole
 export const REPORT_ENV_PREFIX = "env."; // one `env.<KEY>: <value>` line per env key, after the table
 // ADR-0014 §3: an env value passes only as a member of its key's closed enum; every other value is REPORT_INVALID.

@@ -3,6 +3,7 @@
 // DEVIATIONS D-M2-6, D-M2-T3-1 (rankTexts), D-M2-T8-1.
 // Reduction is selection of whole chunks; nothing is cut. The full text stays indexed and `more`
 // names the search that reaches every chunk that was not selected.
+import { ECHO_MAX_BYTES } from "../contracts/constants.ts";
 import type { Chunk, DbHandle } from "../contracts/types.ts";
 import { rankTexts } from "../store/fts.ts";
 
@@ -61,5 +62,7 @@ function select(chunks: Chunk[], intent: string, budget: number, label: string |
 
 export function moreLine(intent: string, label: string | undefined): string {
   const source = label === undefined ? "" : ", source:" + JSON.stringify(label);
-  return "ctx_search({queries:[" + JSON.stringify(intent) + "]" + source + "})";
+  // D-NO-LOSSY-CUT-2: a long intent is not echoed (the caller holds it), the same `[...]` as the ctx_batch footer.
+  const query = Buffer.byteLength(intent, "utf8") > ECHO_MAX_BYTES ? "..." : JSON.stringify(intent);
+  return "ctx_search({queries:[" + query + "]" + source + "})";
 }

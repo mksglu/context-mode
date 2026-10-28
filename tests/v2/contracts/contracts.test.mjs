@@ -421,7 +421,8 @@ test("[M5] doctor check order, labels and D5 fixture (ADR-0010, impl/07 §5)", (
   assert.equal(C.HOOK_FIXTURE_FILE, "hook-roundtrip.json");
   assert.equal(C.DOCTOR_FAIL_LINE("codex", "D8", "integrity_check failed", "run ctx_upgrade"), "FAIL codex: D8 — integrity_check failed. Fix: run ctx_upgrade");
   assert.equal(C.REPORT_HEADER, "| Check | Status | Detail | Fix |");
-  assert.equal(C.REPORT_TRUNCATED_LINE, "(report truncated at 4096 B; run ctx_doctor again after the first fix)");
+  assert.equal(C.REPORT_SOURCE_LABEL, "ctx_doctor:report");
+  assert.equal(C.REPORT_REST_PREFIX, "Rows not shown here are stored in full. Read them with: ");
   assert.equal(C.D8_STALE_SCHEMA_DETAIL(1, 2), "stale schema (v1, expected v2)");
   assert.equal(C.D9_INDEX_DETAIL(0, 0), "0 sources, 0 chunks indexed");
   assert.equal(C.D5_CODEX_UNTRUSTED_DETAIL, "Codex hooks not trusted");
