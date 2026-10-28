@@ -1,7 +1,7 @@
 {
   "name": "context-mode",
-  "version": "1.0.169",
-  "description": "MCP server that saves 98% of your context window with session continuity. Sandboxed code execution in 11 languages, FTS5 knowledge base with BM25 ranking, and automatic state restore across compactions.",
+  "version": "2.0.0-next.8",
+  "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
   "author": {
     "name": "Mert Koseoğlu",
     "url": "https://github.com/mksglu"
@@ -10,21 +10,28 @@
   "repository": "https://github.com/mksglu/context-mode",
   "license": "Elastic-2.0",
   "keywords": [
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "qwen-code",
+    "copilot-cli",
+    "vscode",
+    "opencode",
+    "pi",
+    "kiro",
+    "zcode",
     "mcp",
     "context-window",
     "sandbox",
-    "code-execution",
     "fts5",
-    "bm25",
-    "playwright",
-    "context7"
+    "pi-package"
   ],
   "mcpServers": "./.codex-plugin/mcp.json",
   "hooks": "./.codex-plugin/hooks.json",
   "skills": "./skills/",
   "interface": {
     "displayName": "context-mode",
-    "shortDescription": "98% context window savings via FTS5 + sandboxed execution",
+    "shortDescription": "Local context window saver: FTS5 search and sandboxed execution",
     "developerName": "Mert Koseoğlu",
     "category": "Productivity"
   }

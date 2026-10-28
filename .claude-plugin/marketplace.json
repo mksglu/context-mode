@@ -5,28 +5,35 @@
     "email": "code.bm.ksglu@gmail.com"
   },
   "metadata": {
-    "description": "Claude Code plugins by Mert Koseoğlu",
-    "version": "1.0.169"
+    "description": "Context Mode plugins by Mert Koseoğlu",
+    "version": "2.0.0-next.8"
   },
   "plugins": [
     {
       "name": "context-mode",
       "source": "./",
-      "description": "Claude Code MCP plugin that saves 98% of your context window. Sandboxed code execution in 11 languages, FTS5 knowledge base with BM25 ranking, and intent-driven search.",
-      "version": "1.0.169",
+      "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
+      "version": "2.0.0-next.8",
       "author": {
         "name": "Mert Koseoğlu"
       },
       "category": "development",
       "keywords": [
+        "claude-code",
+        "codex",
+        "gemini-cli",
+        "qwen-code",
+        "copilot-cli",
+        "vscode",
+        "opencode",
+        "pi",
+        "kiro",
+        "zcode",
         "mcp",
         "context-window",
         "sandbox",
-        "code-execution",
         "fts5",
-        "bm25",
-        "playwright",
-        "context7"
+        "pi-package"
       ]
     }
   ]
