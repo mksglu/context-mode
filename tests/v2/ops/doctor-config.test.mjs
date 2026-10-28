@@ -268,3 +268,24 @@ test("[GEM-WIN-4] doctor-config/D3 gemini: the ${/} token is a separator, a bare
   const bad = await extensionInstall(t, "gemini", (s) => s.replaceAll("${extensionPath}${/}hook.mjs", "${extensionPath}hook.mjs"));
   assert.equal(checkHostConfig(bad.row, { HOME: bad.home, USERPROFILE: bad.home }, bad.home).status, "FAIL");
 });
+
+// D-DOC-D3-ROOT-1: Claude Code 2.1.311 puts the plugin under plugins/cache/<marketplace>/context-mode/<version> and records
+// that dir as installPath. D3 must read hooks/claude-code.json from there (tester report 2, next.8: "wrong: hook entries").
+for (const [name, layout] of [["versioned", true], ["flat", false]]) {
+  for (const spaced of [false, true]) {
+    test(`[D-DOC-D3-ROOT-1] doctor-config/D3 claude-code ${name} plugin cache${spaced ? ", space in HOME" : ""} passes`, async (t) => {
+      const { generateManifests } = await import("../../../build/manifests.ts");
+      const base = tmp(t);
+      const out = path.join(base, "out");
+      mkdirSync(out);
+      generateManifests(out);
+      const home = path.join(base, spaced ? "my home" : "home");
+      const plugins = path.join(home, ".claude", "plugins");
+      const root = layout ? path.join(plugins, "cache", "context-mode", "context-mode", "2.0.0-next.8") : path.join(plugins, "cache", "mp", "context-mode");
+      put(path.join(root, "hooks", "claude-code.json"), readFileSync(path.join(out, "hooks", "claude-code.json"), "utf8"));
+      if (layout) put(path.join(plugins, "installed_plugins.json"), JSON.stringify({ version: 2, plugins: { "context-mode@context-mode": [{ scope: "user", installPath: root }] } }));
+      const d3 = checkHostConfig(getAdapter("claude-code"), { HOME: home, USERPROFILE: home }, home);
+      assert.equal(d3.status, "PASS", d3.detail);
+    });
+  }
+}
