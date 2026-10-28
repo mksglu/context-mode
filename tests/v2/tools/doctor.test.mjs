@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite"; // v2 has one engine, node:sqlite (ADR-0002); better-sqlite3 is gone (D-PKG-META-1)
 
 import { ctxDoctor, runDoctorChecks } from "../../../src/core/tools/doctor.ts";
 import { getAdapter } from "../../../src/adapters/table.ts";
@@ -52,7 +52,7 @@ test("[M5] doctor/D8-stale-schema-and-integrity-check-are-distinct-detail-string
   const home = tmp(t);
   const { ctx } = await doctor(home);
   mkdirSync(ctx.project.projectDir, { recursive: true });
-  const db = new Database(ctx.project.dbPath);
+  const db = new DatabaseSync(ctx.project.dbPath);
   db.exec("PRAGMA user_version = 999;"); // stale schema
   db.close();
   const stale = (await doctor(home)).rows.find((r) => r.id === "D8");

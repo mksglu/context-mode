@@ -1,84 +1,53 @@
 {
   "name": "context-mode",
-  "version": "1.0.169",
+  "version": "2.0.0-next.8",
   "type": "module",
-  "description": "MCP plugin that saves 98% of your context window. Works with Claude Code, Gemini CLI, VS Code Copilot, OpenCode, and Codex CLI. Sandboxed code execution, FTS5 knowledge base, and intent-driven search.",
+  "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
   "author": "Mert Koseoğlu",
   "license": "Elastic-2.0",
   "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "claude",
     "claude-code",
+    "codex",
     "gemini-cli",
-    "vscode-copilot",
+    "qwen-code",
+    "copilot-cli",
+    "vscode",
     "opencode",
-    "openclaw",
-    "codex-cli",
+    "pi",
+    "kiro",
+    "zcode",
+    "mcp",
     "context-window",
     "sandbox",
-    "code-execution",
     "fts5",
-    "bm25",
     "pi-package"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/mksglu/context-mode"
+    "url": "git+https://github.com/mksglu/context-mode.git"
   },
   "homepage": "https://github.com/mksglu/context-mode#readme",
-  "pi": {
-    "extensions": [
-      "./build/adapters/pi/extension.js"
-    ],
-    "skills": [
-      "./skills"
-    ]
-  },
-  "omp": {
-    "name": "context-mode",
-    "description": "Save 98% of your context window in OMP — sandboxed code execution, FTS5 search, hard-block curl/wget, session continuity across compaction.",
-    "extensions": [
-      "./build/adapters/omp/plugin.js"
-    ]
-  },
-  "bugs": "https://github.com/mksglu/context-mode/issues",
-  "main": "./build/adapters/opencode/plugin.js",
-  "exports": {
-    ".": "./build/adapters/opencode/plugin.js",
-    "./plugin": "./build/adapters/opencode/plugin.js"
+  "bugs": {
+    "url": "https://github.com/mksglu/context-mode/issues"
   },
   "scripts": {
     "build": "node build/build.mjs --out release-out",
     "build:release": "node build/build.mjs --out release-out",
     "typecheck": "tsc --noEmit",
     "gate": "node scripts/gate.mjs",
-    "e2e": "node e2e/cases/run.mjs",
-    "keep-pass": "vitest run --config tests/vitest.config.ts"
-  },
-  "dependencies": {
-    "@clack/prompts": "^1.0.1",
-    "@mixmark-io/domino": "^2.2.0",
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "better-sqlite3": "^12.6.2",
-    "picocolors": "^1.1.1",
-    "turndown": "^7.2.0",
-    "turndown-plugin-gfm": "^1.0.2",
-    "zod": "^3.25.0"
+    "e2e": "node e2e/cases/run.mjs"
   },
   "devDependencies": {
+    "@clack/prompts": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@modelcontextprotocol/server": "2.3.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.11",
-    "@types/turndown": "^5.0.5",
     "esbuild": "0.24.0",
     "toml-eslint-parser": "1.0.3",
-    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.0.18"
+    "zod": "^3.25.0"
   },
-  "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=24.15.0"
   }
 }

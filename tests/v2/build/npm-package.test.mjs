@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const DEV = JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")); // D-PKG-META-1: shared fields come from here
 const FIXTURE = JSON.parse(readFileSync(path.join(REPO, "e2e", "fixtures", "hook-roundtrip.json"), "utf8"));
 const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 let out;
@@ -31,6 +32,11 @@ test("[M7] build/npm-d1-shape: release-out/package.json is the D1 package (bin c
   const pkg = JSON.parse(readFileSync(path.join(out, "package.json"), "utf8"));
   const top = readdirSync(out).filter((n) => n !== "package.json").sort();
   assert.deepEqual(pkg, {
+    bugs: DEV.bugs,
+    description: DEV.description,
+    homepage: DEV.homepage,
+    keywords: DEV.keywords,
+    license: DEV.license,
     bin: { "context-mode": "cli.mjs" },
     engines: { node: ">=24.15.0" },
     files: top,

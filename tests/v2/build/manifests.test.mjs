@@ -5,9 +5,14 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { assertOutPackageJson, buildMatcher, generateManifests } from "../../../build/manifests.ts";
 import { ADAPTERS, getAdapter } from "../../../src/adapters/table.ts";
+
+// D-PKG-META-1: the shared release fields are read from the repo package.json, so the tests read them there too.
+const DEV = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "package.json"), "utf8"));
+const META = { description: DEV.description, keywords: DEV.keywords, license: DEV.license, homepage: DEV.homepage, bugs: DEV.bugs };
 
 const CLAUDE_MATCHER_NAMES = "Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit";
 const MATCHERS = {
@@ -108,21 +113,21 @@ test("plugin and extension manifests carry name, dev version and the --agent MCP
   // D-M3-F-5: Claude Code runs the plugin server with cwd = the project, so the path names the plugin root.
   const claudeEntry = { "context-mode": { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/server.mjs", "--agent", "claude-code"] } };
   assert.deepEqual(readJson(dir, ".claude-plugin/plugin.json"), {
-    hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", skills: "./claude-code/skills", version: "0.0.0-dev",
+    description: DEV.description, hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", skills: "./claude-code/skills", version: "0.0.0-dev",
   });
   // D-INST-3: `claude plugin marketplace add <package dir>` (what setup runs) needs this file in the npm package.
   assert.deepEqual(readJson(dir, ".claude-plugin/marketplace.json"), {
-    name: "context-mode", owner: { name: "context-mode" }, plugins: [{ description: "Context Mode for Claude Code", name: "context-mode", skills: "./claude-code/skills", source: "./", version: "0.0.0-dev" }],
+    name: "context-mode", owner: { name: "context-mode" }, plugins: [{ description: DEV.description, name: "context-mode", skills: "./claude-code/skills", source: "./", version: "0.0.0-dev" }],
   });
   // D-FU-RM-GEMINI-1: Gemini expands ${extensionPath} and ${/} in the manifest and reads hooks only from <ext>/hooks/hooks.json.
   const geminiEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "gemini"] } };
-  assert.deepEqual(readJson(dir, "gemini-extension.json"), { mcpServers: geminiEntry, name: "context-mode", version: "0.0.0-dev" });
+  assert.deepEqual(readJson(dir, "gemini-extension.json"), { description: DEV.description, mcpServers: geminiEntry, name: "context-mode", version: "0.0.0-dev" });
   // D-FU-RM-QWEN-1: Qwen expands ${extensionPath} and ${/} in the manifest and reads config.hooks (a path relative to the extension).
   const qwenEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "qwen"] } };
   assert.deepEqual(readJson(dir, "qwen-extension.json"), {
-    hooks: "hooks/qwen.json", mcpServers: qwenEntry, name: "context-mode", version: "0.0.0-dev",
+    description: DEV.description, hooks: "hooks/qwen.json", mcpServers: qwenEntry, name: "context-mode", version: "0.0.0-dev",
   });
-  assert.deepEqual(readJson(dir, "copilot/plugin.json"), { mcpServers: entry("copilot-cli"), name: "context-mode", version: "0.0.0-dev" });
+  assert.deepEqual(readJson(dir, "copilot/plugin.json"), { description: DEV.description, mcpServers: entry("copilot-cli"), name: "context-mode", version: "0.0.0-dev" });
 });
 
 test("hook files follow each host shape of impl/10 §1.5", (t) => {
@@ -205,6 +210,7 @@ test("package.json is the D1 npm shape: name, version, bin, type, engines, files
   const dir = scratch(t);
   generateManifests(dir, "2.0.0");
   assert.deepEqual(readJson(dir, "package.json"), {
+    ...META,
     bin: { "context-mode": "cli.mjs" },
     engines: { node: ">=24.15.0" },
     files: D1_FILES,
@@ -220,6 +226,7 @@ test("package.json is the D1 npm shape: name, version, bin, type, engines, files
 
 test("assertOutPackageJson throws on dependencies, scripts, private or any other key", () => {
   const ok = {
+    ...META,
     name: "context-mode", version: "2.0.0", type: "module", bin: { "context-mode": "cli.mjs" }, engines: { node: ">=24.15.0" },
     files: D1_FILES, main: "./opencode/plugin.js", pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
     repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" },
@@ -237,6 +244,9 @@ test("assertOutPackageJson throws on dependencies, scripts, private or any other
   // D-RN-REPO-1: npm provenance (E422) needs repository.url to name the source repo; npm pkg fix form, so it stays a no-op.
   assert.throws(() => assertOutPackageJson({ ...ok, repository: { type: "git", url: "" } }), /repository/);
   assert.throws(() => assertOutPackageJson({ ...ok, repository: { type: "git", url: "https://github.com/mksglu/context-mode" } }), /repository/);
+  for (const key of ["description", "keywords", "license", "homepage", "bugs"]) { // D-PKG-META-1: must equal the repo package.json
+    assert.throws(() => assertOutPackageJson({ ...ok, [key]: "x" }), new RegExp(key));
+  }
   assert.throws(() => assertOutPackageJson({ ...ok, main: "./server.mjs" }), /main/); // ADR-0023 D-NI-OPENCODE-1
   for (const key of ["pi", "bin", "engines", "files", "repository"]) {
     const { [key]: _drop, ...missing } = ok;

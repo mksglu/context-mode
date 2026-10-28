@@ -2,15 +2,31 @@
 // DECISIONS-r9 R1, R4; DEVIATIONS D-M3-arch-4, D-M3-A7-1..5). Build-time only: reads adapters/table.ts rows and
 // writes files; never shipped as code. M6 adds the release-only part: `version` from plan.mjs via build.mjs --version
 // (D-M6-arch-3, D-M6-B2-1); hashes are build/hash.mjs.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { ADAPTERS, hasReplace } from "../src/adapters/table.ts";
 import type { AgentId } from "../src/core/contracts/agents.ts";
-import { KIRO_TOOL_MATCHERS, RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
+import { KIRO_TOOL_MATCHERS, NODE_MIN, RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
 import type { AdapterRow } from "../src/core/contracts/types.ts";
 
 // Build-tool literals (same rule as build.mjs DEFAULT_OUT/BUNDLES; DEVIATIONS D-M3-A7-5).
 const DEV_VERSION = "0.0.0-dev"; // impl/13 §3.1 step 2: non-release builds
+// D-PKG-META-1: the repo package.json is the one source of the shared release fields (description, keywords, license,
+// homepage, bugs, repository). The release version comes from build.mjs --version; engines from NODE_MIN.
+const DEV_PACKAGE_JSON = fileURLToPath(new URL("../package.json", import.meta.url));
+interface DevMeta { description: string; keywords: string[]; license: string; homepage: string; bugs: JsonObject; repository: JsonObject }
+function devMeta(): DevMeta {
+  const pkg = JSON.parse(readFileSync(DEV_PACKAGE_JSON, "utf8")) as Record<string, unknown>;
+  for (const key of ["description", "license", "homepage"]) {
+    if (typeof pkg[key] !== "string" || pkg[key] === "") throw new Error("package.json: " + key + " must be a non-empty string");
+  }
+  if (!Array.isArray(pkg.keywords) || pkg.keywords.length === 0) throw new Error("package.json: keywords must be a non-empty array");
+  for (const key of ["bugs", "repository"]) {
+    if (pkg[key] === null || typeof pkg[key] !== "object" || Array.isArray(pkg[key])) throw new Error("package.json: " + key + " must be an object");
+  }
+  return pkg as unknown as DevMeta;
+}
 const NODE_COMMAND = "node";
 const SERVER_BUNDLE = "server.mjs";
 const HOOK_BUNDLE = "hook.mjs";
@@ -130,6 +146,7 @@ function mcpManifest(row: AdapterRow, version: string): JsonObject {
   return {
     name: SERVER_KEY,
     version,
+    description: devMeta().description,
     mcpServers: { [SERVER_KEY]: { command: NODE_COMMAND, args: [serverArg(row), AGENT_FLAG, row.id] } },
   };
 }
@@ -167,7 +184,7 @@ function codexPlugin(row: AdapterRow, version: string): [string, JsonObject][] {
   const hookCmd: JsonObject = { type: "command", command: [NODE_COMMAND, '"' + CODEX_PLUGIN_ROOT + "/" + HOOK_BUNDLE + '"', AGENT_FLAG, row.id].join(" ") };
   return [
     [CODEX_PLUGIN_DIR + "/plugin.json", {
-      name: SERVER_KEY, version, description: "Context Mode for Codex",
+      name: SERVER_KEY, version, description: devMeta().description,
       mcpServers: "./" + CODEX_PLUGIN_DIR + "/mcp.json", hooks: "./" + CODEX_PLUGIN_DIR + "/hooks.json", skills: "./" + CODEX_PLUGIN_SKILLS + "/",
       interface: { displayName: SERVER_KEY, category: "Productivity" },
     }],
@@ -182,7 +199,7 @@ const PI_EXTENSION = "./pi/index.js";
 const PI_SKILLS = "./pi/skills"; // D-HQ-SKILLS-1: pi's own rendered copy
 const OPENCODE_MAIN = "./opencode/plugin.js"; // ADR-0023 (D-NI-OPENCODE-1): OpenCode imports the plugin by package name
 const CLI_BUNDLE = "cli.mjs";
-const NODE_ENGINE = ">=24.15.0"; // D1
+const NODE_ENGINE = ">=" + NODE_MIN; // D1, the runtime check constant (D-PKG-META-1)
 
 // D1 "files = the release tree": every top-level name build.mjs writes, except package.json (npm always packs it).
 // build.mjs assertOutTree fails the build when the real tree and this list differ.
@@ -193,13 +210,15 @@ export const OUT_FILES: readonly string[] = [
 // D-RN-REPO-1: npm provenance rejects a publish (E422) unless repository.url names the source repo. This is the
 // `npm pkg fix` form, so check-npm-tarball.mjs's "npm pkg fix is a no-op" gate still holds.
 const REPOSITORY = { type: "git", url: "git+https://github.com/mksglu/context-mode.git" };
-const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "engines", "files", "main", "name", "pi", "repository", "type", "version"];
+const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "bugs", "description", "engines", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"];
 const PI_KEYS: readonly string[] = ["extensions", "skills"];
 
 function npmPackageJson(version: string): JsonObject {
+  const meta = devMeta();
   return {
     name: SERVER_KEY, version, type: "module", bin: { [SERVER_KEY]: CLI_BUNDLE }, engines: { node: NODE_ENGINE },
-    files: [...OUT_FILES], main: OPENCODE_MAIN, pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] }, repository: { ...REPOSITORY },
+    files: [...OUT_FILES], main: OPENCODE_MAIN, pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] },
+    description: meta.description, keywords: [...meta.keywords], license: meta.license, homepage: meta.homepage, bugs: meta.bugs, repository: meta.repository,
   };
 }
 
@@ -219,6 +238,10 @@ export function assertOutPackageJson(pkg: unknown): void {
   if (JSON.stringify(obj.files) !== JSON.stringify(OUT_FILES)) throw new Error("package.json: files must be " + OUT_FILES.join(","));
   if (obj.main !== OPENCODE_MAIN) throw new Error("package.json: main must be " + OPENCODE_MAIN);
   if (JSON.stringify(obj.repository) !== JSON.stringify(REPOSITORY)) throw new Error("package.json: repository must be " + JSON.stringify(REPOSITORY));
+  const meta = devMeta(); // D-PKG-META-1: the shared fields must equal the repo package.json
+  for (const key of ["description", "keywords", "license", "homepage", "bugs"] as const) {
+    if (JSON.stringify(obj[key]) !== JSON.stringify(meta[key])) throw new Error("package.json: " + key + " must equal the repo package.json " + key);
+  }
   const pi = obj.pi;
   if (pi === null || typeof pi !== "object" || Array.isArray(pi)) throw new Error("package.json: pi must be an object");
   const piObj = pi as Record<string, unknown>;
@@ -253,7 +276,7 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
     if (row.installMode === "marketplace") { // D-INST-3: setup runs `claude plugin marketplace add <package dir>`
       files.push([".claude-plugin/marketplace.json", {
         name: SERVER_KEY, owner: { name: SERVER_KEY }, // Claude Code rejects a marketplace file without an owner object
-        plugins: [{ name: SERVER_KEY, source: "./", description: "Context Mode for Claude Code", version, skills: skillsDir(row) }],
+        plugins: [{ name: SERVER_KEY, source: "./", description: devMeta().description, version, skills: skillsDir(row) }],
       }]);
     }
     if (row.id === "codex") files.push(...codexPlugin(row, version));
