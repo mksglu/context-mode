@@ -203,6 +203,66 @@ export function checkNativePages(pages) {
   return bad;
 }
 
+// D-NI-DOCS-REF-2: until v2 is on main, main holds the old build. Every GitHub-source command a user copies names the
+// release ref in the host's own syntax (claude and codex: a #release or @release suffix on the repo; gemini and qwen: --ref release).
+// Only a line that starts with "After v2 is on main: " may hold the command without it. No regex: plain string search.
+export const SWITCH_HEADING = "Already installed from GitHub?";
+export const AFTER_PREFIX = "After v2 is on main: ";
+const REF_HOSTS = Object.freeze(["claude-code", "codex", "gemini", "qwen"]);
+const REF_BOUNDARY = " `,.|)\"'";
+const SUFFIX_CMD = "plugin marketplace add mksglu/context-mode"; // claude, /plugin in claude, codex
+const FLAG_CMD = "extensions install https://github.com/mksglu/context-mode"; // gemini, qwen
+const atBoundary = (rest) => rest === "" || REF_BOUNDARY.includes(rest[0]);
+
+/** The "### Already installed from GitHub?" part of a page: from its heading to the next heading, or "" when absent. */
+export function switchSection(text) {
+  const start = text.indexOf(`### ${SWITCH_HEADING}`);
+  if (start < 0) return "";
+  const rest = text.slice(start + 4);
+  const end = rest.indexOf("\n#");
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+/** Each GitHub-source command in `line` that lacks the release ref (one entry per command). */
+function bareCommands(line) {
+  const out = [];
+  for (const [cmd, flag] of [[SUFFIX_CMD, false], [FLAG_CMD, true]]) {
+    let at = line.indexOf(cmd);
+    while (at >= 0) {
+      const rest = line.slice(at + cmd.length);
+      if (!flag) {
+        const ok = rest.startsWith("#release") || rest.startsWith("@release") ? atBoundary(rest.slice(8)) : false;
+        if (!ok && atBoundary(rest)) out.push(cmd);
+      } else if (rest === "" || rest[0] === ":" || atBoundary(rest)) {
+        let tail = 0;
+        while (tail < rest.length && !" `,|".includes(rest[tail])) tail++;
+        const after = rest.slice(tail);
+        if (!(after.startsWith(" --ref release") && atBoundary(after.slice(14)))) out.push(cmd);
+      }
+      at = line.indexOf(cmd, at + cmd.length);
+    }
+  }
+  return out;
+}
+
+/** pages: { relative path: text }. Fails a GitHub-source command without the release ref, and a host page without the switch step. */
+export function checkReleaseRef(pages) {
+  const bad = [];
+  for (const [name, text] of Object.entries(pages)) {
+    text.split("\n").forEach((line, i) => {
+      if (line.trim().startsWith(AFTER_PREFIX)) return;
+      for (const cmd of bareCommands(line)) bad.push(`${name}:${i + 1} GitHub-source command without the release ref (claude #release, codex @release, gemini and qwen --ref release): ${cmd}`);
+    });
+    const parts = name.split("/");
+    const id = parts[parts.length - 1].replace(".md", "");
+    const inInstall = parts.length === 1 || parts[parts.length - 2] === "install";
+    if (inInstall && REF_HOSTS.includes(id) && (!installSection(text).includes(`### ${SWITCH_HEADING}`) || fencedBlocks(switchSection(text)).length !== 1)) {
+      bad.push(`${name} needs the switch step: a "### ${SWITCH_HEADING}" part in Install with one block of the host's own remove and add commands`);
+    }
+  }
+  return bad;
+}
+
 const V1_WORD = /\bv1\b/i;
 /** Lines of `text` that hold the word v1 (any case; v10, ev1 and @1 do not match). */
 export function checkNoV1(name, text) {
@@ -248,6 +308,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     pages["../../README.md"] = readFileSync(readme, "utf8"); // root README: same two-command rule
     bad.push(...checkSimplePages(pages));
     bad.push(...checkNativePages(pages));
+    bad.push(...checkReleaseRef(Object.fromEntries(docFiles(repo).map((f) => [path.relative(repo, f), readFileSync(f, "utf8")]))));
   }
   for (const b of bad) console.log("  " + b);
   console.log(`${bad.length ? "FAIL" : "PASS"} install-docs ${files.length} files`);

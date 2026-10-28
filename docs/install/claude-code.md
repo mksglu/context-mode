@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-claude plugin marketplace add mksglu/context-mode
+claude plugin marketplace add mksglu/context-mode#release
 claude plugin install context-mode@context-mode
 ```
 
@@ -15,11 +15,11 @@ claude plugin update context-mode@context-mode
 
 Check: `context-mode doctor`
 
-Testing v2 (next): `claude plugin marketplace add mksglu/context-mode#release`, then `claude plugin install context-mode@context-mode`
+Until v2 is on `main`, `main` holds the old build (1.0.169), so the commands above name the `release` branch (`#release`).
 
 After v2 is on main: `claude plugin marketplace add mksglu/context-mode`, then `claude plugin install context-mode@context-mode`
 
-In Claude Code itself: `/plugin marketplace add mksglu/context-mode`, then `/plugin install context-mode@context-mode`. Restart Claude Code after the install and after each update.
+Restart Claude Code after the install and after each update.
 
 `next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
 
@@ -32,6 +32,18 @@ context-mode setup --agents claude-code
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents claude-code`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print claude-code` and follow what it prints.
+
+### Already installed from GitHub?
+
+You added `mksglu/context-mode` without `#release` and `claude plugin list` shows 1.0.169. `claude plugin marketplace remove` removes a configured marketplace and its plugins. Then add the marketplace again with `#release`:
+
+```sh
+claude plugin marketplace remove context-mode
+claude plugin marketplace add mksglu/context-mode#release
+claude plugin install context-mode@context-mode
+```
+
+`claude plugin list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 

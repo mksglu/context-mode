@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-gemini extensions install https://github.com/mksglu/context-mode
+gemini extensions install https://github.com/mksglu/context-mode --ref release
 ```
 
 Update:
@@ -14,7 +14,7 @@ gemini extensions update context-mode
 
 Check: `context-mode doctor`
 
-Testing v2 (next): `gemini extensions install https://github.com/mksglu/context-mode --ref release`
+Until v2 is on `main`, `main` holds the old build (1.0.169), so the command above names the `release` branch (`--ref release`).
 
 After v2 is on main: `gemini extensions install https://github.com/mksglu/context-mode`
 
@@ -31,6 +31,17 @@ context-mode setup --agents gemini
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents gemini`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print gemini` and follow what it prints.
+
+### Already installed from GitHub?
+
+You installed without `--ref release` and `gemini extensions list` shows 1.0.169. `gemini extensions uninstall` uninstalls one or more extensions. Then install again with the ref:
+
+```sh
+gemini extensions uninstall context-mode
+gemini extensions install https://github.com/mksglu/context-mode --ref release
+```
+
+`gemini extensions list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 

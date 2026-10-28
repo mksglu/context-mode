@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-qwen extensions install https://github.com/mksglu/context-mode:context-mode
+qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
 ```
 
 Update:
@@ -14,7 +14,7 @@ qwen extensions update context-mode
 
 Check: `context-mode doctor`
 
-Testing v2 (next): `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release`
+Until v2 is on `main`, `main` holds the old build (1.0.169), so the command above names the `release` branch (`--ref release`).
 
 After v2 is on main: `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
 
@@ -31,6 +31,17 @@ context-mode setup --agents qwen
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents qwen`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print qwen` and follow what it prints.
+
+### Already installed from GitHub?
+
+You installed without `--ref release` and `qwen extensions list` shows 1.0.169. `qwen extensions uninstall` uninstalls an extension. Then install again with the ref:
+
+```sh
+qwen extensions uninstall context-mode
+qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
+```
+
+`qwen extensions list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 

@@ -12,7 +12,7 @@ test("gemini guide installs with the extension (method 1)", () => {
   assert.doesNotMatch(md, /It does not work yet/);
   assert.match(md, /gemini extensions update context-mode/);
   assert.match(md, /gemini extensions uninstall context-mode/);
-  assert.match(read("docs/install/README.md"), /\| Gemini CLI \| `gemini extensions install https:\/\/github\.com\/mksglu\/context-mode` \| `gemini extensions update context-mode` \|/);
+  assert.match(read("docs/install/README.md"), /\| Gemini CLI \| `gemini extensions install https:\/\/github\.com\/mksglu\/context-mode --ref release` \| `gemini extensions update context-mode` \|/);
 });
 
 test("pi guide does not claim a missing package.json or a /ctx-doctor command in Pi", () => {

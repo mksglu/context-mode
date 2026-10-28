@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-codex plugin marketplace add mksglu/context-mode
+codex plugin marketplace add mksglu/context-mode@release
 codex plugin add context-mode@context-mode
 ```
 
@@ -15,7 +15,7 @@ codex plugin marketplace upgrade context-mode
 
 Check: `context-mode doctor`
 
-Testing v2 (next): `codex plugin marketplace add mksglu/context-mode@release`, then `codex plugin add context-mode@context-mode`
+Until v2 is on `main`, `main` holds the old build (1.0.169), so the commands above name the `release` branch (`@release`).
 
 After v2 is on main: `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode`
 
@@ -32,6 +32,19 @@ context-mode setup --agents codex
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents codex`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print codex` and follow what it prints.
+
+### Already installed from GitHub?
+
+You added `mksglu/context-mode` without `@release` and `codex plugin list` shows 1.0.169. `codex plugin remove` uninstalls a plugin and removes its local cache; `codex plugin marketplace remove` removes a configured marketplace source by name. Then add it again with `@release`:
+
+```sh
+codex plugin remove context-mode@context-mode
+codex plugin marketplace remove context-mode
+codex plugin marketplace add mksglu/context-mode@release
+codex plugin add context-mode@context-mode
+```
+
+`codex plugin list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 
@@ -63,7 +76,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 - After `codex plugin add`, `context-mode doctor` checks the plugin (`codex plugin list` shows it enabled) and setup writes nothing under `~/.codex`, so the hooks never run twice (D-NI-CODEX-DOCTOR-1).
 - Codex 0.156.1 reads a local marketplace folder only when it is a git repo.
-- The `release` branch at `2.0.0-next.5` has no `.codex-plugin` folder (it was built before ADR-0023), so the Testing command installs a plugin without the MCP server and hooks, and doctor says "not set up". The next release writes the folder. Tested on a fresh build of this branch: install and doctor pass.
+- The `release` branch at `2.0.0-next.5` had no `.codex-plugin` folder (it was built before ADR-0023). From `2.0.0-next.8` the folder is there, so the install above carries the MCP server and the hooks.
 - The shipped `hooks/codex.json` is a template: the writer fills the path; do not copy hooks/codex.json by hand.
 
 ## Report a problem

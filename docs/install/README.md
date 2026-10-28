@@ -13,13 +13,19 @@ Use your agent's own install command. Each line below is the native command, the
 
 | Agent | Install | Update |
 |---|---|---|
-| Claude Code | `claude plugin marketplace add mksglu/context-mode`, then `claude plugin install context-mode@context-mode` | `claude plugin update context-mode@context-mode` |
-| Codex | `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode` | `codex plugin marketplace upgrade context-mode` |
-| Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode` | `gemini extensions update context-mode` |
-| Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode` | `qwen extensions update context-mode` |
+| Claude Code | `claude plugin marketplace add mksglu/context-mode#release`, then `claude plugin install context-mode@context-mode` | `claude plugin update context-mode@context-mode` |
+| Codex | `codex plugin marketplace add mksglu/context-mode@release`, then `codex plugin add context-mode@context-mode` | `codex plugin marketplace upgrade context-mode` |
+| Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | `gemini extensions update context-mode` |
+| Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | `qwen extensions update context-mode` |
 | Pi | `pi install npm:context-mode@next` | `pi update --extensions` |
 | OpenCode | `opencode plugin context-mode@next --global` | `opencode plugin context-mode@next --global --force` |
 | Copilot CLI, Kiro, VS Code, ZCode | `npm i -g context-mode@next`, then `context-mode setup --agents <id>` | `context-mode upgrade` |
+
+Until v2 is on `main`, `main` holds the old build (1.0.169), so the four GitHub-source rows name the `release` branch with each agent's own syntax.
+
+After v2 is on main: `claude plugin marketplace add mksglu/context-mode`, `codex plugin marketplace add mksglu/context-mode`, `gemini extensions install https://github.com/mksglu/context-mode`, `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
+
+Already installed from GitHub without the ref? Each agent page has the steps to switch: see "Already installed from GitHub?" in [Claude Code](claude-code.md#already-installed-from-github), [Codex](codex.md#already-installed-from-github), [Gemini CLI](gemini.md#already-installed-from-github) and [Qwen Code](qwen.md#already-installed-from-github).
 
 Fallback for any agent, and the only route for Copilot CLI, Kiro, VS Code and ZCode:
 
