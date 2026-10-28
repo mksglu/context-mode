@@ -34,3 +34,5 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - Everything is automatic: merge into `main`, then one click (Actions > Release > Run workflow). The workflow picks the version, tags, publishes to npm, writes the GitHub release with notes from the commits, and updates what the marketplaces read. No manual step.
 - Prepared now on `v2-design` (v2 is not ready for `main` yet). The `release` branch stays only for testers until merge day, then it is deleted.
 - Work: `docs/v2/review/main-only-release.workflow.js`.
+
+- Target (owner, 2026-10-28): merge v2-design into main in about 2 weeks (around 2026-11-11), then one-click release. Until then: next releases from the release branch for testers; owner docs review before the merge.
