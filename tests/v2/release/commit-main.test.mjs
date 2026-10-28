@@ -67,7 +67,9 @@ test("[MAIN-ONLY] commit-main: main moved meanwhile -> rebase onto it and push a
   const fx = fixture(t, "2.0.0");
   const racer = path.join(fx.root, "racer");
   git(fx.root, "clone", "-q", fx.bare, racer);
-  const r = run(fx, "2.0.0", ["--before-push", `git -C ${racer} commit -q --allow-empty -m "docs: raced" && git -C ${racer} push -q origin HEAD:refs/heads/main`]);
+  // The racer is a second clone: it needs its own identity, a CI runner has no global one.
+  const g = `git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false -C "${racer}"`;
+  const r = run(fx, "2.0.0", ["--before-push", `${g} commit -q --allow-empty -m "docs: raced" && ${g} push -q origin HEAD:refs/heads/main`]);
   assert.equal(r.status, 0, r.stderr);
   const head = git(fx.bare, "rev-parse", "refs/heads/main");
   assert.equal(git(fx.bare, "rev-parse", "refs/tags/v2.0.0^{}"), head);
