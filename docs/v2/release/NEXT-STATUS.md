@@ -4,15 +4,25 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.8 (provenance present, SLSA v1). `latest` is still 1.0.169.
+`next` is 2.0.0-next.9 (provenance present, SLSA v1, gitHead b808edb0). `latest` is still 1.0.169. Checked 2026-10-28 against the raw registry JSON.
 
-## What 2.0.0-next.8 ships
+## What 2.0.0-next.9 ships
 
-- Windows fixes on all 10 hosts. The `windows hosts` matrix (CI run 40609930810, head 4fb62aa6) ran 10 agents x 5 steps per OS: windows-latest 51 pass 0 fail, ubuntu-latest 51 pass 0 fail, macos-latest 51 pass 0 fail. Details per host: docs/v2/release/WINDOWS.md.
-- D-VT-WINBASH-1: Git Bash resolver for shell languages and ctx_batch on Windows.
-- D-TOML-PARSER-1: Codex config.toml is read and edited with a real TOML parser.
-- D-N7-VSCODE-TOOLS-1: VS Code shell, read and web tool names.
-- D-TRUST-KEYDIR-2 (found by the macOS matrix before release): `codex app-server` sometimes returned an empty reply, so setup keyed the Codex hook trust with /private/var/... while Codex uses /var/.... Setup now asks Codex up to 3 times and keys a default ~/.codex as spelled; `setup --print` uses the same key. Reproduced on macOS, test first.
+Changes since v2.0.0-next.8 (51 commits; DEVIATIONS rows added):
+
+- D-MO-1, D-MO-2: main-only release path. `release.yml` has a `route` job: a `workflow_dispatch` on main takes the new `main-*` jobs (channel next or latest, `confirm_latest`, npm, release commit and tag on main, GitHub release). Every other start, including this tag push, keeps the old release-branch jobs, so testers still install from `release` until merge day. Build writes root Gemini and Qwen manifests that point into `plugins/claude-code/`. Not yet run on main: the first real main run is the proof (Gemini hooks from the subfolder, Qwen install from the real repo).
+- D-PKG-META-1: the v2 package.json is the source of the release fields; plugin manifests carry the v2 version and description.
+- D-CI-PERF-8: `resolveProject` computes projectKey, projectDir and dbPath on first read (PreToolUse hook overhead on Windows). Behaviour change: a missing HOME throws NO_HOME at the first read of a store field.
+- D-CI-BATCH-DEADLINE-1, D-CI-PERF-2, D-CI-IDENT-1: test-only changes (no wall-clock budget in the ctx_batch deadline test; heldout search p95 is the lowest of 3 passes; git identity in the commit-main race test; T-F5 check records how long a surviving grandchild lives). No budget or timeout was raised.
+- D-HOOK-SYNC-1 (synchronous=NORMAL) was applied and then reverted: it can lose the last commits on an OS crash. Not in this release. Owner decision needed.
+
+## Release numbers (next.9)
+
+- Head b808edb0 (docs-only commit over e2865520). Local on the head: `build --generated-only` ok, v2-unit 1960 pass, 0 fail, 17 skip of 1977, `gate --all` exit 0 (live 0 of 30 ran: no case covers the changed files), check-install-docs, check-secrets clean. Fix rounds: 0.
+- CI on e2865520 (run 40703242303): all 12 jobs green, incl. macOS and windows hosts on 3 OS. CI on b808edb0: success.
+- CI on the earlier head 106cdda3 (run 40699061925) was red on 2 jobs: ubuntu node 26 GP-SEARCH/heldout p95 81.6 ms > 50 ms, and windows node 24.15.0 T-F5 `check on Windows: 10 runs, 0 grandchildren alive`. Both passed on the next head with no product change in between. No rerun was used. Root cause of both is not proven.
+- Tag v2.0.0-next.9 on b808edb0. release.yml run 40709418131 green; `route` chose the release layout, all `main-*` jobs skipped, as designed. publish-npm step ended 15:05:19Z; GitHub prerelease 15:05:35Z; the registry showed the version only at 15:08:31Z (about 190 s after the publish step).
+- `latest` stays 1.0.169; GitHub release v1.0.169 is still Latest. The `release` branch marketplace.json shows 2.0.0-next.9.
 
 ## Release numbers (next.8)
 
@@ -70,3 +80,5 @@ The Claude Code, Pi and OpenCode rows are from next.6 and were not re-tested for
 - Windows: `e2e/checks/windows-grandchild-kill.mjs` failed once on a 2 s close budget (run 40590253825) and in the next.6 release run; root cause not found, budget not changed.
 - Timing: `[r3] units/222KB` (50 ms budget) failed once under full-suite load on a laptop (91 ms), passes alone and on rerun; budget not changed.
 - Registry `time` for a version can lag the publish step by about 80 s; the GitHub release can look earlier than npm in the registry.
+- Release (next.9): T-F5 (`windows-grandchild-kill`) missed one grandchild on run 40699061925 (windows node 24, run 3 of 10); root cause not proven, the check now records `diedAfterMs`. GP-SEARCH/heldout p95 81.6 ms once on ubuntu node 26 (run 40699061925); budget not changed.
+- Release (next.9): D-HOOK-SYNC-1 reverted, owner decision on data-loss risk needed. Main-only path has two open owner questions (Codex marketplace entry; allow github-actions to push the release commit and tag to main). See docs/v2/release/MAIN-ONLY.md.
