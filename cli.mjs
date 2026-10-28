@@ -87,7 +87,7 @@ var require_src = __commonJS({
 
 // src/entries/cli.ts
 import { spawn as spawn2 } from "node:child_process";
-import { readFileSync as readFileSync5, realpathSync as realpathSync5 } from "node:fs";
+import { readFileSync as readFileSync6, realpathSync as realpathSync5 } from "node:fs";
 import path8 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -95,7 +95,6 @@ import { fileURLToPath as fileURLToPath2 } from "node:url";
 var SERVER_KEY = "context-mode";
 var TOOL_ORDER = Object.freeze(["ctx_execute", "ctx_batch", "ctx_index", "ctx_search", "ctx_resume", "ctx_stats", "ctx_doctor", "ctx_upgrade", "ctx_purge"]);
 var OUTPUT_CAP = 16384;
-var REPORT_CAP = 4096;
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -294,7 +293,8 @@ var DOCTOR_LABEL = Object.freeze({
   D10: "enforcement mode",
   D11: "shell"
 });
-var REPORT_TRUNCATED_LINE = `(report truncated at ${REPORT_CAP} B; run ctx_doctor again after the first fix)`;
+var REPORT_SOURCE_LABEL = "ctx_doctor:report";
+var REPORT_POINTER = `ctx_search({queries:["FAIL","PASS","UNKNOWN"], source:${JSON.stringify(REPORT_SOURCE_LABEL)}})`;
 var D2_NODE_FIX = `install Node ${NODE_MIN} or later`;
 var D3_PARTS = Object.freeze(["MCP entry", "hook entries", "hook timeout"]);
 var AGENT_HOME_DIR = Object.freeze({
@@ -488,9 +488,9 @@ function canonicalName(name, ownPrefix) {
   if (name.startsWith(ownPrefix)) return name.slice(ownPrefix.length);
   if (!name.startsWith(MCP_PREFIX)) return name;
   const rest = name.slice(MCP_PREFIX.length);
-  const sep = rest.indexOf(MCP_SEP);
-  if (sep < 0) return name;
-  return "mcp:" + rest.slice(0, sep) + ":" + rest.slice(sep + MCP_SEP.length);
+  const sep2 = rest.indexOf(MCP_SEP);
+  if (sep2 < 0) return name;
+  return "mcp:" + rest.slice(0, sep2) + ":" + rest.slice(sep2 + MCP_SEP.length);
 }
 function outputOf(resp) {
   if (resp === void 0) return "";
@@ -848,9 +848,9 @@ function canonicalName4(name) {
   if (Object.hasOwn(NATIVE_TO_CANONICAL4, name)) return NATIVE_TO_CANONICAL4[name];
   if (!name.startsWith(MCP_PREFIX2)) return name;
   const rest = name.slice(MCP_PREFIX2.length);
-  const sep = rest.indexOf(MCP_SEP2);
-  if (sep <= 0 || sep === rest.length - 1) return name;
-  return "mcp:" + rest.slice(0, sep) + ":" + rest.slice(sep + MCP_SEP2.length);
+  const sep2 = rest.indexOf(MCP_SEP2);
+  if (sep2 <= 0 || sep2 === rest.length - 1) return name;
+  return "mcp:" + rest.slice(0, sep2) + ":" + rest.slice(sep2 + MCP_SEP2.length);
 }
 var isNum = (v) => typeof v === "number" && Number.isFinite(v);
 function policyInput(name, canonical, input) {
@@ -976,9 +976,9 @@ function canonicalName5(name) {
   if (Object.hasOwn(NATIVE_TO_CANONICAL5, name)) return NATIVE_TO_CANONICAL5[name];
   if (!name.startsWith(MCP_PREFIX3)) return name;
   const rest = name.slice(MCP_PREFIX3.length);
-  const sep = rest.indexOf(MCP_SEP3);
-  if (sep <= 0 || sep === rest.length - 1) return name;
-  return "mcp:" + rest.slice(0, sep) + ":" + rest.slice(sep + MCP_SEP3.length);
+  const sep2 = rest.indexOf(MCP_SEP3);
+  if (sep2 <= 0 || sep2 === rest.length - 1) return name;
+  return "mcp:" + rest.slice(0, sep2) + ":" + rest.slice(sep2 + MCP_SEP3.length);
 }
 function readResult5(resp) {
   const text2 = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
@@ -6963,8 +6963,8 @@ function replaceToml(text2, doc, path9, value) {
   let out2 = text2;
   for (const [s, e, put] of cuts) out2 = out2.slice(0, s) + put + out2.slice(e);
   if (owned.length > 0 || block2 === "") return out2;
-  const sep = out2 === "" ? "" : out2.endsWith("\n\n") ? "" : out2.endsWith("\n") ? "\n" : "\n\n";
-  return out2 + sep + block2;
+  const sep2 = out2 === "" ? "" : out2.endsWith("\n\n") ? "" : out2.endsWith("\n") ? "\n" : "\n\n";
+  return out2 + sep2 + block2;
 }
 var tableLike = (v) => v === void 0 || isPlainObject(v);
 function setTomlText(text2, path9, value) {
@@ -7105,7 +7105,7 @@ function flatCommands(events2, prefix) {
   return out2;
 }
 var isV1Hook = (cmd) => cmd.includes(SERVER_KEY) && (V1_SCRIPT_NAMES.some((name) => cmd.includes(name)) || cmd.includes(V1_HOOK_COMMAND));
-var isCodexScript = (cmd) => cmd.includes(V1_SCRIPT_EXT) && V1_PATH_SEPS.some((sep) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep) + sep));
+var isCodexScript = (cmd) => cmd.includes(V1_SCRIPT_EXT) && V1_PATH_SEPS.some((sep2) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep2) + sep2));
 function dataDir(dir, reason, out2) {
   if (existsSync3(dir)) out2.push(finding(dir, "", reason));
 }
@@ -7304,8 +7304,8 @@ function detectV1(agent, home, scope = {}) {
 }
 
 // src/core/ops/plugin-root.ts
-import { existsSync as existsSync4, readdirSync as readdirSync3, realpathSync as realpathSync2 } from "node:fs";
-import { dirname as dirname3, isAbsolute, join as join5 } from "node:path";
+import { existsSync as existsSync4, readdirSync as readdirSync3, readFileSync as readFileSync3, realpathSync as realpathSync2 } from "node:fs";
+import { dirname as dirname3, isAbsolute, join as join5, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/core/ops/doctor-config.ts
@@ -7788,7 +7788,7 @@ function codexTrustEntries(hooksFile, doc, command, env) {
 
 // src/setup/engine.ts
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { closeSync, existsSync as existsSync6, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync3, readSync, readdirSync as readdirSync4, realpathSync as realpathSync4, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { closeSync, existsSync as existsSync6, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync4, readSync, readdirSync as readdirSync4, realpathSync as realpathSync4, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import path6 from "node:path";
 
@@ -7887,7 +7887,7 @@ function owningPackage(dir) {
     const f2 = path6.join(d, "package.json");
     if (existsSync6(f2)) {
       try {
-        return String(JSON.parse(hostText(readFileSync3(f2, "utf8"))).name);
+        return String(JSON.parse(hostText(readFileSync4(f2, "utf8"))).name);
       } catch {
         return void 0;
       }
@@ -7920,10 +7920,10 @@ function runBin(bin, args, env, input) {
   return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS });
 }
 function readOr(file) {
-  return existsSync6(file) ? hostText(readFileSync3(file, "utf8")) : void 0;
+  return existsSync6(file) ? hostText(readFileSync4(file, "utf8")) : void 0;
 }
 function readRaw(file) {
-  return existsSync6(file) ? readFileSync3(file, "utf8") : void 0;
+  return existsSync6(file) ? readFileSync4(file, "utf8") : void 0;
 }
 var atomicWrite = atomicWriteFile;
 function pidAlive(pid) {
@@ -8079,7 +8079,7 @@ function planSkills(row, edits) {
   if (s.kind !== "dir") return;
   for (const f2 of s.files) {
     if (!existsSync6(f2.src)) throw new Error(`preflight: ${f2.src} is missing`);
-    const after = renderSkill(readFileSync3(f2.src, "utf8"), s.prefixes);
+    const after = renderSkill(readFileSync4(f2.src, "utf8"), s.prefixes);
     const before = readRaw(f2.file);
     if (before !== after) edits.push({ plain: true, file: f2.file, before, after, changes: [{ file: f2.file, path: f2.name, before: before === void 0 ? null : "old", after: "SKILL.md" }] });
   }
@@ -8117,7 +8117,7 @@ function listCheck(row, env) {
 }
 function packageVersion(pkgDir) {
   try {
-    const v = JSON.parse(hostText(readFileSync3(path6.join(pkgDir, "package.json"), "utf8"))).version;
+    const v = JSON.parse(hostText(readFileSync4(path6.join(pkgDir, "package.json"), "utf8"))).version;
     return typeof v === "string" ? v : void 0;
   } catch {
     return void 0;
@@ -8160,6 +8160,7 @@ function mcpCheck(cmd, env) {
     const timer = setTimeout(() => done(false, "no MCP answer before timeout"), VERIFY_TIMEOUT_MS);
     child.on("error", (e) => done(false, e.message));
     child.on("exit", (code) => done(false, `server exited (${code}) before tools/list`));
+    child.stdin.on("error", (e) => done(false, `server closed its input: ${e.message}`));
     child.stdout.on("data", (d) => {
       buf += d.toString();
       let nl;
@@ -8312,7 +8313,7 @@ function skillsCheck(row, pkgDir) {
     const miss = COMMAND_SKILLS.map((n3) => path6.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync6(f2));
     return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : void 0 };
   }
-  const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync6(f2.src) ? renderSkill(readFileSync3(f2.src, "utf8"), s.prefixes) : void 0));
+  const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync6(f2.src) ? renderSkill(readFileSync4(f2.src, "utf8"), s.prefixes) : void 0));
   return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f2) => f2.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : void 0 };
 }
 var PLUGIN_ENABLED = "enabled";
@@ -8438,7 +8439,7 @@ function undo(dir, entries, env) {
       continue;
     }
     if (!e.file) continue;
-    if (e.existed && e.backup) atomicWrite(e.file, readFileSync3(path6.join(dir, e.backup), "utf8"));
+    if (e.existed && e.backup) atomicWrite(e.file, readFileSync4(path6.join(dir, e.backup), "utf8"));
     else unlinkWithRetry(e.file);
   }
 }
@@ -8453,7 +8454,7 @@ function takeLock(root, runId) {
       if (e.code !== "EEXIST") throw e;
       let pid = 0;
       try {
-        pid = Number(JSON.parse(readFileSync3(file, "utf8")).pid);
+        pid = Number(JSON.parse(readFileSync4(file, "utf8")).pid);
       } catch {
       }
       if (pid && pidAlive(pid)) return `setup lock ${file} is held by pid ${pid}; wait for that run or remove the lock`;
@@ -8628,7 +8629,7 @@ function runRemove(opts) {
   try {
     const runs = readdirSync4(base).map((r2) => path6.join(base, r2)).filter((d) => existsSync6(path6.join(d, MANIFEST))).sort().reverse();
     for (const dir of runs) {
-      const m3 = JSON.parse(readFileSync3(path6.join(dir, MANIFEST), "utf8"));
+      const m3 = JSON.parse(readFileSync4(path6.join(dir, MANIFEST), "utf8"));
       undo(dir, m3.entries, env);
       restored += m3.entries.length;
       renameWithRetry(path6.join(dir, MANIFEST), path6.join(dir, MANIFEST_DONE));
@@ -8640,7 +8641,7 @@ function runRemove(opts) {
 }
 
 // src/setup/print.ts
-import { readFileSync as readFileSync4 } from "node:fs";
+import { readFileSync as readFileSync5 } from "node:fs";
 var SHELL_SAFE_PUNCT = "@%+=:,./-_";
 function isShellSafe(s) {
   if (s === "") return false;
@@ -8668,7 +8669,7 @@ function printPlan(row, env) {
   else if (h2.kind === "plugin-list") steps.push({ kind: "hook", file: h2.file, block: JSON.stringify({ [h2.key[0]]: [h2.entry] }, null, 2) + "\n" });
   const sk = row.skillInstall;
   if (sk.kind === "dir") {
-    for (const f2 of sk.files) steps.push({ kind: "skill", file: f2.file, block: renderSkill(readFileSync4(f2.src, "utf8"), sk.prefixes) });
+    for (const f2 of sk.files) steps.push({ kind: "skill", file: f2.file, block: renderSkill(readFileSync5(f2.src, "utf8"), sk.prefixes) });
   }
   return { agent: row.id, steps, verify: `context-mode doctor --agents ${row.id}` };
 }
@@ -9176,7 +9177,7 @@ function main() {
   const dir = path8.dirname(realpathSync5(fileURLToPath2(import.meta.url)));
   let version = "";
   try {
-    version = String(JSON.parse(readFileSync5(path8.join(dir, PACKAGE_FILE), "utf8")).version);
+    version = String(JSON.parse(readFileSync6(path8.join(dir, PACKAGE_FILE), "utf8")).version);
   } catch (err2) {
     process.stderr.write(`${SERVER_KEY}: cannot read ${PACKAGE_FILE}: ${err2.message}
 `);

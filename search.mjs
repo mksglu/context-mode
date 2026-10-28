@@ -11,7 +11,6 @@ function prefixToolNames(text, prefix) {
   return out;
 }
 var OUTPUT_CAP = 16384;
-var REPORT_CAP = 4096;
 var INDEX_WRITE_CHUNK = 1048576;
 var MAX_CHUNK_BYTES = 4096;
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
@@ -251,7 +250,9 @@ var DOCTOR_LABEL = Object.freeze({
   D10: "enforcement mode",
   D11: "shell"
 });
-var REPORT_TRUNCATED_LINE = `(report truncated at ${REPORT_CAP} B; run ctx_doctor again after the first fix)`;
+var ECHO_MAX_BYTES = 256;
+var REPORT_SOURCE_LABEL = "ctx_doctor:report";
+var REPORT_POINTER = `ctx_search({queries:["FAIL","PASS","UNKNOWN"], source:${JSON.stringify(REPORT_SOURCE_LABEL)}})`;
 var D2_NODE_FIX = `install Node ${NODE_MIN} or later`;
 var D3_PARTS = Object.freeze(["MCP entry", "hook entries", "hook timeout"]);
 var AGENT_HOME_DIR = Object.freeze({
@@ -1559,7 +1560,7 @@ async function openDb(project, opts) {
     } else {
       raw = openWritable(sqlite, path3);
     }
-    return { raw, projectKey: project.projectKey, path: path3 };
+    return { raw, projectKey: project.projectKey, path: path3, ...opts?.readOnly === true ? { readOnly: true } : {} };
   } catch (err) {
     if (isCorrupt(err)) throw new CtxError("DB_CORRUPT");
     throw err;
@@ -1577,9 +1578,11 @@ function withWrite(db, fn) {
   }
 }
 function closeDb(db) {
-  try {
-    db.raw.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-  } catch {
+  if (db.readOnly !== true) {
+    try {
+      db.raw.exec("PRAGMA wal_checkpoint(PASSIVE)");
+    } catch {
+    }
   }
   try {
     db.raw.close();
@@ -3338,7 +3341,8 @@ function select(chunks, intent, budget, label, rankQuery) {
 }
 function moreLine(intent, label) {
   const source = label === void 0 ? "" : ", source:" + JSON.stringify(label);
-  return "ctx_search({queries:[" + JSON.stringify(intent) + "]" + source + "})";
+  const query = Buffer.byteLength(intent, "utf8") > ECHO_MAX_BYTES ? "..." : JSON.stringify(intent);
+  return "ctx_search({queries:[" + query + "]" + source + "})";
 }
 
 // src/core/policy/decide.ts
