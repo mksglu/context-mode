@@ -27,8 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install
-        name: dev tooling (npm is dev-only, never shipped)
+      - run: node scripts/ci-install.mjs
+        id: install
+        name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
       # Gate selection (DEVIATIONS D-M2-arch-4, D-M2-CI-4, D-M7-CLN-5): milestone = the highest
       # milestone in .impl/progress.json "done" (M0 if none), the same milestone the local gate
       # passed before "done"; the one in progress has its own gate run.
@@ -50,6 +51,12 @@ jobs:
       - run: node e2e/checks/windows-grandchild-kill.mjs
         name: T-F5 Windows grandchild kill (0 alive after KILL_GRACE_MS)
         if: runner.os == 'Windows'
+      # D-TF5-TIMING-1: info only. Times taskkill /F /T and the wait until the grandchild PID is gone (30 runs), to tell a slow
+      # taskkill.exe from a slow process teardown when T-F5 misses KILL_GRACE_MS.
+      - run: node e2e/checks/windows-kill-timing.mjs
+        name: T-F5 kill timing probe (info)
+        if: runner.os == 'Windows'
+        continue-on-error: true
       # Viet report 1 (docs/v2/review/viet/README.md): ctx_stats / ctx_search after ctx_index took 1.45 s on Windows, all in
       # PRAGMA wal_checkpoint(TRUNCATE). Per-call latency of the tester's repro on all 3 OS; the trace run prints the checkpoint ms (info).
       - run: node e2e/checks/checkpoint-latency.mjs --trace
@@ -80,24 +87,24 @@ jobs:
       # red test step too, so a test fail never hides their result on any OS (the job stays red).
       - run: node scripts/ci-gs4-lint.mjs
         name: GS4 lint (no e2e import of src, ledger verdicts)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: node build/check-readme.mjs
         name: README line cap (ADR-0015, README_MAX_LINES)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: node build/check-install-docs.mjs
         name: Install docs (no placeholder or npx in code blocks)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: node build/check-secrets.mjs
         name: No tenant id in tracked files (D-FU-OI-TENANT-1)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: node build/check-prompt-static.mjs
         name: No dynamic token in tool descriptions or instructions (ADR-0021 rule 1, D-C5-PREFIX-1)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       # GS5 repo-cleanup gate (impl/15 §2, DEVIATIONS D-M7-arch-3/4). The check-removed layer starts
       # at M7 (D-M6-arch-2), the same rule as scripts/gate.mjs LAYER_START.
       - run: node build/check-removed.mjs
         name: GS5 check-removed (from gate milestone M7, D-M6-arch-2)
-        if: ${{ !cancelled() && env.GATE_MILESTONE == 'M7' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && env.GATE_MILESTONE == 'M7' }}
 
   # ADR-0019 D1/D2: npm pack -> npm i -g (temp prefix, temp HOME) -> context-mode setup/doctor/--remove with fake agent CLIs.
   # No network beyond npm tooling, no real agent CLI, no key. Windows runs the .cmd shim path.
@@ -114,8 +121,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24.15.0"
-      - run: npm install --no-package-lock
-        name: dev tooling (npm is dev-only, never shipped)
+      - run: node scripts/ci-install.mjs --no-package-lock
+        id: install
+        name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts
       - run: node --test e2e/cases/GP-SETUP-npm-install.e2e.mjs
@@ -137,8 +145,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24.15.0"
-      - run: npm install --no-package-lock
-        name: dev tooling (npm is dev-only, never shipped)
+      - run: node scripts/ci-install.mjs --no-package-lock
+        id: install
+        name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts
       - run: node e2e/checks/windows-hosts.mjs
