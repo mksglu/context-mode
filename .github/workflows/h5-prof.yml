@@ -9,11 +9,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        run: [1, 2]
+        run: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "26" }
-      - run: npm install --no-package-lock
+      - run: npm install
+      - run: node build/build.mjs --out release-out
       - run: node build/build.mjs --generated-only
       - run: node .h5-prof/annot.mjs "✖" node --test "tests/v2/**/*.test.mjs"
