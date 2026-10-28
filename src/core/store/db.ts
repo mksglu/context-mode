@@ -166,9 +166,10 @@ export function withWrite<T>(db: DbHandle, fn: (db: DbHandle) => T): T {
 }
 
 // Every server checkpoints on its own close, no election (impl/02 §6.3). Never throws.
+// PASSIVE, never TRUNCATE: owner main rule (D-NO-TRUNCATE-1). PASSIVE never waits on readers.
 export function closeDb(db: DbHandle): void {
   try {
-    db.raw.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    db.raw.exec("PRAGMA wal_checkpoint(PASSIVE)");
   } catch {
     // best-effort: a failed checkpoint never blocks shutdown
   }
