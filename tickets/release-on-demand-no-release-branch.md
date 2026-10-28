@@ -41,3 +41,5 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - The marketplaces on `main` point at a plugin subfolder that holds the built files, like upstash/context7 (`source: "./plugins/claude/context7"`). No npm source for the marketplace.
 - The one-click release builds the subfolder and commits it to `main` itself. No manual step.
 - Each host keeps its own install command (ADR-0023). Gemini CLI and Qwen Code install from the same repo; if a host cannot read a subfolder, record the evidence and the host's documented alternative here before choosing it.
+
+- v1 is finished (owner, 2026-10-28): no v1 changes go to main before the merge, so main stays at 1.0.169 and the merge has no v1 conflicts.
