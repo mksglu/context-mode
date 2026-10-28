@@ -55,8 +55,9 @@ for (const b of busy) b.kill();
 {
   const { DatabaseSync } = await import("node:sqlite");
   const out = [];
+  let n = 0;
   for (const mode of ["FULL", "NORMAL", "FULL", "NORMAL", "OFF"]) {
-    const f = path.join(root, "m-" + mode + "-" + out.length + ".db");
+    const f = path.join(root, "m-" + mode + "-" + (n++) + ".db");
     const d = new DatabaseSync(f, { timeout: 5000 });
     d.exec("PRAGMA journal_mode = WAL; CREATE TABLE t(a)");
     d.exec("PRAGMA synchronous = " + mode);
