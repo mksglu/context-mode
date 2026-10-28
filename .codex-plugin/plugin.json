@@ -1,5 +1,5 @@
 {
-  "description": "Context Mode for Codex",
+  "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
   "hooks": "./.codex-plugin/hooks.json",
   "interface": {
     "category": "Productivity",
@@ -8,5 +8,5 @@
   "mcpServers": "./.codex-plugin/mcp.json",
   "name": "context-mode",
   "skills": "./codex/skills/",
-  "version": "2.0.0-next.8"
+  "version": "2.0.0-next.9"
 }

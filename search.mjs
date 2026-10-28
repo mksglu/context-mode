@@ -5007,14 +5007,15 @@ function gitDirs(dir) {
   } catch {
     throw new CtxError("NO_GIT_DIR", { path: dir });
   }
+  const start = cur;
   for (; ; ) {
     const gitDir = gitDirAt(join4(cur, GIT_DIR_NAME));
     if (gitDir !== null) {
       const common = firstLine(join4(gitDir, GIT_COMMONDIR_FILE));
-      return { commonDir: realpathSync3.native(common === null ? gitDir : resolve2(gitDir, common)), worktree: cur };
+      return { commonDir: realpathSync3.native(common === null ? gitDir : resolve2(gitDir, common)), worktree: cur, start };
     }
     const up = dirname2(cur);
-    if (up === cur) return null;
+    if (up === cur) return { commonDir: null, start };
     cur = up;
   }
 }
@@ -5060,16 +5061,24 @@ function resolveProject(agent, src) {
   const dir = dirOf(source, src);
   if (dir === void 0) throw new CtxError("NO_PROJECT", { kind: source });
   const repo = gitDirs(dir);
-  const plain = repo === null ? realpathSync3.native(dir) : void 0;
-  const commonDir = repo?.commonDir ?? plain;
-  const worktree = repo?.worktree ?? plain;
-  const projectKey = sha256Hex(commonDir).slice(0, PROJECT_KEY_HEX_LEN);
-  const projectDir = join4(resolveConfigDir(process.env), PROJECTS_DIR_NAME, projectKey);
+  const plain = repo.commonDir === null ? repo.start : void 0;
+  const commonDir = repo.commonDir ?? repo.start;
+  const worktree = repo.commonDir === null ? repo.start : repo.worktree;
+  let key;
+  let pdir;
   let root;
   return {
-    projectKey,
-    projectDir,
-    dbPath: join4(projectDir, DB_FILE_NAME),
+    get projectKey() {
+      key ??= sha256Hex(commonDir).slice(0, PROJECT_KEY_HEX_LEN);
+      return key;
+    },
+    get projectDir() {
+      pdir ??= join4(resolveConfigDir(process.env), PROJECTS_DIR_NAME, this.projectKey);
+      return pdir;
+    },
+    get dbPath() {
+      return join4(this.projectDir, DB_FILE_NAME);
+    },
     worktree,
     get containmentRoot() {
       root ??= plain ?? containmentRootOf(dir, commonDir);
