@@ -30,7 +30,9 @@ const a = process.argv.slice(2), H = process.env.HOME, st = path.join(H, "stub-c
 fs.writeFileSync(path.join(process.env.TMPDIR, "probe-claude.json"), JSON.stringify({ home: H, argv: a }));
 const s = fs.existsSync(st) ? JSON.parse(fs.readFileSync(st, "utf8")) : {};
 const save = () => fs.writeFileSync(st, JSON.stringify(s));
-if (a[1] === "marketplace") { s.mkt = JSON.parse(fs.readFileSync(path.join(a[3], ".claude-plugin", "marketplace.json"), "utf8")); save(); }
+if (a[1] === "marketplace") { s.mkt = JSON.parse(fs.readFileSync(path.join(a[3], ".claude-plugin", "marketplace.json"), "utf8")); s.root = a[3]; save(); }
+else if (a[1] === "install" && typeof s.mkt.plugins[0].source === "string") { const p = s.mkt.plugins[0]; const dir = path.join(H, ".claude", "plugins", "cache", s.mkt.name, p.name, "v");
+  fs.cpSync(path.join(s.root, p.source), dir, { recursive: true }); s.id = a[2]; s.dir = dir; save(); }
 else if (a[1] === "install") { const p = s.mkt.plugins[0]; const dir = path.join(H, ".claude", "plugins", "cache", s.mkt.name, p.name, "v");
   cp.execFileSync("git", ["clone", "-q", "--branch", p.source.ref, p.source.url, dir]); s.id = a[2]; s.dir = dir; save(); }
 else if (a[1] === "list") process.stdout.write(JSON.stringify(s.id ? [{ id: s.id, installPath: s.dir }] : []));
@@ -42,6 +44,11 @@ const lines = fs.readFileSync(path.join(process.env.CODEX_HOME, "config.toml"), 
 const val = (k) => JSON.parse(lines.find((l) => l.startsWith(k + " = ")).slice(k.length + 3));
 process.stdout.write(JSON.stringify([{ name: lines[0].slice(1, -1).split(".")[1], transport: { type: "stdio", command: val("command"), args: val("args") } }]));`,
   gemini: `process.stderr.write("not logged in\\n"); process.exit(41);`,
+  // qwen: `extensions install <dir>:<plugin> --consent` copies <dir> to $HOME/.qwen/extensions/<plugin>
+  qwen: `const fs = require("fs"), path = require("path");
+const a = process.argv.slice(2), src = a[2].slice(0, a[2].lastIndexOf(":")), name = a[2].slice(a[2].lastIndexOf(":") + 1);
+fs.cpSync(src, path.join(process.env.HOME, ".qwen", "extensions", name), { recursive: true });
+process.stdout.write("Extension installed\\n");`,
 };
 
 // tmp root: bare repo with branch release-staging carrying a tiny release tree; bin dir with node + git + chosen stubs.
@@ -85,11 +92,11 @@ function smoke(fx, ...args) {
 }
 const smokeHomes = (fx) => readdirSync(fx.tmp).filter((n) => n.startsWith("context-mode-smoke-"));
 
-test("[M6] release/smoke: unknown --agent exits 1 and names the three agents", (t) => {
+test("[M6] release/smoke: unknown --agent exits 1 and names the four agents", (t) => {
   const fx = fixture(t);
-  const r = smoke(fx, "--ref", "release-staging", "--agent", "qwen", "--repo", fx.repo);
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "nope", "--repo", fx.repo);
   assert.equal(r.status, 1);
-  assert.ok(r.err.includes("claude-code, codex, gemini"), r.err);
+  assert.ok(r.err.includes("claude-code, codex, gemini, qwen"), r.err);
 });
 
 test("[M6] release/smoke: gemini CLI absent is SKIPPED, exit 0", (t) => {
@@ -296,4 +303,67 @@ test("[M6] release/smoke: claude-code finds the native claude.exe under node_mod
   assert.equal(r.status, 1);
   assert.ok(r.err.startsWith(`claude-code: FAIL: ${realpathSync(process.execPath)} plugin marketplace add`), r.err);
   assert.ok(!existsSync(path.join(fx.root, "shim-ran")));
+});
+
+// MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): --layout main smokes the tree a release commit on main holds: the built
+// plugin under plugins/claude-code, root manifests for Gemini and Qwen. The "remote" is a bare repo with branch main.
+function mainFixture(t, opts) {
+  const fx = fixture(t, opts);
+  const seed = path.join(fx.root, "seed-main");
+  git(fx.root, "init", "-q", "-b", "main", seed);
+  const plugin = path.join(seed, "plugins", "claude-code");
+  mkdirSync(path.join(plugin, ".claude-plugin"), { recursive: true });
+  writeFileSync(path.join(plugin, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "context-mode", version: "0.0.0-dev" }));
+  writeFileSync(path.join(plugin, "server.mjs"), serverSrc(opts?.serverName ?? "context-mode"));
+  mkdirSync(path.join(seed, ".claude-plugin"));
+  writeFileSync(path.join(seed, ".claude-plugin", "marketplace.json"),
+    JSON.stringify({ name: "context-mode", owner: { name: "o" }, plugins: [{ name: "context-mode", source: "./plugins/claude-code" }] }));
+  writeFileSync(path.join(seed, "qwen-extension.json"), JSON.stringify({ name: "context-mode", mcpServers: { "context-mode": { command: "node", args: ["x/plugins/claude-code/server.mjs", "--agent", fx.qwenAgent ?? "qwen"] } } }));
+  git(seed, "add", "-A");
+  git(seed, "commit", "-q", "-m", "chore(release): v0.0.0");
+  git(seed, "push", "-q", path.join(fx.root, "remote.git"), "main");
+  return fx;
+}
+
+test("[MAIN-ONLY] release/smoke --layout main: claude-code adds the cloned repo as marketplace, installs the subfolder plugin and validates it", { skip: !POSIX }, (t) => {
+  const fx = mainFixture(t, { stubs: ["claude"] });
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "claude-code", "--repo", fx.repo);
+  assert.equal(r.status, 0, r.err);
+  assert.ok(r.out.startsWith("claude-code: PASS: installed context-mode@context-mode"), r.out);
+});
+
+test("[MAIN-ONLY] release/smoke --layout main: codex finds the server under plugins/claude-code and it answers initialize", { skip: !POSIX }, (t) => {
+  const fx = mainFixture(t, { stubs: ["codex"] });
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "codex", "--repo", fx.repo);
+  assert.equal(r.status, 0, r.err);
+  assert.ok(r.out.startsWith("codex: PASS: codex reads the context-mode entry"), r.out);
+});
+
+test("[MAIN-ONLY] release/smoke --layout main: qwen installs <clone>:context-mode and the installed server runs --agent qwen", { skip: !POSIX }, (t) => {
+  const fx = mainFixture(t, { stubs: ["qwen"] });
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "qwen", "--repo", fx.repo);
+  assert.equal(r.status, 0, r.err);
+  assert.ok(r.out.startsWith("qwen: PASS: "), r.out);
+});
+
+test("[MAIN-ONLY] release/smoke --layout main: qwen installed with another --agent is FAIL (the gap the probe found)", { skip: !POSIX }, (t) => {
+  const fx = mainFixture(t, { stubs: ["qwen"] });
+  fx.qwenAgent = "claude-code";
+  const fx2 = mainFixture(t, { stubs: ["qwen"] });
+  assert.ok(fx2);
+  // rebuild the main branch with the wrong agent flag
+  const seed = path.join(fx.root, "seed-main");
+  writeFileSync(path.join(seed, "qwen-extension.json"), JSON.stringify({ name: "context-mode", mcpServers: { "context-mode": { command: "node", args: ["x/server.mjs", "--agent", "claude-code"] } } }));
+  git(seed, "commit", "-qam", "bad");
+  git(seed, "push", "-q", "-f", path.join(fx.root, "remote.git"), "main");
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "qwen", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith("qwen: FAIL: "), r.err);
+});
+
+test("[MAIN-ONLY] release/smoke --layout main: qwen CLI absent is SKIPPED (tier 2)", (t) => {
+  const fx = mainFixture(t);
+  const r = smoke(fx, "--ref", "main", "--layout", "main", "--agent", "qwen", "--repo", fx.repo);
+  assert.equal(r.status, 0, r.err);
+  assert.equal(r.out, "qwen: SKIPPED: qwen not available\n");
 });

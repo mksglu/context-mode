@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // scripts/release/smoke.mjs — impl/13-build-release.md §11.2, DEVIATIONS D-M6-arch-5, D-M6-P3-1..3.
 // Installs <repo>@<ref> for one agent inside a throwaway HOME and checks the install answers.
-// Usage: node scripts/release/smoke.mjs --ref <branch> --agent <claude-code|codex|gemini> [--repo <git url>]
+// Usage: node scripts/release/smoke.mjs --ref <branch> --agent <claude-code|codex|gemini|qwen> [--repo <git url>] [--layout release|main]
+// --layout main (MAIN-ONLY, D-MO-1): the ref holds the main tree (built plugin in plugins/claude-code, root manifests
+// for Gemini and Qwen, marketplace on the repo root). claude-code adds a clone of the ref as marketplace, codex
+// reads the server under plugins/claude-code, qwen installs <clone>:context-mode and checks --agent qwen.
 // Exit 0 = PASS or SKIPPED (gemini CLI absent or failing, tier-2 per GS2); exit 1 = FAIL.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -93,13 +96,29 @@ function must(step) {
 // claude-code (§11.2 step 1). The CLI has no `marketplace add --ref` and the release branch carries no
 // marketplace.json (ADR-0011 b keeps it on main), so the throwaway HOME gets a one-entry marketplace whose
 // plugin source is <repo>@<ref> — the same source shape main's marketplace.json uses (D-M6-P3-1).
+const MAIN_PLUGIN_DIR = path.join("plugins", "claude-code");
+const MAIN_LAYOUT = "main";
+const QWEN_EXTENSIONS_DIR = [".qwen", "extensions"];
+const QWEN_MANIFEST = "qwen-extension.json";
+
+function cloneRef(env, home, a, name) {
+  const dir = path.join(home, name);
+  must(run(env, home, GIT_BIN, [...GIT_CLONE_ARGS, a.ref, a.repo, dir]));
+  return dir;
+}
+
 function claudeCode(env, home, a) {
   const claude = realClaude(env.PATH);
-  const mkt = path.join(home, PLUGIN_MARKETPLACE_NAME);
-  fs.mkdirSync(path.join(mkt, ".claude-plugin"), { recursive: true });
-  const manifest = { name: PLUGIN_MARKETPLACE_NAME, owner: { name: SERVER_KEY },
-    plugins: [{ name: PLUGIN_NAME, source: { source: "url", url: a.repo, ref: a.ref } }] };
-  fs.writeFileSync(path.join(mkt, ".claude-plugin", "marketplace.json"), JSON.stringify(manifest));
+  let mkt;
+  if (a.layout === MAIN_LAYOUT) {
+    mkt = cloneRef(env, home, a, "main-clone"); // the repo root is the marketplace; its entry source is ./plugins/claude-code
+  } else {
+    mkt = path.join(home, PLUGIN_MARKETPLACE_NAME);
+    fs.mkdirSync(path.join(mkt, ".claude-plugin"), { recursive: true });
+    const manifest = { name: PLUGIN_MARKETPLACE_NAME, owner: { name: SERVER_KEY },
+      plugins: [{ name: PLUGIN_NAME, source: { source: "url", url: a.repo, ref: a.ref } }] };
+    fs.writeFileSync(path.join(mkt, ".claude-plugin", "marketplace.json"), JSON.stringify(manifest));
+  }
   const id = PLUGIN_NAME + PLUGIN_KEY_SEPARATOR + PLUGIN_MARKETPLACE_NAME;
   must(run(env, home, claude, ["plugin", "marketplace", "add", mkt]));
   must(run(env, home, claude, ["plugin", "install", id]));
@@ -127,9 +146,8 @@ function handshake(env, cwd, command, args) {
 
 // codex (§11.2 step 2, A2): a git checkout of <repo>@<ref> plus a plain config.toml entry under CODEX_HOME.
 function codex(env, home, a) {
-  const dir = path.join(home, SERVER_KEY);
-  must(run(env, home, GIT_BIN, [...GIT_CLONE_ARGS, a.ref, a.repo, dir]));
-  const server = path.join(dir, SERVER_ENTRY_FILE);
+  const dir = cloneRef(env, home, a, SERVER_KEY);
+  const server = path.join(dir, ...(a.layout === MAIN_LAYOUT ? [MAIN_PLUGIN_DIR] : []), SERVER_ENTRY_FILE);
   const args = [server, AGENT_ARG, "codex"];
   const codexHome = path.join(home, ...AGENT_HOME_DIR.codex);
   fs.mkdirSync(codexHome, { recursive: true });
@@ -153,7 +171,20 @@ function gemini(env, home, a) {
   return `gemini extensions install ${a.repo} --ref ${a.ref} passed`;
 }
 
-const AGENTS = { "claude-code": claudeCode, codex, gemini };
+// qwen (MAIN-ONLY): tier-2 like gemini. Installs <clone>:context-mode (the native command, marketplace plugin by name) and
+// reads the installed manifest back: the server must run with --agent qwen (the probe found a Claude conversion that did not).
+function qwen(env, home, a) {
+  const dir = cloneRef(env, home, a, "qwen-src");
+  const r = run(env, home, "qwen", ["extensions", "install", `${dir}:${PLUGIN_NAME}`, "--consent"]);
+  if (!r.ok) return { skipped: "qwen not available" };
+  const manifest = path.join(home, ...QWEN_EXTENSIONS_DIR, PLUGIN_NAME, QWEN_MANIFEST);
+  if (!fs.existsSync(manifest)) throw new StepFailed(`qwen extensions install: no ${manifest}`);
+  const args = JSON.parse(fs.readFileSync(manifest, "utf8")).mcpServers?.[SERVER_KEY]?.args ?? [];
+  if (args[args.indexOf(AGENT_ARG) + 1] !== "qwen" || !args.includes(AGENT_ARG)) throw new StepFailed(`installed ${QWEN_MANIFEST} runs the server with ${args.join(" ")}, not ${AGENT_ARG} qwen`);
+  return `qwen extensions install ${PLUGIN_NAME} passed; server runs ${AGENT_ARG} qwen`;
+}
+
+const AGENTS = { "claude-code": claudeCode, codex, gemini, qwen };
 
 async function main(a) {
   const step = AGENTS[a.agent];
@@ -179,6 +210,6 @@ async function main(a) {
 }
 
 const { values } = parseArgs({ options: {
-  ref: { type: "string", default: RELEASE_BRANCH }, agent: { type: "string" }, repo: { type: "string", default: RELEASE_REPO_URL },
+  ref: { type: "string", default: RELEASE_BRANCH }, layout: { type: "string", default: "release" }, agent: { type: "string" }, repo: { type: "string", default: RELEASE_REPO_URL },
 } });
-await main({ ref: values.ref, agent: values.agent ?? "", repo: values.repo });
+await main({ ref: values.ref, layout: values.layout, agent: values.agent ?? "", repo: values.repo });
