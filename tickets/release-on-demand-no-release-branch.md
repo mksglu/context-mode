@@ -1,6 +1,6 @@
 # Release on demand from main, drop the `release` branch
 
-Status: decided by the owner, 2026-10-26. Not started.
+Status: ready for merge day (2026-10-28 local proof, all 4 installed hosts passed; see "Proof 2026-10-28"). Not proven until the first real run: Gemini GitHub-release install path, bot push to `main`.
 
 ## Decision
 - Fixes land on `main` as soon as they are done. They pile up there.
@@ -59,3 +59,18 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - Not proven until the first real run: Gemini hooks from the subfolder, Qwen install from the real repo, bot push to `main`.
 - Merge-day checklist: docs/v2/release/MAIN-ONLY.md.
 - Still open for owner: Codex stays on npm; allow the bot to push to `main`.
+
+## Proof 2026-10-28: local main, native install per host (prover)
+Method: bare local repo, default branch `main` = the `v2-design` tree + the release commit that `commit-main.mjs` makes after `build.mjs --out` (tag `v2.0.0-next.N`). Temp HOME per host, `~/.gitconfig` `insteadOf` maps the GitHub URL in the README command to the local repo, so the command text is the real one. A second and third fake release commit after the install. Real `~/.claude` etc. untouched. Origin `main`, branches, tags and npm not touched.
+- Claude Code 2.1.311: `claude plugin marketplace add mksglu/context-mode`, `claude plugin install context-mode@context-mode` -> `context-mode@context-mode 2.0.0-next.1`, enabled. Hooks: `hooks/claude-code.json` registers PostToolUse, PreToolUse, SessionStart, UserPromptSubmit. Skills: ctx-doctor, ctx-stats, ctx-upgrade. `claude plugin validate` passed; MCP server Connected. After release commit next.2: `claude plugin marketplace update context-mode` + `claude plugin update context-mode@context-mode` -> 2.0.0-next.1 to 2.0.0-next.2. PASS.
+- Codex 0.156.1: `codex plugin marketplace add mksglu/context-mode`, `codex plugin add context-mode@context-mode` -> installed, enabled, `2.0.0-next.7`; after the next commit `codex plugin marketplace upgrade context-mode` -> `2.0.0-next.8`. Codex pins an npm version, so this leg used versions that exist on npm (next.7, next.8); a fake version fails with ETARGET by design (no publish was done). Skills: 3. Codex is MCP only per README (no hooks promise). PASS.
+- Gemini CLI 0.66.0 (installed in a temp npm prefix): `gemini extensions install <repo url> --consent --skip-settings` -> `context-mode (2.0.0-next.2)`, 3 skills, MCP server, `hooks/hooks.json` with AfterTool, BeforeAgent, BeforeTool, PreCompress pointing at `${extensionPath}/plugins/claude-code/hook.mjs`. After next.3: `gemini extensions update context-mode` -> 2.0.0-next.2 to 2.0.0-next.3. PASS. Notes: update asks `Continue? [Y/n]` (docs should say answer Y); `file://` and plain local path sources do not work for Gemini (it needs a GitHub URL), the `insteadOf` URL works; a real hook run with a hand-made BeforeTool payload exited 0 with no output (weak evidence, the real run is the first release smoke). `--pre-release` and the GitHub-release install path need a real GitHub release: not proven.
+- Qwen Code 0.26.2: `qwen extensions install <repo url>:context-mode` -> `context-mode (2.0.0-next.3)`, 3 skills, MCP server args `--agent qwen` (the earlier `--agent claude-code` gap is closed by the root `qwen-extension.json`), `hooks/qwen.json` with PostToolUse, PreToolUse, SessionStart, UserPromptSubmit. After next.4: `qwen extensions update context-mode` -> 2.0.0-next.3 to 2.0.0-next.4 (asks Y/n). Hook run exit 0. PASS.
+- `plan.mjs --main --channel next` on the fake main: `2.0.0-next.1` first, `2.0.0-next.5` after tags next.1-4 and one feat commit; `latest` without confirm refuses; `latest --confirm latest` gives `2.0.0`; no new commit gives `release failed: no releasable commits since v2.0.0-next.4`. `plan.mjs --dry-run` (old path, v2-design) prints `version: 2.0.0` plus notes. Real repo: `--main` on v2-design gives `2.0.0-next.9`.
+- `gh workflow run release.yml --ref v2-design` NOT run, on purpose: a dispatch off `main` takes the old release-branch path, where `publish-promote` runs for any non-rollback mode (also with publish=false) and moves the `release` branch. That breaks the rule "never move the release branch". The `main-*` jobs run only on a dispatch on `main`, so they cannot be dispatched before merge. First real proof = merge-day run.
+
+## Merge-day checklist
+1. Merge `v2-design` into `main`.
+2. Allow github-actions to push to `main` (branch protection bypass for the bot).
+3. Actions > Release > Run workflow on `main` (channel `next` or `latest`; `latest` needs `confirm_latest` = `latest`).
+4. After the first main release passes: delete the `release` and `release-staging` branches and drop the switch (old jobs, `route`, `--stage/--promote`, `RELEASE_BRANCH`, README/install-page `#release` and `--ref release` steps).
