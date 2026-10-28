@@ -43,3 +43,11 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - Each host keeps its own install command (ADR-0023). Gemini CLI and Qwen Code install from the same repo; if a host cannot read a subfolder, record the evidence and the host's documented alternative here before choosing it.
 
 - v1 is finished (owner, 2026-10-28): no v1 changes go to main before the merge, so main stays at 1.0.169 and the merge has no v1 conflicts.
+
+## Plan 2026-10-28: main-only release (architect), see docs/v2/release/MAIN-ONLY.md
+- Claude Code: marketplace on main, `./plugins/claude-code` subfolder (probe: install + update next.8 to next.9, CLI 2.1.311). npm source also works, not chosen.
+- Codex: npm entry in `.agents/plugins/marketplace.json` (probe: dist-tag `next` resolved, CLI 0.156.1). Nothing built in git. Owner to confirm.
+- Gemini CLI: no subfolder option; root `gemini-extension.json` + `hooks/hooks.json` point into `plugins/gemini/`; tag on the release commit, because a GitHub release makes Gemini install the tag source (code read). Install proven, run of hooks not yet.
+- Qwen Code: reads the same Claude marketplace (`:context-mode`); gap: converted plugin runs with `--agent claude-code`. Fix to probe: own entry `./plugins/qwen`.
+- One click: inputs channel next|latest (+ confirm_latest), version from commits since last v2 tag on main, build, smoke, npm publish, one release commit + tag on main, GitHub release after. Rollback = forward commit, no reset of main.
+- Open for owner: Codex on npm; bot push to main allowed.
