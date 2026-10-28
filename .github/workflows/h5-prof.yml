@@ -1,0 +1,22 @@
+name: h5-prof
+on:
+  push:
+    branches: [v2-design]
+    paths: [".h5-prof/**", ".github/workflows/h5-prof.yml"]
+jobs:
+  prof:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        node: ["26"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install --no-package-lock
+      - run: node build/build.mjs --generated-only
+      - run: node build/build.mjs --out release-out
+      - run: node .h5-prof/prof.mjs
