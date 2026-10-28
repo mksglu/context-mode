@@ -74,3 +74,6 @@ Method: bare local repo, default branch `main` = the `v2-design` tree + the rele
 2. Allow github-actions to push to `main` (branch protection bypass for the bot).
 3. Actions > Release > Run workflow on `main` (channel `next` or `latest`; `latest` needs `confirm_latest` = `latest`).
 4. After the first main release passes: delete the `release` and `release-staging` branches and drop the switch (old jobs, `route`, `--stage/--promote`, `RELEASE_BRANCH`, README/install-page `#release` and `--ref release` steps).
+
+## Update 2026-10-28: Codex too (owner decision, final)
+Every agent uses the context7 style, Codex included: the Codex marketplace on main points at a built plugin subfolder, no npm entry. Work: docs/v2/review/viet-next8-codex7.workflow.js.
