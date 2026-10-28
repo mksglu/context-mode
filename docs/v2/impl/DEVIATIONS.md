@@ -1,6 +1,6 @@
 # Deviations from the v2 design docs
 
-One row per deviation found while implementing or verifying against the design. Format: date, file, question, decision, reason.
+One row per deviation found while implementing or verifying against the design. Format: date, file, question, decision, reason. Rows with an id (D-...) and no date are in docs/v2/DEVIATIONS.md.
 
 | Date | File | Question | Decision | Reason |
 | --- | --- | --- | --- | --- |

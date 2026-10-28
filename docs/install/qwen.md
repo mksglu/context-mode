@@ -18,7 +18,7 @@ Until v2 is on `main`, `main` holds the old build (1.0.169), so the command abov
 
 After v2 is on main: `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
 
-Qwen Code asks you to confirm the install. Restart Qwen Code after the install and after each update.
+Qwen Code asks you to confirm the install, and `qwen extensions update` asks the same question (`Do you want to continue? [Y/n]`). Answer `Y`. Restart Qwen Code after the install and after each update.
 
 `next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
 

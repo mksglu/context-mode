@@ -18,7 +18,7 @@ Context Mode stops the big output before it lands, keeps it on disk, and gives b
 
 ## Install
 
-Use your agent's own install command. You need Node 24.15.0 or later (v2 uses the built-in `node:sqlite`).
+Use your agent's own install command. You need Node 24.15.0 or later (v2 uses the built-in `node:sqlite`). On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` check D11 (shell) fails without it.
 
 | Agent | Install | Update |
 |---|---|---|

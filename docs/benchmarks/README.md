@@ -14,7 +14,7 @@ Six short tasks from the published gateway benchmark, 8 pairs per task, 2026-10-
 
 ## README try-it prompts: direct vs v1 vs v2 vs the gateway (Opus 5.5)
 
-The six "Try It" prompts from the OSS README, 4 pairs per prompt (session-continuity: 2, demonstration only), 2026-10-22, Claude Code 2.1.303, `claude-opus-5-5`, plan pushed first. Summed over 20 pairs, v1 cost 35.2% more than direct, v2 cost 10.9% more and the gateway cost 43.8% less. The gateway passed the task check in 7 of 20 sessions, against 16 of 20 for the other arms. Of 13 README numbers checked, 2 hold. Full tables, ranges, losses and the claim check: [try-it/README.md](try-it/README.md). Evidence: [try-it/ab.json](try-it/ab.json).
+The six "Try It" prompts from the OSS README, 4 pairs per prompt (session-continuity: 2, demonstration only), 2026-10-22, Claude Code 2.1.303, `claude-opus-5-5`, plan pushed first. Summed over 20 pairs, v1 cost 33.1% more than direct, v2 cost 15.5% more and the gateway cost 43.8% less. Direct passed the task check in 20 of 20 sessions, v1 17 of 20, v2 18 of 20 and the gateway 15 of 20. Of 14 README numbers checked, 2 hold. Full tables, ranges, losses and the claim check: [try-it/README.md](try-it/README.md). Evidence: [try-it/ab.json](try-it/ab.json).
 
 ## Headline: bytes the model sees, and cost
 

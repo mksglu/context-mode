@@ -7,6 +7,7 @@ Use your agent's own install command. Each line below is the native command, the
 ## Requirements
 
 - Node 24.15.0 or later. v2 uses the built-in `node:sqlite`.
+- On Windows: Git for Windows. The shell tools (`ctx_execute` with `shell`, `bash` or `sh`, and `ctx_batch`) run in Git Bash. Without it they return `NO_GIT_BASH`, and `context-mode doctor` check D11 (shell) fails.
 - At least one supported agent. Run `context-mode setup --list` to see which ones work.
 
 ## Install

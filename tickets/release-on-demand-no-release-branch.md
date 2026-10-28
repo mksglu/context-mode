@@ -47,7 +47,7 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 ## Plan 2026-10-28: main-only release (architect), see docs/v2/release/MAIN-ONLY.md
 - Claude Code: marketplace on main, `./plugins/claude-code` subfolder (probe: install + update next.8 to next.9, CLI 2.1.311). npm source also works, not chosen.
 - Codex: first planned as an npm entry (probe: dist-tag `next` resolved, CLI 0.156.1); replaced by the local subfolder entry, see "Update 2026-10-28: Codex too".
-- Gemini CLI: no subfolder option; root `gemini-extension.json` + `hooks/hooks.json` point into `plugins/gemini/`; tag on the release commit, because a GitHub release makes Gemini install the tag source (code read). Install proven, run of hooks not yet.
+- Gemini CLI: no subfolder option; root `gemini-extension.json` + `hooks/hooks.json` point into the one built copy `plugins/claude-code/` (D-MO-1, no `plugins/gemini/`); tag on the release commit, because a GitHub release makes Gemini install the tag source (code read). Install proven, run of hooks not yet.
 - Qwen Code: reads the same Claude marketplace (`:context-mode`); gap: converted plugin runs with `--agent claude-code`. Fix to probe: own entry `./plugins/qwen`.
 - One click: inputs channel next|latest (+ confirm_latest), version from commits since last v2 tag on main, build, smoke, npm publish, one release commit + tag on main, GitHub release after. Rollback = forward commit, no reset of main.
 - Open for owner: bot push to main allowed.
