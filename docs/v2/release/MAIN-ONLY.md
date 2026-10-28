@@ -9,11 +9,20 @@ Checked 2026-10-28 with a temp HOME per probe (never the real home). CLI version
 | Host | Install command (unchanged) | Source on `main` | Built files come from | Proof |
 |---|---|---|---|---|
 | Claude Code | `claude plugin marketplace add mksglu/context-mode`, `claude plugin install context-mode@context-mode` | `.claude-plugin/marketplace.json`, entry source `./plugins/claude-code` (relative subfolder, context7 style) | The release commit on `main` holds `plugins/claude-code/` | Probe: local git marketplace with subfolder source: install ok, then a version bump committed to the marketplace, `claude plugin marketplace update` + `claude plugin update` went 2.0.0-next.8 to 2.0.0-next.9. Docs: https://code.claude.com/docs/en/plugins/marketplace-reference.md (relative path rule: starts with `./`, resolves from the marketplace root). |
-| Codex | `codex plugin marketplace add mksglu/context-mode`, `codex plugin add context-mode@context-mode` | `.agents/plugins/marketplace.json` with an npm entry; the workflow writes the version (or the dist-tag `next`) | npm. Nothing built goes to git for Codex. | Probe: npm entry installed the real npm tarball; version `next` (dist-tag) resolved to 2.0.0-next.8 (`codex plugin list`: installed, enabled). Already decided in ADR-0023. |
+| Codex | `codex plugin marketplace add mksglu/context-mode`, `codex plugin add context-mode@context-mode` | `.agents/plugins/marketplace.json`, entry source `{"source":"local","path":"./plugins/claude-code"}` (context7 style, the same single built copy as Claude) | The release commit on `main` holds `plugins/claude-code/` (it ships `.codex-plugin/`, `codex/skills/`) | Probe 2026-10-28, codex-cli 0.156.1, temp HOME: local bare `main`, `insteadOf`, the README command: `codex plugin list` shows `context-mode@context-mode installed, enabled 2.0.0-next.9`, source `local` `.../plugins/claude-code`; MCP `tools/list` returns 9 tools; 3 skills. A second release commit and `codex plugin marketplace upgrade context-mode` moved it to 2.0.0-next.10 (new plugin cache dir, tools/list again 9 tools). Docs form: see "Codex source forms". |
 | Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode` | Repo root of the tagged release commit: small `gemini-extension.json` and `hooks/hooks.json` that point into `plugins/gemini/` | The release commit on `main` holds `plugins/gemini/` | See "Gemini" below. Subfolder install is not offered by the CLI. |
 | Qwen Code | `qwen extensions install mksglu/context-mode:context-mode` (name after the colon = marketplace plugin) | Same `.claude-plugin/marketplace.json` as Claude | The release commit on `main` | See "Qwen" below. One gap: agent flag. |
 
-Why Claude uses the subfolder and not npm: the npm source form is documented and works (probe: `{"source":"npm","package":"context-mode","version":"next"}` installed 2.0.0-next.8, Claude Code 2.1.311, local marketplace). The owner ticket (final update 2026-10-28) says no npm source for the marketplace, and Gemini and Qwen need built files in git anyway, so one mechanism is simpler. Switching Claude to npm later is a one-line change in the manifest generator. Owner: the ticket line "No npm source for the marketplace" is read as Claude only; Codex keeps npm because it is already decided and proven (ADR-0023). Say so if you want Codex on a subfolder too.
+Why Claude uses the subfolder and not npm: the npm source form is documented and works (probe: `{"source":"npm","package":"context-mode","version":"next"}` installed 2.0.0-next.8, Claude Code 2.1.311, local marketplace). The owner ticket (final update 2026-10-28) says no npm source for the marketplace, and Gemini and Qwen need built files in git anyway, so one mechanism is simpler. Switching Claude to npm later is a one-line change in the manifest generator. Owner decision 2026-10-28 (final): Codex uses the same subfolder style; no npm entry for any host.
+
+## Codex source forms (0.156.1)
+
+Evidence for a local subfolder (codex-cli 0.156.1, read 2026-10-28):
+- `codex plugin marketplace add --help`: "`<SOURCE>` Marketplace source: a local path, owner/repo[@ref], HTTPS Git URL, or SSH Git URL"; options `--ref`, `--sparse <PATH>` (git sources). Example in the help: `codex plugin marketplace add https://github.com/owner/repo --sparse plugins/foo`.
+- The bundled marketplace Codex ships (`~/.codex/.tmp/bundled-marketplaces/openai-bundled/.agents/plugins/marketplace.json`) uses entries `"source": {"source": "local", "path": "./plugins/browser"}`.
+- Codex binary strings (plugin-creator text): "Marketplace entries always point to ./plugins/<plugin-name> relative to the marketplace root." and "Keep marketplace `source.path` relative to the selected marketplace root as `./plugins/<plugin-name>`." Other source kinds in the binary: npm (`invalid npm plugin source package`) and git (`invalid git plugin source url`); not used here.
+- Proof of read: `codex plugin list --json` prints `"source": {"source": "local", "path": "<marketplace root>/plugins/claude-code"}` for our entry. Codex reads `.codex-plugin/plugin.json` inside the folder; its paths (`./.codex-plugin/mcp.json`, `./codex/skills/`) are relative to the plugin folder, so the same copy that Claude uses works (no `plugins/codex` needed).
+- Update path: a Git marketplace; `codex plugin marketplace upgrade context-mode` pulls the new commit and the plugin moves to the new version.
 
 ## Gemini (0.66.0)
 
@@ -32,7 +41,7 @@ Why Claude uses the subfolder and not npm: the npm source form is documented and
 
 ## Built files on main with zero manual steps
 
-The workflow, as the last step of the one click, makes one commit on `main`: `plugins/*` (generated), the Codex pin, `gemini-extension.json`, root `hooks/hooks.json`, version in `package.json`. Author: github-actions bot. Message: `chore(release): vX.Y.Z`. Tag `vX.Y.Z` (annotated) on that commit. The `Source-Commit:` trailer and `release-staging` go away: the tag range replaces them.
+The workflow, as the last step of the one click, makes one commit on `main`: `plugins/*` (generated), the Codex marketplace file (`.agents/plugins/marketplace.json`), `gemini-extension.json`, root `hooks/hooks.json`, version in `package.json`. Author: github-actions bot. Message: `chore(release): vX.Y.Z`. Tag `vX.Y.Z` (annotated) on that commit. The `Source-Commit:` trailer and `release-staging` go away: the tag range replaces them.
 
 Files that change when the build step is written (for later steps, not done here): `.github/workflows/release.yml`, `scripts/release/plan.mjs` (range = last `v2.*` tag reachable from `main`), `scripts/release/publish.mjs` (`--stage`/`--promote` become `--commit-main`, tag), `scripts/release/rollback.mjs`, `scripts/release/smoke.mjs` (no `--ref release-staging`: smoke runs on a local clone of the built commit by path, proven for Claude and Codex), `src/core/contracts/constants.ts` (`RELEASE_BRANCH`), `build/manifests.ts` (output into `plugins/`).
 
@@ -55,16 +64,15 @@ Order (each step needs the one before it):
 
 Why this order, from git history: 6136a9c0 (GitHub release only after npm), 21d8e438/e2bee539 (a pushed tag as version), 7d377219 (last release = newest v2 tag; the same idea now reads tags on `main`), 1dd34d92 (npm only through OIDC and provenance, tag `next`, never `latest` by default).
 
-Rollback (a forward commit, `main` is never reset or force-pushed): `mode=rollback sha=<release commit>` makes a commit that restores the generated paths and the Codex pin from that release commit, no tag; the commit message names the sha. npm: `npm dist-tag add context-mode@<good> next|latest` stays an owner action (needs npm login; the workflow has no token for it by design). Users on Claude: `claude plugin update`; Codex: `codex plugin marketplace upgrade`; Gemini and Qwen: `extensions update`.
+Rollback (a forward commit, `main` is never reset or force-pushed): `mode=rollback sha=<release commit>` makes a commit that restores the generated paths (the Codex marketplace file included) from that release commit, no tag; the commit message names the sha. npm: `npm dist-tag add context-mode@<good> next|latest` stays an owner action (needs npm login; the workflow has no token for it by design). Users on Claude: `claude plugin update`; Codex: `codex plugin marketplace upgrade`; Gemini and Qwen: `extensions update`.
 
 ## What the ticket still needs from the owner
 
-- Confirm Codex stays on npm (above).
 - Confirm that `main` allows the bot push (no branch protection on the release commit, or a bypass for github-actions).
 
 ## Built on v2-design (state 2026-10-28)
 
-Done and tested, not yet on `main`: `plan.mjs --main`, `build/main-tree.mjs` (Claude subfolder, Codex npm pin, root Gemini and Qwen manifests), `commit-main.mjs` (release commit, tag, push; rollback), `smoke.mjs --layout main` with a Qwen leg, and the `route` + `main-*` jobs in `release.yml` (DEVIATIONS D-MO-1, D-MO-2). One copy of the built plugin (`plugins/claude-code/`) serves all three hosts; the design's `plugins/gemini/` was dropped for that reason.
+Done and tested, not yet on `main`: `plan.mjs --main`, `build/main-tree.mjs` (Claude and Codex subfolder entries, root Gemini and Qwen manifests), `commit-main.mjs` (release commit, tag, push; rollback), `smoke.mjs --layout main` with a Qwen leg, and the `route` + `main-*` jobs in `release.yml` (DEVIATIONS D-MO-1, D-MO-2). One copy of the built plugin (`plugins/claude-code/`) serves all three hosts; the design's `plugins/gemini/` was dropped for that reason.
 
 ## Merge-day checklist
 

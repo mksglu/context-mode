@@ -46,11 +46,11 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 
 ## Plan 2026-10-28: main-only release (architect), see docs/v2/release/MAIN-ONLY.md
 - Claude Code: marketplace on main, `./plugins/claude-code` subfolder (probe: install + update next.8 to next.9, CLI 2.1.311). npm source also works, not chosen.
-- Codex: npm entry in `.agents/plugins/marketplace.json` (probe: dist-tag `next` resolved, CLI 0.156.1). Nothing built in git. Owner to confirm.
+- Codex: first planned as an npm entry (probe: dist-tag `next` resolved, CLI 0.156.1); replaced by the local subfolder entry, see "Update 2026-10-28: Codex too".
 - Gemini CLI: no subfolder option; root `gemini-extension.json` + `hooks/hooks.json` point into `plugins/gemini/`; tag on the release commit, because a GitHub release makes Gemini install the tag source (code read). Install proven, run of hooks not yet.
 - Qwen Code: reads the same Claude marketplace (`:context-mode`); gap: converted plugin runs with `--agent claude-code`. Fix to probe: own entry `./plugins/qwen`.
 - One click: inputs channel next|latest (+ confirm_latest), version from commits since last v2 tag on main, build, smoke, npm publish, one release commit + tag on main, GitHub release after. Rollback = forward commit, no reset of main.
-- Open for owner: Codex on npm; bot push to main allowed.
+- Open for owner: bot push to main allowed.
 
 ## Built 2026-10-28 on v2-design (not on main yet)
 - One click path is in `release.yml` (jobs `route`, `main-plan`, `main-build`, `main-smoke`, `main-npm`, `main-commit`, `main-github-release`, `main-rollback`). A dispatch on `main` takes it; tag push and other refs keep the release-branch path until merge day, so testers are not affected.
@@ -58,7 +58,7 @@ Until v2 is on `main`, `release` stays as the temporary source for testing `next
 - Only branch named in the main path: `main`. Rollback is a forward commit.
 - Not proven until the first real run: Gemini hooks from the subfolder, Qwen install from the real repo, bot push to `main`.
 - Merge-day checklist: docs/v2/release/MAIN-ONLY.md.
-- Still open for owner: Codex stays on npm; allow the bot to push to `main`.
+- Still open for owner: allow the bot to push to `main`.
 
 ## Proof 2026-10-28: local main, native install per host (prover)
 Method: bare local repo, default branch `main` = the `v2-design` tree + the release commit that `commit-main.mjs` makes after `build.mjs --out` (tag `v2.0.0-next.N`). Temp HOME per host, `~/.gitconfig` `insteadOf` maps the GitHub URL in the README command to the local repo, so the command text is the real one. A second and third fake release commit after the install. Real `~/.claude` etc. untouched. Origin `main`, branches, tags and npm not touched.
@@ -77,3 +77,5 @@ Method: bare local repo, default branch `main` = the `v2-design` tree + the rele
 
 ## Update 2026-10-28: Codex too (owner decision, final)
 Every agent uses the context7 style, Codex included: the Codex marketplace on main points at a built plugin subfolder, no npm entry. Work: docs/v2/review/viet-next8-codex7.workflow.js.
+- Done 2026-10-28 (branch v2-design, not on main yet): `build/main-tree.mjs` writes `.agents/plugins/marketplace.json` with `{"source":"local","path":"./plugins/claude-code"}`, the same single built copy Claude, Gemini and Qwen use (Codex reads `.codex-plugin/` inside it). No npm entry. `smoke.mjs --layout main --agent codex` now runs `codex plugin marketplace add <clone>`, `codex plugin add context-mode@context-mode`, `plugin list --json` (must be installed, enabled, source local) and starts the installed MCP server. The release-branch path is unchanged. DEVIATIONS D-MO-3.
+- Proof line (codex-cli 0.156.1, temp HOME, local bare `main` built by `commit-main.mjs`, `insteadOf` for the GitHub URL): `codex plugin marketplace add mksglu/context-mode` + `codex plugin add context-mode@context-mode` -> `context-mode@context-mode installed, enabled 2.0.0-next.9`, source local plugins/claude-code, MCP `tools/list` returns 9 tools (ctx_execute, ctx_batch, ctx_index, ctx_search, ctx_resume, ctx_stats, ctx_doctor, ctx_upgrade, ctx_purge), 3 skills (ctx-doctor, ctx-stats, ctx-upgrade). Second release commit + `codex plugin marketplace upgrade context-mode` -> 2.0.0-next.10, tools/list 9 tools. Real ~/.codex untouched. Not proven until the first real run: hooks firing in a live Codex session (MCP only is promised in the README), the bot push to `main`.
