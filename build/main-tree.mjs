@@ -5,6 +5,9 @@
 //                                   SHA256SUMS rewritten for that tree, so ctx_upgrade verifies it)
 //   .claude-plugin/marketplace.json source "./plugins/claude-code" (/plugin marketplace add mksglu/context-mode)
 //   .agents/plugins/marketplace.json npm entry at this version (codex plugin marketplace add mksglu/context-mode)
+//   gemini-extension.json, hooks/hooks.json   Gemini CLI reads the repo root of the tagged release commit (no subfolder
+//   qwen-extension.json, hooks/qwen.json       option); Qwen reads the root when installed from the repo. Their paths point
+//                                              into the one built copy under plugins/claude-code (D-MO-1).
 // Usage: node build/main-tree.mjs --pkg <unpacked package dir> --repo <repo root> --version <x.y.z>
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -15,6 +18,21 @@ const PLUGIN_DIR = path.join("plugins", "claude-code");
 const PLUGIN_SOURCE = "./plugins/claude-code";
 const CLAUDE_MARKETPLACE = path.join(".claude-plugin", "marketplace.json");
 const CODEX_MARKETPLACE = path.join(".agents", "plugins", "marketplace.json");
+
+const BUILT_PREFIX = "plugins/claude-code/";
+const BUNDLES = ["server.mjs", "hook.mjs"];
+
+// Every string in a manifest that ends a path with a shipped bundle gets the built-copy folder in front of the bundle name.
+function repoint(value) {
+  if (typeof value === "string") {
+    let out = value;
+    for (const b of BUNDLES) out = out.split(b).join(BUILT_PREFIX + b);
+    return out;
+  }
+  if (Array.isArray(value)) return value.map(repoint);
+  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, repoint(v)]));
+  return value;
+}
 
 class MainTreeError extends Error {}
 
@@ -49,6 +67,11 @@ export function writeMainTree(pkg, repo, version) {
     ...pkgMarket,
     plugins: pkgMarket.plugins.map((p) => ({ ...p, source: PLUGIN_SOURCE })),
   });
+  writeJson(path.join(repo, "gemini-extension.json"), repoint(readJson(path.join(pkg, "gemini-extension.json"))));
+  writeJson(path.join(repo, "hooks", "hooks.json"), repoint(readJson(path.join(pkg, "hooks", "hooks.json"))));
+  const qwen = readJson(path.join(pkg, "qwen-extension.json"));
+  writeJson(path.join(repo, "qwen-extension.json"), repoint(qwen));
+  writeJson(path.join(repo, qwen.hooks), repoint(readJson(path.join(pkg, qwen.hooks))));
   writeJson(path.join(repo, CODEX_MARKETPLACE), {
     name: SERVER_KEY,
     interface: { displayName: SERVER_KEY },

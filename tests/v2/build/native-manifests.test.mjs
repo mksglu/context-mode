@@ -191,3 +191,41 @@ test("[ADR-0023] native/codex-main: main tree .agents/plugins/marketplace.json i
   assert.equal(entry.name, "context-mode", "codex plugin add context-mode@context-mode");
   assert.deepEqual(entry.source, { source: "npm", package: "context-mode", version: VERSION });
 });
+
+// MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): Gemini and Qwen install the repo root of the tagged release commit.
+// Their root manifests point into the one built copy under plugins/claude-code (D-MO-1), so nothing is built twice.
+const BUILT = "plugins/claude-code/";
+test("[MAIN-ONLY] native/gemini-main: root gemini-extension.json and hooks/hooks.json name files shipped in plugins/claude-code", () => {
+  const g = json(main, "gemini-extension.json");
+  assert.equal(g.name, "context-mode");
+  assert.equal(g.version, VERSION);
+  assert.ok(!("contextFileName" in g), "gemini: no contextFileName (ADR-0023 D5)");
+  assertServers(main, g.mcpServers, "gemini-main");
+  assert.ok(g.mcpServers["context-mode"].args[0].includes(BUILT), "gemini-main: server path is inside " + BUILT);
+  assert.ok(g.mcpServers["context-mode"].args.includes("gemini"), "gemini-main: server runs with --agent gemini");
+  assertHooks(main, "hooks/hooks.json", "gemini-main");
+  for (const c of hookCommands(json(main, "hooks/hooks.json"))) {
+    assert.ok(c.includes(BUILT + "hook.mjs"), "gemini-main: hook path is inside " + BUILT + ": " + c);
+    assert.ok(c.endsWith("--agent gemini"), "gemini-main: " + c);
+  }
+});
+
+test("[MAIN-ONLY] native/qwen-main: root qwen-extension.json names shipped server and a root hooks file with --agent qwen", () => {
+  const q = json(main, "qwen-extension.json");
+  assert.equal(q.name, "context-mode");
+  assert.equal(q.version, VERSION);
+  assertServers(main, q.mcpServers, "qwen-main");
+  assert.ok(q.mcpServers["context-mode"].args[0].includes(BUILT), "qwen-main: server path is inside " + BUILT);
+  assert.ok(q.mcpServers["context-mode"].args.includes("qwen"), "qwen-main: server runs with --agent qwen");
+  assertHooks(main, q.hooks, "qwen-main");
+  for (const c of hookCommands(json(main, q.hooks))) {
+    assert.ok(c.includes(BUILT + "hook.mjs"), "qwen-main: hook path is inside " + BUILT + ": " + c);
+    assert.ok(c.endsWith("--agent qwen"), "qwen-main: " + c);
+  }
+});
+
+test("[MAIN-ONLY] native/main: the main tree writes no release branch name and no instruction file", () => {
+  for (const name of ["GEMINI.md", "QWEN.md", "CLAUDE.md", "AGENTS.md"]) assert.ok(!existsSync(path.join(main, name)), "no instruction file " + name);
+  const mk = readFileSync(path.join(main, ".claude-plugin", "marketplace.json"), "utf8");
+  assert.ok(!mk.includes("release-staging") && !mk.includes('"ref"'), "marketplace names no branch or ref");
+});
