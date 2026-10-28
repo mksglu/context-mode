@@ -57,6 +57,8 @@ jobs:
         continue-on-error: true
       - run: node e2e/checks/checkpoint-latency.mjs
         name: ckpt latency, per-call budget after ctx_index (D-CKPT-LAT-1)
+      - run: node e2e/checks/checkpoint-latency.mjs --crash
+        name: ckpt durability, kill the server right after ctx_index, reopen, search finds it (D-CKPT-LAT-1)
       # ADR-0019 D3: the one hook overhead gate (warm-up, lowest of 5 batch p95 values, 15 ms), all three OSes
       # (DEVIATIONS D-CI-PERF-1, D-CI-PERF-5). It also prints the cold first call of a fresh bundle copy as info.
       - run: node e2e/checks/setup-hook-overhead.mjs

@@ -140,7 +140,7 @@ export async function openDb(project: ProjectContext, opts?: { readOnly?: boolea
     } else {
       raw = openWritable(sqlite, path);
     }
-    return { raw, projectKey: project.projectKey, path };
+    return { raw, projectKey: project.projectKey, path, ...(opts?.readOnly === true ? { readOnly: true } : {}) };
   } catch (err) {
     // Never rename here: only ctx_doctor renames aside (ADR-0002 decision 3, impl/02 A-S3).
     if (isCorrupt(err)) throw new CtxError("DB_CORRUPT");
@@ -167,11 +167,14 @@ export function withWrite<T>(db: DbHandle, fn: (db: DbHandle) => T): T {
 
 // Every server checkpoints on its own close, no election (impl/02 §6.3). Never throws.
 // PASSIVE, never TRUNCATE: owner main rule (D-NO-TRUNCATE-1). PASSIVE never waits on readers.
+// D-CKPT-LAT-1: a read-only handle wrote nothing, so it has nothing to checkpoint; the writers checkpoint their own WAL.
 export function closeDb(db: DbHandle): void {
-  try {
-    db.raw.exec("PRAGMA wal_checkpoint(PASSIVE)");
-  } catch {
-    // best-effort: a failed checkpoint never blocks shutdown
+  if (db.readOnly !== true) {
+    try {
+      db.raw.exec("PRAGMA wal_checkpoint(PASSIVE)");
+    } catch {
+      // best-effort: a failed checkpoint never blocks shutdown
+    }
   }
   try {
     db.raw.close();

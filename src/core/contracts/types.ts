@@ -98,6 +98,7 @@ export interface DbHandle {
   raw: DatabaseSync;
   projectKey: string;
   path: string;
+  readOnly?: boolean; // D-CKPT-LAT-1: a read-only handle writes nothing, closeDb skips the checkpoint
 }
 
 // ContentStore types (impl/05 §0 verbatim).
