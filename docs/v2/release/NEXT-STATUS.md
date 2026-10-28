@@ -4,7 +4,31 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.9 (provenance present, SLSA v1, gitHead b808edb0). `latest` is still 1.0.169. Checked 2026-10-28 against the raw registry JSON.
+`next` is 2.0.0-next.11 (provenance present, SLSA v1, gitHead c3982498). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON.
+
+Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.11 ships
+
+Changes since v2.0.0-next.9 (19 commits; DEVIATIONS rows added):
+
+- D-CKPT-LAT-1: the checkpoint no longer runs on the read path (ctx_stats, ctx_search). Windows latency fix.
+- D-NO-TRUNCATE-1: no TRUNCATE anywhere (no wal_checkpoint(TRUNCATE), no TRUNCATE SQL, no fs truncate). Guard: tests/v2/repo/no-truncate.test.mjs.
+- D-NO-LOSSY-CUT-1, D-NO-LOSSY-CUT-2: the doctor report is stored whole; long echoes are named by id. No content is thrown away with no way back.
+- D-DOC-D3-ROOT-1: doctor D3 root fix.
+- D-MO-3: Codex gets context7 too.
+- D-CLI-EPIPE-1: product bug that stopped next.10. In `mcpCheck` (src/setup/engine.ts) the initialize write had no `error` listener on the server stdin. A server that exits or closes its input first gave EPIPE, an uncaught error, and the CLI exited 1 before the report. Now it is the FAIL row `mcp: server closed its input` and the report is written. Test first: cli/report-server-closes-stdin was red, then green.
+- D-HOOK-SYNC-1 stays reverted. Not in this release. Owner decision needed.
+
+## Release numbers (next.11)
+
+- Tag v2.0.0-next.11 on c3982498. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.10 tag) plus 1.
+- CI on c3982498 (run 40757175981): all 12 jobs green, incl. macOS and windows hosts on 3 OS.
+- Local on a fresh clone of c3982498: `build --generated-only` ok, `gate --all` exit 0, v2-unit 1991 pass, 0 fail, 17 skip of 2008, live 0 of 30 ran (no case covers the changed files), check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- Two earlier local runs failed on timing only, with machine load average 75 to 100: first run doctor-env D1 and opencode-dir (10 s each, `no network`), second run the 50 ms units/222KB check (126 ms). Each file passed alone. The third full gate run, after the load fell, was clean.
+- release.yml run 40766996320 green (rollback and all main-* jobs skipped, as designed; ci, build, stage, smoke on 3 OS, promote, publish-npm, github-release). Run start 20:51:36Z; GitHub prerelease 21:12:51Z; registry showed the version at 21:14:10Z.
+- `latest` stays 1.0.169; GitHub release v1.0.169 is still Latest. The `release` branch marketplace.json shows 2.0.0-next.11.
+- Later docs-only head b3610d95: CI red on one job, windows node 24.15.0, T-F5 `check on Windows: 10 runs, 0 grandchildren alive`. This is the known open T-F5 flake (see Open items). Not part of this release.
 
 ## What 2.0.0-next.9 ships
 
