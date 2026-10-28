@@ -50,6 +50,13 @@ jobs:
       - run: node e2e/checks/windows-grandchild-kill.mjs
         name: T-F5 Windows grandchild kill (0 alive after KILL_GRACE_MS)
         if: runner.os == 'Windows'
+      # Viet report 1 (docs/v2/review/viet/README.md): ctx_stats / ctx_search after ctx_index took 1.45 s on Windows, all in
+      # PRAGMA wal_checkpoint(TRUNCATE). Per-call latency of the tester's repro on all 3 OS; the trace run prints the checkpoint ms (info).
+      - run: node e2e/checks/checkpoint-latency.mjs
+        name: ckpt latency, per-call budget after ctx_index (D-CKPT-LAT-1)
+      - run: node e2e/checks/checkpoint-latency.mjs --trace
+        name: ckpt latency, trace of wal_checkpoint ms (info)
+        continue-on-error: true
       # ADR-0019 D3: the one hook overhead gate (warm-up, lowest of 5 batch p95 values, 15 ms), all three OSes
       # (DEVIATIONS D-CI-PERF-1, D-CI-PERF-5). It also prints the cold first call of a fresh bundle copy as info.
       - run: node e2e/checks/setup-hook-overhead.mjs
