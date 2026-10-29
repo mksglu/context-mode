@@ -13,7 +13,6 @@ import { ALL_COMMANDS, COMMANDS, HELP_MAIN, suggest, type Command } from "../cli
 import { runCommand } from "../cli/commands.ts";
 import { isEntry } from "./is-entry.ts";
 
-export { isEntry };
 
 // D7 exit codes (clig.dev): 0 ok, 1 failure, 2 usage error, 130 Ctrl-C.
 const EXIT_OK = 0;

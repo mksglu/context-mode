@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { isEntry } from "../../../src/entries/cli.ts";
+import { isEntry } from "../../../src/entries/is-entry.ts";
 
 test("[D-HNE-CLI-ENTRY-1] cli/isEntry trusts import.meta.main when the Node has it", () => {
   assert.equal(isEntry(true, undefined, "/x/cli.mjs"), true);
