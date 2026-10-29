@@ -19,7 +19,9 @@ Until v2 is on `main`, `main` holds the old build (1.0.169), so the commands abo
 
 After v2 is on main: `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode`
 
-The plugin installs the npm package. Codex keeps plugin hooks off until you trust them in the Codex TUI. Restart Codex after the install.
+The plugin brings the MCP server, the hooks and the skills. Codex runs a hook only when it is trusted. Checked on Codex 0.156.1 in a clean HOME: after `codex plugin add`, `hooks/list` shows all 6 plugin hooks `untrusted`, and `context-mode setup` writes no trust for them (it writes nothing under `~/.codex` when the plugin is enabled). Codex 0.156.1 help names the switch `--dangerously-bypass-hook-trust` ("Run enabled hooks without requiring persisted hook trust"). So after the plugin install, trust the hooks in the Codex TUI, or use the route below. Restart Codex after the install.
+
+Route where the hooks run with no extra step (npm + setup, no plugin): `context-mode setup --agents codex` writes `~/.codex/hooks.json` and one `[hooks.state]` trust table per hook in `config.toml` (D-TRUST-KEYDIR-2). The same probe shows `trusted` for all 4 hooks.
 
 `next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
 
@@ -74,6 +76,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
+- Open product bug: after `codex plugin add` the plugin hooks stay untrusted, and doctor `hook-registered` still passes. Do not read that PASS as hooks firing. Fix path: setup writes trust for the plugin hooks, or doctor fails on `untrusted`.
 - After `codex plugin add`, `context-mode doctor` checks the plugin (`codex plugin list` shows it enabled) and setup writes nothing under `~/.codex`, so the hooks never run twice (D-NI-CODEX-DOCTOR-1).
 - Codex 0.156.1 reads a local marketplace folder only when it is a git repo.
 - The `release` branch at `2.0.0-next.5` had no `.codex-plugin` folder (it was built before ADR-0023). From `2.0.0-next.8` the folder is there, so the install above carries the MCP server and the hooks.

@@ -47,21 +47,21 @@ Restart the agent, then check: `context-mode doctor` (or `/ctx-doctor` in the ag
 `context-mode setup` is the fallback and the repair. It shows a plan, applies it, and rolls back an agent that fails.
 Uninstall: `context-mode setup --remove && npm rm -g context-mode`. Details: [docs/install/README.md](docs/install/README.md).
 
-**full** = setup installs the hooks and the MCP server. **MCP only** = setup adds the MCP server; the agent page says why there are no hooks.
+Every agent gets hooks, the MCP server and the skills. The Install column is the agent's own install command, or the npm route when the agent has none.
 
 <!-- agents:install:start (node build/readme-agents.mjs --write) -->
-| Agent | Support | Guide |
-|---|---|---|
-| Claude Code | full | [docs/install/claude-code.md](docs/install/claude-code.md#install) |
-| Codex | MCP only | [docs/install/codex.md](docs/install/codex.md#install) |
-| Copilot CLI | MCP only | [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install) |
-| Gemini CLI | full | [docs/install/gemini.md](docs/install/gemini.md#install) |
-| Kiro | MCP only | [docs/install/kiro.md](docs/install/kiro.md#install) |
-| OpenCode | MCP only | [docs/install/opencode.md](docs/install/opencode.md#install) |
-| Pi | full | [docs/install/pi.md](docs/install/pi.md#install) |
-| Qwen Code | full | [docs/install/qwen.md](docs/install/qwen.md#install) |
-| VS Code (Copilot) | MCP only | [docs/install/vscode.md](docs/install/vscode.md#install) |
-| ZCode | MCP only | [docs/install/zcode.md](docs/install/zcode.md#install) |
+| Agent | Hooks | MCP | Skills | Install | Guide |
+|---|---|---|---|---|---|
+| Claude Code | yes, package | yes | yes | `claude plugin install context-mode@context-mode` | [docs/install/claude-code.md](docs/install/claude-code.md#install) |
+| Codex | yes, hook file | yes | yes | `codex plugin add context-mode@context-mode` | [docs/install/codex.md](docs/install/codex.md#install) |
+| Copilot CLI | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install) |
+| Gemini CLI | yes, package | yes | yes | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | [docs/install/gemini.md](docs/install/gemini.md#install) |
+| Kiro | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/kiro.md](docs/install/kiro.md#install) |
+| OpenCode | yes, in-process | yes | yes | `opencode plugin context-mode@next --global` | [docs/install/opencode.md](docs/install/opencode.md#install) |
+| Pi | yes, in-process | in-process | yes | `pi install npm:context-mode@next` | [docs/install/pi.md](docs/install/pi.md#install) |
+| Qwen Code | yes, package | yes | yes | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | [docs/install/qwen.md](docs/install/qwen.md#install) |
+| VS Code (Copilot) | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/vscode.md](docs/install/vscode.md#install) |
+| ZCode | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/zcode.md](docs/install/zcode.md#install) |
 <!-- agents:install:end -->
 
 The table comes from `src/adapters/table.ts` and `src/setup/registry.ts`; `build/check-readme.mjs` fails when it differs.

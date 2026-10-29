@@ -238,13 +238,13 @@ function list(ui: Ui): number {
   const detected = new Set(detectAgents(reg, ui.ctx));
   const rows = ADAPTERS.map((a) => ({
     id: a.id,
-    level: Object.keys(a.eventMap).length ? "full" : "MCP only",
+    hooks: a.hookChannel.kind, // ADR-0020: every agent has a hook channel
     installMode: a.installMode,
     detected: detected.has(a.id),
   }));
   if (ui.f.json) { out(JSON.stringify({ agents: rows })); return EXIT_OK; }
-  out(`${"AGENT".padEnd(13)} ${"SUPPORT".padEnd(9)} ${"FOUND".padEnd(9)} INSTALL`);
-  for (const r of rows) out(`${r.id.padEnd(13)} ${r.level.padEnd(9)} ${(r.detected ? "detected" : "-").padEnd(9)} ${r.installMode}`);
+  out(`${"AGENT".padEnd(13)} ${"HOOKS".padEnd(11)} ${"FOUND".padEnd(9)} INSTALL`);
+  for (const r of rows) out(`${r.id.padEnd(13)} ${r.hooks.padEnd(11)} ${(r.detected ? "detected" : "-").padEnd(9)} ${r.installMode}`);
   return EXIT_OK;
 }
 

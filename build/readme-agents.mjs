@@ -2,8 +2,10 @@
 // build/readme-agents.mjs — D-README-1: renders the README agent table (install) from the adapter
 // table (src/adapters/table.ts) and the setup registry (src/setup/registry.ts).
 // Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
-// Support "full" = setup installs the agent's own package through the agent CLI (installMode marketplace,
-// extension or in-process, and the registry row has a CLI plan); every other row is "MCP only".
+// Columns (DEVIATIONS D-README-2): Hooks = the row's hookChannel kind in table.ts (every agent has one, ADR-0020);
+// MCP = "yes", or "in-process" when the registry row has no MCP config and the agent runs in process (Pi);
+// Skills = the row's skillChannel; Install = the last command of the first fence in the page's Install section when
+// it is the agent's own command, else "npm + context-mode setup".
 // Usage: node build/readme-agents.mjs [--write]. Without --write it prints the tables; --write puts them into
 // README.md between the markers. build/check-readme.mjs calls checkAgentTables() and fails on any problem.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +17,8 @@ import { buildRegistry } from "../src/setup/registry.ts";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const README = path.join(REPO_ROOT, "README.md");
 const TITLE_PREFIX = "# Install context-mode v2 on ";
-const PACKAGE_MODES = new Set(["marketplace", "extension", "in-process"]);
+export const HOOK_WORDS = Object.freeze({ package: "package", "home-file": "hook file", "in-process": "in-process" });
+const FALLBACK_INSTALL = "npm + `context-mode setup`";
 const SECTIONS = { install: { heading: "## Install", anchor: "install" } };
 
 export const MARKERS = Object.freeze(Object.fromEntries(Object.keys(SECTIONS).map((k) => [k, Object.freeze([
@@ -31,7 +34,18 @@ function pageOf(id) {
   for (const { heading } of Object.values(SECTIONS)) {
     if (!lines.includes(heading)) throw new Error(`${rel}: no "${heading}" heading`);
   }
-  return { rel, name: title.slice(TITLE_PREFIX.length).trim() };
+  return { rel, name: title.slice(TITLE_PREFIX.length).trim(), lines };
+}
+
+/** The Install cell: the page's own agent command (last line of the first fence under "## Install"), else the npm route. */
+function installCell(lines, bin) {
+  const at = lines.indexOf(SECTIONS.install.heading);
+  const open = lines.findIndex((l, i) => i > at && l.startsWith("```"));
+  const close = lines.findIndex((l, i) => i > open && l.startsWith("```"));
+  const cmds = lines.slice(open + 1, close).filter((l) => l.trim() !== "");
+  const last = cmds[cmds.length - 1] ?? "";
+  if (cmds[0]?.startsWith("npm ") || !last.startsWith(`${bin} `)) return FALLBACK_INSTALL;
+  return `\`${last}\``;
 }
 
 /** One row per adapter, sorted by agent name. */
@@ -42,9 +56,12 @@ export function agentRows() {
   return ADAPTERS.map((a) => {
     const reg = byId.get(a.id);
     if (!reg) throw new Error(`setup registry has no row for ${a.id}`);
-    const { rel, name } = pageOf(a.id);
-    const support = PACKAGE_MODES.has(a.installMode) && reg.cli ? "full" : "MCP only";
-    return { id: a.id, name, support, page: rel };
+    const { rel, name, lines } = pageOf(a.id);
+    if (!(a.hookChannel.kind in HOOK_WORDS)) throw new Error(`${a.id}: unknown hook channel ${a.hookChannel.kind}`);
+    const hooks = `yes, ${HOOK_WORDS[a.hookChannel.kind]}`;
+    const mcp = a.installMode === "in-process" && !reg.config ? "in-process" : "yes";
+    const bin = reg.nativePlugin?.bin ?? reg.cli?.bin ?? (a.installMode === "in-process" ? a.id : "");
+    return { id: a.id, name, hooks, mcp, skills: a.skillChannel ? "yes" : "no", install: installCell(lines, bin), page: rel };
   }).sort((x, y) => x.name.localeCompare(y.name));
 }
 
@@ -53,8 +70,8 @@ export function renderAgentTables() {
   const rows = agentRows();
   const out = {};
   for (const [key, { anchor }] of Object.entries(SECTIONS)) {
-    out[key] = ["| Agent | Support | Guide |", "|---|---|---|",
-      ...rows.map((r) => `| ${r.name} | ${r.support} | [${r.page}](${r.page}#${anchor}) |`)].join("\n");
+    out[key] = ["| Agent | Hooks | MCP | Skills | Install | Guide |", "|---|---|---|---|---|---|",
+      ...rows.map((r) => `| ${r.name} | ${r.hooks} | ${r.mcp} | ${r.skills} | ${r.install} | [${r.page}](${r.page}#${anchor}) |`)].join("\n");
   }
   return out;
 }

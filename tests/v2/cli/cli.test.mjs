@@ -307,11 +307,14 @@ test("[M7] cli/list: setup --list prints every supported agent with its support 
   const r = run(s, ["setup", "--list"]);
   assert.equal(r.status, 0, r.stderr);
   for (const a of ADAPTERS) assert.match(r.stdout, new RegExp(`^${a.id}\\s`, "m"));
-  assert.match(r.stdout, /full|MCP only/);
+  assert.match(r.stdout, /HOOKS/);
+  assert.ok(!r.stdout.includes("MCP only"));
+  for (const a of ADAPTERS) assert.match(r.stdout, new RegExp(`^${a.id}\\s+${a.hookChannel.kind}\\s`, "m"));
   assert.match(r.stdout, /^codex\s+.*detected/m);
   assert.deepEqual(snapshot(s.home), before);
   const j = JSON.parse(run(s, ["setup", "--list", "--json"]).stdout);
   assert.equal(j.agents.length, ADAPTERS.length);
+  for (const a of j.agents) assert.equal(a.hooks, ADAPTERS.find((x) => x.id === a.id).hookChannel.kind);
 });
 
 test("[M7] cli/remove: setup --remove --yes puts every touched file back byte for byte", (t) => {
