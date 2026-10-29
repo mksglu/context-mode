@@ -209,6 +209,33 @@ export const USER_DENY_REASON_PREFIX = "Blocked by security policy: matches deny
 export const POLICY_UNREADABLE_LINE = "context-mode: your deny rules could not be read. Fix: run ctx_doctor."; // DECISIONS-r9 E2
 export const PARSE_ERROR_DENY_LINE = "context-mode: could not parse this command; it may be blocked by your own rules. Run it through ctx_execute instead."; // impl/08 §6.1 step 5b, Q4
 
+// D-HNE-GUARD-1: a hook never errors. On any internal failure it exits 0 with a valid decision for its host, built from
+// this table with no store access: own ctx_* tools and tools that cannot flood the context are allowed; shell, large
+// Read, grep and fetch tools are denied with the usual redirect plus one line naming the error and "run ctx_doctor".
+export const HOOK_ERROR_LOG_FILE = "hook-errors.log"; // <DATA_ROOT>/hook-errors.log, one JSON line per failure, append only
+export const HOOK_LOG_TAIL_BYTES = 65536; // ctx_doctor reads only this tail of the log; the file itself is never cut
+export const HOOK_FAIL_TOOL_KEYS = Object.freeze(["tool_name", "toolName", "tool"] as const); // tool name key of every host payload
+export const HOOK_FAIL_EVENT_KEYS = Object.freeze(["hook_event_name", "hookEventName", "type"] as const);
+export const HOOK_FAIL_INPUT_KEYS = Object.freeze(["tool_input", "toolArgs", "input", "args"] as const);
+export const HOOK_FAIL_CWD_KEYS = Object.freeze(["cwd", "directory"] as const);
+export const HOOK_FAIL_PRE_EVENTS = Object.freeze(["pretooluse", "beforetool", "tool_call", "execute.before", "tool.execute.before"]); // lower case; every host's pre-tool event name, next to the adapter row's own eventMap name
+export const HOOK_FAULT_ENV = "CM_HOOK_FAULT"; // test seam: one of HOOK_FAULT_STAGES makes that stage throw once, so every failure path is testable
+export const HOOK_FAULT_STAGES = Object.freeze(["decode", "project", "policy", "store", "encode"] as const);
+export const HOOK_FAIL_TOOLS = Object.freeze({
+  shell: Object.freeze(["Bash", "bash", "shell"]),
+  read: Object.freeze(["Read", "read_file"]),
+  grep: Object.freeze(["Grep", "grep_search"]),
+  fetch: Object.freeze(["WebFetch", "web_fetch", "fetch"]),
+});
+export function HOOK_FAIL_LINE(label: string, prefix: string): string { return `${DENY_PREFIX}the hook failed (${label}). Fix: run ${prefix}ctx_doctor.`; } // prefix: the host's own tool prefix (D-HL-NAMES-1)
+export const HOOK_FAIL_REDIRECT = Object.freeze({
+  read: "Read the file in parts with offset and limit, or process it with ctx_execute(language, code); only what you print comes back.",
+  shell: "Run the command with ctx_execute(language, code) or ctx_batch instead; only the part that matches your intent comes back.",
+  grep: "Search with ctx_execute(language, code), or index the files with ctx_index and query them with ctx_search.",
+  fetch: "Index the URL with ctx_index and query it with ctx_search.",
+});
+export function D5_LAST_HOOK_ERROR(ts: string, stage: string, label: string): string { return `; last hook error ${ts} at ${stage} (${label}), stack in ${HOOK_ERROR_LOG_FILE}`; }
+
 // impl/08 §6.1 step 5d, DECISIONS-r9 E4. D-M7-RR-2: step 5d (bounded -> no hint) is retired with the hints; the
 // set stays only because tests/v2/contracts pins it (not owned by this change).
 // E3: CONTEXT_MODE_BASH_NUDGE_MIN_COMMAND_BYTES is not ported.

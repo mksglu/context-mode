@@ -36,7 +36,10 @@ import { appendDetached } from "./detached.ts";
 import { askedWords } from "./handle-query.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
 import { shouldHint } from "./throttle.ts";
+import { CtxError } from "../contracts/errors.ts";
+import { failureOutput, fault, logHookError, nodeTooOld } from "./fallback.ts";
 
+export { failureOutput, logHookError } from "./fallback.ts"; // D-HNE-GUARD-1: the entry's last-resort catch
 export { readStdin, writeOut } from "./io.ts"; // D-M7-HP-1: entry I/O without process.stdin/stdout streams
 
 const ALLOW: Decision = { kind: "allow" };
@@ -62,32 +65,44 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
     return EMPTY;
   }
   const row = getAdapter(agent);
+  // D-HNE-GUARD-1: every failure below ends in failureOutput (exit 0, this host's shape, tool table only) and a log line.
+  const fail = (stage: string, err: unknown, line?: string): HookOutput => {
+    logHookError(env, agent, stage, err);
+    process.stderr.write(line ?? "hooks: " + stage + " failed: " + message(err) + "\n");
+    return failureOutput(agent, raw, err);
+  };
+  if (nodeTooOld(process.version)) return fail("node", new CtxError("NODE_TOO_OLD", { v: process.version }));
   let ev: CanonicalHookEvent;
   try {
+    fault(env, "decode");
     ev = row.decode(raw);
   } catch (err) {
-    process.stderr.write("hooks: decode failed: " + message(err) + "\n"); // step 2
-    return row.encode({ event: "PreToolUse", agent, sessionId: "", cwd: "", turn: 0 }, ALLOW);
+    return fail("decode", err); // step 2
   }
   let project: ProjectContext;
   try {
+    fault(env, "project");
     // D-HA-PI-PROJECT-1: on pi the entry puts ctx.cwd into the payload, so ev.cwd is the pi:ctx.cwd source.
     // D-HF-VSCODE-PROJECT-1: a VS Code hook has no launch args; its workspace folder is the payload cwd.
     const argv = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, ev.cwd] : process.argv;
     project = resolveProject(agent, { env, argv, cwd: ev.cwd, piCwd: agent === "pi" ? ev.cwd : undefined }); // step 3
   } catch (err) {
-    // D-FU-PS-1: no project: never deny, never hint, no DB; one stderr line, never a silent drop.
-    process.stderr.write("hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n");
-    return row.encode(ev, ALLOW);
+    // D-FU-PS-1 keeps its one stderr line (code first); the decision part is new.
+    return fail("project", err, "hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n"); // D-HNE-GUARD-1 supersedes D-FU-PS-1: a flooding call is denied, the rest allowed
   }
   let decision: Decision;
   try {
+    fault(env, "policy");
     decision = await dispatch(ev, row, project, env); // step 4
   } catch (err) {
-    process.stderr.write("hooks: " + message(err) + "\n");
-    decision = ALLOW;
+    return fail("store", err);
   }
-  return row.encode(ev, decision); // step 6
+  try {
+    fault(env, "encode");
+    return row.encode(ev, decision); // step 6
+  } catch (err) {
+    return fail("encode", err);
+  }
 }
 
 function dispatch(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv): Promise<Decision> {

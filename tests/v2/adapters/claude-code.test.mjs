@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -244,6 +245,19 @@ function runEntry(args, input) {
   return spawnSync(process.execPath, [HOOK_ENTRY, ...args], { input, encoding: "utf8" });
 }
 
+// D-HNE-GUARD-1: a Bash PreToolUse with no resolvable project is now denied (the hook failed), so the PreToolUse cases
+// below run in a real git repo with a temp HOME and CLAUDE_PROJECT_DIR; the assertions (allow, empty stdout, exit 0) are unchanged.
+function healthyEntry(args, payload) {
+  const dir = mkdtempSync(join(tmpdir(), "cm-cc-entry-"));
+  try {
+    spawnSync("git", ["init", "-q", dir]);
+    const env = { PATH: process.env.PATH, HOME: dir, USERPROFILE: dir, CLAUDE_PROJECT_DIR: dir };
+    return spawnSync(process.execPath, [HOOK_ENTRY, ...args], { input: JSON.stringify({ ...payload, cwd: dir }), encoding: "utf8", env, cwd: dir });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 test("hook entry: recorded-shape payload -> allow, empty stdout, exit 0", () => {
   for (const [event, extra] of [
     ["SessionStart", { source: "startup" }],
@@ -251,14 +265,16 @@ test("hook entry: recorded-shape payload -> allow, empty stdout, exit 0", () => 
     ["PreToolUse", { tool_name: "Bash", tool_input: { command: "ls" } }],
     ["PostToolUse", { tool_name: "Bash", tool_input: { command: "ls" }, tool_response: { stdout: "a" } }],
   ]) {
-    const r = runEntry(["--agent", "claude-code", "--event", event], JSON.stringify({ ...base, hook_event_name: event, ...extra }));
+    const payload = { ...base, hook_event_name: event, ...extra };
+    const args = ["--agent", "claude-code", "--event", event];
+    const r = event === "PreToolUse" ? healthyEntry(args, payload) : runEntry(args, JSON.stringify(payload));
     assert.equal(r.status, 0, event + " " + r.stderr);
     assert.equal(r.stdout, "", event);
   }
 });
 
 test("hook entry: codex payload -> allow, empty stdout, exit 0", () => {
-  const r = runEntry(["--agent", "codex"], JSON.stringify({ ...base, turn_id: "t1", model: "m", hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } }));
+  const r = healthyEntry(["--agent", "codex"], { ...base, turn_id: "t1", model: "m", hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, "");
 });

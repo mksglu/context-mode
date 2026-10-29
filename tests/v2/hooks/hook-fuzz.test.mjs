@@ -494,7 +494,7 @@ function floodPayload(host, keys, variant, cwd) {
 }
 
 for (const host of HOSTS) {
-  test(`hook-fuzz ${host}: a flooding call that is denied when healthy is still denied when the project cannot be resolved`, { todo: "red until the guard agent lands the policy fallback in handleHook (owner decision 2026-10-29); remove todo then" }, async () => {
+  test(`hook-fuzz ${host}: a flooding call that is denied when healthy is still denied when the project cannot be resolved`, async () => {
     const home = mkdtempSync(join(root, "home-fb-"));
     const keys = SPEC[host].keys[0];
     let found = -1;

@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
-  DOCTOR_CHECK_ORDER, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
+  D5_LAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
   PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
@@ -18,6 +18,7 @@ import { checkDoubleFire, checkHostConfig, checkV1Leftovers } from "../ops/docto
 import { checkDb, checkIndex } from "../ops/doctor-db.ts";
 import { checkMcp, checkMode, checkNode, checkProject, checkShell, checkVersion } from "../ops/doctor-env.ts";
 import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
+import { lastHookError } from "../hooks/fallback.ts";
 import { healD8 } from "../ops/db-heal.ts";
 import { buildReport, buildReportHead } from "../ops/report.ts";
 import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
@@ -64,7 +65,7 @@ async function codexDb(ctx: ToolContext, adapter: AdapterRow): Promise<DbHandle 
 async function hookRow(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost): Promise<DoctorRow> {
   const db = await codexDb(ctx, adapter);
   try {
-    return await checkHookRoundTrip({
+    const row = await checkHookRoundTrip({
       agent: adapter.id,
       bundleDir: host.bundleDir,
       env: buildChildEnv(host.env),
@@ -72,6 +73,9 @@ async function hookRow(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost):
       codexConfigDir: codexDirOf(host.env, requireHomeDir(host.env)), // same Codex dir D3 reads (D-N6-CODEX-HOME-2)
       db,
     });
+    // D-HNE-GUARD-1: the hook never errors, it logs; D5 names the last logged failure so the user sees it.
+    const last = lastHookError(host.env);
+    return last === null ? row : { ...row, detail: row.detail + D5_LAST_HOOK_ERROR(last.ts, last.stage, last.label) };
   } finally {
     if (db !== null) closeDb(db);
   }
