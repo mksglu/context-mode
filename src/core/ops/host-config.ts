@@ -9,7 +9,8 @@ import type { AST } from "toml-eslint-parser";
 import {
   AGENT_ARG, HOST_CONFIG_TEXT_PATH, HOST_NODE_COMMAND, JSON_INDENT_UNIT, JSONC_EXT,
   MCP_ARGS_FIELD, MCP_COMMAND_FIELD, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY, OWN_MCP_ENTRY,
-  PI_GIT_PACKAGE, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_OPENCODE_PLUGIN_SPEC, V1_PI_PACKAGE,
+  OPENCODE_PLUGIN_PATH, PI_GIT_PACKAGE, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_OPENCODE_PLUGIN_SPEC, V1_PATH_SEPS, V1_PI_PACKAGE,
+  VSCODE_WORKSPACE_VAR, WORKSPACE_FOLDER_FLAG, EXE_SUFFIX,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import { atomicWriteFile } from "./atomic-file.ts";
@@ -436,30 +437,61 @@ function serverScript(): string {
   return join(dirname(process.argv[1] ?? ""), SERVER_ENTRY_FILE);
 }
 
-function listTarget(key: string, own: string, v1: string): OwnTarget {
+/** D-DOC-RT-1: true when `command` runs node: its last path segment is `node` or `node.exe` (any case on Windows). */
+export function isNodeCommand(command: unknown): command is string {
+  if (typeof command !== "string") return false;
+  let at = -1;
+  for (const sep of V1_PATH_SEPS) at = Math.max(at, command.lastIndexOf(sep));
+  const exe = command.slice(at + 1).toLowerCase();
+  return exe === HOST_NODE_COMMAND || exe === HOST_NODE_COMMAND + EXE_SUFFIX;
+}
+
+/** D-DOC-RT-1: the ONE shape of an agent's MCP server entry. Setup writes it with the node it runs and the package
+ *  server bundle; ctx_upgrade writes it with bare `node` and the running bundle; doctor D3 compares against it. */
+export function ownMcpValue(agent: AgentId, node: string, server: string): Record<string, unknown> | undefined {
+  const mcp = OWN_MCP_ENTRY[agent];
+  if (mcp === undefined) return undefined;
+  // D-HF-VSCODE-PROJECT-1: VS Code expands ${workspaceFolder} in MCP server args; the server reads the project from it (D-M1-5).
+  const tail = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [];
+  return { ...mcp.fields, [MCP_COMMAND_FIELD]: node, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent, ...tail] };
+}
+
+/** What doctor D3 accepts beyond the exact ctx_upgrade form: the entry setup wrote (D-DOC-RT-1). */
+export interface OwnAccept {
+  nodePath?: boolean;             // an absolute node path (setup writes process.execPath) counts as `node`
+  listEntries?: readonly string[]; // list entries setup writes in place of the upgrade form (OpenCode plugin file path)
+}
+
+/** D-DOC-RT-1: the OpenCode plugin file setup lists (D-WIN-OCENTRY-1), next to the running server bundle. */
+export function opencodePluginFile(): string {
+  return join(dirname(process.argv[1] ?? ""), ...OPENCODE_PLUGIN_PATH);
+}
+
+function listTarget(key: string, own: string, v1: string, alt: readonly string[] = []): OwnTarget {
   return {
     key: [key],
     next(current) {
       const list = Array.isArray(current) ? current.filter((x) => x !== v1) : [];
-      return list.includes(own) ? list : [...list, own];
+      return list.includes(own) || alt.some((a) => list.includes(a)) ? list : [...list, own];
     },
   };
 }
 
 // D-M5-O1-4: the own entries a host config holds per agent. Hook entries ship in the release's hook files
 // (build/manifests.ts); this module regenerates the MCP entry and the plugin/package list entry.
-function ownTargets(agent: AgentId): OwnTarget[] {
+function ownTargets(agent: AgentId, accept: OwnAccept): OwnTarget[] {
   const mcp = OWN_MCP_ENTRY[agent];
   if (mcp !== undefined) {
     return [{
       key: mcp.key,
       next(current) {
         const keep = isPlainObject(current) ? current : {};
-        return { ...keep, ...mcp.fields, [MCP_COMMAND_FIELD]: HOST_NODE_COMMAND, [MCP_ARGS_FIELD]: [serverScript(), AGENT_ARG, agent] };
+        const node = accept.nodePath === true && isNodeCommand(keep[MCP_COMMAND_FIELD]) ? keep[MCP_COMMAND_FIELD] : HOST_NODE_COMMAND;
+        return { ...keep, ...ownMcpValue(agent, node, serverScript()) };
       },
     }, ...(mcp.also ?? []).map(([key, value]): OwnTarget => ({ key, next: () => value }))];
   }
-  if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC)];
+  if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC, accept.listEntries)];
   if (agent === "pi") return [listTarget(PI_PACKAGES_KEY, PI_GIT_PACKAGE, V1_PI_PACKAGE)];
   return [];
 }
@@ -484,9 +516,9 @@ export function editHostConfigText(agent: AgentId, path: string, text: string, f
 }
 
 /** impl/07 §2: regenerate only context-mode's own entries; every other key and user value is kept. */
-export function mergeOwnEntries(agent: AgentId, current: string, format: HostConfigFormat, row: AdapterRow): HostConfigResult {
+export function mergeOwnEntries(agent: AgentId, current: string, format: HostConfigFormat, row: AdapterRow, accept: OwnAccept = {}): HostConfigResult {
   const parsed = parseHostConfig(row.id, HOST_CONFIG_TEXT_PATH, current, format);
-  const wanted = ownTargets(agent).map((t): [KeyPath, unknown] => [t.key, t.next(hostConfigValueAt(parsed, t.key))]);
+  const wanted = ownTargets(agent, accept).map((t): [KeyPath, unknown] => [t.key, t.next(hostConfigValueAt(parsed, t.key))]);
   return applyEdits(agent, HOST_CONFIG_TEXT_PATH, current, format, wanted);
 }
 

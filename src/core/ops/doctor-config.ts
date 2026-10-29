@@ -17,7 +17,7 @@ import type { AdapterRow, AgentId, DoctorRow } from "../contracts/types.ts";
 import { hasReplace } from "../../adapters/table.ts";
 import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
 import { detectV1, type V1Scope } from "./detect-v1.ts";
-import { hostConfigValueAt, mergeOwnEntries, parseHostConfig, readHostConfig } from "./host-config.ts";
+import { hostConfigValueAt, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
 import { resolvePluginRoot } from "./plugin-root.ts";
 
 type D3Part = (typeof D3_PARTS)[number];
@@ -135,7 +135,8 @@ function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv): boolea
       return false;
     }
     const cur = readHostConfig(row.id, file);
-    return mergeOwnEntries(row.id, cur.text, cur.format, row).edits.length > 0;
+    // D-DOC-RT-1: accept the entry setup writes (absolute node, OpenCode plugin file), not only the ctx_upgrade form.
+    return mergeOwnEntries(row.id, cur.text, cur.format, row, { nodePath: true, listEntries: [opencodePluginFile()] }).edits.length > 0;
   } catch {
     return true; // root missing or the config did not parse: the entry is not what ctx_upgrade writes
   }

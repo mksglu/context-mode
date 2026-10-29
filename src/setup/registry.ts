@@ -4,9 +4,10 @@
 import path from "node:path";
 
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
-import { AGENT_HOME_DIR, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER, WORKSPACE_FOLDER_FLAG } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OPENCODE_PLUGIN_PATH, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
 import type { AgentId, AdapterRow, HostConfigFormat } from "../core/contracts/types.ts";
 import { claudeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf } from "../core/project/config-dir.ts";
+import { ownMcpValue } from "../core/ops/host-config.ts";
 import { HOOK_SHAPES, type JsonObject } from "./hook-shapes.ts";
 
 export const SERVER_BUNDLE = "server.mjs";
@@ -54,7 +55,6 @@ export type SkillInstall = { kind: "dir"; dir: string; files: SkillFile[]; prefi
 export const COMMAND_SKILLS: readonly string[] = Object.freeze(["ctx-doctor", "ctx-stats", "ctx-upgrade"]);
 export const SKILLS_DIR = "skills";
 export const SKILL_FILE = "SKILL.md";
-const OPENCODE_PLUGIN = ["opencode", "plugin.js"];
 const CODEX_CONFIG_FILE = "config.toml";
 const CODEX_HOME_ENV = "CODEX_HOME";
 const CODEX_DIR = ".codex";
@@ -167,19 +167,14 @@ function golden(row: AdapterRow, home: string): Record<string, unknown> {
   };
 }
 
-const VSCODE_WORKSPACE_VAR = "${workspaceFolder}";
-
 function configFor(ctx: SetupContext, id: AgentId): ConfigTarget | undefined {
   const [node, server, flag, agent] = serverCmd(ctx, id);
   const own = OWN_MCP_ENTRY[id];
   if (own) {
     const file = id === "vscode" ? ownMcpFileOf(id, own.file, ctx.env, ctx.home) : agentPath(ctx, id, own.file); // D-WIN-VSCODE-MCP-1
     const format: HostConfigFormat = file.endsWith(".toml") ? "toml" : id === "vscode" ? "jsonc" : "json";
-    // D-HF-VSCODE-PROJECT-1: VS Code expands ${workspaceFolder} in MCP server args (VS Code MCP configuration
-    // reference, predefined variables); the server reads the project from --workspace-folder (D-M1-5).
-    const args = id === "vscode" ? [server, flag, agent, WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [server, flag, agent];
     const also = own.also?.map(([k, v]): [readonly string[], unknown] => [k, v]);
-    return { file, format, key: own.key, value: { ...own.fields, command: node, args }, ...(also ? { also } : {}) };
+    return { file, format, key: own.key, value: ownMcpValue(id, node, server), ...(also ? { also } : {}) };
   }
   if (id === "opencode") { // docs/install/opencode.md: a local MCP entry in opencode.json
     return {
@@ -248,7 +243,7 @@ function hookInstallFor(ctx: SetupContext, row: AdapterRow, command: string): Ho
   }
   if (row.id === "opencode") {
     return { kind: "plugin-list", file: path.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE), key: ["plugin"],
-      entry: path.join(ctx.pkgDir, ...OPENCODE_PLUGIN) }; // OpenCode 1.19.4 turns an absolute or drive-letter path into a file URL itself (D-WIN-OCENTRY-1)
+      entry: path.join(ctx.pkgDir, ...OPENCODE_PLUGIN_PATH) }; // OpenCode 1.19.4 turns an absolute or drive-letter path into a file URL itself (D-WIN-OCENTRY-1)
   }
   return { kind: "package", via: ch.path };
 }

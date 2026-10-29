@@ -584,7 +584,7 @@ export const V1_STATUSLINE_COMMAND = "context-mode statusline"; // report only, 
 export const V1_PI_PACKAGE = "npm:context-mode";
 export const V1_OPENCODE_PLUGIN_SPEC = "context-mode"; // bare npm spec in .plugin[]
 export const V1_TMP_PREFIX = "context-mode-"; // <os tmp>/context-mode-*
-export const V1_TOML_SECTION_PREFIX = "[mcp_servers.context-mode"; // codex config.toml section header start
+export const V1_TOML_SECTION_ROOT = "mcp_servers"; // codex config.toml: v1 wrote [mcp_servers.context-mode] and its .tools.* tables (D-DOC-RT-1)
 export const V1_HOOKS_DIR_NAME = "hooks";
 export const SETTINGS_FILE = "settings.json"; // claude-code, gemini, qwen; pi under agent/
 export const CLAUDE_USER_CONFIG_FILE = ".claude.json"; // $HOME/.claude.json
@@ -669,6 +669,8 @@ export const OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
 
 // ops/plugin-root.ts, ops/host-config.ts (impl/07 §1-§2; DEVIATIONS D-M5-O1-1..3).
 export const SERVER_ENTRY_FILE = "server.mjs"; // the MCP server bundle next to hook.mjs in the release root
+export const VSCODE_WORKSPACE_VAR = "${workspaceFolder}"; // VS Code expands it in MCP server args (D-HF-VSCODE-PROJECT-1)
+export const OPENCODE_PLUGIN_PATH: readonly string[] = Object.freeze(["opencode", "plugin.js"]); // under the package dir (D-WIN-OCENTRY-1)
 export const HOST_NODE_COMMAND = "node"; // MCP entry `command`
 export const EXE_SUFFIX = ".exe"; // Windows node: "C:\\Program Files\\nodejs\\node.exe" (D-VT-DOCTOR-CMD-1)
 export const HOST_CONFIG_TMP_SUFFIX = ".tmp"; // write <file>.tmp.<pid>, then rename over <file>

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentId } from "../contracts/agents.ts";
 import type { V1Finding } from "../contracts/types.ts";
-import { tomlHeaderText, tomlTableSpans } from "./host-config.ts";
+import { hostConfigValueAt, isNodeCommand, parseHostConfig, tomlTableSpans } from "./host-config.ts";
 import { hostText } from "./host-text.ts";
 import {
   AGENT_HOME_DIR, CLAUDE_USER_CONFIG_FILE, CONFIG_JSON_FILE, CONFIG_TOML_FILE, DATA_ROOT, GITHUB_DIR_NAME,
@@ -16,7 +16,7 @@ import {
   V1_BIN_COMMAND, V1_CACHE_HEAL_EXTS, V1_CACHE_HEAL_NAME, V1_CODEX_HOOK_COMMAND, V1_CODEX_HOOKS_DIR,
   V1_DATA_DIR_NAME, V1_DATA_ROOT_ENTRIES, V1_HOOK_COMMAND, V1_HOOKS_DIR_NAME, V1_OPENCODE_PLUGIN_SPEC,
   V1_PATH_SEPS, V1_PI_PACKAGE, V1_REASON, V1_SCRIPT_EXT, V1_SCRIPT_NAMES, V1_SESSIONS_DIR_NAME,
-  V1_STATUSLINE_COMMAND, V1_TMP_PREFIX, V1_TOML_SECTION_PREFIX, VSCODE_DIR_NAME, VSCODE_MCP_FILE,
+  V1_STATUSLINE_COMMAND, V1_TMP_PREFIX, V1_TOML_SECTION_ROOT, SERVER_ENTRY_FILE, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, VSCODE_DIR_NAME, VSCODE_MCP_FILE,
   VSCODE_MCP_SERVERS_KEY, ZCODE_CLI_DIR, ZCODE_EVENTS_KEY,
 } from "../contracts/constants.ts";
 
@@ -86,6 +86,24 @@ function readTomlTables(file: string): ReturnType<typeof tomlTableSpans> {
   } catch {
     return [];
   }
+}
+
+function readTomlValue(file: string): unknown {
+  try {
+    return parseHostConfig("codex", file, readText(file), "toml");
+  } catch {
+    return {};
+  }
+}
+
+/** The v2 Codex MCP table: command is node, args[0] is the package server bundle (D-DOC-RT-1). */
+function isV2McpTable(v: unknown): boolean {
+  if (!isObj(v) || !isNodeCommand(v[MCP_COMMAND_FIELD])) return false;
+  const first = Array.isArray(v[MCP_ARGS_FIELD]) ? (v[MCP_ARGS_FIELD] as unknown[])[0] : undefined;
+  if (typeof first !== "string") return false;
+  let at = -1;
+  for (const sep of V1_PATH_SEPS) at = Math.max(at, first.lastIndexOf(sep));
+  return first.slice(at + 1) === SERVER_ENTRY_FILE;
 }
 
 const listOf = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -178,8 +196,13 @@ function scanCodex(agentHome: string, out: V1Finding[]): void {
     }
   }
   const tomlFile = join(agentHome, CONFIG_TOML_FILE);
+  const config = readTomlValue(tomlFile);
   for (const span of readTomlTables(tomlFile)) { // real tables only: a header-looking line inside a multiline string is not one
-    if (tomlHeaderText(span.path).startsWith(V1_TOML_SECTION_PREFIX)) out.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
+    if (span.path[0] !== V1_TOML_SECTION_ROOT || span.path[1] !== SERVER_KEY) continue; // sibling servers (context-mode-x) are not ours
+    // D-DOC-RT-1: v2 setup writes [mcp_servers.context-mode] too. It is v2 when it runs node on our server bundle; any
+    // sub-table (v1 [..tools.ctx_*]) or any other command (v1 `context-mode` bin) is the old section.
+    if (span.path.length === 2 && isV2McpTable(hostConfigValueAt(config, span.path))) continue;
+    out.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
   }
   dataDir(join(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);
 }
@@ -307,6 +330,7 @@ export interface V1Scope {
   claudeDir?: string; // env CLAUDE_CONFIG_DIR (D-WF-CC-CONFIG-1); none → <home>/.claude
   copilotDir?: string; // env COPILOT_HOME (D-WIN-COPILOT-HOME-1); none → <home>/.copilot
   kiroDir?: string; // env KIRO_HOME (D-WIN-KIRO-HOME-1); none → <home>/.kiro
+  codexDir?: string; // env CODEX_HOME (D-N6-CODEX-HOME-2); none → <home>/.codex
   opencodeDir?: string; // env OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME (D-WIN-OPENCODE-DIR-1); none → <home>/.config/opencode
   tmp?: string; // none → os.tmpdir()
 }
@@ -316,6 +340,7 @@ export function detectV1(agent: AgentId, home: string, scope: V1Scope = {}): V1F
   const out: V1Finding[] = [];
   const project = scope.project;
   const agentHome = agent === "claude-code" && scope.claudeDir !== undefined ? scope.claudeDir
+    : agent === "codex" && scope.codexDir !== undefined ? scope.codexDir
     : agent === "copilot-cli" && scope.copilotDir !== undefined ? scope.copilotDir
     : agent === "kiro" && scope.kiroDir !== undefined ? scope.kiroDir
     : agent === "opencode" && scope.opencodeDir !== undefined ? scope.opencodeDir : join(home, ...AGENT_HOME_DIR[agent]);
