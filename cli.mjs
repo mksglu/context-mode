@@ -404,12 +404,13 @@ var V1_STATUSLINE_COMMAND = "context-mode statusline";
 var V1_PI_PACKAGE = "npm:context-mode";
 var V1_OPENCODE_PLUGIN_SPEC = "context-mode";
 var V1_TMP_PREFIX = "context-mode-";
-var V1_TOML_SECTION_PREFIX = "[mcp_servers.context-mode";
+var V1_TOML_SECTION_ROOT = "mcp_servers";
 var V1_HOOKS_DIR_NAME = "hooks";
 var SETTINGS_FILE = "settings.json";
 var CLAUDE_USER_CONFIG_FILE = ".claude.json";
 var HOOKS_JSON_FILE = "hooks.json";
 var CLAUDE_CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR";
+var CODEX_HOME_ENV = "CODEX_HOME";
 var COPILOT_HOME_ENV = "COPILOT_HOME";
 var KIRO_HOME_ENV = "KIRO_HOME";
 var OPENCODE_CONFIG_DIR_ENV = "OPENCODE_CONFIG_DIR";
@@ -471,12 +472,19 @@ var V1_REASON = Object.freeze({
 });
 var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering]);
 var OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
+var SERVER_ENTRY_FILE = "server.mjs";
+var VSCODE_WORKSPACE_VAR = "${workspaceFolder}";
+var OPENCODE_PLUGIN_PATH = Object.freeze(["opencode", "plugin.js"]);
+var HOST_NODE_COMMAND = "node";
+var EXE_SUFFIX = ".exe";
 var ATOMIC_RENAME_RETRIES = 5;
 var ATOMIC_RENAME_DELAY_MS = 50;
 var ATOMIC_RENAME_BUSY_CODES = ["EPERM", "EBUSY", "EACCES"];
 var ATOMIC_TMP_PREFIX = ".";
 var ATOMIC_TMP_MARK = ".cm-tmp-";
 var JSON_INDENT_UNIT = "  ";
+var MCP_COMMAND_FIELD = "command";
+var MCP_ARGS_FIELD = "args";
 var ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"]);
 var CODEX_OMIT_TOOLS_FROM_FIELD = "omit_tools_from";
 var CODEX_OMIT_DEFERRED = Object.freeze(["deferred"]);
@@ -4490,6 +4498,10 @@ function homeDirOf(env, platform = process.platform) {
   if (set2(env.HOME)) return env.HOME;
   return set2(env.USERPROFILE) ? env.USERPROFILE : null;
 }
+function codexDirOf(env, home) {
+  const dir = env[CODEX_HOME_ENV];
+  return dir !== void 0 && dir !== "" ? dir : join2(home, ...AGENT_HOME_DIR.codex);
+}
 function copilotDirOf(env, home) {
   const dir = env[COPILOT_HOME_ENV];
   return dir !== void 0 && dir !== "" ? dir : join2(home, ...AGENT_HOME_DIR["copilot-cli"]);
@@ -4531,14 +4543,6 @@ function ownMcpFileOf(agent, file, env, home) {
 
 // src/setup/registry.ts
 import path3 from "node:path";
-
-// src/core/ops/doctor-config.ts
-import { join as join6 } from "node:path";
-
-// src/core/ops/detect-v1.ts
-import { existsSync as existsSync3, opendirSync, readdirSync as readdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { tmpdir } from "node:os";
-import { join as join4 } from "node:path";
 
 // src/core/ops/host-config.ts
 import { existsSync as existsSync2, readFileSync } from "node:fs";
@@ -6850,9 +6854,6 @@ function scanToml(text2) {
 function tomlTableSpans(text2) {
   return scanToml(text2).tables;
 }
-function tomlHeaderText(path9) {
-  return "[" + path9.map(tomlHeaderKey).join(".") + "]";
-}
 function parseHostConfig(agent, path9, text2, format) {
   try {
     return format === "toml" ? scanToml(text2).value : scanJson(text2, format).value;
@@ -7018,6 +7019,19 @@ function setText(agent, path9, text2, format, key, value) {
     throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path9, format });
   }
 }
+function isNodeCommand(command) {
+  if (typeof command !== "string") return false;
+  let at = -1;
+  for (const sep2 of V1_PATH_SEPS) at = Math.max(at, command.lastIndexOf(sep2));
+  const exe = command.slice(at + 1).toLowerCase();
+  return exe === HOST_NODE_COMMAND || exe === HOST_NODE_COMMAND + EXE_SUFFIX;
+}
+function ownMcpValue(agent, node, server) {
+  const mcp = OWN_MCP_ENTRY[agent];
+  if (mcp === void 0) return void 0;
+  const tail = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [];
+  return { ...mcp.fields, [MCP_COMMAND_FIELD]: node, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent, ...tail] };
+}
 function applyEdits(agent, path9, text2, format, wanted) {
   const parsed = parseHostConfig(agent, path9, text2, format);
   let out2 = text2;
@@ -7034,7 +7048,13 @@ function editHostConfigText(agent, path9, text2, format, wanted) {
   return applyEdits(agent, path9, text2, format, wanted);
 }
 
+// src/core/ops/doctor-config.ts
+import { join as join6 } from "node:path";
+
 // src/core/ops/detect-v1.ts
+import { existsSync as existsSync3, opendirSync, readdirSync as readdirSync2, readFileSync as readFileSync2 } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as join4 } from "node:path";
 var isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var keyPath = (...parts) => parts.join(".");
 var finding = (file, path9, reason) => ({ file, path: path9, reason });
@@ -7095,6 +7115,21 @@ function readTomlTables(file) {
   } catch {
     return [];
   }
+}
+function readTomlValue(file) {
+  try {
+    return parseHostConfig("codex", file, readText(file), "toml");
+  } catch {
+    return {};
+  }
+}
+function isV2McpTable(v) {
+  if (!isObj(v) || !isNodeCommand(v[MCP_COMMAND_FIELD])) return false;
+  const first = Array.isArray(v[MCP_ARGS_FIELD]) ? v[MCP_ARGS_FIELD][0] : void 0;
+  if (typeof first !== "string") return false;
+  let at = -1;
+  for (const sep2 of V1_PATH_SEPS) at = Math.max(at, first.lastIndexOf(sep2));
+  return first.slice(at + 1) === SERVER_ENTRY_FILE;
 }
 var listOf = (v) => Array.isArray(v) ? v : [];
 var commandOf = (v) => isObj(v) && typeof v.command === "string" ? v.command : null;
@@ -7169,8 +7204,11 @@ function scanCodex(agentHome, out2) {
     }
   }
   const tomlFile = join4(agentHome, CONFIG_TOML_FILE);
+  const config = readTomlValue(tomlFile);
   for (const span of readTomlTables(tomlFile)) {
-    if (tomlHeaderText(span.path).startsWith(V1_TOML_SECTION_PREFIX)) out2.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
+    if (span.path[0] !== V1_TOML_SECTION_ROOT || span.path[1] !== SERVER_KEY) continue;
+    if (span.path.length === 2 && isV2McpTable(hostConfigValueAt(config, span.path))) continue;
+    out2.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
   }
   dataDir(join4(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out2);
 }
@@ -7282,7 +7320,7 @@ function scanAll(home, tmp, out2) {
 function detectV1(agent, home, scope = {}) {
   const out2 = [];
   const project = scope.project;
-  const agentHome = agent === "claude-code" && scope.claudeDir !== void 0 ? scope.claudeDir : agent === "copilot-cli" && scope.copilotDir !== void 0 ? scope.copilotDir : agent === "kiro" && scope.kiroDir !== void 0 ? scope.kiroDir : agent === "opencode" && scope.opencodeDir !== void 0 ? scope.opencodeDir : join4(home, ...AGENT_HOME_DIR[agent]);
+  const agentHome = agent === "claude-code" && scope.claudeDir !== void 0 ? scope.claudeDir : agent === "codex" && scope.codexDir !== void 0 ? scope.codexDir : agent === "copilot-cli" && scope.copilotDir !== void 0 ? scope.copilotDir : agent === "kiro" && scope.kiroDir !== void 0 ? scope.kiroDir : agent === "opencode" && scope.opencodeDir !== void 0 ? scope.opencodeDir : join4(home, ...AGENT_HOME_DIR[agent]);
   switch (agent) {
     case "claude-code":
       scanClaudeCode(home, agentHome, out2);
@@ -7413,7 +7451,6 @@ function configEdits(c3) {
 }
 var COMMAND_SKILLS = Object.freeze(["ctx-doctor", "ctx-stats", "ctx-upgrade"]);
 var SKILL_FILE = "SKILL.md";
-var OPENCODE_PLUGIN = ["opencode", "plugin.js"];
 var CODEX_CONFIG_FILE = "config.toml";
 var CODEX_HOME_ENV2 = "CODEX_HOME";
 var CODEX_DIR = ".codex";
@@ -7478,16 +7515,14 @@ function golden(row, home) {
     tool_input: { command: "true" }
   };
 }
-var VSCODE_WORKSPACE_VAR = "${workspaceFolder}";
 function configFor(ctx, id) {
   const [node, server, flag, agent] = serverCmd(ctx, id);
   const own2 = OWN_MCP_ENTRY[id];
   if (own2) {
     const file = id === "vscode" ? ownMcpFileOf(id, own2.file, ctx.env, ctx.home) : agentPath(ctx, id, own2.file);
     const format = file.endsWith(".toml") ? "toml" : id === "vscode" ? "jsonc" : "json";
-    const args = id === "vscode" ? [server, flag, agent, WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [server, flag, agent];
     const also = own2.also?.map(([k, v]) => [k, v]);
-    return { file, format, key: own2.key, value: { ...own2.fields, command: node, args }, ...also ? { also } : {} };
+    return { file, format, key: own2.key, value: ownMcpValue(id, node, server), ...also ? { also } : {} };
   }
   if (id === "opencode") {
     return {
@@ -7564,7 +7599,7 @@ function hookInstallFor(ctx, row, command) {
       kind: "plugin-list",
       file: path3.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE),
       key: ["plugin"],
-      entry: path3.join(ctx.pkgDir, ...OPENCODE_PLUGIN)
+      entry: path3.join(ctx.pkgDir, ...OPENCODE_PLUGIN_PATH)
     };
   }
   return { kind: "package", via: ch.path };
@@ -8551,7 +8586,7 @@ async function setupRow(row, ctx, run, dryRun) {
     return { ...res, status: "FAIL", reason: e.message };
   }
   const configEdited = (file) => plan.edits.some((e) => e.file === file && e.changes.some((c3) => !isTrust(row, c3)));
-  res.v1 = detectV1(row.id, ctx.home, { claudeDir: claudeDirOf(ctx.env, ctx.home), copilotDir: copilotDirOf(ctx.env, ctx.home), kiroDir: kiroDirOf(ctx.env, ctx.home), opencodeDir: opencodeDirOf(ctx.env, ctx.home) }).filter((f2) => !(row.config && f2.file === row.config.file && !configEdited(f2.file)));
+  res.v1 = detectV1(row.id, ctx.home, { claudeDir: claudeDirOf(ctx.env, ctx.home), codexDir: codexDirOf(ctx.env, ctx.home), copilotDir: copilotDirOf(ctx.env, ctx.home), kiroDir: kiroDirOf(ctx.env, ctx.home), opencodeDir: opencodeDirOf(ctx.env, ctx.home) }).filter((f2) => !(row.config && f2.file === row.config.file && !configEdited(f2.file)));
   res.changes = [...plan.edits.flatMap((e) => e.changes), ...[...plan.cli, ...plan.refresh].map((args) => ({ command: [row.cli.bin, ...args] }))];
   if (dryRun) return res;
   try {

@@ -382,6 +382,7 @@ var V1_REASON = Object.freeze({
 });
 var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering]);
 var OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
+var OPENCODE_PLUGIN_PATH = Object.freeze(["opencode", "plugin.js"]);
 var ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"]);
 var CODEX_OMIT_TOOLS_FROM_FIELD = "omit_tools_from";
 var CODEX_OMIT_DEFERRED = Object.freeze(["deferred"]);

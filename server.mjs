@@ -28339,7 +28339,7 @@ var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "c8f6a68d0aea0fbe994c9e6a4c2d674a7f3260ac" : void 0;
+var BUNDLE_SHA = true ? "c340dae8d2fee31a56ace2bcff5d62c0d858a4ea" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -28586,7 +28586,7 @@ var V1_STATUSLINE_COMMAND = "context-mode statusline";
 var V1_PI_PACKAGE = "npm:context-mode";
 var V1_OPENCODE_PLUGIN_SPEC = "context-mode";
 var V1_TMP_PREFIX = "context-mode-";
-var V1_TOML_SECTION_PREFIX = "[mcp_servers.context-mode";
+var V1_TOML_SECTION_ROOT = "mcp_servers";
 var V1_HOOKS_DIR_NAME = "hooks";
 var SETTINGS_FILE = "settings.json";
 var CLAUDE_USER_CONFIG_FILE = ".claude.json";
@@ -28659,6 +28659,8 @@ var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON
 var PLUGIN_NAME = SERVER_KEY;
 var OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
 var SERVER_ENTRY_FILE = "server.mjs";
+var VSCODE_WORKSPACE_VAR = "${workspaceFolder}";
+var OPENCODE_PLUGIN_PATH = Object.freeze(["opencode", "plugin.js"]);
 var HOST_NODE_COMMAND = "node";
 var EXE_SUFFIX = ".exe";
 var HOST_CONFIG_TMP_SUFFIX = ".tmp";
@@ -47484,9 +47486,6 @@ function scanToml(text) {
 function tomlTableSpans(text) {
   return scanToml(text).tables;
 }
-function tomlHeaderText(path5) {
-  return "[" + path5.map(tomlHeaderKey).join(".") + "]";
-}
 function parseHostConfig(agent, path5, text, format) {
   try {
     return format === "toml" ? scanToml(text).value : scanJson(text, format).value;
@@ -47655,27 +47654,44 @@ function setText(agent, path5, text, format, key, value) {
 function serverScript() {
   return join6(dirname3(process.argv[1] ?? ""), SERVER_ENTRY_FILE);
 }
-function listTarget(key, own4, v1) {
+function isNodeCommand(command) {
+  if (typeof command !== "string") return false;
+  let at = -1;
+  for (const sep3 of V1_PATH_SEPS) at = Math.max(at, command.lastIndexOf(sep3));
+  const exe = command.slice(at + 1).toLowerCase();
+  return exe === HOST_NODE_COMMAND || exe === HOST_NODE_COMMAND + EXE_SUFFIX;
+}
+function ownMcpValue(agent, node3, server) {
+  const mcp = OWN_MCP_ENTRY[agent];
+  if (mcp === void 0) return void 0;
+  const tail = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [];
+  return { ...mcp.fields, [MCP_COMMAND_FIELD]: node3, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent, ...tail] };
+}
+function opencodePluginFile() {
+  return join6(dirname3(process.argv[1] ?? ""), ...OPENCODE_PLUGIN_PATH);
+}
+function listTarget(key, own4, v1, alt = []) {
   return {
     key: [key],
     next(current) {
       const list2 = Array.isArray(current) ? current.filter((x) => x !== v1) : [];
-      return list2.includes(own4) ? list2 : [...list2, own4];
+      return list2.includes(own4) || alt.some((a) => list2.includes(a)) ? list2 : [...list2, own4];
     }
   };
 }
-function ownTargets(agent) {
+function ownTargets(agent, accept) {
   const mcp = OWN_MCP_ENTRY[agent];
   if (mcp !== void 0) {
     return [{
       key: mcp.key,
       next(current) {
         const keep = isPlainObject6(current) ? current : {};
-        return { ...keep, ...mcp.fields, [MCP_COMMAND_FIELD]: HOST_NODE_COMMAND, [MCP_ARGS_FIELD]: [serverScript(), AGENT_ARG, agent] };
+        const node3 = accept.nodePath === true && isNodeCommand(keep[MCP_COMMAND_FIELD]) ? keep[MCP_COMMAND_FIELD] : HOST_NODE_COMMAND;
+        return { ...keep, ...ownMcpValue(agent, node3, serverScript()) };
       }
     }, ...(mcp.also ?? []).map(([key, value]) => ({ key, next: () => value }))];
   }
-  if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC)];
+  if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC, accept.listEntries)];
   if (agent === "pi") return [listTarget(PI_PACKAGES_KEY, PI_GIT_PACKAGE, V1_PI_PACKAGE)];
   return [];
 }
@@ -47691,9 +47707,9 @@ function applyEdits(agent, path5, text, format, wanted) {
   }
   return { text: out, format, edits };
 }
-function mergeOwnEntries(agent, current, format, row5) {
+function mergeOwnEntries(agent, current, format, row5, accept = {}) {
   const parsed = parseHostConfig(row5.id, HOST_CONFIG_TEXT_PATH, current, format);
-  const wanted = ownTargets(agent).map((t) => [t.key, t.next(hostConfigValueAt(parsed, t.key))]);
+  const wanted = ownTargets(agent, accept).map((t) => [t.key, t.next(hostConfigValueAt(parsed, t.key))]);
   return applyEdits(agent, HOST_CONFIG_TEXT_PATH, current, format, wanted);
 }
 function writeHostConfigEdit(_requested, current, patch) {
@@ -47765,6 +47781,21 @@ function readTomlTables(file2) {
   } catch {
     return [];
   }
+}
+function readTomlValue(file2) {
+  try {
+    return parseHostConfig("codex", file2, readText(file2), "toml");
+  } catch {
+    return {};
+  }
+}
+function isV2McpTable(v) {
+  if (!isObj(v) || !isNodeCommand(v[MCP_COMMAND_FIELD])) return false;
+  const first = Array.isArray(v[MCP_ARGS_FIELD]) ? v[MCP_ARGS_FIELD][0] : void 0;
+  if (typeof first !== "string") return false;
+  let at = -1;
+  for (const sep3 of V1_PATH_SEPS) at = Math.max(at, first.lastIndexOf(sep3));
+  return first.slice(at + 1) === SERVER_ENTRY_FILE;
 }
 var listOf = (v) => Array.isArray(v) ? v : [];
 var commandOf = (v) => isObj(v) && typeof v.command === "string" ? v.command : null;
@@ -47839,8 +47870,11 @@ function scanCodex(agentHome, out) {
     }
   }
   const tomlFile = join7(agentHome, CONFIG_TOML_FILE);
+  const config4 = readTomlValue(tomlFile);
   for (const span of readTomlTables(tomlFile)) {
-    if (tomlHeaderText(span.path).startsWith(V1_TOML_SECTION_PREFIX)) out.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
+    if (span.path[0] !== V1_TOML_SECTION_ROOT || span.path[1] !== SERVER_KEY) continue;
+    if (span.path.length === 2 && isV2McpTable(hostConfigValueAt(config4, span.path))) continue;
+    out.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
   }
   dataDir(join7(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);
 }
@@ -47952,7 +47986,7 @@ function scanAll(home, tmp, out) {
 function detectV1(agent, home, scope = {}) {
   const out = [];
   const project = scope.project;
-  const agentHome = agent === "claude-code" && scope.claudeDir !== void 0 ? scope.claudeDir : agent === "copilot-cli" && scope.copilotDir !== void 0 ? scope.copilotDir : agent === "kiro" && scope.kiroDir !== void 0 ? scope.kiroDir : agent === "opencode" && scope.opencodeDir !== void 0 ? scope.opencodeDir : join7(home, ...AGENT_HOME_DIR[agent]);
+  const agentHome = agent === "claude-code" && scope.claudeDir !== void 0 ? scope.claudeDir : agent === "codex" && scope.codexDir !== void 0 ? scope.codexDir : agent === "copilot-cli" && scope.copilotDir !== void 0 ? scope.copilotDir : agent === "kiro" && scope.kiroDir !== void 0 ? scope.kiroDir : agent === "opencode" && scope.opencodeDir !== void 0 ? scope.opencodeDir : join7(home, ...AGENT_HOME_DIR[agent]);
   switch (agent) {
     case "claude-code":
       scanClaudeCode(home, agentHome, out);
@@ -48186,7 +48220,7 @@ function mcpWrong(row5, home, env) {
       return false;
     }
     const cur = readHostConfig(row5.id, file2);
-    return mergeOwnEntries(row5.id, cur.text, cur.format, row5).edits.length > 0;
+    return mergeOwnEntries(row5.id, cur.text, cur.format, row5, { nodePath: true, listEntries: [opencodePluginFile()] }).edits.length > 0;
   } catch {
     return true;
   }
@@ -48692,7 +48726,7 @@ async function runDoctorChecks(ctx, adapter, host) {
     D1: () => checkVersion({ bundleSha: BUNDLE_SHA, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal }),
     D2: () => checkNode({ nodeVersion: process.version, bunVersion: process.versions.bun }),
     D3: () => checkHostConfig(adapter, env, project.worktree),
-    D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { project: project.worktree, piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
+    D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { project: project.worktree, piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), codexDir: codexDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
     D5: () => hookRow(ctx, adapter, host),
     D5b: () => checkDoubleFire(adapter.id, project.worktree),
     D6: () => checkMcp(ctx),
