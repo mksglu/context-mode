@@ -117,6 +117,8 @@ export interface CheckRow {
   skillInstall: SkillInstall;
   /** ADR-0020 hook-runs: the hook bundle for this agent, also for in-process agents (doctor sample event). */
   hookRunCommand: string[];
+  /** D-HF-COPILOT-ENABLED-1: Copilot CLI's user settings.json, whose `disabledHooks` list stops a hook from running. */
+  copilotSettings?: string;
   allowedWrites: string[];
   goldenPayload: Record<string, unknown>;
   /** D-NI-CODEX-DOCTOR-1 (ADR-0023): the host's own plugin install. When `bin args` lists `plugin` as enabled, the
@@ -276,7 +278,9 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     const command = `"${hookCommand[0]}" "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
     const hookInstall = hookInstallFor(ctx, getAdapter(id), command);
     const skillInstall = skillInstallFor(ctx, row);
+    const copilotSettings = id === "copilot-cli" ? agentPath(ctx, id, [COPILOT_DIR, "settings.json"]) : undefined;
     const writes = [
+      ...(copilotSettings ? [copilotSettings] : []),
       ...(config ? [config.file] : []), ...hookFiles.map((h) => h.file),
       ...(hookInstall.kind === "package" ? [] : [hookInstall.file]),
       ...(hookInstall.kind === "file" && hookInstall.trust ? [hookInstall.trust] : []),
@@ -288,6 +292,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
       allowedWrites: [...new Set(writes.map((f) => path.resolve(f)))],
       goldenPayload: golden(row, ctx.home),
     };
+    if (copilotSettings) out.copilotSettings = copilotSettings;
     if (row.installMode !== "in-process") out.hookCommand = hookCommand;
     const copy = copyFor(ctx, id);
     if (copy) out.copy = copy;

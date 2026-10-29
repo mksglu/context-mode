@@ -29,6 +29,7 @@ To do the setup step by hand, run `context-mode setup --print copilot-cli` and f
 - Writes the hooks to `~/.copilot/hooks/context-mode.json`, or `$COPILOT_HOME/hooks/context-mode.json` when COPILOT_HOME is set (sessionStart, userPromptSubmitted, preToolUse, postToolUse).
 - Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.copilot/skills/<name>/SKILL.md` (`$COPILOT_HOME/skills/<name>/SKILL.md` when COPILOT_HOME is set).
 - Effect: the call runs, then a large result is replaced by a short selection that names `ctx_search` (replace). postToolUse returns `modifiedResult` (D-HA-COPILOT-REPLACE-1).
+- If `~/.copilot/settings.json` lists a context-mode hook in `disabledHooks`, removes that key (asks `copilot --server --stdio` `hooks.discover`); other keys stay. It never changes `disableAllHooks`.
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
@@ -51,7 +52,8 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
-- On a fresh HOME setup writes `~/.copilot/mcp-config.json` only; no hook file.
+- `disableAllHooks: true` in `~/.copilot/settings.json` turns off every hook. Setup does not change it; setup and doctor FAIL and name it. Set it to false.
+- Doctor check `hook-enabled` needs `copilot` on PATH. Without it, or with a copilot that gives no hook list, the check is a WARN.
 - The plugin install does not work yet: the release branch has no `marketplace.json` for Copilot.
 - The shipped `hooks/copilot-cli.json` is a template: the writer fills the path; do not copy hooks/copilot-cli.json by hand.
 

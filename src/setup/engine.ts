@@ -6,6 +6,7 @@ import { piSettingsGate } from "./pi-gate.ts";
 import { qwenHooksOff } from "./qwen-gate.ts";
 import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
 import type { PluginHook } from "./codex-trust.ts";
+import { listCopilotHooks } from "./copilot-hooks.ts";
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -746,6 +747,51 @@ function withHookTrust(checks: Check[], hooks: PluginHook[] | undefined, dryRun:
   return checks.map((c) => c.name === "hook-registered" ? { name: c.name, ok: false, detail } : c);
 }
 
+/** D-HF-COPILOT-ENABLED-1: Copilot CLI lists our hooks (hooks.discover) with `enabled`; a hook whose key is in settings.json
+ *  `disabledHooks`, or any hook under `disableAllHooks`, never runs. A host that gives no answer is a WARN. */
+async function copilotEnabledCheck(row: CheckRow, ctx: SetupContext): Promise<Check> {
+  const name = "hook-enabled";
+  const h = row.hookInstall;
+  const settings = row.copilotSettings;
+  if (h.kind !== "file" || !settings) return { name, ok: true };
+  const hooks = await listCopilotHooks(ctx.env, h.file, ctx.home);
+  if (hooks === undefined) return { name, ok: true, warn: true, detail: "copilot did not report hook state (copilot --server --stdio hooks.discover)" };
+  if (!hooks.length) return { name, ok: false, detail: `copilot lists no context-mode hook from ${h.file}; ${UNTRUSTED_FIX}` };
+  const bad = hooks.filter((x) => !x.enabled);
+  if (!bad.length) return { name, ok: true };
+  let doc: unknown;
+  try { const t = readOr(settings); doc = t === undefined ? {} : parseHostConfig(row.id, settings, t, "jsonc"); } catch { doc = {}; }
+  if (isObjSetup(doc) && doc.disableAllHooks === true) return { name, ok: false, detail: `${settings} sets disableAllHooks, so copilot runs no hook; set it to false` };
+  if (bad.every((x) => x.disableKey !== undefined)) return { name, ok: false, detail: `${bad.length} of ${hooks.length} context-mode hooks disabled in ${settings} disabledHooks, so they do not run; ${UNTRUSTED_FIX}` };
+  return { name, ok: false, detail: `copilot lists ${bad.length} of ${hooks.length} context-mode hooks disabled by a policy, so they do not run` };
+}
+
+/** D-HF-COPILOT-ENABLED-1: drop the keys of our own hook file from settings.json `disabledHooks`; every other key and setting stays. */
+async function enableCopilotHooks(row: CheckRow, ctx: SetupContext, run: Run): Promise<Change[]> {
+  const h = row.hookInstall;
+  const settings = row.copilotSettings;
+  if (h.kind !== "file" || !settings) return [];
+  const listed = await listCopilotHooks(ctx.env, h.file, ctx.home);
+  const keys = (listed ?? []).flatMap((x) => !x.enabled && x.disableKey !== undefined ? [x.disableKey] : []);
+  if (!keys.length) return [];
+  const text = readOr(settings);
+  let doc: unknown = {};
+  if (text !== undefined && text.trim() !== "") { try { doc = parseHostConfig(row.id, settings, text, "jsonc"); } catch { throw new Error(parseFail(row, settings)); } }
+  if (!isObjSetup(doc)) throw new Error(parseFail(row, settings));
+  const cur = Array.isArray(doc.disabledHooks) ? doc.disabledHooks : [];
+  const next = cur.filter((k) => !keys.includes(k as string));
+  if (next.length === cur.length) return [];
+  let edit;
+  try { edit = editHostConfigText(row.id, settings, text ?? "", "jsonc", [[["disabledHooks"], next]]); }
+  catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, settings)); throw e; }
+  assertWritable(row, settings);
+  const raw = readRaw(settings);
+  run.record({ agent: row.id, file: settings, existed: raw !== undefined }, raw);
+  atomicWrite(settings, raw === undefined ? edit.text : withLayout(edit.text, hostLayout(raw)));
+  return edit.edits.map((e) => ({ file: settings, ...e }));
+}
+const isObjSetup = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
 async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   const env = ctx.env;
   const checks: Check[] = [parseCheck(row)];
@@ -759,6 +805,7 @@ async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   checks.push(hookRegisteredCheck(row, env, l));
   const en = hookEnabledCheck(row, ls.status);
   if (en) checks.push(en);
+  if (row.copilotSettings) checks.push(await copilotEnabledCheck(row, ctx));
   checks.push(hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
   // D-NI-PI-GATE-1: a packages[] extensions filter keeps pi from loading the listed package's hooks.
   return row.id === "pi" ? withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd())) : checks;
@@ -912,6 +959,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
       run.record({ agent: row.id, ran: { bin: row.cli!.bin, args } });
     }
+    res.changes.push(...await enableCopilotHooks(row, ctx, run));
     res.checks = await verifyRow(row, ctx);
     const bad = res.checks.filter((c) => !c.ok);
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
