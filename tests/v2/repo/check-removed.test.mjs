@@ -219,3 +219,12 @@ test("bench fixture data holds no file named SKILL.md (GS5, D-CR-0019-1)", () =>
   assert.equal(r.status, 1);
   assert.deepEqual(r.lines, ["check-removed: still present: bench/fixtures/data/skills/SKILL.md"]);
 });
+
+test("allow-list: scripts/ci-install.mjs and scripts/v1-cases/ pass; near-miss names still fail (D-CR-SCRIPTS-1)", () => {
+  const ok = run(fixture({ ...ALLOWED, "scripts/ci-install.mjs": "x", "scripts/v1-cases/convert.mjs": "x", "scripts/v1-cases/inventory.mjs": "x" }));
+  assert.equal(ok.status, 0);
+  assert.deepEqual(ok.lines, ["check-removed: clean"]);
+  const bad = run(fixture({ ...ALLOWED, "scripts/ci-install.mjs.bak": "x", "scripts/v1-cases-x/a.mjs": "x", "scripts/v1-case/a.mjs": "x" }));
+  assert.equal(bad.status, 1);
+  assert.deepEqual(bad.lines.slice().sort(), ["scripts/ci-install.mjs.bak", "scripts/v1-case/a.mjs", "scripts/v1-cases-x/a.mjs"].map((p) => OUT + p));
+});

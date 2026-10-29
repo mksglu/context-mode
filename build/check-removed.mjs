@@ -100,7 +100,7 @@ const ALLOWED_DIRS = [
   "src/cli/", "src/setup/", // ADR-0019 D5-D7: npm CLI and setup engine (D-CR-0019-1)
   "tests/v2/", "e2e/", "build/", "bench/", "tickets/", "metrics/",
   "docs/v2/", "docs/install/", "docs/benchmarks/",
-  "scripts/release/",
+  "scripts/release/", "scripts/v1-cases/", // v1 differential harness inputs (D-CR-SCRIPTS-1)
   ".github/", ".impl/",
   ".claude-plugin/", ".codex-plugin/", ".agents/plugins/",
 ];
@@ -114,7 +114,7 @@ const ALLOWED_FILES = [
   ...ALLOWED_SKILL_FILES,
   ".claude/settings.json",
   // Scripts.
-  "scripts/gate.mjs", "scripts/ci-gs4-lint.mjs", "scripts/record-fixtures.mjs",
+  "scripts/gate.mjs", "scripts/ci-gs4-lint.mjs", "scripts/record-fixtures.mjs", "scripts/ci-install.mjs",
   // v2 user docs outside docs/v2 and docs/install (cleanup-plan §2).
   "docs/how-it-works.md", "docs/tools.md", "docs/algorithms.md", "docs/performance.md", "docs/UPSTREAM-CREDITS.md",
   // Root files.
