@@ -87,7 +87,7 @@ var require_src = __commonJS({
 });
 
 // src/entries/cli.ts
-import { spawn as spawn2 } from "node:child_process";
+import { spawn as spawn3 } from "node:child_process";
 import { readFileSync as readFileSync6, realpathSync as realpathSync6 } from "node:fs";
 import path8 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -7494,7 +7494,7 @@ function extensionPlugin(bin, id) {
   };
 }
 var NATIVE_PLUGIN = {
-  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path3.join("codex", SKILLS_DIR_NAME), format: "table" },
+  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path3.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
   qwen: extensionPlugin("qwen", "qwen"),
   gemini: extensionPlugin("gemini", "gemini")
 };
@@ -7669,6 +7669,7 @@ function assertWritable(row, file) {
 import { createHash } from "node:crypto";
 import { existsSync as existsSync5, realpathSync as realpathSync3 } from "node:fs";
 import path5 from "node:path";
+import { spawn } from "node:child_process";
 
 // src/setup/spawn-bin.ts
 import { spawnSync } from "node:child_process";
@@ -7839,9 +7840,84 @@ function codexTrustEntries(hooksFile, doc, command, env) {
   }
   return out2;
 }
+var LIST_TIMEOUT_MS = 15e3;
+var PLUGIN_SOURCE = "plugin";
+var TRUSTED = "trusted";
+function pluginHooksFromReply(m3, pluginId) {
+  const out2 = [];
+  if (!isObj2(m3) || !isObj2(m3.result) || !Array.isArray(m3.result.data)) return out2;
+  for (const d of m3.result.data) {
+    if (!isObj2(d) || !Array.isArray(d.hooks)) continue;
+    for (const h2 of d.hooks) {
+      if (!isObj2(h2) || h2.source !== PLUGIN_SOURCE || h2.pluginId !== pluginId) continue;
+      if (typeof h2.key !== "string" || typeof h2.currentHash !== "string") continue;
+      if (out2.some((x2) => x2.key === h2.key)) continue;
+      out2.push({ key: h2.key, hash: h2.currentHash, trusted: h2.trustStatus === TRUSTED });
+    }
+  }
+  return out2;
+}
+function listPluginHooks(env, pluginId, cwd) {
+  const bin = whichBin("codex", env);
+  if (!bin) return Promise.resolve(void 0);
+  return new Promise((resolve) => {
+    let f2;
+    try {
+      f2 = spawnForm(bin, ["app-server"], env);
+    } catch {
+      resolve(void 0);
+      return;
+    }
+    const child = spawn(f2.command, f2.args, { env, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f2.windowsVerbatimArguments, windowsHide: true });
+    let buf = "";
+    let done = false;
+    const finish2 = (v) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.stdin.destroy();
+      child.kill();
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish2(void 0), LIST_TIMEOUT_MS);
+    const send = (o2) => {
+      try {
+        child.stdin.write(JSON.stringify(o2) + "\n");
+      } catch {
+        finish2(void 0);
+      }
+    };
+    child.on("error", () => finish2(void 0));
+    child.on("close", () => finish2(void 0));
+    child.stdin.on("error", () => finish2(void 0));
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d) => {
+      buf += d;
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        let m3;
+        try {
+          m3 = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (!isObj2(m3)) continue;
+        if (m3.id === 1) {
+          send({ method: "initialized" });
+          send({ id: 2, method: "hooks/list", params: { cwds: [cwd] } });
+        } else if (m3.id === 2) finish2(pluginHooksFromReply(m3, pluginId));
+      }
+    });
+    send({ id: 1, method: "initialize", params: { clientInfo: { name: "context-mode-setup", version: "2.0.0" } } });
+  });
+}
+function pluginTrustEntries(hooks) {
+  return hooks.filter((h2) => !h2.trusted).map((h2) => [[...TRUST_KEY, h2.key], { [HASH_FIELD]: h2.hash }]);
+}
 
 // src/setup/engine.ts
-import { spawn, spawnSync as spawnSync2 } from "node:child_process";
+import { spawn as spawn2, spawnSync as spawnSync2 } from "node:child_process";
 import { closeSync, existsSync as existsSync6, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync4, readSync, readdirSync as readdirSync4, realpathSync as realpathSync4, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import path6 from "node:path";
@@ -8198,7 +8274,7 @@ function copyCheck(row, pkgDir) {
 }
 function mcpCheck(cmd, env) {
   return new Promise((resolve) => {
-    const child = spawn(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32", windowsHide: true });
+    const child = spawn2(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32", windowsHide: true });
     const reap = () => {
       child.kill();
     };
@@ -8372,6 +8448,7 @@ function skillsCheck(row, pkgDir) {
 }
 var PLUGIN_ENABLED = "enabled";
 var WORD_TRIM = ",;";
+var CODEX_CONFIG_FILE2 = "config.toml";
 var EXT_ENABLED_USER = "Enabled (User):";
 var EXT_TRUE = "true";
 function tableState(n3, text2) {
@@ -8418,7 +8495,7 @@ function trimChars(w, chars) {
   while (b3 > a2 && chars.includes(w.charAt(b3 - 1))) b3--;
   return w.slice(a2, b3);
 }
-async function nativeResult(row, ctx) {
+async function nativeResult(row, ctx, apply2) {
   const n3 = row.nativePlugin;
   const state = nativeState(row, ctx.env);
   if (!n3 || state === void 0) return void 0;
@@ -8435,13 +8512,57 @@ async function nativeResult(row, ctx) {
       reason: `context-mode is installed but disabled in ${n3.bin}, run ${n3.bin} ${n3.enable.join(" ")}`
     };
   }
-  const res = { id: row.id, status: "PASS", v1: [], changes: [], checks: await verifyRow(nativeRow(row, n3), ctx), bin };
+  const res = { id: row.id, status: "PASS", v1: [], changes: [], checks: [], bin };
+  let hooks = n3.hookTrust ? await listPluginHooks(ctx.env, n3.plugin, ctx.home) : void 0;
+  if (apply2 && hooks?.some((h2) => !h2.trusted)) {
+    try {
+      const done = trustPluginHooks(row, ctx, apply2, hooks);
+      res.changes.push(...done);
+      if (done.length && !apply2.dryRun) hooks = await listPluginHooks(ctx.env, n3.plugin, ctx.home);
+    } catch (e) {
+      apply2.run.rollback(row.id, ctx.env);
+      return { ...res, status: "FAIL", reason: e.message, rolledBack: true };
+    }
+  }
+  res.checks = await verifyRow(nativeRow(row, n3), ctx);
+  if (n3.hookTrust) res.checks = withHookTrust(res.checks, hooks, !!apply2?.dryRun);
   const bad = res.checks.filter((c3) => !c3.ok);
   if (bad.length) {
     res.status = "FAIL";
     res.reason = bad.map((c3) => `${c3.name}: ${c3.detail}`).join("; ");
+    if (apply2 && !apply2.dryRun && res.changes.length) {
+      apply2.run.rollback(row.id, ctx.env);
+      res.rolledBack = true;
+    }
   }
   return res;
+}
+function trustPluginHooks(row, ctx, apply2, hooks) {
+  const file = path6.join(codexDirOf(ctx.env, ctx.home), CODEX_CONFIG_FILE2);
+  const text2 = readOr(file);
+  let edit;
+  try {
+    edit = editHostConfigText(row.id, file, text2 ?? "", "toml", pluginTrustEntries(hooks));
+  } catch (e) {
+    if (e instanceof CtxError) throw new Error(parseFail(row, file));
+    throw e;
+  }
+  if (!edit.edits.length) return [];
+  if (!apply2.dryRun) {
+    assertWritable(row, file);
+    const raw = readRaw(file);
+    apply2.run.record({ agent: row.id, file, existed: raw !== void 0 }, raw);
+    atomicWrite(file, raw === void 0 ? edit.text : withLayout(edit.text, hostLayout(raw)));
+  }
+  return edit.edits.map((e) => ({ file, ...e }));
+}
+var UNTRUSTED_FIX = "run: context-mode setup";
+function withHookTrust(checks, hooks, dryRun) {
+  if (hooks === void 0) return [...checks, { name: "hook-trust", ok: true, warn: true, detail: "codex did not report hook trust (codex app-server hooks/list)" }];
+  const bad = hooks.filter((h2) => !h2.trusted);
+  if (!bad.length || dryRun) return checks;
+  const detail = `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks untrusted, so they do not run; ${UNTRUSTED_FIX}`;
+  return checks.map((c3) => c3.name === "hook-registered" ? { name: c3.name, ok: false, detail } : c3);
 }
 async function verifyRow(row, ctx) {
   const env = ctx.env;
@@ -8557,7 +8678,7 @@ async function runSetup(opts) {
       }
       current = id;
       opts.onAgent?.(id, "start");
-      const res = await nativeResult(row, ctx) ?? await setupRow(row, ctx, run, !!opts.dryRun);
+      const res = await nativeResult(row, ctx, { run, dryRun: !!opts.dryRun }) ?? await setupRow(row, ctx, run, !!opts.dryRun);
       current = void 0;
       agents.push(res);
       opts.onAgent?.(id, "done", res);
@@ -8976,7 +9097,8 @@ function list(ui) {
   const detected = new Set(detectAgents(reg, ui.ctx));
   const rows = ADAPTERS.map((a2) => ({
     id: a2.id,
-    level: Object.keys(a2.eventMap).length ? "full" : "MCP only",
+    hooks: a2.hookChannel.kind,
+    // ADR-0020: every agent has a hook channel
     installMode: a2.installMode,
     detected: detected.has(a2.id)
   }));
@@ -8984,8 +9106,8 @@ function list(ui) {
     out(JSON.stringify({ agents: rows }));
     return EXIT_OK;
   }
-  out(`${"AGENT".padEnd(13)} ${"SUPPORT".padEnd(9)} ${"FOUND".padEnd(9)} INSTALL`);
-  for (const r2 of rows) out(`${r2.id.padEnd(13)} ${r2.level.padEnd(9)} ${(r2.detected ? "detected" : "-").padEnd(9)} ${r2.installMode}`);
+  out(`${"AGENT".padEnd(13)} ${"HOOKS".padEnd(11)} ${"FOUND".padEnd(9)} INSTALL`);
+  for (const r2 of rows) out(`${r2.id.padEnd(13)} ${r2.hooks.padEnd(11)} ${(r2.detected ? "detected" : "-").padEnd(9)} ${r2.installMode}`);
   return EXIT_OK;
 }
 async function remove(ui) {
@@ -9267,7 +9389,7 @@ function main() {
     process.exitCode = r2.code;
     return;
   }
-  const child = spawn2(process.execPath, [path8.join(dir, r2.file), ...r2.args], { stdio: "inherit", windowsHide: true });
+  const child = spawn3(process.execPath, [path8.join(dir, r2.file), ...r2.args], { stdio: "inherit", windowsHide: true });
   process.on("SIGINT", () => {
   });
   child.on("error", (err2) => {
