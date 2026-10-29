@@ -1,7 +1,8 @@
 // src/setup/engine.ts
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
-import { CODEX_TRUST_PATH, codexTrustEntries } from "./codex-trust.ts";
+import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
+import type { PluginHook } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -501,6 +502,7 @@ function skillsCheck(row: CheckRow, pkgDir: string): Check {
 
 const PLUGIN_ENABLED = "enabled";
 const WORD_TRIM = ",;";
+const CODEX_CONFIG_FILE = "config.toml";
 
 const EXT_ENABLED_USER = "Enabled (User):";
 const EXT_TRUE = "true";
@@ -553,7 +555,7 @@ function trimChars(w: string, chars: string): string {
 
 /** A native plugin install: verify it as is, write nothing (a second hook copy under HOME would run twice). A listed but
  *  disabled extension is a FAIL that names the host's enable command: setup cannot link over it (D-NI-EXT-DOCTOR-1). */
-async function nativeResult(row: CheckRow, ctx: SetupContext): Promise<AgentResult | undefined> {
+async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult | undefined> {
   const n = row.nativePlugin;
   const state = nativeState(row, ctx.env);
   if (!n || state === undefined) return undefined;
@@ -563,10 +565,54 @@ async function nativeResult(row: CheckRow, ctx: SetupContext): Promise<AgentResu
     return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin,
       reason: `context-mode is installed but disabled in ${n.bin}, run ${n.bin} ${n.enable.join(" ")}` };
   }
-  const res: AgentResult = { id: row.id, status: "PASS", v1: [], changes: [], checks: await verifyRow(nativeRow(row, n), ctx), bin };
+  const res: AgentResult = { id: row.id, status: "PASS", v1: [], changes: [], checks: [], bin };
+  let hooks = n.hookTrust ? await listPluginHooks(ctx.env, n.plugin, ctx.home) : undefined;
+  if (apply && hooks?.some((h) => !h.trusted)) {
+    try {
+      const done = trustPluginHooks(row, ctx, apply, hooks);
+      res.changes.push(...done);
+      if (done.length && !apply.dryRun) hooks = await listPluginHooks(ctx.env, n.plugin, ctx.home);
+    } catch (e) {
+      apply.run.rollback(row.id, ctx.env);
+      return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
+    }
+  }
+  res.checks = await verifyRow(nativeRow(row, n), ctx);
+  if (n.hookTrust) res.checks = withHookTrust(res.checks, hooks, !!apply?.dryRun);
   const bad = res.checks.filter((c) => !c.ok);
-  if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); }
+  if (bad.length) {
+    res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; ");
+    if (apply && !apply.dryRun && res.changes.length) { apply.run.rollback(row.id, ctx.env); res.rolledBack = true; }
+  }
   return res;
+}
+
+/** D-NI-CODEX-TRUST-1: trust the hooks of our own plugin, as Codex keyed and hashed them (hooks/list), in config.toml.
+ *  Only entries of the plugin id are written; user hooks and other plugins are never touched. */
+function trustPluginHooks(row: CheckRow, ctx: SetupContext, apply: { run: Run; dryRun: boolean }, hooks: PluginHook[]): Change[] {
+  const file = path.join(codexDirOf(ctx.env, ctx.home), CODEX_CONFIG_FILE);
+  const text = readOr(file);
+  let edit;
+  try { edit = editHostConfigText(row.id, file, text ?? "", "toml", pluginTrustEntries(hooks)); }
+  catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, file)); throw e; }
+  if (!edit.edits.length) return [];
+  if (!apply.dryRun) {
+    assertWritable(row, file);
+    const raw = readRaw(file);
+    apply.run.record({ agent: row.id, file, existed: raw !== undefined }, raw);
+    atomicWrite(file, raw === undefined ? edit.text : withLayout(edit.text, hostLayout(raw)));
+  }
+  return edit.edits.map((e) => ({ file, ...e }));
+}
+
+const UNTRUSTED_FIX = "run: context-mode setup";
+/** hook-registered says FAIL when Codex lists our plugin hooks untrusted (they never run); a hook-trust WARN when Codex gave no answer. */
+function withHookTrust(checks: Check[], hooks: PluginHook[] | undefined, dryRun: boolean): Check[] {
+  if (hooks === undefined) return [...checks, { name: "hook-trust", ok: true, warn: true, detail: "codex did not report hook trust (codex app-server hooks/list)" }];
+  const bad = hooks.filter((h) => !h.trusted);
+  if (!bad.length || dryRun) return checks;
+  const detail = `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks untrusted, so they do not run; ${UNTRUSTED_FIX}`;
+  return checks.map((c) => c.name === "hook-registered" ? { name: c.name, ok: false, detail } : c);
 }
 
 async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
@@ -680,7 +726,7 @@ export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
       if (!row) { agents.push({ id, status: "FAIL", reason: `unknown agent ${id}`, v1: [], changes: [], checks: [] }); continue; }
       current = id;
       opts.onAgent?.(id, "start");
-      const res = (await nativeResult(row, ctx)) ?? await setupRow(row, ctx, run, !!opts.dryRun);
+      const res = (await nativeResult(row, ctx, { run, dryRun: !!opts.dryRun })) ?? await setupRow(row, ctx, run, !!opts.dryRun);
       current = undefined;
       agents.push(res);
       opts.onAgent?.(id, "done", res);

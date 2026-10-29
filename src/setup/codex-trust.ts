@@ -7,7 +7,9 @@ import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-import { spawnShim, whichBin } from "./spawn-bin.ts";
+import { spawn } from "node:child_process";
+
+import { spawnForm, spawnShim, whichBin } from "./spawn-bin.ts";
 
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -110,4 +112,77 @@ export function codexTrustEntries(hooksFile: string, doc: unknown, command: stri
     });
   }
   return out;
+}
+
+// ---------- D-NI-CODEX-TRUST-1: hooks of an installed Codex plugin ----------
+
+/** One hook as `hooks/list` reports it: Codex's own key and the hash it computes now. */
+export interface PluginHook { key: string; hash: string; trusted: boolean; }
+
+const LIST_TIMEOUT_MS = 15_000;
+const PLUGIN_SOURCE = "plugin";
+const TRUSTED = "trusted";
+
+/** The hooks of plugin `pluginId` in a `hooks/list` reply (id 2). Hooks of other plugins and user hooks are left out. */
+export function pluginHooksFromReply(m: unknown, pluginId: string): PluginHook[] {
+  const out: PluginHook[] = [];
+  if (!isObj(m) || !isObj(m.result) || !Array.isArray(m.result.data)) return out;
+  for (const d of m.result.data) {
+    if (!isObj(d) || !Array.isArray(d.hooks)) continue;
+    for (const h of d.hooks) {
+      if (!isObj(h) || h.source !== PLUGIN_SOURCE || h.pluginId !== pluginId) continue;
+      if (typeof h.key !== "string" || typeof h.currentHash !== "string") continue;
+      if (out.some((x) => x.key === h.key)) continue; // one entry per key, also when two cwds list it
+      out.push({ key: h.key, hash: h.currentHash, trusted: h.trustStatus === TRUSTED });
+    }
+  }
+  return out;
+}
+
+/** Ask `codex app-server` (hooks/list) for the hooks of plugin `pluginId`. The server answers only while its stdin
+ *  stays open, so the requests go one after the other and the process is stopped after the reply. Undefined: no Codex
+ *  on PATH, or no answer in time (the caller cannot tell, so it does not claim untrusted). */
+export function listPluginHooks(env: Record<string, string | undefined>, pluginId: string, cwd: string): Promise<PluginHook[] | undefined> {
+  const bin = whichBin("codex", env);
+  if (!bin) return Promise.resolve(undefined);
+  return new Promise((resolve) => {
+    let f;
+    try { f = spawnForm(bin, ["app-server"], env as NodeJS.ProcessEnv); } catch { resolve(undefined); return; }
+    const child = spawn(f.command, f.args, { env: env as NodeJS.ProcessEnv, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
+    let buf = "";
+    let done = false;
+    const finish = (v: PluginHook[] | undefined): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.stdin.destroy();
+      child.kill();
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish(undefined), LIST_TIMEOUT_MS);
+    const send = (o: unknown): void => { try { child.stdin.write(JSON.stringify(o) + "\n"); } catch { finish(undefined); } };
+    child.on("error", () => finish(undefined));
+    child.on("close", () => finish(undefined));
+    child.stdin.on("error", () => finish(undefined));
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => {
+      buf += d;
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        let m: unknown;
+        try { m = JSON.parse(line); } catch { continue; }
+        if (!isObj(m)) continue;
+        if (m.id === 1) { send({ method: "initialized" }); send({ id: 2, method: "hooks/list", params: { cwds: [cwd] } }); }
+        else if (m.id === 2) finish(pluginHooksFromReply(m, pluginId));
+      }
+    });
+    send({ id: 1, method: "initialize", params: { clientInfo: { name: "context-mode-setup", version: "2.0.0" } } });
+  });
+}
+
+/** The [hooks.state."<key>"] tables that trust every hook of the plugin that Codex does not trust now. Codex's key and
+ *  currentHash are used as given: no hash is computed here. */
+export function pluginTrustEntries(hooks: PluginHook[]): [readonly string[], unknown][] {
+  return hooks.filter((h) => !h.trusted).map((h): [readonly string[], unknown] => [[...TRUST_KEY, h.key], { [HASH_FIELD]: h.hash }]);
 }

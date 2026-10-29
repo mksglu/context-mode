@@ -608,6 +608,81 @@ test("[D-NI-CODEX-DOCTOR-1] doctor: a disabled codex plugin is still not set up"
   assert.equal(doc.agents[0].reason, "not set up, run context-mode setup");
 });
 
+// D-NI-CODEX-TRUST-1: after `codex plugin add context-mode@context-mode` Codex 0.156.1 lists the plugin hooks "untrusted"
+// (hooks/list: key "<plugin>:.codex-plugin/hooks.json:<event>:0:0", currentHash) and never runs them. A
+// [hooks.state."<key>"] trusted_hash = <currentHash> entry in $CODEX_HOME/config.toml flips them to "trusted" (live probe).
+// The fake app-server below behaves like the real one: it answers over a held-open stdin and exits when stdin closes.
+const PLUGIN_ID = "context-mode@context-mode";
+const PLUGIN_KEY = (ev) => `${PLUGIN_ID}:.codex-plugin/hooks.json:${ev}:0:0`;
+const PLUGIN_EVENTS = ["pre_tool_use", "post_tool_use", "session_start", "user_prompt_submit"];
+const OTHER_KEY = "other@x:.codex-plugin/hooks.json:pre_tool_use:0:0";
+const hashOf = (key) => "sha256:" + key.length.toString(16).padStart(64, "0");
+const FAKE_APP_SERVER = `import { readFileSync, existsSync } from "node:fs";
+import { createInterface } from "node:readline";
+const home = process.env.CODEX_HOME;
+const hooks = ${JSON.stringify([...PLUGIN_EVENTS.map((e) => ({ key: PLUGIN_KEY(e), pluginId: PLUGIN_ID, source: "plugin" })), { key: OTHER_KEY, pluginId: "other@x", source: "plugin" }, { key: "/h/hooks.json:pre_tool_use:0:0", source: "user" }])};
+const hash = (k) => "sha256:" + k.length.toString(16).padStart(64, "0");
+const rl = createInterface({ input: process.stdin });
+rl.on("line", (l) => {
+  const m = JSON.parse(l);
+  if (m.id === 1) process.stdout.write(JSON.stringify({ id: 1, result: { codexHome: home } }) + "\\n");
+  if (m.id === 2) {
+    const toml = existsSync(home + "/config.toml") ? readFileSync(home + "/config.toml", "utf8") : "";
+    const data = hooks.map((h) => ({ ...h, eventName: "preToolUse", currentHash: hash(h.key),
+      trustStatus: toml.includes("[hooks.state." + JSON.stringify(h.key) + "]\\ntrusted_hash = " + JSON.stringify(hash(h.key))) ? "trusted" : "untrusted" }));
+    process.stdout.write(JSON.stringify({ id: 2, result: { data: [{ cwd: process.cwd(), hooks: data }] } }) + "\\n");
+  }
+});
+rl.on("close", () => process.exit(0));
+`;
+function codexWithHookTrust(s) {
+  const app = put(path.join(s.root, "fake-app-server.mjs"), FAKE_APP_SERVER);
+  cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(s.pkgDir, "codex", "skills"), { recursive: true });
+  fakeBin(s.root, "codex", `case "$1" in
+  plugin) printf 'PLUGIN                     STATUS              VERSION  SOURCE\\ncontext-mode@context-mode  installed, enabled  2.0.0    /x\\n' ;;
+  app-server) exec "${NODE}" "${app}" ;;
+esac
+exit 0`);
+  s.env.CODEX_HOME = path.join(s.home, ".codex");
+  mkdirSync(s.env.CODEX_HOME, { recursive: true });
+  return path.join(s.env.CODEX_HOME, "config.toml");
+}
+const SKIP_SH = { skip: process.platform === "win32" && "fake agent binaries are sh scripts" };
+
+test("[D-NI-CODEX-TRUST-1] doctor: a native codex install whose plugin hooks Codex lists untrusted is a FAIL that names the fix", SKIP_SH, async (t) => {
+  const s = sandbox(t);
+  const toml = codexWithHookTrust(s);
+  const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+  const a = doc.agents[0];
+  assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+  const reg = a.checks.find((c) => c.name === "hook-registered");
+  assert.equal(reg.ok, false);
+  assert.ok(reg.detail.includes("untrusted") && reg.detail.includes("context-mode setup"), reg.detail);
+  assert.equal(existsSync(toml), false, "doctor writes nothing");
+});
+
+test("[D-NI-CODEX-TRUST-1] setup: a native codex install gets a trust entry per own plugin hook, no other hook; doctor then passes; remove restores", SKIP_SH, async (t) => {
+  const s = sandbox(t);
+  const toml = codexWithHookTrust(s);
+  const before = `model = "o3"\n`;
+  put(toml, before);
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "t1" });
+  assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+  const text = readFileSync(toml, "utf8");
+  for (const ev of PLUGIN_EVENTS) assert.ok(text.includes(`[hooks.state.${JSON.stringify(PLUGIN_KEY(ev))}]\ntrusted_hash = ${JSON.stringify(hashOf(PLUGIN_KEY(ev)))}\n`), `trusted: ${ev}\n${text}`);
+  assert.equal(text.includes("other@x"), false, "another plugin's hook is not trusted");
+  assert.equal(text.includes("/h/hooks.json"), false, "a user hook is not trusted");
+  assert.ok(text.startsWith(`model = "o3"`), "user keys stay");
+  const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+  assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
+  const again = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "t2" });
+  assert.equal(again.agents[0].status, "PASS");
+  assert.equal(readFileSync(toml, "utf8"), text, "a second run changes nothing");
+  const rm = await runRemove({ home: s.home, env: s.env, runId: "t1" });
+  assert.equal(rm.exitCode, 0, JSON.stringify(rm));
+  assert.equal(readFileSync(toml, "utf8"), before, "remove gives the original bytes back");
+});
+
 // D-NI-EXT-DOCTOR-1 (ADR-0023): `qwen extensions install <source>` (Qwen Code 0.26.1) and `gemini extensions install
 // <source>` (gemini-cli 0.65.0) copy the package to ~/.<host>/extensions/context-mode; the extension ships the MCP server,
 // the hooks and skills/. Live run (temp HOME): qwen doctor said "not set up" because setup still planned ~/.qwen/skills.

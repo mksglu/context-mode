@@ -130,6 +130,8 @@ export interface CheckRow {
 export interface NativePlugin {
   bin: string; args: string[]; plugin: string; hooksVia: string; skillsVia: string;
   format: "table" | "extension"; enable?: string[];
+  /** D-NI-CODEX-TRUST-1: the host runs a plugin hook only once its config trusts it (Codex hooks/list trustStatus). */
+  hookTrust?: boolean;
 }
 
 const EXTENSION_LIST = ["extensions", "list"];
@@ -141,7 +143,7 @@ function extensionPlugin(bin: string, id: AgentId): NativePlugin {
 }
 
 const NATIVE_PLUGIN: Partial<Record<AgentId, NativePlugin>> = {
-  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path.join("codex", SKILLS_DIR_NAME), format: "table" },
+  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
   qwen: extensionPlugin("qwen", "qwen"),
   gemini: extensionPlugin("gemini", "gemini"),
 };
