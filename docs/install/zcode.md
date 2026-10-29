@@ -50,9 +50,15 @@ context-mode setup --remove --agents zcode
 
 It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
+## When ZCode runs no hook
+
+ZCode 0.17.0 (built from zai-org/ZCode `3c5b2276`) reads `~/.zcode/cli/config.json` with one schema. If any key in the file is invalid (for example `ui.locale` set to a value other than `auto`, `en-US` or `zh-CN`, or `logging` set to a string), ZCode logs `config.file.invalid Config file failed to load` and uses no key of the file. The hooks and the MCP server do not load. Hooks in this user file need no workspace trust; only project `zcode.json` hooks do.
+
+`context-mode doctor --agents zcode` FAILs `hook-registered` and names the invalid key. Fix or remove that key. Setup does not change keys it does not own.
+
 ## Known limits
 
-- ZCode has no npm package, so no run showed ZCode load the server. The ZCode desktop app is not covered.
+- ZCode has no npm package. The live test `tests/v2/e2e/zcode-fire.test.mjs` runs the real CLI built from source (set `ZCODE_CLI_BUNDLE` to `zcode.cjs`) against a local fake provider; it skips when no binary is found. The ZCode desktop app is not covered.
 
 ## Report a problem
 

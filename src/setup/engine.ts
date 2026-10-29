@@ -2,6 +2,7 @@
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { geminiSettingsGate } from "./gemini-gate.ts";
+import { zcodeConfigGate } from "./zcode-gate.ts";
 import { piSettingsGate } from "./pi-gate.ts";
 import { vscodeSettingsGate } from "./vscode-gate.ts";
 import { qwenHooksOff } from "./qwen-gate.ts";
@@ -811,7 +812,9 @@ async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   // D-NI-PI-GATE-1: a packages[] extensions filter keeps pi from loading the listed package's hooks.
   if (row.id === "pi") return withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd()));
   // D-NI-VSCODE-GATE-1: chat.useHooks false, a hookFilesLocations that drops ~/.copilot/hooks, or a managed policy keeps VS Code from running the hook file.
-  return row.id === "vscode" ? withHookGate(checks, vscodeSettingsGate(env, ctx.home, process.cwd())) : checks;
+  if (row.id === "vscode") return withHookGate(checks, vscodeSettingsGate(env, ctx.home, process.cwd()));
+  // D-NI-ZCODE-GATE-1: one key zcode's schema rejects makes it drop the whole config.json, hooks included.
+  return row.id === "zcode" ? withHookGate(checks, zcodeConfigGate(ctx.home)) : checks;
 }
 
 // ---------- apply, backup, rollback ----------
