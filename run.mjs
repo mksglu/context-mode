@@ -1,3 +1,5 @@
+import{createRequire as __cmRequire}from"node:module";if(typeof process.getBuiltinModule!=="function")process.getBuiltinModule=(id)=>__cmRequire(import.meta.url)(id);
+
 // src/entries/run.ts
 import { basename as basename2 } from "node:path";
 
@@ -206,6 +208,24 @@ var DENY_WEBFETCH_TOOLS = Object.freeze(["ctx_index", "ctx_search"]);
 var USER_DENY_REASON_PREFIX = "Blocked by security policy: matches deny pattern ";
 var POLICY_UNREADABLE_LINE = "context-mode: your deny rules could not be read. Fix: run ctx_doctor.";
 var PARSE_ERROR_DENY_LINE = "context-mode: could not parse this command; it may be blocked by your own rules. Run it through ctx_execute instead.";
+var HOOK_FAIL_TOOL_KEYS = Object.freeze(["tool_name", "toolName", "tool"]);
+var HOOK_FAIL_EVENT_KEYS = Object.freeze(["hook_event_name", "hookEventName", "type"]);
+var HOOK_FAIL_INPUT_KEYS = Object.freeze(["tool_input", "toolArgs", "input", "args"]);
+var HOOK_FAIL_CWD_KEYS = Object.freeze(["cwd", "directory"]);
+var HOOK_FAIL_PRE_EVENTS = Object.freeze(["pretooluse", "beforetool", "tool_call", "execute.before", "tool.execute.before"]);
+var HOOK_FAULT_STAGES = Object.freeze(["decode", "project", "policy", "store", "encode"]);
+var HOOK_FAIL_TOOLS = Object.freeze({
+  shell: Object.freeze(["Bash", "bash", "shell"]),
+  read: Object.freeze(["Read", "read_file"]),
+  grep: Object.freeze(["Grep", "grep_search"]),
+  fetch: Object.freeze(["WebFetch", "web_fetch", "fetch"])
+});
+var HOOK_FAIL_REDIRECT = Object.freeze({
+  read: "Read the file in parts with offset and limit, or process it with ctx_execute(language, code); only what you print comes back.",
+  shell: "Run the command with ctx_execute(language, code) or ctx_batch instead; only the part that matches your intent comes back.",
+  grep: "Search with ctx_execute(language, code), or index the files with ctx_index and query them with ctx_search.",
+  fetch: "Index the URL with ctx_index and query it with ctx_search."
+});
 var BOUNDED_COMMANDS = Object.freeze(["pwd", "whoami", "uname", "id", "realpath", "ln"]);
 var BOUNDED_GIT_SUBCOMMANDS = Object.freeze(["status"]);
 var VERSION_PROBE_FLAGS = Object.freeze(["--version", "-v"]);
@@ -4241,6 +4261,7 @@ function pipeline(p) {
     all.push(...last.cmds);
     const t = at(p);
     if (t !== void 0 && t.kind === "op" && PIPES.includes(t.text)) {
+      for (const c of last.cmds) c.pipesOut = true;
       p.i++;
       continue;
     }
@@ -4330,7 +4351,7 @@ var WRAPPERS = Object.freeze({
   command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV" },
   xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE }
 });
-var SHELLS = ["bash", "sh"];
+var SHELLS = ["bash", "sh", "zsh"];
 var SCRIPT_FLAG = "c";
 var SHELL_LABEL_SUFFIX = " -c";
 var SHELL_VALUE_OPTS = ["-o", "+o", "-O", "+O"];
@@ -4731,6 +4752,7 @@ function inlineHttp(raw) {
   }
   return false;
 }
+var CD_COMMAND = "cd";
 function fileSize(abs) {
   try {
     const st = statSync(abs);
@@ -4752,17 +4774,24 @@ function read(ev, row, input) {
 }
 function shellDump(cmds, cwd, row) {
   if (row.nativeTools.read !== void 0 && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
-  if (cmds.length !== 1) return null;
-  const c = cmds[0];
-  if (c.redirectsToFile || c.endsInBoundedSink) return null;
-  const name = c.argv0.toLowerCase();
-  if (!has(SHELL_DUMP_COMMANDS, name)) return null;
-  const d = dumpTarget(name, c.args);
-  if (d === null) return null;
-  if (d.bounded) return ALLOW;
-  const abs = resolve(cwd, d.file);
-  const size = fileSize(abs);
-  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix)) : null;
+  let dir = cwd;
+  let verdict = null;
+  for (const c of cmds) {
+    const name = c.argv0.toLowerCase();
+    if (name === CD_COMMAND && c.args.length === 1 && c.insideConstruct === void 0) dir = resolve(dir, c.args[0]);
+    if (c.redirectsToFile || c.endsInBoundedSink || c.pipesOut === true || c.insideConstruct !== void 0) continue;
+    if (!has(SHELL_DUMP_COMMANDS, name)) continue;
+    const d = dumpTarget(name, c.args);
+    if (d === null) continue;
+    if (d.bounded) {
+      verdict = ALLOW;
+      continue;
+    }
+    const abs = resolve(dir, d.file);
+    const size = fileSize(abs);
+    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+  }
+  return verdict;
 }
 var allDigits2 = (s) => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");
 function countFlag(a) {

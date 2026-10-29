@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import{createRequire as __cmRequire}from"node:module";if(typeof process.getBuiltinModule!=="function")process.getBuiltinModule=(id)=>__cmRequire(import.meta.url)(id);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -87,7 +88,7 @@ var require_src = __commonJS({
 
 // src/entries/cli.ts
 import { spawn as spawn2 } from "node:child_process";
-import { readFileSync as readFileSync6, realpathSync as realpathSync5 } from "node:fs";
+import { readFileSync as readFileSync6, realpathSync as realpathSync6 } from "node:fs";
 import path8 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -255,6 +256,24 @@ var DENY_WHAT = Object.freeze({
   webfetch: "WebFetch"
 });
 var DENY_WEBFETCH_TOOLS = Object.freeze(["ctx_index", "ctx_search"]);
+var HOOK_FAIL_TOOL_KEYS = Object.freeze(["tool_name", "toolName", "tool"]);
+var HOOK_FAIL_EVENT_KEYS = Object.freeze(["hook_event_name", "hookEventName", "type"]);
+var HOOK_FAIL_INPUT_KEYS = Object.freeze(["tool_input", "toolArgs", "input", "args"]);
+var HOOK_FAIL_CWD_KEYS = Object.freeze(["cwd", "directory"]);
+var HOOK_FAIL_PRE_EVENTS = Object.freeze(["pretooluse", "beforetool", "tool_call", "execute.before", "tool.execute.before"]);
+var HOOK_FAULT_STAGES = Object.freeze(["decode", "project", "policy", "store", "encode"]);
+var HOOK_FAIL_TOOLS = Object.freeze({
+  shell: Object.freeze(["Bash", "bash", "shell"]),
+  read: Object.freeze(["Read", "read_file"]),
+  grep: Object.freeze(["Grep", "grep_search"]),
+  fetch: Object.freeze(["WebFetch", "web_fetch", "fetch"])
+});
+var HOOK_FAIL_REDIRECT = Object.freeze({
+  read: "Read the file in parts with offset and limit, or process it with ctx_execute(language, code); only what you print comes back.",
+  shell: "Run the command with ctx_execute(language, code) or ctx_batch instead; only the part that matches your intent comes back.",
+  grep: "Search with ctx_execute(language, code), or index the files with ctx_index and query them with ctx_search.",
+  fetch: "Index the URL with ctx_index and query it with ctx_search."
+});
 var BOUNDED_COMMANDS = Object.freeze(["pwd", "whoami", "uname", "id", "realpath", "ln"]);
 var BOUNDED_GIT_SUBCOMMANDS = Object.freeze(["status"]);
 var VERSION_PROBE_FLAGS = Object.freeze(["--version", "-v"]);
@@ -9129,6 +9148,18 @@ Run context-mode ${cmd} --help.`);
   }
 }
 
+// src/entries/is-entry.ts
+import { realpathSync as realpathSync5 } from "node:fs";
+function isEntry(main2, argv1, self) {
+  if (main2 !== void 0) return main2;
+  if (argv1 === void 0 || argv1 === "") return false;
+  try {
+    return realpathSync5(argv1) === realpathSync5(self);
+  } catch {
+    return false;
+  }
+}
+
 // src/entries/cli.ts
 var EXIT_OK2 = 0;
 var EXIT_FAIL2 = 1;
@@ -9174,7 +9205,7 @@ function route(argv, version) {
 ` };
 }
 function main() {
-  const dir = path8.dirname(realpathSync5(fileURLToPath2(import.meta.url)));
+  const dir = path8.dirname(realpathSync6(fileURLToPath2(import.meta.url)));
   let version = "";
   try {
     version = String(JSON.parse(readFileSync6(path8.join(dir, PACKAGE_FILE), "utf8")).version);
@@ -9213,7 +9244,7 @@ function main() {
     process.exitCode = signal === "SIGINT" ? EXIT_SIGINT2 : code ?? EXIT_FAIL2;
   });
 }
-if (import.meta.main) main();
+if (isEntry(import.meta.main, process.argv[1], fileURLToPath2(import.meta.url))) main();
 export {
   HELP2 as HELP,
   V1_PLATFORM_AGENT,
