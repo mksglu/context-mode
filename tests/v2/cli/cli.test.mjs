@@ -566,7 +566,7 @@ test("[M7] cli/print-same-source: --print run steps equal the commands setup run
     fakeAgentBin(s, steps[0].argv[0]);
     const r = run(s, ["setup", "--yes", "--agents", a.id]);
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    const ran = readFileSync(s.env.LOG, "utf8").trim().split("\n").filter((l) => !/ list$/.test(l));
+    const ran = readFileSync(s.env.LOG, "utf8").trim().split("\n").filter((l) => !/ list$/.test(l) && !l.endsWith(" --server --stdio --no-auto-update")); // read-only host queries (list, copilot hooks.discover), not install steps
     assert.deepEqual(ran, steps.map((x) => x.argv.join(" ")), a.id);
   }
 });
