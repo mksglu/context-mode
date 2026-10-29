@@ -1,6 +1,7 @@
 // src/setup/engine.ts
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
+import { geminiSettingsGate } from "./gemini-gate.ts";
 import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
 import type { PluginHook } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
@@ -505,8 +506,11 @@ const WORD_TRIM = ",;";
 const CODEX_CONFIG_FILE = "config.toml";
 
 const EXT_ENABLED_USER = "Enabled (User):";
+const EXT_ENABLED_WORKSPACE = "Enabled (Workspace):";
 const EXT_TRUE = "true";
 type NativeState = "enabled" | "disabled" | undefined;
+/** The extension list also shows the workspace scope: off there, gemini runs none of its hooks (D-NI-GEMINI-GATE-1). */
+interface NativeStatus { state: NativeState; workspaceOff: boolean }
 
 /** codex plugin list: the table row that names the plugin, enabled when one of its words is "enabled". */
 function tableState(n: NativePlugin, text: string): NativeState {
@@ -518,25 +522,30 @@ function tableState(n: NativePlugin, text: string): NativeState {
 /** qwen 0.26.1 / gemini 0.65.0 extensions list: a block per extension. A header line starts in column 0 ("<mark> <name>
  *  (<version>)"); its indented lines follow. Only the header names the extension: an indented "context-mode" is an MCP
  *  server another extension ships. */
-function extensionState(n: NativePlugin, text: string): NativeState {
+function extensionState(n: NativePlugin, text: string): NativeStatus {
   let mine = false;
+  let state: NativeState;
+  let workspaceOff = false;
   for (const raw of text.split("\n")) {
     const line = raw.trimEnd();
     if (line.length && !line.startsWith(" ")) { mine = line.split(" ")[1] === n.plugin; continue; }
     const t = line.trim();
-    if (mine && t.startsWith(EXT_ENABLED_USER)) return t.slice(EXT_ENABLED_USER.length).trim() === EXT_TRUE ? "enabled" : "disabled";
+    if (!mine) continue;
+    if (t.startsWith(EXT_ENABLED_USER)) state = t.slice(EXT_ENABLED_USER.length).trim() === EXT_TRUE ? "enabled" : "disabled";
+    if (t.startsWith(EXT_ENABLED_WORKSPACE)) workspaceOff = t.slice(EXT_ENABLED_WORKSPACE.length).trim() !== EXT_TRUE;
   }
-  return undefined;
+  return { state, workspaceOff };
 }
 
 /** The host's own install as its list command shows it (undefined: not listed in that form, setup owns the agent). */
-function nativeState(row: CheckRow, env: SetupContext["env"]): NativeState {
+function nativeState(row: CheckRow, env: SetupContext["env"]): NativeStatus {
+  const none: NativeStatus = { state: undefined, workspaceOff: false };
   const n = row.nativePlugin;
-  if (!n || !hostBin(n.bin, env).file) return undefined;
+  if (!n || !hostBin(n.bin, env).file) return none;
   const r = runBin(n.bin, n.args, env);
-  if (r.status !== 0) return undefined;
+  if (r.status !== 0) return none;
   // Gemini 0.65.0 writes the extension list to stderr (D-INST-2).
-  return n.format === "extension" ? extensionState(n, `${r.stdout}${r.stderr}`) : tableState(n, `${r.stdout}`);
+  return n.format === "extension" ? extensionState(n, `${r.stdout}${r.stderr}`) : { state: tableState(n, `${r.stdout}`), workspaceOff: false };
 }
 
 /** The row as the host's own plugin install sets it up. */
@@ -557,7 +566,7 @@ function trimChars(w: string, chars: string): string {
  *  disabled extension is a FAIL that names the host's enable command: setup cannot link over it (D-NI-EXT-DOCTOR-1). */
 async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult | undefined> {
   const n = row.nativePlugin;
-  const state = nativeState(row, ctx.env);
+  const { state, workspaceOff } = nativeState(row, ctx.env);
   if (!n || state === undefined) return undefined;
   const bin = hostBin(n.bin, ctx.env).file;
   if (state === "disabled") {
@@ -579,6 +588,7 @@ async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run
   }
   res.checks = await verifyRow(nativeRow(row, n), ctx);
   if (n.hookTrust) res.checks = withHookTrust(res.checks, hooks, !!apply?.dryRun);
+  if (n.format === "extension") res.checks = withHookGate(res.checks, geminiGate(n, ctx, workspaceOff));
   const bad = res.checks.filter((c) => !c.ok);
   if (bad.length) {
     res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; ");
@@ -603,6 +613,19 @@ function trustPluginHooks(row: CheckRow, ctx: SetupContext, apply: { run: Run; d
     atomicWrite(file, raw === undefined ? edit.text : withLayout(edit.text, hostLayout(raw)));
   }
   return edit.edits.map((e) => ({ file, ...e }));
+}
+
+/** D-NI-GEMINI-GATE-1: why gemini would not run an installed, enabled extension's hooks (undefined: nothing gates them). */
+function geminiGate(n: NativePlugin, ctx: SetupContext, workspaceOff: boolean): string | undefined {
+  if (n.bin !== "gemini") return undefined;
+  if (workspaceOff && n.enable) return `gemini lists context-mode disabled for this workspace, so it runs no hook; run ${n.bin} ${n.enable.join(" ")} --scope workspace`;
+  return geminiSettingsGate(ctx.env, ctx.home, process.cwd());
+}
+
+/** hook-registered says FAIL when a host setting stops the installed hooks. */
+function withHookGate(checks: Check[], detail: string | undefined): Check[] {
+  if (detail === undefined) return checks;
+  return checks.map((c) => c.name === "hook-registered" ? { name: c.name, ok: false, detail } : c);
 }
 
 const UNTRUSTED_FIX = "run: context-mode setup";
