@@ -98,7 +98,7 @@ function skillDirPrefixes(dirPath: string): string[] {
   return out;
 }
 
-export interface HostCopy { host: string; bin: string; plugin: string; file: string; refresh: string[]; }
+export interface HostCopy { host: string; bin: string; plugin: string; file: string; refresh: string[]; /** D-CC-HOOKS-RUN-1: the host command that enables a listed but disabled plugin (its hooks run only when enabled). */ enable: string[]; }
 
 export interface CliPlan { bin: string; install: string[][]; remove: string[][]; input?: string; }
 
@@ -207,7 +207,7 @@ function cliFor(ctx: SetupContext, id: AgentId): CliPlan | undefined {
 function copyFor(ctx: SetupContext, id: AgentId): HostCopy | undefined {
   if (id !== "claude-code") return undefined;
   const file = path.join(claudeDirOf(ctx.env, ctx.home), HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE);
-  return { host: "Claude Code", bin: "claude", plugin: PLUGIN_ID, file, refresh: ["plugin", "update", PLUGIN_ID] };
+  return { host: "Claude Code", bin: "claude", plugin: PLUGIN_ID, file, refresh: ["plugin", "update", PLUGIN_ID], enable: ["plugin", "enable", PLUGIN_ID] };
 }
 
 const LIST: Partial<Record<AgentId, { bin: string; args: string[] }>> = {

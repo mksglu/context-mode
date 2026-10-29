@@ -74,7 +74,8 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 ## Known limits
 
 - The setup route adds the package folder from npm as a marketplace. The native route adds `mksglu/context-mode` from GitHub; use one of the two, not both.
-- No live, logged-in Claude Code session fired the hooks in any run.
+- Verified live on Claude Code 2.1.274 without a login: `claude -p` against a local fake Anthropic endpoint ran our hook and the model saw the `ctx_search(` redirect for a 200 KB file (`tests/v2/e2e/claude-code-fire.test.mjs`). A logged-in session was not run.
+- Hooks do not run when the plugin is disabled (`claude plugin enable context-mode@context-mode`; setup does this for you) or when `disableAllHooks` is `true` in a Claude Code settings file. Doctor fails with the fix for both; it never edits your settings.
 - `claude mcp add` by hand adds the MCP server only, with no hooks. Use `context-mode setup --print claude-code` instead.
 
 ## Report a problem

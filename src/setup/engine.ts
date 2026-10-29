@@ -318,7 +318,7 @@ function planSkills(row: CheckRow, edits: FileEdit[]): void {
   }
 }
 
-function planRow(row: CheckRow, listed: boolean, stale: boolean, env: SetupContext["env"]): Plan {
+function planRow(row: CheckRow, listed: boolean, stale: boolean, env: SetupContext["env"], disabled = false): Plan {
   const edits: FileEdit[] = [];
   if (row.config) {
     const c = row.config;
@@ -334,18 +334,76 @@ function planRow(row: CheckRow, listed: boolean, stale: boolean, env: SetupConte
   const cli = row.config || !row.cli || listed ? [] : row.cli.install;
   // D-US-1: a listed plugin whose copy is older than the package gets the host's own update command, not a reinstall.
   const refresh = listed && stale && row.copy ? [row.copy.refresh] : [];
+  // D-CC-HOOKS-RUN-1: a listed but disabled plugin runs no hooks; the host's own enable command turns it on.
+  if (listed && disabled && row.copy) refresh.push(row.copy.enable);
   return { edits, cli, refresh };
 }
 
 // ---------- verify ----------
 
 function listCheck(row: CheckRow, env: SetupContext["env"]): Check | undefined {
+  return listState(row, env).check;
+}
+
+const STATUS_KEY = "Status:";
+const DISABLED_WORD = "disabled";
+type PluginStatus = "enabled" | "disabled" | undefined;
+/** D-CC-HOOKS-RUN-1, `claude plugin list` (2.1.274): a block per plugin, its header names the id, an indented
+ *  "Status: <mark> enabled|disabled" line follows. Undefined: the host did not list the plugin. */
+function statusOf(row: CheckRow, text: string): PluginStatus {
+  const c = row.copy;
+  if (!c) return undefined;
+  let mine = false;
+  for (const raw of text.split("\n")) {
+    const t = raw.trim();
+    if (raw.length && !raw.startsWith("  ")) { mine = false; continue; }
+    if (t.split(" ").includes(c.plugin)) { mine = true; continue; }
+    if (mine && t.startsWith(STATUS_KEY)) return t.split(" ").includes(DISABLED_WORD) ? "disabled" : "enabled";
+  }
+  return undefined;
+}
+
+/** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
+function listState(row: CheckRow, env: SetupContext["env"]): { check?: Check; status: PluginStatus } {
   const l = row.listCommand;
-  if (!l || !hostBin(l.bin, env).file) return undefined;
+  if (!l || !hostBin(l.bin, env).file) return { status: undefined };
   const r = runBin(l.bin, l.args, env);
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
   const ok = r.status === 0 && `${r.stdout}${r.stderr}`.includes("context-mode");
-  return { name: "list", ok, detail: ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
+  const check: Check = { name: "list", ok, detail: ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
+  return { check, status: r.status === 0 ? statusOf(row, `${r.stdout}`) : undefined };
+}
+
+
+const DISABLE_ALL_HOOKS = "disableAllHooks";
+const SETTINGS_FILES = ["settings.json", "settings.local.json"];
+/** D-CC-HOOKS-RUN-1 (live, 2.1.274): `disableAllHooks: true` in the user settings or in <project>/.claude/ stops every
+ *  hook, plugin hooks included. Returns the file that sets it (a file that is not JSON is the host's own error). */
+function disabledBySettings(row: CheckRow): string | undefined {
+  const c = row.copy;
+  if (!c) return undefined;
+  const dirs = [path.dirname(path.dirname(c.file)), path.join(process.cwd(), ".claude")];
+  for (const dir of dirs) {
+    for (const name of SETTINGS_FILES) {
+      const file = path.join(dir, name);
+      const text = readOr(file);
+      if (text === undefined) continue;
+      let doc: unknown;
+      try { doc = JSON.parse(text); } catch { continue; }
+      if (isObj(doc) && doc[DISABLE_ALL_HOOKS] === true) return file;
+    }
+  }
+  return undefined;
+}
+
+/** D-CC-HOOKS-RUN-1: Claude Code runs plugin hooks only while the plugin is enabled and hooks are not switched off. */
+function hookEnabledCheck(row: CheckRow, status: PluginStatus): Check | undefined {
+  const c = row.copy;
+  if (!c) return undefined;
+  if (status === "disabled") return { name: "hook-enabled", ok: false, detail: `${c.plugin} is installed but disabled in ${c.bin}, so its hooks do not run; run: ${c.bin} ${c.enable.join(" ")}` };
+  const file = disabledBySettings(row);
+  if (file) return { name: "hook-enabled", ok: false, detail: `${file} sets ${DISABLE_ALL_HOOKS}, so ${c.host} runs no hooks; remove "${DISABLE_ALL_HOOKS}" from it` };
+  return { name: "hook-enabled", ok: true };
 }
 
 function packageVersion(pkgDir: string): string | undefined {
@@ -680,13 +738,17 @@ function withHookTrust(checks: Check[], hooks: PluginHook[] | undefined, dryRun:
 async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   const env = ctx.env;
   const checks: Check[] = [parseCheck(row)];
-  const l = listCheck(row, env);
+  const ls = listState(row, env);
+  const l = ls.check;
   if (l) checks.push(l);
   const cp = copyCheck(row, ctx.pkgDir);
   if (cp) checks.push(cp);
   checks.push(await mcpCheck(row.serverCommand, env));
   if (row.hookCommand) checks.push(hookCheck(row, env));
-  checks.push(hookRegisteredCheck(row, env, l), hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
+  checks.push(hookRegisteredCheck(row, env, l));
+  const en = hookEnabledCheck(row, ls.status);
+  if (en) checks.push(en);
+  checks.push(hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
   // D-NI-PI-GATE-1: a packages[] extensions filter keeps pi from loading the listed package's hooks.
   return row.id === "pi" ? withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd())) : checks;
 }
@@ -813,8 +875,9 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
   if (!row.config && !row.cli) return { ...res, status: "SKIPPED", reason: `${row.id}: no setup path in the registry` };
   let plan: Plan;
   try {
-    const listed = needsBin ? listCheck(row, ctx.env)?.ok === true : false;
-    plan = planRow(row, listed, copyCheck(row, ctx.pkgDir)?.ok === false, ctx.env);
+    const ls = needsBin ? listState(row, ctx.env) : { status: undefined, check: undefined };
+    const listed = ls.check?.ok === true;
+    plan = planRow(row, listed, copyCheck(row, ctx.pkgDir)?.ok === false, ctx.env, listed && ls.status === "disabled");
   } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
   // The config entry is current when the plan changes nothing in that file but codex trust entries.
   const configEdited = (file: string): boolean => plan.edits.some((e) => e.file === file && e.changes.some((c) => !isTrust(row, c)));
@@ -892,7 +955,9 @@ function onlyTrust(row: CheckRow, changes: Change[]): boolean { return changes.e
 /** D-US-1: a pending copy refresh is not "not set up": doctor runs verify, whose copy check names the stale version. */
 function isRefresh(row: CheckRow, c: Change): boolean {
   const r = row.copy;
-  return r !== undefined && c.command !== undefined && c.command.join(" ") === [r.bin, ...r.refresh].join(" ");
+  if (r === undefined || c.command === undefined) return false;
+  const cmd = c.command.join(" ");
+  return cmd === [r.bin, ...r.refresh].join(" ") || cmd === [r.bin, ...r.enable].join(" "); // D-CC-HOOKS-RUN-1
 }
 function isTrust(row: CheckRow, c: Change): boolean {
   const h = row.hookInstall;
