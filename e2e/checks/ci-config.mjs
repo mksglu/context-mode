@@ -64,7 +64,10 @@ function main() {
   if (!hookGate) return fail("ci.yml needs the D3 step node e2e/checks/setup-hook-overhead.mjs");
   if (/\bif:/.test(hookGate[1])) return fail("ci.yml D3 hook overhead step must run on all three OSes (no if: condition)");
 
-  if (/\bsecrets\.|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY/.test(src)) {
+  // A real secret reference is a "${{ secrets.NAME }}" expression, or a key env name. The bare word "secrets" is
+  // safe: line 97 runs build/check-secrets.mjs, whose file name the old \bsecrets\. pattern misread.
+  const expressions = src.split("${{").slice(1).map((e) => e.split("}}")[0]);
+  if (expressions.some((e) => e.trim().startsWith("secrets.") || e.includes("secrets[")) || src.includes("API_KEY")) {
     return fail("ci.yml must carry no secrets or key env (ADR-0012: no key in CI)");
   }
 

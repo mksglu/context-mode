@@ -228,3 +228,11 @@ test("allow-list: scripts/ci-install.mjs and scripts/v1-cases/ pass; near-miss n
   assert.equal(bad.status, 1);
   assert.deepEqual(bad.lines.slice().sort(), ["scripts/ci-install.mjs.bak", "scripts/v1-case/a.mjs", "scripts/v1-cases-x/a.mjs"].map((p) => OUT + p));
 });
+
+// D-CR-SCRIPTS-1 follow-up: the live gate caught scripts/ci-install.mjs because no unit test ran the script on the
+// real tracked tree. A new tracked file outside the target tree now fails here, in `node --test tests/v2/`.
+test("the real tracked tree is clean: a new tracked file outside the target tree fails fast", () => {
+  const r = spawnSync(process.execPath, [SCRIPT], { cwd: REPO, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(r.stdout.split("\n").filter((l) => l !== ""), ["check-removed: clean"]);
+});

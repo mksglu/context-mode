@@ -33,10 +33,11 @@ const HOOK_BUNDLE = path.join(REPO_ROOT, "release-out", "hook.mjs");
 
 // Constants mirrored from src/core/contracts/constants.ts (e2e/ never imports src/, GS4).
 const OUTPUT_CAP = 16384; // 00-architecture.md §3.2, Q2
+const REPLACE_TRIGGER_BYTES = 4096; // D-M7-SV-1: the replace path has its own trigger; OUTPUT_CAP is no longer the boundary
 const SYNC_INDEX_MAX_BYTES = 65536; // 00-architecture.md §3.2, DECISIONS-r9 F1
 const HOOK_COMBINED_P95_MS = 60; // 00-architecture.md §3.2, GS6/A31
 
-const SIZES = [16 * 1024, 64 * 1024, 1024 * 1024]; // 16 KB, 64 KB (== SYNC_INDEX_MAX_BYTES), 1 MB
+const SIZES = [REPLACE_TRIGGER_BYTES, 16 * 1024, 64 * 1024, 1024 * 1024]; // 16 KB, 64 KB (== SYNC_INDEX_MAX_BYTES), 1 MB
 const RUNS_PER_SIZE = 50;
 const CASE_C_RUNS_PER_SIZE = 10; // see deviation note above
 
@@ -94,11 +95,16 @@ function buildInput(totalBytes) {
   return { text, lineSet: new Set(lines) };
 }
 
-// Strips the hook's own trailing "more:" pointer line (05-tools-index.md §5 step 4: more = "ctx_search(...)"),
-// which is not part of the chunked content and must not be checked against the input's lines.
+// Strips the hook's own trailing handle line (D-CR3-HANDLE-1, REPLACE_HANDLE_LINE: the host's tool-name prefix,
+// then "ctx_search({queries:[...], source:\"...\"}) searches the whole output (N B)."), which is not part of the
+// chunked content and must not be checked against the input's lines. No pattern match: three fixed parts.
+function isHandleLine(line) {
+  const at = line.indexOf("ctx_search({queries:[");
+  return at >= 0 && line.indexOf(", source:", at) > at && line.includes(") searches the whole output (") && line.endsWith(" B).");
+}
 function stripMoreLine(output) {
   const lines = output.split("\n");
-  if (lines.length > 0 && lines[lines.length - 1].startsWith("ctx_search(")) lines.pop();
+  if (lines.length > 0 && isHandleLine(lines[lines.length - 1])) lines.pop();
   return lines.join("\n");
 }
 
@@ -177,7 +183,7 @@ function postToolUse(f, agentType, text) {
 }
 
 // Claude-shape encode (src/adapters/claude-code.ts encodeClaudeShape): "allow" -> stdout ""; "replace" ->
-// stdout JSON {hookSpecificOutput:{hookEventName,updatedToolOutput}}.
+// stdout JSON {hookSpecificOutput:{hookEventName,updatedToolOutput:{stdout,stderr,interrupted}}} for a Bash call (D-M7-SV-1).
 function parseDecision(stdout, size) {
   if (stdout === "") return { kind: "allow" };
   let parsed;
@@ -186,11 +192,14 @@ function parseDecision(stdout, size) {
   } catch (err) {
     throw new Error("size " + size + ": hook stdout is not JSON and not empty: " + (err?.message ?? err));
   }
-  const out = parsed?.hookSpecificOutput;
-  if (out === undefined || typeof out.updatedToolOutput !== "string") {
-    throw new Error("size " + size + ": hook stdout has no hookSpecificOutput.updatedToolOutput: " + stdout.slice(0, 200));
+  // D-M7-SV-1: Claude Code checks updatedToolOutput against the tool's own output schema (Bash: an object
+  // {stdout, stderr, interrupted}); a bare string is rejected and the original output is kept. The payload
+  // here is a Bash call, so the replaced text is updatedToolOutput.stdout, and the shape must be exact.
+  const u = parsed?.hookSpecificOutput?.updatedToolOutput;
+  if (u === null || typeof u !== "object" || Array.isArray(u) || typeof u.stdout !== "string" || u.stderr !== "" || u.interrupted !== false) {
+    throw new Error("size " + size + ": hook stdout has no Bash-shaped hookSpecificOutput.updatedToolOutput {stdout, stderr:\"\", interrupted:false}: " + stdout.slice(0, 200));
   }
-  return { kind: "replace", output: out.updatedToolOutput };
+  return { kind: "replace", output: u.stdout };
 }
 
 function runSize(f, agentType, size, runs) {
@@ -201,11 +210,11 @@ function runSize(f, agentType, size, runs) {
     if (r.status !== 0) throw new Error("size " + size + " run " + i + ": hook exit " + r.status + ": " + (r.stderr ?? "").slice(0, 300));
     times.push(r.ms);
     const decision = parseDecision(r.stdout, size);
-    if (size <= OUTPUT_CAP) {
-      if (decision.kind !== "allow") throw new Error("size " + size + ": expected allow at/under OUTPUT_CAP, got " + decision.kind);
+    if (size <= REPLACE_TRIGGER_BYTES) {
+      if (decision.kind !== "allow") throw new Error("size " + size + ": expected allow at/under REPLACE_TRIGGER_BYTES, got " + decision.kind);
       continue;
     }
-    if (decision.kind !== "replace") throw new Error("size " + size + ": expected replace over OUTPUT_CAP, got " + decision.kind);
+    if (decision.kind !== "replace") throw new Error("size " + size + ": expected replace over REPLACE_TRIGGER_BYTES, got " + decision.kind);
     if (decision.output.length === 0) throw new Error("size " + size + ": replace output is empty");
     const check = wholeChunksOnly(decision.output, lineSet);
     if (!check.ok) throw new Error("size " + size + ": returned line is not a byte-exact input line: " + JSON.stringify(check.badLine.slice(0, 80)));

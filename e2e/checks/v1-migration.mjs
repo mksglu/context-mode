@@ -182,8 +182,11 @@ async function main() {
   step("uninstall-global-bin", !existsSync(bin), bin);
 
   // Step 6: the written hook commands still run (they never call the global bin).
-  const hooksFile = path.join(RELEASE_OUT, "hooks", `${agent}.json`);
-  const commands = existsSync(hooksFile) ? commandsOf(JSON.parse(readFileSync(hooksFile, "utf8"))) : [];
+  // D-FU-RM-GEMINI-1: Gemini reads only <ext>/hooks/hooks.json, and its commands name the script as
+  // ${extensionPath}${/}hook.mjs; the host fills both, so the check does the same (as windows-hosts.mjs does).
+  const hooksFile = path.join(RELEASE_OUT, "hooks", agent === "gemini" ? "hooks.json" : `${agent}.json`);
+  const hostFill = (cmd) => cmd.split("${extensionPath}").join(RELEASE_OUT).split("${/}").join(path.sep);
+  const commands = existsSync(hooksFile) ? commandsOf(JSON.parse(readFileSync(hooksFile, "utf8"))).map(hostFill) : [];
   step("hook-commands", commands.length > 0, hooksFile);
   const payload = JSON.stringify(fixturePayload(project));
   for (const cmd of commands) {

@@ -34,9 +34,14 @@ function commit(dir, subject) {
 }
 
 function runCase([name, version, after, expected]) {
-  const dir = mkdtempSync(path.join(tmpdir(), "cm-v2-e2e-plan-"));
+  const root = mkdtempSync(path.join(tmpdir(), "cm-v2-e2e-plan-"));
+  const dir = path.join(root, "work");
+  const bare = path.join(root, "origin.git");
   try {
-    git(dir, "init", "-q");
+    // D-FU-RF-1: plan.mjs reads the pushed annotated v2+ tags on origin, so the scratch repo gets a local bare origin.
+    git(root, "init", "-q", "--bare", bare);
+    git(root, "init", "-q", dir);
+    git(dir, "remote", "add", "origin", bare);
     commit(dir, "feat: before release");
     const src = commit(dir, "fix: before release");
     if (version) {
@@ -45,6 +50,8 @@ function runCase([name, version, after, expected]) {
       writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ version }));
       git(dir, "add", ".claude-plugin/plugin.json");
       git(dir, "commit", "-q", "-m", `release ${version}\n\nSource-Commit: ${src}`);
+      git(dir, "tag", "-a", `v${version}`, "-m", `v${version}`, "release");
+      git(dir, "push", "-q", "origin", `refs/tags/v${version}`);
       rmSync(path.join(dir, ".claude-plugin"), { recursive: true, force: true });
       git(dir, "checkout", "-q", "main");
     }
@@ -59,7 +66,7 @@ function runCase([name, version, after, expected]) {
     if (!r.stdout.includes("\nnotes<<EOF\n") || !r.stdout.endsWith("\nEOF\n")) return `${name}: no GITHUB_OUTPUT notes block`;
     return null;
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 

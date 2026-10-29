@@ -79,6 +79,14 @@ jobs:
         name: src/prompt/_generated.ts for v2 unit tests (D-M2-arch-6)
       - run: node --test "tests/v2/**/*.test.mjs"
         name: v2 unit tests (TECH-SPEC 6.2a, DEVIATIONS D-M1-13, same as gate layer v2-unit)
+      # Keyless local live cases (ADR-0012: kind "local" runs no model). They failed on a dev machine while CI never ran
+      # them. Same harness the owner runs by hand: node e2e/live/run.mjs --only <ids>. T-GS6 and T-F1 are wall-time
+      # budgets, so they stay on a quiet dev machine; setup-hook-overhead above is the CI timing gate.
+      - run: node e2e/live/run.mjs --only ci-config,release-plan-bump,repo-cleanup-gate
+        name: live local cases (ci-config, release-plan-bump, repo-cleanup-gate)
+      - run: node e2e/live/run.mjs --only v1-migration-gemini
+        name: live local case v1-migration-gemini (hook file and ${extensionPath} fill)
+        if: runner.os != 'Windows'
       # Fixture benchmark (docs/benchmarks/fixtures, DEVIATIONS D-BENCH-FX-1): 21 v1 scenarios, no network,
       # under 60 s. Fails on any scenario error or a part total off by more than 5% from results.json.
       - run: node bench/fixtures/run.mjs --check --bundle release-out
