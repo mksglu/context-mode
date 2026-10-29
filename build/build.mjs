@@ -77,6 +77,11 @@ const ESBUILD_COMMON = Object.freeze({
   logLevel: "silent",
 });
 
+// D-HNE-OLDNODE-1: process.getBuiltinModule exists from Node 22.3 / 20.16. The bundles call it at load (D-CI-PERF-3), so on an
+// older Node the hook died with exit 1 ("hook errored" in Copilot CLI) before any code of ours could answer. This shim
+// adds it from createRequire only when it is missing; on Node 24 it is one failed property test.
+const GETBUILTIN_SHIM = 'import{createRequire as __cmRequire}from"node:module";if(typeof process.getBuiltinModule!=="function")process.getBuiltinModule=(id)=>__cmRequire(import.meta.url)(id);';
+
 class BuildError extends Error {}
 
 function parseArgs(argv) {
@@ -178,7 +183,9 @@ async function buildBundle(bundle, outDir, define) {
   const entry = path.join(REPO_ROOT, bundle.entry);
   let result;
   try {
-    const banner = bundle.banner === undefined ? {} : { banner: bundle.banner };
+    // A shebang must stay the first line, so the shim follows it.
+    const shebang = bundle.banner === undefined ? "" : bundle.banner.js + "\n";
+    const banner = { banner: { js: shebang + GETBUILTIN_SHIM } };
     const minify = bundle.minify === true ? { minify: true } : {};
     result = await esbuild.build({ ...ESBUILD_COMMON, ...banner, ...minify, define, entryPoints: [entry], outfile: path.join(outDir, bundle.out) });
   } catch (err) {
