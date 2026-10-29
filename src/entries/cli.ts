@@ -11,6 +11,9 @@ import type { AgentId } from "../core/contracts/agents.ts";
 import { AGENT_ARG, SERVER_KEY } from "../core/contracts/constants.ts";
 import { ALL_COMMANDS, COMMANDS, HELP_MAIN, suggest, type Command } from "../cli/args.ts";
 import { runCommand } from "../cli/commands.ts";
+import { isEntry } from "./is-entry.ts";
+
+export { isEntry };
 
 // D7 exit codes (clig.dev): 0 ok, 1 failure, 2 usage error, 130 Ctrl-C.
 const EXIT_OK = 0;
@@ -97,18 +100,6 @@ function main(): void {
   child.on("exit", (code, signal) => {
     process.exitCode = signal === "SIGINT" ? EXIT_SIGINT : code ?? EXIT_FAIL;
   });
-}
-
-// D-HNE-CLI-ENTRY-1: import.meta.main exists from Node 24.2. On Node 22 it is undefined and the CLI ran nothing (exit 0,
-// no output). Without it, the process is the entry when argv[1] and this file are the same real file (npm bin link too).
-export function isEntry(main: boolean | undefined, argv1: string | undefined, self: string): boolean {
-  if (main !== undefined) return main;
-  if (argv1 === undefined || argv1 === "") return false;
-  try {
-    return realpathSync(argv1) === realpathSync(self);
-  } catch {
-    return false;
-  }
 }
 
 if (isEntry(import.meta.main, process.argv[1], fileURLToPath(import.meta.url))) main();

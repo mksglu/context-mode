@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer, type ServerContext, type StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { AGENT_IDS, type AgentId } from "../core/contracts/agents.ts";
@@ -22,6 +23,7 @@ import { closeDb, openDb } from "../core/store/db.ts";
 import { removeOwnerPid, writeOwnerPid } from "../core/store/owners.ts";
 import { TOOLS, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "../prompt/_generated.ts";
+import { isEntry } from "./is-entry.ts";
 
 export { INSTRUCTIONS };
 
@@ -267,7 +269,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
 
 // The bundle (server.mjs) is the process entry, so import.meta.main is true there; a unit test that
 // imports this module for INSTRUCTIONS does not start the server (DEVIATIONS D-M2-R1-1).
-if (import.meta.main) {
+if (isEntry(import.meta.main, process.argv[1], fileURLToPath(import.meta.url))) {
   const [, , ...cliArgs] = process.argv; // node <server.mjs> <args...>
   await startServer(cliArgs, process.env);
 }
