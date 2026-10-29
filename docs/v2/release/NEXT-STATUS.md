@@ -4,9 +4,26 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.13 (provenance present, SLSA v1, gitHead c340dae8). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.13: 2026-10-29T18:26:19Z.
+`next` is 2.0.0-next.14 (provenance present, SLSA v1, gitHead a66617dc). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.14: 2026-10-29T20:27:54Z.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.14 ships
+
+Changes since v2.0.0-next.13 (5 commits, 1 behaviour change):
+
+- D-NI-CODEX-TRUST-1: setup asks Codex `hooks/list` (via `codex app-server`) for the hooks of context-mode@context-mode only. For each untrusted hook it writes Codex's own key and hash as `[hooks.state."<key>"] trusted_hash` in $CODEX_HOME/config.toml. User hooks and other plugins are never touched. The edit is backed up, `setup --remove` restores the file, a second run changes nothing. Doctor fails on an untrusted plugin hook.
+- D-README-2: the README agent table shows hooks, MCP, skills and install per host.
+- Docs only: workflow files for codex-plugin-trust and readme-hooks-table, NEXT-STATUS and RESUME for next.13.
+
+## Release numbers (next.14)
+
+- Tag v2.0.0-next.14 on a66617dc. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.13) plus 1. v2-design was quiet from 22:31 (+03) for more than 15 minutes before the tag.
+- Local on a fresh clone: v2-unit 2187 pass, 0 fail, 17 skip of 2204; `gate --all` exit 0; check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on a66617dc (run 40940806100): all 12 jobs green. The release.yml run 40945644081 runs the same ci jobs again, all green.
+- In its first attempt the job `build` failed in actions/attest-build-provenance@v1: the attestation was signed and uploaded (Rekor logIndex 3575599008), then "error fetching tlog entry - (404) Not Found". That is a registry/timing error of the sigstore service, shown in the log. One rerun of the failed job only (`gh run rerun --failed`): green, all publish jobs green. No code changed between the two attempts.
+- Registry version published 2026-10-29T20:27:54Z (gitHead a66617dc, SLSA v1 provenance, 2 signatures). GitHub prerelease v2.0.0-next.14 (not draft) at 20:26:52Z.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.14 (release commit 5e49b72b).
 
 ## What 2.0.0-next.13 ships
 
