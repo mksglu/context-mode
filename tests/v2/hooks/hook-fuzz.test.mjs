@@ -473,5 +473,49 @@ test("hook-fuzz: the generator is deterministic (same seed, same bytes)", () => 
   assert.ok(existsSync(join(REPO, "build", "build.mjs")));
 });
 
-void writeFileSync;
 
+// Owner decision 2026-10-29: on any internal failure the hook falls back to the policy table with no store access.
+// A call the policy denies when healthy must still be denied when the project cannot be resolved (cwd not a git dir,
+// cwd missing, cwd not a string, HOME unset). Fail-open here lets the raw output flood the context.
+const FLOODERS = [
+  (keys, host) => ({ [keys.tool]: pick0(["WebFetch", "web_fetch", "fetch_webpage", "webfetch"]), [keys.input]: { url: "https://example.com" } }),
+  (keys, host) => ({ [keys.tool]: SHELL[host][0] ?? "Bash", [keys.input]: { command: "curl https://example.com" } }),
+  (keys, host) => ({ [keys.tool]: SHELL[host][0] ?? "Bash", [keys.input]: { command: "cat /etc/hosts" } }),
+];
+const pick0 = (l) => l[0];
+
+function floodPayload(host, keys, variant, cwd) {
+  const spec = SPEC[host];
+  const pre = spec.events.find((e) => PRE_TOOL.has(e));
+  const p = { [keys.event]: pre, [keys.session]: "s1", ...FLOODERS[variant](keys, host) };
+  if (cwd !== undefined) p[keys.cwd] = cwd;
+  if (host === "copilot-cli" || host === "vscode") p[keys.input] = JSON.stringify(p[keys.input]);
+  return p;
+}
+
+for (const host of HOSTS) {
+  test(`hook-fuzz ${host}: a flooding call that is denied when healthy is still denied when the project cannot be resolved`, { todo: "red until the guard agent lands the policy fallback in handleHook (owner decision 2026-10-29); remove todo then" }, async () => {
+    const home = mkdtempSync(join(root, "home-fb-"));
+    const keys = SPEC[host].keys[0];
+    let found = -1;
+    for (let v = 0; v < FLOODERS.length && found < 0; v++) {
+      const res = await runHook(host, JSON.stringify(floodPayload(host, keys, v, repoDir)), { PATH: process.env.PATH, HOME: home, USERPROFILE: home }, repoDir);
+      if (isDeny(host, res)) found = v;
+    }
+    if (found < 0) return; // this host has no flooding call its policy denies (the table decides, not this test)
+    const broken = [
+      ["cwd is not a git dir", join(root, "does", "not", "exist"), { HOME: home, USERPROFILE: home }],
+      ["no cwd field", undefined, { HOME: home, USERPROFILE: home }],
+      ["cwd empty", "", { HOME: home, USERPROFILE: home }],
+      ["HOME and USERPROFILE unset", repoDir, {}],
+    ];
+    const bad = [];
+    for (const [label, cwd, env] of broken) {
+      const res = await runHook(host, JSON.stringify(floodPayload(host, keys, found, cwd)), { PATH: process.env.PATH, ...env }, spaceDir);
+      if (!isDeny(host, res) || res.status !== (host === "kiro" || host === "pi" || host === "opencode" ? 2 : 0)) bad.push({ label, status: res.status, stdout: res.stdout.slice(0, 100), stderr: res.stderr.slice(0, 160) });
+    }
+    assert.equal(bad.length, 0, host + " fails open on an internal failure: " + JSON.stringify(bad, null, 1));
+  });
+}
+
+void writeFileSync;
