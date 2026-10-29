@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ctxExecute } from "../../../src/core/tools/execute.ts";
@@ -62,10 +62,15 @@ for (const [name, language, code, re, bin] of FAIL) {
   });
 }
 
-// Windows: Git Bash does not export TMPDIR from the host environment (it uses TEMP), so the v1 assertion has no meaning there.
-test("v1 executor: shell TMPDIR points to the sandbox temp dir, not the project root", { skip: process.platform === "win32" ? "TMPDIR is a POSIX variable; Windows shells use TEMP" : false }, async () => {
-  const out = await exec({ language: "shell", code: 'echo "TMP=$TMPDIR"' });
-  const m = /TMP=(\S+)/.exec(out.text);
-  assert.ok(m, "TMPDIR is empty: " + out.text);
-  assert.ok(m[1].length > 1 && m[1] !== process.cwd(), out.text);
+// v1 set TMPDIR to its sandbox temp dir (v1 executor.test.ts:520). v2 does not set TMPDIR (D-V1DIFF-TMPDIR-1). The script's cwd is the
+// project root by design, so the kept property is that the sandbox's own script file leaves nothing behind in it.
+test("v1 executor: the sandbox leaves no script or temp file in the project root (D-V1DIFF-TMPDIR-1)", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-v1ex-root-"));
+  try {
+    const before = readdirSync(root).sort();
+    const out = await ctxExecute.handler({ language: "shell", code: "pwd; echo done" }, ctxFor(root));
+    assert.ok(out.text.includes("done"), out.text);
+    const added = readdirSync(root).filter((f) => !before.includes(f) && f !== "projects");
+    assert.deepEqual(added, [], "files left in the project root: " + added.join(", "));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
