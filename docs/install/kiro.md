@@ -50,7 +50,9 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
-- Kiro has no npm package, so no run showed Kiro load the server or fire a hook.
+- Kiro CLI 2.35.2 (V3 engine, macOS tarball from cli.kiro.dev) loaded all 6 hook entries setup wrote (`hooks.reload.loaded {"read":6,"registered":6}` in `~/.kiro/logs/<run>/kiro.log`). No run showed Kiro fire one: the first model call needs a real `kiro-cli login`, and a fake key stops at "could not load the available models".
+- Kiro counts a hook with `"enabled": false` as loaded but does not run it. If you turned one of ours off, `context-mode doctor` fails hook-registered and names it; `context-mode setup` turns it back on. Your own hooks in the same file stay as they are.
+- The hook file is read by the V3 engine. The Classic engine does not read `~/.kiro/hooks/`.
 
 ## Report a problem
 

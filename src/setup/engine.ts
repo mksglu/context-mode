@@ -290,6 +290,17 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   return undefined;
 }
 
+/** D-NI-KIRO-GATE-1: kiro counts an own hook with "enabled": false as registered but never runs it. The one-line reason, or undefined. */
+function kiroDisabledIssue(h: Extract<HookInstall, { kind: "file" }>): string | undefined {
+  const text = readOr(h.file);
+  if (text === undefined) return undefined;
+  let doc: unknown;
+  try { doc = parseHostConfig("kiro", h.file, text, "json"); } catch { return undefined; }
+  const hooks = isObj(doc) && Array.isArray(doc.hooks) ? doc.hooks : [];
+  const off = hooks.filter((e) => isObj(e) && e.enabled === false && isObj(e.action) && isOwnHookCommand(e.action.command, "kiro")).map((e) => String((e as Json).name));
+  return off.length ? `${h.file}: kiro skips the disabled context-mode hook${off.length > 1 ? "s" : ""} (${off.join(", ")}); set "enabled" to true or run: context-mode setup` : undefined;
+}
+
 /** ADR-0020 hook channel: write or merge the host hook file, or add the in-process plugin list entry. */
 function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["env"]): void {
   const h = row.hookInstall;
@@ -532,7 +543,7 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   if (!edits.length) return { name: "hook-registered", ok: true };
   const trust = h.kind === "file" ? h.trust : undefined;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
-  const issue = h.kind === "plugin-list" ? pluginListIssue(h) : undefined;
+  const issue = h.kind === "plugin-list" ? pluginListIssue(h) : h.kind === "file" && row.id === "kiro" ? kiroDisabledIssue(h) : undefined;
   return { name: "hook-registered", ok: false, detail: issue ?? `${h.file} lacks the context-mode hook entry` };
 }
 
@@ -948,7 +959,11 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
 }
 
 /** D-HF-OPENCODE-GATE-1: a plugin list that loads twice or names a missing file of ours is a hook-registered FAIL with its own fix line. */
-function hasPluginIssue(row: CheckRow): boolean { const h = row.hookInstall; return h.kind === "plugin-list" && pluginListIssue(h) !== undefined; }
+function hasPluginIssue(row: CheckRow): boolean {
+  const h = row.hookInstall;
+  if (h.kind === "file") return row.id === "kiro" && kiroDisabledIssue(h) !== undefined; // D-NI-KIRO-GATE-1
+  return h.kind === "plugin-list" && pluginListIssue(h) !== undefined;
+}
 
 /** D-HA-CODEX-TRUST-1: the only planned change is a trust entry, so the hooks are there and hook-registered names it. */
 function onlyTrust(row: CheckRow, changes: Change[]): boolean { return changes.every((c) => isTrust(row, c) || isRefresh(row, c)); }
