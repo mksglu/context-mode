@@ -4,9 +4,26 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.12 (provenance present, SLSA v1, gitHead c8f6a68d). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON. The full packument was cached and showed next.11 for about 7 minutes after publish; the dist-tags endpoint and the version document showed next.12 first.
+`next` is 2.0.0-next.13 (provenance present, SLSA v1, gitHead c340dae8). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.13: 2026-10-29T18:26:19Z.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.13 ships
+
+Changes since v2.0.0-next.12 (4 commits):
+
+- D-DOC-RT-1: doctor D3 and D4 agree with setup for Codex and MCP hosts. One `ownMcpValue` source; D4 reads CODEX_HOME. Fixes the false FAIL a tester saw after setup on next.11.
+- D-LEF-1: six local live e2e cases follow the current contracts (T-F1 updatedToolOutput object, ci-config, release-plan-bump, repo-cleanup-gate and others). CI runs four keyless ones (ci-config, release-plan-bump, repo-cleanup-gate, v1-migration-gemini).
+- D-LEF-2: live run.mjs root uses fileURLToPath, so it runs on Windows.
+- Still open, not fixed: the T-F1 64 KB PostToolUse wall p95 reads 63 to 74 ms against 60 on a loaded Mac; T-GS6 passes at exactly the limit of 40. No threshold was raised. Run both again on an idle machine. They are not in CI.
+
+## Release numbers (next.13)
+
+- Tag v2.0.0-next.13 on c340dae8. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.12) plus 1.
+- Local on a fresh clone: v2-unit 2183 pass, 0 fail, 17 skip of 2200; `gate --all` exit 0; check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on c340dae8 (run 40919372631): all 12 jobs green. The release.yml run 40925377340 runs the same ci jobs again. In its first attempt the job `ci (windows-latest, node 24.15.0)` failed in the v2 unit step on three timing cases: T-F5 `windows-grandchild-kill` ("bundle did not exit in 2000ms"), H5 `doctor-hook-runs` ("hook did not finish"), and the known-defect cases Q-WIN-5 and KIRO-WIN-4 (shown as warnings, `# KNOWN DEFECT` / `# UNVERIFIED`). All other 11 jobs were green. One rerun of the failed job only (`gh run rerun --failed`): green. No code changed between the two attempts. The T-F5 and H5 timing on windows-latest is a flake to look at; it is not understood yet.
+- release.yml run 40925377340 green after that one rerun (main-* and rollback skipped, as designed). Registry version published 2026-10-29T18:26:19Z. GitHub prerelease v2.0.0-next.13 (not draft) at 18:24:58Z.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.13.
 
 ## What 2.0.0-next.12 ships
 
