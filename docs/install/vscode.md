@@ -51,6 +51,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 ## Known limits
 
 - Setup writes one hook file: `~/.copilot/hooks/context-mode-vscode.json`, shape `{ version: 1, hooks: { <Event>: [{ type: "command", command, timeout }] } }` with `version: 1`, `type: "command"` and `timeout` 5 (seconds), for SessionStart, UserPromptSubmit, PreToolUse, PostToolUse and PreCompact. The command is `"<node>" "<package>/hook.mjs" --agent vscode` (absolute paths). Other entries in that file stay. Setup does not write project hooks under `.github/hooks/`.
+- VS Code loads that hook file only while `chat.useHooks` is not `false`, `chat.hookFilesLocations` (if you set it) lists `"~/.copilot/hooks": true`, the workspace is trusted, and an administrator policy (`allowManagedHooksOnly`, `strictPluginOnlyCustomization` in `managed-settings.json`) does not block user hook files. `context-mode doctor --agents vscode` fails with the file and the fix for the settings and policy cases; it cannot read workspace trust.
 - VS Code itself was not run. The path follows the VS Code source (`userDataPath.ts`, default profile `mcp.json`); the docs page does not state it. Code - Insiders, VSCodium and named profiles are not written.
 - The shipped `hooks/vscode.json` is a template: the writer fills the path; do not copy hooks/vscode.json by hand.
 

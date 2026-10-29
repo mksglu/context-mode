@@ -3,6 +3,7 @@
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { geminiSettingsGate } from "./gemini-gate.ts";
 import { piSettingsGate } from "./pi-gate.ts";
+import { vscodeSettingsGate } from "./vscode-gate.ts";
 import { qwenHooksOff } from "./qwen-gate.ts";
 import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
 import type { PluginHook } from "./codex-trust.ts";
@@ -808,7 +809,9 @@ async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   if (row.copilotSettings) checks.push(await copilotEnabledCheck(row, ctx));
   checks.push(hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
   // D-NI-PI-GATE-1: a packages[] extensions filter keeps pi from loading the listed package's hooks.
-  return row.id === "pi" ? withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd())) : checks;
+  if (row.id === "pi") return withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd()));
+  // D-NI-VSCODE-GATE-1: chat.useHooks false, a hookFilesLocations that drops ~/.copilot/hooks, or a managed policy keeps VS Code from running the hook file.
+  return row.id === "vscode" ? withHookGate(checks, vscodeSettingsGate(env, ctx.home, process.cwd())) : checks;
 }
 
 // ---------- apply, backup, rollback ----------
