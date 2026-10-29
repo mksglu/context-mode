@@ -3,6 +3,7 @@
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { geminiSettingsGate } from "./gemini-gate.ts";
 import { piSettingsGate } from "./pi-gate.ts";
+import { qwenHooksOff } from "./qwen-gate.ts";
 import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
 import type { PluginHook } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
@@ -651,6 +652,10 @@ function trustPluginHooks(row: CheckRow, ctx: SetupContext, apply: { run: Run; d
 
 /** D-NI-GEMINI-GATE-1: why gemini would not run an installed, enabled extension's hooks (undefined: nothing gates them). */
 function geminiGate(n: NativePlugin, ctx: SetupContext, workspaceOff: boolean): string | undefined {
+  if (n.bin === "qwen") { // D-NI-QWEN-GATE-1
+    if (workspaceOff && n.enable) return `qwen runs no hook: context-mode is disabled for this workspace; run ${n.bin} ${n.enable.join(" ")}`;
+    return qwenHooksOff(ctx.env, ctx.home, process.cwd());
+  }
   if (n.bin !== "gemini") return undefined;
   if (workspaceOff && n.enable) return `gemini lists context-mode disabled for this workspace, so it runs no hook; run ${n.bin} ${n.enable.join(" ")} --scope workspace`;
   return geminiSettingsGate(ctx.env, ctx.home, process.cwd());

@@ -11,6 +11,7 @@ import path from "node:path";
 
 import { ADAPTERS } from "../../../src/adapters/table.ts";
 import { TOOL_ORDER } from "../../../src/core/contracts/constants.ts";
+import { qwenHooksOff } from "../../../src/setup/qwen-gate.ts";
 import { assertWritable, buildRegistry, hostBin, installExitOk, pathEntries, runDoctor, runRemove, runSetup, spawnForm, spawnShim, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
 
 const NODE = process.execPath;
@@ -719,6 +720,57 @@ for (const [bin, stream] of [["qwen", "stdout"], ["gemini", "stderr"]]) {
     assert.equal(doc.agents[0].reason, `context-mode is installed but disabled in ${bin}, run ${bin} extensions enable context-mode`);
   });
 }
+
+// D-NI-QWEN-GATE-1: live (qwen 0.26.4, fake provider, e2e/live qwen-fire): with the extension linked and enabled, qwen still
+// ran no hook when settings.json had "disableAllHooks": true (user, project or system file) or when the extension was disabled
+// for the workspace ("Enabled (Workspace): false"); the model saw the full 192 KB. Doctor and setup must FAIL with a one-line fix.
+const WS_LIST = (ws) => EXT_LIST("true").split("Enabled (Workspace): true").join(`Enabled (Workspace): ${ws}`);
+const QWEN_FAKE = (ws) => `case "$1 $2" in\n  "extensions list") printf '${WS_LIST(ws)}' ;;\n  "extensions link") exit 7 ;;\nesac\nexit 0`;
+
+for (const [where, rel, envKey] of [["user", [".qwen", "settings.json"]], ["system", ["sys", "settings.json"], "QWEN_CODE_SYSTEM_SETTINGS_PATH"]]) {
+  for (const [id, setup] of [["doctor", false], ["setup", true]]) {
+    test(`[D-NI-QWEN-GATE-1] ${id}: disableAllHooks in the ${where} qwen settings fails and names the file and the fix`, { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+      const s = sandbox(t);
+      fakeBin(s.root, "qwen", QWEN_FAKE("true"));
+      const file = put(path.join(envKey ? s.root : s.home, ...rel), '{\n  // hooks off\n  "disableAllHooks": true\n}\n');
+      const env = envKey ? { ...s.env, [envKey]: file } : s.env;
+      const o = { home: s.home, pkgDir: s.pkgDir, env, agents: ["qwen"], runId: "r" };
+      const res = setup ? await runSetup(o) : await runDoctor(o);
+      assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0], null, 2));
+      const bad = res.agents[0].checks.find((c) => c.name === "hook-registered");
+      assert.equal(bad.ok, false);
+      assert.equal(bad.detail, `qwen runs no hook: "disableAllHooks" is true in ${file}; set it to false`);
+      assert.equal(readFileSync(file, "utf8").includes('"disableAllHooks": true'), true, "the user's settings file is never edited");
+    });
+  }
+}
+
+test("[D-NI-QWEN-GATE-1] doctor: a qwen extension disabled for the workspace fails and names the enable command", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  fakeBin(s.root, "qwen", QWEN_FAKE("false"));
+  const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["qwen"] });
+  assert.equal(doc.agents[0].status, "FAIL", JSON.stringify(doc.agents[0], null, 2));
+  assert.equal(doc.agents[0].checks.find((c) => c.name === "hook-registered").detail, "qwen runs no hook: context-mode is disabled for this workspace; run qwen extensions enable context-mode");
+});
+
+test("[D-NI-QWEN-GATE-1] doctor: disableAllHooks false, or absent, in user, project and system files passes", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  fakeBin(s.root, "qwen", QWEN_FAKE("true"));
+  put(path.join(s.home, ".qwen", "settings.json"), '{"disableAllHooks": false}');
+  const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["qwen"] });
+  assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
+});
+
+test("[D-NI-QWEN-GATE-1] qwenHooksOff: project settings in the working directory, QWEN_HOME, and a file that does not parse", (t) => {
+  const s = sandbox(t);
+  const proj = path.join(s.root, "proj");
+  const pf = put(path.join(proj, ".qwen", "settings.json"), '{"disableAllHooks": true}');
+  assert.equal(qwenHooksOff(s.env, s.home, proj), `qwen runs no hook: "disableAllHooks" is true in ${pf}; set it to false`);
+  const qh = put(path.join(s.root, "qh", "settings.json"), '{"disableAllHooks": true}');
+  assert.equal(qwenHooksOff({ ...s.env, QWEN_HOME: path.join(s.root, "qh") }, s.home, s.root), `qwen runs no hook: "disableAllHooks" is true in ${qh}; set it to false`);
+  put(path.join(s.home, ".qwen", "settings.json"), "{ not json");
+  assert.equal(qwenHooksOff(s.env, s.home, s.root), undefined, "a file qwen itself cannot read is not our finding");
+});
 
 // GEM-WIN-1, CP-WIN-4 (D-WIN-BOM-2): the BOM + CRLF fixture for the two JSON hook files that are not codex's:
 // gemini's ~/.gemini/settings.json (mode drop) and copilot-cli's ~/.copilot/hooks/context-mode.json (mode rewrite).
