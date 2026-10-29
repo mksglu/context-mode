@@ -58,6 +58,8 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 - Setup adds the hooks plugin to the `plugin` list in `~/.config/opencode/opencode.json`. On its first start after that, OpenCode installs `@opencode-ai/plugin` into `~/.config/opencode` (30-60 s on OpenCode 1.19.4, needs the network). Setup checks the server with `opencode mcp list --pure`, so it does not wait on that install (D-HF-OPENCODE-LIST-1).
 
+- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin context-mode@next --global` the list holds `context-mode@next`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1).
+
 ## Report a problem
 
 Run `context-mode doctor --agents opencode`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
@@ -75,4 +77,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 
 Read, not run: the 1.19.4 plugin resolver treats a `file://` value, an absolute path and a drive-letter path (`C:\\` or `C:/`) as a file entry and converts it with `pathToFileURL`, so setup writes the bare absolute path on Windows too (D-WIN-OCENTRY-1). On macOS a path with spaces showed as `file:///.../home%20dir/...` in `opencode debug config`.
 
-Not run: a live, logged-in OpenCode session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Live fire (OpenCode 1.19.5, macOS arm64, temp HOME, fake local OpenAI-compatible provider, no key): the plugin installed with `opencode plugin context-mode@next --global` replaced the output of `cat big.log` (192 KB) with a 160-byte `ctx_execute` redirect. Test: `tests/v2/e2e/opencode-fire.test.mjs`, skipped when `opencode` is not on PATH. Not run: Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).

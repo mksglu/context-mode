@@ -258,6 +258,37 @@ function planCodexTrust(row: CheckRow, edits: FileEdit[], hooksFile: string, fil
   else edits.push({ file, before: text, after: res.text, changes });
 }
 
+/** D-HF-OPENCODE-GATE-1: OpenCode 1.19.5 loads every entry of the plugin list and skips a missing file without an
+ *  error. The native install writes "context-mode@<tag>" (opencode plugin ...): with it our path entry would load the
+ *  plugin twice (every hook fires twice), so the path entry is dropped; a stale path entry of ours (the file is gone,
+ *  .../context-mode/opencode/plugin.js) never loads, so it is dropped too. Entries of the user are kept. */
+const NATIVE_PLUGIN_PREFIX = "context-mode@";
+function isNativeSpec(e: unknown): boolean { return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX); }
+function isStaleOwnPlugin(e: unknown, entry: string): boolean {
+  if (typeof e !== "string" || e === entry || !path.isAbsolute(e) || existsSync(e)) return false;
+  const seg = e.split("\\").join("/").split("/");
+  const n = seg.length;
+  return n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === "context-mode";
+}
+function wantedPluginList(list: unknown[], entry: string): unknown[] {
+  const native = list.some(isNativeSpec);
+  const kept = list.filter((e) => !(native && e === entry) && !isStaleOwnPlugin(e, entry));
+  return native || kept.includes(entry) ? kept : [...kept, entry];
+}
+/** The one-line reason hook-registered fails on a plugin-list channel, from the file as it is now. */
+function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
+  const text = readOr(h.file);
+  if (text === undefined) return undefined;
+  let doc: unknown;
+  try { doc = parseHostConfig("opencode", h.file, text, fileFormat({ id: "opencode" } as CheckRow, h.file)); } catch { return undefined; }
+  const cur = isObj(doc) ? doc[h.key[0]] : undefined;
+  const list = Array.isArray(cur) ? cur : [];
+  if (list.some(isNativeSpec) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
+  if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
+  return undefined;
+}
+
 /** ADR-0020 hook channel: write or merge the host hook file, or add the in-process plugin list entry. */
 function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["env"]): void {
   const h = row.hookInstall;
@@ -268,7 +299,8 @@ function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["en
     planJsonKeys(row, edits, h.file, fileFormat(row, h.file), (doc) => {
       const cur = doc[h.key[0]];
       const list = Array.isArray(cur) ? cur : [];
-      return [[h.key, list.includes(h.entry) ? list : [...list, h.entry]]];
+      const want = wantedPluginList(list, h.entry);
+      return [[h.key, want.length === list.length && want.every((e, i) => e === list[i]) ? list : want]];
     });
   }
 }
@@ -441,7 +473,8 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   if (!edits.length) return { name: "hook-registered", ok: true };
   const trust = h.kind === "file" ? h.trust : undefined;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
-  return { name: "hook-registered", ok: false, detail: `${h.file} lacks the context-mode hook entry` };
+  const issue = h.kind === "plugin-list" ? pluginListIssue(h) : undefined;
+  return { name: "hook-registered", ok: false, detail: issue ?? `${h.file} lacks the context-mode hook entry` };
 }
 
 /**
@@ -833,7 +866,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     if (res.status === "PASS") {
       // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
       if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
-      else if (res.changes.length && !onlyTrust(row, res.changes)) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
+      else if (res.changes.length && !onlyTrust(row, res.changes) && !hasPluginIssue(row)) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
       else {
         res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
@@ -845,6 +878,9 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
   }
   return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents };
 }
+
+/** D-HF-OPENCODE-GATE-1: a plugin list that loads twice or names a missing file of ours is a hook-registered FAIL with its own fix line. */
+function hasPluginIssue(row: CheckRow): boolean { const h = row.hookInstall; return h.kind === "plugin-list" && pluginListIssue(h) !== undefined; }
 
 /** D-HA-CODEX-TRUST-1: the only planned change is a trust entry, so the hooks are there and hook-registered names it. */
 function onlyTrust(row: CheckRow, changes: Change[]): boolean { return changes.every((c) => isTrust(row, c) || isRefresh(row, c)); }
