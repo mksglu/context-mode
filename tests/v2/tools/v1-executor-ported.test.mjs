@@ -62,8 +62,10 @@ for (const [name, language, code, re, bin] of FAIL) {
   });
 }
 
-test("v1 executor: shell TMPDIR points to the sandbox temp dir, not the project root", async () => {
-  const out = await exec({ language: "shell", code: 'echo "TMP=$TMPDIR"; pwd' });
-  assert.ok(out.text.includes("TMP="), out.text);
-  assert.ok(!out.text.includes("TMP=\n"), out.text);
+// Windows: Git Bash does not export TMPDIR from the host environment (it uses TEMP), so the v1 assertion has no meaning there.
+test("v1 executor: shell TMPDIR points to the sandbox temp dir, not the project root", { skip: process.platform === "win32" ? "TMPDIR is a POSIX variable; Windows shells use TEMP" : false }, async () => {
+  const out = await exec({ language: "shell", code: 'echo "TMP=$TMPDIR"' });
+  const m = /TMP=(\S+)/.exec(out.text);
+  assert.ok(m, "TMPDIR is empty: " + out.text);
+  assert.ok(m[1].length > 1 && m[1] !== process.cwd(), out.text);
 });
