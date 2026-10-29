@@ -43,7 +43,7 @@ context-mode doctor --agents pi
 pi list
 ```
 
-The package must be listed. In a run with no login, Pi loads the extension and its hooks print a `hooks: no project: NO_PROJECT` line before the "No API key" error. That line shows the extension loaded.
+The package must be listed, and its `packages[]` entry in `settings.json` must not filter out `pi/index.js` (an `extensions` list such as `[]` or `["!pi/index.js"]`). Pi then lists the package but loads no hook; doctor reports the file and the filter as a FAIL. The same filter in `.pi/settings.json` counts once Pi trusts the project. In a run with no login, Pi loads the extension and its hooks print a `hooks: no project: NO_PROJECT` line before the "No API key" error. That line shows the extension loaded.
 
 ## Remove
 
@@ -56,7 +56,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 ## Known limits
 
 - Pi has no `/ctx-doctor` or `/ctx-upgrade` command (D-FU-RM-DOCS-1). Use `context-mode doctor` in a shell.
-- No logged-in Pi session (needs an API key) fired a hook. The git-route runs below used commit 05e97724; setup no longer uses that route.
+- The hooks were fired live with Pi 1.4.0 against a fake local model (`tests/v2/e2e/pi-fire.test.mjs`): `cat` of a 192 KB log reached the model as a short `ctx_execute` redirect. A real logged-in Pi session was not run. The git-route runs below used commit 05e97724; setup no longer uses that route.
 
 ## Report a problem
 
@@ -73,6 +73,6 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents pi` | 1.4.0 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 1.4.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Pi session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a logged-in Pi session (the live check uses a fake local model). Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
 
 Earlier git-route run, commit 05e97724, Pi 1.4.0, 2026-10-22: `pi install git:github.com/mksglu/context-mode@release` Pass; `pi list` Pass; `pi update --extensions` Pass; `pi remove` Pass; `/ctx-doctor` in Pi Fail (the command does not exist, D-FU-RM-DOCS-1).

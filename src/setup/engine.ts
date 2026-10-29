@@ -2,6 +2,7 @@
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { geminiSettingsGate } from "./gemini-gate.ts";
+import { piSettingsGate } from "./pi-gate.ts";
 import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
 import type { PluginHook } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
@@ -648,7 +649,8 @@ async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   checks.push(await mcpCheck(row.serverCommand, env));
   if (row.hookCommand) checks.push(hookCheck(row, env));
   checks.push(hookRegisteredCheck(row, env, l), hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
-  return checks;
+  // D-NI-PI-GATE-1: a packages[] extensions filter keeps pi from loading the listed package's hooks.
+  return row.id === "pi" ? withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd())) : checks;
 }
 
 // ---------- apply, backup, rollback ----------
