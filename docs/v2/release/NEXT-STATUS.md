@@ -4,9 +4,27 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.11 (provenance present, SLSA v1, gitHead c3982498). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON.
+`next` is 2.0.0-next.12 (provenance present, SLSA v1, gitHead c8f6a68d). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON. The full packument was cached and showed next.11 for about 7 minutes after publish; the dist-tags endpoint and the version document showed next.12 first.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.12 ships
+
+Changes since v2.0.0-next.11:
+
+- D-HNE-GUARD-1: the hook never errors on any of the 10 hosts. On an internal failure it exits 0 with a valid decision in the host's own shape (stdin, decode, project resolve, policy/store, encode, Node below NODE_MIN). Flooding native tools are denied with the sandbox redirect and "run ctx_doctor"; ctx_* and harmless tools pass.
+- D-CDX-CAT-1: the shell-dump deny checks every command in a chain, follows cd, and unwraps zsh -c.
+- D-V1DIFF-*: v1 differential harness (371 recorded v1 router calls) and a 10-host property test of the built hook.
+- D-CR-SCRIPTS-1: check-removed allows scripts/ci-install.mjs and scripts/v1-cases/. Found by `gate --all`; CI skips that step below M7, so CI did not show it.
+
+## Release numbers (next.12)
+
+- Tag v2.0.0-next.12 on c8f6a68d. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.11) plus 1.
+- Local on a fresh clone: v2-unit 2176 pass, 0 fail, 17 skip of 2193; `gate --all` exit 0 (live 1 of 30 ran); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- Two earlier local gate runs failed on load only (load average over 100): codex-cat-redirect ENOTEMPTY on temp dir cleanup, and the 50 ms units/222KB check. Each passed when the load fell.
+- CI on c8f6a68d (run 40903234519): all 12 jobs green, incl. macOS and the windows hosts matrix.
+- release.yml run 40905873629 green (main-* and rollback skipped, as designed). Provenance logged to sigstore logIndex 3571241116. Registry version published 16:11:15Z. GitHub prerelease v2.0.0-next.12 at 16:11:30Z.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.12.
 
 ## What 2.0.0-next.11 ships
 
