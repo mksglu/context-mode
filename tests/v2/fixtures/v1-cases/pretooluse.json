@@ -1,0 +1,6699 @@
+{
+ "v1Version": "1.0.169",
+ "generatedBy": "scripts/v1-cases/{instrument,convert}.mjs on a vitest run of tests/hooks tests/core/routing tests/guidance-throttle",
+ "count": 371,
+ "settings": {
+  "S1": {
+   "project": {
+    "permissions": {
+     "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Read(.env)",
+      "Read(**/.env*)"
+     ],
+     "allow": [
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)"
+     ]
+    }
+   }
+  },
+  "S2": {
+   "project": {
+    "permissions": {
+     "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Read(.env)",
+      "Read(**/.env*)"
+     ],
+     "allow": [
+      "Bash(git:*)",
+      "Bash(ls:*)"
+     ]
+    }
+   }
+  },
+  "S3": {
+   "projectLocal": {
+    "permissions": {
+     "deny": [
+      "Bash(sudo *)"
+     ]
+    }
+   }
+  }
+ },
+ "rows": [
+  {
+   "id": "v1-001",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "file_path": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU/output.ts"
+   },
+   "platform": "kimi",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-002",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -s http://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-003",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "kimi",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-004",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "wget https://example.com -O out.html"
+   },
+   "platform": "kimi",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-005",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "wget http://example.com/file.tar.gz"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-006",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "kimi",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-007",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "node -e \"fetch('http://api.example.com/data')\""
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-008",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "git status"
+   },
+   "platform": "kimi",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-009",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "kimi",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kimi-hook-test-JYdGLU",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-010",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "./gradlew build --info"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-011",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "mvn clean package -DskipTests"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-012",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-013",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "find /etc -name '*.conf'"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-014",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "git status"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-015",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://docs.example.com/api"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://docs.example.com/api\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-016",
+   "source": "subprocess",
+   "tool": "Task",
+   "input": {
+    "prompt": "Analyze this codebase and summarize the architecture."
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-017",
+   "source": "subprocess",
+   "tool": "TaskCreate",
+   "input": {
+    "title": "my task"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-018",
+   "source": "subprocess",
+   "tool": "TaskUpdate",
+   "input": {
+    "id": "123",
+    "status": "done"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-019",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "file_path": "/some/path/to/file.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-020",
+   "source": "subprocess",
+   "tool": "Grep",
+   "input": {
+    "pattern": "TODO",
+    "path": "/src"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-021",
+   "source": "subprocess",
+   "tool": "Glob",
+   "input": {
+    "pattern": "**/*.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-022",
+   "source": "subprocess",
+   "tool": "WebSearch",
+   "input": {
+    "query": "typescript best practices"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-023",
+   "source": "subprocess",
+   "tool": "Edit",
+   "input": {
+    "file_path": "/tmp/test.ts",
+    "old_string": "foo",
+    "new_string": "bar"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-024",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "sudo apt install vim"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-025",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "git diff"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-026",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "shell",
+    "code": "sudo rm -rf /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: shell code matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-027",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "python",
+    "code": "print('hello')"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-028",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "shell",
+    "code": "pwd"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-756-worktree-7C1bDC",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-029",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+   "input": {
+    "path": ".env",
+    "language": "shell",
+    "code": "cat"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: file path matches Read deny pattern .env",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-030",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+   "input": {
+    "path": "src/app.ts",
+    "language": "javascript",
+    "code": "console.log('ok')"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-031",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+   "input": {
+    "path": "src/app.sh",
+    "language": "shell",
+    "code": "sudo rm -rf /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: shell code matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-032",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+   "input": {
+    "commands": [
+     {
+      "label": "list",
+      "command": "ls -la"
+     },
+     {
+      "label": "evil",
+      "command": "sudo rm -rf /"
+     }
+    ]
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/hook-sec-project-1793276412656",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S2",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: batch command \"evil\" matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-033",
+   "source": "subprocess",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+   "input": {
+    "commands": [
+     {
+      "label": "list",
+      "command": "ls -la"
+     },
+     {
+      "label": "git",
+      "command": "git log --oneline -5"
+     }
+    ]
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-756-batch-worktree-DZX2ed",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-034",
+   "source": "subprocess",
+   "tool": "Agent",
+   "input": {
+    "prompt": "Do something."
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-035",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "file_path": "/some/file.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-036",
+   "source": "subprocess",
+   "tool": "Grep",
+   "input": {
+    "pattern": "TODO"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-037",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-038",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "python3 -c 'import requests; requests.get(url)'"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-039",
+   "source": "subprocess",
+   "tool": "Write",
+   "input": {
+    "file_path": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH/ignored-docs/faq-schema-mapping.md",
+    "content": "# FAQ Page -> Schema.org Mapping"
+   },
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-040",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "echo hello"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-latency-project-Sb9Fig",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-041",
+   "source": "subprocess",
+   "tool": "Shell",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-042",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-043",
+   "source": "subprocess",
+   "tool": "mcp_web_fetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-044",
+   "source": "subprocess",
+   "tool": "mcp_fetch_tool",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-045",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "gemini-cli",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-empty-project-859lMj",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-046",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "vscode-copilot",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-empty-project-yfZIok",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-047",
+   "source": "subprocess",
+   "tool": "Write",
+   "input": {
+    "file_path": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH/test.md",
+    "content": "hello"
+   },
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cursor-hook-test-kABJgH",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-048",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "cursor",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-empty-project-n8migu",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-049",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "codex",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {},
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-050",
+   "source": "subprocess",
+   "tool": "run_in_terminal",
+   "input": {
+    "command": "npm test"
+   },
+   "platform": "vscode-copilot",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/vscode-hook-test-OfwF2d",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-051",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "kiro",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {},
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-052",
+   "source": "subprocess",
+   "tool": "run_in_terminal",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "vscode-copilot",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/vscode-hook-test-OfwF2d",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-053",
+   "source": "subprocess",
+   "tool": "run_in_terminal",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": "vscode-copilot",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/vscode-hook-test-OfwF2d",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-054",
+   "source": "subprocess",
+   "tool": "fs_write",
+   "input": {
+    "path": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kiro-hook-test-4JbNv0/output.ts",
+    "content": "export {}"
+   },
+   "platform": "kiro",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kiro-hook-test-4JbNv0",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-055",
+   "source": "subprocess",
+   "tool": "execute_bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "kiro",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kiro-hook-test-4JbNv0",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-056",
+   "source": "subprocess",
+   "tool": "execute_bash",
+   "input": {
+    "command": "wget https://example.com -O out.html"
+   },
+   "platform": "kiro",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kiro-hook-test-4JbNv0",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-057",
+   "source": "subprocess",
+   "tool": "execute_bash",
+   "input": {
+    "command": "git status"
+   },
+   "platform": "kiro",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kiro-hook-test-4JbNv0",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-058",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "kiro",
+   "projectDir": "/private/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/kiro-hook-test-4JbNv0",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-059",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "CommandLine": "curl https://example.com",
+    "command": "curl https://example.com"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": "/tmp/agy-hook-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-060",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "AbsolutePath": "/repo/src/app.ts",
+    "file_path": "/repo/src/app.ts"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": "/tmp/agy-hook-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-061",
+   "source": "subprocess",
+   "tool": "Grep",
+   "input": {
+    "Pattern": "TODO",
+    "path": "/repo",
+    "pattern": "TODO"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": "/tmp/agy-hook-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-062",
+   "source": "subprocess",
+   "tool": "LS",
+   "input": {
+    "path": "/repo"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": "/tmp/agy-hook-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-063",
+   "source": "subprocess",
+   "tool": "WebSearch",
+   "input": {
+    "query": "context-mode"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": "/tmp/agy-hook-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-064",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "antigravity-cli",
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-065",
+   "source": "subprocess",
+   "tool": "run_in_terminal",
+   "input": {
+    "command": "npm test"
+   },
+   "platform": "jetbrains-copilot",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/jetbrains-hook-test-NEtV9L",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-066",
+   "source": "subprocess",
+   "tool": "",
+   "input": {},
+   "platform": "jetbrains-copilot",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/jetbrains-hook-test-NEtV9L",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-067",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://api.example.com/data.json"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-bash-project-Ya0g6F",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-068",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com/secret"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-bash-project-Ya0g6F",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-069",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-bash-project-Ya0g6F",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-070",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-bash-project-Ya0g6F",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-071",
+   "source": "tests/core/routing.test.ts:25",
+   "tool": "Agent",
+   "input": {
+    "prompt": "hello"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-072",
+   "source": "tests/core/routing.test.ts:25",
+   "tool": "Agent",
+   "input": {
+    "request": "hello"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-073",
+   "source": "tests/core/routing.test.ts:25",
+   "tool": "Agent",
+   "input": {
+    "objective": "hello"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-074",
+   "source": "tests/core/routing.test.ts:25",
+   "tool": "Agent",
+   "input": {
+    "question": "hello"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-075",
+   "source": "tests/core/routing.test.ts:25",
+   "tool": "Agent",
+   "input": {
+    "query": "hello"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-076",
+   "source": "tests/core/routing.test.ts:25",
+   "tool": "Agent",
+   "input": {
+    "task": "hello"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-077",
+   "source": "tests/core/routing.test.ts:34",
+   "tool": "Agent",
+   "input": {
+    "unknown_field": "content"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-078",
+   "source": "tests/core/routing.test.ts:45",
+   "tool": "Agent",
+   "input": {
+    "prompt": "do something",
+    "subagent_type": "Bash"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-079",
+   "source": "tests/core/routing.test.ts:58",
+   "tool": "Agent",
+   "input": {
+    "request": "analyze this",
+    "other_param": 123,
+    "nested": {
+     "a": 1
+    }
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-080",
+   "source": "tests/core/routing.test.ts:67",
+   "tool": "Agent",
+   "input": {
+    "prompt": "test"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-081",
+   "source": "tests/core/routing.test.ts:75",
+   "tool": "Agent",
+   "input": {
+    "prompt": "test"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-082",
+   "source": "tests/core/routing.test.ts:83",
+   "tool": "Agent",
+   "input": {
+    "prompt": "test"
+   },
+   "platform": "codex",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-083",
+   "source": "tests/core/routing.test.ts:91",
+   "tool": "Task",
+   "input": {
+    "prompt": "create a task"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-084",
+   "source": "tests/core/routing.test.ts:98",
+   "tool": "TaskCreate",
+   "input": {
+    "title": "my task"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-085",
+   "source": "tests/core/routing.test.ts:103",
+   "tool": "TaskUpdate",
+   "input": {
+    "id": "123",
+    "status": "done"
+   },
+   "platform": null,
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-086",
+   "source": "tests/core/routing.test.ts:118",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-087",
+   "source": "tests/core/routing.test.ts:118",
+   "tool": "Bash",
+   "input": {
+    "command": "whoami"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-088",
+   "source": "tests/core/routing.test.ts:118",
+   "tool": "Bash",
+   "input": {
+    "command": "hostname"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-089",
+   "source": "tests/core/routing.test.ts:118",
+   "tool": "Bash",
+   "input": {
+    "command": "hostname -f"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-090",
+   "source": "tests/core/routing.test.ts:118",
+   "tool": "Bash",
+   "input": {
+    "command": "date"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-091",
+   "source": "tests/core/routing.test.ts:118",
+   "tool": "Bash",
+   "input": {
+    "command": "date -Iseconds"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-092",
+   "source": "tests/core/routing.test.ts:132",
+   "tool": "Bash",
+   "input": {
+    "command": "echo hello"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-093",
+   "source": "tests/core/routing.test.ts:132",
+   "tool": "Bash",
+   "input": {
+    "command": "printf '%s' x"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-094",
+   "source": "tests/core/routing.test.ts:132",
+   "tool": "Bash",
+   "input": {
+    "command": "which node"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-095",
+   "source": "tests/core/routing.test.ts:132",
+   "tool": "Bash",
+   "input": {
+    "command": "type git"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-096",
+   "source": "tests/core/routing.test.ts:132",
+   "tool": "Bash",
+   "input": {
+    "command": "command -v gh"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-097",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git status"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-098",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git status --short"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-099",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git rev-parse HEAD"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-100",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git remote -v"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-101",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git remote show origin"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-102",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git branch"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-103",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git branch -vv"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-104",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git config --get user.email"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-105",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git diff --stat"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-106",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git diff --name-only"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-107",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git stash list"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-108",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git tag"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-109",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git tag -l 'v1.*'"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-110",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git log -5"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-111",
+   "source": "tests/core/routing.test.ts:156",
+   "tool": "Bash",
+   "input": {
+    "command": "git log -10 --oneline"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-112",
+   "source": "tests/core/routing.test.ts:169",
+   "tool": "Bash",
+   "input": {
+    "command": "node --version"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-113",
+   "source": "tests/core/routing.test.ts:169",
+   "tool": "Bash",
+   "input": {
+    "command": "npm --version"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-114",
+   "source": "tests/core/routing.test.ts:169",
+   "tool": "Bash",
+   "input": {
+    "command": "git --version"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-115",
+   "source": "tests/core/routing.test.ts:169",
+   "tool": "Bash",
+   "input": {
+    "command": "node -V"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-116",
+   "source": "tests/core/routing.test.ts:176",
+   "tool": "Bash",
+   "input": {
+    "command": "ls"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-117",
+   "source": "tests/core/routing.test.ts:178",
+   "tool": "Bash",
+   "input": {
+    "command": "ls -la /etc"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-118",
+   "source": "tests/core/routing.test.ts:181",
+   "tool": "Bash",
+   "input": {
+    "command": "ls -R /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-119",
+   "source": "tests/core/routing.test.ts:184",
+   "tool": "Bash",
+   "input": {
+    "command": "ls --recursive"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-120",
+   "source": "tests/core/routing.test.ts:198",
+   "tool": "Bash",
+   "input": {
+    "command": "find /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-121",
+   "source": "tests/core/routing.test.ts:198",
+   "tool": "Bash",
+   "input": {
+    "command": "cat /var/log/syslog"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-122",
+   "source": "tests/core/routing.test.ts:198",
+   "tool": "Bash",
+   "input": {
+    "command": "grep -r foo /etc"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-123",
+   "source": "tests/core/routing.test.ts:198",
+   "tool": "Bash",
+   "input": {
+    "command": "ps aux"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-124",
+   "source": "tests/core/routing.test.ts:198",
+   "tool": "Bash",
+   "input": {
+    "command": "git log"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-125",
+   "source": "tests/core/routing.test.ts:198",
+   "tool": "Bash",
+   "input": {
+    "command": "git diff"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-126",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd | xargs cat"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-127",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd > /tmp/out"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-128",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd >> /tmp/out"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-129",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "echo $(find /)"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-130",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "echo `find /`"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-131",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "git status && cat huge.log"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-132",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "git status || tail -F /var/log/syslog"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-133",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "whoami; find /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-134",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "date & cat /var/log/syslog"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-135",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "whoami & find /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-136",
+   "source": "tests/core/routing.test.ts:226",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd & tail -F huge.log"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-137",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "cp -v /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-138",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "cp -rv /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-139",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "cp -v -r /etc /tmp"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-140",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "cp --verbose /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-141",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "mv -v /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-142",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "mv --verbose /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-143",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "rm -v /tmp/foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-144",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "rm -rv /tmp/foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-145",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "rm --verbose /tmp/foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-146",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "cp -rvi /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-147",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "cp -vfr /etc /tmp"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-148",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "mv -vfr /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-149",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "rm -rvf /tmp/x"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-150",
+   "source": "tests/core/routing.test.ts:257",
+   "tool": "Bash",
+   "input": {
+    "command": "rm -vfr /tmp/x"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-151",
+   "source": "tests/core/routing.test.ts:273",
+   "tool": "Bash",
+   "input": {
+    "command": "cp /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-152",
+   "source": "tests/core/routing.test.ts:273",
+   "tool": "Bash",
+   "input": {
+    "command": "cp -r /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-153",
+   "source": "tests/core/routing.test.ts:273",
+   "tool": "Bash",
+   "input": {
+    "command": "mv /a /b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-154",
+   "source": "tests/core/routing.test.ts:273",
+   "tool": "Bash",
+   "input": {
+    "command": "rm /tmp/foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-155",
+   "source": "tests/core/routing.test.ts:273",
+   "tool": "Bash",
+   "input": {
+    "command": "rm -rf /tmp/foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-156",
+   "source": "tests/core/routing.test.ts:304",
+   "tool": "Bash",
+   "input": {
+    "command": "uname"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-157",
+   "source": "tests/core/routing.test.ts:304",
+   "tool": "Bash",
+   "input": {
+    "command": "uname -a"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-158",
+   "source": "tests/core/routing.test.ts:304",
+   "tool": "Bash",
+   "input": {
+    "command": "uname -srm"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-159",
+   "source": "tests/core/routing.test.ts:312",
+   "tool": "Bash",
+   "input": {
+    "command": "id"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-160",
+   "source": "tests/core/routing.test.ts:312",
+   "tool": "Bash",
+   "input": {
+    "command": "id mksglu"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-161",
+   "source": "tests/core/routing.test.ts:312",
+   "tool": "Bash",
+   "input": {
+    "command": "id -u"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-162",
+   "source": "tests/core/routing.test.ts:320",
+   "tool": "Bash",
+   "input": {
+    "command": "realpath ./foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-163",
+   "source": "tests/core/routing.test.ts:320",
+   "tool": "Bash",
+   "input": {
+    "command": "realpath /etc/hosts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-164",
+   "source": "tests/core/routing.test.ts:320",
+   "tool": "Bash",
+   "input": {
+    "command": "realpath -s ./bar"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-165",
+   "source": "tests/core/routing.test.ts:342",
+   "tool": "Bash",
+   "input": {
+    "command": "uname -a | tee /tmp/x"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-166",
+   "source": "tests/core/routing.test.ts:342",
+   "tool": "Bash",
+   "input": {
+    "command": "id > /tmp/leak"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-167",
+   "source": "tests/core/routing.test.ts:342",
+   "tool": "Bash",
+   "input": {
+    "command": "realpath /etc/hosts && cat /var/log/syslog"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-168",
+   "source": "tests/core/routing.test.ts:342",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -s a b ; find /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-169",
+   "source": "tests/core/routing.test.ts:342",
+   "tool": "Bash",
+   "input": {
+    "command": "uname -a\nfind /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-170",
+   "source": "tests/core/routing.test.ts:342",
+   "tool": "Bash",
+   "input": {
+    "command": "id $(find /)"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-171",
+   "source": "tests/core/routing.test.ts:353",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -s a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-172",
+   "source": "tests/core/routing.test.ts:353",
+   "tool": "Bash",
+   "input": {
+    "command": "ln a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-173",
+   "source": "tests/core/routing.test.ts:353",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -sf /src /dst"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-174",
+   "source": "tests/core/routing.test.ts:366",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -v a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-175",
+   "source": "tests/core/routing.test.ts:366",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -sv a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-176",
+   "source": "tests/core/routing.test.ts:366",
+   "tool": "Bash",
+   "input": {
+    "command": "ln --verbose a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-177",
+   "source": "tests/core/routing.test.ts:366",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -vs a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-178",
+   "source": "tests/core/routing.test.ts:366",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -vfs a b"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-179",
+   "source": "tests/core/routing.test.ts:366",
+   "tool": "Bash",
+   "input": {
+    "command": "ln -sfvr /src /dst"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-180",
+   "source": "tests/core/routing.test.ts:391",
+   "tool": "Bash",
+   "input": {
+    "command": "git status\nfind /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-181",
+   "source": "tests/core/routing.test.ts:391",
+   "tool": "Bash",
+   "input": {
+    "command": "echo ok\nfind /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-182",
+   "source": "tests/core/routing.test.ts:391",
+   "tool": "Bash",
+   "input": {
+    "command": "echo ok\nrm -rf /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-183",
+   "source": "tests/core/routing.test.ts:391",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd\ncat /var/log/syslog"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-184",
+   "source": "tests/core/routing.test.ts:391",
+   "tool": "Bash",
+   "input": {
+    "command": "whoami\ngrep -r foo /etc"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-185",
+   "source": "tests/core/routing.test.ts:404",
+   "tool": "Bash",
+   "input": {
+    "command": "git status\r\nfind /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-186",
+   "source": "tests/core/routing.test.ts:404",
+   "tool": "Bash",
+   "input": {
+    "command": "echo ok\r\nrm -rf /"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-187",
+   "source": "tests/core/routing.test.ts:404",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd\r\ncat /var/log/syslog"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-188",
+   "source": "tests/core/routing.test.ts:411",
+   "tool": "Bash",
+   "input": {
+    "command": "git status"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-189",
+   "source": "tests/core/routing.test.ts:413",
+   "tool": "Bash",
+   "input": {
+    "command": "pwd"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-190",
+   "source": "tests/core/routing.test.ts:415",
+   "tool": "Bash",
+   "input": {
+    "command": "echo ok"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-191",
+   "source": "tests/core/routing.test.ts:457",
+   "tool": "Bash",
+   "input": {
+    "command": "ps"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-192",
+   "source": "tests/core/routing.test.ts:464",
+   "tool": "Bash",
+   "input": {
+    "command": "ps aux"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-193",
+   "source": "tests/core/routing.test.ts:472",
+   "tool": "Bash",
+   "input": {
+    "command": "find / -type f -name '*.log' -exec cat {} +"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-194",
+   "source": "tests/core/routing.test.ts:483",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://x.io"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-195",
+   "source": "tests/core/routing.test.ts:491",
+   "tool": "Bash",
+   "input": {
+    "command": "ps"
+   },
+   "platform": "claude-code",
+   "projectDir": "/test",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-196",
+   "source": "tests/hooks/core-routing.test.ts:87",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-197",
+   "source": "tests/hooks/core-routing.test.ts:100",
+   "tool": "exec_command",
+   "input": {
+    "cmd": "curl https://example.com"
+   },
+   "platform": "codex",
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-198",
+   "source": "tests/hooks/core-routing.test.ts:115",
+   "tool": "run_command",
+   "input": {
+    "CommandLine": "curl https://example.com"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-199",
+   "source": "tests/hooks/core-routing.test.ts:130",
+   "tool": "Bash",
+   "input": {
+    "command": "wget https://example.com/file.tar.gz"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-200",
+   "source": "tests/hooks/core-routing.test.ts:143",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -sL https://example.com/file.tar.gz -o /tmp/file.tar.gz"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-201",
+   "source": "tests/hooks/core-routing.test.ts:150",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -s --output /tmp/stripe.tar.gz https://github.com/stripe/stripe-cli/releases/download/v1.38.1/stripe.tar.gz"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-202",
+   "source": "tests/hooks/core-routing.test.ts:157",
+   "tool": "Bash",
+   "input": {
+    "command": "wget -q -O /tmp/terraform.zip https://releases.hashicorp.com/terraform/1.0.0/terraform_1.0.0_linux_amd64.zip"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-203",
+   "source": "tests/hooks/core-routing.test.ts:164",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -s https://example.com/data.json > /tmp/data.json"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-204",
+   "source": "tests/hooks/core-routing.test.ts:171",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -s -o - https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-205",
+   "source": "tests/hooks/core-routing.test.ts:179",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -L -o /tmp/file.tar.gz https://example.com/file.tar.gz"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-206",
+   "source": "tests/hooks/core-routing.test.ts:187",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -s --verbose -o /tmp/file.tar.gz https://example.com/file.tar.gz"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-207",
+   "source": "tests/hooks/core-routing.test.ts:195",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -sL -o /tmp/file.tar.gz https://example.com/a.tar.gz && curl https://example.com/api"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-208",
+   "source": "tests/hooks/core-routing.test.ts:203",
+   "tool": "Bash",
+   "input": {
+    "command": "curl -sL -o /tmp/file.tar.gz https://example.com/a.tar.gz && tar xzf /tmp/file.tar.gz -C /tmp"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-209",
+   "source": "tests/hooks/core-routing.test.ts:210",
+   "tool": "Bash",
+   "input": {
+    "command": "node -e \"fetch('https://api.example.com/data')\""
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-210",
+   "source": "tests/hooks/core-routing.test.ts:222",
+   "tool": "Bash",
+   "input": {
+    "command": "python -c \"import requests; requests.get('https://example.com')\""
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-211",
+   "source": "tests/hooks/core-routing.test.ts:236",
+   "tool": "Bash",
+   "input": {
+    "command": "git status"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-212",
+   "source": "tests/hooks/core-routing.test.ts:241",
+   "tool": "Bash",
+   "input": {
+    "command": "mkdir -p /tmp/test-dir"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-213",
+   "source": "tests/hooks/core-routing.test.ts:248",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-214",
+   "source": "tests/hooks/core-routing.test.ts:254",
+   "tool": "Bash",
+   "input": {
+    "command": "./gradlew build"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-215",
+   "source": "tests/hooks/core-routing.test.ts:265",
+   "tool": "Bash",
+   "input": {
+    "command": "gradle test --info"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-216",
+   "source": "tests/hooks/core-routing.test.ts:273",
+   "tool": "Bash",
+   "input": {
+    "command": "mvn clean package -DskipTests"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-217",
+   "source": "tests/hooks/core-routing.test.ts:281",
+   "tool": "Bash",
+   "input": {
+    "command": "./mvnw verify"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-218",
+   "source": "tests/hooks/core-routing.test.ts:293",
+   "tool": "Bash",
+   "input": {
+    "command": "find . -name \"run gradle build to compile\""
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-219",
+   "source": "tests/hooks/core-routing.test.ts:303",
+   "tool": "Bash",
+   "input": {
+    "command": "sbt compile"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-220",
+   "source": "tests/hooks/core-routing.test.ts:314",
+   "tool": "Bash",
+   "input": {
+    "command": "./sbt test"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-221",
+   "source": "tests/hooks/core-routing.test.ts:323",
+   "tool": "Bash",
+   "input": {
+    "command": "ls gradle-wrapper-config"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-222",
+   "source": "tests/hooks/core-routing.test.ts:325",
+   "tool": "Bash",
+   "input": {
+    "command": "echo mvnDocker-image"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-223",
+   "source": "tests/hooks/core-routing.test.ts:335",
+   "tool": "Read",
+   "input": {
+    "file_path": "/some/file.ts"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-224",
+   "source": "tests/hooks/core-routing.test.ts:345",
+   "tool": "view_file",
+   "input": {
+    "AbsolutePath": "/some/file.ts"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-225",
+   "source": "tests/hooks/core-routing.test.ts:362",
+   "tool": "Grep",
+   "input": {
+    "pattern": "TODO",
+    "path": "/some/dir"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-226",
+   "source": "tests/hooks/core-routing.test.ts:376",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://docs.example.com",
+    "prompt": "Get the docs"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://docs.example.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-227",
+   "source": "tests/hooks/core-routing.test.ts:393",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://api.github.com/repos/test"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://api.github.com/repos/test\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-228",
+   "source": "tests/hooks/core-routing.test.ts:400",
+   "tool": "read_url_content",
+   "input": {
+    "URL": "https://example.com/docs"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call context-mode/ctx_fetch_and_index(url: \"https://example.com/docs\", source: \"...\") to fetch + index the page, then context-mode/ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call context-mode/ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-229",
+   "source": "tests/hooks/core-routing.test.ts:417",
+   "tool": "mcp_web_fetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-230",
+   "source": "tests/hooks/core-routing.test.ts:427",
+   "tool": "mcp_fetch_tool",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-231",
+   "source": "tests/hooks/core-routing.test.ts:438",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": false,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-232",
+   "source": "tests/hooks/core-routing.test.ts:444",
+   "tool": "mcp_web_fetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": false,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-233",
+   "source": "tests/hooks/core-routing.test.ts:449",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": null,
+   "options": {
+    "mcpToolsAvailable": false
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-234",
+   "source": "tests/hooks/core-routing.test.ts:461",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-235",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://docs.example.com/long-page",
+    "prompt": "summarize"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-wf-project-g5O8u2",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://docs.example.com/long-page\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-236",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": "/private/tmp/cm-v1-src",
+   "options": {
+    "mcpToolsAvailable": false
+   },
+   "settings": "S1",
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-237",
+   "source": "tests/hooks/core-routing.test.ts:500",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": false,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-238",
+   "source": "tests/hooks/core-routing.test.ts:506",
+   "tool": "Bash",
+   "input": {
+    "command": "node -e \"fetch('https://example.com')\""
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": false,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-239",
+   "source": "tests/hooks/core-routing.test.ts:512",
+   "tool": "Bash",
+   "input": {
+    "command": "./gradlew build"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": false,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-240",
+   "source": "tests/hooks/core-routing.test.ts:525",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": null,
+   "options": {
+    "mcpToolsAvailable": false
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-241",
+   "source": "tests/hooks/core-routing.test.ts:525",
+   "tool": "Bash",
+   "input": {
+    "command": "node -e \"fetch('https://example.com')\""
+   },
+   "platform": "claude-code",
+   "projectDir": null,
+   "options": {
+    "mcpToolsAvailable": false
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-242",
+   "source": "tests/hooks/core-routing.test.ts:525",
+   "tool": "Bash",
+   "input": {
+    "command": "./gradlew build"
+   },
+   "platform": "claude-code",
+   "projectDir": null,
+   "options": {
+    "mcpToolsAvailable": false
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-243",
+   "source": "tests/hooks/core-routing.test.ts:525",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "claude-code",
+   "projectDir": null,
+   "options": {
+    "mcpToolsAvailable": false
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-244",
+   "source": "tests/hooks/core-routing.test.ts:542",
+   "tool": "Agent",
+   "input": {
+    "prompt": "Search the codebase",
+    "subagent_type": "general-purpose"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-245",
+   "source": "tests/hooks/core-routing.test.ts:554",
+   "tool": "Agent",
+   "input": {
+    "prompt": "Research this repository",
+    "subagent_type": "general-purpose"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-246",
+   "source": "tests/hooks/core-routing.test.ts:589",
+   "tool": "Task",
+   "input": {
+    "prompt": "Analyze the codebase",
+    "subagent_type": "general-purpose"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-247",
+   "source": "tests/hooks/core-routing.test.ts:597",
+   "tool": "TaskCreate",
+   "input": {
+    "title": "my task"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-248",
+   "source": "tests/hooks/core-routing.test.ts:604",
+   "tool": "TaskUpdate",
+   "input": {
+    "id": "123",
+    "status": "done"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-249",
+   "source": "tests/hooks/core-routing.test.ts:616",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "javascript",
+    "code": "console.log('hello')"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-250",
+   "source": "tests/hooks/core-routing.test.ts:624",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+   "input": {
+    "path": "/some/file.log",
+    "language": "python",
+    "code": "print(len(FILE_CONTENT))"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-251",
+   "source": "tests/hooks/core-routing.test.ts:636",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+   "input": {
+    "commands": [
+     {
+      "label": "test",
+      "command": "ls -la"
+     }
+    ],
+    "queries": [
+     "file list"
+    ]
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-252",
+   "source": "tests/hooks/core-routing.test.ts:647",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "shell",
+    "code": "pwd"
+   },
+   "platform": "claude-code",
+   "projectDir": "/worktree/repo",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-253",
+   "source": "tests/hooks/core-routing.test.ts:662",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+   "input": {
+    "commands": [
+     {
+      "label": "branch",
+      "command": "git rev-parse --abbrev-ref HEAD"
+     }
+    ]
+   },
+   "platform": "claude-code",
+   "projectDir": "/worktree/repo",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-254",
+   "source": "tests/hooks/core-routing.test.ts:676",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "shell",
+    "code": "pwd",
+    "cwd": "/explicit"
+   },
+   "platform": "claude-code",
+   "projectDir": "/worktree/repo",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-255",
+   "source": "tests/hooks/core-routing.test.ts:715",
+   "tool": "ctx_execute",
+   "input": {
+    "language": "shell",
+    "code": "sudo whoami"
+   },
+   "platform": null,
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-routing-PpQGou",
+   "options": {},
+   "settings": "S3",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: shell code matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-256",
+   "source": "tests/hooks/core-routing.test.ts:715",
+   "tool": "mcp__other__ctx_execute",
+   "input": {
+    "language": "shell",
+    "code": "sudo whoami"
+   },
+   "platform": null,
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-routing-OJaCZB",
+   "options": {},
+   "settings": "S3",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: shell code matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-257",
+   "source": "tests/hooks/core-routing.test.ts:715",
+   "tool": "ctx_execute_file",
+   "input": {
+    "path": "script.sh",
+    "language": "shell",
+    "code": "sudo whoami"
+   },
+   "platform": null,
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-routing-EKRGch",
+   "options": {},
+   "settings": "S3",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: shell code matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-258",
+   "source": "tests/hooks/core-routing.test.ts:715",
+   "tool": "mcp__other__ctx_execute_file",
+   "input": {
+    "path": "script.sh",
+    "language": "shell",
+    "code": "sudo whoami"
+   },
+   "platform": null,
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-routing-i9TtJC",
+   "options": {},
+   "settings": "S3",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: shell code matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-259",
+   "source": "tests/hooks/core-routing.test.ts:715",
+   "tool": "ctx_batch_execute",
+   "input": {
+    "commands": [
+     {
+      "label": "bad",
+      "command": "sudo whoami"
+     }
+    ]
+   },
+   "platform": null,
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-routing-AcCvIN",
+   "options": {},
+   "settings": "S3",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: batch command \"bad\" matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-260",
+   "source": "tests/hooks/core-routing.test.ts:715",
+   "tool": "mcp__other__ctx_batch_execute",
+   "input": {
+    "commands": [
+     {
+      "label": "bad",
+      "command": "sudo whoami"
+     }
+    ]
+   },
+   "platform": null,
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-routing-fxsCBT",
+   "options": {},
+   "settings": "S3",
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: batch command \"bad\" matches deny pattern Bash(sudo *)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-261",
+   "source": "tests/hooks/core-routing.test.ts:763",
+   "tool": "exec_command",
+   "input": {
+    "cmd": "echo blocked"
+   },
+   "platform": "codex",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-codex-exec-project-TZdAyw",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "Blocked by security policy: matches deny pattern Bash(echo blocked)",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-262",
+   "source": "tests/hooks/core-routing.test.ts:818",
+   "tool": "Glob",
+   "input": {
+    "pattern": "**/*.ts"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-263",
+   "source": "tests/hooks/core-routing.test.ts:823",
+   "tool": "Edit",
+   "input": {
+    "file_path": "/some/file.ts",
+    "old_string": "foo",
+    "new_string": "bar"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-264",
+   "source": "tests/hooks/core-routing.test.ts:832",
+   "tool": "Write",
+   "input": {
+    "file_path": "/some/file.ts",
+    "content": "hello"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-265",
+   "source": "tests/hooks/core-routing.test.ts:840",
+   "tool": "WebSearch",
+   "input": {
+    "query": "vitest documentation"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-266",
+   "source": "tests/hooks/core-routing.test.ts:856",
+   "tool": "mcp__slack__list_channels",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-267",
+   "source": "tests/hooks/core-routing.test.ts:870",
+   "tool": "mcp__plugin_telegram__list_messages",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-268",
+   "source": "tests/hooks/core-routing.test.ts:870",
+   "tool": "mcp__claude_ai_Google_Drive__search",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-269",
+   "source": "tests/hooks/core-routing.test.ts:870",
+   "tool": "mcp__notion__query_database",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-270",
+   "source": "tests/hooks/core-routing.test.ts:888",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute",
+   "input": {
+    "language": "javascript",
+    "code": "1+1"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-271",
+   "source": "tests/hooks/core-routing.test.ts:888",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+   "input": {
+    "language": "javascript",
+    "code": "1+1"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-272",
+   "source": "tests/hooks/core-routing.test.ts:888",
+   "tool": "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+   "input": {
+    "language": "javascript",
+    "code": "1+1"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-273",
+   "source": "tests/hooks/core-routing.test.ts:888",
+   "tool": "mcp__context-mode__ctx_execute",
+   "input": {
+    "language": "javascript",
+    "code": "1+1"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-274",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_0",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-275",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_1",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-276",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_2",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-277",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_3",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-278",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_4",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-279",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_5",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-280",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_6",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-281",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_7",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-282",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_8",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-283",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_9",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-284",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_10",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-285",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_11",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-286",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_12",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-287",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_13",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-288",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_14",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-289",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_15",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-290",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_16",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-291",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_17",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-292",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_18",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-293",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_19",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-294",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_20",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-295",
+   "source": "tests/hooks/core-routing.test.ts:903",
+   "tool": "mcp__slack__tool_21",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-296",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_0",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-297",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_1",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-298",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_2",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-299",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_3",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-300",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_4",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-301",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_5",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-302",
+   "source": "tests/hooks/core-routing.test.ts:917",
+   "tool": "mcp__notion__tool_6",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-303",
+   "source": "tests/hooks/core-routing.test.ts:935",
+   "tool": "mcp__slack__a",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-304",
+   "source": "tests/hooks/core-routing.test.ts:936",
+   "tool": "mcp__slack__b",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-305",
+   "source": "tests/hooks/core-routing.test.ts:949",
+   "tool": "mcp__slack__post_message",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-306",
+   "source": "tests/hooks/core-routing.test.ts:951",
+   "tool": "mcp__slack__list_users",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-307",
+   "source": "tests/hooks/core-routing.test.ts:957",
+   "tool": "mcp__slack__list_users",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-308",
+   "source": "tests/hooks/core-routing.test.ts:965",
+   "tool": "Glob",
+   "input": {
+    "pattern": "**/*.ts"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-309",
+   "source": "tests/hooks/core-routing.test.ts:980",
+   "tool": "mcp__notion__search_context-mode_notes",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-310",
+   "source": "tests/hooks/core-routing.test.ts:980",
+   "tool": "mcp__slack__post_to_context-mode_channel",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-311",
+   "source": "tests/hooks/core-routing.test.ts:991",
+   "tool": "",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-312",
+   "source": "tests/hooks/core-routing.test.ts:991",
+   "tool": "mcp__",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-313",
+   "source": "tests/hooks/core-routing.test.ts:991",
+   "tool": null,
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-314",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com/article",
+    "prompt": "summarize"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-wf-project-g5O8u2",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com/article\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-315",
+   "source": "subprocess",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "prompt": "summarize"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-wf-project-g5O8u2",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-316",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "file_path": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-read-project-zijndu/big.txt"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-read-project-zijndu",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-317",
+   "source": "subprocess",
+   "tool": "Bash",
+   "input": {
+    "command": "ls"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-318",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "file_path": "/etc/passwd"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: security module unavailable and CONTEXT_MODE_REQUIRE_SECURITY=1 — fail-closed engaged. Run `npm run build` (or reinstall context-mode) to restore security enforcement. To bypass, unset or set CONTEXT_MODE_REQUIRE_SECURITY=0.",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-319",
+   "source": "subprocess",
+   "tool": "Read",
+   "input": {
+    "file_path": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-read-project-zijndu/small.txt"
+   },
+   "platform": "claude-code",
+   "projectDir": "/var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/ctx-redirect-read-project-zijndu",
+   "options": {
+    "mcpToolsAvailable": true
+   },
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-320",
+   "source": "tests/guidance-throttle.test.ts:25",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-321",
+   "source": "tests/guidance-throttle.test.ts:26",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-322",
+   "source": "tests/guidance-throttle.test.ts:27",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/c.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-323",
+   "source": "tests/guidance-throttle.test.ts:38",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-324",
+   "source": "tests/guidance-throttle.test.ts:39",
+   "tool": "Bash",
+   "input": {
+    "command": "find /"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-325",
+   "source": "tests/guidance-throttle.test.ts:46",
+   "tool": "Grep",
+   "input": {
+    "pattern": "foo"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-326",
+   "source": "tests/guidance-throttle.test.ts:47",
+   "tool": "Grep",
+   "input": {
+    "pattern": "bar"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-327",
+   "source": "tests/guidance-throttle.test.ts:54",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-328",
+   "source": "tests/guidance-throttle.test.ts:58",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-329",
+   "source": "tests/guidance-throttle.test.ts:59",
+   "tool": "Grep",
+   "input": {
+    "pattern": "foo"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-330",
+   "source": "tests/guidance-throttle.test.ts:67",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-331",
+   "source": "tests/guidance-throttle.test.ts:68",
+   "tool": "Bash",
+   "input": {
+    "command": "find /"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-332",
+   "source": "tests/guidance-throttle.test.ts:69",
+   "tool": "Grep",
+   "input": {
+    "pattern": "bar"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-333",
+   "source": "tests/guidance-throttle.test.ts:78",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-334",
+   "source": "tests/guidance-throttle.test.ts:79",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://other.com"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \"https://other.com\", source: \"...\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-335",
+   "source": "tests/guidance-throttle.test.ts:86",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-336",
+   "source": "tests/guidance-throttle.test.ts:89",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-337",
+   "source": "tests/guidance-throttle.test.ts:95",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/c.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-338",
+   "source": "tests/guidance-throttle.test.ts:101",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-339",
+   "source": "tests/guidance-throttle.test.ts:118",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-340",
+   "source": "tests/guidance-throttle.test.ts:125",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-341",
+   "source": "tests/guidance-throttle.test.ts:128",
+   "tool": "Bash",
+   "input": {
+    "command": "find /"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-342",
+   "source": "tests/guidance-throttle.test.ts:174",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-343",
+   "source": "tests/guidance-throttle.test.ts:182",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-344",
+   "source": "tests/guidance-throttle.test.ts:189",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-345",
+   "source": "tests/guidance-throttle.test.ts:196",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-346",
+   "source": "tests/guidance-throttle.test.ts:213",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-347",
+   "source": "tests/guidance-throttle.test.ts:218",
+   "tool": "Grep",
+   "input": {
+    "pattern": "foo"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-348",
+   "source": "tests/guidance-throttle.test.ts:224",
+   "tool": "Grep",
+   "input": {
+    "pattern": "bar"
+   },
+   "platform": "claude-code",
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-349",
+   "source": "tests/guidance-throttle.test.ts:230",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-350",
+   "source": "tests/guidance-throttle.test.ts:233",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/b.ts"
+   },
+   "platform": null,
+   "projectDir": "/tmp/test-project",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-351",
+   "source": "tests/hooks/tool-naming.test.ts:316",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "gemini-cli",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-352",
+   "source": "tests/hooks/tool-naming.test.ts:326",
+   "tool": "Bash",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": null,
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-353",
+   "source": "tests/hooks/tool-naming.test.ts:333",
+   "tool": "Bash",
+   "input": {
+    "command": "python -c \"requests.get('http://example.com')\""
+   },
+   "platform": "cursor",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-354",
+   "source": "tests/hooks/tool-naming.test.ts:348",
+   "tool": "WebFetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "kiro",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call @context-mode/ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then @context-mode/ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call @context-mode/ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-355",
+   "source": "tests/hooks/tool-naming.test.ts:356",
+   "tool": "Task",
+   "input": {
+    "prompt": "Analyze the code"
+   },
+   "platform": "opencode",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-356",
+   "source": "tests/hooks/tool-naming.test.ts:363",
+   "tool": "Read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": "vscode-copilot",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-357",
+   "source": "tests/hooks/tool-naming.test.ts:371",
+   "tool": "Grep",
+   "input": {
+    "pattern": "TODO"
+   },
+   "platform": "zed",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-358",
+   "source": "tests/hooks/tool-naming.test.ts:381",
+   "tool": "Bash",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": "openclaw",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-359",
+   "source": "tests/hooks/tool-naming.test.ts:390",
+   "tool": "exec",
+   "input": {
+    "command": "npm install"
+   },
+   "platform": "openclaw",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-360",
+   "source": "tests/hooks/tool-naming.test.ts:395",
+   "tool": "read",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": "openclaw",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-361",
+   "source": "tests/hooks/tool-naming.test.ts:400",
+   "tool": "search",
+   "input": {
+    "pattern": "TODO"
+   },
+   "platform": "openclaw",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-362",
+   "source": "tests/hooks/tool-naming.test.ts:408",
+   "tool": "view_file",
+   "input": {
+    "AbsolutePath": "/tmp/a.ts"
+   },
+   "platform": "antigravity-cli",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-363",
+   "source": "tests/hooks/tool-naming.test.ts:421",
+   "tool": "Bash",
+   "input": {
+    "command": "./gradlew build"
+   },
+   "platform": "gemini-cli",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-364",
+   "source": "tests/hooks/tool-naming.test.ts:432",
+   "tool": "run_shell_command",
+   "input": {
+    "command": "curl https://example.com"
+   },
+   "platform": "qwen-code",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "modify",
+    "reason": null,
+    "rewritten": true,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-365",
+   "source": "tests/hooks/tool-naming.test.ts:446",
+   "tool": "web_fetch",
+   "input": {
+    "url": "https://example.com"
+   },
+   "platform": "qwen-code",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "deny",
+    "reason": "context-mode: WebFetch redirected. Call mcp__context-mode__ctx_fetch_and_index(url: \"https://example.com\", source: \"...\") to fetch + index the page, then mcp__context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).",
+    "rewritten": false,
+    "hasContext": false
+   }
+  },
+  {
+   "id": "v1-366",
+   "source": "tests/hooks/tool-naming.test.ts:458",
+   "tool": "read_file",
+   "input": {
+    "file_path": "/tmp/a.ts"
+   },
+   "platform": "qwen-code",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-367",
+   "source": "tests/hooks/tool-naming.test.ts:470",
+   "tool": "grep_search",
+   "input": {
+    "pattern": "TODO"
+   },
+   "platform": "qwen-code",
+   "projectDir": "/tmp",
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-368",
+   "source": "tests/adapters/kiro-external-mcp-routing.test.ts:70",
+   "tool": "@slack/post_message",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-369",
+   "source": "tests/adapters/kiro-external-mcp-routing.test.ts:81",
+   "tool": "@context-mode/ctx_execute",
+   "input": {
+    "language": "javascript",
+    "code": "1+1"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  },
+  {
+   "id": "v1-370",
+   "source": "tests/adapters/cursor-external-mcp-routing.test.ts:71",
+   "tool": "MCP:slack_post_message",
+   "input": {},
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "context",
+    "reason": null,
+    "rewritten": false,
+    "hasContext": true
+   }
+  },
+  {
+   "id": "v1-371",
+   "source": "tests/adapters/cursor-external-mcp-routing.test.ts:84",
+   "tool": "MCP:ctx_execute",
+   "input": {
+    "language": "javascript",
+    "code": "1+1"
+   },
+   "platform": null,
+   "projectDir": null,
+   "options": {},
+   "settings": null,
+   "mcpReady": true,
+   "v1": {
+    "action": "passthrough"
+   }
+  }
+ ]
+}
