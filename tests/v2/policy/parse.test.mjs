@@ -204,3 +204,12 @@ test("parseShell never throws on odd input", () => {
     parseShell(s);
   }
 });
+
+test("D-CDX-CAT-1: pipesOut marks a command whose stdout feeds the next pipeline command", () => {
+  const out = (cmd) => cmds(cmd).map((c) => c.pipesOut === true);
+  assert.deepEqual(out("cat a | grep x"), [true, false]);
+  assert.deepEqual(out("cat a | grep x | wc -l"), [true, true, false]);
+  assert.deepEqual(out("cat a; grep x b"), [false, false]);
+  assert.deepEqual(out("cat a && ls | wc"), [false, true, false]);
+  assert.equal("pipesOut" in cmds("cat a")[0], false);
+});

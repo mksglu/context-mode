@@ -372,7 +372,7 @@ function pipeline(p: Ctx): SimpleCommand[] {
     last = element(p);
     all.push(...last.cmds);
     const t = at(p);
-    if (t !== undefined && t.kind === "op" && PIPES.includes(t.text)) { p.i++; continue; }
+    if (t !== undefined && t.kind === "op" && PIPES.includes(t.text)) { for (const c of last.cmds) c.pipesOut = true; p.i++; continue; }
     break;
   }
   if (last.simple !== null && isBoundedSink(last.simple)) for (const c of all) c.endsInBoundedSink = true;

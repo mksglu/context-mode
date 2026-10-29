@@ -217,6 +217,8 @@ function inlineHttp(raw: string): boolean {
 
 // ---------- steps 6, 6a: Read and one-file shell dumps (DECISIONS-r8 VR) ----------
 
+const CD_COMMAND = "cd";
+
 function fileSize(abs: string): number {
   try {
     const st = statSync(abs);
@@ -242,17 +244,22 @@ function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
  *  Read tool where the dump runs and PostToolUse replaces it (D-HA-QWEN-DUMP-1, D-HA-GEMINI-DUMP-1). */
 function shellDump(cmds: SimpleCommand[], cwd: string, row: AdapterRow): Decision | null {
   if (row.nativeTools.read !== undefined && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
-  if (cmds.length !== 1) return null;
-  const c = cmds[0];
-  if (c.redirectsToFile || c.endsInBoundedSink) return null;
-  const name = c.argv0.toLowerCase();
-  if (!has(SHELL_DUMP_COMMANDS, name)) return null;
-  const d = dumpTarget(name, c.args);
-  if (d === null) return null;
-  if (d.bounded) return ALLOW;
-  const abs = resolve(cwd, d.file);
-  const size = fileSize(abs);
-  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix)) : null;
+  // D-CDX-CAT-1: every command whose stdout reaches the tool result is checked, also inside a chain (`cd x && cat f`).
+  let dir = cwd;
+  let verdict: Decision | null = null;
+  for (const c of cmds) {
+    const name = c.argv0.toLowerCase();
+    if (name === CD_COMMAND && c.args.length === 1 && c.insideConstruct === undefined) dir = resolve(dir, c.args[0]);
+    if (c.redirectsToFile || c.endsInBoundedSink || c.pipesOut === true || c.insideConstruct !== undefined) continue;
+    if (!has(SHELL_DUMP_COMMANDS, name)) continue;
+    const d = dumpTarget(name, c.args);
+    if (d === null) continue;
+    if (d.bounded) { verdict = ALLOW; continue; }
+    const abs = resolve(dir, d.file);
+    const size = fileSize(abs);
+    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+  }
+  return verdict;
 }
 
 const allDigits = (s: string): boolean => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");

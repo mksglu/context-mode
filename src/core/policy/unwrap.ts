@@ -23,7 +23,7 @@ const WRAPPERS: Readonly<Record<string, Wrapper>> = Object.freeze({
   command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV" },
   xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE },
 });
-const SHELLS: readonly string[] = ["bash", "sh"];
+const SHELLS: readonly string[] = ["bash", "sh", "zsh"]; // D-CDX-CAT-1: Codex runs the cmd as zsh -lc on macOS
 const SCRIPT_FLAG = "c";
 const SHELL_LABEL_SUFFIX = " -c";
 const SHELL_VALUE_OPTS: readonly string[] = ["-o", "+o", "-O", "+O"];

@@ -161,6 +161,7 @@ export interface SimpleCommand {
   redirectsToFile: boolean;    // > / >> to a real file, curl -o / wget -O to a real file
   endsInBoundedSink: boolean;  // last pipeline segment is head -c N, wc, grep -c, or a whitelisted jq
   raw: string;                 // original substring for this segment
+  pipesOut?: true;             // D-CDX-CAT-1: stdout feeds the next pipeline command (set only when true)
   insideConstruct?: string;    // DECISIONS-r9 P1: "case", or the function's name
   wrappedBy?: string[];        // impl/08 §3.1: unwrapped wrappers, outermost first
 }

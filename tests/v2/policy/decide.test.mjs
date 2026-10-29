@@ -246,3 +246,20 @@ test("B2: drafts.md deny-* blocks equal the code's text (hint-* blocks retired, 
   assert.equal(block("deny-read"), READ_DENY_MESSAGE("{path}", "{size}"));
   assert.ok(OUTPUT_CAP > 0);
 });
+
+// D-CDX-CAT-1: live Codex 0.156.1 (codex exec + fake provider) sends exec_command as tool_name "Bash"; the model
+// wraps the cat in a chain or a zsh -lc. Each unbounded one-file dump that reaches stdout is denied, as for one command.
+test("D-CDX-CAT-1: a chained or zsh-wrapped unbounded dump over OUTPUT_CAP is denied on a no-Read host", () => {
+  const p = big.split(sep).join("/");
+  const want = { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024, CODEX.toolNamePrefix) };
+  for (const cmd of [`cd ${dir.split(sep).join("/")} && cat big.log`, "cat big.log; echo done", "ls && cat big.log", "echo ---; cat big.log",
+    `zsh -lc "cat ${p}"`, `/bin/zsh -lc 'cat big.log'`, "true || cat big.log"]) {
+    assert.deepEqual(bash(cmd, CODEX), want, cmd);
+  }
+});
+test("D-CDX-CAT-1: a dump that feeds a pipe, a file or a bound is not denied; claude-code (Read tool) is unchanged", () => {
+  for (const cmd of ["cat big.log | grep x", "cat big.log | head -n 5", "cat big.log > /dev/null", "cat big.log | wc -l; ls", "ls && head -n 3 big.log", "cat small.txt && ls"]) {
+    assert.notEqual(bash(cmd, CODEX).kind, "deny", cmd);
+  }
+  assert.notEqual(bash("ls && cat big.log", CC).kind, "deny");
+});
