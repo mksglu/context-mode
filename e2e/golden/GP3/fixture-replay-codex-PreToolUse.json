@@ -2,6 +2,6 @@
   "agent": "codex",
   "event": "PreToolUse",
   "exitCode": 0,
-  "stdout": "",
+  "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Run the command with mcp__context_mode__ctx_execute(language, code) or mcp__context_mode__ctx_batch instead; only the part that matches your intent comes back./ncontext-mode: the hook failed (NO_GIT_DIR). Fix: run mcp__context_mode__ctx_doctor.\"}}",
   "stderr": "hooks: no project: NO_GIT_DIR No git repository at <proj>. Fix: run context-mode inside a git repository.\n"
 }
