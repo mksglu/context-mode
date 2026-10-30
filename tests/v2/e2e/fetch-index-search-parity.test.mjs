@@ -17,6 +17,7 @@ import { spawn, execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const REPO = resolve(import.meta.dirname, "../../..");
 const BUILD = join(REPO, "build/build.mjs");
@@ -67,7 +68,7 @@ after(async () => {
 async function mcpRun(host, home, proj, calls) {
   const args = [join(pkg, "server.mjs"), "--agent", host];
   if (host === "vscode") args.push("--workspace-folder", proj);
-  const env = { ...process.env, HOME: home, USERPROFILE: home, NODE_OPTIONS: `--import=${SHIM}` };
+  const env = { ...process.env, HOME: home, USERPROFILE: home, NODE_OPTIONS: `--import=${pathToFileURL(SHIM).href}` };
   delete env.CLAUDE_PROJECT_DIR;
   const child = spawn(process.execPath, args, { cwd: proj, env, stdio: ["pipe", "pipe", "pipe"] });
   let buf = "";
