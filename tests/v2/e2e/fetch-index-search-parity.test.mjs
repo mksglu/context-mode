@@ -200,9 +200,19 @@ test("[parity] once HTML is converted to readable text, no host returns tags, at
   console.log("readable-text conversion in tree: " + converted);
   if (!converted) return;
   for (const host of ALL_HOSTS) {
-    const t = results.get(host).searchText;
+    const full = results.get(host).searchText;
+    // A page about React shows JSX in a fenced code block; that is page content, not leaked markup. The tag check
+    // reads the text outside fences; the attribute, escape and flight-data checks read the whole reply.
+    let prose = "";
+    let fenced = false;
+    for (const line of full.split("\n")) {
+      if (line.trimStart().startsWith("```")) { fenced = !fenced; continue; }
+      if (!fenced) prose += line + "\n";
+    }
     for (const bad of [/<\/?[a-z][a-z0-9]*[\s>]/i, /\sclass="/, /\\u003[ce]/i, /\\"children\\"/, /\$r\\?"/]) {
-      assert.ok(!bad.test(t), `${host}: snippet holds ${bad}:\n${t.slice(0, 500)}`);
+      const t = bad.source.startsWith("<") ? prose : full;
+      const hit = bad.exec(t);
+      assert.ok(hit === null, `${host}: snippet holds ${bad} at ${hit && JSON.stringify(t.slice(Math.max(0, hit.index - 80), hit.index + 120))}`);
     }
   }
 });

@@ -36,6 +36,9 @@ const TITLE_WEIGHT = 1.0;
 // D-SEARCH-4: the porter list, every match in final order (rid only; bodies load for one page).
 // D-HQ-PERF-1: only scope "project" reads rank_a/rank_b (RRF). Scope session/worktree score by -bm, so
 // their statement skips the two window sorts over every match (same rows, same order, about 35% less SQL time).
+// D-HTML-READABLE-1: the raw body of an HTML page is stored as "<label> (raw)"; default search (no `source`) skips it.
+export const RAW_LABEL_SUFFIX = " (raw)";
+const NOT_RAW = `AND (:source IS NOT NULL OR substr(s.label, -${RAW_LABEL_SUFFIX.length}) <> '${RAW_LABEL_SUFFIX}')`;
 const PORTER_MATCH = `
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
          chunks.worktree AS worktree, chunks.ord AS ord, s.created_ts AS created_ts,
@@ -45,7 +48,8 @@ const PORTER_MATCH = `
   WHERE chunks MATCH :match
     AND (:scope <> 'session' OR chunks.session_id = :session_id)
     AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
-    AND (:source IS NULL OR s.label = :source)`;
+    AND (:source IS NULL OR s.label = :source)
+    ${NOT_RAW}`;
 const PORTER_ORDER = `
 ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
 const PORTER_RANK_PROJECT = `
@@ -76,6 +80,7 @@ WHERE chunks_tri MATCH :match
   AND (:scope <> 'session' OR c.session_id = :session_id)
   AND (:scope <> 'worktree' OR c.worktree = :worktree)
   AND (:source IS NULL OR s.label = :source)
+  ${NOT_RAW}
 ORDER BY bm25(chunks_tri, 1.0, ${TITLE_WEIGHT}) ASC, c.source_id DESC, c.ord ASC`;
 
 const PAGE_ROWS = `

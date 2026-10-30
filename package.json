@@ -43,6 +43,7 @@
     "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "^22.19.11",
     "esbuild": "0.24.0",
+    "htmlparser2": "^12.0.0",
     "toml-eslint-parser": "1.0.3",
     "typescript": "^5.7.0",
     "zod": "^3.25.0"
