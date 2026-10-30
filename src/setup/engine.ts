@@ -487,7 +487,7 @@ function mcpCheck(cmd: string[], env: SetupContext["env"]): Promise<Check> {
 }
 
 function hookRound(row: CheckRow, env: SetupContext["env"]): Check {
-  const cmd = row.hookCommand as string[];
+  const cmd = row.hookRunCommand; // absolute node: the written line may use bare node (D-C166-WIN-FIRE-2)
   const input = JSON.stringify(row.goldenPayload);
   const wall: number[] = [];
   const bare: number[] = [];

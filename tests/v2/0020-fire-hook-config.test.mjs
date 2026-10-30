@@ -164,7 +164,7 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       const logFile = join(d, "hook-events.jsonl");
       writeFileSync(join(d, "log.mjs"), `import{appendFileSync}from"node:fs";let b="";process.stdin.on("data",c=>b+=c).on("end",()=>appendFileSync(${JSON.stringify(logFile)},JSON.stringify(JSON.parse(b))+"\\n"));`);
       const logger = { type: "command", command: `"${process.execPath}" "${join(d, "log.mjs")}"`, timeout: 20 };
-      const ours = { type: "command", command: `"${process.execPath}" "${HOOK}" --agent codex`, timeout: 20 };
+      const ours = { type: "command", command: `${process.platform === "win32" ? "node" : `"${process.execPath}"`} "${HOOK}" --agent codex`, timeout: 20 }; // D-C166-WIN-FIRE-2: 0.166 runs hooks in PowerShell on Windows
       const events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"];
       writeFileSync(join(home, "hooks.json"), JSON.stringify({ hooks: Object.fromEntries(events.map((e) => [e, [{ matcher: ".*", hooks: e === "PreToolUse" ? [logger, ours] : [logger] }]])) }));
       const env = { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: home };
