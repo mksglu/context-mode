@@ -4,9 +4,26 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.16 (provenance present, SLSA v1, gitHead 144e3495). `latest` is still 1.0.169. Checked 2026-10-30 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.16: 2026-10-30T03:06:30Z.
+`next` is 2.0.0-next.17 (provenance present, SLSA v1, gitHead d526f1e5). `latest` is still 1.0.169. Checked 2026-10-30 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.17: 2026-10-30T14:02:42Z.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.17 ships
+
+Changes since v2.0.0-next.16: two Codex 0.166 fixes from the Windows tester report (Viet, 0.166.0-alpha.5.1).
+
+- D-NI-CODEX-TRUST-2: Codex 0.166 reports hooks/list currentHash as "<hook hash>/<plugin hash>". Setup now writes only the hook hash as trusted_hash, so the 4 plugin hooks are "trusted" and setup no longer rolls back. 0.156.1 plain hashes are unchanged.
+- D-C166-WIN-FIRE-2: Codex 0.166 runs a hook through the session shell, PowerShell on Windows, which cannot run a leading quoted node path. On Windows only, the codex hook line is now bare node "<hook.mjs>" --agent codex. Other hosts and OSes keep the quoted absolute path. The doctor still runs the absolute node.
+- Not proven: the tester's exact Desktop-bundled 0.166.0-alpha.5.1 build on Windows. Proven on macOS (0.156.1, 0.166.0, alpha.5, alpha.6) and in CI on windows-latest with codex-cli 0.166.0.
+
+## Release numbers (next.17)
+
+- Tag v2.0.0-next.17 on d526f1e5. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.16) plus 1. v2-design was quiet from 15:49 (+03) for more than 45 minutes before the tag.
+- Local on a fresh clone: `node --test "tests/v2/**/*.test.mjs"` 113 s, 2396 tests, 2362 pass, 0 fail, 34 skip; `gate --all` 407 s, exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on d526f1e5 (run 41058292998): all 12 jobs green on the first run.
+- release.yml run 41064404552: all jobs green on the first run, no rerun (ci, plan, build, publish-stage, smoke x3, publish-promote, publish-npm, github-release).
+- Registry version published 2026-10-30T14:02:42Z (gitHead d526f1e5, SLSA v1 provenance, 2 signatures). The full package document lagged the dist-tags endpoint by about 3 minutes. GitHub prerelease v2.0.0-next.17 (not draft) at 13:59:52Z.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.17 (release commit a9b4e89e).
 
 ## What 2.0.0-next.16 ships
 
