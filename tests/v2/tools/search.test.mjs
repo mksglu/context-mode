@@ -371,3 +371,30 @@ test("H9: a source query whose words match nothing lists that source's chunks, f
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// D-SEARCH-REPLY-1: a relevance reply holds SEARCH_REPLY_HITS hits, not SEARCH_PAGE_SIZE; `More:` pages through the rest.
+test("ctxSearch reply holds SEARCH_REPLY_HITS hits and paging reaches every hit exactly once", async () => {
+  const { SEARCH_REPLY_HITS } = await import("../../../src/core/contracts/constants.ts");
+  const root = mkdtempSync(join(tmpdir(), "cm-se-reply-"));
+  try {
+    const ctx = ctxFor(root);
+    const doc = Array.from({ length: 23 }, (_, i) => `## Section ${i}\n\nThe gadget handler number ${i} registers a gadget callback for widget${i}.\n`).join("\n");
+    await ctxIndex.handler({ content: doc, source: "gadgets" }, ctx);
+    const seen = [];
+    let offset = 0;
+    for (let guard = 0; guard < 10; guard++) {
+      const out = await ctxSearch.handler({ queries: ["gadget callback"], source: "gadgets", offset }, ctx);
+      const hits = out.text.split("\n").filter((l) => /^gadgets #\d+: /.test(l));
+      assert.ok(hits.length > 0 && hits.length <= SEARCH_REPLY_HITS, `page ${guard} has ${hits.length} hits`);
+      for (const l of out.text.matchAll(/^gadgets #(\d+): /gm)) seen.push(Number(l[1]));
+      const more = out.text.split("\n").find((l) => l.startsWith("More: "));
+      if (more === undefined) break;
+      offset = Number(/offset:(\d+)/.exec(more)[1]);
+      assert.equal(offset, seen.length, "the cursor starts at the first hit not shown");
+    }
+    assert.equal(new Set(seen).size, seen.length, "no hit twice");
+    assert.equal(seen.length, 23, "paging reaches all 23 matching chunks");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

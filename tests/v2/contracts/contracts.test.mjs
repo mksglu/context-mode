@@ -493,3 +493,8 @@ test("[M5] D-INST-7: the temp-file finding text says it is report only and nothi
   assert.match(C.V1_REASON.tmpFile, /context-mode-\*/);
   assert.match(C.V1_REASON.tmpFile, /report only, no action needed/);
 });
+
+test("SEARCH_REPLY_HITS is 5 and not above SEARCH_PAGE_SIZE (D-SEARCH-REPLY-1)", async () => {
+  assert.equal(C.SEARCH_REPLY_HITS, 5);
+  assert.ok(C.SEARCH_REPLY_HITS <= C.SEARCH_PAGE_SIZE);
+});

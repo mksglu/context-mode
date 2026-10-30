@@ -40,6 +40,7 @@ export function REPLACE_HANDLE_LINE(intent: string, handle: string, bytes: numbe
 export const HANDLE_PROMPT_WORDS = 3; // D-HA-GEMINI-HINT-1: prompt words the handle-line query may add
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
+export const SEARCH_REPLY_HITS = 5; // D-SEARCH-REPLY-1: hits in one ctx_search relevance reply; `More:` pages the rest (SEARCH_PAGE_SIZE stays the decision-list page)
 export const SNIPPET_MAX_BYTES = 800; // DECISIONS-r9 M21: under floor(OUTPUT_CAP / SEARCH_PAGE_SIZE) = 819
 export const SNIPPET_CODE_MAX_BYTES = 2048; // D-SEARCH-7: a whole fenced block up to this; 7 fit one OUTPUT_CAP reply
 export const READ_MAX_LINES = 200; // DECISIONS-r8: hint text only, never enforced (READ_HINT_BYTES retired)

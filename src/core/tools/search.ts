@@ -3,7 +3,7 @@
 // ctx_search: relevance (ContentStore, BM25 / RRF for scope "project", session first) or timeline
 // (ContentStore + SessionDB + auto-memory, oldest first, epoch-ms `after` cursor).
 import { z } from "zod/v4";
-import { DECISION_SOURCE, OUTPUT_CAP, SEARCH_PAGE_SIZE, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
+import { DECISION_SOURCE, OUTPUT_CAP, SEARCH_PAGE_SIZE, SEARCH_REPLY_HITS, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
 import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
@@ -75,17 +75,23 @@ function decisionQueries(input: CtxSearchInput): string[] {
   return input.source === DECISION_SOURCE && input.queries.length === 0 ? [""] : input.queries;
 }
 
+// D-SEARCH-REPLY-1: a relevance reply holds SEARCH_REPLY_HITS hits; the decision list keeps SEARCH_PAGE_SIZE.
+function pageSize(input: CtxSearchInput): number {
+  return input.source === DECISION_SOURCE ? SEARCH_PAGE_SIZE : SEARCH_REPLY_HITS;
+}
+
 function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, offset: number): Hit[] {
+  const size = pageSize(input);
   if (input.source === DECISION_SOURCE && q.trim() === "") {
-    return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
+    return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, size, offset);
   }
-  const hits = ftsQuery(db, q, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset, input.source);
+  const hits = ftsQuery(db, q, scope, ctx.project, ctx.sessionId, size, offset, input.source);
   // H9 (D-HL-H9-1): the replace handle line names a source and uses the command as the query. When no query
   // word is in that source, the source's chunks are listed by position, so the handle line always returns rows.
   if (hits.length > 0 || input.source === undefined) return hits;
   const any = offset === 0 ? hits : ftsQuery(db, q, scope, ctx.project, ctx.sessionId, 1, 0, input.source);
   if (any.length > 0) return hits;
-  return ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
+  return ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, size, offset);
 }
 
 // D-M2-JSON-3: a `source` that holds a JSON array of objects answers with whole rows, BM25-ranked over the row
@@ -137,12 +143,13 @@ function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, 
 function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx: ToolContext): ToolReply {
   const input: CtxSearchInput = { ...given, queries: decisionQueries(given) };
   const offset = input.offset ?? 0;
+  const size = pageSize(input);
   const seen = new Set<string>();
   const entries: Entry[] = [];
   const full = new Set<number>(); // query indexes whose page came back full
   input.queries.forEach((q, qi) => {
     const hits = page(db, q, input, scope, ctx, offset);
-    if (hits.length === SEARCH_PAGE_SIZE) full.add(qi);
+    if (hits.length === size) full.add(qi);
     hits.forEach((hit, i) => {
       // Step 6: a (sourceId, ord) pair already returned by an earlier query of this call is dropped.
       const key = hit.sourceId + ":" + hit.ord;
@@ -158,7 +165,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
     "More: " + callText([q], scope, input.source, "offset:" + pos);
   // Room for one paging line per query at its largest cursor (offset + page size).
   let reserve = 0;
-  for (const q of input.queries) reserve += bytes(moreLine(q, offset + SEARCH_PAGE_SIZE)) + 1;
+  for (const q of input.queries) reserve += bytes(moreLine(q, offset + size)) + 1;
 
   const lines: string[] = [];
   const more: string[] = [];
@@ -183,7 +190,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       lines.push(line);
       used += bytes(line) + 1;
     }
-    if (!stopped && full.has(qi)) more.push(moreLine(q, offset + SEARCH_PAGE_SIZE));
+    if (!stopped && full.has(qi)) more.push(moreLine(q, offset + size));
   });
   return reply(lines.concat(more).join("\n"), false);
 }
