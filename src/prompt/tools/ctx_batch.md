@@ -1,1 +1,2 @@
+Example: `ctx_batch({commands:["git log --oneline -5"],queries:["recent changes"]})`. Required: commands, queries.
 Runs several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.

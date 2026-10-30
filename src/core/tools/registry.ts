@@ -64,3 +64,30 @@ function define(name: ToolName): RegisteredTool<unknown> {
 // §1 steps 3 and 6. Built from TOOL_ORDER itself, so the order is TOOL_ORDER by construction (§1 step 7
 // as a compile-time check).
 export const TOOLS: readonly RegisteredTool<unknown>[] = Object.freeze(TOOL_ORDER.map(define));
+
+// D-CALL-SHAPE-1: the exact example call is the first backtick span of the description (src/prompt/tools/<tool>.md).
+export function callExample(tool: RegisteredTool<unknown>): string {
+  const a = tool.description.indexOf("`");
+  const b = tool.description.indexOf("`", a + 1);
+  return a < 0 || b < 0 ? tool.name + "({})" : tool.description.slice(a + 1, b);
+}
+
+// One isError line for a call with {} or a wrong shape: what was wrong, then the exact correct call. Never a stack.
+export function invalidCallLine(tool: RegisteredTool<unknown>, issues: readonly { path: readonly PropertyKey[]; message: string }[]): string {
+  const parts: string[] = [];
+  for (const issue of issues.slice(0, 3)) {
+    const where = issue.path.length === 0 ? "" : issue.path.map(String).join(".") + ": ";
+    let one = (where + issue.message).split("\n").join(" ").trim();
+    while (one.endsWith(".")) one = one.slice(0, -1);
+    parts.push(one);
+  }
+  const detail = parts.length === 0 ? "Invalid arguments" : parts.join("; ");
+  return tool.name + ": " + detail + ". Correct call: " + callExample(tool);
+}
+
+export type CallCheck = { ok: true; data: unknown } | { ok: false; line: string };
+
+export function checkCall(tool: RegisteredTool<unknown>, input: unknown): CallCheck {
+  const parsed = tool.schema.safeParse(input);
+  return parsed.success ? { ok: true, data: parsed.data } : { ok: false, line: invalidCallLine(tool, parsed.error.issues) };
+}

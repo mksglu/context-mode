@@ -7,7 +7,7 @@ import type { HookOutput, ProjectContext, ToolContext, ToolReply } from "../core
 import { handleHook } from "../core/hooks/dispatch.ts";
 import { ownJournal } from "../core/journal/own-call.ts";
 import { resolveProject } from "../core/project/resolve.ts";
-import { TOOLS, type RegisteredTool } from "../core/tools/registry.ts";
+import { TOOLS, checkCall, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "../prompt/_generated.ts";
 
 const AGENT = "opencode";
@@ -68,8 +68,8 @@ export async function setup(app: OpenCodeApp) {
       description: tool.description,
       args: tool.schema,
       async execute(args, toolCtx) {
-        const parsed = tool.schema.safeParse(args);
-        if (!parsed.success) return parsed.error.message;
+        const checked = checkCall(tool, args);
+        if (!checked.ok) return checked.line;
         const sessionId = toolCtx.sessionID ?? "";
         let resolved: ProjectContext | undefined;
         const ctx: ToolContext = {
@@ -84,7 +84,7 @@ export async function setup(app: OpenCodeApp) {
         };
         let reply: ToolReply;
         try {
-          reply = await tool.handler(parsed.data, ctx);
+          reply = await tool.handler(checked.data, ctx);
         } catch (err) {
           return err instanceof CtxError ? err.toLine() : INTERNAL_ERROR_LINE;
         }

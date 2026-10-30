@@ -1,1 +1,2 @@
+Example: `ctx_execute({language:"shell",code:"git log --oneline -5"})`. Required: language, code.
 Runs code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.

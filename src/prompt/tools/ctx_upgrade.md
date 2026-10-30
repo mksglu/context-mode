@@ -1,1 +1,2 @@
+Example: `ctx_upgrade({})`. Required: none.
 Updates context-mode to the latest release for this agent and rewrites only context-mode's own entries in the host config. User entries and user settings such as hook timeouts are kept, and old entries are erased. Returns a table of what changed and whether a restart is needed. Use it only when the user asks to update context-mode.

@@ -3,7 +3,7 @@
     "content": [
       {
         "type": "text",
-        "text": "Input validation error: Invalid arguments for tool ctx_search: offset: Too small: expected number to be >=0, after: Too small: expected number to be >=0"
+        "text": "ctx_search: offset: Too small: expected number to be >=0; after: Too small: expected number to be >=0. Correct call: ctx_search({queries:[\"auth middleware\"]})"
       }
     ],
     "isError": true

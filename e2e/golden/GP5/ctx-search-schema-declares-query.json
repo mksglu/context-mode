@@ -2,7 +2,7 @@
   "content": [
     {
       "type": "text",
-      "text": "Input validation error: Invalid arguments for tool ctx_search: queries: Invalid input: expected array, received undefined, Unknown field \"query\". Fix: use \"queries\"."
+      "text": "ctx_search: queries: Invalid input: expected array, received undefined; Unknown field \"query\". Fix: use \"queries\". Correct call: ctx_search({queries:[\"auth middleware\"]})"
     }
   ],
   "isError": true

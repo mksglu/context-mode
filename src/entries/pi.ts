@@ -7,12 +7,12 @@
 import { z } from "zod/v4";
 import { checkPermission } from "../adapters/pi.ts";
 import { INTERNAL_ERROR_LINE } from "../core/contracts/constants.ts";
-import { CtxError, formatError } from "../core/contracts/errors.ts";
+import { CtxError } from "../core/contracts/errors.ts";
 import type { HookOutput, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
 import { handleHook } from "../core/hooks/dispatch.ts";
 import { ownJournal } from "../core/journal/own-call.ts";
 import { resolveProject } from "../core/project/resolve.ts";
-import { TOOLS, type RegisteredTool } from "../core/tools/registry.ts";
+import { TOOLS, checkCall, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "./server.ts";
 
 /** The Pi handler context fields this file reads (impl/10 §10). */
@@ -57,11 +57,6 @@ function errorReply(err: unknown): ToolReply {
   return { text: err instanceof CtxError ? err.toLine() : INTERNAL_ERROR_LINE, isError: true, sandboxBytes: 0 };
 }
 
-function invalidArgs(tool: RegisteredTool<unknown>, issue: { path: PropertyKey[]; message: string }): ToolReply {
-  const field = issue.path.length === 0 ? tool.name : issue.path.map(String).join(".");
-  return { text: formatError("INVALID_ARGS", { field, action: issue.message }), isError: true, sandboxBytes: 0 };
-}
-
 // Pi marks a failed tool call by a throw from execute (impl/12 A26); the reply text is the message.
 // The reply's first line is the handler's own plain-text line, never a fence opener (#1094).
 function toPi(reply: ToolReply): PiToolResult {
@@ -99,8 +94,8 @@ export default function piExtension(pi: PiApi): void {
   }
 
   async function runTool(tool: RegisteredTool<unknown>, params: unknown, signal: AbortSignal | undefined): Promise<ToolReply> {
-    const parsed = tool.schema.safeParse(params);
-    if (!parsed.success) return invalidArgs(tool, parsed.error.issues[0]);
+    const checked = checkCall(tool, params);
+    if (!checked.ok) return { text: checked.line, isError: true, sandboxBytes: 0 };
     const ctx: ToolContext = {
       get project(): ProjectContext {
         return projectOf();
@@ -113,7 +108,7 @@ export default function piExtension(pi: PiApi): void {
     };
     let reply: ToolReply;
     try {
-      reply = await tool.handler(parsed.data, ctx);
+      reply = await tool.handler(checked.data, ctx);
     } catch (err) {
       return errorReply(err);
     }

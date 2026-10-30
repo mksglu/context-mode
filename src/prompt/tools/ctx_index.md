@@ -1,1 +1,2 @@
+Example: `ctx_index({path:"docs/api.md"})`. Required: one of path, content, url.
 Stores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.

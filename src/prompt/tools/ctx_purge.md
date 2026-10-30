@@ -1,1 +1,2 @@
+Example: `ctx_purge({source:"old-docs"})`. Required: one of session, source, project.
 Deletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data.

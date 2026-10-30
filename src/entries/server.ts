@@ -21,7 +21,8 @@ import { resolveProject } from "../core/project/resolve.ts";
 import { cleanupProject, sweepDeadProjects } from "../core/store/cleanup.ts";
 import { closeDb, openDb } from "../core/store/db.ts";
 import { removeOwnerPid, writeOwnerPid } from "../core/store/owners.ts";
-import { TOOLS, type RegisteredTool } from "../core/tools/registry.ts";
+import { z } from "zod/v4";
+import { TOOLS, checkCall, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "../prompt/_generated.ts";
 import { isEntry } from "./is-entry.ts";
 
@@ -47,6 +48,20 @@ const NUMERIC = new Intl.Collator("en", { numeric: true });
 function versionAtLeast(have: string, min: string): boolean {
   const [lower] = [have, min].sort(NUMERIC.compare);
   return lower === min;
+}
+
+// D-CALL-SHAPE-1: the host gets the real JSON Schema (required, enums, descriptions kept); the SDK's own
+// validation accepts every input, so a bad call reaches dispatch, which answers with one line that shows the exact call.
+function passThrough(tool: RegisteredTool<unknown>): StandardSchemaWithJSON {
+  const json = (): Record<string, unknown> => z.toJSONSchema(tool.schema, { target: "draft-2020-12", io: "input" }) as Record<string, unknown>;
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "context-mode",
+      validate: (value: unknown) => ({ value }),
+      jsonSchema: { input: json, output: json },
+    },
+  } as unknown as StandardSchemaWithJSON;
 }
 
 // §5 step 2.
@@ -174,11 +189,17 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
         clientInfo: server.server.getClientVersion(),
         protocolVersion: server.server.getNegotiatedProtocolVersion() ?? "",
       };
+      // D-CALL-SHAPE-1: the SDK passes the input through (see passThrough); the check and its one-line error live here.
       let reply: ToolReply;
-      try {
-        reply = await tool.handler(input, ctx);
-      } catch (err) {
-        reply = errorReply(err);
+      const checked = checkCall(tool, input);
+      if (!checked.ok) {
+        reply = { text: checked.line, isError: true, sandboxBytes: 0 };
+      } else {
+        try {
+          reply = await tool.handler(checked.data, ctx);
+        } catch (err) {
+          reply = errorReply(err);
+        }
       }
       // impl/07 uninstall step 1, D-M5-R1-1: a call that left this server's own stop marker (ctx_upgrade
       // mode "uninstall") writes no journal row (the project data is going away) and ends the process
@@ -228,7 +249,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
         {
           description: tool.description,
           // zod 3.25 `zod/v4` has no ~standard.jsonSchema type; the SDK converts it with z.toJSONSchema (DEVIATIONS).
-          inputSchema: tool.schema as unknown as StandardSchemaWithJSON,
+          inputSchema: passThrough(tool),
           ...(tool.readOnly ? { annotations: { readOnlyHint: true } } : {}),
           ...(tool.alwaysLoad ? { _meta: { "anthropic/alwaysLoad": true } } : {}),
         },

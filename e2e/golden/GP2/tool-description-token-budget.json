@@ -2,39 +2,39 @@
   "perTool": [
     {
       "name": "ctx_execute",
-      "len": 484
+      "len": 581
     },
     {
       "name": "ctx_batch",
-      "len": 322
+      "len": 437
     },
     {
       "name": "ctx_index",
-      "len": 358
+      "len": 439
     },
     {
       "name": "ctx_search",
-      "len": 716
+      "len": 789
     },
     {
       "name": "ctx_resume",
-      "len": 423
+      "len": 466
     },
     {
       "name": "ctx_stats",
-      "len": 221
+      "len": 263
     },
     {
       "name": "ctx_doctor",
-      "len": 395
+      "len": 438
     },
     {
       "name": "ctx_upgrade",
-      "len": 333
+      "len": 377
     },
     {
       "name": "ctx_purge",
-      "len": 171
+      "len": 257
     }
   ]
 }
