@@ -87,9 +87,9 @@ var require_src = __commonJS({
 });
 
 // src/entries/cli.ts
-import { spawn as spawn3 } from "node:child_process";
-import { readFileSync as readFileSync6, realpathSync as realpathSync6 } from "node:fs";
-import path8 from "node:path";
+import { spawn as spawn4 } from "node:child_process";
+import { readFileSync as readFileSync11, realpathSync as realpathSync8 } from "node:fs";
+import path14 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/core/contracts/constants.ts
@@ -445,6 +445,7 @@ var V1_BIN_COMMAND = SERVER_KEY;
 var VSCODE_MCP_SERVERS_KEY = "servers";
 var ZCODE_EVENTS_KEY = "events";
 var PI_ROLE = "custom";
+var PI_AGENT_DIR_ENV = "PI_CODING_AGENT_DIR";
 var PI_PACKAGE_SOURCE_KEY = "source";
 var V1_PATH_SEPS = Object.freeze(["/", "\\"]);
 var HOST_SEP_TOKEN = "${/}";
@@ -565,7 +566,7 @@ function readResult(resp) {
   }
   return info;
 }
-function decodeClaudeShape(raw, agent, ownPrefix, sources) {
+function decodeClaudeShape(raw, agent, ownPrefix, sources2) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(agent + ": hook payload is not a JSON object");
   const p3 = raw;
   const event = CLAUDE_SHAPE_EVENTS.find((e) => e === p3.hook_event_name);
@@ -575,7 +576,7 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources) {
     ev.agentId = p3.agent_id;
     if (typeof p3.agent_type === "string") ev.agentType = p3.agent_type;
   }
-  if (event === "SessionStart" && typeof p3.source === "string" && sources[p3.source] !== void 0) ev.source = sources[p3.source];
+  if (event === "SessionStart" && typeof p3.source === "string" && sources2[p3.source] !== void 0) ev.source = sources2[p3.source];
   if (event === "UserPromptSubmit" && typeof p3.prompt === "string") ev.prompt = p3.prompt;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const name = String(p3.tool_name ?? "");
@@ -1594,9 +1595,9 @@ Examples:
 // src/cli/commands.ts
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { existsSync as existsSync7, mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync12, mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import os from "node:os";
-import path7 from "node:path";
+import path13 from "node:path";
 
 // node_modules/@clack/prompts/dist/index.mjs
 var dist_exports = {};
@@ -4529,6 +4530,10 @@ function opencodeDirOf(env, home) {
   if (xdg !== void 0 && xdg !== "") return join2(xdg, AGENT_HOME_DIR.opencode[AGENT_HOME_DIR.opencode.length - 1]);
   return join2(home, ...AGENT_HOME_DIR.opencode);
 }
+function piAgentDirOf(env, home) {
+  const dir = env[PI_AGENT_DIR_ENV];
+  return dir !== void 0 && dir !== "" ? dir : join2(home, ...AGENT_HOME_DIR.pi, PI_AGENT_DIR);
+}
 function vscodeUserDirOf(env, home, platform = process.platform) {
   const set2 = (v) => v !== void 0 && v !== "";
   const p3 = platform === "win32" ? win32 : posix;
@@ -6836,14 +6841,14 @@ function scanToml(text2) {
       continue;
     }
     if (!node.resolvedKey.every((seg) => typeof seg === "string")) continue;
-    const path9 = node.resolvedKey;
-    for (const kv of node.body) addKey(path9, kv);
+    const path15 = node.resolvedKey;
+    for (const kv of node.body) addKey(path15, kv);
     if (node.kind !== "standard") continue;
     const start = lineStartOf(text2, node.range[0]);
     const headEnd = lineEndOf(text2, node.key.range[1]);
     const last2 = node.body[node.body.length - 1];
     tables.push({
-      path: path9,
+      path: path15,
       header: text2.slice(start, text2[headEnd - 1] === "\n" ? headEnd - 1 : headEnd),
       start,
       end: last2 === void 0 ? headEnd : lineEndOf(text2, last2.range[1])
@@ -6854,16 +6859,16 @@ function scanToml(text2) {
 function tomlTableSpans(text2) {
   return scanToml(text2).tables;
 }
-function parseHostConfig(agent, path9, text2, format) {
+function parseHostConfig(agent, path15, text2, format) {
   try {
     return format === "toml" ? scanToml(text2).value : scanJson(text2, format).value;
   } catch {
-    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path9, format });
+    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path15, format });
   }
 }
-function hostConfigValueAt(value, path9) {
+function hostConfigValueAt(value, path15) {
   let cur = value;
-  for (const seg of path9) {
+  for (const seg of path15) {
     if (!isPlainObject(cur)) return void 0;
     cur = cur[seg];
   }
@@ -6896,32 +6901,32 @@ function indentUnit(root, clean) {
 function render(value, unit, base) {
   return JSON.stringify(value, null, unit).split("\n").join("\n" + base);
 }
-function nest(path9, value) {
+function nest(path15, value) {
   let out2 = value;
-  for (let k = path9.length - 1; k >= 0; k -= 1) out2 = { [path9[k]]: out2 };
+  for (let k = path15.length - 1; k >= 0; k -= 1) out2 = { [path15[k]]: out2 };
   return out2;
 }
-function setJsonText(text2, format, path9, value) {
+function setJsonText(text2, format, path15, value) {
   const doc = scanJson(text2, format);
   const unit = indentUnit(doc.root, doc.clean);
-  if (doc.root === null) return render(nest(path9, value), unit, "") + "\n";
+  if (doc.root === null) return render(nest(path15, value), unit, "") + "\n";
   let node = doc.root;
   let depth = 0;
-  while (depth < path9.length && node.kind === "object") {
-    const hit = node.members.find((m3) => m3.key === path9[depth]);
+  while (depth < path15.length && node.kind === "object") {
+    const hit = node.members.find((m3) => m3.key === path15[depth]);
     if (hit === void 0) break;
     node = hit.node;
     depth += 1;
   }
-  if (depth === path9.length) {
+  if (depth === path15.length) {
     return text2.slice(0, node.start) + render(value, unit, lineIndent(doc.clean, node.start)) + text2.slice(node.end);
   }
-  if (node.kind !== "object") throw new SyntaxError("not an object at " + path9.slice(0, depth).join("."));
-  const rest = nest(path9.slice(depth + 1), value);
+  if (node.kind !== "object") throw new SyntaxError("not an object at " + path15.slice(0, depth).join("."));
+  const rest = nest(path15.slice(depth + 1), value);
   const last2 = node.members[node.members.length - 1];
   if (last2 === void 0) {
     const base2 = lineIndent(doc.clean, node.start);
-    const member2 = "\n" + base2 + unit + JSON.stringify(path9[depth]) + ": " + render(rest, unit, base2 + unit) + "\n" + base2;
+    const member2 = "\n" + base2 + unit + JSON.stringify(path15[depth]) + ": " + render(rest, unit, base2 + unit) + "\n" + base2;
     return text2.slice(0, node.start + 1) + member2 + text2.slice(node.end - 1);
   }
   const base = lineIndent(doc.clean, last2.keyStart);
@@ -6929,7 +6934,7 @@ function setJsonText(text2, format, path9, value) {
   while (" 	\r\n".includes(doc.clean[at])) at += 1;
   const trailing = doc.clean[at] === ",";
   const insertAt = trailing ? at + 1 : last2.node.end;
-  const member = (trailing ? "" : ",") + "\n" + base + JSON.stringify(path9[depth]) + ": " + render(rest, unit, base);
+  const member = (trailing ? "" : ",") + "\n" + base + JSON.stringify(path15[depth]) + ": " + render(rest, unit, base);
   return text2.slice(0, insertAt) + member + text2.slice(insertAt);
 }
 function tomlScalar(v) {
@@ -6947,17 +6952,17 @@ function tomlHeaderKey(seg) {
   }
   return seg;
 }
-function tomlBlock(path9, value) {
-  let out2 = "[" + path9.map(tomlHeaderKey).join(".") + "]\n";
+function tomlBlock(path15, value) {
+  let out2 = "[" + path15.map(tomlHeaderKey).join(".") + "]\n";
   const subs = [];
   for (const [k, v] of Object.entries(value)) {
-    if (isPlainObject(v)) subs.push(tomlBlock([...path9, k], v));
+    if (isPlainObject(v)) subs.push(tomlBlock([...path15, k], v));
     else out2 += tomlHeaderKey(k) + " = " + tomlScalar(v) + "\n";
   }
   return [out2, ...subs].join("\n");
 }
-function under(path9, prefix) {
-  return path9.length >= prefix.length && prefix.every((seg, k) => path9[k] === seg);
+function under(path15, prefix) {
+  return path15.length >= prefix.length && prefix.every((seg, k) => path15[k] === seg);
 }
 function keyLineRange(text2, k) {
   const ls = lineStartOf(text2, k.start);
@@ -6974,10 +6979,10 @@ function withValueAt(root, rel, value) {
   else base[rel[0]] = next;
   return base;
 }
-function replaceToml(text2, doc, path9, value) {
-  const block2 = value === void 0 ? "" : tomlBlock(path9, value);
-  const owned = doc.tables.filter((t2) => under(t2.path, path9));
-  const cuts = doc.keys.filter((k) => under(k.full, path9) && !under(k.base, path9)).map((k) => [...keyLineRange(text2, k), ""]);
+function replaceToml(text2, doc, path15, value) {
+  const block2 = value === void 0 ? "" : tomlBlock(path15, value);
+  const owned = doc.tables.filter((t2) => under(t2.path, path15));
+  const cuts = doc.keys.filter((k) => under(k.full, path15) && !under(k.base, path15)).map((k) => [...keyLineRange(text2, k), ""]);
   owned.forEach((t2, n3) => cuts.push([t2.start, t2.end, n3 === 0 ? block2 : ""]));
   cuts.sort((a2, b3) => b3[0] - a2[0]);
   let out2 = text2;
@@ -6987,27 +6992,27 @@ function replaceToml(text2, doc, path9, value) {
   return out2 + sep2 + block2;
 }
 var tableLike = (v) => v === void 0 || isPlainObject(v);
-function setTomlText(text2, path9, value) {
+function setTomlText(text2, path15, value) {
   if (value !== void 0 && !isPlainObject(value)) throw new SyntaxError("TOML edits replace a whole table");
   const doc = scanToml(text2);
-  const cur = hostConfigValueAt(doc.value, path9);
+  const cur = hostConfigValueAt(doc.value, path15);
   if (sameValue(cur, value)) return text2;
-  const inline = doc.keys.find((k) => k.inline && k.full.length < path9.length && under(path9, k.full));
+  const inline = doc.keys.find((k) => k.inline && k.full.length < path15.length && under(path15, k.full));
   if (inline !== void 0) {
-    const whole = withValueAt(hostConfigValueAt(doc.value, inline.full), path9.slice(inline.full.length), value);
+    const whole = withValueAt(hostConfigValueAt(doc.value, inline.full), path15.slice(inline.full.length), value);
     return replaceToml(text2, doc, inline.full, whole);
   }
   if (isPlainObject(cur) && isPlainObject(value)) {
     const names = [.../* @__PURE__ */ new Set([...Object.keys(cur), ...Object.keys(value)])].filter((k) => !sameValue(cur[k], value[k]));
     if (names.every((k) => tableLike(cur[k]) && tableLike(value[k]))) {
       let out2 = text2;
-      for (const k of names) out2 = setTomlText(out2, [...path9, k], value[k]);
+      for (const k of names) out2 = setTomlText(out2, [...path15, k], value[k]);
       return out2;
     }
   }
-  return replaceToml(text2, doc, path9, value);
+  return replaceToml(text2, doc, path15, value);
 }
-function setText(agent, path9, text2, format, key, value) {
+function setText(agent, path15, text2, format, key, value) {
   try {
     if (format !== "toml") return setJsonText(text2, format, key, value);
     const out2 = setTomlText(text2, key, value);
@@ -7016,7 +7021,7 @@ function setText(agent, path9, text2, format, key, value) {
     if (!sameValue(landed, value) && !(emptyTable && landed === void 0)) throw new SyntaxError("edit did not land");
     return out2;
   } catch {
-    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path9, format });
+    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path15, format });
   }
 }
 function isNodeCommand(command) {
@@ -7032,20 +7037,20 @@ function ownMcpValue(agent, node, server) {
   const tail = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [];
   return { ...mcp.fields, [MCP_COMMAND_FIELD]: node, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent, ...tail] };
 }
-function applyEdits(agent, path9, text2, format, wanted) {
-  const parsed = parseHostConfig(agent, path9, text2, format);
+function applyEdits(agent, path15, text2, format, wanted) {
+  const parsed = parseHostConfig(agent, path15, text2, format);
   let out2 = text2;
   const edits = [];
   for (const [key, after] of wanted) {
     const before = hostConfigValueAt(parsed, key);
     if (sameValue(before, after)) continue;
-    out2 = setText(agent, path9, out2, format, key, after);
+    out2 = setText(agent, path15, out2, format, key, after);
     edits.push({ path: key.join("."), before, after });
   }
   return { text: out2, format, edits };
 }
-function editHostConfigText(agent, path9, text2, format, wanted) {
-  return applyEdits(agent, path9, text2, format, wanted);
+function editHostConfigText(agent, path15, text2, format, wanted) {
+  return applyEdits(agent, path15, text2, format, wanted);
 }
 
 // src/core/ops/doctor-config.ts
@@ -7057,7 +7062,7 @@ import { tmpdir } from "node:os";
 import { join as join4 } from "node:path";
 var isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var keyPath = (...parts) => parts.join(".");
-var finding = (file, path9, reason) => ({ file, path: path9, reason });
+var finding = (file, path15, reason) => ({ file, path: path15, reason });
 function stripJsonc(text2) {
   let out2 = "";
   let inStr = false;
@@ -7556,7 +7561,7 @@ function cliFor(ctx, id) {
 function copyFor(ctx, id) {
   if (id !== "claude-code") return void 0;
   const file = path3.join(claudeDirOf(ctx.env, ctx.home), HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE);
-  return { host: "Claude Code", bin: "claude", plugin: PLUGIN_ID, file, refresh: ["plugin", "update", PLUGIN_ID] };
+  return { host: "Claude Code", bin: "claude", plugin: PLUGIN_ID, file, refresh: ["plugin", "update", PLUGIN_ID], enable: ["plugin", "enable", PLUGIN_ID] };
 }
 var LIST = {
   "claude-code": { bin: "claude", args: ["plugin", "list"] },
@@ -7629,7 +7634,9 @@ function buildRegistry(ctx) {
     const command = `"${hookCommand[0]}" "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
     const hookInstall = hookInstallFor(ctx, getAdapter(id), command);
     const skillInstall = skillInstallFor(ctx, row);
+    const copilotSettings = id === "copilot-cli" ? agentPath(ctx, id, [COPILOT_DIR, "settings.json"]) : void 0;
     const writes = [
+      ...copilotSettings ? [copilotSettings] : [],
       ...config ? [config.file] : [],
       ...hookFiles.map((h2) => h2.file),
       ...hookInstall.kind === "package" ? [] : [hookInstall.file],
@@ -7650,6 +7657,7 @@ function buildRegistry(ctx) {
       allowedWrites: [...new Set(writes.map((f2) => path3.resolve(f2)))],
       goldenPayload: golden(row, ctx.home)
     };
+    if (copilotSettings) out2.copilotSettings = copilotSettings;
     if (row.installMode !== "in-process") out2.hookCommand = hookCommand;
     const copy = copyFor(ctx, id);
     if (copy) out2.copy = copy;
@@ -7665,16 +7673,349 @@ function assertWritable(row, file) {
   }
 }
 
+// src/setup/gemini-gate.ts
+import { existsSync as existsSync5, readFileSync as readFileSync4 } from "node:fs";
+import path4 from "node:path";
+var GEMINI_DIR = ".gemini";
+var SETTINGS_FILE2 = "settings.json";
+var SYSTEM_PATH_ENV = "GEMINI_CLI_SYSTEM_SETTINGS_PATH";
+var OWN_AGENT = "gemini";
+function systemSettingsPath(env) {
+  const set2 = env[SYSTEM_PATH_ENV];
+  if (set2) return set2;
+  if (process.platform === "darwin") return "/Library/Application Support/GeminiCli/settings.json";
+  if (process.platform === "win32") return "C:\\ProgramData\\gemini-cli\\settings.json";
+  return "/etc/gemini-cli/settings.json";
+}
+function load(file) {
+  if (!existsSync5(file)) return void 0;
+  try {
+    return { file, doc: parseHostConfig(OWN_AGENT, file, hostText(readFileSync4(file, "utf8")), "jsonc") };
+  } catch {
+    return void 0;
+  }
+}
+function sources(env, home, cwd) {
+  return [path4.join(home, GEMINI_DIR, SETTINGS_FILE2), path4.join(cwd, GEMINI_DIR, SETTINGS_FILE2), systemSettingsPath(env)].map(load).filter((s) => s !== void 0);
+}
+function ownHookEntry(entry2) {
+  return typeof entry2 === "string" && entry2.includes(HOOK_BUNDLE) && entry2.includes(`${AGENT_FLAG} ${OWN_AGENT}`);
+}
+function geminiSettingsGate(env, home, cwd) {
+  const srcs = sources(env, home, cwd);
+  for (const s of srcs) {
+    if (hostConfigValueAt(s.doc, ["admin", "extensions", "enabled"]) === false) {
+      return `${s.file}: admin.extensions.enabled is false, so gemini loads no extension and runs no context-mode hook; an administrator must change it`;
+    }
+  }
+  let winner;
+  for (const s of srcs) if (typeof hostConfigValueAt(s.doc, ["hooksConfig", "enabled"]) === "boolean") winner = s;
+  if (winner && hostConfigValueAt(winner.doc, ["hooksConfig", "enabled"]) === false) {
+    return `${winner.file}: hooksConfig.enabled is false, so gemini runs no hook; set it to true`;
+  }
+  for (const s of srcs) {
+    const off = hostConfigValueAt(s.doc, ["hooksConfig", "disabled"]);
+    const own2 = Array.isArray(off) ? off.find(ownHookEntry) : void 0;
+    if (own2 !== void 0) return `${s.file}: hooksConfig.disabled lists the context-mode hook (${own2}), so gemini skips it; remove that entry`;
+  }
+  return void 0;
+}
+
+// src/setup/zcode-gate.ts
+import { existsSync as existsSync6, readFileSync as readFileSync5 } from "node:fs";
+import path5 from "node:path";
+var OWN_AGENT2 = "zcode";
+var EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"];
+var HOOK_TYPES = ["process", "command"];
+var isObj2 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var isPositive = (v) => typeof v === "number" && Number.isFinite(v) && v > 0;
+var isText = (v) => typeof v === "string" && v.length > 0;
+var isTexts = (v) => Array.isArray(v) && v.every((x2) => typeof x2 === "string");
+function field(o2, at, name, ok, why) {
+  const v = o2[name];
+  return v === void 0 || ok(v) ? void 0 : { key: `${at}.${name}`, why };
+}
+function section(doc, name) {
+  const v = doc[name];
+  if (v === void 0) return {};
+  return isObj2(v) ? { o: v } : { bad: { key: name, why: "must be an object" } };
+}
+var oneOf = (allowed) => (v) => allowed.includes(v);
+var isBool = (v) => typeof v === "boolean";
+function firstBad(...checks) {
+  return checks.find((c3) => c3 !== void 0);
+}
+function simple(doc, name, rules) {
+  const s = section(doc, name);
+  if (s.bad) return s.bad;
+  if (!s.o) return void 0;
+  return firstBad(...rules.map(([k, ok, why]) => field(s.o, name, k, ok, why)));
+}
+function hookBad(h2, at) {
+  if (!isObj2(h2)) return { key: at, why: "must be an object" };
+  if (!HOOK_TYPES.includes(h2.type)) return { key: `${at}.type`, why: "must be process or command" };
+  return firstBad(
+    isText(h2.command) ? void 0 : { key: `${at}.command`, why: "must be a non-empty string" },
+    field(h2, at, "enabled", isBool, "must be a boolean"),
+    field(h2, at, "timeoutMs", isPositive, "must be a positive number"),
+    field(h2, at, "timeout", isPositive, "must be a positive number"),
+    field(h2, at, "async", isBool, "must be a boolean"),
+    field(h2, at, "args", isTexts, "must be an array of strings"),
+    field(h2, at, "statusMessage", isText, "must be a non-empty string")
+  );
+}
+var GROUP_KEYS = ["matcher", "hooks"];
+function groupBad(g2, at) {
+  if (!isObj2(g2)) return { key: at, why: "must be an object" };
+  const extra = Object.keys(g2).find((k) => !GROUP_KEYS.includes(k));
+  if (extra !== void 0) return { key: at, why: `has the unknown key ${extra}` };
+  if (!Array.isArray(g2.hooks) || g2.hooks.length === 0) return { key: at, why: "needs a non-empty hooks array" };
+  const m3 = field(g2, at, "matcher", isText, "must be a non-empty string");
+  if (m3) return m3;
+  for (let i2 = 0; i2 < g2.hooks.length; i2++) {
+    const b3 = hookBad(g2.hooks[i2], `${at}.hooks[${i2}]`);
+    if (b3) return b3;
+  }
+  return void 0;
+}
+var HOOK_ROOT_KEYS = ["enabled", "timeoutMs", "maxOutputBytes", "events"];
+function hooksBad(doc) {
+  const s = section(doc, "hooks");
+  if (s.bad) return s.bad;
+  const h2 = s.o;
+  if (!h2) return void 0;
+  const extra = Object.keys(h2).find((k) => !HOOK_ROOT_KEYS.includes(k));
+  if (extra !== void 0) return { key: `hooks.${extra}`, why: "is not a hooks key" };
+  const root = firstBad(field(h2, "hooks", "enabled", isBool, "must be a boolean"), field(h2, "hooks", "timeoutMs", isPositive, "must be a positive number"), field(h2, "hooks", "maxOutputBytes", isPositive, "must be a positive number"));
+  if (root || h2.events === void 0) return root;
+  if (!isObj2(h2.events)) return { key: "hooks.events", why: "must be an object" };
+  for (const [ev, groups] of Object.entries(h2.events)) {
+    if (!EVENTS.includes(ev)) return { key: `hooks.events.${ev}`, why: "is not a zcode hook event" };
+    if (!Array.isArray(groups)) return { key: `hooks.events.${ev}`, why: "must be an array of matcher groups" };
+    for (let i2 = 0; i2 < groups.length; i2++) {
+      const b3 = groupBad(groups[i2], `hooks.events.${ev}[${i2}]`);
+      if (b3) return b3;
+    }
+  }
+  return void 0;
+}
+function zcodeSchemaBad(doc) {
+  if (!isObj2(doc)) return { key: "(root)", why: "must be a JSON object" };
+  return firstBad(
+    simple(doc, "modelStream", [["idleTimeoutMs", isPositive, "must be a positive number"]]),
+    simple(doc, "permission", [["mode", oneOf(["plan", "build", "edit", "yolo", "guarded", "auto"]), "must be plan, build, edit, yolo, guarded or auto"], ["allowedTools", isTexts, "must be an array of strings"], ["disallowedTools", isTexts, "must be an array of strings"], ["autoApproveHighRisk", isBool, "must be a boolean"], ["allowMediumRiskInAuto", isBool, "must be a boolean"]]),
+    simple(doc, "features", ["compact", "rewind", "subagent", "memory", "skill", "mcp"].map((k) => [k, isBool, "must be a boolean"])),
+    simple(doc, "memory", [["use", isBool, "must be a boolean"]]),
+    simple(doc, "logging", [["level", oneOf(["debug", "info", "warn", "error"]), "must be debug, info, warn or error"], ["format", oneOf(["text", "json"]), "must be text or json"]]),
+    simple(doc, "ui", [["locale", oneOf(["auto", "en-US", "zh-CN"]), "must be auto, en-US or zh-CN"], ["theme", oneOf(["auto", "dark", "light"]), "must be auto, dark or light"]]),
+    simple(doc, "toolConcurrency", [["maxConcurrency", isPositive, "must be a positive number"]]),
+    hooksBad(doc)
+  );
+}
+function zcodeConfigGate(home) {
+  const file = path5.join(home, ".zcode", "cli", "config.json");
+  if (!existsSync6(file)) return void 0;
+  let doc;
+  try {
+    doc = parseHostConfig(OWN_AGENT2, file, hostText(readFileSync5(file, "utf8")), "json");
+  } catch {
+    return void 0;
+  }
+  const bad = zcodeSchemaBad(doc);
+  if (!bad) return void 0;
+  return `${file}: ${bad.key} ${bad.why}, so zcode drops the whole config.json and runs no context-mode hook; fix or remove that key`;
+}
+
+// src/setup/pi-gate.ts
+import { existsSync as existsSync7, readFileSync as readFileSync6, realpathSync as realpathSync3 } from "node:fs";
+import path6 from "node:path";
+var OWN_FILE = "pi/index.js";
+var EXTENSIONS_KEY = "extensions";
+var PROJECT_DIR = ".pi";
+var TRUST_FILE = "trust.json";
+var ALWAYS = "always";
+var SOURCE_PREFIXES = ["npm:", "git:"];
+function load2(file) {
+  if (!existsSync7(file)) return void 0;
+  try {
+    return { file, doc: parseHostConfig("pi", file, hostText(readFileSync6(file, "utf8")), "json") };
+  } catch {
+    return void 0;
+  }
+}
+var real = (p3) => {
+  try {
+    return realpathSync3(p3);
+  } catch {
+    return path6.resolve(p3);
+  }
+};
+function sourceName(source) {
+  let s = source;
+  for (const p3 of SOURCE_PREFIXES) if (s.startsWith(p3)) s = s.slice(p3.length);
+  const last2 = s.split("/").pop() ?? "";
+  const at = last2.indexOf("@", 1);
+  const name = at > 0 ? last2.slice(0, at) : last2;
+  return name.endsWith(".git") ? name.slice(0, -4) : name;
+}
+function isOwn(source, pkgDir) {
+  if (typeof source !== "string") return false;
+  return real(source) === real(pkgDir) || sourceName(source) === SERVER_KEY;
+}
+function ownEntries(src, pkgDir) {
+  const list2 = hostConfigValueAt(src.doc, [PI_PACKAGES_KEY]);
+  if (!Array.isArray(list2)) return [];
+  const out2 = [];
+  for (const e of list2) {
+    const obj = typeof e === "object" && e !== null && !Array.isArray(e) ? e : void 0;
+    if (!isOwn(obj ? obj[PI_PACKAGE_SOURCE_KEY] : e, pkgDir)) continue;
+    const ext = obj?.[EXTENSIONS_KEY];
+    out2.push({ source: src, patterns: Array.isArray(ext) ? ext.filter((x2) => typeof x2 === "string") : void 0 });
+  }
+  return out2;
+}
+function matchesAny(patterns, pkgDir) {
+  const abs = path6.join(pkgDir, OWN_FILE).split(path6.sep).join("/");
+  return patterns.some((p3) => {
+    const g2 = p3.startsWith("./") ? p3.slice(2) : p3;
+    return [OWN_FILE, path6.posix.basename(OWN_FILE), abs].some((c3) => path6.posix.matchesGlob(c3, g2));
+  });
+}
+var exactAny = (patterns, pkgDir) => {
+  const abs = path6.join(pkgDir, OWN_FILE).split(path6.sep).join("/");
+  return patterns.some((p3) => {
+    const g2 = p3.startsWith("./") ? p3.slice(2) : p3;
+    return g2 === OWN_FILE || g2 === abs;
+  });
+};
+function loads(patterns, pkgDir) {
+  if (patterns.length === 0) return false;
+  const by = (c3) => patterns.filter((p3) => p3.startsWith(c3)).map((p3) => p3.slice(1));
+  const includes = patterns.filter((p3) => !"+-!".includes(p3[0] ?? ""));
+  let on = includes.length === 0 || matchesAny(includes, pkgDir);
+  if (matchesAny(by("!"), pkgDir)) on = false;
+  if (exactAny(by("+"), pkgDir)) on = true;
+  if (exactAny(by("-"), pkgDir)) on = false;
+  return on;
+}
+function projectTrusted(agentDir, userDoc, cwd) {
+  const trust = load2(path6.join(agentDir, TRUST_FILE));
+  const entries = /* @__PURE__ */ new Map();
+  if (trust && typeof trust.doc === "object" && trust.doc !== null) for (const [k, v] of Object.entries(trust.doc)) entries.set(real(k), v);
+  let dir = real(cwd);
+  for (; ; ) {
+    const v = entries.get(dir);
+    if (v === true || v === false) return v;
+    const up = path6.dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return hostConfigValueAt(userDoc, ["defaultProjectTrust"]) === ALWAYS;
+}
+function piSettingsGate(env, home, pkgDir, cwd) {
+  const agentDir = piAgentDirOf(env, home);
+  const user = load2(path6.join(agentDir, SETTINGS_FILE));
+  const project = load2(path6.join(cwd, PROJECT_DIR, SETTINGS_FILE));
+  const projectOwn = project && projectTrusted(agentDir, user?.doc, cwd) ? ownEntries(project, pkgDir) : [];
+  const effective = projectOwn.length ? projectOwn : user ? ownEntries(user, pkgDir) : [];
+  for (const e of effective) {
+    if (e.patterns !== void 0 && !loads(e.patterns, pkgDir)) {
+      return `${e.source.file}: the packages[] entry for context-mode has extensions ${JSON.stringify(e.patterns)}, which leaves out ${OWN_FILE}, so pi loads no hook; remove the "extensions" filter from that entry`;
+    }
+  }
+  return void 0;
+}
+
+// src/setup/vscode-gate.ts
+import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
+import path7 from "node:path";
+var SETTINGS_FILE3 = "settings.json";
+var WORKSPACE_DIR = ".vscode";
+var USE_HOOKS_KEY = "chat.useHooks";
+var LOCATIONS_KEY = "chat.hookFilesLocations";
+var OWN_LOCATION = "~/.copilot/hooks";
+var MANAGED_KEYS = ["allowManagedHooksOnly", "strictPluginOnlyCustomization"];
+function load3(file) {
+  if (!existsSync8(file)) return void 0;
+  try {
+    return { file, doc: parseHostConfig("vscode", file, hostText(readFileSync7(file, "utf8")), "jsonc") };
+  } catch {
+    return void 0;
+  }
+}
+function managedSettingsPath(env) {
+  if (process.platform === "darwin") return "/Library/Application Support/GitHubCopilot/managed-settings.json";
+  if (process.platform === "win32") return path7.join(env.ProgramFiles || "C:\\Program Files", "GitHubCopilot", "managed-settings.json");
+  return "/etc/github-copilot/managed-settings.json";
+}
+function vscodeSettingsGate(env, home, cwd, managedFile = managedSettingsPath(env)) {
+  const managed = load3(managedFile);
+  if (managed) {
+    for (const key of MANAGED_KEYS) {
+      if (hostConfigValueAt(managed.doc, [key]) === true) {
+        return `${managed.file}: ${key} is true, so VS Code runs no user hook file; an administrator must change it`;
+      }
+    }
+  }
+  const srcs = [path7.join(vscodeUserDirOf(env, home), SETTINGS_FILE3), path7.join(cwd, WORKSPACE_DIR, SETTINGS_FILE3)].map(load3).filter((s) => s !== void 0);
+  let hooks;
+  let locations;
+  for (const s of srcs) {
+    if (typeof hostConfigValueAt(s.doc, [USE_HOOKS_KEY]) === "boolean") hooks = s;
+    const v = hostConfigValueAt(s.doc, [LOCATIONS_KEY]);
+    if (typeof v === "object" && v !== null && !Array.isArray(v)) locations = s;
+  }
+  if (hooks && hostConfigValueAt(hooks.doc, [USE_HOOKS_KEY]) === false) {
+    return `${hooks.file}: ${USE_HOOKS_KEY} is false, so VS Code runs no hook; set it to true`;
+  }
+  if (locations) {
+    const v = hostConfigValueAt(locations.doc, [LOCATIONS_KEY]);
+    if (v[OWN_LOCATION] !== true) {
+      return `${locations.file}: ${LOCATIONS_KEY} leaves out "${OWN_LOCATION}", so VS Code does not read the context-mode hook file; add "${OWN_LOCATION}": true`;
+    }
+  }
+  return void 0;
+}
+
+// src/setup/qwen-gate.ts
+import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
+import path8 from "node:path";
+var KEY = "disableAllHooks";
+var SETTINGS = "settings.json";
+var SYSTEM_ENV = "QWEN_CODE_SYSTEM_SETTINGS_PATH";
+var HOME_ENV = "QWEN_HOME";
+var DARWIN_SYSTEM = "/Library/Application Support/QwenCode/settings.json";
+var WIN_SYSTEM = "C:\\ProgramData\\qwen-code\\settings.json";
+var LINUX_SYSTEM = "/etc/qwen-code/settings.json";
+function settingsFiles(env, home, cwd, platform) {
+  const sys = env[SYSTEM_ENV] || (platform === "darwin" ? DARWIN_SYSTEM : platform === "win32" ? WIN_SYSTEM : LINUX_SYSTEM);
+  const userDir = env[HOME_ENV] || path8.join(home, ".qwen");
+  return [sys, path8.join(userDir, SETTINGS), path8.join(cwd, ".qwen", SETTINGS)];
+}
+function qwenHooksOff(env, home, cwd = process.cwd(), platform = process.platform) {
+  for (const file of settingsFiles(env, home, cwd, platform)) {
+    if (!existsSync9(file)) continue;
+    let value;
+    try {
+      value = hostConfigValueAt(parseHostConfig("qwen", file, hostText(readFileSync8(file, "utf8")), "jsonc"), [KEY]);
+    } catch {
+      continue;
+    }
+    if (value === true) return `qwen runs no hook: "${KEY}" is true in ${file}; set it to false`;
+  }
+  return void 0;
+}
+
 // src/setup/codex-trust.ts
 import { createHash } from "node:crypto";
-import { existsSync as existsSync5, realpathSync as realpathSync3 } from "node:fs";
-import path5 from "node:path";
+import { existsSync as existsSync10, realpathSync as realpathSync4 } from "node:fs";
+import path10 from "node:path";
 import { spawn } from "node:child_process";
 
 // src/setup/spawn-bin.ts
 import { spawnSync } from "node:child_process";
 import { accessSync, constants as fsc, statSync } from "node:fs";
-import path4 from "node:path";
+import path9 from "node:path";
 
 // src/core/sandbox/path-entries.ts
 function pathEntries(value, platform = process.platform, delimiter = platform === "win32" ? ";" : ":") {
@@ -7693,10 +8034,10 @@ function whichBin(bin, env, platform = process.platform) {
   const get = (k) => envGet(env, k);
   const win = platform === "win32";
   const exts = win ? (get("PATHEXT") || WIN_EXT).split(";").filter(Boolean) : [""];
-  const names = win && path4.extname(bin) ? [bin] : exts.map((e) => bin + e.toLowerCase());
+  const names = win && path9.extname(bin) ? [bin] : exts.map((e) => bin + e.toLowerCase());
   for (const dir of pathEntries(get("PATH") ?? "", platform)) {
     for (const n3 of names) {
-      const f2 = path4.join(dir, n3);
+      const f2 = path9.join(dir, n3);
       try {
         accessSync(f2, fsc.X_OK);
         if (statSync(f2).isFile()) return f2;
@@ -7737,7 +8078,7 @@ function winCmdLine(file, args, env = {}) {
   return `"${[file, ...args].map(q).join(" ")}"`;
 }
 function spawnForm(file, args, env, platform = process.platform) {
-  if (platform === "win32" && WIN_SHIM_EXTS.includes(path4.extname(file).toLowerCase())) {
+  if (platform === "win32" && WIN_SHIM_EXTS.includes(path9.extname(file).toLowerCase())) {
     return { command: envGet(env, "COMSPEC") || DEFAULT_COMSPEC, args: ["/d", "/v:off", "/s", "/c", winCmdLine(file, args, env)], windowsVerbatimArguments: true };
   }
   return { command: file, args, windowsVerbatimArguments: false };
@@ -7754,14 +8095,14 @@ function spawnShim(file, args, env, opts, platform = process.platform) {
 }
 
 // src/setup/codex-trust.ts
-var isObj2 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var isObj3 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var TRUST_KEY = ["hooks", "state"];
 var CODEX_TRUST_PATH = TRUST_KEY.join(".") + ".";
 var HASH_FIELD = "trusted_hash";
 var HASH_PREFIX = "sha256:";
 function sortKeys(v) {
   if (Array.isArray(v)) return v.map(sortKeys);
-  if (!isObj2(v)) return v;
+  if (!isObj3(v)) return v;
   return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])]));
 }
 function snake(name) {
@@ -7773,13 +8114,13 @@ function snake(name) {
   return out2;
 }
 function realFile(file) {
-  let dir = path5.resolve(file);
+  let dir = path10.resolve(file);
   const rest = [];
-  while (!existsSync5(dir) && path5.dirname(dir) !== dir) {
-    rest.unshift(path5.basename(dir));
-    dir = path5.dirname(dir);
+  while (!existsSync10(dir) && path10.dirname(dir) !== dir) {
+    rest.unshift(path10.basename(dir));
+    dir = path10.dirname(dir);
   }
-  return path5.join(realpathSync3(dir), ...rest);
+  return path10.join(realpathSync4(dir), ...rest);
 }
 var ASK_TIMEOUT_MS = 1e4;
 var ASK_TRIES = 3;
@@ -7792,7 +8133,7 @@ function codexHomeFromReply(out2) {
     } catch {
       continue;
     }
-    if (isObj2(m3) && isObj2(m3.result) && typeof m3.result.codexHome === "string" && m3.result.codexHome !== "") return m3.result.codexHome;
+    if (isObj3(m3) && isObj3(m3.result) && typeof m3.result.codexHome === "string" && m3.result.codexHome !== "") return m3.result.codexHome;
   }
   return void 0;
 }
@@ -7808,10 +8149,10 @@ function askCodexHome(env) {
   return void 0;
 }
 function sameDir(a2, b3, platform) {
-  if (platform !== "win32") return path5.posix.normalize(a2) === path5.posix.normalize(b3);
+  if (platform !== "win32") return path10.posix.normalize(a2) === path10.posix.normalize(b3);
   const norm = (p3) => {
     const bare = p3.startsWith(WIN_VERBATIM_PREFIX) ? p3.slice(WIN_VERBATIM_PREFIX.length) : p3;
-    const n3 = path5.win32.normalize(bare).toLowerCase();
+    const n3 = path10.win32.normalize(bare).toLowerCase();
     return n3.length > 3 && n3.endsWith("\\") ? n3.slice(0, -1) : n3;
   };
   return norm(a2) === norm(b3);
@@ -7821,20 +8162,20 @@ function codexKeyDir(o2, platform = process.platform) {
 }
 function codexTrustEntries(hooksFile, doc, command, env) {
   const out2 = [];
-  if (!isObj2(doc) || !isObj2(doc.hooks)) return out2;
-  const abs = path5.resolve(hooksFile);
-  const dir = codexKeyDir({ dir: path5.dirname(abs), asked: env ? askCodexHome(env) : void 0, real: env && !env.CODEX_HOME ? (p3) => path5.resolve(p3) : realFile });
-  const real = (dir.startsWith(WIN_VERBATIM_PREFIX) ? path5.win32 : path5).join(dir, path5.basename(abs));
+  if (!isObj3(doc) || !isObj3(doc.hooks)) return out2;
+  const abs = path10.resolve(hooksFile);
+  const dir = codexKeyDir({ dir: path10.dirname(abs), asked: env ? askCodexHome(env) : void 0, real: env && !env.CODEX_HOME ? (p3) => path10.resolve(p3) : realFile });
+  const real2 = (dir.startsWith(WIN_VERBATIM_PREFIX) ? path10.win32 : path10).join(dir, path10.basename(abs));
   for (const [event, groups] of Object.entries(doc.hooks)) {
     if (!Array.isArray(groups)) continue;
     groups.forEach((g2, gi) => {
-      if (!isObj2(g2) || !Array.isArray(g2.hooks)) return;
+      if (!isObj3(g2) || !Array.isArray(g2.hooks)) return;
       g2.hooks.forEach((h2, hi) => {
-        if (!isObj2(h2) || h2.command !== command) return;
+        if (!isObj3(h2) || h2.command !== command) return;
         const id = { event_name: snake(event), hooks: [{ ...h2, async: false }] };
         if (g2.matcher !== void 0) id.matcher = g2.matcher;
         const hash = HASH_PREFIX + createHash("sha256").update(JSON.stringify(sortKeys(id))).digest("hex");
-        out2.push([[...TRUST_KEY, `${real}:${snake(event)}:${gi}:${hi}`], { [HASH_FIELD]: hash }]);
+        out2.push([[...TRUST_KEY, `${real2}:${snake(event)}:${gi}:${hi}`], { [HASH_FIELD]: hash }]);
       });
     });
   }
@@ -7845,11 +8186,11 @@ var PLUGIN_SOURCE = "plugin";
 var TRUSTED = "trusted";
 function pluginHooksFromReply(m3, pluginId) {
   const out2 = [];
-  if (!isObj2(m3) || !isObj2(m3.result) || !Array.isArray(m3.result.data)) return out2;
+  if (!isObj3(m3) || !isObj3(m3.result) || !Array.isArray(m3.result.data)) return out2;
   for (const d of m3.result.data) {
-    if (!isObj2(d) || !Array.isArray(d.hooks)) continue;
+    if (!isObj3(d) || !Array.isArray(d.hooks)) continue;
     for (const h2 of d.hooks) {
-      if (!isObj2(h2) || h2.source !== PLUGIN_SOURCE || h2.pluginId !== pluginId) continue;
+      if (!isObj3(h2) || h2.source !== PLUGIN_SOURCE || h2.pluginId !== pluginId) continue;
       if (typeof h2.key !== "string" || typeof h2.currentHash !== "string") continue;
       if (out2.some((x2) => x2.key === h2.key)) continue;
       out2.push({ key: h2.key, hash: h2.currentHash, trusted: h2.trustStatus === TRUSTED });
@@ -7902,7 +8243,7 @@ function listPluginHooks(env, pluginId, cwd) {
         } catch {
           continue;
         }
-        if (!isObj2(m3)) continue;
+        if (!isObj3(m3)) continue;
         if (m3.id === 1) {
           send({ method: "initialized" });
           send({ id: 2, method: "hooks/list", params: { cwds: [cwd] } });
@@ -7916,11 +8257,106 @@ function pluginTrustEntries(hooks) {
   return hooks.filter((h2) => !h2.trusted).map((h2) => [[...TRUST_KEY, h2.key], { [HASH_FIELD]: h2.hash }]);
 }
 
+// src/setup/copilot-hooks.ts
+import { spawn as spawn2 } from "node:child_process";
+import { realpathSync as realpathSync5 } from "node:fs";
+import path11 from "node:path";
+var isObj4 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var ASK_TIMEOUT_MS2 = 15e3;
+var HEADER_END = "\r\n\r\n";
+var LENGTH_HEADER = "content-length";
+var USER_ORIGIN = "user";
+function canon(p3) {
+  let r2 = path11.resolve(p3);
+  try {
+    r2 = realpathSync5(r2);
+  } catch {
+  }
+  return process.platform === "win32" ? r2.toLowerCase() : r2;
+}
+function copilotHooksFromReply(m3, file) {
+  const out2 = [];
+  if (!isObj4(m3) || !isObj4(m3.result) || !Array.isArray(m3.result.hooks)) return out2;
+  const want = canon(file);
+  const base = path11.dirname(path11.dirname(path11.resolve(file)));
+  for (const h2 of m3.result.hooks) {
+    if (!isObj4(h2) || h2.origin !== USER_ORIGIN || typeof h2.source !== "string" || typeof h2.hookType !== "string" || typeof h2.enabled !== "boolean") continue;
+    if (canon(path11.isAbsolute(h2.source) ? h2.source : path11.join(base, h2.source)) !== want) continue;
+    out2.push({ event: h2.hookType, source: h2.source, enabled: h2.enabled, ...typeof h2.disableKey === "string" ? { disableKey: h2.disableKey } : {} });
+  }
+  return out2;
+}
+function frame(buf) {
+  const end = buf.indexOf(HEADER_END);
+  if (end < 0) return void 0;
+  let len = -1;
+  for (const line of buf.subarray(0, end).toString("latin1").split("\r\n")) {
+    const at = line.indexOf(":");
+    if (at > 0 && line.slice(0, at).trim().toLowerCase() === LENGTH_HEADER) len = Number(line.slice(at + 1).trim());
+  }
+  if (!Number.isInteger(len) || len < 0) return void 0;
+  const start = end + HEADER_END.length;
+  if (buf.length < start + len) return void 0;
+  return { body: buf.subarray(start, start + len).toString("utf8"), rest: buf.subarray(start + len) };
+}
+function listCopilotHooks(env, file, cwd) {
+  const bin = whichBin("copilot", env);
+  if (!bin) return Promise.resolve(void 0);
+  return new Promise((resolve) => {
+    let f2;
+    try {
+      f2 = spawnForm(bin, ["--server", "--stdio", "--no-auto-update"], env);
+    } catch {
+      resolve(void 0);
+      return;
+    }
+    const child = spawn2(f2.command, f2.args, { env, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f2.windowsVerbatimArguments, windowsHide: true });
+    let buf = Buffer.alloc(0);
+    let done = false;
+    const finish2 = (v) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.stdin.destroy();
+      child.kill();
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish2(void 0), ASK_TIMEOUT_MS2);
+    child.on("error", () => finish2(void 0));
+    child.on("close", () => finish2(void 0));
+    child.stdin.on("error", () => finish2(void 0));
+    child.stdout.on("data", (d) => {
+      buf = Buffer.concat([buf, d]);
+      const m3 = frame(buf);
+      if (!m3) return;
+      buf = Buffer.from(m3.rest);
+      let reply;
+      try {
+        reply = JSON.parse(m3.body);
+      } catch {
+        finish2(void 0);
+        return;
+      }
+      if (!isObj4(reply) || !isObj4(reply.result) || !Array.isArray(reply.result.hooks)) {
+        finish2(void 0);
+        return;
+      }
+      finish2(copilotHooksFromReply(reply, file));
+    });
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "hooks.discover", params: {} });
+    try {
+      child.stdin.write(`Content-Length: ${Buffer.byteLength(body)}${HEADER_END}${body}`);
+    } catch {
+      finish2(void 0);
+    }
+  });
+}
+
 // src/setup/engine.ts
-import { spawn as spawn2, spawnSync as spawnSync2 } from "node:child_process";
-import { closeSync, existsSync as existsSync6, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync4, readSync, readdirSync as readdirSync4, realpathSync as realpathSync4, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
+import { closeSync, existsSync as existsSync11, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync9, readSync, readdirSync as readdirSync4, realpathSync as realpathSync6, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import path6 from "node:path";
+import path12 from "node:path";
 
 // src/setup/hook-sample.ts
 var SAMPLE_FILE = "big.log";
@@ -8013,29 +8449,29 @@ function isNativeBinary(file) {
   return BINARY_MAGICS.some((m3) => hex.startsWith(m3));
 }
 function owningPackage(dir) {
-  for (let d = dir; ; d = path6.dirname(d)) {
-    const f2 = path6.join(d, "package.json");
-    if (existsSync6(f2)) {
+  for (let d = dir; ; d = path12.dirname(d)) {
+    const f2 = path12.join(d, "package.json");
+    if (existsSync11(f2)) {
       try {
-        return String(JSON.parse(hostText(readFileSync4(f2, "utf8"))).name);
+        return String(JSON.parse(hostText(readFileSync9(f2, "utf8"))).name);
       } catch {
         return void 0;
       }
     }
-    if (path6.dirname(d) === d) return void 0;
+    if (path12.dirname(d) === d) return void 0;
   }
 }
 function hostBin(bin, env, platform = process.platform) {
-  const real = REAL_HOST[bin];
-  if (!real) return { file: which(bin, env, platform), shims: [] };
+  const real2 = REAL_HOST[bin];
+  if (!real2) return { file: which(bin, env, platform), shims: [] };
   const get = (k) => env[Object.keys(env).find((x2) => x2.toUpperCase() === k) ?? k];
   const shims = [];
   for (const dir of pathEntries(get("PATH") ?? "", platform)) {
     const own2 = which(bin, { PATH: dir, ...get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {} }, platform);
-    for (const f2 of [own2, ...real.extra.map((p3) => path6.join(dir, ...p3))]) {
-      if (!f2 || !existsSync6(f2) || !statSync2(f2).isFile()) continue;
-      const file = realpathSync4(f2);
-      if (isNativeBinary(file) || owningPackage(path6.dirname(file)) === real.pkg) return { file, shims };
+    for (const f2 of [own2, ...real2.extra.map((p3) => path12.join(dir, ...p3))]) {
+      if (!f2 || !existsSync11(f2) || !statSync2(f2).isFile()) continue;
+      const file = realpathSync6(f2);
+      if (isNativeBinary(file) || owningPackage(path12.dirname(file)) === real2.pkg) return { file, shims };
       shims.push(f2);
     }
   }
@@ -8050,10 +8486,10 @@ function runBin(bin, args, env, input) {
   return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS });
 }
 function readOr(file) {
-  return existsSync6(file) ? hostText(readFileSync4(file, "utf8")) : void 0;
+  return existsSync11(file) ? hostText(readFileSync9(file, "utf8")) : void 0;
 }
 function readRaw(file) {
-  return existsSync6(file) ? readFileSync4(file, "utf8") : void 0;
+  return existsSync11(file) ? readFileSync9(file, "utf8") : void 0;
 }
 var atomicWrite = atomicWriteFile;
 function pidAlive(pid) {
@@ -8071,7 +8507,7 @@ function p95(xs) {
 function parseFail(_row, file) {
   return `${file} does not parse; left as is. Fix the file, then re-run setup`;
 }
-var isObj3 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var isObj5 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 function planHookFile(row, hf) {
   const before = readOr(hf.file);
   if (before === void 0) return void 0;
@@ -8081,14 +8517,14 @@ function planHookFile(row, hf) {
   } catch {
     throw new Error(parseFail(row, hf.file));
   }
-  if (!isObj3(doc) || !isObj3(doc.hooks)) return void 0;
+  if (!isObj5(doc) || !isObj5(doc.hooks)) return void 0;
   const changes = [];
   const want = hookCommandString(row);
   for (const [event, groups] of Object.entries(doc.hooks)) {
     if (!Array.isArray(groups)) continue;
     for (let g2 = groups.length - 1; g2 >= 0; g2--) {
       const group2 = groups[g2];
-      if (isObj3(group2) && typeof group2.command === "string" && !Array.isArray(group2.hooks)) {
+      if (isObj5(group2) && typeof group2.command === "string" && !Array.isArray(group2.hooks)) {
         if (!group2.command.includes(V1_HOOK_MARK)) continue;
         const at = `hooks.${event}[${g2}].command`;
         if (hf.mode === "rewrite") {
@@ -8100,10 +8536,10 @@ function planHookFile(row, hf) {
         }
         continue;
       }
-      const list2 = isObj3(group2) ? group2.hooks : void 0;
+      const list2 = isObj5(group2) ? group2.hooks : void 0;
       if (!Array.isArray(list2)) continue;
       for (let h2 = list2.length - 1; h2 >= 0; h2--) {
-        const cmd = isObj3(list2[h2]) ? list2[h2].command : void 0;
+        const cmd = isObj5(list2[h2]) ? list2[h2].command : void 0;
         if (typeof cmd !== "string" || !cmd.includes(V1_HOOK_MARK)) continue;
         const at = `hooks.${event}[${g2}].hooks[${h2}].command`;
         if (hf.mode === "rewrite") {
@@ -8128,11 +8564,11 @@ function isOwnHookCommand(cmd, agent) {
   if (tail.startsWith('"')) tail = tail.slice(1);
   return tail.trim() === `${AGENT_FLAG} ${agent}`;
 }
-var holdsOwn = (v, agent) => typeof v === "string" ? isOwnHookCommand(v, agent) : Array.isArray(v) ? v.some((x2) => holdsOwn(x2, agent)) : isObj3(v) ? Object.values(v).some((x2) => holdsOwn(x2, agent)) : false;
+var holdsOwn = (v, agent) => typeof v === "string" ? isOwnHookCommand(v, agent) : Array.isArray(v) ? v.some((x2) => holdsOwn(x2, agent)) : isObj5(v) ? Object.values(v).some((x2) => holdsOwn(x2, agent)) : false;
 var same = (a2, b3) => JSON.stringify(a2) === JSON.stringify(b3);
 function mergeOwn(cur, want, agent) {
-  if (isObj3(want)) {
-    const base = isObj3(cur) ? { ...cur } : {};
+  if (isObj5(want)) {
+    const base = isObj5(cur) ? { ...cur } : {};
     for (const [k, v] of Object.entries(want)) base[k] = mergeOwn(base[k], v, agent);
     return base;
   }
@@ -8155,7 +8591,7 @@ function planJsonKeys(row, edits, file, format, want) {
       throw new Error(parseFail(row, file));
     }
   }
-  if (!isObj3(doc)) throw new Error(parseFail(row, file));
+  if (!isObj5(doc)) throw new Error(parseFail(row, file));
   let res;
   try {
     res = editHostConfigText(row.id, file, text2 ?? "", format, want(doc));
@@ -8191,6 +8627,50 @@ function planCodexTrust(row, edits, hooksFile, file, command, env) {
     prior.changes.push(...changes);
   } else edits.push({ file, before: text2, after: res.text, changes });
 }
+var NATIVE_PLUGIN_PREFIX = "context-mode@";
+function isNativeSpec(e) {
+  return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX);
+}
+function isStaleOwnPlugin(e, entry2) {
+  if (typeof e !== "string" || e === entry2 || !path12.isAbsolute(e) || existsSync11(e)) return false;
+  const seg = e.split("\\").join("/").split("/");
+  const n3 = seg.length;
+  return n3 >= 3 && seg[n3 - 1] === "plugin.js" && seg[n3 - 2] === "opencode" && seg[n3 - 3] === "context-mode";
+}
+function wantedPluginList(list2, entry2) {
+  const native = list2.some(isNativeSpec);
+  const kept = list2.filter((e) => !(native && e === entry2) && !isStaleOwnPlugin(e, entry2));
+  return native || kept.includes(entry2) ? kept : [...kept, entry2];
+}
+function pluginListIssue(h2) {
+  const text2 = readOr(h2.file);
+  if (text2 === void 0) return void 0;
+  let doc;
+  try {
+    doc = parseHostConfig("opencode", h2.file, text2, fileFormat({ id: "opencode" }, h2.file));
+  } catch {
+    return void 0;
+  }
+  const cur = isObj5(doc) ? doc[h2.key[0]] : void 0;
+  const list2 = Array.isArray(cur) ? cur : [];
+  if (list2.some(isNativeSpec) && list2.includes(h2.entry)) return `${h2.file}: context-mode loads twice (native entry and ${h2.entry}), every hook fires twice; run: context-mode setup`;
+  const stale = list2.find((e) => isStaleOwnPlugin(e, h2.entry));
+  if (stale !== void 0) return `${h2.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
+  return void 0;
+}
+function kiroDisabledIssue(h2) {
+  const text2 = readOr(h2.file);
+  if (text2 === void 0) return void 0;
+  let doc;
+  try {
+    doc = parseHostConfig("kiro", h2.file, text2, "json");
+  } catch {
+    return void 0;
+  }
+  const hooks = isObj5(doc) && Array.isArray(doc.hooks) ? doc.hooks : [];
+  const off = hooks.filter((e) => isObj5(e) && e.enabled === false && isObj5(e.action) && isOwnHookCommand(e.action.command, "kiro")).map((e) => String(e.name));
+  return off.length ? `${h2.file}: kiro skips the disabled context-mode hook${off.length > 1 ? "s" : ""} (${off.join(", ")}); set "enabled" to true or run: context-mode setup` : void 0;
+}
 function planHookInstall(row, edits, env) {
   const h2 = row.hookInstall;
   if (h2.kind === "file") {
@@ -8200,7 +8680,8 @@ function planHookInstall(row, edits, env) {
     planJsonKeys(row, edits, h2.file, fileFormat(row, h2.file), (doc) => {
       const cur = doc[h2.key[0]];
       const list2 = Array.isArray(cur) ? cur : [];
-      return [[h2.key, list2.includes(h2.entry) ? list2 : [...list2, h2.entry]]];
+      const want = wantedPluginList(list2, h2.entry);
+      return [[h2.key, want.length === list2.length && want.every((e, i2) => e === list2[i2]) ? list2 : want]];
     });
   }
 }
@@ -8208,13 +8689,13 @@ function planSkills(row, edits) {
   const s = row.skillInstall;
   if (s.kind !== "dir") return;
   for (const f2 of s.files) {
-    if (!existsSync6(f2.src)) throw new Error(`preflight: ${f2.src} is missing`);
-    const after = renderSkill(readFileSync4(f2.src, "utf8"), s.prefixes);
+    if (!existsSync11(f2.src)) throw new Error(`preflight: ${f2.src} is missing`);
+    const after = renderSkill(readFileSync9(f2.src, "utf8"), s.prefixes);
     const before = readRaw(f2.file);
     if (before !== after) edits.push({ plain: true, file: f2.file, before, after, changes: [{ file: f2.file, path: f2.name, before: before === void 0 ? null : "old", after: "SKILL.md" }] });
   }
 }
-function planRow(row, listed, stale, env) {
+function planRow(row, listed, stale, env, disabled = false) {
   const edits = [];
   if (row.config) {
     const c3 = row.config;
@@ -8236,18 +8717,73 @@ function planRow(row, listed, stale, env) {
   planSkills(row, edits);
   const cli = row.config || !row.cli || listed ? [] : row.cli.install;
   const refresh = listed && stale && row.copy ? [row.copy.refresh] : [];
+  if (listed && disabled && row.copy) refresh.push(row.copy.enable);
   return { edits, cli, refresh };
 }
 function listCheck(row, env) {
+  return listState(row, env).check;
+}
+var STATUS_KEY = "Status:";
+var DISABLED_WORD = "disabled";
+function statusOf(row, text2) {
+  const c3 = row.copy;
+  if (!c3) return void 0;
+  let mine = false;
+  for (const raw of text2.split("\n")) {
+    const t2 = raw.trim();
+    if (raw.length && !raw.startsWith("  ")) {
+      mine = false;
+      continue;
+    }
+    if (t2.split(" ").includes(c3.plugin)) {
+      mine = true;
+      continue;
+    }
+    if (mine && t2.startsWith(STATUS_KEY)) return t2.split(" ").includes(DISABLED_WORD) ? "disabled" : "enabled";
+  }
+  return void 0;
+}
+function listState(row, env) {
   const l2 = row.listCommand;
-  if (!l2 || !hostBin(l2.bin, env).file) return void 0;
+  if (!l2 || !hostBin(l2.bin, env).file) return { status: void 0 };
   const r2 = runBin(l2.bin, l2.args, env);
   const ok = r2.status === 0 && `${r2.stdout}${r2.stderr}`.includes("context-mode");
-  return { name: "list", ok, detail: ok ? void 0 : `${l2.bin} ${l2.args.join(" ")} does not list context-mode` };
+  const check = { name: "list", ok, detail: ok ? void 0 : `${l2.bin} ${l2.args.join(" ")} does not list context-mode` };
+  return { check, status: r2.status === 0 ? statusOf(row, `${r2.stdout}`) : void 0 };
+}
+var DISABLE_ALL_HOOKS = "disableAllHooks";
+var SETTINGS_FILES = ["settings.json", "settings.local.json"];
+function disabledBySettings(row) {
+  const c3 = row.copy;
+  if (!c3) return void 0;
+  const dirs = [path12.dirname(path12.dirname(c3.file)), path12.join(process.cwd(), ".claude")];
+  for (const dir of dirs) {
+    for (const name of SETTINGS_FILES) {
+      const file = path12.join(dir, name);
+      const text2 = readOr(file);
+      if (text2 === void 0) continue;
+      let doc;
+      try {
+        doc = JSON.parse(text2);
+      } catch {
+        continue;
+      }
+      if (isObj5(doc) && doc[DISABLE_ALL_HOOKS] === true) return file;
+    }
+  }
+  return void 0;
+}
+function hookEnabledCheck(row, status) {
+  const c3 = row.copy;
+  if (!c3) return void 0;
+  if (status === "disabled") return { name: "hook-enabled", ok: false, detail: `${c3.plugin} is installed but disabled in ${c3.bin}, so its hooks do not run; run: ${c3.bin} ${c3.enable.join(" ")}` };
+  const file = disabledBySettings(row);
+  if (file) return { name: "hook-enabled", ok: false, detail: `${file} sets ${DISABLE_ALL_HOOKS}, so ${c3.host} runs no hooks; remove "${DISABLE_ALL_HOOKS}" from it` };
+  return { name: "hook-enabled", ok: true };
 }
 function packageVersion(pkgDir) {
   try {
-    const v = JSON.parse(hostText(readFileSync4(path6.join(pkgDir, "package.json"), "utf8"))).version;
+    const v = JSON.parse(hostText(readFileSync9(path12.join(pkgDir, "package.json"), "utf8"))).version;
     return typeof v === "string" ? v : void 0;
   } catch {
     return void 0;
@@ -8261,12 +8797,12 @@ function copyCheck(row, pkgDir) {
   let entries;
   try {
     const doc = JSON.parse(text2);
-    entries = isObj3(doc) && isObj3(doc.plugins) ? doc.plugins[c3.plugin] : void 0;
+    entries = isObj5(doc) && isObj5(doc.plugins) ? doc.plugins[c3.plugin] : void 0;
   } catch {
     return { name: "copy", ok: false, detail: `${c3.file} is not valid JSON; run ${c3.bin} ${c3.refresh.join(" ")}` };
   }
   if (!Array.isArray(entries)) return void 0;
-  const versions = entries.filter(isObj3).map((e) => e.version).filter((v) => typeof v === "string");
+  const versions = entries.filter(isObj5).map((e) => e.version).filter((v) => typeof v === "string");
   if (!versions.length) return void 0;
   const old = versions.find((v) => v !== pkg);
   if (old === void 0) return { name: "copy", ok: true };
@@ -8274,7 +8810,7 @@ function copyCheck(row, pkgDir) {
 }
 function mcpCheck(cmd, env) {
   return new Promise((resolve) => {
-    const child = spawn2(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32", windowsHide: true });
+    const child = spawn3(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32", windowsHide: true });
     const reap = () => {
       child.kill();
     };
@@ -8308,7 +8844,7 @@ function mcpCheck(cmd, env) {
           child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
           child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }) + "\n");
         } else if (m3.id === 2) {
-          const tools = isObj3(m3.result) && Array.isArray(m3.result.tools) ? m3.result.tools.map((t2) => t2.name) : [];
+          const tools = isObj5(m3.result) && Array.isArray(m3.result.tools) ? m3.result.tools.map((t2) => t2.name) : [];
           const want = [...TOOL_ORDER].sort();
           const got = [...tools].sort();
           const ok = JSON.stringify(got) === JSON.stringify(want);
@@ -8340,7 +8876,7 @@ function hookRound(row, env) {
         j2 = JSON.parse(out2);
       } catch {
       }
-      if (!isObj3(j2)) return { name: "hook", ok: false, detail: `hook answer is not a JSON object: ${out2.slice(0, 200)}` };
+      if (!isObj5(j2)) return { name: "hook", ok: false, detail: `hook answer is not a JSON object: ${out2.slice(0, 200)}` };
     }
     t2 = performance.now();
     spawnSync2(cmd[0], ["-e", ""], { env, timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
@@ -8390,17 +8926,18 @@ function hookRegisteredCheck(row, env, list2) {
   if (!edits.length) return { name: "hook-registered", ok: true };
   const trust = h2.kind === "file" ? h2.trust : void 0;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c3) => isTrust(row, c3)))) return { name: "hook-registered", ok: false, detail: `${h2.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
-  return { name: "hook-registered", ok: false, detail: `${h2.file} lacks the context-mode hook entry` };
+  const issue = h2.kind === "plugin-list" ? pluginListIssue(h2) : h2.kind === "file" && row.id === "kiro" ? kiroDisabledIssue(h2) : void 0;
+  return { name: "hook-registered", ok: false, detail: issue ?? `${h2.file} lacks the context-mode hook entry` };
 }
 function hookRunsCheck(row, env) {
-  const root = mkdtempSync(path6.join(tmpdir2(), "cm-doctor-runs-"));
+  const root = mkdtempSync(path12.join(tmpdir2(), "cm-doctor-runs-"));
   try {
-    const home = path6.join(root, "home");
-    const proj = path6.join(root, "proj");
+    const home = path12.join(root, "home");
+    const proj = path12.join(root, "proj");
     mkdirSync3(home);
     mkdirSync3(proj);
     const text2 = sampleText();
-    writeFileSync2(path6.join(proj, SAMPLE_FILE), text2);
+    writeFileSync2(path12.join(proj, SAMPLE_FILE), text2);
     const { effect, payload } = hookSample(row.id, proj, text2);
     const sampleEnv = { ...env, HOME: home, USERPROFILE: home };
     delete sampleEnv.CLAUDE_PROJECT_DIR;
@@ -8415,8 +8952,8 @@ function hookRunsCheck(row, env) {
 var SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
 var NOT_SEEN_LINE = "not seen yet, run one tool call";
 function hookSeenCheck(row, home) {
-  const base = path6.join(home, STATE_DIR, PROJECTS_DIR_NAME);
-  const dirs = existsSync6(base) ? readdirSync4(base) : [];
+  const base = path12.join(home, STATE_DIR, PROJECTS_DIR_NAME);
+  const dirs = existsSync11(base) ? readdirSync4(base) : [];
   let sqlite;
   try {
     sqlite = process.getBuiltinModule("node:sqlite");
@@ -8424,8 +8961,8 @@ function hookSeenCheck(row, home) {
     sqlite = void 0;
   }
   for (const d of dirs) {
-    const file = path6.join(base, d, DB_FILE_NAME);
-    if (!sqlite || !existsSync6(file)) continue;
+    const file = path12.join(base, d, DB_FILE_NAME);
+    if (!sqlite || !existsSync11(file)) continue;
     let db;
     try {
       db = new sqlite.DatabaseSync(file, { readOnly: true });
@@ -8440,16 +8977,17 @@ function hookSeenCheck(row, home) {
 function skillsCheck(row, pkgDir) {
   const s = row.skillInstall;
   if (s.kind === "package") {
-    const miss = COMMAND_SKILLS.map((n3) => path6.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync6(f2));
+    const miss = COMMAND_SKILLS.map((n3) => path12.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync11(f2));
     return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : void 0 };
   }
-  const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync6(f2.src) ? renderSkill(readFileSync4(f2.src, "utf8"), s.prefixes) : void 0));
+  const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync11(f2.src) ? renderSkill(readFileSync9(f2.src, "utf8"), s.prefixes) : void 0));
   return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f2) => f2.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : void 0 };
 }
 var PLUGIN_ENABLED = "enabled";
 var WORD_TRIM = ",;";
 var CODEX_CONFIG_FILE2 = "config.toml";
 var EXT_ENABLED_USER = "Enabled (User):";
+var EXT_ENABLED_WORKSPACE = "Enabled (Workspace):";
 var EXT_TRUE = "true";
 function tableState(n3, text2) {
   const line = text2.split("\n").find((l2) => l2.split(" ").includes(n3.plugin));
@@ -8458,6 +8996,8 @@ function tableState(n3, text2) {
 }
 function extensionState(n3, text2) {
   let mine = false;
+  let state;
+  let workspaceOff = false;
   for (const raw of text2.split("\n")) {
     const line = raw.trimEnd();
     if (line.length && !line.startsWith(" ")) {
@@ -8465,16 +9005,19 @@ function extensionState(n3, text2) {
       continue;
     }
     const t2 = line.trim();
-    if (mine && t2.startsWith(EXT_ENABLED_USER)) return t2.slice(EXT_ENABLED_USER.length).trim() === EXT_TRUE ? "enabled" : "disabled";
+    if (!mine) continue;
+    if (t2.startsWith(EXT_ENABLED_USER)) state = t2.slice(EXT_ENABLED_USER.length).trim() === EXT_TRUE ? "enabled" : "disabled";
+    if (t2.startsWith(EXT_ENABLED_WORKSPACE)) workspaceOff = t2.slice(EXT_ENABLED_WORKSPACE.length).trim() !== EXT_TRUE;
   }
-  return void 0;
+  return { state, workspaceOff };
 }
 function nativeState(row, env) {
+  const none = { state: void 0, workspaceOff: false };
   const n3 = row.nativePlugin;
-  if (!n3 || !hostBin(n3.bin, env).file) return void 0;
+  if (!n3 || !hostBin(n3.bin, env).file) return none;
   const r2 = runBin(n3.bin, n3.args, env);
-  if (r2.status !== 0) return void 0;
-  return n3.format === "extension" ? extensionState(n3, `${r2.stdout}${r2.stderr}`) : tableState(n3, `${r2.stdout}`);
+  if (r2.status !== 0) return none;
+  return n3.format === "extension" ? extensionState(n3, `${r2.stdout}${r2.stderr}`) : { state: tableState(n3, `${r2.stdout}`), workspaceOff: false };
 }
 function nativeRow(row, n3) {
   return {
@@ -8497,7 +9040,7 @@ function trimChars(w, chars) {
 }
 async function nativeResult(row, ctx, apply2) {
   const n3 = row.nativePlugin;
-  const state = nativeState(row, ctx.env);
+  const { state, workspaceOff } = nativeState(row, ctx.env);
   if (!n3 || state === void 0) return void 0;
   const bin = hostBin(n3.bin, ctx.env).file;
   if (state === "disabled") {
@@ -8526,6 +9069,7 @@ async function nativeResult(row, ctx, apply2) {
   }
   res.checks = await verifyRow(nativeRow(row, n3), ctx);
   if (n3.hookTrust) res.checks = withHookTrust(res.checks, hooks, !!apply2?.dryRun);
+  if (n3.format === "extension") res.checks = withHookGate(res.checks, geminiGate(n3, ctx, workspaceOff));
   const bad = res.checks.filter((c3) => !c3.ok);
   if (bad.length) {
     res.status = "FAIL";
@@ -8538,7 +9082,7 @@ async function nativeResult(row, ctx, apply2) {
   return res;
 }
 function trustPluginHooks(row, ctx, apply2, hooks) {
-  const file = path6.join(codexDirOf(ctx.env, ctx.home), CODEX_CONFIG_FILE2);
+  const file = path12.join(codexDirOf(ctx.env, ctx.home), CODEX_CONFIG_FILE2);
   const text2 = readOr(file);
   let edit;
   try {
@@ -8556,6 +9100,19 @@ function trustPluginHooks(row, ctx, apply2, hooks) {
   }
   return edit.edits.map((e) => ({ file, ...e }));
 }
+function geminiGate(n3, ctx, workspaceOff) {
+  if (n3.bin === "qwen") {
+    if (workspaceOff && n3.enable) return `qwen runs no hook: context-mode is disabled for this workspace; run ${n3.bin} ${n3.enable.join(" ")}`;
+    return qwenHooksOff(ctx.env, ctx.home, process.cwd());
+  }
+  if (n3.bin !== "gemini") return void 0;
+  if (workspaceOff && n3.enable) return `gemini lists context-mode disabled for this workspace, so it runs no hook; run ${n3.bin} ${n3.enable.join(" ")} --scope workspace`;
+  return geminiSettingsGate(ctx.env, ctx.home, process.cwd());
+}
+function withHookGate(checks, detail) {
+  if (detail === void 0) return checks;
+  return checks.map((c3) => c3.name === "hook-registered" ? { name: c3.name, ok: false, detail } : c3);
+}
 var UNTRUSTED_FIX = "run: context-mode setup";
 function withHookTrust(checks, hooks, dryRun) {
   if (hooks === void 0) return [...checks, { name: "hook-trust", ok: true, warn: true, detail: "codex did not report hook trust (codex app-server hooks/list)" }];
@@ -8564,17 +9121,79 @@ function withHookTrust(checks, hooks, dryRun) {
   const detail = `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks untrusted, so they do not run; ${UNTRUSTED_FIX}`;
   return checks.map((c3) => c3.name === "hook-registered" ? { name: c3.name, ok: false, detail } : c3);
 }
+async function copilotEnabledCheck(row, ctx) {
+  const name = "hook-enabled";
+  const h2 = row.hookInstall;
+  const settings2 = row.copilotSettings;
+  if (h2.kind !== "file" || !settings2) return { name, ok: true };
+  const hooks = await listCopilotHooks(ctx.env, h2.file, ctx.home);
+  if (hooks === void 0) return { name, ok: true, warn: true, detail: "copilot did not report hook state (copilot --server --stdio hooks.discover)" };
+  if (!hooks.length) return { name, ok: false, detail: `copilot lists no context-mode hook from ${h2.file}; ${UNTRUSTED_FIX}` };
+  const bad = hooks.filter((x2) => !x2.enabled);
+  if (!bad.length) return { name, ok: true };
+  let doc;
+  try {
+    const t2 = readOr(settings2);
+    doc = t2 === void 0 ? {} : parseHostConfig(row.id, settings2, t2, "jsonc");
+  } catch {
+    doc = {};
+  }
+  if (isObjSetup(doc) && doc.disableAllHooks === true) return { name, ok: false, detail: `${settings2} sets disableAllHooks, so copilot runs no hook; set it to false` };
+  if (bad.every((x2) => x2.disableKey !== void 0)) return { name, ok: false, detail: `${bad.length} of ${hooks.length} context-mode hooks disabled in ${settings2} disabledHooks, so they do not run; ${UNTRUSTED_FIX}` };
+  return { name, ok: false, detail: `copilot lists ${bad.length} of ${hooks.length} context-mode hooks disabled by a policy, so they do not run` };
+}
+async function enableCopilotHooks(row, ctx, run) {
+  const h2 = row.hookInstall;
+  const settings2 = row.copilotSettings;
+  if (h2.kind !== "file" || !settings2) return [];
+  const listed = await listCopilotHooks(ctx.env, h2.file, ctx.home);
+  const keys = (listed ?? []).flatMap((x2) => !x2.enabled && x2.disableKey !== void 0 ? [x2.disableKey] : []);
+  if (!keys.length) return [];
+  const text2 = readOr(settings2);
+  let doc = {};
+  if (text2 !== void 0 && text2.trim() !== "") {
+    try {
+      doc = parseHostConfig(row.id, settings2, text2, "jsonc");
+    } catch {
+      throw new Error(parseFail(row, settings2));
+    }
+  }
+  if (!isObjSetup(doc)) throw new Error(parseFail(row, settings2));
+  const cur = Array.isArray(doc.disabledHooks) ? doc.disabledHooks : [];
+  const next = cur.filter((k) => !keys.includes(k));
+  if (next.length === cur.length) return [];
+  let edit;
+  try {
+    edit = editHostConfigText(row.id, settings2, text2 ?? "", "jsonc", [[["disabledHooks"], next]]);
+  } catch (e) {
+    if (e instanceof CtxError) throw new Error(parseFail(row, settings2));
+    throw e;
+  }
+  assertWritable(row, settings2);
+  const raw = readRaw(settings2);
+  run.record({ agent: row.id, file: settings2, existed: raw !== void 0 }, raw);
+  atomicWrite(settings2, raw === void 0 ? edit.text : withLayout(edit.text, hostLayout(raw)));
+  return edit.edits.map((e) => ({ file: settings2, ...e }));
+}
+var isObjSetup = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 async function verifyRow(row, ctx) {
   const env = ctx.env;
   const checks = [parseCheck(row)];
-  const l2 = listCheck(row, env);
+  const ls = listState(row, env);
+  const l2 = ls.check;
   if (l2) checks.push(l2);
   const cp = copyCheck(row, ctx.pkgDir);
   if (cp) checks.push(cp);
   checks.push(await mcpCheck(row.serverCommand, env));
   if (row.hookCommand) checks.push(hookCheck(row, env));
-  checks.push(hookRegisteredCheck(row, env, l2), hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
-  return checks;
+  checks.push(hookRegisteredCheck(row, env, l2));
+  const en = hookEnabledCheck(row, ls.status);
+  if (en) checks.push(en);
+  if (row.copilotSettings) checks.push(await copilotEnabledCheck(row, ctx));
+  checks.push(hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
+  if (row.id === "pi") return withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd()));
+  if (row.id === "vscode") return withHookGate(checks, vscodeSettingsGate(env, ctx.home, process.cwd()));
+  return row.id === "zcode" ? withHookGate(checks, zcodeConfigGate(ctx.home)) : checks;
 }
 var Run = class {
   manifest;
@@ -8585,16 +9204,16 @@ var Run = class {
     this.runId = runId;
   }
   get dir() {
-    return path6.join(this.root, BACKUP_DIR, this.runId);
+    return path12.join(this.root, BACKUP_DIR, this.runId);
   }
   save() {
-    if (this.manifest) atomicWrite(path6.join(this.dir, MANIFEST), JSON.stringify(this.manifest, null, 2));
+    if (this.manifest) atomicWrite(path12.join(this.dir, MANIFEST), JSON.stringify(this.manifest, null, 2));
   }
   record(e, bytes) {
     if (!this.manifest) this.manifest = { runId: this.runId, path: this.dir, entries: [] };
     if (bytes !== void 0) {
-      const rel = path6.join(FILES, String(this.manifest.entries.length));
-      atomicWrite(path6.join(this.dir, rel), bytes);
+      const rel = path12.join(FILES, String(this.manifest.entries.length));
+      atomicWrite(path12.join(this.dir, rel), bytes);
       e.backup = rel;
     }
     this.manifest.entries.push(e);
@@ -8614,12 +9233,12 @@ function undo(dir, entries, env) {
       continue;
     }
     if (!e.file) continue;
-    if (e.existed && e.backup) atomicWrite(e.file, readFileSync4(path6.join(dir, e.backup), "utf8"));
+    if (e.existed && e.backup) atomicWrite(e.file, readFileSync9(path12.join(dir, e.backup), "utf8"));
     else unlinkWithRetry(e.file);
   }
 }
 function takeLock(root, runId) {
-  const file = path6.join(root, LOCK_FILE);
+  const file = path12.join(root, LOCK_FILE);
   mkdirSync3(root, { recursive: true });
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -8629,7 +9248,7 @@ function takeLock(root, runId) {
       if (e.code !== "EEXIST") throw e;
       let pid = 0;
       try {
-        pid = Number(JSON.parse(readFileSync4(file, "utf8")).pid);
+        pid = Number(JSON.parse(readFileSync9(file, "utf8")).pid);
       } catch {
       }
       if (pid && pidAlive(pid)) return `setup lock ${file} is held by pid ${pid}; wait for that run or remove the lock`;
@@ -8643,20 +9262,20 @@ function agentHomeDir(id, ctx) {
   if (id === "copilot-cli") return copilotDirOf(ctx.env, ctx.home);
   if (id === "kiro") return kiroDirOf(ctx.env, ctx.home);
   if (id === "opencode") return opencodeDirOf(ctx.env, ctx.home);
-  return path6.join(ctx.home, ...AGENT_HOME_DIR[id]);
+  return path12.join(ctx.home, ...AGENT_HOME_DIR[id]);
 }
 function detectAgents(reg, ctx) {
-  return reg.filter((r2) => existsSync6(agentHomeDir(r2.id, ctx)) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
+  return reg.filter((r2) => existsSync11(agentHomeDir(r2.id, ctx)) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
 }
 async function runSetup(opts) {
   const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const runId = opts.runId ?? (/* @__PURE__ */ new Date()).toISOString().split(":").join("-").split(".").join("-");
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
-    if (!existsSync6(path6.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path6.join(ctx.pkgDir, f2)} is missing` };
+    if (!existsSync11(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
-  const root = path6.join(ctx.home, STATE_DIR);
+  const root = path12.join(ctx.home, STATE_DIR);
   if (!opts.dryRun) {
     const held = takeLock(root, runId);
     if (held) return { exitCode: 1, agents: [], error: held };
@@ -8666,7 +9285,7 @@ async function runSetup(opts) {
   let current;
   const onAbort = () => {
     if (current !== void 0 && !opts.dryRun) run.rollback(current, ctx.env);
-    if (!opts.dryRun) rmSync(path6.join(root, LOCK_FILE), { force: true });
+    if (!opts.dryRun) rmSync(path12.join(root, LOCK_FILE), { force: true });
   };
   opts.signal?.addEventListener("abort", onAbort, { once: true });
   try {
@@ -8685,7 +9304,7 @@ async function runSetup(opts) {
     }
   } finally {
     opts.signal?.removeEventListener("abort", onAbort);
-    if (!opts.dryRun) rmSync(path6.join(root, LOCK_FILE), { force: true });
+    if (!opts.dryRun) rmSync(path12.join(root, LOCK_FILE), { force: true });
   }
   return { exitCode: agents.some((a2) => a2.status === "FAIL") ? 1 : 0, agents, backupDir: run.manifest ? run.dir : void 0 };
 }
@@ -8701,8 +9320,9 @@ async function setupRow(row, ctx, run, dryRun) {
   if (!row.config && !row.cli) return { ...res, status: "SKIPPED", reason: `${row.id}: no setup path in the registry` };
   let plan;
   try {
-    const listed = needsBin ? listCheck(row, ctx.env)?.ok === true : false;
-    plan = planRow(row, listed, copyCheck(row, ctx.pkgDir)?.ok === false, ctx.env);
+    const ls = needsBin ? listState(row, ctx.env) : { status: void 0, check: void 0 };
+    const listed = ls.check?.ok === true;
+    plan = planRow(row, listed, copyCheck(row, ctx.pkgDir)?.ok === false, ctx.env, listed && ls.status === "disabled");
   } catch (e) {
     return { ...res, status: "FAIL", reason: e.message };
   }
@@ -8727,6 +9347,7 @@ async function setupRow(row, ctx, run, dryRun) {
       if (r2.status !== 0) throw new Error(`${row.cli.bin} ${args.join(" ")} exited ${r2.status}: ${`${r2.stderr}`.trim()}`);
       run.record({ agent: row.id, ran: { bin: row.cli.bin, args } });
     }
+    res.changes.push(...await enableCopilotHooks(row, ctx, run));
     res.checks = await verifyRow(row, ctx);
     const bad = res.checks.filter((c3) => !c3.ok);
     if (bad.length) throw new Error(bad.map((c3) => `${c3.name}: ${c3.detail}`).join("; "));
@@ -8742,10 +9363,10 @@ async function runDoctor(opts) {
   const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
-    if (!existsSync6(path6.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path6.join(ctx.pkgDir, f2)} is missing` };
+    if (!existsSync11(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
-  const run = new Run(path6.join(ctx.home, STATE_DIR), "doctor");
+  const run = new Run(path12.join(ctx.home, STATE_DIR), "doctor");
   const agents = [];
   for (const id of ids) {
     const row = reg.find((r2) => r2.id === id);
@@ -8765,7 +9386,7 @@ async function runDoctor(opts) {
       if (res.v1.some((f2) => !UPGRADE_REPORT_ONLY_REASONS.includes(f2.reason))) {
         res.status = "FAIL";
         res.reason = V1_FORM_REASON;
-      } else if (res.changes.length && !onlyTrust(row, res.changes)) {
+      } else if (res.changes.length && !onlyTrust(row, res.changes) && !hasPluginIssue(row)) {
         res.status = "FAIL";
         res.reason = NOT_SET_UP_REASON;
       } else {
@@ -8782,12 +9403,19 @@ async function runDoctor(opts) {
   }
   return { exitCode: agents.some((a2) => a2.status === "FAIL") ? 1 : 0, agents };
 }
+function hasPluginIssue(row) {
+  const h2 = row.hookInstall;
+  if (h2.kind === "file") return row.id === "kiro" && kiroDisabledIssue(h2) !== void 0;
+  return h2.kind === "plugin-list" && pluginListIssue(h2) !== void 0;
+}
 function onlyTrust(row, changes) {
   return changes.every((c3) => isTrust(row, c3) || isRefresh(row, c3));
 }
 function isRefresh(row, c3) {
   const r2 = row.copy;
-  return r2 !== void 0 && c3.command !== void 0 && c3.command.join(" ") === [r2.bin, ...r2.refresh].join(" ");
+  if (r2 === void 0 || c3.command === void 0) return false;
+  const cmd = c3.command.join(" ");
+  return cmd === [r2.bin, ...r2.refresh].join(" ") || cmd === [r2.bin, ...r2.enable].join(" ");
 }
 function isTrust(row, c3) {
   const h2 = row.hookInstall;
@@ -8795,28 +9423,28 @@ function isTrust(row, c3) {
 }
 function runRemove(opts) {
   const env = opts.env ?? process.env;
-  const root = path6.join(opts.home, STATE_DIR);
-  const base = path6.join(root, BACKUP_DIR);
-  if (!existsSync6(base)) return { exitCode: 0, restored: 0 };
+  const root = path12.join(opts.home, STATE_DIR);
+  const base = path12.join(root, BACKUP_DIR);
+  if (!existsSync11(base)) return { exitCode: 0, restored: 0 };
   const held = takeLock(root, "remove");
   if (held) return { exitCode: 1, restored: 0, error: held };
   let restored = 0;
   try {
-    const runs = readdirSync4(base).map((r2) => path6.join(base, r2)).filter((d) => existsSync6(path6.join(d, MANIFEST))).sort().reverse();
+    const runs = readdirSync4(base).map((r2) => path12.join(base, r2)).filter((d) => existsSync11(path12.join(d, MANIFEST))).sort().reverse();
     for (const dir of runs) {
-      const m3 = JSON.parse(readFileSync4(path6.join(dir, MANIFEST), "utf8"));
+      const m3 = JSON.parse(readFileSync9(path12.join(dir, MANIFEST), "utf8"));
       undo(dir, m3.entries, env);
       restored += m3.entries.length;
-      renameWithRetry(path6.join(dir, MANIFEST), path6.join(dir, MANIFEST_DONE));
+      renameWithRetry(path12.join(dir, MANIFEST), path12.join(dir, MANIFEST_DONE));
     }
   } finally {
-    rmSync(path6.join(root, LOCK_FILE), { force: true });
+    rmSync(path12.join(root, LOCK_FILE), { force: true });
   }
   return { exitCode: 0, restored };
 }
 
 // src/setup/print.ts
-import { readFileSync as readFileSync5 } from "node:fs";
+import { readFileSync as readFileSync10 } from "node:fs";
 var SHELL_SAFE_PUNCT = "@%+=:,./-_";
 function isShellSafe(s) {
   if (s === "") return false;
@@ -8844,7 +9472,7 @@ function printPlan(row, env) {
   else if (h2.kind === "plugin-list") steps.push({ kind: "hook", file: h2.file, block: JSON.stringify({ [h2.key[0]]: [h2.entry] }, null, 2) + "\n" });
   const sk = row.skillInstall;
   if (sk.kind === "dir") {
-    for (const f2 of sk.files) steps.push({ kind: "skill", file: f2.file, block: renderSkill(readFileSync5(f2.src, "utf8"), sk.prefixes) });
+    for (const f2 of sk.files) steps.push({ kind: "skill", file: f2.file, block: renderSkill(readFileSync10(f2.src, "utf8"), sk.prefixes) });
   }
   return { agent: row.id, steps, verify: `context-mode doctor --agents ${row.id}` };
 }
@@ -9016,9 +9644,9 @@ async function report(ui, command, res, write) {
   const { text: text2, title } = buildIssueReport(command, res, ui);
   let file = "";
   if (write) {
-    const dir = path7.join(ui.ctx.home, STATE_DIR, REPORT_DIR);
+    const dir = path13.join(ui.ctx.home, STATE_DIR, REPORT_DIR);
     mkdirSync4(dir, { recursive: true });
-    file = path7.join(dir, `${command}-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.md`);
+    file = path13.join(dir, `${command}-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.md`);
     writeFileSync3(file, text2);
   }
   const gh = `gh issue create --repo ${ISSUE_REPO} --title ${JSON.stringify(title)} --body-file ${JSON.stringify(file || "<report>")}`;
@@ -9127,7 +9755,7 @@ async function remove(ui) {
     }
   }
   if (ui.f.dryRun) {
-    out(`Would restore every file recorded under ${path7.join(ui.ctx.home, STATE_DIR, "backups")}`);
+    out(`Would restore every file recorded under ${path13.join(ui.ctx.home, STATE_DIR, "backups")}`);
     return EXIT_OK;
   }
   const r2 = runRemove({ home: ui.ctx.home, env: ui.ctx.env });
@@ -9266,8 +9894,8 @@ async function upgrade(ui) {
     return EXIT_FAIL;
   }
   const root = `${spawnSync3(npm, ["root", "-g"], { env: ui.ctx.env, encoding: "utf8", shell, windowsHide: true }).stdout ?? ""}`.trim();
-  const cli = path7.join(root, "context-mode", "cli.mjs");
-  if (!root || !existsSync7(cli)) {
+  const cli = path13.join(root, "context-mode", "cli.mjs");
+  if (!root || !existsSync12(cli)) {
     err(`FAIL upgrade: ${cli} not found after ${install}. Fix: ${install}`);
     return EXIT_FAIL;
   }
@@ -9306,12 +9934,12 @@ Run context-mode ${cmd} --help.`);
 }
 
 // src/entries/is-entry.ts
-import { realpathSync as realpathSync5 } from "node:fs";
+import { realpathSync as realpathSync7 } from "node:fs";
 function isEntry(main2, argv1, self) {
   if (main2 !== void 0) return main2;
   if (argv1 === void 0 || argv1 === "") return false;
   try {
-    return realpathSync5(argv1) === realpathSync5(self);
+    return realpathSync7(argv1) === realpathSync7(self);
   } catch {
     return false;
   }
@@ -9362,10 +9990,10 @@ function route(argv, version) {
 ` };
 }
 function main() {
-  const dir = path8.dirname(realpathSync6(fileURLToPath2(import.meta.url)));
+  const dir = path14.dirname(realpathSync8(fileURLToPath2(import.meta.url)));
   let version = "";
   try {
-    version = String(JSON.parse(readFileSync6(path8.join(dir, PACKAGE_FILE), "utf8")).version);
+    version = String(JSON.parse(readFileSync11(path14.join(dir, PACKAGE_FILE), "utf8")).version);
   } catch (err2) {
     process.stderr.write(`${SERVER_KEY}: cannot read ${PACKAGE_FILE}: ${err2.message}
 `);
@@ -9389,7 +10017,7 @@ function main() {
     process.exitCode = r2.code;
     return;
   }
-  const child = spawn3(process.execPath, [path8.join(dir, r2.file), ...r2.args], { stdio: "inherit", windowsHide: true });
+  const child = spawn4(process.execPath, [path14.join(dir, r2.file), ...r2.args], { stdio: "inherit", windowsHide: true });
   process.on("SIGINT", () => {
   });
   child.on("error", (err2) => {

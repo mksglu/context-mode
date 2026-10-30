@@ -13,5 +13,5 @@
   },
   "name": "context-mode",
   "skills": "./claude-code/skills",
-  "version": "2.0.0-next.14"
+  "version": "2.0.0-next.15"
 }
