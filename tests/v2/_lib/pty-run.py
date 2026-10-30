@@ -1,4 +1,4 @@
-# tests/v2/cli/pty-run.py: run one command in a real pty, answer prompts, report the exit code and output.
+# tests/v2/_lib/pty-run.py: run one command in a real pty, answer prompts, report the exit code and output.
 # argv[1] is JSON: {argv, env, steps: [{expect, send, delay?}], timeout}. Prints JSON {code, out, pending}.
 import json, os, pty, select, signal, sys, time
 

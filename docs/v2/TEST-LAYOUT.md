@@ -53,7 +53,8 @@ Status: accepted by owner 2026-10-30. Decision record: [ADR-0024](adr/0024-test-
 | 0020-gates-zcode | ADR-0020 | `tests/v2/0020-gates-zcode.test.mjs` | hook gate and shape for Z Code | 23 | 24.2 |
 | 0020-gates-vscode-gemini-kiro | ADR-0020 | `tests/v2/0020-gates-vscode-gemini-kiro.test.mjs` | hook gates for VS Code, Gemini CLI, Kiro | 23 | 24.1 |
 | 0020-gates-pi-copilot-claude | ADR-0020 | `tests/v2/0020-gates-pi-copilot-claude.test.mjs` | hook gates for Pi, Copilot CLI, Claude Code, Codex, OpenCode | 40 | 26.0 |
-| 0020-fire | ADR-0020 | `tests/v2/0020-fire.test.mjs` | real-agent fire tests (built bundle, skipped when the agent is absent) | 25 | 13.3 |
+| 0020-fire-hook-config | ADR-0020 | `tests/v2/0020-fire-hook-config.test.mjs` | real-agent fire tests: Claude Code, Codex, Copilot CLI, Gemini CLI, Kiro (skipped when the agent is absent) | 13 | 3.2 |
+| 0020-fire-plugin-ext | ADR-0020 | `tests/v2/0020-fire-plugin-ext.test.mjs` | real-agent fire tests: OpenCode, Pi, Qwen, VS Code, Z Code (split from 0020-fire: spawnSync probes block the event loop, so one file ran slower than its longest source) | 12 | 4.0 |
 | 0019-setup-engine | ADR-0019, ADR-0023, PRD-setup | `tests/v2/0019-setup-engine.test.mjs` | interactive setup engine and its no-regex rule | 73 | 34.5 |
 | 0019-host-config | ADR-0019, ADR-0023, PRD-setup | `tests/v2/0019-host-config.test.mjs` | host config read/write, TOML, plugin root and swap, uninstall | 121 | 1.8 |
 | 0019-cli | ADR-0019, PRD-setup | `tests/v2/0019-cli.test.mjs` | the context-mode CLI | 59 | 35.6 |
