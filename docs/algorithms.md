@@ -78,7 +78,7 @@ without one swamping the other.
 equal at p95 (`DECISIONS-r7`, `tickets/memory-retrieval/eval/results.md`). Search itself measured 27 ms
 against a 30 ms target (`SEARCH_P95_MS`).
 
-**Constants:** `RRF_K = 60`; `SEARCH_PAGE_SIZE = 20` per source before merge; `SEARCH_P95_MS = 30` (target).
+**Constants:** `RRF_K = 60`; `SEARCH_PAGE_SIZE = 20` per source before merge (decision list page); `SEARCH_REPLY_HITS = 5` hits per `ctx_search` relevance reply (D-SEARCH-REPLY-1); `SEARCH_P95_MS = 30` (target).
 
 **Code:** `src/core/tools/search.ts` (per `05-tools-index.md`).
 
