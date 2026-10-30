@@ -12,6 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, cpSync, readFileSync, ex
 import { tmpdir } from "node:os";
 import path, { join, resolve } from "node:path";
 import { hostBin, runSetup } from "../../src/setup/index.ts";
+import { spawnForm, whichBin } from "../../src/setup/spawn-bin.ts";
 import { TOOL_ORDER } from "../../src/core/contracts/constants.ts";
 import { generateManifests } from "../../build/manifests.ts";
 import { listCopilotHooks } from "../../src/setup/copilot-hooks.ts";
@@ -123,8 +124,9 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
     // Skipped when codex is not on PATH. Temp HOME and CODEX_HOME only.
 
     const HOOK = resolve("src/entries/hook.ts");
-    let hasCodex = true;
-    try { execFileSync("codex", ["--version"], { stdio: "ignore" }); } catch { hasCodex = false; }
+    // D-C166-WIN-FIRE-1: found the way setup finds it (npm installs codex.cmd on Windows, which spawn("codex") cannot run).
+    const CODEX = whichBin("codex", process.env);
+    const hasCodex = CODEX !== undefined && spawnSync(spawnForm(CODEX, ["--version"], process.env).command, spawnForm(CODEX, ["--version"], process.env).args, { stdio: "ignore", windowsVerbatimArguments: spawnForm(CODEX, ["--version"], process.env).windowsVerbatimArguments }).status === 0;
 
     const sse = (o) => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
     function provider(cmd, bodies) {
@@ -147,7 +149,7 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       });
     }
 
-    async function run(cmd) {
+    async function run(cmd, seen) {
       const d = mkdtempSync(join(tmpdir(), "cm-cdxcat-"));
       const work = join(d, "work");
       const home = join(d, "home");
@@ -158,15 +160,23 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       await new Promise((r) => srv.listen(0, "127.0.0.1", r));
       const port = srv.address().port;
       writeFileSync(join(home, "config.toml"), `model = "fake-model"\nmodel_provider = "fake"\napproval_policy = "never"\nsandbox_mode = "workspace-write"\n[model_providers.fake]\nname = "fake"\nbase_url = "http://127.0.0.1:${port}/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n`);
-      writeFileSync(join(home, "hooks.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: ".*", hooks: [{ type: "command", command: `"${process.execPath}" "${HOOK}" --agent codex`, timeout: 20 }] }] } }));
-      const env = { ...process.env, HOME: home, CODEX_HOME: home };
+      // A logging-only hook sits next to ours on every event: it shows which events and tool names this Codex build sends.
+      const logFile = join(d, "hook-events.jsonl");
+      writeFileSync(join(d, "log.mjs"), `import{appendFileSync}from"node:fs";let b="";process.stdin.on("data",c=>b+=c).on("end",()=>appendFileSync(${JSON.stringify(logFile)},JSON.stringify(JSON.parse(b))+"\\n"));`);
+      const logger = { type: "command", command: `"${process.execPath}" "${join(d, "log.mjs")}"`, timeout: 20 };
+      const ours = { type: "command", command: `"${process.execPath}" "${HOOK}" --agent codex`, timeout: 20 };
+      const events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"];
+      writeFileSync(join(home, "hooks.json"), JSON.stringify({ hooks: Object.fromEntries(events.map((e) => [e, [{ matcher: ".*", hooks: e === "PreToolUse" ? [logger, ours] : [logger] }]])) }));
+      const env = { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: home };
       // a hook that is not trusted never runs; the bypass flag stands in for the trust hashes setup writes
       await new Promise((resolveRun) => {
-        const c = spawn("codex", ["exec", "--skip-git-repo-check", "--dangerously-bypass-hook-trust", "show"], { cwd: work, env, stdio: "ignore" });
+        const f = spawnForm(CODEX, ["exec", "--skip-git-repo-check", "--dangerously-bypass-hook-trust", "show"], env);
+        const c = spawn(f.command, f.args, { cwd: work, env, stdio: "ignore", windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
         const t = setTimeout(() => c.kill(), 90000);
         c.on("close", () => { clearTimeout(t); resolveRun(); });
       });
       srv.close();
+      if (seen !== undefined && existsSync(logFile)) for (const l of readFileSync(logFile, "utf8").split("\n")) if (l !== "") seen.push(JSON.parse(l));
       rmSync(d, { recursive: true, force: true });
       return bodies.length > 1 ? JSON.parse(bodies[1]).input.at(-1).output : "";
     }
@@ -181,6 +191,17 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       const out = await run("ls && cat big.log");
       assert.match(out, /blocked by PreToolUse hook/);
       assert.ok(out.includes("ctx_execute"), out);
+    });
+    // D-C166-WIN-FIRE-1: the host sends PreToolUse for the shell tool with tool_name Bash and tool_input.command, on every
+    // OS and Codex build the job installs. The tester's Windows 0.166.0-alpha.5.1 run saw no hook input at all.
+    test("D-C166-WIN-FIRE-1: codex sends PreToolUse for the shell tool (tool_name Bash, tool_input.command) and the deny reaches the model", opts, async () => {
+      const seen = [];
+      const out = await run("cat big.log", seen);
+      const pre = seen.filter((e) => e.hook_event_name === "PreToolUse");
+      assert.ok(pre.length >= 1, "no PreToolUse event reached the hook; events seen: " + JSON.stringify(seen.map((e) => e.hook_event_name)));
+      assert.equal(pre[0].tool_name, "Bash");
+      assert.equal(pre[0].tool_input.command, "cat big.log");
+      assert.match(out, /blocked by PreToolUse hook/);
     });
     test("D-CDX-CAT-1: codex exec_command bounded head of a large log is not denied", opts, async () => {
       const out = await run("head -n 3 big.log");

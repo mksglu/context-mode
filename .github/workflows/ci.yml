@@ -75,6 +75,12 @@ jobs:
       - run: node e2e/cases/run.mjs --milestone "$GATE_MILESTONE"
         name: GP cases tagged <= gate milestone (D-M0-2, D-M2-arch-4)
         shell: bash
+      # D-C166-WIN-FIRE-1: the real Codex CLI on all 3 OS, so the codex fire tests (tests/v2/0020-fire-hook-config) run
+      # on the Windows runner too. Fake local provider, temp HOME and CODEX_HOME, no login, no key.
+      - run: npm install -g @openai/codex@0.166.0
+        name: codex 0.166.0 for the codex fire tests (D-C166-WIN-FIRE-1)
+      - run: codex --version
+        name: codex version (info)
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts for v2 unit tests (D-M2-arch-6)
       - run: node --test "tests/v2/**/*.test.mjs"
