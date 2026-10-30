@@ -121,7 +121,10 @@ rl.on("line", (l) => {
   test("registry: server and hook commands are absolute node + absolute file, never the bin name", () => {
     const reg = buildRegistry({ home: "/h", pkgDir: "/abs/pkg", env: {} });
     for (const r of reg.filter((x) => x.hookCommand)) {
-      assert.deepEqual(r.hookCommand, [NODE, path.join("/abs/pkg", "hook.mjs"), "--agent", r.id]);
+      // D-C166-WIN-FIRE-2: codex on Windows writes bare node (0.166 runs hooks in PowerShell); the doctor runs hookRunCommand
+      const node = r.id === "codex" && process.platform === "win32" ? "node" : NODE;
+      assert.deepEqual(r.hookCommand, [node, path.join("/abs/pkg", "hook.mjs"), "--agent", r.id]);
+      assert.equal(r.hookRunCommand[0], NODE);
     }
     const codex = reg.find((r) => r.id === "codex");
     assert.deepEqual(codex.serverCommand, [NODE, path.join("/abs/pkg", "server.mjs"), "--agent", "codex"]);
@@ -152,7 +155,7 @@ rl.on("line", (l) => {
     assert.ok(toml.includes(JSON.stringify(NODE)), "absolute node");
     assert.ok(toml.includes(JSON.stringify(path.join(s.pkgDir, "server.mjs"))), "absolute server.mjs");
     const hooks = JSON.parse(readFileSync(codexHooks, "utf8"));
-    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].command, `"${NODE}" "${path.join(s.pkgDir, "hook.mjs")}" --agent codex`);
+    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].command, `${process.platform === "win32" ? "node" : `"${NODE}"`} "${path.join(s.pkgDir, "hook.mjs")}" --agent codex`); // D-C166-WIN-FIRE-2
     assert.equal(hooks.hooks.Stop[0].hooks[0].command, "my-own-hook");
     const k = JSON.parse(readFileSync(kiro, "utf8"));
     assert.deepEqual(k.mcpServers.other, { command: "other-server" });

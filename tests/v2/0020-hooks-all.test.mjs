@@ -65,7 +65,8 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, USERPROFILE: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000", ...win } };
   }
 
-  const hookCmd = (pkgDir, id) => `"${NODE}" "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;
+  // D-C166-WIN-FIRE-2: codex on Windows writes bare node (0.166 runs hooks in PowerShell)
+  const hookCmd = (pkgDir, id) => `${id === "codex" && process.platform === "win32" ? "node" : `"${NODE}"`} "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;
   // Agents setup writes by file (no host CLI needed): their hook file and skill dir sit under HOME.
   const FILE_AGENTS = ["codex", "copilot-cli", "vscode", "kiro", "zcode", "opencode"];
 
