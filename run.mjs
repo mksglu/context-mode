@@ -3173,6 +3173,8 @@ RETURNING id`;
 var INSERT_CHUNK = `
 INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VALUES (?, ?, ?, ?, ?, ?, ?)`;
 var TITLE_WEIGHT = 1;
+var RAW_LABEL_SUFFIX = " (raw)";
+var NOT_RAW = `AND (:source IS NOT NULL OR substr(s.label, -${RAW_LABEL_SUFFIX.length}) <> '${RAW_LABEL_SUFFIX}')`;
 var PORTER_MATCH = `
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
          chunks.worktree AS worktree, chunks.ord AS ord, s.created_ts AS created_ts,
@@ -3182,7 +3184,8 @@ var PORTER_MATCH = `
   WHERE chunks MATCH :match
     AND (:scope <> 'session' OR chunks.session_id = :session_id)
     AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
-    AND (:source IS NULL OR s.label = :source)`;
+    AND (:source IS NULL OR s.label = :source)
+    ${NOT_RAW}`;
 var PORTER_ORDER = `
 ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
 var PORTER_RANK_PROJECT = `
@@ -3207,6 +3210,7 @@ WHERE chunks_tri MATCH :match
   AND (:scope <> 'session' OR c.session_id = :session_id)
   AND (:scope <> 'worktree' OR c.worktree = :worktree)
   AND (:source IS NULL OR s.label = :source)
+  ${NOT_RAW}
 ORDER BY bm25(chunks_tri, 1.0, ${TITLE_WEIGHT}) ASC, c.source_id DESC, c.ord ASC`;
 var INSERT_TRI = "INSERT INTO chunks_tri(rowid, body, title) VALUES (?, ?, ?)";
 function ftsInsert(db, src, chunks) {
@@ -4581,15 +4585,15 @@ function matchesAnyDenyPattern(text, patterns, subject = BASH_SUBJECT) {
 
 // src/prompt/_generated.ts
 var TOOL_DESCRIPTIONS = Object.freeze({
-  ctx_execute: "Runs code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.\n",
-  ctx_batch: "Runs several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.",
-  ctx_index: "Stores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.",
-  ctx_search: "Searches content stored with ctx_index and earlier sandbox output in this project. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.",
-  ctx_resume: "Returns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
-  ctx_stats: "Reports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.",
-  ctx_doctor: "Checks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause and the fix in one line. It changes nothing. Use it when the user asks whether context-mode works, or after a context-mode error.",
-  ctx_upgrade: "Updates context-mode to the latest release for this agent and rewrites only context-mode's own entries in the host config. User entries and user settings such as hook timeouts are kept, and old entries are erased. Returns a table of what changed and whether a restart is needed. Use it only when the user asks to update context-mode.",
-  ctx_purge: "Deletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data."
+  ctx_execute: 'Example: `ctx_execute({language:"shell",code:"git log --oneline -5"})`. Required: language, code.\nRuns code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.',
+  ctx_batch: 'Example: `ctx_batch({commands:["git log --oneline -5"],queries:["recent changes"]})`. Required: commands, queries.\nRuns several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.',
+  ctx_index: 'Example: `ctx_index({path:"docs/api.md"})`. Required: one of path, content, url.\nStores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.',
+  ctx_search: 'Example: `ctx_search({queries:["auth middleware"]})`. Required: queries.\nSearches content stored with ctx_index and earlier sandbox output in this project. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.',
+  ctx_resume: "Example: `ctx_resume({})`. Required: none.\nReturns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
+  ctx_stats: "Example: `ctx_stats({})`. Required: none.\nReports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.",
+  ctx_doctor: "Example: `ctx_doctor({})`. Required: none.\nChecks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause and the fix in one line. It changes nothing. Use it when the user asks whether context-mode works, or after a context-mode error.",
+  ctx_upgrade: "Example: `ctx_upgrade({})`. Required: none.\nUpdates context-mode to the latest release for this agent and rewrites only context-mode's own entries in the host config. User entries and user settings such as hook timeouts are kept, and old entries are erased. Returns a table of what changed and whether a restart is needed. Use it only when the user asks to update context-mode.",
+  ctx_purge: 'Example: `ctx_purge({source:"old-docs"})`. Required: one of session, source, project.\nDeletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data.'
 });
 var READ_DENY_TEMPLATE = 'context-mode: {size}-byte file, over the one-read limit. Run ctx_execute(language, code, file="{path}") and print only the answer.';
 
