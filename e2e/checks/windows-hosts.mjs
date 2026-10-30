@@ -302,6 +302,25 @@ function stepSetup(id, env) {
   if (!ok) diag(id, env.HOME, env);
   return ok;
 }
+/** D-NI-CODEX-TRUST-2: the native plugin route (ADR-0023), tester report on Codex 0.166.0-alpha.5.1 / Windows. A fresh
+ *  CODEX_HOME, the release tree as a local marketplace, `codex plugin add`, then setup: the plugin hooks must end trusted
+ *  and verification must not roll back. */
+function stepCodexPlugin(home, env) {
+  const codex = path.join(WIN ? prefix : binDir, WIN ? "codex.cmd" : "codex");
+  const e = { ...env, CODEX_HOME: path.join(home, ".codex-plugin-route") };
+  mkdirSync(e.CODEX_HOME, { recursive: true });
+  const mk = run(codex, ["plugin", "marketplace", "add", outDir], { env: e });
+  if (mk.status !== 0) return record("codex", "plugin-route", false, `marketplace add exit ${mk.status} ${tail(mk.stderr)} ${tail(mk.stdout)}`);
+  const add = run(codex, ["plugin", "add", "context-mode@context-mode"], { env: e });
+  if (add.status !== 0) return record("codex", "plugin-route", false, `plugin add exit ${add.status} ${tail(add.stderr)} ${tail(add.stdout)}`);
+  const r = run(cmBin, ["setup", "--yes", "--agents", "codex", "--json"], { env: e });
+  const json = lastJson(r.stdout);
+  const a = json?.agents?.[0];
+  const ok = r.status === 0 && a?.status === "PASS" && a?.rolledBack !== true && (a.checks ?? []).every((c) => c.ok);
+  const cfg = path.join(e.CODEX_HOME, "config.toml");
+  const trusted = existsSync(cfg) ? (readFileSync(cfg, "utf8").match(/trusted_hash = /g) ?? []).length : 0;
+  record("codex", "plugin-route", ok && trusted >= 4, `exit ${r.status} status=${a?.status} rolledBack=${a?.rolledBack} trusted_hash tables=${trusted} ${json ? checkLines(json) : ""} stderr=${tail(r.stderr)}`);
+}
 function stepDoctor(id, env) {
   const r = run(cmBin, ["doctor", "--agents", id, "--json"], { env });
   const json = lastJson(r.stdout);
@@ -425,6 +444,7 @@ async function main() {
     stepDoctor(h.id, env);
     stepHook(h.id, home, project, env);
     await stepMcp(h.id, home, project, env);
+    if (h.id === "codex") stepCodexPlugin(home, env);
   }
 }
 

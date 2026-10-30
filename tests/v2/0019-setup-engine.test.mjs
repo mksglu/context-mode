@@ -12,6 +12,7 @@ import ts from "typescript";
 import { ADAPTERS } from "../../src/adapters/table.ts";
 import { TOOL_ORDER } from "../../src/core/contracts/constants.ts";
 import { qwenHooksOff } from "../../src/setup/qwen-gate.ts";
+import { hookHashOf, pluginTrustEntries } from "../../src/setup/codex-trust.ts";
 import { assertWritable, buildRegistry, hostBin, installExitOk, pathEntries, runDoctor, runRemove, runSetup, spawnForm, spawnShim, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR, shellWord } from "../../src/setup/index.ts";
 import { generateManifests } from "../../build/manifests.ts";
 import { vscodeUserDirOf } from "../../src/core/project/config-dir.ts";
@@ -631,7 +632,10 @@ exit 0`;
 import { createInterface } from "node:readline";
 const home = process.env.CODEX_HOME;
 const hooks = ${JSON.stringify([...PLUGIN_EVENTS.map((e) => ({ key: PLUGIN_KEY(e), pluginId: PLUGIN_ID, source: "plugin" })), { key: OTHER_KEY, pluginId: "other@x", source: "plugin" }, { key: "/h/hooks.json:pre_tool_use:0:0", source: "user" }])};
-const hash = (k) => "sha256:" + k.length.toString(16).padStart(64, "0");
+const base = (k) => "sha256:" + k.length.toString(16).padStart(64, "0");
+// Codex 0.166.0-alpha.5.1 reports currentHash as "<hook hash>/<plugin hash>" but trusts only a trusted_hash equal to the hook hash.
+const composite = process.env.FAKE_COMPOSITE === "1";
+const hash = (k) => composite ? base(k) + "/sha256:" + "ab".repeat(32) : base(k);
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (l) => {
   const m = JSON.parse(l);
@@ -639,7 +643,7 @@ rl.on("line", (l) => {
   if (m.id === 2) {
     const toml = existsSync(home + "/config.toml") ? readFileSync(home + "/config.toml", "utf8") : "";
     const data = hooks.map((h) => ({ ...h, eventName: "preToolUse", currentHash: hash(h.key),
-      trustStatus: toml.includes("[hooks.state." + JSON.stringify(h.key) + "]\\ntrusted_hash = " + JSON.stringify(hash(h.key))) ? "trusted" : "untrusted" }));
+      trustStatus: toml.includes("[hooks.state." + JSON.stringify(h.key) + "]\\ntrusted_hash = " + JSON.stringify(base(h.key))) ? "trusted" : toml.includes("[hooks.state." + JSON.stringify(h.key) + "]") ? "modified" : "untrusted" }));
     process.stdout.write(JSON.stringify({ id: 2, result: { data: [{ cwd: process.cwd(), hooks: data }] } }) + "\\n");
   }
 });
@@ -691,6 +695,28 @@ exit 0`);
     const rm = await runRemove({ home: s.home, env: s.env, runId: "t1" });
     assert.equal(rm.exitCode, 0, JSON.stringify(rm));
     assert.equal(readFileSync(toml, "utf8"), before, "remove gives the original bytes back");
+  });
+
+  test("[D-NI-CODEX-TRUST-2] setup: Codex 0.166 reports currentHash as <hook hash>/<plugin hash>; trusted_hash is the hook hash only, so the plugin hooks end trusted and verification does not roll back", SKIP_SH, async (t) => {
+    const s = sandbox(t);
+    const toml = codexWithHookTrust(s);
+    s.env.FAKE_COMPOSITE = "1";
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "c1" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.equal(res.agents[0].rolledBack, undefined);
+    const text = readFileSync(toml, "utf8");
+    for (const ev of PLUGIN_EVENTS) assert.ok(text.includes(`[hooks.state.${JSON.stringify(PLUGIN_KEY(ev))}]\ntrusted_hash = ${JSON.stringify(hashOf(PLUGIN_KEY(ev)))}\n`), `hook hash only: ${ev}\n${text}`);
+    assert.equal(text.includes("/sha256:"), false, `no plugin-hash suffix\n${text}`);
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
+  });
+
+  test("[D-NI-CODEX-TRUST-2] pluginTrustEntries: trusted_hash is the hook hash of a composite or plain currentHash, a trusted hook gets none (runs on Windows too)", () => {
+    const A = "sha256:" + "a".repeat(64), B = "sha256:" + "b".repeat(64);
+    assert.equal(hookHashOf(`${A}/${B}`), A);
+    assert.equal(hookHashOf(A), A);
+    const got = pluginTrustEntries([{ key: "p:k1", hash: `${A}/${B}`, trusted: false }, { key: "p:k2", hash: A, trusted: false }, { key: "p:k3", hash: A, trusted: true }]);
+    assert.deepEqual(got, [[["hooks", "state", "p:k1"], { trusted_hash: A }], [["hooks", "state", "p:k2"], { trusted_hash: A }]]);
   });
 
   // D-NI-EXT-DOCTOR-1 (ADR-0023): `qwen extensions install <source>` (Qwen Code 0.26.1) and `gemini extensions install

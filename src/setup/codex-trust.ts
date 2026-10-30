@@ -181,8 +181,17 @@ export function listPluginHooks(env: Record<string, string | undefined>, pluginI
   });
 }
 
+const HASH_PART_SEP = "/";
+
+/** D-NI-CODEX-TRUST-2: Codex 0.166.0-alpha.5.1 reports currentHash as "<hook hash>/<plugin hash>" and trusts a hook only
+ *  when trusted_hash is the hook hash alone (the full value gives "modified"). 0.156.1 reports the hook hash alone. */
+export function hookHashOf(currentHash: string): string {
+  const cut = currentHash.indexOf(HASH_PART_SEP);
+  return cut < 0 ? currentHash : currentHash.slice(0, cut);
+}
+
 /** The [hooks.state."<key>"] tables that trust every hook of the plugin that Codex does not trust now. Codex's key and
- *  currentHash are used as given: no hash is computed here. */
+ *  hook hash (hookHashOf of currentHash) are used: no hash is computed here. */
 export function pluginTrustEntries(hooks: PluginHook[]): [readonly string[], unknown][] {
-  return hooks.filter((h) => !h.trusted).map((h): [readonly string[], unknown] => [[...TRUST_KEY, h.key], { [HASH_FIELD]: h.hash }]);
+  return hooks.filter((h) => !h.trusted).map((h): [readonly string[], unknown] => [[...TRUST_KEY, h.key], { [HASH_FIELD]: hookHashOf(h.hash) }]);
 }
