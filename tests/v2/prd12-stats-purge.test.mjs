@@ -3,6 +3,7 @@
 // Concurrent: every test builds its own project root and DB; nothing reads process.env.
 
 import { test, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,7 +17,7 @@ import { ctxPurge } from "../../src/core/tools/purge.ts";
 import { ctxIndex } from "../../src/core/tools/index.ts";
 
 // Concurrent.
-describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency: true }, () => {
+describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency: CONC }, () => {
   // Moved from tests/v2/tools/stats.test.mjs
   describe("PRD-v2 section 8 / ctx_stats", () => {
     // [M4] Unit tests for src/core/tools/stats.ts (impl/06 §5, TECH-SPEC GP10 + §6.2a D3, DECISIONS-r9 V18/V19,

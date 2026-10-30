@@ -3,6 +3,7 @@
 // Concurrent: both sections only read files and constants; they share no state.
 
 import { test, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path, { join, dirname } from "node:path";
@@ -14,7 +15,7 @@ import { CtxError, ERROR_TEXT, formatError } from "../../src/core/contracts/erro
 import { ADAPTERS } from "../../src/adapters/table.ts";
 
 // Concurrent.
-describe("ADR-0018: contracts (concurrent)", { concurrency: true }, () => {
+describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
   // Moved from tests/v2/contracts/contracts.test.mjs
   describe("ADR-0018 / contracts constants and texts", () => {
     // Unit tests for src/core/contracts (impl/01 §1-§5, impl/00 §3.1-§3.3, TECH-SPEC §6.2a/§11, DECISIONS-r9).

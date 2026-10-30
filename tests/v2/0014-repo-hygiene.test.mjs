@@ -1,6 +1,7 @@
 // ADR-0013 (release automation), ADR-0014 (issue forms), ADR-0015 (README and repo cleanup): repo shape, gates, workflows, docs facts.
 // One file per ADR area (docs/v2/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -15,7 +16,7 @@ import { AGENT_IDS } from "../../src/core/contracts/agents.ts";
 import { DOCTOR_CHECK_ORDER, REPORT_CAP, REPORT_SOURCE_LABEL } from "../../src/core/contracts/constants.ts";
 
 // Sections are independent: own temp dirs or read-only reads of the repo; none changes process.env or the cwd, so they run concurrently.
-describe("ADR-0013 / ADR-0014 / ADR-0015 repo hygiene", { concurrency: true }, () => {
+describe("ADR-0013 / ADR-0014 / ADR-0015 repo hygiene", { concurrency: CONC }, () => {
 describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
   // build/check-removed.mjs — GS5 repo-cleanup gate (impl/15 §2, TECH-SPEC §1 GS5 + §3.10,
   // DEVIATIONS D-M7-arch-4, D-M7-CLN-W3c). Each case runs the real script in a throwaway git repo.
@@ -1000,7 +1001,7 @@ describe("ADR-0014 repo: issue forms", async () => {
 });
 
 // ADR-0024: every test file is listed in docs/v2/TEST-LAYOUT.md. A fix puts its red test in the file of its area, never in a new file.
-describe("ADR-0024 test layout: every test file is in the table", { concurrency: true }, () => {
+describe("ADR-0024 test layout: every test file is in the table", { concurrency: CONC }, () => {
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
   const TABLE = readFileSync(path.join(ROOT, "docs", "v2", "TEST-LAYOUT.md"), "utf8");
 

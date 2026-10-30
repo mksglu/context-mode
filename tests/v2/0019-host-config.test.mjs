@@ -4,6 +4,7 @@
 // Serial where a test sets process.env (host-text); the other blocks use own temp dirs and run their tests concurrently.
 
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -181,8 +182,8 @@ describe("ADR-0019 host text layout: BOM, CRLF (D-WIN-BOM, D-WIN-EOL)", () => {
 });
 
 // Independent blocks (own temp dirs, no process-wide state): they run at the same time.
-describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () => {
-  describe("ADR-0019 atomic file replace and unlink (D-WIN-ATOMIC)", { concurrency: true }, () => {
+describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () => {
+  describe("ADR-0019 atomic file replace and unlink (D-WIN-ATOMIC)", { concurrency: CONC }, () => {
     // tests/v2/ops/atomic-file.test.mjs
     // DEVIATIONS D-WIN-ATOMIC-1: on Windows a rename over a file another process holds open (host watching
     // settings.json, antivirus, indexer) fails with EPERM/EBUSY/EACCES. renameWithRetry retries; atomicWriteFile
@@ -325,7 +326,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () =
     });
   });
 
-  describe("ADR-0019 host config edit keeps user content (M5)", { concurrency: true }, () => {
+  describe("ADR-0019 host config edit keeps user content (M5)", { concurrency: CONC }, () => {
     // tests/v2/ops/host-config.test.mjs
     // Spec: docs/v2/impl/07-tools-ops.md §2. 14a GP11/jsonc-comment-boundaries (#1271): a JSONC
     // config with a URL string containing // keeps that string and existing comments intact
@@ -379,7 +380,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () =
     });
   });
 
-  describe("ADR-0019 codex TOML reader and editor (D-TOML-PARSER-1)", { concurrency: true }, () => {
+  describe("ADR-0019 codex TOML reader and editor (D-TOML-PARSER-1)", { concurrency: CONC }, () => {
     // tests/v2/ops/host-config-toml.test.mjs
     // Tester report 2.0.0-next.6: the Codex setup rejected valid TOML (multiline strings, multiline arrays,
     // [[skills.config]]). Contract: every valid TOML 1.0 file is read, our own table and keys are edited, and every
@@ -540,7 +541,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () =
     });
   });
 
-  describe("ADR-0019 host config write, rollback, Windows retry", { concurrency: true }, () => {
+  describe("ADR-0019 host config write, rollback, Windows retry", { concurrency: CONC }, () => {
     // tests/v2/ops/host-write.test.mjs
     // Spec: docs/v2/impl/07-tools-ops.md §6 step 5, §2; DEVIATIONS D-M5-O1-3, D-M5-O1-4, D-M5-U5-1.
     // GP11: keep user values, sibling plugins survive (#1160), .jsonc wins (#849), rollback on write failure,
@@ -736,7 +737,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () =
     });
   });
 
-  describe("ADR-0019 plugin root resolution", { concurrency: true }, () => {
+  describe("ADR-0019 plugin root resolution", { concurrency: CONC }, () => {
     // tests/v2/ops/plugin-root.test.mjs
     // Spec: docs/v2/impl/07-tools-ops.md §1. resolvePluginRoot(adapter, env) switches on
     // adapter.installMode, realpaths the result, never caches across calls, and throws
@@ -893,7 +894,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () =
     });
   });
 
-  describe("ADR-0019 plugin current swap and rollback generation", { concurrency: true }, () => {
+  describe("ADR-0019 plugin current swap and rollback generation", { concurrency: CONC }, () => {
     // tests/v2/ops/plugin-swap.test.mjs
     // Spec: docs/v2/impl/07-tools-ops.md §6 step 4c-4d; DEVIATIONS D-M5-U1-6 (current.swap symlink, then rename),
     // D-M5-U4-1 (signature, which dirs count as a generation), D-M7-W3-1 (current -> current.old, current.swap -> current:
@@ -1099,7 +1100,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: true }, () =
     });
   });
 
-  describe("ADR-0019 uninstall areas (Q21)", { concurrency: true }, () => {
+  describe("ADR-0019 uninstall areas (Q21)", { concurrency: CONC }, () => {
     // tests/v2/ops/uninstall.test.mjs
     // Spec: docs/v2/impl/07-tools-ops.md §6 "Steps (Uninstall)", DECISIONS-r3 Q16 Q21,
     // DEVIATIONS D-M5-U1-3, D-M5-U1-6, D-M5-U7-1..3.

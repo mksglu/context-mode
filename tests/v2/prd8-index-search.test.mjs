@@ -8,6 +8,7 @@
 
 import "./e2e/_parity-net-shim.mjs";
 import { test, before, after, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSync, realpathSync, existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -40,9 +41,9 @@ import { spawn, execFileSync, spawnSync } from "node:child_process";
 
 // Stage 1 (concurrent): the pure block, the HTML section and the parity section. None of them sets a proxy variable.
 // The parity section sets HOME and PARITY_HOST only inside its own serial pi/opencode group; its MCP children get HOME in their own env.
-describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: true }, () => {
+describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => {
   // Concurrent: each section builds its own temp dirs and DBs and reads no process.env.
-  describe("PRD-v2 section 8: chunk, store, search (concurrent: own temp dirs, no env)", { concurrency: true }, () => {
+  describe("PRD-v2 section 8: chunk, store, search (concurrent: own temp dirs, no env)", { concurrency: CONC }, () => {
     // Moved from tests/v2/index/auto-memory.test.mjs
     describe("PRD-v2 section 8 / auto-memory timeline rows", () => {
       // Unit tests for src/core/index/auto-memory.ts (DEVIATIONS D-M2-3).
@@ -2474,7 +2475,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: true }, () => 
     });
     // The eight MCP hosts are child processes with their own HOME in env: they run concurrently. Pi and opencode run in this
     // process and set process.env.HOME, so they stay serial after the MCP block.
-    describe("PRD-v2 section 8 / parity: MCP hosts (concurrent)", { concurrency: true }, () => {
+    describe("PRD-v2 section 8 / parity: MCP hosts (concurrent)", { concurrency: CONC }, () => {
       for (const host of MCP_HOSTS) hostCase(host);
     });
     for (const host of ALL_HOSTS.filter((h) => !MCP_HOSTS.includes(h))) hostCase(host);

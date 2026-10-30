@@ -1,6 +1,7 @@
 // ADR-0009 (compaction and memory), PRD-v2 section 11, GP6. One file per ADR area (ADR-0024); one describe per ADR section.
 // Moved from tests/v2/compaction/*, store/journal*, plugins/inprocess-journal, tools/resume, tools/search-decision. Names and assertions unchanged.
 import { after, before, describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,7 +25,7 @@ import { ctxIndex } from "../../src/core/tools/index.ts";
 import { ftsInsert } from "../../src/core/store/fts.ts";
 import { indexText } from "../../src/core/index/text.ts";
 
-describe("ADR-0009 section 1: journal, ported v1 session-journal cases", { concurrency: true }, () => {
+describe("ADR-0009 section 1: journal, ported v1 session-journal cases", { concurrency: CONC }, () => {
   // [W1-session-journal] Ported from tests/session/{extract-git-commit,parse-git-invocation}.test.ts.
   // v1 had `git` / `git_commit` / `cwd` event types. v2 keeps one closed set of journal kinds
   // (ADR-0009 §1, schema CHECK on events.kind): git runs are plain `cmd` rows with key = tool + canonical
@@ -99,7 +100,7 @@ describe("ADR-0009 section 1: journal, ported v1 session-journal cases", { concu
   });
 });
 
-describe("ADR-0009 section 1: journal write and read", { concurrency: true }, () => {
+describe("ADR-0009 section 1: journal write and read", { concurrency: CONC }, () => {
   // Unit tests for src/core/journal/append.ts and read.ts (impl/02 §10-11, DEVIATIONS D-M1-1).
   // appendEvent(db, row: NewJournalRow): number (seq). readSessionEvents(db, sessionId, kind?): JournalRow[].
   // readEventBySeq(db, seq): JournalRow | null. Empty/unknown session_id -> [] (never "latest session" fallback, F4).
@@ -268,7 +269,7 @@ describe("ADR-0009 section 1: journal write and read", { concurrency: true }, ()
   });
 });
 
-describe("ADR-0009 section 2: candidates", { concurrency: true }, () => {
+describe("ADR-0009 section 2: candidates", { concurrency: CONC }, () => {
   // [M4] Unit tests for src/core/compaction/candidates.ts (ADR-0009 §2, impl/00 §5.4 step 3).
   // Candidate sections: last request (pinned), open errors, changed files, earlier requests,
   // indexed sources. Each section capped at MAX_CANDIDATES (85). decision rows never a candidate.
@@ -370,7 +371,7 @@ describe("ADR-0009 section 2: candidates", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0009 section 3: score", { concurrency: true }, () => {
+describe("ADR-0009 section 3: score", { concurrency: CONC }, () => {
   // [M4] Unit tests for src/core/compaction/score.ts (ADR-0009 §3, impl/00 §5.4 step 3).
   // score = Math.round(WEIGHT[section] * DECAY_X1000[age] * (1 + floor(log2(repeatCount))) / 1000), integers only
   // (DECISIONS-r9 M7: one Math.round at the end; DEVIATIONS D-M4-S1-5).
@@ -420,7 +421,7 @@ describe("ADR-0009 section 3: score", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0009 section 5: render", { concurrency: true }, () => {
+describe("ADR-0009 section 5: render", { concurrency: CONC }, () => {
   // [M4] Unit tests for src/core/compaction/render.ts (ADR-0009 §4-§5, impl/06 §3, impl/00 §4
   // renderState(rows, turn), DECISIONS-r6 D1, DECISIONS-r9 M4/M8/M10-M13/M25, DEVIATIONS D-M4-arch-2).
 
@@ -746,7 +747,7 @@ describe("ADR-0009 section 0: journal write path from the in-process entries (Op
   });
 });
 
-describe("ADR-0009 section 6: ctx_resume delivery", { concurrency: true }, () => {
+describe("ADR-0009 section 6: ctx_resume delivery", { concurrency: CONC }, () => {
   // [M4] Unit tests for src/core/tools/resume.ts (impl/06 §4, ADR-0009 §4, DECISIONS-r6 D6, DECISIONS-r9 V21,
   // DEVIATIONS D-M4-arch-2 (renderState(rows, turn) over readSessionEvents rows), D-M4-arch-3 (handler (input, ctx),
   // session from ctx.sessionId), D-M4-S2-1 (seq read returns the whole body)).
@@ -954,7 +955,7 @@ describe("ADR-0009 section 6: ctx_resume delivery", { concurrency: true }, () =>
   }));
 });
 
-describe("ADR-0009 section 7: memory recall", { concurrency: true }, () => {
+describe("ADR-0009 section 7: memory recall", { concurrency: CONC }, () => {
   // [M7] Unit tests for src/core/compaction/recall.ts (DECISIONS-r11 B): BM25 turn-boundary recall, whole rows,
   // RECALL_BUDGET_BYTES, RECALL_MIN_SCORE, no repeat of a row already injected.
 
@@ -1052,7 +1053,7 @@ describe("ADR-0009 section 7: memory recall", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0009 section 8: decision tag, timeline and cross-session ranking in ctx_search", { concurrency: true }, () => {
+describe("ADR-0009 section 8: decision tag, timeline and cross-session ranking in ctx_search", { concurrency: CONC }, () => {
   // Unit tests for ctx_search source:"decision" and the ctx_index "decision (user)" rename
   // (ADR-0009 §8.2-§8.4, DECISIONS-r6 D2-D4, DECISIONS-r7 R1-R4, DEVIATIONS D-M4-arch-5).
   // A decision write (hooks/decision.ts) = one kind:"decision" journal row + its body as one chunk

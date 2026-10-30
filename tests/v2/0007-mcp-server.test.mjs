@@ -2,6 +2,7 @@
 // Area: ADR-0004, ADR-0005, ADR-0007, PRD-v2 sections 6-7: MCP server, tool registry, call shapes.
 // One file per ADR area (ADR-0024).
 import { describe, test, before, after } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { spawnSync, execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, realpathSync } from "node:fs";
@@ -24,7 +25,7 @@ import piExtension from "../../src/entries/pi.ts";
 import * as opencodePlugin from "../../src/entries/opencode.ts";
 import { spawnBundle } from "../../e2e/harness/mcp-client.mjs";
 
-describe("ADR-0005 tool registry", { concurrency: true }, () => {
+describe("ADR-0005 tool registry", { concurrency: CONC }, () => {
   // Unit tests for src/core/tools/registry.ts (impl/11 §1). TOOLS: readonly ToolDef<any>[], fixed order of 9.
 
   test("TOOLS has exactly the 9 tools in TOOL_ORDER order", () => {

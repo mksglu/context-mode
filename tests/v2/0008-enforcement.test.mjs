@@ -4,6 +4,7 @@
 // Serial blocks (decide, user-deny, routing) set process.env; the pure blocks run concurrently.
 
 import { after, before, describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { dequote, isAssignment, lex, scan, substitutions } from "../../src/core/policy/lexer.ts";
 import { parseShell } from "../../src/core/policy/parse.ts";
@@ -24,7 +25,7 @@ import { join, sep } from "node:path";
 import { matchesAnyDenyPattern, readUserDeny } from "../../src/core/policy/user-deny.ts";
 import { AGENT_IDS } from "../../src/core/contracts/agents.ts";
 
-describe("ADR-0008 lexer", { concurrency: true }, () => {
+describe("ADR-0008 lexer", { concurrency: CONC }, () => {
   // Unit tests for src/core/policy/lexer.ts (impl/08 §1, DECISIONS-r9 P1, P3, E1).
 
   const kinds = (cmd) => lex(cmd).map((t) => `${t.kind}:${t.text}`);
@@ -150,7 +151,7 @@ describe("ADR-0008 lexer", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0008 command parse", { concurrency: true }, () => {
+describe("ADR-0008 command parse", { concurrency: CONC }, () => {
   // Unit tests for src/core/policy/parse.ts (impl/08 §2, DECISIONS-r9 P1-P4, E1; DEVIATIONS D-M3-E1-1..5).
 
   function cmds(cmd) {
@@ -364,7 +365,7 @@ describe("ADR-0008 command parse", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0008 shell unwrap", { concurrency: true }, () => {
+describe("ADR-0008 shell unwrap", { concurrency: CONC }, () => {
   // Unit tests for src/core/policy/unwrap.ts (impl/08 §3, ADR-0008 GP3 wrapper rows, DECISIONS-r9 P1/P4).
 
   function run(cmd) {
@@ -497,7 +498,7 @@ describe("ADR-0008 shell unwrap", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0008 read-deny hook text", { concurrency: true }, () => {
+describe("ADR-0008 read-deny hook text", { concurrency: CONC }, () => {
   // D-DU-DENY-1: the Read deny is one line built from the src/prompt/hooks/read-deny.md template:
   // the exact ctx_execute call for this file, no prose from the tool descriptions. Golden text + byte cap.
 
@@ -536,7 +537,7 @@ describe("ADR-0008 read-deny hook text", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0001 external MCP tool names (ported from v1)", { concurrency: true }, () => {
+describe("ADR-0001 external MCP tool names (ported from v1)", { concurrency: CONC }, () => {
   // PORT of tests/adapters/{codex,gemini-cli,kiro,qwen-code}-external-mcp-routing.test.ts (#529), cleanup-plan W1-adapters.
   // v1 asserted an EXTERNAL_MCP_MATCHER_PATTERN in each hook config so another server's large output was routed.
   // v2 (ADR-0008 table row "other MCP servers", D-M7-RR-2): the host matcher lists only the agent's native tools and
@@ -587,7 +588,7 @@ describe("ADR-0001 external MCP tool names (ported from v1)", { concurrency: tru
   });
 });
 
-describe("ADR-0008 security rules (ported from v1)", { concurrency: true }, () => {
+describe("ADR-0008 security rules (ported from v1)", { concurrency: CONC }, () => {
   // W1-core PORT of tests/security.test.ts, tests/core/deny-policy.test.ts, tests/security/project-boundary-852.test.ts
   // to the v2 decide() surface (ADR-0008, impl/08 §4, §6). Same inputs as v1; v2 verdict shape ({kind}).
 

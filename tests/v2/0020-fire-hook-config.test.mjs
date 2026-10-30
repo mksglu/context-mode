@@ -4,6 +4,7 @@
 // Split from one file because the spawnSync probes and builds block the event loop; two files run in two processes.
 
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { spawn, spawnSync, execFileSync } from "node:child_process";
@@ -17,7 +18,7 @@ import { listCopilotHooks } from "../../src/setup/copilot-hooks.ts";
 
 // Agent describes run concurrently (each owns its temp dirs and fake provider). Tests inside one describe stay serial:
 // they share the built package, and a concurrent run hit ENOTEMPTY on the shared temp dir (codex).
-describe("ADR-0020 fire, hook-config hosts", { concurrency: true }, () => {
+describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
   describe("ADR-0020 fire claude-code", () => {
     // D-CC-HOOKS-RUN-1: the real `claude -p` (no login, fake Anthropic Messages endpoint through ANTHROPIC_BASE_URL) runs
     // Bash "cat big.log" on a 200 KB file. The plugin is installed the documented way (`claude plugin marketplace add`

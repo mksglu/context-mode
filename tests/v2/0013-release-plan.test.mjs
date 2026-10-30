@@ -1,6 +1,7 @@
 // ADR-0013 (release automation), ADR-0019 (npm channel), PRD-v2 section 14: release plan, smoke, rollback, npm tarball check.
 // One file per ADR area (docs/v2/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -10,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Sections are independent: each builds its own temp git repos and stubs; none changes process.env or the cwd, so they run concurrently.
-describe("ADR-0013 / ADR-0019 / PRD-v2 section 14 release plan", { concurrency: true }, () => {
+describe("ADR-0013 / ADR-0019 / PRD-v2 section 14 release plan", { concurrency: CONC }, () => {
 describe("ADR-0013 release: plan", () => {
   // Unit tests for scripts/release/plan.mjs (impl/13 §10, A11, DEVIATIONS D-M6-arch-4).
   // Each test seeds a scratch git repo and runs the real script in it.

@@ -7,6 +7,7 @@ import { mkdtempSync, mkdirSync, rmSync, realpathSync, writeFileSync, symlinkSyn
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { test, before, after, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import { getAdapter } from "../../src/adapters/table.ts";
 import { AGENT_IDS } from "../../src/core/contracts/agents.ts";
 import { CtxError } from "../../src/core/contracts/errors.ts";
@@ -22,7 +23,7 @@ import { resolveProject } from "../../src/core/project/resolve.ts";
 import { sha256Hex } from "../../src/core/project/sha256.ts";
 import { buildRegistry } from "../../src/setup/registry.ts";
 
-describe("ADR-0007: resolveProject picks the project dir per host", { concurrency: true }, () => {
+describe("ADR-0007: resolveProject picks the project dir per host", { concurrency: CONC }, () => {
   // Unit tests for src/core/project/resolve.ts (impl/02 §2, DEVIATIONS D-M1-5).
   // resolveProject(agent, { env, argv, cwd, piCwd? }): ProjectContext.
   // Dir picked per AdapterRow.projectSource: env:CLAUDE_PROJECT_DIR, arg:--agent+cwd,
@@ -213,7 +214,7 @@ describe("ADR-0007: resolveProject picks the project dir per host", { concurrenc
   });
 });
 
-describe("ADR-0007: containment by realpath components, not string prefix", { concurrency: true }, () => {
+describe("ADR-0007: containment by realpath components, not string prefix", { concurrency: CONC }, () => {
   // Unit tests for src/core/project/contain.ts (impl/02 §3): isInside(root, p) by
   // realpath'd path COMPONENTS, never a string prefix check (A61 — "/root-evil" vs "/root").
   // Concurrent: each test makes its own temp tree.
@@ -321,7 +322,7 @@ describe("ADR-0007: containment by realpath components, not string prefix", { co
   });
 });
 
-describe("ADR-0007: CLAUDE_CONFIG_DIR is honoured for detection", { concurrency: true }, () => {
+describe("ADR-0007: CLAUDE_CONFIG_DIR is honoured for detection", { concurrency: CONC }, () => {
   // D-WF-CC-CONFIG-1: Claude Code reads its user dir from $CLAUDE_CONFIG_DIR (default <home>/.claude). Windows users with
   // OneDrive-redirected profiles set it. One helper (claudeDirOf) feeds setup, doctor, plugin-root and the subagent reader.
   // Fake Windows paths: path.join is the host's, so the assertions compare against path.join of the same inputs and run on every OS.
@@ -390,7 +391,7 @@ describe("ADR-0007: CLAUDE_CONFIG_DIR is honoured for detection", { concurrency:
   });
 });
 
-describe("ADR-0007: Copilot home dir", { concurrency: true }, () => {
+describe("ADR-0007: Copilot home dir", { concurrency: CONC }, () => {
   // D-WIN-COPILOT-HOME-1: Copilot CLI reads hooks/ and skills/ from $COPILOT_HOME (it replaces ~/.copilot as a whole;
   // docs.github.com cli-config-dir-reference). One helper (copilotDirOf) feeds setup, detection, doctor and the v1 scan.
   // Fake Windows paths: path.join is the host's, so the assertions compare against path.join of the same inputs and run on every OS.
@@ -486,7 +487,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   });
 });
 
-describe("ADR-0007: requireHomeDir and the per-agent home dir table", { concurrency: true }, () => {
+describe("ADR-0007: requireHomeDir and the per-agent home dir table", { concurrency: CONC }, () => {
   // homeDirOf(env, platform): the one home rule (D-M1-T3-1, superseded on win32 by D-WIN-HOME-2).
   // Windows hosts (Gemini, pi, Claude Code, Codex) take their home from os.homedir(), which is USERPROFILE and never HOME,
   // so on win32 USERPROFILE wins. POSIX keeps HOME first. These cases pass the platform in, so they run on every OS.
@@ -542,7 +543,7 @@ describe("ADR-0007: requireHomeDir and the per-agent home dir table", { concurre
   });
 });
 
-describe("ADR-0007: Kiro home dir", { concurrency: true }, () => {
+describe("ADR-0007: Kiro home dir", { concurrency: CONC }, () => {
   // D-WIN-KIRO-HOME-1: Kiro CLI V3 takes its global dir from $KIRO_HOME (kiro.dev/docs/reference/settings: "overrides the global
   // Kiro directory"; a filesystem root, the home dir, one of its ancestors or a relative path falls back to ~/.kiro).
   // One helper (kiroDirOf) feeds setup, detection, doctor, uninstall, host-write, upgrade and the v1 scan.
@@ -665,7 +666,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   });
 });
 
-describe("ADR-0007: OpenCode config dir", { concurrency: true }, () => {
+describe("ADR-0007: OpenCode config dir", { concurrency: CONC }, () => {
   // D-WIN-OPENCODE-DIR-1: OpenCode reads opencode.json and skills/ from $OPENCODE_CONFIG_DIR, else $XDG_CONFIG_HOME/opencode
   // (xdg-basedir), else ~/.config/opencode. One helper (opencodeDirOf) feeds setup, host-write, doctor, uninstall, detection
   // and the v1 scan. Fake Windows paths: path.join is the host's, so assertions compare against path.join of the same inputs
@@ -781,7 +782,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   });
 });
 
-describe("ADR-0007: Pi agent dir", { concurrency: true }, () => {
+describe("ADR-0007: Pi agent dir", { concurrency: CONC }, () => {
   // D-WIN-PIDIR-1: Pi reads settings.json from $PI_CODING_AGENT_DIR, else <home>/.pi/agent. An empty value counts as unset
   // (same as codexDirOf). One helper (piAgentDirOf) feeds host-write, uninstall, doctor, upgrade and the v1 scan. Before the
   // fix host-write and uninstall used `??`, so "" gave join("", "settings.json") = a relative path in the cwd. Fake Windows
@@ -839,7 +840,7 @@ describe("ADR-0007: Pi agent dir", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0007: VS Code user dir", { concurrency: true }, () => {
+describe("ADR-0007: VS Code user dir", { concurrency: CONC }, () => {
   // D-WIN-VSCODE-MCP-1 (VS-WIN-2): VS Code reads the user-profile mcp.json from its user data dir, not from ~/.vscode
   // (the extensions dir). Rule from microsoft/vscode src/vs/platform/environment/node/userDataPath.ts and
   // src/vs/platform/userDataProfile/common/userDataProfile.ts (default profile = userRoamingDataHome = <data>/Code/User,
@@ -913,7 +914,7 @@ describe("ADR-0007: VS Code user dir", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0007: a project that is not a git repo", { concurrency: true }, () => {
+describe("ADR-0007: a project that is not a git repo", { concurrency: CONC }, () => {
   // D-M7-NG-1: one fixed project rule (impl/02 §2). A .git found walking up from the project dir ->
   // the project is the git common dir, worktree = the dir that holds that .git (unchanged). No .git up
   // to the filesystem root -> the project is realpath(dir) and worktree = containmentRoot = realpath(dir).

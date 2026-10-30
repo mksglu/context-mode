@@ -2,6 +2,7 @@
 // Area: ADR-0019 (interactive setup, npm channel), ADR-0023, PRD-setup.
 // One file per ADR area (ADR-0024). A new setup test goes into the describe block of its section.
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -875,7 +876,7 @@ exit 0`);
   });
 });
 
-describe("ADR-0019 no-regex rule for src/setup", { concurrency: true }, () => {
+describe("ADR-0019 no-regex rule for src/setup", { concurrency: CONC }, () => {
   // No regex in the setup runtime (rule: no regex as a mechanism). The TypeScript parser finds the nodes.
   // CP-WIN-6: spawn-bin.ts quotes with a char loop; the leftovers in print.ts and engine.ts went the same way.
 

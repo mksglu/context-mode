@@ -4,6 +4,7 @@
 // Every block only reads files, so all run concurrently.
 
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -11,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { SWITCH_HEADING, checkLines, checkNativePages, checkNoV1, checkPages, checkReleaseRef, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, switchSection, v1FreeFiles } from "../../build/check-install-docs.mjs";
 import { getAdapter } from "../../src/adapters/table.ts";
 
-describe("ADR-0023 install pages: lines and pages", { concurrency: true }, () => {
+describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () => {
   // build/check-install-docs.mjs: docs/install/*.md fenced blocks must run as copied (owner rule 2026-10-21).
 
   const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "docs", "install");
@@ -89,7 +90,7 @@ describe("ADR-0023 install pages: lines and pages", { concurrency: true }, () =>
   });
 });
 
-describe("ADR-0023 native install commands per host", { concurrency: true }, () => {
+describe("ADR-0023 native install commands per host", { concurrency: CONC }, () => {
   // ADR-0023: every install page opens with the host's own native install command, then the native update command,
   // then "Check: `context-mode doctor`". Hosts with no native step shipped yet open with the npm fallback.
 
@@ -241,7 +242,7 @@ describe("ADR-0023 native install commands per host", { concurrency: true }, () 
   });
 });
 
-describe("ADR-0023 pi and Gemini pages", { concurrency: true }, () => {
+describe("ADR-0023 pi and Gemini pages", { concurrency: CONC }, () => {
   // D-FU-RM-DOCS-1: Pi and Gemini install guides must match release 05e97724.
 
   const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
@@ -273,7 +274,7 @@ describe("ADR-0023 pi and Gemini pages", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0023 Qwen and Kiro pages", { concurrency: true }, () => {
+describe("ADR-0023 Qwen and Kiro pages", { concurrency: CONC }, () => {
   // D-FU-RM-QWEN-2 and D-FU-RM-KIRO-2: install guide text for Qwen Code and Kiro must match the release build.
 
   const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
@@ -300,7 +301,7 @@ describe("ADR-0023 Qwen and Kiro pages", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0023 simple wording", { concurrency: true }, () => {
+describe("ADR-0023 simple wording", { concurrency: CONC }, () => {
   // build/check-install-docs.mjs simple rules (owner 2026-10-25): users never type paths, JSON or scripts.
   // A docs code block must not hold `node -e`, `npm root -g`, `$(...)` or a path under a home dir; a shell line is
   // at most 100 chars; every install page names the two-command path or `context-mode setup --agents`.
@@ -381,7 +382,7 @@ describe("ADR-0023 simple wording", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0023 source install", { concurrency: true }, () => {
+describe("ADR-0023 source install", { concurrency: CONC }, () => {
   // New-user finding (2026-10-25): `npm pack` at the repo root gives a package with no bin, so `context-mode` is missing.
   // The repo root is the dev package. The user package is the release tree from build/build.mjs. The docs must say so.
 
@@ -411,7 +412,7 @@ describe("ADR-0023 source install", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0023 no v1 text in docs", { concurrency: true }, () => {
+describe("ADR-0023 no v1 text in docs", { concurrency: CONC }, () => {
   // D-V1OUT-1 (owner 2026-10-25): users see one product. The word "v1" must not appear in README.md, docs/install/**,
   // src/prompt/**, issue templates or CLI help/output. docs/benchmarks/** and docs/v2/** are exempt.
 
@@ -435,7 +436,7 @@ describe("ADR-0023 no v1 text in docs", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0023 VS Code hooks limits", { concurrency: true }, () => {
+describe("ADR-0023 VS Code hooks limits", { concurrency: CONC }, () => {
   // tests/v2/repo/install-docs-vscode-hooks.test.mjs
   // D-NI-VSCODE-DOC-1: setup writes the VS Code hooks to ~/.copilot/hooks/context-mode-vscode.json (src/adapters/table.ts
   // hookChannel home-file, src/setup/hook-shapes.ts flatShape with "timeout"). The Known limits line said the opposite.

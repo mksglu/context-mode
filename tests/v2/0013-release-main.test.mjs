@@ -1,6 +1,7 @@
 // ADR-0013 (release automation), PRD-v2 section 14: release to main. One file per ADR area (ADR-0024); one describe per script.
 // Moved from tests/v2/release/{publish,plan-main,commit-main,branch-protection,release-next}. Names and assertions unchanged.
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -9,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PROTECTION_ENDPOINT, SETTINGS, protectionDrift } from "../../scripts/release/branch-protection.mjs";
 
-describe("ADR-0013: plan.mjs on main", { concurrency: true }, () => {
+describe("ADR-0013: plan.mjs on main", { concurrency: CONC }, () => {
   // Main-only release plan (docs/v2/release/MAIN-ONLY.md, owner decision 2026-10-28): `plan.mjs --main --channel next|latest`
   // reads the v2 tags on origin and the commits on main. Each test seeds a scratch repo with a local bare origin and
   // runs the real script in it. No release branch, no Source-Commit trailer.
@@ -151,7 +152,7 @@ describe("ADR-0013: plan.mjs on main", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0013: publish.mjs", { concurrency: true }, () => {
+describe("ADR-0013: publish.mjs", { concurrency: CONC }, () => {
   // Unit tests for scripts/release/publish.mjs (impl/13-build-release.md §11.1, DEVIATIONS D-M6-arch-5,
   // D-M6-P2-1). Runs the real script against a local bare repo passed via --remote; nothing leaves the machine.
 
@@ -536,7 +537,7 @@ describe("ADR-0013: publish.mjs", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0013: release-next (plan then publish)", { concurrency: true }, () => {
+describe("ADR-0013: release-next (plan then publish)", { concurrency: CONC }, () => {
   // Release-next dry run (DEVIATIONS D-RN-TAG-1): the release.yml path for a pushed v2.* tag, run locally against
   // a bare temp remote. plan.mjs --tag -> publish.mjs --stage -> publish.mjs --promote (fresh checkout) -> publish.mjs
   // --github-release (fresh checkout) with a stub gh. Nothing leaves the machine; npm is never called.
@@ -642,7 +643,7 @@ describe("ADR-0013: release-next (plan then publish)", { concurrency: true }, ()
   });
 });
 
-describe("ADR-0013: commit-main.mjs", { concurrency: true }, () => {
+describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
   // MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): scripts/release/commit-main.mjs makes the release commit on `main` from an unpacked
   // package, tags it (annotated) and pushes both to the remote in one push. Local bare remote; no network.
 
@@ -750,7 +751,7 @@ describe("ADR-0013: commit-main.mjs", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0013: branch protection check", { concurrency: true }, () => {
+describe("ADR-0013: branch protection check", { concurrency: CONC }, () => {
   // Unit tests for scripts/release/branch-protection.mjs and check-branch-protection.mjs
   // (impl/13 §12, §14.2). No network: the GitHub API is a stub `gh` placed first on PATH.
 

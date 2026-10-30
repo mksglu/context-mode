@@ -2,6 +2,7 @@
 // Area: ADR-0021 (prompt cache safety): prefix determinism, Pi and OpenCode cache guards, cache usage analysis.
 // One file per ADR area (ADR-0024).
 import { describe, test, after, before } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -17,7 +18,7 @@ import { parseSession, analyzeSession, percentile, armOf, workloadOf, summarize 
 import * as opencodePlugin from "../../src/entries/opencode.ts";
 import piExtension from "../../src/entries/pi.ts";
 
-describe("ADR-0021 Codex cache usage analysis", { concurrency: true }, () => {
+describe("ADR-0021 Codex cache usage analysis", { concurrency: CONC }, () => {
   // Codex cache-usage analysis (docs/v2/spikes/cache). Pure: no spawn, no network.
   // Codex reports input_tokens (which INCLUDES cached_input_tokens) and no cache write count, so the
   // definitions map as: cache_read = cached, cache_creation = input - cached, uncached "input" = 0.
@@ -295,7 +296,7 @@ describe("ADR-0021 prefix determinism across starts", () => {
   });
 });
 
-describe("ADR-0021 cache mining (bench/cache/mine.mjs)", { concurrency: true }, () => {
+describe("ADR-0021 cache mining (bench/cache/mine.mjs)", { concurrency: CONC }, () => {
   // bench/cache/mine.mjs: per-turn prompt-cache accounting from raw Claude Code stream-json (pure parsing).
 
   const j = (o) => JSON.stringify(o);

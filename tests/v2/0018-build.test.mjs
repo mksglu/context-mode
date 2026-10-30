@@ -1,6 +1,7 @@
 // ADR-0018 (module map and build), ADR-0019 (npm channel), ADR-0023 (native install): build output, generated files, host manifests,
 // hook shells and the npm package. One file per ADR area (docs/v2/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
 import { after, before, describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -18,7 +19,7 @@ import { denyMessage } from "../../src/core/policy/decide.ts";
 import { buildRegistry, renderSkill } from "../../src/setup/registry.ts";
 
 // Sections are independent: each builds into its own temp dir and none changes process.env or the cwd, so they run concurrently.
-describe("ADR-0018 / ADR-0019 / ADR-0023 build, generated files, host manifests, npm package", { concurrency: true }, () => {
+describe("ADR-0018 / ADR-0019 / ADR-0023 build, generated files, host manifests, npm package", { concurrency: CONC }, () => {
 describe("ADR-0018 build: release-out tree", () => {
   // Unit tests for build/build.mjs §2.2 step 5 (fixture copy, DEVIATIONS D-M5-arch-4) and the
   // BUNDLE_SHA esbuild define (D-M5-arch-5, D-M5-B1-1). Runs the real script into a scratch dir.

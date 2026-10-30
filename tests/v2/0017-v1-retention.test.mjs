@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, before, after, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import { rewriteWindowsBuildTools as rw } from "../../src/core/sandbox/win-build.ts";
 import { ctxExecute } from "../../src/core/tools/execute.ts";
 import { ctxIndex } from "../../src/core/tools/index.ts";
@@ -117,7 +118,7 @@ describe("ADR-0017: every v1 PreToolUse call through the built v2 hook bundle", 
   });
 });
 
-describe("ADR-0017: v1 executor language cases through ctx_execute", { concurrency: true }, () => {
+describe("ADR-0017: v1 executor language cases through ctx_execute", { concurrency: CONC }, () => {
   // Ported from v1 tests/executor.test.ts (context-mode 1.0.169): the language cases, through v2's public ctx_execute handler.
   // A runtime missing on the machine shows as a named skip (node:test prints it), never as a pass.
   // Concurrent: each test makes its own temp root and does not touch process.env or cwd.
@@ -189,7 +190,7 @@ describe("ADR-0017: v1 executor language cases through ctx_execute", { concurren
   });
 });
 
-describe("ADR-0017: v1 store index and search cases through the v2 handlers", { concurrency: true }, () => {
+describe("ADR-0017: v1 store index and search cases through the v2 handlers", { concurrency: CONC }, () => {
   // Ported from v1 tests/store.test.ts (context-mode 1.0.169): index and search behaviour through v2's public handlers.
   // Concurrent: each test makes its own temp store.
   function ctxFor(root) {
@@ -312,7 +313,7 @@ describe("ADR-0017: v1 store index and search cases through the v2 handlers", { 
   });
 });
 
-describe("ADR-0017: v1 #782 Windows build-tool rewrite", { concurrency: true }, () => {
+describe("ADR-0017: v1 #782 Windows build-tool rewrite", { concurrency: CONC }, () => {
   // W1-core PORT of tests/executor/win-sandbox-782-788.test.ts #782 (rewriteWindowsBuildTools), same cases.
   // Concurrent: pure functions, no shared state.
   test("[W1-core] #782: bare mvn becomes mvn.cmd on win32", () => {

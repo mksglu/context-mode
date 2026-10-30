@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, writeFileS
 import { tmpdir } from "node:os";
 import { join, dirname, delimiter } from "node:path";
 import { test, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import { fileURLToPath } from "node:url";
 import * as C from "../../src/core/contracts/constants.ts";
 import { formatError } from "../../src/core/contracts/errors.ts";
@@ -19,7 +20,7 @@ import { ctxBatch, runBatch, runPool } from "../../src/core/tools/batch.ts";
 import { ctxExecute, ctxExecuteSchema } from "../../src/core/tools/execute.ts";
 import { ctxSearch } from "../../src/core/tools/search.ts";
 
-describe("PRD-v2 section 9: output cap", { concurrency: true }, () => {
+describe("PRD-v2 section 9: output cap", { concurrency: CONC }, () => {
   // Unit tests for src/core/sandbox/cap.ts (impl/03 §3).
   // capBytes(s, cap): { text, cut, fullBytes }. Code-point safe cut, never mid-sequence.
   // Concurrent: pure function, no shared state.
@@ -104,7 +105,7 @@ describe("PRD-v2 section 9: output cap", { concurrency: true }, () => {
   });
 });
 
-describe("PRD-v2 section 9: ctx_execute", { concurrency: true }, () => {
+describe("PRD-v2 section 9: ctx_execute", { concurrency: CONC }, () => {
   // Unit tests for src/core/tools/execute.ts (impl/04 §2). ctx_execute: alwaysLoad tool.
   // Concurrent: each test makes its own temp root and does not touch process.env or cwd.
   function ctxFor(root) {
@@ -338,7 +339,7 @@ describe("PRD-v2 section 9: ctx_execute", { concurrency: true }, () => {
   });
 });
 
-describe("PRD-v2 section 9: ctx_batch", { concurrency: true }, () => {
+describe("PRD-v2 section 9: ctx_batch", { concurrency: CONC }, () => {
   // Unit tests for src/core/tools/batch.ts (impl/04 §3). ctx_batch: {commands[], queries[]}.
   // Concurrent: each test makes its own temp root and does not touch process.env or cwd.
   function ctxFor(root) {

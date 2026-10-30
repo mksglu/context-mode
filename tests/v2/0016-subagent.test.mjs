@@ -1,6 +1,7 @@
 // ADR-0016: subagent routing. Policy cases, the run wrapper, and the vscode project and tool-name handling.
 // One file per area (docs/v2/TEST-LAYOUT.md).
 import { test, before, after, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import path, { join, resolve } from "node:path";
@@ -16,7 +17,7 @@ import { buildRegistry } from "../../src/setup/index.ts";
 import { decode } from "../../src/adapters/vscode.ts";
 import { generateManifests } from "../../build/manifests.ts";
 
-describe("ADR-0016: subagent policy cases", { concurrency: true }, () => {
+describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
   // Unit tests for src/core/policy/subagent.ts (impl/08 §5, Assumption B4; ADR-0016; DECISIONS-r3 Q23).
   // GP3 ADR-0016 golden cases at the pick level: case A/B/C, unknown built-in type, no tools: line,
   // disallowedTools: mcp__*, main thread of --agent x, Gemini generateValidName() name.
@@ -195,7 +196,7 @@ describe("ADR-0016: subagent policy cases", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0016: run wrapper", { concurrency: true }, () => {
+describe("ADR-0016: run wrapper", { concurrency: CONC }, () => {
   // Each case runs the real entry as a child process in a temp git repo with a temp HOME.
   const ENTRY = resolve(fileURLToPath(import.meta.url), "../../../src/entries/run.ts");
   const b64 = (s) => Buffer.from(s, "utf8").toString("base64url");

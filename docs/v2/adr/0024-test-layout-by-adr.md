@@ -37,3 +37,4 @@ Baseline (see docs/v2/review/test-layout/BASELINE.md): 2398 unit tests, 188 e2e/
 - Full parallel run (node --test "tests/v2/**/*.test.mjs"): 2389 tests, 0 fail, 33 skip. Wall time, 3 interleaved runs against a worktree of f3c958c3 on the same loaded machine (load average about 30): baseline 112, 102, 100 s (median 102); new 101, 100, 91 s (median 100). Not slower.
 - Two fixes after the name check: the 3 live-local names were restored (tests/v2/0012-live-harness.test.mjs), and the Copilot block of tests/v2/0020-gates-pi-copilot-claude.test.mjs now runs its tests in order inside a block cap of 2 (D-TEST-LAYOUT-1).
 - Guard: tests/v2/0014-repo-hygiene.test.mjs fails when a *.test.mjs under tests/v2 or a case file under e2e/cases is not in docs/v2/TEST-LAYOUT.md.
+- Windows: blocks in a merged file run in order on win32 (tests/v2/_lib/concurrency.mjs, CONC), because the 4-core runner starved timed tests when they ran at once. See D-TEST-LAYOUT-1.

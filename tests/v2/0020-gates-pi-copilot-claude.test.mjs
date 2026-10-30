@@ -3,6 +3,7 @@
 // Merged by ADR-0024 from 7 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // pi-gate is serial because its tests call process.chdir; the other blocks use own temp dirs and explicit env, so they run concurrently.
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -163,7 +164,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
 
 // Independent blocks (own temp dirs, no process-wide state). At most 2 blocks run at once, and the Copilot block runs its tests one after another:
 // its host stubs answer under the 10 s verify timeout of src/setup/engine.ts, and 7 blocks at once starved them on a loaded machine (D-TEST-LAYOUT-1).
-describe("ADR-0020 gates (concurrent blocks)", { concurrency: 2 }, () => {
+describe("ADR-0020 gates (concurrent blocks)", { concurrency: CONC === true ? 2 : 1 }, () => {
   describe("ADR-0020 Copilot CLI hooks enabled", { concurrency: 1 }, () => {
     // D-HF-COPILOT-ENABLED-1: Copilot CLI 1.0.105 does not run a hook whose key is in settings.json `disabledHooks`
     // (live-proven in tests/v2/e2e/copilot-cli-fire.test.mjs). Setup removes our own keys; doctor FAILs with a one-line fix.
@@ -310,7 +311,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     });
   });
 
-  describe("ADR-0020 Claude Code hooks run", { concurrency: true }, () => {
+  describe("ADR-0020 Claude Code hooks run", { concurrency: CONC }, () => {
     // tests/v2/setup/claude-code-hooks-run.test.mjs
     // D-CC-HOOKS-RUN-1. Claude Code 2.1.274 (live spike): the plugin hooks never run when the plugin is installed but
     // disabled (`claude plugin list` shows "Status: disabled") or when `disableAllHooks: true` is set in a settings file.
@@ -412,7 +413,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     });
   });
 
-  describe("ADR-0020 Codex trust key dir", { concurrency: true }, () => {
+  describe("ADR-0020 Codex trust key dir", { concurrency: CONC }, () => {
     // tests/v2/setup/codex-trust-key.test.mjs
     // D-WIN-CODEX-KEY-1: the [hooks.state."<key>"] key must equal the `key` Codex prints in hooks/list. Probed on Codex 0.156.1:
     // the default ~/.codex is used as spelled (a symlinked HOME is not resolved); $CODEX_HOME is canonicalised; the key is
@@ -516,7 +517,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     });
   });
 
-  describe("ADR-0020 OpenCode plugin gate", { concurrency: true }, () => {
+  describe("ADR-0020 OpenCode plugin gate", { concurrency: CONC }, () => {
     // D-HF-OPENCODE-GATE-1: OpenCode 1.19.5 loads every entry of the `plugin` list (config.plugin_origins) and skips an
     // entry whose file is missing without an error, so hooks silently do not run. Two ways our hooks stop or double:
     //  - a stale own path entry (the package moved or was upgraded): the file is gone, the hooks never run;
@@ -630,7 +631,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     });
   });
 
-  describe("ADR-0020 OpenCode plugin entry path", { concurrency: true }, () => {
+  describe("ADR-0020 OpenCode plugin entry path", { concurrency: CONC }, () => {
     // OC-WIN-4 (D-WIN-OCENTRY-1): the opencode plugin entry is the absolute path of opencode/plugin.js, written bare.
     // OpenCode 1.19.4 (binary strings, resolver for config `plugin` entries): a value that is `file://`, starts with `.`,
     // is absolute, or starts with a drive letter + `:` + `\` or `/` is a file entry, and an absolute or drive-letter
@@ -666,7 +667,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     });
   });
 
-  describe("ADR-0020 hook entry survives a node or package path change", { concurrency: true }, () => {
+  describe("ADR-0020 hook entry survives a node or package path change", { concurrency: CONC }, () => {
     // Z-WIN-4 (D-WIN-HOOKMERGE-1): setup finds its own hook entries by a stable marker (hook.mjs ... --agent <id>), not by the
     // full command. When the node path or the package dir changes between runs (node upgrade, C:\ vs c:\, nvm-windows switch,
     // 8.3 short name), the old own entry is replaced, not left next to the new one. Runs on every OS: both package dirs are

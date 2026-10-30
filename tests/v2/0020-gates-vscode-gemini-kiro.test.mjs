@@ -4,6 +4,7 @@
 // vscode-gate and gemini-gate are serial because their tests call process.chdir; kiro-gate runs concurrently.
 
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -296,8 +297,8 @@ rl.on("line", (l) => {
 });
 
 // Independent blocks (own temp dirs, no process-wide state): they run at the same time.
-describe("ADR-0020 gates (concurrent blocks)", { concurrency: true }, () => {
-  describe("ADR-0020 Kiro gate", { concurrency: true }, () => {
+describe("ADR-0020 gates (concurrent blocks)", { concurrency: CONC }, () => {
+  describe("ADR-0020 Kiro gate", { concurrency: CONC }, () => {
     // D-NI-KIRO-GATE-1: kiro-cli 2.35.2 (V3 engine, real binary, temp HOME) logs `hooks.reload.loaded {read, registered}` and counts a
     // hook with "enabled": false as registered. The docs (kiro.dev/docs/cli/v3/hooks-migration, hooks[].enabled: "Set false to skip
     // the hook without deleting it") say it does not run. A disabled own entry looks installed but never fires: doctor must FAIL

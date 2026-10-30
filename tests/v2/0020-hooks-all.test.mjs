@@ -2,6 +2,7 @@
 // Area: ADR-0020 (hooks and skills on every agent): one fire matrix plus the per-shell hook command checks.
 // One file per ADR area (ADR-0024).
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -429,7 +430,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   });
 });
 
-describe("ADR-0020 Copilot hook sample", { concurrency: true }, () => {
+describe("ADR-0020 Copilot hook sample", { concurrency: CONC }, () => {
   // D-HQ-COPILOT-EVENT-1: doctor hook-runs must send the copilot-cli payload the host really sends
   // (docs.github.com/en/copilot/reference/hooks-configuration): no hookEventName, toolArgs a JSON string.
   // A sample with a field the host never sends hid the live decode failure.
@@ -446,7 +447,7 @@ describe("ADR-0020 Copilot hook sample", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0020 Windows hook shell command", { concurrency: true }, () => {
+describe("ADR-0020 Windows hook shell command", { concurrency: CONC }, () => {
   // D-HW-PS-1: the hook command setup writes starts with a quoted node path. cmd.exe /C "..." (codex) and sh accept
   // that; PowerShell reads a leading quoted string as a string literal and fails to parse the rest. The Copilot
   // harness (copilot-cli, vscode) runs `command` through PowerShell on Windows unless an explicit `powershell` field
@@ -531,7 +532,7 @@ describe("ADR-0020 Windows hook shell command", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0020 Kiro hook shell command", { concurrency: true }, () => {
+describe("ADR-0020 Kiro hook shell command", { concurrency: CONC }, () => {
   // KIRO-WIN-4: which shell runs the kiro hook command on Windows, and does the registered string survive it.
   // Source read (aws/amazon-q-developer-cli main, crates/chat-cli/src/cli/chat/cli/hooks.rs run_hook, the open source
   // base of Kiro CLI): unix `bash -c <command>`; windows `tokio::process::Command::new("cmd").arg("/C").arg(command)`.
@@ -566,7 +567,7 @@ describe("ADR-0020 Kiro hook shell command", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0020 Z Code hook shell command", { concurrency: true }, () => {
+describe("ADR-0020 Z Code hook shell command", { concurrency: CONC }, () => {
   // Z-WIN-3: which shell runs the zcode hook command on Windows, and does the registered string survive it.
   // Source read (zai-org/ZCode main, apps/zcode-cli/packages): core/src/hooks/configured-runner-callback.ts runs a
   // `type: "command"` hook as ExecutionCommand mode "shell" with no shellProfile; adapters/src/exec/execution-command.ts

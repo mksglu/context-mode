@@ -4,6 +4,7 @@
 // Split from one file because the spawnSync probes and builds block the event loop; two files run in two processes.
 
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { spawn, execFileSync, spawnSync } from "node:child_process";
@@ -13,7 +14,7 @@ import { join, resolve } from "node:path";
 import { runDoctor, runSetup } from "../../src/setup/index.ts";
 
 // Agent describes run concurrently (each owns its temp dirs and fake provider). Tests inside one describe stay serial: they share the built package.
-describe("ADR-0020 fire, plugin and extension hosts", { concurrency: true }, () => {
+describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () => {
   describe("ADR-0020 fire opencode", () => {
     // D-HF-OPENCODE-FIRE-1: the real `opencode run` (no login, no key) against a local fake OpenAI-compatible provider calls
     // the bash tool with `cat big.log` (200 KB). Our built plugin (opencode/plugin.js, loaded from the config `plugin` list)

@@ -1,6 +1,7 @@
 // PRD-v2 section 10, GP3, GP6, GP7: the hook process. stdin, entry, dispatch, replace and saving, compaction delivery,
 // decisions, errors, throttle and tool names. One file per area (docs/v2/TEST-LAYOUT.md); a describe per ADR/PRD section.
 import { test, before, after, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -952,7 +953,7 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
   });
 });
 
-describe("PRD-v2 section 10: decision rows from AskUserQuestion and option echo", { concurrency: true }, () => {
+describe("PRD-v2 section 10: decision rows from AskUserQuestion and option echo", { concurrency: CONC }, () => {
   // Unit tests for src/core/hooks/decision.ts (ADR-0009 §8.2, DECISIONS-r6 D3, impl/00 §5.3,
   // DEVIATIONS D-M4-arch-5, D-M4-H1-1). Pure: no DB, no I/O. No regex, no word list.
   // ---- rule 1: AskUserQuestion tool answer ----
@@ -1566,7 +1567,7 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
   });
 });
 
-describe("PRD-v2 section 10: last hook error log", { concurrency: true }, () => {
+describe("PRD-v2 section 10: last hook error log", { concurrency: CONC }, () => {
   // D-HNE-GUARD-1: ctx_doctor (D5) names the last hook error from <HOME>/.context-mode/hook-errors.log.
   test("lastHookError: none when no log exists", (t) => {
     const home = mkdtempSync(join(tmpdir(), "cm-last-"));
@@ -1594,7 +1595,7 @@ describe("PRD-v2 section 10: last hook error log", { concurrency: true }, () => 
   });
 });
 
-describe("PRD-v2 section 10: PreToolUse module load set", { concurrency: true }, () => {
+describe("PRD-v2 section 10: PreToolUse module load set", { concurrency: CONC }, () => {
   // D-CI-PERF-7: the built hook bundle on a PreToolUse hook call must not load the stream stack, readline or fs/promises. A static ESM
   // `import ... from "node:fs"` anywhere in the hook graph makes the loader build them (about 3 ms per call on Windows).
   const ROOT = join(import.meta.dirname, "..", "..");
@@ -1772,7 +1773,7 @@ describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
   });
 });
 
-describe("PRD-v2 section 10: hook on an old node", { concurrency: true }, () => {
+describe("PRD-v2 section 10: hook on an old node", { concurrency: CONC }, () => {
   // D-HNE-OLDNODE-1: process.getBuiltinModule exists from Node 22.3 (and 20.16). On an older Node on PATH the built hook threw
   // "TypeError: process.getBuiltinModule is not a function" at load and exited 1: Copilot CLI shows "Denied by preToolUse hook
   // (hook errored)" for every tool. The hook must load and answer (exit 0) whatever Node runs it. The preload removes the
@@ -2199,7 +2200,7 @@ describe("PRD-v2 section 10: saving on live payload shapes", () => {
   });
 });
 
-describe("PRD-v2 section 10: readStdin without the stream stack (D-CI-PERF-6)", { concurrency: true }, () => {
+describe("PRD-v2 section 10: readStdin without the stream stack (D-CI-PERF-6)", { concurrency: CONC }, () => {
   // Unit tests for src/core/hooks/io.ts readStdin (DEVIATIONS D-CI-PERF-6): the bytes on stdin come back unchanged,
   // and the read does not build the process.stdin stream stack (net, stream, pipe_wrap) on a pipe.
   const IO = join(import.meta.dirname, "..", "..", "src", "core", "hooks", "io.ts");
@@ -2232,7 +2233,7 @@ process.stdout.write(s);`;
   });
 });
 
-describe("PRD-v2 section 10: hint throttle", { concurrency: true }, () => {
+describe("PRD-v2 section 10: hint throttle", { concurrency: CONC }, () => {
   // Unit tests for src/core/hooks/throttle.ts (impl/09 §2, A20, A24; DECISIONS-r9 E5; impl/08 §6.1 step 8).
   // shouldHint(db, sessionId, onceKey, everyN?): boolean. Marker lives in meta under
   // "hint:" + sessionId + ":" + onceKey. Keyed by session id only: no ppid, no "latest session" guess.

@@ -1,6 +1,7 @@
 // ADR-0002 (single DB), PRD-v2 section 4, GP8, GP9. One file per ADR area (ADR-0024); one describe per area part.
 // Moved from tests/v2/store/{cleanup,close-checkpoint,config-dir,cost-dedup,db,db-platform-ported,owners,reserve,schema,sha256,shared-helpers} and lifecycle/exit. Names and assertions unchanged.
 import { describe, test } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,7 +25,7 @@ import { ctxStats } from "../../src/core/tools/stats.ts";
 import { ctxSearch } from "../../src/core/tools/search.ts";
 import { installExitGuard } from "../../src/core/lifecycle/exit.ts";
 
-describe("ADR-0002: config dir resolution", { concurrency: true }, () => {
+describe("ADR-0002: config dir resolution", { concurrency: CONC }, () => {
   // Unit tests for src/core/project/config-dir.ts (impl/02 §4, DEVIATIONS D-M1-6).
   // resolveConfigDir(env): expands DATA_ROOT with HOME (POSIX) or USERPROFILE (win32),
   // mkdir recursive, returns realpath. No agent arg (D-M1-6 overrides impl/00 §4).
@@ -88,7 +89,7 @@ describe("ADR-0002: config dir resolution", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: openDb and the single DB", { concurrency: true }, () => {
+describe("ADR-0002: openDb and the single DB", { concurrency: CONC }, () => {
   // Unit tests for src/core/store/db.ts (impl/02 §6, impl/00 §4, DEVIATIONS D-M1-1, D-M1-7).
   // openDb(project, opts?): Promise<DbHandle>; withWrite<T>(db, fn(db)): T; closeDb(db): void.
   // metaGet/metaSet/metaTake live here too (D-M1-7).
@@ -281,7 +282,7 @@ describe("ADR-0002: openDb and the single DB", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: DB platform cases, ported from v1", { concurrency: true }, () => {
+describe("ADR-0002: DB platform cases, ported from v1", { concurrency: CONC }, () => {
   // tests/v2/store/db-platform-ported.test.mjs
   // Ported from tests/util/db-base-platform-gate.test.ts (cleanup-plan W1-ops, PORT row). v1 had a
   // better-sqlite3 / node:sqlite / bun ladder (#551, #642). v2 has one engine, node:sqlite (ADR-0002), so the
@@ -375,7 +376,7 @@ describe("ADR-0002: DB platform cases, ported from v1", { concurrency: true }, (
   });
 });
 
-describe("ADR-0002: schema", { concurrency: true }, () => {
+describe("ADR-0002: schema", { concurrency: CONC }, () => {
   // Unit tests for src/core/store/schema.ts (impl/02 §5, DEVIATIONS D-M1-4, D-M1-3).
   // applyMigrations(db, fromVersion) brings a fresh DB to SCHEMA_VERSION and is a no-op
   // when already current; throws ERR_SCHEMA_STALE / SCHEMA_STALE when fromVersion > SCHEMA_VERSION.
@@ -582,7 +583,7 @@ describe("ADR-0002: schema", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: sha256 helper", { concurrency: true }, () => {
+describe("ADR-0002: sha256 helper", { concurrency: CONC }, () => {
   // Unit tests for src/core/project/sha256.ts (DEVIATIONS D-M7-HP-2): same digest as node:crypto.
 
   const ref = (s) => createHash("sha256").update(s).digest("hex");
@@ -599,7 +600,7 @@ describe("ADR-0002: sha256 helper", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: shared store helpers", { concurrency: true }, () => {
+describe("ADR-0002: shared store helpers", { concurrency: CONC }, () => {
   // r4g shared helpers (refactor, no behaviour change): recallQueryText and deleteChunkRows (store/fts.ts),
   // sourceRowOf (hooks/dispatch.ts). Namespace imports keep each test red on its own until its helper exists.
 
@@ -672,7 +673,7 @@ describe("ADR-0002: shared store helpers", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: source reserve", { concurrency: true }, () => {
+describe("ADR-0002: source reserve", { concurrency: CONC }, () => {
   // D-R4-RESERVE-1: a source reserved for a detached write (reserveSource) is deleted again when its chunk
   // or line unit write fails, so no 0-chunk orphan row stays in sources.
 
@@ -724,7 +725,7 @@ describe("ADR-0002: source reserve", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: cost row dedup", { concurrency: true }, () => {
+describe("ADR-0002: cost row dedup", { concurrency: CONC }, () => {
   const SCHEMA_VERSION = CONSTANTS_SCHEMA_VERSION;
   // tests/v2/store/cost-dedup.test.mjs
   // D-M5-arch-2: cost rows are deduped per (session_id, turn) via a partial unique index on
@@ -798,7 +799,7 @@ describe("ADR-0002: cost row dedup", { concurrency: true }, () => {
   });
 });
 
-describe("ADR-0002: retention cleanup and dead-project sweep", { concurrency: true }, () => {
+describe("ADR-0002: retention cleanup and dead-project sweep", { concurrency: CONC }, () => {
   // Unit tests for src/core/store/cleanup.ts (impl/02 §8, DEVIATIONS D-M1-11, D-M1-12).
   // cleanupProject(db, configDir): { deletedSources, deletedProject }.
   // sweepDeadProjects(configDir): string[] (deleted projectKeys).
@@ -1053,7 +1054,7 @@ describe("ADR-0002: close and WAL checkpoint (GP8, GP9)", () => {
   });
 });
 
-describe("ADR-0002: owner pid files (GP9)", { concurrency: true }, () => {
+describe("ADR-0002: owner pid files (GP9)", { concurrency: CONC }, () => {
   // Unit tests for src/core/store/owners.ts (impl/02 §7).
   // writeOwnerPid/removeOwnerPid/listLiveOwners(configDir, projectKey).
   // Files live at <configDir>/projects/<projectKey>/owners/<serverId>.pid.

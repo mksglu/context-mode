@@ -3,6 +3,7 @@
 // Sections: process groups, compact eval arms, M2 bench scorer. The M2 bench runner (fixtures-run) is 0012-m2-bench.test.mjs.
 
 import { test, describe } from "node:test";
+import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { spawnGroup, killGroup, runGroup } from "../../e2e/live/lib/proc-group.mjs";
 import fs, { readFileSync, chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -19,7 +20,7 @@ import { TASKS as HELDOUT } from "../../bench/m2/heldout/tasks.mjs";
 import { TASKS as MAIN } from "../../bench/m2/main/tasks.mjs";
 
 // Concurrent: own temp dirs, no env. The M2 bench runner section is in 0012-m2-bench.test.mjs (it blocks on a build).
-describe("ADR-0012: live harness (concurrent)", { concurrency: true }, () => {
+describe("ADR-0012: live harness (concurrent)", { concurrency: CONC }, () => {
   // Moved from tests/v2/e2e/live-proc-group.test.mjs
   describe("ADR-0012 / process group kill", () => {
     // D-CR3-WATCHDOG-1: e2e/live/lib/proc-group.mjs. A run that spawns `claude -p` in its own process group can
