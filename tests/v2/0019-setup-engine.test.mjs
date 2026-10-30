@@ -212,7 +212,7 @@ rl.on("line", (l) => {
       assert.equal(out.split("\r\n").join("").includes("\n"), false, `${f}: every line end is CRLF`);
     }
     const hooks = JSON.parse(readFileSync(codexHooks, "utf8").slice(1));
-    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].command, `"${NODE}" "${path.join(s.pkgDir, "hook.mjs")}" --agent codex`);
+    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].command, `${process.platform === "win32" ? "node" : `"${NODE}"`} "${path.join(s.pkgDir, "hook.mjs")}" --agent codex`); // D-C166-WIN-FIRE-2
     assert.equal(hooks.hooks.Stop[0].hooks[0].command, "my-own-hook");
     const saved = readdirSync(path.join(res.backupDir, "files")).map((n) => readFileSync(path.join(res.backupDir, "files", n), "utf8"));
     assert.ok(saved.includes(hooksRaw) && saved.includes(tomlRaw), "backup keeps the original bytes");
