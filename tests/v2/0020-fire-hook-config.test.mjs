@@ -178,7 +178,9 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       srv.close();
       if (seen !== undefined && existsSync(logFile)) for (const l of readFileSync(logFile, "utf8").split("\n")) if (l !== "") seen.push(JSON.parse(l));
       // Windows keeps the dir locked while codex or a hook child still exits (EPERM in CI run 41043168016): retry the cleanup.
-      rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+      // Still EPERM after 5 s in run 41044642993: a codex child outlives the exec and holds the dir. The temp dir is not
+      // under test, so a failed cleanup is logged and the assertions below still run (the OS removes the temp dir later).
+      try { rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch (e) { console.error("cleanup skipped: " + e.code + " " + d); }
       return bodies.length > 1 ? JSON.parse(bodies[1]).input.at(-1).output : "";
     }
 
