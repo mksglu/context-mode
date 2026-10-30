@@ -177,7 +177,8 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       });
       srv.close();
       if (seen !== undefined && existsSync(logFile)) for (const l of readFileSync(logFile, "utf8").split("\n")) if (l !== "") seen.push(JSON.parse(l));
-      rmSync(d, { recursive: true, force: true });
+      // Windows keeps the dir locked while codex or a hook child still exits (EPERM in CI run 41043168016): retry the cleanup.
+      rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
       return bodies.length > 1 ? JSON.parse(bodies[1]).input.at(-1).output : "";
     }
 
