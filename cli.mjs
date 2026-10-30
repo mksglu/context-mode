@@ -7508,7 +7508,7 @@ function serverCmd(ctx, id) {
 }
 function hookCommandString(row) {
   const [node, file, flag, id] = row.hookCommand ?? [];
-  return `"${node}" "${file}" ${flag} ${id}`;
+  return `${node === HOST_NODE_COMMAND ? node : `"${node}"`} "${file}" ${flag} ${id}`;
 }
 function golden(row, home) {
   const shell = row.nativeTools.shell?.[0];
@@ -7630,8 +7630,10 @@ function buildRegistry(ctx) {
     const id = row.id;
     const config = configFor(ctx, id);
     const hookFiles = hookFilesFor(ctx, id);
-    const hookCommand = [process.execPath, path3.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
-    const command = `"${hookCommand[0]}" "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
+    const runCommand2 = [process.execPath, path3.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
+    const bareNode = id === "codex" && (ctx.platform ?? process.platform) === "win32";
+    const hookCommand = bareNode ? [HOST_NODE_COMMAND, ...runCommand2.slice(1)] : runCommand2;
+    const command = `${bareNode ? HOST_NODE_COMMAND : `"${hookCommand[0]}"`} "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
     const hookInstall = hookInstallFor(ctx, getAdapter(id), command);
     const skillInstall = skillInstallFor(ctx, row);
     const copilotSettings = id === "copilot-cli" ? agentPath(ctx, id, [COPILOT_DIR, "settings.json"]) : void 0;
@@ -7653,7 +7655,7 @@ function buildRegistry(ctx) {
       hookFiles,
       hookInstall,
       skillInstall,
-      hookRunCommand: hookCommand,
+      hookRunCommand: runCommand2,
       allowedWrites: [...new Set(writes.map((f2) => path3.resolve(f2)))],
       goldenPayload: golden(row, ctx.home)
     };
@@ -8253,8 +8255,13 @@ function listPluginHooks(env, pluginId, cwd) {
     send({ id: 1, method: "initialize", params: { clientInfo: { name: "context-mode-setup", version: "2.0.0" } } });
   });
 }
+var HASH_PART_SEP = "/";
+function hookHashOf(currentHash) {
+  const cut = currentHash.indexOf(HASH_PART_SEP);
+  return cut < 0 ? currentHash : currentHash.slice(0, cut);
+}
 function pluginTrustEntries(hooks) {
-  return hooks.filter((h2) => !h2.trusted).map((h2) => [[...TRUST_KEY, h2.key], { [HASH_FIELD]: h2.hash }]);
+  return hooks.filter((h2) => !h2.trusted).map((h2) => [[...TRUST_KEY, h2.key], { [HASH_FIELD]: hookHashOf(h2.hash) }]);
 }
 
 // src/setup/copilot-hooks.ts
@@ -8860,7 +8867,7 @@ function mcpCheck(cmd, env) {
   });
 }
 function hookRound(row, env) {
-  const cmd = row.hookCommand;
+  const cmd = row.hookRunCommand;
   const input = JSON.stringify(row.goldenPayload);
   const wall = [];
   const bare = [];
