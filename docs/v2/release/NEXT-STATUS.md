@@ -4,9 +4,27 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.15 (provenance present, SLSA v1, gitHead 5ef1f189). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.14: 2026-10-29T20:27:54Z.
+`next` is 2.0.0-next.16 (provenance present, SLSA v1, gitHead 144e3495). `latest` is still 1.0.169. Checked 2026-10-30 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.16: 2026-10-30T03:06:30Z.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.16 ships
+
+Changes since v2.0.0-next.15: search quality for every host, not only Pi.
+
+- D-HTML-READABLE-1: ctx_index turns HTML (text/html fetch, .html/.htm path) into readable markdown-like text at index time with htmlparser2. No regex. Code blocks stay whole.
+- D-CALL-SHAPE-1: every tool description leads with an exact example call; a bad call gets one line with the correct call. Same tool schema on all 10 hosts.
+- D-SEARCH-REPLY-1: a ctx_search relevance reply holds 5 hits (SEARCH_REPLY_HITS); the More: line pages the rest. No snippet is cut.
+- Parity e2e: fetch, index, search on a recorded react.dev page (tests/v2/e2e/fetch-index-search-parity.test.mjs).
+
+## Release numbers (next.16)
+
+- Tag v2.0.0-next.16 on 144e3495. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.15) plus 1. v2-design was quiet from 05:09 (+03) for more than 15 minutes before the tag.
+- Local on a fresh clone (seconds): `node --test tests/v2/` 101 s, 2383 tests, 2350 pass, 0 fail, 33 skip; `gate --all` 362 s, exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0 in under 1 s. No budget or timeout was raised.
+- CI on 144e3495 (run 40990086878): all 12 jobs green on the first run.
+- release.yml run 40992512193 needed one rerun of the failed job only: ci / windows hosts (windows-latest), copilot-cli setup exited null while the copilot CLI was still extracting its package on first start (log: "Package extraction took 23502ms"). Same cause as the CI rerun on next.15. The rerun passed; build, publish-stage, smoke x3, publish-promote, publish-npm and github-release all succeeded. No code changed between attempts.
+- Registry version published 2026-10-30T03:06:30Z (gitHead 144e3495, SLSA v1 provenance, 2 signatures). The raw registry still showed next.15 for about 100 seconds after `npm notice ... may take a few minutes`. GitHub prerelease v2.0.0-next.16 (not draft) at 03:05:07Z.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.16 (release commit 5a776453).
 
 ## What 2.0.0-next.15 ships
 
