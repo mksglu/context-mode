@@ -31,7 +31,8 @@ Status: accepted by owner 2026-10-30. Decision record: [ADR-0024](adr/0024-test-
 | e2e-gp-keep | TECH-SPEC GP2, GP4-GP10, GP-SEARCH, GP-SETUP | (stay in place) 10 files | one file per GP case already; stay in place | 118 | 253.0 |
 | 0003-e2e-harness | ADR-0003 | (stay in place) `e2e/harness/normalize.test.mjs`, `e2e/harness/run-filter.test.mjs` | tests of the e2e harness itself (stay in place under e2e/, never import src/) | 15 | 0.2 |
 | 0012-live-eval-selftests | ADR-0012 | (stay in place) `e2e/live/cache/analyze.test.mjs`, `e2e/live/compact-hard/score.test.mjs`, `e2e/live/routing/score.test.mjs` | scorers and analyzers of the live evals (stay in place; compact-hard is frozen) | 35 | 0.3 |
-| 0012-live-harness | ADR-0012 | `tests/v2/0012-live-harness.test.mjs` | keyless live harness, process groups, compact eval arms, M2 bench runner | 44 | 6.9 |
+| 0012-live-harness | ADR-0012 | `tests/v2/0012-live-harness.test.mjs` | keyless live harness, process groups, compact eval arms, M2 bench scorer | 40 | 2.5 |
+| 0012-m2-bench | ADR-0012 | `tests/v2/0012-m2-bench.test.mjs` | M2 bench fixtures runner (builds the bundle with a blocking execFileSync; own file so it cannot stall the timer tests) | 4 | 4.4 |
 | 0017-v1-retention | ADR-0017 | `tests/v2/0017-v1-retention.test.mjs` | v1 vs v2 diff and the ported v1 executor and store tests | 37 | 20.4 |
 | 0018-contracts | ADR-0018 | `tests/v2/0018-contracts.test.mjs` | module contracts and single-source hook file | 46 | 0.3 |
 | 0018-build | ADR-0018, ADR-0019, ADR-0023 | `tests/v2/0018-build.test.mjs` | build, generated files, host manifests, npm package | 79 | 10.1 |
