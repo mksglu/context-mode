@@ -168,14 +168,18 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       const events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"];
       writeFileSync(join(home, "hooks.json"), JSON.stringify({ hooks: Object.fromEntries(events.map((e) => [e, [{ matcher: ".*", hooks: e === "PreToolUse" ? [logger, ours] : [logger] }]])) }));
       const env = { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: home };
+      let codexOut = "";
       // a hook that is not trusted never runs; the bypass flag stands in for the trust hashes setup writes
       await new Promise((resolveRun) => {
         const f = spawnForm(CODEX, ["exec", "--skip-git-repo-check", "--dangerously-bypass-hook-trust", "show"], env);
-        const c = spawn(f.command, f.args, { cwd: work, env, stdio: "ignore", windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
+        const c = spawn(f.command, f.args, { cwd: work, env, stdio: ["ignore", "pipe", "pipe"], windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
+        // D-C166-WIN-FIRE-1: what codex printed (hook warnings, sandbox errors) goes into the failure message, so a red CI run says why.
+        for (const st of [c.stdout, c.stderr]) st.on("data", (b) => { codexOut += b; });
         const t = setTimeout(() => c.kill(), 90000);
         c.on("close", () => { clearTimeout(t); resolveRun(); });
       });
       srv.close();
+      if (seen !== undefined) seen.codexOut = codexOut.slice(-4000);
       if (seen !== undefined && existsSync(logFile)) for (const l of readFileSync(logFile, "utf8").split("\n")) if (l !== "") seen.push(JSON.parse(l));
       // Windows keeps the dir locked while codex or a hook child still exits (EPERM in CI run 41043168016): retry the cleanup.
       // Still EPERM after 5 s in run 41044642993: a codex child outlives the exec and holds the dir. The temp dir is not
@@ -201,7 +205,7 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       const seen = [];
       const out = await run("cat big.log", seen);
       const pre = seen.filter((e) => e.hook_event_name === "PreToolUse");
-      assert.ok(pre.length >= 1, "no PreToolUse event reached the hook; events seen: " + JSON.stringify(seen.map((e) => e.hook_event_name)));
+      assert.ok(pre.length >= 1, "no PreToolUse event reached the hook; events seen: " + JSON.stringify(seen.map((e) => e.hook_event_name)) + "\ncodex output tail:\n" + seen.codexOut);
       assert.equal(pre[0].tool_name, "Bash");
       assert.equal(pre[0].tool_input.command, "cat big.log");
       assert.match(out, /blocked by PreToolUse hook/);
