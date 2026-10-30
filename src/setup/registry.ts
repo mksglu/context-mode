@@ -4,7 +4,7 @@
 import path from "node:path";
 
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
-import { AGENT_HOME_DIR, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OPENCODE_PLUGIN_PATH, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, HOST_NODE_COMMAND, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OPENCODE_PLUGIN_PATH, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
 import type { AgentId, AdapterRow, HostConfigFormat } from "../core/contracts/types.ts";
 import { claudeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf } from "../core/project/config-dir.ts";
 import { ownMcpValue } from "../core/ops/host-config.ts";
@@ -24,7 +24,7 @@ export const INSTRUCTION_FILES: readonly string[] = Object.freeze([
   "CLAUDE.md", "AGENTS.md", "AGENTS.override.md", "GEMINI.md", "QWEN.md", "copilot-instructions.md", "KIRO.md",
 ]);
 
-export interface SetupContext { home: string; pkgDir: string; env: Record<string, string | undefined>; }
+export interface SetupContext { home: string; pkgDir: string; env: Record<string, string | undefined>; platform?: NodeJS.Platform; }
 
 /** A config file setup edits itself: the exact diff is known before apply. */
 export interface ConfigTarget {
@@ -157,7 +157,7 @@ function serverCmd(ctx: SetupContext, id: AgentId): string[] {
 /** D4: the one v2 hook command string (quoted, so paths with spaces survive the host shell). */
 export function hookCommandString(row: CheckRow): string {
   const [node, file, flag, id] = row.hookCommand ?? [];
-  return `"${node}" "${file}" ${flag} ${id}`;
+  return `${node === HOST_NODE_COMMAND ? node : `"${node}"`} "${file}" ${flag} ${id}`;
 }
 
 function golden(row: AdapterRow, home: string): Record<string, unknown> {
@@ -274,8 +274,12 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     const id = row.id;
     const config = configFor(ctx, id);
     const hookFiles = hookFilesFor(ctx, id);
-    const hookCommand = [process.execPath, path.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
-    const command = `"${hookCommand[0]}" "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
+    const runCommand = [process.execPath, path.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
+    // D-C166-WIN-FIRE-1: Codex 0.166 runs a hook through the session shell, PowerShell on Windows, and PowerShell reads a
+    // leading quoted path as a string. A bare `node` word runs in sh, cmd.exe and PowerShell; the doctor still runs the absolute node.
+    const bareNode = id === "codex" && (ctx.platform ?? process.platform) === "win32";
+    const hookCommand = bareNode ? [HOST_NODE_COMMAND, ...runCommand.slice(1)] : runCommand;
+    const command = `${bareNode ? HOST_NODE_COMMAND : `"${hookCommand[0]}"`} "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
     const hookInstall = hookInstallFor(ctx, getAdapter(id), command);
     const skillInstall = skillInstallFor(ctx, row);
     const copilotSettings = id === "copilot-cli" ? agentPath(ctx, id, [COPILOT_DIR, "settings.json"]) : undefined;
@@ -288,7 +292,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     ];
     const out: CheckRow = {
       id, installMode: row.installMode, serverCommand: serverCmd(ctx, id), config, cli: cliFor(ctx, id),
-      listCommand: LIST[id], hookFiles, hookInstall, skillInstall, hookRunCommand: hookCommand,
+      listCommand: LIST[id], hookFiles, hookInstall, skillInstall, hookRunCommand: runCommand,
       allowedWrites: [...new Set(writes.map((f) => path.resolve(f)))],
       goldenPayload: golden(row, ctx.home),
     };

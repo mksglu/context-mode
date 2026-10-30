@@ -532,6 +532,55 @@ describe("ADR-0020 Windows hook shell command", { concurrency: CONC }, () => {
   });
 });
 
+describe("ADR-0020 Codex 0.166 hook shell command (D-C166-WIN-FIRE-1)", { concurrency: CONC }, () => {
+  // CI run 41047932424 (codex-cli 0.166.0, windows-latest): every hook, even a logging-only one, ended `hook: PreToolUse Failed`.
+  // Source (rust-v0.166.0 core/src/session/mod.rs build_hooks_config): the hook shell is the session shell, and on Windows
+  // that is PowerShell (the exec_command error names pwsh.exe). 0.156 ran `%COMSPEC% /C`. PowerShell reads a leading quoted
+  // path as a string, so `"C:\...\node.exe" "hook.mjs" ...` is a parse error. The codex command must start with a bare word
+  // that cmd.exe, sh and PowerShell all run: `node "<hook.mjs>" --agent codex`.
+  const WIN_HOME = "C:\\Users\\Jane Doe";
+  const WIN_PKG = "C:\\Program Files\\nodejs\\node_modules\\context-mode";
+  const codexCommands = (row) => Object.values(row.hookInstall.shape.hooks).flatMap((g) => g.flatMap((x) => x.hooks.map((h) => h.command)));
+
+  test("D-C166-WIN-FIRE-1: on Windows the codex hook command starts with bare node, never a quoted path", () => {
+    const row = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {}, platform: "win32" }).find((r) => r.id === "codex");
+    const cmds = codexCommands(row);
+    assert.ok(cmds.length > 0);
+    for (const c of cmds) {
+      assert.ok(c.startsWith('node "'), "starts with bare node: " + c);
+      assert.ok(c.endsWith('hook.mjs" --agent codex'), c);
+    }
+    assert.equal(hookCommandString(row), cmds[0], "the v1 rewrite and the doctor use the same line");
+    assert.equal(row.hookCommand[0], "node", "the written line uses bare node");
+    assert.equal(row.hookRunCommand[0], process.execPath, "the doctor still runs the absolute node");
+  });
+
+  test("D-C166-WIN-FIRE-1: off Windows the codex hook command keeps the absolute quoted node path (D4)", () => {
+    const row = buildRegistry({ home: "/home/jane", pkgDir: "/opt/context mode", env: {}, platform: "linux" }).find((r) => r.id === "codex");
+    for (const c of codexCommands(row)) assert.ok(c.startsWith('"' + process.execPath + '" "'), c);
+  });
+
+  test("D-C166-WIN-FIRE-1: only codex changes; every other host keeps the quoted absolute form on Windows", () => {
+    const reg = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {}, platform: "win32" });
+    for (const row of reg.filter((r) => r.id !== "codex" && r.hookCommand)) assert.ok(hookCommandString(row).startsWith('"'), row.id);
+  });
+
+  // Windows only: PowerShell runs the line the way 0.166 builds it (hook_environment_executor.rs): the JSON line is piped in.
+  test("D-C166-WIN-FIRE-1: PowerShell runs the codex hook command with the stdin line piped in", { skip: process.platform !== "win32" }, () => {
+    const root = mkdtempSync(path.join(tmpdir(), "cm c166 "));
+    try {
+      const dir = path.join(root, "pkg dir");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "hook.mjs"), "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>process.stdout.write('ran:' + process.argv.slice(2).join(' ') + ':' + d.trim()));\n");
+      const row = buildRegistry({ home: root, pkgDir: dir, env: {} }).find((r) => r.id === "codex");
+      const script = "$global:LASTEXITCODE = 0\n'{\"a\":1}' | " + hookCommandString(row) + "\nif ($?) { exit 0 }\nif ($LASTEXITCODE) { exit $LASTEXITCODE }\nexit 1";
+      const run = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", windowsHide: true });
+      assert.equal(run.status, 0, run.stderr + run.stdout);
+      assert.equal(run.stdout.trim(), 'ran:--agent codex:{"a":1}');
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
 describe("ADR-0020 Kiro hook shell command", { concurrency: CONC }, () => {
   // KIRO-WIN-4: which shell runs the kiro hook command on Windows, and does the registered string survive it.
   // Source read (aws/amazon-q-developer-cli main, crates/chat-cli/src/cli/chat/cli/hooks.rs run_hook, the open source
