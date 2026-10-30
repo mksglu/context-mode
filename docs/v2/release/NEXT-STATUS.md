@@ -4,9 +4,25 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.14 (provenance present, SLSA v1, gitHead a66617dc). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.14: 2026-10-29T20:27:54Z.
+`next` is 2.0.0-next.15 (provenance present, SLSA v1, gitHead 5ef1f189). `latest` is still 1.0.169. Checked 2026-10-29 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.14: 2026-10-29T20:27:54Z.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.15 ships
+
+Changes since v2.0.0-next.14: hook gates for every host. Setup and doctor now FAIL when a host would list context-mode but run no hook. Per-host proof is in docs/v2/release/HOOKS-FIRE.md.
+
+- D-NI-QWEN-GATE-1, D-NI-GEMINI-GATE-1, D-NI-PI-GATE-1, D-HF-COPILOT-ENABLED-1, D-HF-OPENCODE-GATE-1, D-NI-VSCODE-GATE-1, D-NI-KIRO-GATE-1, D-NI-ZCODE-GATE-1.
+- Live-proven with the host's own binary: claude-code, codex, gemini, qwen, copilot-cli, opencode, pi, zcode. Not proven live: vscode (hook command only) and kiro (load only).
+
+## Release numbers (next.15)
+
+- Tag v2.0.0-next.15 on 5ef1f189. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.14) plus 1. v2-design was quiet from 01:52 (+03) for more than 15 minutes before the tag.
+- Local on a fresh clone: v2-unit 2271 pass, 0 fail, 33 skip of 2304; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on 5ef1f189 (run 40969196868): one rerun of windows hosts (windows-latest). copilot-cli setup exited null on the first run while the copilot CLI was still extracting its package on first start; the rerun passed all 10 hosts.
+- release.yml run 40974700619 needed two reruns, each for a different cause: (1) ci windows-latest node 26, hook-fuzz opencode had 2 of 500 calls over 5000 ms (timing on a loaded runner; no budget changed); (2) job `build`, attest-build-provenance signed and uploaded the attestation, then "error fetching tlog entry - (404) Not Found" (same sigstore 404 as next.14). Third attempt: all jobs green.
+- Registry version published 2026-10-30T00:20:09Z (gitHead 5ef1f189, SLSA v1 provenance, 2 signatures). The first registry reads right after publish still showed next.14 for about 40 seconds. GitHub prerelease v2.0.0-next.15 (not draft) at 00:19:04Z.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.15 (release commit 24a3cc40).
 
 ## What 2.0.0-next.14 ships
 
