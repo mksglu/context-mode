@@ -85,3 +85,16 @@ Source: gh api repos/mksglu/context-mode/actions/runs/<id>/jobs. The v2 unit ste
 - Names: sorted status and name columns of baseline-names.txt equal those of a new collect-names.mjs run (file column ignored). 33 unit skips and 12 e2e skips stay skips.
 - Wall time: median of 3 full runs at most 96 s on a machine with the same load; e2e/cases at most 265 s; no job in CI above its median here.
 - No file above 51.1 s.
+
+## After the move (2026-10-30)
+
+| Item | Before | After |
+|---|---|---|
+| Unit test files in tests/v2 | 240 | 34 |
+| e2e/cases files | 22 | 14 |
+| Test names (unit, harness, live self-tests, e2e/cases, live-local) | 2624 | 2624, sorted status and name equal |
+| Full parallel run | 2383 tests, 0 fail, 33 skip | 2389 tests, 0 fail, 33 skip (guard tests +3, live-local +3, minus 0) |
+| Suite wall, 3 interleaved runs, same machine, load about 30 | 112, 102, 100 s (median 102) | 101, 100, 91 s (median 100) |
+
+The 96 s above was taken at load 5 to 6; the paired run is the fair compare. The throwaway scripts (collect-names, make-groups, groups.json, workers.json, baseline-names.txt, baseline-perfile-*.json) are deleted; git history has them (commit 492cc0b9).
+

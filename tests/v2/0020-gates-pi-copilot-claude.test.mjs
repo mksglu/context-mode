@@ -2,7 +2,6 @@
 // Area: 0020-gates-pi-copilot-claude (docs/v2/TEST-LAYOUT.md).
 // Merged by ADR-0024 from 7 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // pi-gate is serial because its tests call process.chdir; the other blocks use own temp dirs and explicit env, so they run concurrently.
-
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -162,9 +161,10 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   });
 });
 
-// Independent blocks (own temp dirs, no process-wide state): they run at the same time.
-describe("ADR-0020 gates (concurrent blocks)", { concurrency: true }, () => {
-  describe("ADR-0020 Copilot CLI hooks enabled", { concurrency: true }, () => {
+// Independent blocks (own temp dirs, no process-wide state). At most 2 blocks run at once, and the Copilot block runs its tests one after another:
+// its host stubs answer under the 10 s verify timeout of src/setup/engine.ts, and 7 blocks at once starved them on a loaded machine (D-TEST-LAYOUT-1).
+describe("ADR-0020 gates (concurrent blocks)", { concurrency: 2 }, () => {
+  describe("ADR-0020 Copilot CLI hooks enabled", { concurrency: 1 }, () => {
     // D-HF-COPILOT-ENABLED-1: Copilot CLI 1.0.105 does not run a hook whose key is in settings.json `disabledHooks`
     // (live-proven in tests/v2/e2e/copilot-cli-fire.test.mjs). Setup removes our own keys; doctor FAILs with a one-line fix.
     // The stub spells source relative to COPILOT_HOME, as copilot 1.0.105 does. The host here is a stub that answers `copilot --server --stdio` hooks.discover from the files in COPILOT_HOME.

@@ -1,6 +1,6 @@
 # Test layout: one file per ADR/PRD area
 
-Status: accepted by owner 2026-10-30. Decision record: [ADR-0024](adr/0024-test-layout-by-adr.md).
+Status: accepted 2026-10-30, move done. Decision record: [ADR-0024](adr/0024-test-layout-by-adr.md).
 
 ## The rule
 
@@ -28,7 +28,7 @@ Status: accepted by owner 2026-10-30. Decision record: [ADR-0024](adr/0024-test-
 | e2e-gp1 | TECH-SPEC GP1, ADR-0019, ADR-0023 | `e2e/cases/GP1-install.e2e.mjs` | GP1 install: node path, docs, install, uninstall, release tree, OpenCode client info (merge 6 GP1 files into one) | 29 | 7.6 |
 | e2e-gp3 | TECH-SPEC GP3, ADR-0008 | `e2e/cases/GP3-hooks.e2e.mjs` | GP3 hooks: perf, enforcement, Z Code tool names (merge 3 GP3 files into one) | 23 | 2.1 |
 | e2e-gp11 | TECH-SPEC GP11, ADR-0010, ADR-0011 | `e2e/cases/GP11-doctor-upgrade.e2e.mjs` | GP11 doctor, upgrade, release audit, Pi and Antigravity (merge 3 GP11 files into one) | 18 | 6.2 |
-| e2e-gp-keep | TECH-SPEC GP2, GP4-GP10, GP-SEARCH, GP-SETUP | (stay in place) 10 files | one file per GP case already; stay in place | 118 | 253.0 |
+| e2e-gp-keep | TECH-SPEC GP2, GP4-GP10, GP-SEARCH, GP-SETUP | (stay in place) `e2e/cases/GP2-prompt-surface.e2e.mjs`, `e2e/cases/GP4-execute.e2e.mjs`, `e2e/cases/GP5-index-search.e2e.mjs`, `e2e/cases/GP6-journal-resume.e2e.mjs`, `e2e/cases/GP7-scope.e2e.mjs`, `e2e/cases/GP8-concurrency.e2e.mjs`, `e2e/cases/GP9-lifecycle.e2e.mjs`, `e2e/cases/GP10-stats.e2e.mjs`, `e2e/cases/GP-SEARCH-heldout.e2e.mjs`, `e2e/cases/GP-SETUP-npm-install.e2e.mjs` | one file per GP case already; stay in place | 118 | 253.0 |
 | 0003-e2e-harness | ADR-0003 | (stay in place) `e2e/harness/normalize.test.mjs`, `e2e/harness/run-filter.test.mjs` | tests of the e2e harness itself (stay in place under e2e/, never import src/) | 15 | 0.2 |
 | 0012-live-eval-selftests | ADR-0012 | (stay in place) `e2e/live/cache/analyze.test.mjs`, `e2e/live/compact-hard/score.test.mjs`, `e2e/live/routing/score.test.mjs` | scorers and analyzers of the live evals (stay in place; compact-hard is frozen) | 35 | 0.3 |
 | 0012-live-harness | ADR-0012 | `tests/v2/0012-live-harness.test.mjs` | keyless live harness, process groups, compact eval arms, M2 bench scorer | 40 | 2.5 |
@@ -70,4 +70,8 @@ Groups marked "stay in place" are already one file per area; the move does not t
 
 ## Numbers behind the table
 
-Baseline: review/test-layout/BASELINE.md. All 2624 test names are kept: review/test-layout/baseline-names.txt. After the move the list must match with the file column ignored (collect-names.mjs).
+Before: 242 unit files, 2624 test names, suite wall median 102 s (same machine, same load, 3 interleaved runs). After: 34 unit files, 2624 names, 100 s. See review/test-layout/BASELINE.md and ADR-0024 (Result).
+
+## Guard
+
+tests/v2/0014-repo-hygiene.test.mjs (section ADR-0024) fails for every *.test.mjs under tests/v2 and every case file under e2e/cases that this table does not list by path. The e2e files that stay in place are listed by path in the e2e-gp-keep row.

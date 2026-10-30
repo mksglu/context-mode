@@ -8,7 +8,7 @@ import { spawnGroup, killGroup, runGroup } from "../../e2e/live/lib/proc-group.m
 import fs, { readFileSync, chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { ARMS, ARM_IDS } from "../../e2e/live/compact/arms.mjs";
 import { FIXTURES } from "../../e2e/live/compact/fixtures.mjs";
 import { verdict, exactMatch } from "../../e2e/live/compact/score.mjs";
@@ -466,5 +466,31 @@ process.stdin.on("end", () => {
         assert.deepEqual(a, b, t.id + " deterministic");
       }
     });
+  });
+
+  // The three keyless cases of e2e/live/run.mjs (kind "local"): they run a repo check and need no model or key.
+  // Moved here from the baseline list "live-local" rows, which no test file had (the names came from a run of run.mjs).
+  describe("ADR-0012 / live-local cases (no key)", () => {
+    const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const RUNNER = path.join(ROOT, "e2e", "live", "run.mjs");
+
+    // Async spawn on purpose: spawnSync would block this file's event loop and delay the timers of the sibling tests.
+    function runLocal(id) {
+      return new Promise((resolve, reject) => {
+        execFile(process.execPath, [RUNNER, "--only", id], { cwd: ROOT, encoding: "utf8" }, (err, stdout, stderr) => {
+          try {
+            assert.equal(err, null, stdout + stderr);
+            const row = stdout.split("\n").find((l) => l.startsWith("| " + id + " |"));
+            assert.ok(row, "the report lists the case " + id + ": " + stdout);
+            assert.equal(row.split("|")[2].trim(), "PASS", row);
+            resolve();
+          } catch (e) { reject(e); }
+        });
+      });
+    }
+
+    test("live-local ci-config (node e2e/live/run.mjs --only)", () => runLocal("ci-config"));
+    test("live-local release-plan-bump", () => runLocal("release-plan-bump"));
+    test("live-local repo-cleanup-gate", () => runLocal("repo-cleanup-gate"));
   });
 });

@@ -998,4 +998,44 @@ describe("ADR-0014 repo: issue forms", async () => {
     for (const id of AGENT_IDS) assert.ok(src.includes(`"${id}"`), id);
   });
 });
+
+// ADR-0024: every test file is listed in docs/v2/TEST-LAYOUT.md. A fix puts its red test in the file of its area, never in a new file.
+describe("ADR-0024 test layout: every test file is in the table", { concurrency: true }, () => {
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const TABLE = readFileSync(path.join(ROOT, "docs", "v2", "TEST-LAYOUT.md"), "utf8");
+
+  function walk(dir, suffix, acc) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === "fixtures") continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p, suffix, acc);
+      else if (e.name.endsWith(suffix)) acc.push(path.relative(ROOT, p).split(path.sep).join("/"));
+    }
+    return acc;
+  }
+
+  function unlisted(files) {
+    return files.filter((f) => !TABLE.includes("`" + f + "`"));
+  }
+
+  const hint = (f) => f.map((x) => x + ": add the test to the file that owns its ADR area (see docs/v2/TEST-LAYOUT.md); a new area needs a table row and an ADR first").join("\n");
+
+  test("every *.test.mjs under tests/v2 is listed in docs/v2/TEST-LAYOUT.md", () => {
+    const files = walk(path.join(ROOT, "tests", "v2"), ".test.mjs", []);
+    assert.ok(files.length > 0);
+    const bad = unlisted(files);
+    assert.deepEqual(bad, [], hint(bad));
+  });
+
+  test("every case file under e2e/cases is listed in docs/v2/TEST-LAYOUT.md", () => {
+    const files = walk(path.join(ROOT, "e2e", "cases"), ".e2e.mjs", []);
+    assert.ok(files.length > 0);
+    const bad = unlisted(files);
+    assert.deepEqual(bad, [], hint(bad));
+  });
+
+  test("the guard finds an unlisted file (self-check on a name that is not in the table)", () => {
+    assert.deepEqual(unlisted(["tests/v2/9999-not-an-area.test.mjs"]), ["tests/v2/9999-not-an-area.test.mjs"]);
+  });
+});
 });
