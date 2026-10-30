@@ -77,7 +77,8 @@ jobs:
         shell: bash
       # D-C166-WIN-FIRE-1: the real Codex CLI on all 3 OS, so the codex fire tests (tests/v2/0020-fire-hook-config) run
       # on the Windows runner too. Fake local provider, temp HOME and CODEX_HOME, no login, no key.
-      - run: npm install -g @openai/codex@0.166.0
+      # A global agent CLI, not a dev install, so it does not go through scripts/ci-install.mjs.
+      - run: npm i -g @openai/codex@0.166.0
         name: codex 0.166.0 for the codex fire tests (D-C166-WIN-FIRE-1)
       - run: codex --version
         name: codex version (info)
