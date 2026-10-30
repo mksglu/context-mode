@@ -42,7 +42,12 @@ before(() => {
 
 after(() => {
   process.env.HOME = oldHome;
-  rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  try {
+    rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) {
+    // Same rule as tests/v2/plugins/pi-ops-ported.test.mjs: Windows keeps the in-process DB file open.
+    if (process.platform !== "win32" || err.code !== "EPERM") throw err;
+  }
 });
 
 // The example call is the text between the first pair of backticks in the description.
