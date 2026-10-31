@@ -12,7 +12,7 @@
     "content": [
       {
         "type": "text",
-        "text": "Query \"inside body\":\n..notes/inside.txt #0: inside body\nQuery \"outside body\":"
+        "text": "Query \"inside body\":\n..notes/inside.txt #0: inside body\nQuery \"outside body\":\nSame as above: ..notes/inside.txt (chunk 0)"
       }
     ],
     "isError": false
