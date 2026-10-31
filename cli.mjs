@@ -782,7 +782,8 @@ var RESULT_SUCCESS = "success";
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
-var NATIVE_TO_CANONICAL3 = { bash: "Bash" };
+var SHELL_TOOL_NAMES = Object.freeze(["bash", "powershell"]);
+var NATIVE_TO_CANONICAL3 = Object.fromEntries(SHELL_TOOL_NAMES.map((n3) => [n3, "Bash"]));
 function canonicalName3(name) {
   if (name.startsWith(TOOL_NAME_PREFIX5)) return name.slice(TOOL_NAME_PREFIX5.length);
   if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
@@ -863,11 +864,11 @@ var VSCODE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostTool
 var MCP_PREFIX2 = "mcp_";
 var MCP_SEP2 = "_";
 var SESSION_START_NEW = "new";
-var SHELL_TOOL_NAMES = Object.freeze(["run_in_terminal", "runTerminalCommand", "bash", "powershell"]);
+var SHELL_TOOL_NAMES2 = Object.freeze(["run_in_terminal", "runTerminalCommand", "bash", "powershell"]);
 var READ_TOOL_NAMES = Object.freeze(["read_file", "view"]);
 var WEBFETCH_TOOL_NAMES = Object.freeze(["fetch_webpage", "web_fetch"]);
 var NATIVE_TO_CANONICAL4 = Object.fromEntries([
-  ...SHELL_TOOL_NAMES.map((n3) => [n3, "Bash"]),
+  ...SHELL_TOOL_NAMES2.map((n3) => [n3, "Bash"]),
   ...READ_TOOL_NAMES.map((n3) => [n3, "Read"]),
   ...WEBFETCH_TOOL_NAMES.map((n3) => [n3, "WebFetch"])
 ]);
@@ -995,8 +996,8 @@ var KIRO_EVENTS = {
 };
 var PROMPT_ENV = "USER_PROMPT";
 var MCP_PREFIX3 = "mcp_";
-var SHELL_TOOL_NAMES2 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
-var NATIVE_TO_CANONICAL5 = Object.fromEntries(SHELL_TOOL_NAMES2.map((n3) => [n3, "Bash"]));
+var SHELL_TOOL_NAMES3 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
+var NATIVE_TO_CANONICAL5 = Object.fromEntries(SHELL_TOOL_NAMES3.map((n3) => [n3, "Bash"]));
 var MCP_SEP3 = "_";
 var KIRO_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 function canonicalName5(name) {
@@ -1268,8 +1269,9 @@ var ADAPTERS = Object.freeze([
     installMode: "plugin",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX5,
-    nativeTools: { shell: ["bash"] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES] },
     execReadOnlyHint: false,
+    // D-PWSH-DUMP-1
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
@@ -1287,7 +1289,7 @@ var ADAPTERS = Object.freeze([
     projectSource: "arg:workspaceFolder",
     toolNamePrefix: TOOL_NAME_PREFIX6,
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
-    nativeTools: { shell: [...SHELL_TOOL_NAMES], read: [...READ_TOOL_NAMES], webfetch: [...WEBFETCH_TOOL_NAMES] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES2], read: [...READ_TOOL_NAMES], webfetch: [...WEBFETCH_TOOL_NAMES] },
     // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
     execReadOnlyHint: false,
     eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
@@ -1306,7 +1308,7 @@ var ADAPTERS = Object.freeze([
     installMode: "mcp-entry",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX7,
-    nativeTools: { shell: [...SHELL_TOOL_NAMES2] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES3] },
     execReadOnlyHint: false,
     // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
@@ -1595,7 +1597,7 @@ Examples:
 // src/cli/commands.ts
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { existsSync as existsSync12, mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync13, mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import os from "node:os";
 import path13 from "node:path";
 
@@ -7054,6 +7056,7 @@ function editHostConfigText(agent, path15, text2, format, wanted) {
 }
 
 // src/core/ops/doctor-config.ts
+import { existsSync as existsSync5, readdirSync as readdirSync4 } from "node:fs";
 import { join as join6 } from "node:path";
 
 // src/core/ops/detect-v1.ts
@@ -7380,6 +7383,7 @@ function composeMatcher(row, event) {
   if (event === POST_TOOL_USE && hasReplace(row)) alts.push(MCP_ANY_MATCH);
   return MATCHER_OPEN + alts.join(MATCHER_ALT) + MATCHER_CLOSE;
 }
+var CODEX_PLUGIN_KEY = `${SERVER_KEY}@${SERVER_KEY}`;
 
 // src/setup/hook-shapes.ts
 var MS_PER_SECOND = 1e3;
@@ -7676,7 +7680,7 @@ function assertWritable(row, file) {
 }
 
 // src/setup/gemini-gate.ts
-import { existsSync as existsSync5, readFileSync as readFileSync4 } from "node:fs";
+import { existsSync as existsSync6, readFileSync as readFileSync4 } from "node:fs";
 import path4 from "node:path";
 var GEMINI_DIR = ".gemini";
 var SETTINGS_FILE2 = "settings.json";
@@ -7690,7 +7694,7 @@ function systemSettingsPath(env) {
   return "/etc/gemini-cli/settings.json";
 }
 function load(file) {
-  if (!existsSync5(file)) return void 0;
+  if (!existsSync6(file)) return void 0;
   try {
     return { file, doc: parseHostConfig(OWN_AGENT, file, hostText(readFileSync4(file, "utf8")), "jsonc") };
   } catch {
@@ -7724,7 +7728,7 @@ function geminiSettingsGate(env, home, cwd) {
 }
 
 // src/setup/zcode-gate.ts
-import { existsSync as existsSync6, readFileSync as readFileSync5 } from "node:fs";
+import { existsSync as existsSync7, readFileSync as readFileSync5 } from "node:fs";
 import path5 from "node:path";
 var OWN_AGENT2 = "zcode";
 var EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"];
@@ -7816,7 +7820,7 @@ function zcodeSchemaBad(doc) {
 }
 function zcodeConfigGate(home) {
   const file = path5.join(home, ".zcode", "cli", "config.json");
-  if (!existsSync6(file)) return void 0;
+  if (!existsSync7(file)) return void 0;
   let doc;
   try {
     doc = parseHostConfig(OWN_AGENT2, file, hostText(readFileSync5(file, "utf8")), "json");
@@ -7829,7 +7833,7 @@ function zcodeConfigGate(home) {
 }
 
 // src/setup/pi-gate.ts
-import { existsSync as existsSync7, readFileSync as readFileSync6, realpathSync as realpathSync3 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync6, realpathSync as realpathSync3 } from "node:fs";
 import path6 from "node:path";
 var OWN_FILE = "pi/index.js";
 var EXTENSIONS_KEY = "extensions";
@@ -7838,7 +7842,7 @@ var TRUST_FILE = "trust.json";
 var ALWAYS = "always";
 var SOURCE_PREFIXES = ["npm:", "git:"];
 function load2(file) {
-  if (!existsSync7(file)) return void 0;
+  if (!existsSync8(file)) return void 0;
   try {
     return { file, doc: parseHostConfig("pi", file, hostText(readFileSync6(file, "utf8")), "json") };
   } catch {
@@ -7929,7 +7933,7 @@ function piSettingsGate(env, home, pkgDir, cwd) {
 }
 
 // src/setup/vscode-gate.ts
-import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync9, readFileSync as readFileSync7 } from "node:fs";
 import path7 from "node:path";
 var SETTINGS_FILE3 = "settings.json";
 var WORKSPACE_DIR = ".vscode";
@@ -7938,7 +7942,7 @@ var LOCATIONS_KEY = "chat.hookFilesLocations";
 var OWN_LOCATION = "~/.copilot/hooks";
 var MANAGED_KEYS = ["allowManagedHooksOnly", "strictPluginOnlyCustomization"];
 function load3(file) {
-  if (!existsSync8(file)) return void 0;
+  if (!existsSync9(file)) return void 0;
   try {
     return { file, doc: parseHostConfig("vscode", file, hostText(readFileSync7(file, "utf8")), "jsonc") };
   } catch {
@@ -7980,7 +7984,7 @@ function vscodeSettingsGate(env, home, cwd, managedFile = managedSettingsPath(en
 }
 
 // src/setup/qwen-gate.ts
-import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
+import { existsSync as existsSync10, readFileSync as readFileSync8 } from "node:fs";
 import path8 from "node:path";
 var KEY = "disableAllHooks";
 var SETTINGS = "settings.json";
@@ -7996,7 +8000,7 @@ function settingsFiles(env, home, cwd, platform) {
 }
 function qwenHooksOff(env, home, cwd = process.cwd(), platform = process.platform) {
   for (const file of settingsFiles(env, home, cwd, platform)) {
-    if (!existsSync9(file)) continue;
+    if (!existsSync10(file)) continue;
     let value;
     try {
       value = hostConfigValueAt(parseHostConfig("qwen", file, hostText(readFileSync8(file, "utf8")), "jsonc"), [KEY]);
@@ -8010,7 +8014,7 @@ function qwenHooksOff(env, home, cwd = process.cwd(), platform = process.platfor
 
 // src/setup/codex-trust.ts
 import { createHash } from "node:crypto";
-import { existsSync as existsSync10, realpathSync as realpathSync4 } from "node:fs";
+import { existsSync as existsSync11, realpathSync as realpathSync4 } from "node:fs";
 import path10 from "node:path";
 import { spawn } from "node:child_process";
 
@@ -8118,7 +8122,7 @@ function snake(name) {
 function realFile(file) {
   let dir = path10.resolve(file);
   const rest = [];
-  while (!existsSync10(dir) && path10.dirname(dir) !== dir) {
+  while (!existsSync11(dir) && path10.dirname(dir) !== dir) {
     rest.unshift(path10.basename(dir));
     dir = path10.dirname(dir);
   }
@@ -8361,7 +8365,7 @@ function listCopilotHooks(env, file, cwd) {
 
 // src/setup/engine.ts
 import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
-import { closeSync, existsSync as existsSync11, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync9, readSync, readdirSync as readdirSync4, realpathSync as realpathSync6, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { closeSync, existsSync as existsSync12, mkdirSync as mkdirSync3, mkdtempSync, openSync, readFileSync as readFileSync9, readSync, readdirSync as readdirSync5, realpathSync as realpathSync6, rmSync, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import path12 from "node:path";
 
@@ -8458,7 +8462,7 @@ function isNativeBinary(file) {
 function owningPackage(dir) {
   for (let d = dir; ; d = path12.dirname(d)) {
     const f2 = path12.join(d, "package.json");
-    if (existsSync11(f2)) {
+    if (existsSync12(f2)) {
       try {
         return String(JSON.parse(hostText(readFileSync9(f2, "utf8"))).name);
       } catch {
@@ -8476,7 +8480,7 @@ function hostBin(bin, env, platform = process.platform) {
   for (const dir of pathEntries(get("PATH") ?? "", platform)) {
     const own2 = which(bin, { PATH: dir, ...get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {} }, platform);
     for (const f2 of [own2, ...real2.extra.map((p3) => path12.join(dir, ...p3))]) {
-      if (!f2 || !existsSync11(f2) || !statSync2(f2).isFile()) continue;
+      if (!f2 || !existsSync12(f2) || !statSync2(f2).isFile()) continue;
       const file = realpathSync6(f2);
       if (isNativeBinary(file) || owningPackage(path12.dirname(file)) === real2.pkg) return { file, shims };
       shims.push(f2);
@@ -8493,10 +8497,10 @@ function runBin(bin, args, env, input) {
   return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS });
 }
 function readOr(file) {
-  return existsSync11(file) ? hostText(readFileSync9(file, "utf8")) : void 0;
+  return existsSync12(file) ? hostText(readFileSync9(file, "utf8")) : void 0;
 }
 function readRaw(file) {
-  return existsSync11(file) ? readFileSync9(file, "utf8") : void 0;
+  return existsSync12(file) ? readFileSync9(file, "utf8") : void 0;
 }
 var atomicWrite = atomicWriteFile;
 function pidAlive(pid) {
@@ -8639,7 +8643,7 @@ function isNativeSpec(e) {
   return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX);
 }
 function isStaleOwnPlugin(e, entry2) {
-  if (typeof e !== "string" || e === entry2 || !path12.isAbsolute(e) || existsSync11(e)) return false;
+  if (typeof e !== "string" || e === entry2 || !path12.isAbsolute(e) || existsSync12(e)) return false;
   const seg = e.split("\\").join("/").split("/");
   const n3 = seg.length;
   return n3 >= 3 && seg[n3 - 1] === "plugin.js" && seg[n3 - 2] === "opencode" && seg[n3 - 3] === "context-mode";
@@ -8696,7 +8700,7 @@ function planSkills(row, edits) {
   const s = row.skillInstall;
   if (s.kind !== "dir") return;
   for (const f2 of s.files) {
-    if (!existsSync11(f2.src)) throw new Error(`preflight: ${f2.src} is missing`);
+    if (!existsSync12(f2.src)) throw new Error(`preflight: ${f2.src} is missing`);
     const after = renderSkill(readFileSync9(f2.src, "utf8"), s.prefixes);
     const before = readRaw(f2.file);
     if (before !== after) edits.push({ plain: true, file: f2.file, before, after, changes: [{ file: f2.file, path: f2.name, before: before === void 0 ? null : "old", after: "SKILL.md" }] });
@@ -8960,7 +8964,7 @@ var SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
 var NOT_SEEN_LINE = "not seen yet, run one tool call";
 function hookSeenCheck(row, home) {
   const base = path12.join(home, STATE_DIR, PROJECTS_DIR_NAME);
-  const dirs = existsSync11(base) ? readdirSync4(base) : [];
+  const dirs = existsSync12(base) ? readdirSync5(base) : [];
   let sqlite;
   try {
     sqlite = process.getBuiltinModule("node:sqlite");
@@ -8969,7 +8973,7 @@ function hookSeenCheck(row, home) {
   }
   for (const d of dirs) {
     const file = path12.join(base, d, DB_FILE_NAME);
-    if (!sqlite || !existsSync11(file)) continue;
+    if (!sqlite || !existsSync12(file)) continue;
     let db;
     try {
       db = new sqlite.DatabaseSync(file, { readOnly: true });
@@ -8984,10 +8988,10 @@ function hookSeenCheck(row, home) {
 function skillsCheck(row, pkgDir) {
   const s = row.skillInstall;
   if (s.kind === "package") {
-    const miss = COMMAND_SKILLS.map((n3) => path12.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync11(f2));
+    const miss = COMMAND_SKILLS.map((n3) => path12.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync12(f2));
     return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : void 0 };
   }
-  const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync11(f2.src) ? renderSkill(readFileSync9(f2.src, "utf8"), s.prefixes) : void 0));
+  const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync12(f2.src) ? renderSkill(readFileSync9(f2.src, "utf8"), s.prefixes) : void 0));
   return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f2) => f2.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : void 0 };
 }
 var PLUGIN_ENABLED = "enabled";
@@ -9272,14 +9276,14 @@ function agentHomeDir(id, ctx) {
   return path12.join(ctx.home, ...AGENT_HOME_DIR[id]);
 }
 function detectAgents(reg, ctx) {
-  return reg.filter((r2) => existsSync11(agentHomeDir(r2.id, ctx)) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
+  return reg.filter((r2) => existsSync12(agentHomeDir(r2.id, ctx)) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
 }
 async function runSetup(opts) {
   const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const runId = opts.runId ?? (/* @__PURE__ */ new Date()).toISOString().split(":").join("-").split(".").join("-");
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
-    if (!existsSync11(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
+    if (!existsSync12(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
   const root = path12.join(ctx.home, STATE_DIR);
@@ -9370,7 +9374,7 @@ async function runDoctor(opts) {
   const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
-    if (!existsSync11(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
+    if (!existsSync12(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
   const run = new Run(path12.join(ctx.home, STATE_DIR), "doctor");
@@ -9432,12 +9436,12 @@ function runRemove(opts) {
   const env = opts.env ?? process.env;
   const root = path12.join(opts.home, STATE_DIR);
   const base = path12.join(root, BACKUP_DIR);
-  if (!existsSync11(base)) return { exitCode: 0, restored: 0 };
+  if (!existsSync12(base)) return { exitCode: 0, restored: 0 };
   const held = takeLock(root, "remove");
   if (held) return { exitCode: 1, restored: 0, error: held };
   let restored = 0;
   try {
-    const runs = readdirSync4(base).map((r2) => path12.join(base, r2)).filter((d) => existsSync11(path12.join(d, MANIFEST))).sort().reverse();
+    const runs = readdirSync5(base).map((r2) => path12.join(base, r2)).filter((d) => existsSync12(path12.join(d, MANIFEST))).sort().reverse();
     for (const dir of runs) {
       const m3 = JSON.parse(readFileSync9(path12.join(dir, MANIFEST), "utf8"));
       undo(dir, m3.entries, env);
@@ -9902,7 +9906,7 @@ async function upgrade(ui) {
   }
   const root = `${spawnSync3(npm, ["root", "-g"], { env: ui.ctx.env, encoding: "utf8", shell, windowsHide: true }).stdout ?? ""}`.trim();
   const cli = path13.join(root, "context-mode", "cli.mjs");
-  if (!root || !existsSync12(cli)) {
+  if (!root || !existsSync13(cli)) {
     err(`FAIL upgrade: ${cli} not found after ${install}. Fix: ${install}`);
     return EXIT_FAIL;
   }

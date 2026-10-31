@@ -7,8 +7,8 @@ var __export = (target, all) => {
 
 // src/entries/server.ts
 import { randomUUID } from "node:crypto";
-import { existsSync as existsSync20, rmSync as rmSync11 } from "node:fs";
-import { join as join21 } from "node:path";
+import { existsSync as existsSync21, realpathSync as realpathSync9, rmSync as rmSync11 } from "node:fs";
+import { dirname as dirname10, join as join21 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // node_modules/@modelcontextprotocol/server/dist/chunk-Br0eD_fh.mjs
@@ -28291,6 +28291,9 @@ var HOOK_FAIL_REDIRECT = Object.freeze({
 function D5_LAST_HOOK_ERROR(ts, stage, label) {
   return `; last hook error ${ts} at ${stage} (${label}), stack in ${HOOK_ERROR_LOG_FILE}`;
 }
+function D5_PAST_HOOK_ERROR(ts, stage, label) {
+  return `; past hook error ${ts} at ${stage} (${label}), before this run, stack in ${HOOK_ERROR_LOG_FILE}`;
+}
 var BOUNDED_COMMANDS = Object.freeze(["pwd", "whoami", "uname", "id", "realpath", "ln"]);
 var BOUNDED_GIT_SUBCOMMANDS = Object.freeze(["status"]);
 var VERSION_PROBE_FLAGS = Object.freeze(["--version", "-v"]);
@@ -28340,7 +28343,7 @@ var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "d526f1e54835a809b09257c9587a22172141d4c3" : void 0;
+var BUNDLE_SHA = true ? "ea4179fd9a2c4c55eadc9184a295a7f974df90bd" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -28529,7 +28532,7 @@ var REGEX_ESCAPE = "\\";
 var CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"]);
 var D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
 function D5_SLOW_DETAIL(ms) {
-  return `hook round trip took ${ms} ms, over ${HOOK_P95_MS} ms`;
+  return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`;
 }
 var D5_FIX = "run ctx_upgrade";
 var PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";
@@ -44278,7 +44281,7 @@ var ctxBatch = Object.freeze({
 });
 
 // src/core/tools/doctor.ts
-import { readdirSync as readdirSync5, readFileSync as readFileSync8, existsSync as existsSync11 } from "node:fs";
+import { readdirSync as readdirSync6, readFileSync as readFileSync8, existsSync as existsSync12 } from "node:fs";
 import { basename as basename3, dirname as dirname5, join as join11 } from "node:path";
 
 // src/adapters/claude-code.ts
@@ -44557,7 +44560,8 @@ var RESULT_SUCCESS = "success";
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
-var NATIVE_TO_CANONICAL3 = { bash: "Bash" };
+var SHELL_TOOL_NAMES = Object.freeze(["bash", "powershell"]);
+var NATIVE_TO_CANONICAL3 = Object.fromEntries(SHELL_TOOL_NAMES.map((n) => [n, "Bash"]));
 function canonicalName3(name) {
   if (name.startsWith(TOOL_NAME_PREFIX5)) return name.slice(TOOL_NAME_PREFIX5.length);
   if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
@@ -44638,11 +44642,11 @@ var VSCODE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostTool
 var MCP_PREFIX2 = "mcp_";
 var MCP_SEP2 = "_";
 var SESSION_START_NEW = "new";
-var SHELL_TOOL_NAMES = Object.freeze(["run_in_terminal", "runTerminalCommand", "bash", "powershell"]);
+var SHELL_TOOL_NAMES2 = Object.freeze(["run_in_terminal", "runTerminalCommand", "bash", "powershell"]);
 var READ_TOOL_NAMES = Object.freeze(["read_file", "view"]);
 var WEBFETCH_TOOL_NAMES = Object.freeze(["fetch_webpage", "web_fetch"]);
 var NATIVE_TO_CANONICAL4 = Object.fromEntries([
-  ...SHELL_TOOL_NAMES.map((n) => [n, "Bash"]),
+  ...SHELL_TOOL_NAMES2.map((n) => [n, "Bash"]),
   ...READ_TOOL_NAMES.map((n) => [n, "Read"]),
   ...WEBFETCH_TOOL_NAMES.map((n) => [n, "WebFetch"])
 ]);
@@ -44770,8 +44774,8 @@ var KIRO_EVENTS = {
 };
 var PROMPT_ENV = "USER_PROMPT";
 var MCP_PREFIX3 = "mcp_";
-var SHELL_TOOL_NAMES2 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
-var NATIVE_TO_CANONICAL5 = Object.fromEntries(SHELL_TOOL_NAMES2.map((n) => [n, "Bash"]));
+var SHELL_TOOL_NAMES3 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
+var NATIVE_TO_CANONICAL5 = Object.fromEntries(SHELL_TOOL_NAMES3.map((n) => [n, "Bash"]));
 var MCP_SEP3 = "_";
 var KIRO_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 function canonicalName5(name) {
@@ -45043,8 +45047,9 @@ var ADAPTERS = Object.freeze([
     installMode: "plugin",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX5,
-    nativeTools: { shell: ["bash"] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES] },
     execReadOnlyHint: false,
+    // D-PWSH-DUMP-1
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
@@ -45062,7 +45067,7 @@ var ADAPTERS = Object.freeze([
     projectSource: "arg:workspaceFolder",
     toolNamePrefix: TOOL_NAME_PREFIX6,
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
-    nativeTools: { shell: [...SHELL_TOOL_NAMES], read: [...READ_TOOL_NAMES], webfetch: [...WEBFETCH_TOOL_NAMES] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES2], read: [...READ_TOOL_NAMES], webfetch: [...WEBFETCH_TOOL_NAMES] },
     // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
     execReadOnlyHint: false,
     eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
@@ -45081,7 +45086,7 @@ var ADAPTERS = Object.freeze([
     installMode: "mcp-entry",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX7,
-    nativeTools: { shell: [...SHELL_TOOL_NAMES2] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES3] },
     execReadOnlyHint: false,
     // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
@@ -45165,6 +45170,7 @@ function getAdapter(id) {
 }
 
 // src/core/ops/doctor-config.ts
+import { existsSync as existsSync7, readdirSync as readdirSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 
 // src/core/ops/detect-v1.ts
@@ -48222,7 +48228,47 @@ function mcpFile(row5, home, env) {
   }
   return null;
 }
+var CODEX_PLUGIN_KEY = `${SERVER_KEY}@${SERVER_KEY}`;
+var CODEX_PLUGIN_SUBDIR = ".codex-plugin";
+var CODEX_PLUGIN_MCP_FILE = "mcp.json";
+var CODEX_PLUGIN_HOOKS_FILE = "hooks.json";
+var MCP_SERVERS_FIELD = "mcpServers";
+function codexNativeDir(env, home) {
+  const codexDir = codexDirOf(env, home);
+  let enabled;
+  try {
+    enabled = hostConfigValueAt(readParsed("codex", join9(codexDir, CONFIG_TOML_FILE)).value, ["plugins", CODEX_PLUGIN_KEY, "enabled"]);
+  } catch {
+    return null;
+  }
+  if (enabled !== true) return null;
+  const cache = join9(codexDir, "plugins", PLUGIN_CACHE_DIR_NAME);
+  if (!existsSync7(cache)) return null;
+  const found = [];
+  for (const market of readdirSync5(cache)) {
+    const plugin = join9(cache, market, SERVER_KEY);
+    if (!existsSync7(plugin)) continue;
+    for (const version4 of readdirSync5(plugin).sort()) {
+      const dir = join9(plugin, version4, CODEX_PLUGIN_SUBDIR);
+      if (existsSync7(join9(dir, CODEX_PLUGIN_MCP_FILE))) found.push(dir);
+    }
+  }
+  return found.length === 0 ? null : found[found.length - 1];
+}
+function nativeMcpWrong(dir, row5) {
+  try {
+    const entry = hostConfigValueAt(readParsed(row5.id, join9(dir, CODEX_PLUGIN_MCP_FILE)).value, [MCP_SERVERS_FIELD, SERVER_KEY]);
+    if (!isObject4(entry)) return true;
+    const args = list(entry[MCP_ARGS_FIELD]);
+    const script = args[0];
+    return entry.command !== HOST_NODE_COMMAND || typeof script !== "string" || !script.endsWith(SERVER_ENTRY_FILE) || args[1] !== AGENT_ARG || args[2] !== row5.id || args.length !== 3;
+  } catch {
+    return true;
+  }
+}
 function mcpWrong(row5, home, env) {
+  const native = row5.id === "codex" ? codexNativeDir(env, home) : null;
+  if (native !== null) return nativeMcpWrong(native, row5);
   const file2 = mcpFile(row5, home, env);
   try {
     if (file2 === null) {
@@ -48241,7 +48287,8 @@ function hookParts(row5, home, env, worktree) {
   let block;
   try {
     const root = spec.root === "plugin" ? resolvePluginRoot(row5, env) : spec.root === "home" ? home : worktree;
-    const file2 = row5.id === "codex" ? join9(codexDirOf(env, home), HOOKS_JSON_FILE) : row5.id === "copilot-cli" ? join9(copilotDirOf(env, home), ...spec.file.slice(1)) : row5.id === "kiro" ? join9(kiroDirOf(env, home), ...spec.file.slice(1)) : join9(root, ...spec.file);
+    const native = row5.id === "codex" ? codexNativeDir(env, home) : null;
+    const file2 = native !== null ? join9(native, CODEX_PLUGIN_HOOKS_FILE) : row5.id === "codex" ? join9(codexDirOf(env, home), HOOKS_JSON_FILE) : row5.id === "copilot-cli" ? join9(copilotDirOf(env, home), ...spec.file.slice(1)) : row5.id === "kiro" ? join9(kiroDirOf(env, home), ...spec.file.slice(1)) : join9(root, ...spec.file);
     block = hostConfigValueAt(readParsed(row5.id, file2).value, spec.key);
     if (row5.id === "codex") {
       const config4 = readParsed(row5.id, join9(codexDirOf(env, home), CONFIG_TOML_FILE)).value;
@@ -48304,7 +48351,7 @@ function checkDoubleFire(agent, worktree) {
 }
 
 // src/core/ops/doctor-db.ts
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync8 } from "node:fs";
 var unknown4 = (id, detail) => ({ id, label: DOCTOR_LABEL[id], status: "UNKNOWN", detail });
 var pass2 = (id, detail) => ({ id, label: DOCTOR_LABEL[id], status: "PASS", detail });
 var fail2 = (detail, fixCommand) => ({ id: "D8", label: DOCTOR_LABEL.D8, status: "FAIL", detail, fixCommand });
@@ -48344,7 +48391,7 @@ function failsOnCorrupt(step) {
 }
 async function checkDb(project) {
   const clean = { schemaStale: false, integrityFailed: false };
-  if (!existsSync7(project.dbPath)) return { row: pass2("D8", DOCTOR_PASS_DETAIL), ...clean };
+  if (!existsSync8(project.dbPath)) return { row: pass2("D8", DOCTOR_PASS_DETAIL), ...clean };
   const sqlite = await loadSqlite2();
   if (sqlite === null) return { row: unknown4("D8", D2_SQLITE_DETAIL), ...clean };
   let raw = null;
@@ -48370,7 +48417,7 @@ async function checkDb(project) {
   }
 }
 async function checkIndex(project) {
-  if (!existsSync7(project.dbPath)) return pass2("D9", D9_INDEX_DETAIL(0, 0));
+  if (!existsSync8(project.dbPath)) return pass2("D9", D9_INDEX_DETAIL(0, 0));
   const sqlite = await loadSqlite2();
   if (sqlite === null) return unknown4("D9", D2_SQLITE_DETAIL);
   let raw = null;
@@ -48387,7 +48434,7 @@ async function checkIndex(project) {
 }
 
 // src/core/ops/doctor-env.ts
-import { existsSync as existsSync8, realpathSync as realpathSync5 } from "node:fs";
+import { existsSync as existsSync9, realpathSync as realpathSync5 } from "node:fs";
 import { isAbsolute as isAbsolute2, relative } from "node:path";
 function pass3(id, detail = DOCTOR_PASS_DETAIL) {
   return { id, label: DOCTOR_LABEL[id], status: "PASS", detail };
@@ -48445,7 +48492,7 @@ function checkMcp(ctx) {
   return named || versioned ? pass3("D6") : unknown5("D6", D6_UNKNOWN_DETAIL);
 }
 function piCwdInside(worktree, piCwd) {
-  if (piCwd === void 0 || !existsSync8(piCwd)) return false;
+  if (piCwd === void 0 || !existsSync9(piCwd)) return false;
   const rel = relative(worktree, realpathSync5.native(piCwd));
   return rel === "" || !rel.startsWith("..") && !isAbsolute2(rel);
 }
@@ -48466,15 +48513,16 @@ function checkShell(env) {
 }
 
 // src/core/ops/doctor-hook.ts
-import { existsSync as existsSync9, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync10, readFileSync as readFileSync7 } from "node:fs";
 import path4 from "node:path";
+var D5_SAMPLES = 3;
 var row = (status, detail, fixCommand) => fixCommand === void 0 ? { id: "D5", label: DOCTOR_LABEL.D5, status, detail } : { id: "D5", label: DOCTOR_LABEL.D5, status, detail, fixCommand };
 function isObject5(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 function loadFixture(bundleDir2, agent) {
   const file2 = path4.join(bundleDir2, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE);
-  if (!existsSync9(file2)) return null;
+  if (!existsSync10(file2)) return null;
   let all;
   try {
     all = JSON.parse(hostText(readFileSync7(file2, "utf8")));
@@ -48485,6 +48533,9 @@ function loadFixture(bundleDir2, agent) {
   const e = all[agent];
   if (!isObject5(e) || typeof e.event !== "string" || !Object.hasOwn(e, "payload")) return null;
   return { event: e.event, payload: e.payload };
+}
+function payloadFor(payload, worktree) {
+  return worktree !== void 0 && isObject5(payload) ? { ...payload, cwd: worktree } : payload;
 }
 function isNativeShape(stdout, exitCode, killed, event) {
   if (killed !== null || exitCode !== 0 && exitCode !== 2) return false;
@@ -48502,22 +48553,34 @@ function codexHookJournaled(db) {
   return db.raw.prepare("SELECT 1 FROM events WHERE agent = ? LIMIT 1").get("codex") !== void 0;
 }
 async function checkHookRoundTrip(i) {
-  if (i.agent === "codex" && existsSync9(path4.join(i.codexConfigDir, HOOKS_JSON_FILE)) && !codexHookJournaled(i.db)) {
+  if (i.agent === "codex" && existsSync10(path4.join(i.codexConfigDir, HOOKS_JSON_FILE)) && !codexHookJournaled(i.db)) {
     return row("UNKNOWN", D5_CODEX_UNTRUSTED_DETAIL);
   }
   const fixture = loadFixture(i.bundleDir, i.agent);
   if (fixture === null) return row("UNKNOWN", D5_NO_FIXTURE_DETAIL(i.agent));
   const now = i.now ?? (() => performance.now());
-  const start = now();
-  const r = await runProcess([process.execPath, path4.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
-    cwd: i.bundleDir,
-    env: i.env,
-    signal: i.signal,
-    timeoutMs: HOOK_TIMEOUT_MS,
-    stdin: JSON.stringify(fixture.payload)
+  const samples = Math.max(1, i.samples ?? D5_SAMPLES);
+  const bareMs = i.bareMs ?? (async () => {
+    const t = performance.now();
+    await runProcess([process.execPath, "-e", ""], { cwd: i.bundleDir, env: i.env, signal: i.signal, timeoutMs: HOOK_TIMEOUT_MS });
+    return performance.now() - t;
   });
-  const ms = Math.round(now() - start);
-  if (!isNativeShape(r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+  const hookWalls = [];
+  const bareWalls = [];
+  for (let n = 0; n < samples; n++) {
+    const start = now();
+    const r = await runProcess([process.execPath, path4.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir,
+      env: i.env,
+      signal: i.signal,
+      timeoutMs: HOOK_TIMEOUT_MS,
+      stdin: JSON.stringify(payloadFor(fixture.payload, i.worktree))
+    });
+    hookWalls.push(now() - start);
+    if (!isNativeShape(r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+    bareWalls.push(await bareMs());
+  }
+  const ms = Math.max(0, Math.round(Math.min(...hookWalls) - Math.min(...bareWalls)));
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
@@ -48560,7 +48623,7 @@ function lastHookError(env) {
 }
 
 // src/core/ops/db-heal.ts
-import { existsSync as existsSync10, rmSync as rmSync4 } from "node:fs";
+import { existsSync as existsSync11, rmSync as rmSync4 } from "node:fs";
 function integrityOk2(rows) {
   return rows.length === 1 && rows[0].integrity_check === INTEGRITY_OK;
 }
@@ -48594,7 +48657,7 @@ function renameAside(dbPath) {
   const ts = String(Date.now());
   for (const suffix of DB_SIBLING_SUFFIXES) {
     const file2 = dbPath + suffix;
-    if (existsSync10(file2)) renameWithRetry(file2, file2 + HEAL_TS_SEP + ts + HEAL_BACKUP_SUFFIX);
+    if (existsSync11(file2)) renameWithRetry(file2, file2 + HEAL_TS_SEP + ts + HEAL_BACKUP_SUFFIX);
   }
   return ts;
 }
@@ -48694,7 +48757,7 @@ async function guard(id, run) {
   }
 }
 async function codexDb(ctx, adapter) {
-  if (adapter.id !== "codex" || !existsSync11(ctx.project.dbPath)) return null;
+  if (adapter.id !== "codex" || !existsSync12(ctx.project.dbPath)) return null;
   try {
     return await openDb(ctx.project, { readOnly: true });
   } catch {
@@ -48703,8 +48766,10 @@ async function codexDb(ctx, adapter) {
 }
 async function hookRow(ctx, adapter, host) {
   const db = await codexDb(ctx, adapter);
+  const runStart = Date.now();
   try {
     const row5 = await checkHookRoundTrip({
+      worktree: ctx.project.worktree,
       agent: adapter.id,
       bundleDir: host.bundleDir,
       env: buildChildEnv(host.env),
@@ -48714,15 +48779,17 @@ async function hookRow(ctx, adapter, host) {
       db
     });
     const last2 = lastHookError(host.env);
-    return last2 === null ? row5 : { ...row5, detail: row5.detail + D5_LAST_HOOK_ERROR(last2.ts, last2.stage, last2.label) };
+    if (last2 === null) return row5;
+    const text = Date.parse(last2.ts) >= runStart ? D5_LAST_HOOK_ERROR : D5_PAST_HOOK_ERROR;
+    return { ...row5, detail: row5.detail + text(last2.ts, last2.stage, last2.label) };
   } finally {
     if (db !== null) closeDb(db);
   }
 }
 function ownServerId(configDir, projectKey) {
   const dir = join11(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
-  if (!existsSync11(dir)) return "";
-  for (const name of readdirSync5(dir)) {
+  if (!existsSync12(dir)) return "";
+  for (const name of readdirSync6(dir)) {
     if (!name.endsWith(OWNER_PID_EXT)) continue;
     if (readFileSync8(join11(dir, name), "utf8").trim() === String(process.pid)) return basename3(name, OWNER_PID_EXT);
   }
@@ -48796,7 +48863,7 @@ var ctxDoctor = Object.freeze({
 });
 
 // src/core/tools/execute.ts
-import { existsSync as existsSync12, mkdtempSync, rmSync as rmSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync13, mkdtempSync, rmSync as rmSync5, writeFileSync as writeFileSync3 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import { dirname as dirname6, join as join12, parse as parse5, resolve as resolve3 } from "node:path";
 
@@ -48921,7 +48988,7 @@ function schemaLine(issue4) {
 }
 function fileError(given, abs, root) {
   let dir = abs;
-  while (!existsSync12(dir) && dirname6(dir) !== dir) dir = dirname6(dir);
+  while (!existsSync13(dir) && dirname6(dir) !== dir) dir = dirname6(dir);
   if (isInside(root, dir)) return null;
   return new CtxError("OUTSIDE_ROOT", { p: given, root }).toLine();
 }
@@ -49036,11 +49103,11 @@ var ctxExecute = {
 };
 
 // src/core/tools/index.ts
-import { existsSync as existsSync13, readFileSync as readFileSync10, statSync as statSync5 } from "node:fs";
+import { existsSync as existsSync14, readFileSync as readFileSync10, statSync as statSync5 } from "node:fs";
 import { dirname as dirname7, extname, join as join14, relative as relative2, resolve as resolve4 } from "node:path";
 
 // src/core/index/walk.ts
-import { readdirSync as readdirSync6, readFileSync as readFileSync9, realpathSync as realpathSync6, statSync as statSync4 } from "node:fs";
+import { readdirSync as readdirSync7, readFileSync as readFileSync9, realpathSync as realpathSync6, statSync as statSync4 } from "node:fs";
 import { join as join13 } from "node:path";
 var GITIGNORE = ".gitignore";
 var GIT_DIR = ".git";
@@ -49055,7 +49122,7 @@ function walkDir(root, containmentRoot) {
 function visit(abs, rel, parent, contain, seen, found) {
   let entries;
   try {
-    entries = readdirSync6(abs, { withFileTypes: true });
+    entries = readdirSync7(abs, { withFileTypes: true });
   } catch {
     return;
   }
@@ -53192,7 +53259,7 @@ function readUtf8(absPath) {
 }
 function missingOrOutside(given, abs, root) {
   let dir = abs;
-  while (!existsSync13(dir) && dirname7(dir) !== dir) dir = dirname7(dir);
+  while (!existsSync14(dir) && dirname7(dir) !== dir) dir = dirname7(dir);
   if (dir !== abs && isInside(root, dir)) return new CtxError("INVALID_ARGS", { field: "path", action: "pass an existing file or folder" });
   return new CtxError("OUTSIDE_ROOT", { p: given, root });
 }
@@ -53724,11 +53791,11 @@ var ctxStats = Object.freeze({
 });
 
 // src/core/tools/upgrade.ts
-import { existsSync as existsSync19, realpathSync as realpathSync7, rmSync as rmSync10 } from "node:fs";
+import { existsSync as existsSync20, realpathSync as realpathSync7, rmSync as rmSync10 } from "node:fs";
 import { basename as basename5, dirname as dirname9, join as join20 } from "node:path";
 
 // src/core/ops/host-write.ts
-import { copyFileSync, existsSync as existsSync14, mkdirSync as mkdirSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { copyFileSync, existsSync as existsSync15, mkdirSync as mkdirSync5, writeFileSync as writeFileSync4 } from "node:fs";
 import { dirname as dirname8, join as join15 } from "node:path";
 function defaultWrite(file2, text) {
   writeFileSync4(file2, text, "utf8");
@@ -53757,7 +53824,7 @@ function toRow(file2, edit) {
 function writeWithRollback(file2, text, write, atomic) {
   const trash = file2 + UPGRADE_TRASH_SUFFIX;
   const tmp = `${file2}${HOST_CONFIG_TMP_SUFFIX}.${process.pid}`;
-  const had = existsSync14(file2);
+  const had = existsSync15(file2);
   mkdirSync5(dirname8(file2), { recursive: true });
   if (had) copyFileSync(file2, trash);
   try {
@@ -53787,7 +53854,7 @@ function regenerateHostConfig(row5, home, opts = {}) {
   if (requested === null) return [];
   const current = readHostConfig(row5.id, requested);
   const result = mergeOwnEntries(row5.id, current.text, current.format, row5);
-  const exists = existsSync14(current.path);
+  const exists = existsSync15(current.path);
   if (exists && result.text === current.text) return [];
   const text = result.text === "" && current.format !== "toml" ? JSON.stringify({}) : result.text;
   writeWithRollback(current.path, current.layout === void 0 ? text : withLayout(text, current.layout), opts.write ?? defaultWrite, opts.atomic ?? {});
@@ -53795,7 +53862,7 @@ function regenerateHostConfig(row5, home, opts = {}) {
 }
 
 // src/core/ops/plugin-swap.ts
-import { existsSync as existsSync15, lstatSync, readdirSync as readdirSync7, readlinkSync, rmSync as rmSync6, symlinkSync, unlinkSync as unlinkSync2 } from "node:fs";
+import { existsSync as existsSync16, lstatSync, readdirSync as readdirSync8, readlinkSync, rmSync as rmSync6, symlinkSync, unlinkSync as unlinkSync2 } from "node:fs";
 import { basename as basename4, join as join16, win32 as win322 } from "node:path";
 function linkTarget(path5, win) {
   if (!isLink(path5)) return null;
@@ -53806,7 +53873,7 @@ function isLink(path5) {
   return lstatSync(path5, { throwIfNoEntry: false })?.isSymbolicLink() === true;
 }
 function generations(agentDir) {
-  return readdirSync7(agentDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).filter((name) => !name.startsWith(UPGRADE_FETCH_DIR_PREFIX) && !name.endsWith(UPGRADE_TRASH_SUFFIX)).sort();
+  return readdirSync8(agentDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).filter((name) => !name.startsWith(UPGRADE_FETCH_DIR_PREFIX) && !name.endsWith(UPGRADE_TRASH_SUFFIX)).sort();
 }
 function settleLinks(link, tmp, old, opts) {
   if (isLink(tmp)) unlinkSync2(tmp);
@@ -53816,7 +53883,7 @@ function settleLinks(link, tmp, old, opts) {
 }
 function swapPluginCurrent(agentDir, sha, opts = {}) {
   const next = join16(agentDir, sha);
-  if (!existsSync15(next) || !lstatSync(next).isDirectory()) {
+  if (!existsSync16(next) || !lstatSync(next).isDirectory()) {
     throw new CtxError("PLUGIN_ROOT_MISSING", { agent: basename4(agentDir), path: next });
   }
   const link = join16(agentDir, PLUGIN_CURRENT_LINK);
@@ -53836,12 +53903,12 @@ function swapPluginCurrent(agentDir, sha, opts = {}) {
   if (before !== null) keep.add(before);
   const removed = generations(agentDir).filter((name) => !keep.has(name)).map((name) => join16(agentDir, name));
   for (const dir of removed) rmSync6(dir, { recursive: true, force: true });
-  const previous = before !== null && existsSync15(join16(agentDir, before)) ? join16(agentDir, before) : null;
+  const previous = before !== null && existsSync16(join16(agentDir, before)) ? join16(agentDir, before) : null;
   return { current: next, previous, removed };
 }
 
 // src/core/ops/release-fetch.ts
-import { existsSync as existsSync16, mkdirSync as mkdirSync6, rmSync as rmSync7 } from "node:fs";
+import { existsSync as existsSync17, mkdirSync as mkdirSync6, rmSync as rmSync7 } from "node:fs";
 import { join as join17 } from "node:path";
 function failed(r) {
   if (r.exitCode === null && r.killed === null) return new CtxError("FETCH_FAILED", { code: GIT_NOT_STARTED });
@@ -53865,7 +53932,7 @@ async function fetchRelease(agent, url4, env, signal, opts = {}) {
     await git2(gitBin, [...GIT_CLONE_ARGS, RELEASE_BRANCH, url4, fetchDir], agentDir, childEnv, signal);
     const sha = await git2(gitBin, GIT_HEAD_SHA_ARGS, fetchDir, childEnv, signal);
     const dir = join17(agentDir, sha);
-    if (existsSync16(dir)) rmSync7(fetchDir, { recursive: true, force: true });
+    if (existsSync17(dir)) rmSync7(fetchDir, { recursive: true, force: true });
     else renameWithRetry(fetchDir, dir, opts);
     return { sha, dir };
   } catch (e) {
@@ -53875,7 +53942,7 @@ async function fetchRelease(agent, url4, env, signal, opts = {}) {
 }
 
 // src/core/ops/uninstall.ts
-import { existsSync as existsSync17, readdirSync as readdirSync8, rmSync as rmSync8, writeFileSync as writeFileSync5 } from "node:fs";
+import { existsSync as existsSync18, readdirSync as readdirSync9, rmSync as rmSync8, writeFileSync as writeFileSync5 } from "node:fs";
 import { join as join18 } from "node:path";
 function row2(area, before, after) {
   return { area, before, after };
@@ -53905,7 +53972,7 @@ function removeCache(adapter, env, configDir) {
     }
     case "plugin": {
       const agentDir = join18(configDir, DATA_PLUGINS_DIR_NAME, adapter.id);
-      if (!existsSync17(agentDir)) return row2(UPGRADE_CACHE_AREA, "", UPGRADE_NOT_FOUND);
+      if (!existsSync18(agentDir)) return row2(UPGRADE_CACHE_AREA, "", UPGRADE_NOT_FOUND);
       rmSync8(agentDir, { recursive: true, force: true });
       return row2(UPGRADE_CACHE_AREA, agentDir, UPGRADE_REMOVED);
     }
@@ -53985,9 +54052,9 @@ function removeOwnEntries(agent, env) {
 function removeProjectData(configDir, projectKey) {
   const projects = join18(configDir, PROJECTS_DIR_NAME);
   const dir = join18(projects, projectKey);
-  if (!existsSync17(dir)) return row2(UPGRADE_DATA_AREA, "", UPGRADE_NOT_FOUND);
+  if (!existsSync18(dir)) return row2(UPGRADE_DATA_AREA, "", UPGRADE_NOT_FOUND);
   if (dir === projects || !isInside(projects, dir)) throw new CtxError("OUTSIDE_ROOT", { p: dir, root: projects });
-  for (const name of readdirSync8(dir)) {
+  for (const name of readdirSync9(dir)) {
     if (name !== OWNERS_DIR_NAME) rmSync8(join18(dir, name), { recursive: true, force: true });
   }
   return row2(UPGRADE_DATA_AREA, dir, UPGRADE_DATA_DELETED);
@@ -54001,7 +54068,7 @@ function runUninstall(input) {
 }
 
 // src/core/ops/v1-remove.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync18, readFileSync as readFileSync11, rmSync as rmSync9 } from "node:fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync19, readFileSync as readFileSync11, rmSync as rmSync9 } from "node:fs";
 var isObj3 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var areaOf = (f) => f.path === "" ? f.file : f.file + UPGRADE_AREA_KEY_SEP + f.path;
 var row3 = (f, after) => ({ area: areaOf(f), before: f.reason, after });
@@ -54082,14 +54149,14 @@ function removeV1(agent, findings) {
   for (const f of findings) {
     if (UPGRADE_REPORT_ONLY_REASONS.includes(f.reason)) done.set(f, UPGRADE_REPORT_ONLY);
     else if (f.path === "") {
-      if (existsSync18(f.file)) {
+      if (existsSync19(f.file)) {
         moveAside(f.file, undo);
         done.set(f, UPGRADE_REMOVED);
       } else done.set(f, UPGRADE_NOT_FOUND);
     } else entries.set(f.file, [...entries.get(f.file) ?? [], f]);
   }
   for (const [file2, list3] of entries) {
-    if (!existsSync18(file2)) {
+    if (!existsSync19(file2)) {
       for (const f of list3) done.set(f, UPGRADE_NOT_FOUND);
       continue;
     }
@@ -54122,7 +54189,7 @@ function removeV1(agent, findings) {
     },
     rollback() {
       for (const u of undo.splice(0).reverse()) {
-        if (!existsSync18(u.trash)) continue;
+        if (!existsSync19(u.trash)) continue;
         rmSync9(u.target, { recursive: true, force: true });
         renameWithRetry(u.trash, u.target);
       }
@@ -54132,7 +54199,7 @@ function removeV1(agent, findings) {
 
 // src/core/ops/verify-sums.ts
 import { createHash } from "node:crypto";
-import { lstatSync as lstatSync2, readdirSync as readdirSync9, readFileSync as readFileSync12 } from "node:fs";
+import { lstatSync as lstatSync2, readdirSync as readdirSync10, readFileSync as readFileSync12 } from "node:fs";
 import { join as join19 } from "node:path";
 function mismatch() {
   return new CtxError("BUNDLE_HASH_MISMATCH");
@@ -54151,7 +54218,7 @@ function parseSums(text) {
   return sums;
 }
 function walk2(dir, prefix, out) {
-  for (const entry of readdirSync9(dir, { withFileTypes: true })) {
+  for (const entry of readdirSync10(dir, { withFileTypes: true })) {
     const rel = prefix === "" ? entry.name : prefix + "/" + entry.name;
     if (prefix === "" && (entry.name === GIT_DIR_NAME || entry.name === RELEASE_SUMS_FILE)) continue;
     const abs = join19(dir, entry.name);
@@ -54200,7 +54267,7 @@ function pluginRootRow(adapter, env) {
 }
 function isCurrent(agentDir, dir) {
   const link = join20(agentDir, PLUGIN_CURRENT_LINK);
-  return existsSync19(link) && realpathSync7.native(link) === realpathSync7.native(dir);
+  return existsSync20(link) && realpathSync7.native(link) === realpathSync7.native(dir);
 }
 async function checkout(adapter, deps) {
   const fetched = await fetchRelease(adapter.id, deps.releaseUrl, deps.env, deps.signal);
@@ -54385,6 +54452,32 @@ function sessionIdOf(meta3, agent, env, serverId) {
   if (typeof fromHost === "string" && fromHost !== "") return fromHost;
   return RUN_SESSION_PREFIX + serverId;
 }
+var CODEX_SANDBOX_STATE_META = "codex/sandbox-state-meta";
+var FILE_URL_PREFIX = "file:";
+function workspaceFromMeta(meta3) {
+  const state = meta3?.[CODEX_SANDBOX_STATE_META];
+  const cwd = typeof state === "object" && state !== null ? state.sandboxCwd : void 0;
+  if (typeof cwd !== "string" || cwd === "") return void 0;
+  if (!cwd.startsWith(FILE_URL_PREFIX)) return cwd;
+  try {
+    return fileURLToPath2(cwd);
+  } catch {
+    return void 0;
+  }
+}
+function realOrSame(p) {
+  try {
+    return realpathSync9.native(p);
+  } catch {
+    return p;
+  }
+}
+function workspaceCwdOf(meta3, spawnCwd, script) {
+  const fromHost = workspaceFromMeta(meta3);
+  if (fromHost !== void 0) return fromHost;
+  if (script === void 0 || script === "") return spawnCwd;
+  return realOrSame(spawnCwd) === realOrSame(dirname10(script)) ? "" : spawnCwd;
+}
 function errorReply(err) {
   if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0 };
   console.error(err);
@@ -54422,7 +54515,7 @@ async function startServer(argv, env) {
       opening.catch(() => pending.delete(project.dbPath));
     }
     const db = await opening;
-    if (!existsSync20(db.path)) throw new CtxError("DB_GONE");
+    if (!existsSync21(db.path)) throw new CtxError("DB_GONE");
     return db;
   }
   function stopMarker(configDir, projectKey) {
@@ -54430,7 +54523,7 @@ async function startServer(argv, env) {
   }
   function stopRequested() {
     const configDir = resolveConfigDir(process.env);
-    return held.some((db) => existsSync20(stopMarker(configDir, db.projectKey)));
+    return held.some((db) => existsSync21(stopMarker(configDir, db.projectKey)));
   }
   async function journal(project, ctx, name, reply4) {
     const db = await ownDb(project);
@@ -54443,7 +54536,7 @@ async function startServer(argv, env) {
       let project;
       const projectOf = () => {
         if (agent === void 0) throw new CtxError("NO_PROJECT", { kind: "--agent" });
-        project ??= resolveProject(agent, { env, argv, cwd: process.cwd(), piCwd: void 0 });
+        project ??= resolveProject(agent, { env, argv, cwd: workspaceCwdOf(meta3, process.cwd(), process.argv[1]), piCwd: void 0 });
         return project;
       };
       const ctx = {
@@ -54495,6 +54588,7 @@ async function startServer(argv, env) {
       // DEVIATIONS: no version constant in contracts yet
       {
         instructions: INSTRUCTIONS,
+        capabilities: { experimental: { [CODEX_SANDBOX_STATE_META]: {} } },
         cacheHints: {
           "tools/list": { ttlMs: TOOLS_TTL_MS, cacheScope: "public" },
           "server/discover": { ttlMs: TOOLS_TTL_MS, cacheScope: "public" }
@@ -54545,7 +54639,8 @@ if (isEntry(import.meta.main, process.argv[1], fileURLToPath2(import.meta.url)))
 export {
   INSTRUCTIONS,
   sessionIdOf,
-  startServer
+  startServer,
+  workspaceCwdOf
 };
 /*! Bundled license information:
 

@@ -683,7 +683,8 @@ var RESULT_SUCCESS = "success";
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
-var NATIVE_TO_CANONICAL3 = { bash: "Bash" };
+var SHELL_TOOL_NAMES = Object.freeze(["bash", "powershell"]);
+var NATIVE_TO_CANONICAL3 = Object.fromEntries(SHELL_TOOL_NAMES.map((n) => [n, "Bash"]));
 function canonicalName3(name) {
   if (name.startsWith(TOOL_NAME_PREFIX5)) return name.slice(TOOL_NAME_PREFIX5.length);
   if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
@@ -764,11 +765,11 @@ var VSCODE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostTool
 var MCP_PREFIX2 = "mcp_";
 var MCP_SEP2 = "_";
 var SESSION_START_NEW = "new";
-var SHELL_TOOL_NAMES = Object.freeze(["run_in_terminal", "runTerminalCommand", "bash", "powershell"]);
+var SHELL_TOOL_NAMES2 = Object.freeze(["run_in_terminal", "runTerminalCommand", "bash", "powershell"]);
 var READ_TOOL_NAMES = Object.freeze(["read_file", "view"]);
 var WEBFETCH_TOOL_NAMES = Object.freeze(["fetch_webpage", "web_fetch"]);
 var NATIVE_TO_CANONICAL4 = Object.fromEntries([
-  ...SHELL_TOOL_NAMES.map((n) => [n, "Bash"]),
+  ...SHELL_TOOL_NAMES2.map((n) => [n, "Bash"]),
   ...READ_TOOL_NAMES.map((n) => [n, "Read"]),
   ...WEBFETCH_TOOL_NAMES.map((n) => [n, "WebFetch"])
 ]);
@@ -896,8 +897,8 @@ var KIRO_EVENTS = {
 };
 var PROMPT_ENV = "USER_PROMPT";
 var MCP_PREFIX3 = "mcp_";
-var SHELL_TOOL_NAMES2 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
-var NATIVE_TO_CANONICAL5 = Object.fromEntries(SHELL_TOOL_NAMES2.map((n) => [n, "Bash"]));
+var SHELL_TOOL_NAMES3 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
+var NATIVE_TO_CANONICAL5 = Object.fromEntries(SHELL_TOOL_NAMES3.map((n) => [n, "Bash"]));
 var MCP_SEP3 = "_";
 var KIRO_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 function canonicalName5(name) {
@@ -1169,8 +1170,9 @@ var ADAPTERS = Object.freeze([
     installMode: "plugin",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX5,
-    nativeTools: { shell: ["bash"] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES] },
     execReadOnlyHint: false,
+    // D-PWSH-DUMP-1
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
@@ -1188,7 +1190,7 @@ var ADAPTERS = Object.freeze([
     projectSource: "arg:workspaceFolder",
     toolNamePrefix: TOOL_NAME_PREFIX6,
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
-    nativeTools: { shell: [...SHELL_TOOL_NAMES], read: [...READ_TOOL_NAMES], webfetch: [...WEBFETCH_TOOL_NAMES] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES2], read: [...READ_TOOL_NAMES], webfetch: [...WEBFETCH_TOOL_NAMES] },
     // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
     execReadOnlyHint: false,
     eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
@@ -1207,7 +1209,7 @@ var ADAPTERS = Object.freeze([
     installMode: "mcp-entry",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX7,
-    nativeTools: { shell: [...SHELL_TOOL_NAMES2] },
+    nativeTools: { shell: [...SHELL_TOOL_NAMES3] },
     execReadOnlyHint: false,
     // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
@@ -3371,7 +3373,7 @@ function moreLine(intent, label) {
 }
 
 // src/core/policy/decide.ts
-import { resolve } from "node:path";
+import { resolve as resolve2 } from "node:path";
 
 // src/core/policy/lexer.ts
 var OPS = ["&&", "||", ";;", "|&", ";", "|", "&", "(", ")"];
@@ -4312,6 +4314,343 @@ function parseShell(cmd) {
   return { ok: true, commands };
 }
 
+// src/core/policy/powershell.ts
+import { resolve } from "node:path";
+var SQ = "'";
+var DQ = '"';
+var TICK = "`";
+var SPACES = " 	\r";
+var OPENERS = "([{";
+var CLOSERS = ")]}";
+var GLUE_END = " 	\r\n|;>";
+var FD_STAR = "*";
+var STDOUT_FD = "1";
+var METHOD_MARK = "::";
+var PAIR = METHOD_MARK.length;
+var MIN_STATIC_CALL = PAIR;
+function quoteEnd(text, at2) {
+  const q = text.charAt(at2);
+  for (let j = at2 + 1; j < text.length; j++) {
+    const c = text.charAt(j);
+    if (q === DQ && c === TICK) {
+      j++;
+      continue;
+    }
+    if (c !== q) continue;
+    if (text.charAt(j + 1) === q) {
+      j++;
+      continue;
+    }
+    return j;
+  }
+  return -1;
+}
+function unquote(body, q) {
+  let out = "";
+  for (let j = 0; j < body.length; j++) {
+    const c = body.charAt(j);
+    if (q === DQ && c === TICK && j + 1 < body.length) {
+      out += body.charAt(++j);
+      continue;
+    }
+    if (c === q && body.charAt(j + 1) === q) j++;
+    out += c;
+  }
+  return out;
+}
+function closeOf(text, at2) {
+  let depth = 0;
+  for (let j = at2; j < text.length; j++) {
+    const c = text.charAt(j);
+    if (c === SQ || c === DQ) {
+      const e = quoteEnd(text, j);
+      if (e < 0) return -1;
+      j = e;
+      continue;
+    }
+    if (c === TICK) {
+      j++;
+      continue;
+    }
+    if (OPENERS.includes(c)) depth++;
+    else if (CLOSERS.includes(c) && --depth === 0) return j;
+  }
+  return -1;
+}
+function glueEnd(text, from) {
+  let depth = 0;
+  for (let j = from; j < text.length; j++) {
+    const c = text.charAt(j);
+    if (c === SQ || c === DQ) {
+      const e = quoteEnd(text, j);
+      if (e < 0) return text.length;
+      j = e;
+      continue;
+    }
+    if (OPENERS.includes(c)) depth++;
+    else if (CLOSERS.includes(c)) depth--;
+    else if (depth <= 0 && GLUE_END.includes(c)) return j;
+  }
+  return text.length;
+}
+function splitArgs(inner) {
+  const parts = [];
+  let depth = 0;
+  let from = 0;
+  for (let j = 0; j < inner.length; j++) {
+    const c = inner.charAt(j);
+    if (c === SQ || c === DQ) {
+      const e = quoteEnd(inner, j);
+      if (e < 0) break;
+      j = e;
+      continue;
+    }
+    if (OPENERS.includes(c)) depth++;
+    else if (CLOSERS.includes(c)) depth--;
+    else if (c === "," && depth === 0) {
+      parts.push(inner.slice(from, j));
+      from = j + 1;
+    }
+  }
+  parts.push(inner.slice(from));
+  return parts;
+}
+var isFd = (w) => w !== "" && (w === FD_STAR || [...w].every((ch) => ch >= "0" && ch <= "9"));
+var fresh = () => ({ words: [], toFile: false, chained: false });
+function psParse(text) {
+  const statements = [];
+  let stages = [];
+  let stage = fresh();
+  let word = "";
+  let has2 = false;
+  let bare = true;
+  let target = null;
+  const n = text.length;
+  const endWord = () => {
+    if (!has2) return;
+    if (target !== null) {
+      if (target === "file") stage.toFile = true;
+      target = null;
+    } else stage.words.push(word);
+    word = "";
+    has2 = false;
+    bare = true;
+  };
+  const endStage = () => {
+    endWord();
+    if (stage.words.length > 0 || stage.toFile) stages.push(stage);
+    stage = fresh();
+  };
+  const endStatement = () => {
+    endStage();
+    if (stages.length > 0) statements.push(stages);
+    stages = [];
+  };
+  const grow = (s, quoted) => {
+    word += s;
+    has2 = true;
+    if (quoted) bare = false;
+  };
+  let i = 0;
+  while (i < n) {
+    const c = text.charAt(i);
+    const next = text.charAt(i + 1);
+    if (c === SQ || c === DQ) {
+      const e = quoteEnd(text, i);
+      grow(unquote(text.slice(i + 1, e < 0 ? n : e), c), true);
+      i = e < 0 ? n : e + 1;
+    } else if (c === TICK) {
+      if (next !== "\n" && next !== "") grow(next, false);
+      i += PAIR;
+    } else if (c === "\n") {
+      endStatement();
+      i++;
+    } else if (SPACES.includes(c)) {
+      endWord();
+      i++;
+    } else if (c === ";") {
+      endStatement();
+      i++;
+    } else if (c === "|") {
+      if (next === "|") {
+        endStatement();
+        i += PAIR;
+      } else {
+        endStage();
+        i++;
+      }
+    } else if (c === "&") {
+      if (next === "&") {
+        endStatement();
+        i += PAIR;
+      } else {
+        if (has2 || stage.words.length > 0) grow(c, false);
+        i++;
+      }
+    } else if (c === "#" && !has2) {
+      while (i < n && text.charAt(i) !== "\n") i++;
+    } else if (c === ">") {
+      let fd = STDOUT_FD;
+      if (has2 && bare && isFd(word)) {
+        fd = word;
+        word = "";
+        has2 = false;
+      } else if (has2) endWord();
+      let j = i + 1;
+      if (text.charAt(j) === ">") j++;
+      if (text.charAt(j) === "&") {
+        j++;
+        while (j < n && !GLUE_END.includes(text.charAt(j))) j++;
+      } else target = fd === STDOUT_FD || fd === FD_STAR ? "file" : "skip";
+      i = j;
+    } else if (c === "(" && has2 && bare && word.includes(METHOD_MARK)) {
+      const e = closeOf(text, i);
+      const inner = text.slice(i + 1, e < 0 ? n : e);
+      endWord();
+      for (const a of inner.trim() === "" ? [] : splitArgs(inner)) {
+        const first = psParse(a)[0]?.[0]?.words[0];
+        stage.words.push(first ?? a.trim());
+      }
+      i = e < 0 ? n : e + 1;
+      if (i < n && !GLUE_END.includes(text.charAt(i))) {
+        stage.chained = true;
+        i = glueEnd(text, i);
+      }
+    } else if (c === "[" && !has2 && text.startsWith(METHOD_MARK, closeOf(text, i) + 1) && closeOf(text, i) >= 0) {
+      const e = closeOf(text, i);
+      grow(text.slice(i, e + 1), false);
+      i = e + 1;
+    } else if (OPENERS.includes(c) && (c !== "[" || !has2) || (c === "$" || c === "@") && OPENERS.includes(next) && next !== "[") {
+      const open = c === "$" || c === "@" ? i + 1 : i;
+      const e = closeOf(text, open);
+      grow(text.slice(i, e < 0 ? n : e + 1), true);
+      i = e < 0 ? n : e + 1;
+    } else {
+      grow(c, false);
+      i++;
+    }
+  }
+  endStatement();
+  return statements;
+}
+var READ_COMMANDS = ["get-content", "gc", "cat", "type"];
+var FILE_CLASSES = ["[io.file]::", "[system.io.file]::"];
+var FILE_READS = ["readalltext", "readalllines", "readallbytes", "readlines"];
+var PATH_PARAMS = ["path", "literalpath"];
+var BOUND_PARAMS = ["totalcount", "head", "first", "tail", "last"];
+var VALUE_PARAMS = [...PATH_PARAMS, ...BOUND_PARAMS, "encoding", "readcount", "delimiter", "filter", "include", "exclude", "stream", "credential"];
+var SWITCH_PARAMS = ["raw", "wait", "force", "asbytestream"];
+var ALL_PARAMS = [...VALUE_PARAMS, ...SWITCH_PARAMS];
+var PASS_THROUGH = ["out-string", "write-output", "echo", "write", "out-host", "write-host", "out-default", "tee-object"];
+var CD_COMMANDS = ["cd", "chdir", "sl", "set-location", "pushd", "push-location"];
+var POWERSHELLS = ["powershell", "powershell.exe", "pwsh", "pwsh.exe"];
+var CMDS = ["cmd", "cmd.exe"];
+var CMD_RUN_FLAGS = ["/c", "/k", "/r"];
+var COMMAND_PARAM = "command";
+var DASH = "-";
+function cmdName(word) {
+  const k = Math.max(word.lastIndexOf("\\"), word.lastIndexOf("/"));
+  return (k >= 0 && k < word.length - 1 ? word.slice(k + 1) : word).toLowerCase();
+}
+function param(word, names) {
+  const body = word.slice(DASH.length);
+  const colon = body.indexOf(":");
+  const name = (colon < 0 ? body : body.slice(0, colon)).toLowerCase();
+  const inline = colon < 0 ? void 0 : body.slice(colon + 1);
+  if (name === "") return { full: void 0, inline };
+  if (names.includes(name)) return { full: name, inline };
+  const hits = names.filter((p) => p.startsWith(name));
+  return { full: hits.length === 1 ? hits[0] : void 0, inline };
+}
+function psDump(words) {
+  if (words.length === 0) return null;
+  const name = cmdName(words[0]);
+  if (!READ_COMMANDS.includes(name)) {
+    const lower = words[0].toLowerCase();
+    const cls = FILE_CLASSES.find((c) => lower.startsWith(c));
+    if (cls === void 0 || !FILE_READS.includes(lower.slice(cls.length)) || words.length < MIN_STATIC_CALL) return null;
+    return { file: words[1], bounded: false };
+  }
+  const files = [];
+  let bounded = false;
+  for (let k = 1; k < words.length; k++) {
+    const a = words[k];
+    if (!a.startsWith(DASH) || a.length === DASH.length) {
+      files.push(a);
+      continue;
+    }
+    const p = param(a, ALL_PARAMS);
+    if (p.full === void 0 || !VALUE_PARAMS.includes(p.full)) continue;
+    const value = p.inline ?? words[++k];
+    if (value === void 0) return null;
+    if (PATH_PARAMS.includes(p.full)) files.push(value);
+    if (BOUND_PARAMS.includes(p.full)) bounded = true;
+  }
+  return files.length === 1 ? { file: files[0], bounded } : null;
+}
+function nestedScript(name, words) {
+  if (POWERSHELLS.includes(name)) {
+    for (let k = 1; k < words.length; k++) {
+      const w = words[k];
+      if (!w.startsWith(DASH) || w.length === DASH.length) continue;
+      const p = param(w, [COMMAND_PARAM]);
+      if (p.full === void 0) continue;
+      return [...p.inline === void 0 ? [] : [p.inline], ...words.slice(k + 1)].join(" ");
+    }
+    return null;
+  }
+  if (CMDS.includes(name)) {
+    for (let k = 1; k < words.length; k++) {
+      if (CMD_RUN_FLAGS.includes(words[k].toLowerCase())) return words.slice(k + 1).join(" ");
+    }
+  }
+  return null;
+}
+function cdTarget(words) {
+  for (let k = 1; k < words.length; k++) {
+    const w = words[k];
+    if (w.toLowerCase() === "/d") continue;
+    if (!w.startsWith(DASH) || w.length === DASH.length) return w;
+    const p = param(w, PATH_PARAMS);
+    if (p.full !== void 0) return p.inline ?? words[k + 1] ?? null;
+  }
+  return null;
+}
+function walk(script, cwd, depth, found) {
+  let dir = cwd;
+  for (const stages of psParse(script)) {
+    const head = stages[0];
+    if (head.words.length === 0) continue;
+    const name = cmdName(head.words[0]);
+    if (stages.length === 1 && CD_COMMANDS.includes(name)) {
+      const t = cdTarget(head.words);
+      if (t !== null) dir = resolve(dir, t);
+      continue;
+    }
+    const inner = depth < MAX_NEST_DEPTH ? nestedScript(name, head.words) : null;
+    if (inner !== null) {
+      walk(inner, dir, depth + 1, found);
+      continue;
+    }
+    if (head.toFile || head.chained) continue;
+    const d = psDump(head.words);
+    if (d === null || d.bounded) continue;
+    let shown = true;
+    for (let k = 1; k < stages.length; k++) {
+      if (stages[k].toFile || !PASS_THROUGH.includes(cmdName(stages[k].words[0] ?? ""))) {
+        shown = false;
+        break;
+      }
+    }
+    if (shown) found.push(resolve(dir, d.file));
+  }
+}
+function psDumpFiles(script, cwd) {
+  const found = [];
+  walk(script, cwd, 0, found);
+  return found;
+}
+
 // src/core/policy/subagent.ts
 import { join as join2 } from "node:path";
 
@@ -4659,7 +4998,7 @@ function readPath(input) {
 }
 function userDenyHit(canonical, input, cwd, rules) {
   if (rules.length === 0) return null;
-  const readRule = (p) => matchesAnyDenyPattern(resolve(cwd, p), rules, { tool: READ, projectDir: cwd });
+  const readRule = (p) => matchesAnyDenyPattern(resolve2(cwd, p), rules, { tool: READ, projectDir: cwd });
   if (canonical === BASH) {
     const cmd = str(input.command);
     return cmd === void 0 ? null : matchesAnyDenyPattern(cmd, rules);
@@ -4711,7 +5050,7 @@ function webFetch(input, row) {
 function bash(ev, row, input, rules) {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : ALLOW;
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : psShellDump(cmd, ev.cwd, row) ?? ALLOW;
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -4723,7 +5062,7 @@ function bash(ev, row, input, rules) {
       if (kind !== null) return deny(denyMessage(kind, cmd, row, str(input.description)));
     }
   }
-  return shellDump(cmds, ev.cwd, row) ?? ALLOW;
+  return shellDump(cmds, ev.cwd, row) ?? psShellDump(cmd, ev.cwd, row) ?? ALLOW;
 }
 function denyKind(c) {
   const name = c.argv0.toLowerCase();
@@ -4770,7 +5109,7 @@ function read(ev, row, input) {
   if (!present(input.offset) && !present(input.limit)) {
     const p = readPath(input);
     if (p !== void 0) {
-      const abs = resolve(ev.cwd, p);
+      const abs = resolve2(ev.cwd, p);
       const size = fileSize(abs);
       if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
     }
@@ -4783,7 +5122,7 @@ function shellDump(cmds, cwd, row) {
   let verdict = null;
   for (const c of cmds) {
     const name = c.argv0.toLowerCase();
-    if (name === CD_COMMAND && c.args.length === 1 && c.insideConstruct === void 0) dir = resolve(dir, c.args[0]);
+    if (name === CD_COMMAND && c.args.length === 1 && c.insideConstruct === void 0) dir = resolve2(dir, c.args[0]);
     if (c.redirectsToFile || c.endsInBoundedSink || c.pipesOut === true || c.insideConstruct !== void 0) continue;
     if (!has(SHELL_DUMP_COMMANDS, name)) continue;
     const d = dumpTarget(name, c.args);
@@ -4792,11 +5131,19 @@ function shellDump(cmds, cwd, row) {
       verdict = ALLOW;
       continue;
     }
-    const abs = resolve(dir, d.file);
+    const abs = resolve2(dir, d.file);
     const size = fileSize(abs);
     if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
   }
   return verdict;
+}
+function psShellDump(cmd, cwd, row) {
+  if (row.nativeTools.read !== void 0 && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
+  for (const abs of psDumpFiles(cmd, cwd)) {
+    const size = fileSize(abs);
+    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+  }
+  return null;
 }
 var allDigits2 = (s) => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");
 function countFlag(a) {
@@ -4855,7 +5202,7 @@ function dumpTarget(name, args) {
 }
 
 // src/core/project/resolve.ts
-import { basename, dirname as dirname2, join as join4, resolve as resolve2 } from "node:path";
+import { basename, dirname as dirname2, join as join4, resolve as resolve3 } from "node:path";
 
 // src/core/project/contain.ts
 import { dirname, sep as sep2 } from "node:path";
@@ -5050,7 +5397,7 @@ function gitDirs(dir) {
     const gitDir = gitDirAt(join4(cur, GIT_DIR_NAME));
     if (gitDir !== null) {
       const common = firstLine(join4(gitDir, GIT_COMMONDIR_FILE));
-      return { commonDir: realpathSync3.native(common === null ? gitDir : resolve2(gitDir, common)), worktree: cur, start };
+      return { commonDir: realpathSync3.native(common === null ? gitDir : resolve3(gitDir, common)), worktree: cur, start };
     }
     const up = dirname2(cur);
     if (up === cur) return { commonDir: null, start };
@@ -5065,7 +5412,7 @@ function gitDirAt(dotGit) {
     } else {
       const line = firstLine(dotGit);
       if (line === null || !line.startsWith(GITDIR_FILE_PREFIX)) return null;
-      gitDir = resolve2(dirname2(dotGit), line.slice(GITDIR_FILE_PREFIX.length));
+      gitDir = resolve3(dirname2(dotGit), line.slice(GITDIR_FILE_PREFIX.length));
     }
   } catch {
     return null;
@@ -5278,10 +5625,10 @@ function startArgv(argv) {
   return sh === null ? null : [sh, ...argv];
 }
 function runProcess(argv, o) {
-  return new Promise((resolve3) => {
+  return new Promise((resolve4) => {
     const isWin2 = process.platform === "win32";
     const start = startArgv(argv);
-    if (start === null) return resolve3(NOT_STARTED);
+    if (start === null) return resolve4(NOT_STARTED);
     let child;
     try {
       child = spawn(start[0], start.slice(1), {
@@ -5295,7 +5642,7 @@ function runProcess(argv, o) {
         windowsHide: true
       });
     } catch {
-      return resolve3(NOT_STARTED);
+      return resolve4(NOT_STARTED);
     }
     const stdoutChunks = [];
     const stderrChunks = [];
@@ -5320,7 +5667,7 @@ function runProcess(argv, o) {
       settled = true;
       clearTimeout(timer);
       o.signal.removeEventListener("abort", onAbort);
-      resolve3({
+      resolve4({
         stdout: Buffer.concat(stdoutChunks),
         stderr: Buffer.concat(stderrChunks),
         exitCode,
