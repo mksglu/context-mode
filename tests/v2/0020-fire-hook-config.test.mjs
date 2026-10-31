@@ -211,6 +211,20 @@ describe("ADR-0020 fire, hook-config hosts", { concurrency: CONC }, () => {
       assert.equal(pre[0].tool_input.command, "cat big.log");
       assert.match(out, /blocked by PreToolUse hook/);
     });
+    // D-PWSH-DUMP-1: Codex 0.166 runs commands in PowerShell on Windows; the tester's `Get-Content application.log` ran with
+    // no deny. The policy is the same on every OS, so the real codex exec proves the deny, and on the Windows job it also
+    // proves the PowerShell path. A bounded Get-Content passes.
+    test("D-PWSH-DUMP-1: codex exec_command Get-Content of a large log is denied with the ctx_execute redirect", opts, async () => {
+      for (const cmd of ["Get-Content big.log", "Get-Content -Path big.log -Raw", "ls; gc big.log"]) {
+        const out = await run(cmd);
+        assert.match(out, /blocked by PreToolUse hook/, cmd);
+        assert.ok(out.includes("ctx_execute"), cmd + "\n" + out);
+      }
+    });
+    test("D-PWSH-DUMP-1: codex exec_command bounded Get-Content -TotalCount of a large log is not denied", opts, async () => {
+      const out = await run("Get-Content big.log -TotalCount 3");
+      assert.doesNotMatch(out, /blocked by PreToolUse hook/);
+    });
     test("D-CDX-CAT-1: codex exec_command bounded head of a large log is not denied", opts, async () => {
       const out = await run("head -n 3 big.log");
       assert.doesNotMatch(out, /blocked by PreToolUse hook/);

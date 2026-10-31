@@ -10,6 +10,7 @@ import { dequote, isAssignment, lex, scan, substitutions } from "../../src/core/
 import { parseShell } from "../../src/core/policy/parse.ts";
 import { MAX_NEST_DEPTH, OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, READ_DENY_FIXED_CAP, REQUIRE_SECURITY_ENV, USER_DENY_REASON_PREFIX, prefixToolNames } from "../../src/core/contracts/constants.ts";
 import { unwrap } from "../../src/core/policy/unwrap.ts";
+import { psDump, psWords } from "../../src/core/policy/powershell.ts";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { READ_DENY_MESSAGE, READ_DENY_TEMPLATE } from "../../src/core/policy/read-deny.ts";
 import { lintHookText } from "../../docs/v2/prompt/lint.mjs";
@@ -925,6 +926,71 @@ describe("ADR-0008 decide rule table and golden rows", () => {
       assert.notEqual(bash(cmd, CODEX).kind, "deny", cmd);
     }
     assert.notEqual(bash("ls && cat big.log", CC).kind, "deny");
+  });
+
+  // D-PWSH-DUMP-1: Codex 0.166 runs commands in PowerShell on Windows. The tester's `Get-Content application.log`
+  // (371,243 bytes) ran with no deny while the plain and chained cat were denied. Same deny text and redirect as cat.
+  const psWant = () => ({ kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024, CODEX.toolNamePrefix) });
+  let bigq;
+  before(() => { bigq = big.split(sep).join("/"); });
+  test("D-PWSH-DUMP-1: an unbounded Get-Content / gc / type / cat of a large file is denied (tester repro)", () => {
+    for (const cmd of ["cat big.log", "Get-Content big.log", "get-content big.log", "GET-CONTENT big.log", "gc big.log", "type big.log",
+      "Get-Content -Path big.log", "Get-Content -LiteralPath big.log", "Get-Content -Path:big.log", "Get-Content -Pa big.log", "gc big.log -Raw", "Get-Content big.log -Encoding UTF8",
+      "Get-Content -Raw -Encoding utf8 -Path big.log", "Get-Content 'big.log'", 'Get-Content "big.log"', "Get-Content big.log -ReadCount 100",
+      `Get-Content '${bigq}'`, `Get-Content -LiteralPath "${bigq}" -Raw`, "Get-Content big.log 2>&1", "Get-Content big.log | Out-String",
+      "Get-Content big.log | Write-Output", "Get-Content big.log | Out-Host", "ls; Get-Content big.log", "ls && Get-Content big.log",
+      `cd ${dir.split(sep).join("/")}; Get-Content big.log`, "cat -Raw big.log", "cat -Path big.log", "type -Path big.log"]) {
+      assert.deepEqual(bash(cmd, CODEX), psWant(), cmd);
+    }
+  });
+  test("D-PWSH-DUMP-1: a bounded, filtered, redirected or small PowerShell read is not denied", () => {
+    for (const cmd of ["Get-Content big.log -TotalCount 3", "Get-Content big.log -Head 5", "gc big.log -First 5", "Get-Content big.log -Tail 20", "Get-Content -Path big.log -Last 7",
+      "Get-Content big.log -Tail:20", "Get-Content big.log -TotalCount:3 -Raw", "Get-Content -TotalCount 3 big.log", "gc -Tail 3 -Path big.log", "cat big.log -TotalCount 3", "type big.log -Head 3",
+      "Get-Content big.log | Select-Object -First 5", "Get-Content big.log | Select-String error", "gc big.log | Select-Object -Last 5",
+      "Get-Content big.log | Measure-Object -Line", "Get-Content big.log > out.txt", "Get-Content big.log | Out-File out.txt",
+      "Get-Content small.txt", "gc small.txt -Raw", "type small.txt", "Get-Content small.txt | Out-String", "Get-Content missing.log", "Get-Content",
+      "Get-Content big.log, small.txt", "Get-Content *.log", "Get-ChildItem big.log", "Get-Item big.log"]) {
+      assert.notEqual(bash(cmd, CODEX).kind, "deny", cmd);
+    }
+  });
+  test("D-PWSH-DUMP-1: [IO.File]::ReadAllText / ReadAllLines / ReadAllBytes of a large file is denied, a small or bounded one is not", () => {
+    for (const cmd of ["[IO.File]::ReadAllText('big.log')", "[System.IO.File]::ReadAllText('big.log')", '[System.IO.File]::ReadAllText("big.log")', "[io.file]::readalltext('big.log')",
+      "[IO.File]::ReadAllLines('big.log')", "[IO.File]::ReadAllBytes('big.log')", `[IO.File]::ReadAllText('${bigq}')`, "ls; [IO.File]::ReadAllText('big.log')"]) {
+      assert.deepEqual(bash(cmd, CODEX), psWant(), cmd);
+    }
+    for (const cmd of ["[IO.File]::ReadAllText('small.txt')", "[IO.File]::ReadAllText('big.log') | Select-Object -First 5", "[IO.File]::ReadAllLines('big.log') | Select-Object -First 5",
+      "[IO.File]::ReadAllText('big.log').Substring(0,100)", "[IO.File]::ReadAllLines('big.log')[0..9]", "[IO.File]::ReadLines('big.log') | Select-Object -First 5", "[IO.File]::Exists('big.log')"]) {
+      assert.notEqual(bash(cmd, CODEX).kind, "deny", cmd);
+    }
+  });
+  test("D-PWSH-DUMP-1: a PowerShell or cmd script string is unwrapped, as bash -c is", () => {
+    for (const cmd of [`powershell -NoProfile -Command "Get-Content '${bigq}'"`, `pwsh -c "Get-Content big.log"`, `powershell.exe -NoProfile -NonInteractive -Command "gc big.log -Raw"`,
+      `pwsh -Command "ls; Get-Content big.log"`, "cmd /c type big.log", "cmd.exe /d /s /c \"type big.log\"", "cmd /c cat big.log"]) {
+      assert.deepEqual(bash(cmd, CODEX), psWant(), cmd);
+    }
+    for (const cmd of [`pwsh -Command "Get-Content big.log -TotalCount 3"`, `powershell -Command "Get-Content big.log | Select-Object -First 5"`, "cmd /c type small.txt", `pwsh -Command "Get-Content small.txt"`]) {
+      assert.notEqual(bash(cmd, CODEX).kind, "deny", cmd);
+    }
+  });
+  test("D-PWSH-DUMP-1: a PowerShell dump on a Read-tool replace row (claude-code) still runs and PostToolUse replaces it", () => {
+    assert.notEqual(bash("Get-Content big.log", CC).kind, "deny");
+    assert.notEqual(bash("ls; Get-Content big.log", CC).kind, "deny");
+  });
+  test("D-PWSH-DUMP-1: the PowerShell word reader keeps backslashes, honours quotes and the backtick, and stops at a pipe or redirect", () => {
+    assert.deepEqual(psWords("Get-Content C:\\logs\\app.log -Raw"), ["Get-Content", "C:\\logs\\app.log", "-Raw"]);
+    assert.deepEqual(psWords("Get-Content 'C:\\a b\\x.log' -TotalCount 3"), ["Get-Content", "C:\\a b\\x.log", "-TotalCount", "3"]);
+    assert.deepEqual(psWords('Get-Content "C:\\a b\\x.log"'), ["Get-Content", "C:\\a b\\x.log"]);
+    assert.deepEqual(psWords("Get-Content C:\\a` b\\x.log"), ["Get-Content", "C:\\a b\\x.log"]);
+    assert.deepEqual(psWords("Get-Content 'it''s.log'"), ["Get-Content", "it's.log"]);
+    assert.deepEqual(psWords("Get-Content a.log 2>&1"), ["Get-Content", "a.log"]);
+    assert.deepEqual(psWords("Get-Content a.log > out.txt"), ["Get-Content", "a.log"]);
+    assert.deepEqual(psWords("gc a.log | Select-Object -First 5"), ["gc", "a.log"]);
+    assert.deepEqual(psWords("[IO.File]::ReadAllText('C:\\a b.log')"), ["[IO.File]::ReadAllText", "C:\\a b.log"]);
+  });
+  test("D-PWSH-DUMP-1: Windows paths with a drive letter and backslashes are read whole, not as escapes", () => {
+    assert.deepEqual(psDump(psWords("Get-Content C:\\logs\\app.log")), { file: "C:\\logs\\app.log", bounded: false });
+    assert.deepEqual(psDump(psWords("Get-Content 'C:\\a b\\x.log' -TotalCount 3")), { file: "C:\\a b\\x.log", bounded: true });
+    assert.equal(psDump(psWords("Get-Content a.log, b.log")), null);
   });
 });
 

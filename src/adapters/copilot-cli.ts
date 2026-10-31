@@ -43,7 +43,9 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 // copilot-cli 1.0.103 native shell tool id -> canonical name (D-HA-COPILOT-NAMES-1, SDK docs toolName "bash").
-const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { bash: "Bash" };
+// D-PWSH-DUMP-1: the Windows shell tool is "powershell" (same as vscode.ts SHELL_TOOL_NAMES); it is the same canonical shell.
+export const SHELL_TOOL_NAMES: readonly string[] = Object.freeze(["bash", "powershell"]);
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = Object.fromEntries(SHELL_TOOL_NAMES.map((n) => [n, "Bash"]));
 
 // Own tool -> bare ctx_* name; native names mapped; any other name unchanged. Another server's
 // <server>-<tool> name cannot be split (both parts may hold "-"), so it stays whole (D-HQ-COPILOT-NAMES-2).

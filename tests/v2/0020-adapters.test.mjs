@@ -63,7 +63,7 @@ describe("ADR-0020 adapters", () => {
       codex: { shell: ["Bash"], edit: ["apply_patch"] },
       gemini: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, // gemini-cli 0.65.0 *_TOOL_NAME
       qwen: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
-      "copilot-cli": { shell: ["bash"] }, // D-HA-COPILOT-NAMES-1
+      "copilot-cli": { shell: ["bash", "powershell"] }, // D-HA-COPILOT-NAMES-1, D-PWSH-DUMP-1
       vscode: { shell: ["run_in_terminal", "runTerminalCommand", "bash", "powershell"], read: ["read_file", "view"], webfetch: ["fetch_webpage", "web_fetch"] }, // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
       kiro: { shell: ["execute_bash", "execute_pwsh", "shell"] }, // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
       zcode: CLAUDE_NATIVE,
@@ -328,7 +328,7 @@ describe("ADR-0020 adapters", () => {
       assert.deepEqual(getAdapter("gemini").nativeTools, { // D-HA-GEMINI-NAMES-1: gemini-cli 0.65.0 *_TOOL_NAME
         shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"],
       });
-      assert.deepEqual(getAdapter("copilot-cli").nativeTools, { shell: ["bash"] }); // D-HA-COPILOT-NAMES-1
+      assert.deepEqual(getAdapter("copilot-cli").nativeTools, { shell: ["bash", "powershell"] }); // D-HA-COPILOT-NAMES-1, D-PWSH-DUMP-1
       assert.deepEqual(getAdapter("pi").nativeTools, { shell: ["bash"], read: ["read"] }); // D-HA-PI-NAMES-1
       assert.deepEqual(getAdapter("vscode").nativeTools, { shell: ["run_in_terminal", "runTerminalCommand", "bash", "powershell"], read: ["read_file", "view"], webfetch: ["fetch_webpage", "web_fetch"] }); // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
       assert.deepEqual(getAdapter("kiro").nativeTools, { shell: ["execute_bash", "execute_pwsh", "shell"] }); // D-HF-KIRO-SHELL-1, D-N7-KIRO-1

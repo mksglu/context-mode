@@ -17,6 +17,7 @@ import {
 import type { AdapterRow, CanonicalHookEvent, Decision, DenyKind, SimpleCommand } from "../contracts/types.ts";
 import { dumpRunsThenReplaces, hasReplace } from "../../adapters/table.ts";
 import { parseShell } from "./parse.ts";
+import { psDumpFiles } from "./powershell.ts";
 import { isSubagentCall } from "./subagent.ts";
 import { unwrap } from "./unwrap.ts";
 import { matchesAnyDenyPattern } from "./user-deny.ts";
@@ -159,7 +160,7 @@ function webFetch(input: Record<string, unknown>, row: AdapterRow): Decision {
 function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>, rules: string[]): Decision {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : ALLOW; // 5b, Q4
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : psShellDump(cmd, ev.cwd, row) ?? ALLOW; // 5b, Q4
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -173,7 +174,7 @@ function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
       if (kind !== null) return deny(denyMessage(kind, cmd, row, str(input.description)));
     }
   }
-  return shellDump(cmds, ev.cwd, row) ?? ALLOW; // 6a: file size known by stat, kept (D-M7-RR-1)
+  return shellDump(cmds, ev.cwd, row) ?? psShellDump(cmd, ev.cwd, row) ?? ALLOW; // 6a: file size known by stat, kept (D-M7-RR-1)
 }
 
 /** 5c, in the §6.1 order: curl/wget, inline HTTP, build tool. */
@@ -260,6 +261,17 @@ function shellDump(cmds: SimpleCommand[], cwd: string, row: AdapterRow): Decisio
     if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
   }
   return verdict;
+}
+
+/** D-PWSH-DUMP-1: 6a for PowerShell (Codex on Windows, Copilot CLI powershell, VS Code). Its own word reader keeps
+ *  `C:\\logs\\app.log` whole. Same skip rule, same deny text as shellDump. null = no unbounded dump of a large file. */
+function psShellDump(cmd: string, cwd: string, row: AdapterRow): Decision | null {
+  if (row.nativeTools.read !== undefined && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
+  for (const abs of psDumpFiles(cmd, cwd)) {
+    const size = fileSize(abs);
+    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+  }
+  return null;
 }
 
 const allDigits = (s: string): boolean => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");

@@ -62,7 +62,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   },
   {
     id: "copilot-cli", installMode: "plugin", projectSource: "arg:--agent+cwd", toolNamePrefix: copilotCli.TOOL_NAME_PREFIX,
-    nativeTools: { shell: ["bash"] }, execReadOnlyHint: false,
+    nativeTools: { shell: [...copilotCli.SHELL_TOOL_NAMES] }, execReadOnlyHint: false, // D-PWSH-DUMP-1
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
     hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode.json" }, skillChannel: { kind: "home-dir", path: ".copilot/skills" }, // ADR-0020
