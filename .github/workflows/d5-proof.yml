@@ -1,0 +1,47 @@
+# TEMPORARY [D5PROOF] workflow, removed after the run (D-D5-MORE-PAIRS-1).
+name: d5-proof
+on:
+  push:
+    branches: [v2-design]
+    paths: [".github/workflows/d5-proof.yml"]
+permissions:
+  contents: read
+jobs:
+  proof:
+    name: proof (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        node: ["24.15.0", "26"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node scripts/ci-install.mjs
+      - run: node build/build.mjs --generated-only
+      - name: D5 tests 20x beside the full suite looping (the load that failed)
+        shell: bash
+        run: |
+          ( while [ ! -f stop.flag ]; do node --test "tests/v2/**/*.test.mjs" > /dev/null 2>&1; done ) &
+          LOOP=$!
+          pass=0; fail=0; slowpass=0
+          for i in $(seq 1 20); do
+            out=$(node --test --test-name-pattern="doctor-hook/D5" tests/v2/0010-doctor-upgrade.test.mjs 2>&1)
+            if echo "$out" | grep -q "^ℹ fail 0"; then pass=$((pass+1)); else fail=$((fail+1)); echo "$out" | grep -E "✖|took" | head -5; fi
+          done
+          touch stop.flag; pkill -P $LOOP 2>/dev/null || true; kill $LOOP 2>/dev/null || true
+          echo "[D5PROOF] ${{ matrix.os }} node ${{ matrix.node }} D5 block under load: pass=$pass fail=$fail of 20"
+          test "$fail" = 0
+      - name: D5-default-baseline (fast PASS side and slow stub FAIL side) 20x, quiet
+        shell: bash
+        run: |
+          pass=0
+          for i in $(seq 1 20); do
+            node --test --test-name-pattern="D5-default-baseline" tests/v2/0010-doctor-upgrade.test.mjs 2>&1 | grep -q "^ℹ pass 1" && pass=$((pass+1))
+          done
+          echo "[D5PROOF] ${{ matrix.os }} node ${{ matrix.node }} default-baseline quiet: pass=$pass of 20"
+          test "$pass" = 20
