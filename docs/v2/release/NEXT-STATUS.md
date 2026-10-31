@@ -4,9 +4,28 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.17 (provenance present, SLSA v1, gitHead d526f1e5). `latest` is still 1.0.169. Checked 2026-10-30 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.17: 2026-10-30T14:02:42Z.
+`next` is 2.0.0-next.18 (provenance present, SLSA v1, 2 signatures, gitHead ea4179fd). `latest` is still 1.0.169. Checked 2026-10-31 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.18: 2026-10-31T12:56:03Z. The previous version, next.17, was published 2026-10-30T14:02:42Z (gitHead d526f1e5).
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.18 ships
+
+Changes since v2.0.0-next.17: the five findings of the Viet round on next.17. Reply for Viet: docs/v2/review/viet/next18-reply.md.
+
+- c988ff43 (project): the native Codex plugin MCP server now resolves the host workspace, not the plugin cache dir. D3 reads the native plugin entries.
+- 765be33d (D-PWSH-DUMP-1): PowerShell Get-Content, gc, type and [IO.File]::ReadAllText of one file are denied like cat.
+- 7b68b5b8 (D-D5-BARE-1): D5 measures hook cost over bare node. The 40 ms bound is unchanged.
+- 04e05b34 (D-TSC-GATE-1): `npm run typecheck` is green. tsc runs in ci.yml and in the gate v2-unit layer.
+- ea4179fd (D-D5-FIXTURE-1, D-D5-PAST-1): both shipped D5 fixtures are the recorded native PreToolUse payloads; D5 sends the project worktree as cwd; an old hook-errors.log line shows as "past hook error" with its time. The log stays whole.
+
+## Release numbers (next.18)
+
+- Tag v2.0.0-next.18 on ea4179fd. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.17) plus 1. The head commit was 25 minutes old at tag time, and v2-design had no new commit after it.
+- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/v2/**/*.test.mjs"` exit 0, 2425 tests, 2391 pass, 0 fail, 34 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on ea4179fd (run 41198852297): all 12 jobs green on the first run.
+- release.yml run 41200613803: first attempt failed one job, ci (windows-latest, node 24.15.0), step "D3 hook overhead p95 <= 15 ms". Log: claude-code overheadMs 16 (batches 20, 16, 17, 19, 18), codex 13, budget 15. One rerun of the failed job, no code change, no budget change: green. Then plan, build, publish-stage, smoke x3, publish-promote, publish-npm and github-release all green. This is the same timing class as D-CI-PERF-8; it stays open in OPEN-ITEMS (Windows hook overhead sits at 13-17 ms against 15).
+- Registry version published 2026-10-31T12:56:03Z (gitHead ea4179fd, SLSA v1 provenance, 2 signatures). GitHub prerelease v2.0.0-next.18 (not draft) at 12:54:41Z. The registry document lagged the publish step by about 100 s.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.18 (release commit 561ef555).
 
 ## What 2.0.0-next.17 ships
 
