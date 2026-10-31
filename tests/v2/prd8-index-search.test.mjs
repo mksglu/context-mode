@@ -2025,6 +2025,76 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
           rmSync(root, { recursive: true, force: true });
         }
       });
+
+      // D-SEARCH-SMALL-1 (bench/b-retrieval, 2026-10-31): on a 4-6 KB doc the reply was larger than the doc and a query
+      // whose hits all came from an earlier query of the call got an empty block (counted as a miss).
+      function blocksOf(text) {
+        const blocks = [];
+        for (const line of text.split("\n")) {
+          if (line.startsWith("Query ")) blocks.push({ head: line, lines: [] });
+          else if (blocks.length > 0) blocks[blocks.length - 1].lines.push(line);
+        }
+        return blocks;
+      }
+
+      test("D-SEARCH-SMALL-1: a query whose hits were all returned for an earlier query says so, never an empty block", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-sm1-"));
+        try {
+          const ctx = ctxFor(root);
+          await seed(ctx, [{ sessionId: "s1", worktree: root, label: "both", text: "alpha and beta in one chunk" }]);
+          const out = await ctxSearch.handler({ queries: ["alpha", "beta", "alpha"] }, ctx);
+          assert.deepEqual(hitLabels(out.text), ["both"], "still one copy of the chunk");
+          const blocks = blocksOf(out.text);
+          assert.equal(blocks.length, 3);
+          for (const b of blocks.slice(1)) {
+            assert.ok(b.lines.some((l) => l.startsWith("Same as above: both (chunk 0)")), b.head + " has no pointer:\n" + out.text);
+          }
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("D-SEARCH-SMALL-1: the reply for a small source is smaller than the source and a More: line reaches the rest", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-sm2-"));
+        try {
+          const ctx = ctxFor(root);
+          const doc = Array.from({ length: 8 }, (_, i) => `## Gadget ${i}\n\nThe gadget handler number ${i} registers a gadget callback. ${"Words about gadget wiring and handlers. ".repeat(12)}\n`).join("\n");
+          const docBytes = Buffer.byteLength(doc, "utf8");
+          await ctxIndex.handler({ content: doc, source: "gadgets" }, ctx);
+          const seen = [];
+          let offset = 0;
+          let first = null;
+          for (let guard = 0; guard < 10; guard++) {
+            const out = await ctxSearch.handler({ queries: ["gadget handler"], source: "gadgets", offset }, ctx);
+            if (first === null) first = out.text;
+            for (const m of out.text.matchAll(/^gadgets #(\d+): /gm)) seen.push(Number(m[1]));
+            const more = out.text.split("\n").find((l) => l.startsWith("More: "));
+            if (more === undefined) break;
+            offset = Number(/offset:(\d+)/.exec(more)[1]);
+            assert.equal(offset, seen.length, "the cursor starts at the first hit not shown");
+          }
+          assert.ok(Buffer.byteLength(first, "utf8") < docBytes / 2 + 400, `first reply ${Buffer.byteLength(first, "utf8")} B for a ${docBytes} B source`);
+          assert.ok(first.split("\n").some((l) => l.startsWith("More: ")), "the rest is behind a More: line");
+          assert.equal(new Set(seen).size, seen.length, "no hit twice");
+          assert.equal(seen.length, 8, "paging reaches every chunk, none thrown away");
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("D-SEARCH-SMALL-1: the first hit of a query is shown whole even when it is most of a small source", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-sm3-"));
+        try {
+          const ctx = ctxFor(root);
+          const code = "```js\n" + Array.from({ length: 40 }, (_, i) => `const unitTest${i} = invokeEdgeFunction("unit", ${i});`).join("\n") + "\n```";
+          const doc = `## Unit test example\n\nunit test edge function invoke\n\n${code}\n\n## Other\n\nshort note about auth\n`;
+          await ctxIndex.handler({ content: doc, source: "ex" }, ctx);
+          const out = await ctxSearch.handler({ queries: ["unit test edge function invoke"], source: "ex" }, ctx);
+          assert.ok(out.text.includes(code), "the code block is in the reply whole");
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
     });
 
     // Moved from tests/v2/tools/no-lossy-cut.test.mjs

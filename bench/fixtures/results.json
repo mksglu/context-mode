@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-30",
+  "date": "2026-10-31",
   "versions": {
     "v1": "1.0.169",
     "v2": "2.0.0-next.8",
@@ -7,10 +7,10 @@
   },
   "shas": {
     "v1": "90af14e34bf35120c3310f7a75f54fa99d2cabba",
-    "v2": "e138e6f04f68d87c90885f3189126c4c920d83fa"
+    "v2": "12bf686b0f1ecce5ab1ea015606cb8e9d955de4f"
   },
   "v1_source": "v1 numbers measured today by running v1 own scripts (npx tsx tests/ecosystem-benchmark.ts and npx tsx tests/live-benchmark.ts) on a clean checkout of origin/main. run.mjs reads this file; it does not install v1.",
-  "run_ms": 1872,
+  "run_ms": 2023,
   "totals": {
     "part1": {
       "raw_bytes": 322419,
@@ -21,7 +21,7 @@
     "part2": {
       "raw_bytes": 76105,
       "v1_context_bytes": 11099,
-      "v2_tool_context_bytes": 34326,
+      "v2_tool_context_bytes": 24653,
       "v2_hook_context_bytes": 7567
     }
   },
@@ -37,8 +37,8 @@
       "v2_tool_context_bytes": 277,
       "v2_hook_context_bytes": 215,
       "v2_hook_replaced": true,
-      "v2_ms": 57,
-      "v2_hook_ms": 47,
+      "v2_ms": 68,
+      "v2_hook_ms": 52,
       "code_blocks": null,
       "error": null
     },
@@ -53,8 +53,8 @@
       "v2_tool_context_bytes": 265,
       "v2_hook_context_bytes": 216,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
-      "v2_hook_ms": 44,
+      "v2_ms": 54,
+      "v2_hook_ms": 51,
       "code_blocks": null,
       "error": null
     },
@@ -69,8 +69,8 @@
       "v2_tool_context_bytes": 202,
       "v2_hook_context_bytes": 216,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
-      "v2_hook_ms": 43,
+      "v2_ms": 50,
+      "v2_hook_ms": 53,
       "code_blocks": null,
       "error": null
     },
@@ -85,8 +85,8 @@
       "v2_tool_context_bytes": 315,
       "v2_hook_context_bytes": 215,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
-      "v2_hook_ms": 65,
+      "v2_ms": 60,
+      "v2_hook_ms": 78,
       "code_blocks": null,
       "error": null
     },
@@ -101,8 +101,8 @@
       "v2_tool_context_bytes": 365,
       "v2_hook_context_bytes": 400,
       "v2_hook_replaced": false,
-      "v2_ms": 45,
-      "v2_hook_ms": 38,
+      "v2_ms": 47,
+      "v2_hook_ms": 40,
       "code_blocks": null,
       "error": null
     },
@@ -117,8 +117,8 @@
       "v2_tool_context_bytes": 735,
       "v2_hook_context_bytes": 138,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
-      "v2_hook_ms": 46,
+      "v2_ms": 49,
+      "v2_hook_ms": 49,
       "code_blocks": null,
       "error": null
     },
@@ -133,7 +133,7 @@
       "v2_tool_context_bytes": 1156,
       "v2_hook_context_bytes": 142,
       "v2_hook_replaced": true,
-      "v2_ms": 42,
+      "v2_ms": 46,
       "v2_hook_ms": 54,
       "code_blocks": null,
       "error": null
@@ -149,8 +149,8 @@
       "v2_tool_context_bytes": 353,
       "v2_hook_context_bytes": 201,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
-      "v2_hook_ms": 44,
+      "v2_ms": 49,
+      "v2_hook_ms": 47,
       "code_blocks": null,
       "error": null
     },
@@ -165,8 +165,8 @@
       "v2_tool_context_bytes": 363,
       "v2_hook_context_bytes": 137,
       "v2_hook_replaced": true,
-      "v2_ms": 47,
-      "v2_hook_ms": 44,
+      "v2_ms": 43,
+      "v2_hook_ms": 45,
       "code_blocks": null,
       "error": null
     },
@@ -182,7 +182,7 @@
       "v2_hook_context_bytes": 202,
       "v2_hook_replaced": true,
       "v2_ms": 42,
-      "v2_hook_ms": 44,
+      "v2_hook_ms": 45,
       "code_blocks": null,
       "error": null
     },
@@ -197,8 +197,8 @@
       "v2_tool_context_bytes": 758,
       "v2_hook_context_bytes": 192,
       "v2_hook_replaced": true,
-      "v2_ms": 42,
-      "v2_hook_ms": 54,
+      "v2_ms": 46,
+      "v2_hook_ms": 49,
       "code_blocks": null,
       "error": null
     },
@@ -213,8 +213,8 @@
       "v2_tool_context_bytes": 171,
       "v2_hook_context_bytes": 134,
       "v2_hook_replaced": true,
-      "v2_ms": 42,
-      "v2_hook_ms": 50,
+      "v2_ms": 44,
+      "v2_hook_ms": 49,
       "code_blocks": null,
       "error": null
     },
@@ -229,8 +229,8 @@
       "v2_tool_context_bytes": 123,
       "v2_hook_context_bytes": 135,
       "v2_hook_replaced": true,
-      "v2_ms": 42,
-      "v2_hook_ms": 50,
+      "v2_ms": 43,
+      "v2_hook_ms": 76,
       "code_blocks": null,
       "error": null
     },
@@ -245,8 +245,8 @@
       "v2_tool_context_bytes": 238,
       "v2_hook_context_bytes": 137,
       "v2_hook_replaced": true,
-      "v2_ms": 49,
-      "v2_hook_ms": 61,
+      "v2_ms": 39,
+      "v2_hook_ms": 63,
       "code_blocks": null,
       "error": null
     },
@@ -262,19 +262,19 @@
       "raw_bytes": 3988,
       "v1_context_bytes": 2246,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 4455,
+      "v2_tool_context_bytes": 3580,
       "v2_hook_context_bytes": 3988,
       "v2_hook_replaced": false,
       "v2_ms": 16,
-      "v2_hook_ms": 39,
+      "v2_hook_ms": 36,
       "queries_with_hits": {
-        "v2": 2,
+        "v2": 3,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 5,
-        "returned_whole_v2": 5,
+        "returned_whole_v2": 2,
         "v1_code_chunks": 4,
         "v1_exact_code_preserved": true
       },
@@ -293,19 +293,19 @@
       "raw_bytes": 6075,
       "v1_context_bytes": 1494,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 4548,
+      "v2_tool_context_bytes": 2872,
       "v2_hook_context_bytes": 215,
       "v2_hook_replaced": true,
       "v2_ms": 10,
-      "v2_hook_ms": 46,
+      "v2_hook_ms": 43,
       "queries_with_hits": {
-        "v2": 2,
+        "v2": 3,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 5,
-        "returned_whole_v2": 2,
+        "returned_whole_v2": 1,
         "v1_code_chunks": 4,
         "v1_exact_code_preserved": true
       },
@@ -324,19 +324,19 @@
       "raw_bytes": 6658,
       "v1_context_bytes": 3311,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 7170,
+      "v2_tool_context_bytes": 4506,
       "v2_hook_context_bytes": 216,
       "v2_hook_replaced": true,
-      "v2_ms": 11,
-      "v2_hook_ms": 43,
+      "v2_ms": 12,
+      "v2_hook_ms": 49,
       "queries_with_hits": {
-        "v2": 2,
+        "v2": 3,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 9,
-        "returned_whole_v2": 9,
+        "returned_whole_v2": 6,
         "v1_code_chunks": 5,
         "v1_exact_code_preserved": true
       },
@@ -354,11 +354,11 @@
       "raw_bytes": 4102,
       "v1_context_bytes": 620,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 4385,
+      "v2_tool_context_bytes": 1429,
       "v2_hook_context_bytes": 216,
       "v2_hook_replaced": true,
-      "v2_ms": 8,
-      "v2_hook_ms": 44,
+      "v2_ms": 9,
+      "v2_hook_ms": 45,
       "queries_with_hits": {
         "v2": 2,
         "v1": null,
@@ -366,7 +366,7 @@
       },
       "code_blocks": {
         "in_source": 6,
-        "returned_whole_v2": 6,
+        "returned_whole_v2": 2,
         "v1_code_chunks": 5,
         "v1_exact_code_preserved": true
       },
@@ -385,11 +385,11 @@
       "raw_bytes": 16683,
       "v1_context_bytes": 0,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 5950,
+      "v2_tool_context_bytes": 4496,
       "v2_hook_context_bytes": 211,
       "v2_hook_replaced": true,
-      "v2_ms": 17,
-      "v2_hook_ms": 45,
+      "v2_ms": 18,
+      "v2_hook_ms": 47,
       "queries_with_hits": {
         "v2": 3,
         "v1": null,
@@ -397,7 +397,7 @@
       },
       "code_blocks": {
         "in_source": 8,
-        "returned_whole_v2": 3,
+        "returned_whole_v2": 1,
         "v1_code_chunks": 8,
         "v1_exact_code_preserved": true
       },
@@ -416,11 +416,11 @@
       "raw_bytes": 36090,
       "v1_context_bytes": 2412,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 6563,
+      "v2_tool_context_bytes": 6617,
       "v2_hook_context_bytes": 212,
       "v2_hook_replaced": true,
-      "v2_ms": 15,
-      "v2_hook_ms": 52,
+      "v2_ms": 17,
+      "v2_hook_ms": 58,
       "queries_with_hits": {
         "v2": 3,
         "v1": null,
@@ -447,11 +447,11 @@
       "raw_bytes": 2509,
       "v1_context_bytes": 1016,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 1255,
+      "v2_tool_context_bytes": 1153,
       "v2_hook_context_bytes": 2509,
       "v2_hook_replaced": false,
       "v2_ms": 12,
-      "v2_hook_ms": 40,
+      "v2_hook_ms": 38,
       "queries_with_hits": {
         "v2": 3,
         "v1": null,

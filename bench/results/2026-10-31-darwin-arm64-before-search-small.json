@@ -1,0 +1,5578 @@
+{
+  "schema": 1,
+  "date": "2026-10-31",
+  "runs": 5,
+  "run_ms": 94557,
+  "token_method": "bytes / 4, an estimate (no tokenizer is vendored)",
+  "context_mode": {
+    "version": "2.0.0-next.8",
+    "commit": "da0a30e802314f9ca8f6ac1957c0f1e364a8439d",
+    "dirty": false
+  },
+  "env": {
+    "node": "v26.8.1",
+    "os": "Darwin 23.5.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cores": 10,
+    "ram_gb": 32
+  },
+  "fixtures": {
+    "context7-react-docs.md": {
+      "sha256": "c0ee0d81f97dd86973cb8355a37ffa58eb1a3efad82371e2128ccdd75c9f3d4f",
+      "bytes": 6075
+    },
+    "context7-nextjs-docs.md": {
+      "sha256": "b687675406d856b451d05ccb702c345a47849969295d19b2b21d2fede213620b",
+      "bytes": 6658
+    },
+    "context7-tailwind-docs.md": {
+      "sha256": "d0307fa05b356fbd45451317ffeb324dcbf959577772a9da0b7c87d9c98d7a02",
+      "bytes": 4102
+    },
+    "playwright-snapshot.txt": {
+      "sha256": "ff62ad78ab7fff91de94fb3e5a4c38cd4b030aa01c4cdc3b305705e46dad1bec",
+      "bytes": 57521
+    },
+    "playwright-network.txt": {
+      "sha256": "016b08806075962abb8b0ebd160d9cb5c5ca3aa0055dd4a10ef52894b1ffed20",
+      "bytes": 400
+    },
+    "github-prs.json": {
+      "sha256": "c8aba6ce93e3302b6ca8660a4c3b1d4c0a044878386e8f240b222f369d1454ef",
+      "bytes": 6561
+    },
+    "github-issues.json": {
+      "sha256": "2765ceace4b127b15ece4309eb1c91279f85b6107562a498a551657411cb182b",
+      "bytes": 60310
+    },
+    "test-output.txt": {
+      "sha256": "bc0fd4973ba5a401025c7979d05183f6c7f2a5d7b0f4d4d023b4e933f2e06b0d",
+      "bytes": 6185
+    },
+    "tsc-errors.txt": {
+      "sha256": "3ebc05d31d9ac68d3b950d05546f29b01586322660c38c8c94c4447c60cc359f",
+      "bytes": 5023
+    },
+    "build-output.txt": {
+      "sha256": "0e6a2387c978b36d37a4a3bc9030d0d0467ad43b8acd99d4a85a607fdc2e885e",
+      "bytes": 6594
+    },
+    "mcp-tools.json": {
+      "sha256": "290dac23e92d735bfc532c6e757df79725217e4871326cdffcb878c0ada973ef",
+      "bytes": 17362
+    },
+    "access.log": {
+      "sha256": "6e4fa9285b3435ff5f1bb28938124737a0e39035a2f535003b69c46f9e5ff085",
+      "bytes": 46216
+    },
+    "git-log.txt": {
+      "sha256": "d767dbdb990c98070c617a9c8d2263d267c596d3ecfcda4cc0a79743815e45ae",
+      "bytes": 11895
+    },
+    "analytics.csv": {
+      "sha256": "6dae0fc8f09d26e767e58ab0ba2a53aaaa014ddc7a2027aa3ca2f80111a19e54",
+      "bytes": 87517
+    },
+    "github-api-issues-large.json": {
+      "sha256": "bd2bdb943de007b7bb57d4e4a53a01ad801cf57606a3228682b39d05eb8a5e16",
+      "bytes": 219175
+    },
+    "npm-install-log.txt": {
+      "sha256": "54fe053a4c8ece97a96bef23b019a9120a230af1e17eddd70d4a046dd48a9af0",
+      "bytes": 37761
+    },
+    "source-big.ts": {
+      "sha256": "7b4ba6812418434b9c682875de2454668ed98f3e0791f9e2b528ac034ec6e725",
+      "bytes": 61576
+    },
+    "git-log-large.txt": {
+      "sha256": "028317819bc1a93fcfbeeba2d5ffea829fe4c439e3889d688f76fbb11bb913ad",
+      "bytes": 191120
+    },
+    "context7-supabase-edge.md": {
+      "sha256": "c2baf87451f27eaf7737a2319f01577c577893c72479f70e656b86c8e47f610d",
+      "bytes": 3988
+    },
+    "skills/skill-main.md": {
+      "sha256": "ce26cb01de7a116eab256f916620935f029e850771f3fb6cb7d40a3ce8d1f7ff",
+      "bytes": 16683
+    },
+    "skills/patterns-javascript.md": {
+      "sha256": "e0e6e6d17d2df8d93cff0922fb42b21382328d3d14a9bc32f62f0b3f127fc723",
+      "bytes": 9598
+    },
+    "skills/patterns-python.md": {
+      "sha256": "8d76144c9e812a54c884b815f526fea85179839fcc70b205bfde1e757ae95fec",
+      "bytes": 9282
+    },
+    "skills/patterns-shell.md": {
+      "sha256": "34be33127c296b273e03cf1d8c373c57083e160a1a2ac3876dca010c74689877",
+      "bytes": 6814
+    },
+    "skills/anti-patterns.md": {
+      "sha256": "fd6112a5d73375ff2bb3029479766b9927cab48db982fa2a3019682c1c8a3a7d",
+      "bytes": 10368
+    },
+    "sqlite-fts5-docs.html": {
+      "sha256": "de3092630358518a6869bf047055b3938e18b476e3fbc54f4e2146d1e593497f",
+      "bytes": 215354
+    },
+    "SOURCE.md": {
+      "sha256": "393bd16d6603959c06d2bbc8e1f7c0a61b0d66a034874e69f2dd6e1e0858e8af",
+      "bytes": 1764
+    }
+  },
+  "results": [
+    {
+      "group": "a-sandbox",
+      "id": "a-context7-react-docs",
+      "title": "React useEffect docs",
+      "link": "../a-sandbox/README.md#a-context7-react-docs",
+      "inputs": [
+        "context7-react-docs.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-context7-react-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6075,
+          "mean": 6075,
+          "sigma": 0,
+          "min": 6075,
+          "max": 6075,
+          "samples": [
+            6075,
+            6075,
+            6075,
+            6075,
+            6075
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 277,
+          "mean": 277,
+          "sigma": 0,
+          "min": 277,
+          "max": 277,
+          "samples": [
+            277,
+            277,
+            277,
+            277,
+            277
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 215,
+          "mean": 215,
+          "sigma": 0,
+          "min": 215,
+          "max": 215,
+          "samples": [
+            215,
+            215,
+            215,
+            215,
+            215
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57.9,
+          "mean": 57.64,
+          "sigma": 0.87,
+          "min": 56.34,
+          "max": 58.5,
+          "samples": [
+            57.21,
+            57.9,
+            58.5,
+            58.23,
+            56.34
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 45.28,
+          "mean": 44.98,
+          "sigma": 1.1,
+          "min": 43.11,
+          "max": 45.96,
+          "samples": [
+            45.01,
+            45.96,
+            43.11,
+            45.28,
+            45.52
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 261,
+          "mean": 261,
+          "sigma": 0,
+          "min": 261,
+          "max": 261,
+          "samples": [
+            261,
+            261,
+            261,
+            261,
+            261
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-context7-nextjs-docs",
+      "title": "Next.js App Router docs",
+      "link": "../a-sandbox/README.md#a-context7-nextjs-docs",
+      "inputs": [
+        "context7-nextjs-docs.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-context7-nextjs-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6658,
+          "mean": 6658,
+          "sigma": 0,
+          "min": 6658,
+          "max": 6658,
+          "samples": [
+            6658,
+            6658,
+            6658,
+            6658,
+            6658
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 265,
+          "mean": 265,
+          "sigma": 0,
+          "min": 265,
+          "max": 265,
+          "samples": [
+            265,
+            265,
+            265,
+            265,
+            265
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 216,
+          "mean": 216,
+          "sigma": 0,
+          "min": 216,
+          "max": 216,
+          "samples": [
+            216,
+            216,
+            216,
+            216,
+            216
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57,
+          "mean": 57.55,
+          "sigma": 1.56,
+          "min": 56.02,
+          "max": 59.37,
+          "samples": [
+            57,
+            59.37,
+            59.05,
+            56.02,
+            56.33
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 44.68,
+          "mean": 46.98,
+          "sigma": 5.9,
+          "min": 43.79,
+          "max": 57.48,
+          "samples": [
+            44.68,
+            57.48,
+            45.15,
+            43.82,
+            43.79
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 249,
+          "mean": 249,
+          "sigma": 0,
+          "min": 249,
+          "max": 249,
+          "samples": [
+            249,
+            249,
+            249,
+            249,
+            249
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-context7-tailwind-docs",
+      "title": "Tailwind CSS docs",
+      "link": "../a-sandbox/README.md#a-context7-tailwind-docs",
+      "inputs": [
+        "context7-tailwind-docs.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-context7-tailwind-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 4102,
+          "mean": 4102,
+          "sigma": 0,
+          "min": 4102,
+          "max": 4102,
+          "samples": [
+            4102,
+            4102,
+            4102,
+            4102,
+            4102
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 202,
+          "mean": 202,
+          "sigma": 0,
+          "min": 202,
+          "max": 202,
+          "samples": [
+            202,
+            202,
+            202,
+            202,
+            202
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 216,
+          "mean": 216,
+          "sigma": 0,
+          "min": 216,
+          "max": 216,
+          "samples": [
+            216,
+            216,
+            216,
+            216,
+            216
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57.21,
+          "mean": 57.65,
+          "sigma": 1.13,
+          "min": 56.66,
+          "max": 59.22,
+          "samples": [
+            56.66,
+            59.22,
+            57.21,
+            56.73,
+            58.43
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 45.7,
+          "mean": 45.19,
+          "sigma": 1.1,
+          "min": 43.51,
+          "max": 46.18,
+          "samples": [
+            43.51,
+            44.65,
+            45.7,
+            46.18,
+            45.89
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 186,
+          "mean": 186,
+          "sigma": 0,
+          "min": 186,
+          "max": 186,
+          "samples": [
+            186,
+            186,
+            186,
+            186,
+            186
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-playwright-snapshot",
+      "title": "Page snapshot (HN)",
+      "link": "../a-sandbox/README.md#a-playwright-snapshot",
+      "inputs": [
+        "playwright-snapshot.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-playwright-snapshot",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 57521,
+          "mean": 57521,
+          "sigma": 0,
+          "min": 57521,
+          "max": 57521,
+          "samples": [
+            57521,
+            57521,
+            57521,
+            57521,
+            57521
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 315,
+          "mean": 315,
+          "sigma": 0,
+          "min": 315,
+          "max": 315,
+          "samples": [
+            315,
+            315,
+            315,
+            315,
+            315
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 215,
+          "mean": 215,
+          "sigma": 0,
+          "min": 215,
+          "max": 215,
+          "samples": [
+            215,
+            215,
+            215,
+            215,
+            215
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 59.98,
+          "mean": 59.79,
+          "sigma": 1.43,
+          "min": 58.13,
+          "max": 61.91,
+          "samples": [
+            58.9,
+            58.13,
+            59.98,
+            61.91,
+            60.02
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 64.33,
+          "mean": 65.29,
+          "sigma": 2.07,
+          "min": 63.43,
+          "max": 68.61,
+          "samples": [
+            63.43,
+            64.33,
+            64.11,
+            65.95,
+            68.61
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 299,
+          "mean": 299,
+          "sigma": 0,
+          "min": 299,
+          "max": 299,
+          "samples": [
+            299,
+            299,
+            299,
+            299,
+            299
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-playwright-network",
+      "title": "Network requests",
+      "link": "../a-sandbox/README.md#a-playwright-network",
+      "inputs": [
+        "playwright-network.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-playwright-network",
+      "ok": true,
+      "note": "hook allowed (below its threshold)",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 400,
+          "mean": 400,
+          "sigma": 0,
+          "min": 400,
+          "max": 400,
+          "samples": [
+            400,
+            400,
+            400,
+            400,
+            400
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 365,
+          "mean": 365,
+          "sigma": 0,
+          "min": 365,
+          "max": 365,
+          "samples": [
+            365,
+            365,
+            365,
+            365,
+            365
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 400,
+          "mean": 400,
+          "sigma": 0,
+          "min": 400,
+          "max": 400,
+          "samples": [
+            400,
+            400,
+            400,
+            400,
+            400
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 60.98,
+          "mean": 73.69,
+          "sigma": 30.9,
+          "min": 58.47,
+          "max": 128.91,
+          "samples": [
+            60.98,
+            58.47,
+            58.47,
+            61.62,
+            128.91
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 42.63,
+          "mean": 46.67,
+          "sigma": 9.74,
+          "min": 39.84,
+          "max": 63.84,
+          "samples": [
+            42.59,
+            39.84,
+            63.84,
+            44.46,
+            42.63
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 349,
+          "mean": 349,
+          "sigma": 0,
+          "min": 349,
+          "max": 349,
+          "samples": [
+            349,
+            349,
+            349,
+            349,
+            349
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-github-prs",
+      "title": "PR list (Next.js)",
+      "link": "../a-sandbox/README.md#a-github-prs",
+      "inputs": [
+        "github-prs.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-github-prs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6561,
+          "mean": 6561,
+          "sigma": 0,
+          "min": 6561,
+          "max": 6561,
+          "samples": [
+            6561,
+            6561,
+            6561,
+            6561,
+            6561
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 735,
+          "mean": 735,
+          "sigma": 0,
+          "min": 735,
+          "max": 735,
+          "samples": [
+            735,
+            735,
+            735,
+            735,
+            735
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 138,
+          "mean": 138,
+          "sigma": 0,
+          "min": 138,
+          "max": 138,
+          "samples": [
+            138,
+            138,
+            138,
+            138,
+            138
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 78.76,
+          "mean": 75.47,
+          "sigma": 9.76,
+          "min": 64.33,
+          "max": 87.17,
+          "samples": [
+            64.33,
+            78.76,
+            66.4,
+            80.68,
+            87.17
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 51.83,
+          "mean": 51.82,
+          "sigma": 4.4,
+          "min": 47,
+          "max": 58.34,
+          "samples": [
+            58.34,
+            53.22,
+            51.83,
+            48.7,
+            47
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 719,
+          "mean": 719,
+          "sigma": 0,
+          "min": 719,
+          "max": 719,
+          "samples": [
+            719,
+            719,
+            719,
+            719,
+            719
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-github-issues",
+      "title": "Issues (React)",
+      "link": "../a-sandbox/README.md#a-github-issues",
+      "inputs": [
+        "github-issues.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-github-issues",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 60310,
+          "mean": 60310,
+          "sigma": 0,
+          "min": 60310,
+          "max": 60310,
+          "samples": [
+            60310,
+            60310,
+            60310,
+            60310,
+            60310
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 1156,
+          "mean": 1156,
+          "sigma": 0,
+          "min": 1156,
+          "max": 1156,
+          "samples": [
+            1156,
+            1156,
+            1156,
+            1156,
+            1156
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 142,
+          "mean": 142,
+          "sigma": 0,
+          "min": 142,
+          "max": 142,
+          "samples": [
+            142,
+            142,
+            142,
+            142,
+            142
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 59.08,
+          "mean": 59.08,
+          "sigma": 1.41,
+          "min": 57.26,
+          "max": 61.02,
+          "samples": [
+            59.68,
+            61.02,
+            59.08,
+            57.26,
+            58.36
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 54.91,
+          "mean": 56.99,
+          "sigma": 4.91,
+          "min": 52.17,
+          "max": 64.72,
+          "samples": [
+            64.72,
+            58.66,
+            54.91,
+            52.17,
+            54.5
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 1139,
+          "mean": 1139,
+          "sigma": 0,
+          "min": 1139,
+          "max": 1139,
+          "samples": [
+            1139,
+            1139,
+            1139,
+            1139,
+            1139
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-test-output",
+      "title": "Test output (30 suites)",
+      "link": "../a-sandbox/README.md#a-test-output",
+      "inputs": [
+        "test-output.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-test-output",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6185,
+          "mean": 6185,
+          "sigma": 0,
+          "min": 6185,
+          "max": 6185,
+          "samples": [
+            6185,
+            6185,
+            6185,
+            6185,
+            6185
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 353,
+          "mean": 353,
+          "sigma": 0,
+          "min": 353,
+          "max": 353,
+          "samples": [
+            353,
+            353,
+            353,
+            353,
+            353
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 203,
+          "mean": 203,
+          "sigma": 0,
+          "min": 203,
+          "max": 203,
+          "samples": [
+            203,
+            203,
+            203,
+            203,
+            203
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 58.68,
+          "mean": 58.78,
+          "sigma": 1.58,
+          "min": 57.02,
+          "max": 60.84,
+          "samples": [
+            58.68,
+            57.53,
+            57.02,
+            59.82,
+            60.84
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 46.57,
+          "mean": 46.74,
+          "sigma": 2.19,
+          "min": 44.46,
+          "max": 49.94,
+          "samples": [
+            44.46,
+            46.57,
+            45.07,
+            47.67,
+            49.94
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 337,
+          "mean": 337,
+          "sigma": 0,
+          "min": 337,
+          "max": 337,
+          "samples": [
+            337,
+            337,
+            337,
+            337,
+            337
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-tsc-errors",
+      "title": "TypeScript errors (50)",
+      "link": "../a-sandbox/README.md#a-tsc-errors",
+      "inputs": [
+        "tsc-errors.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-tsc-errors",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 5023,
+          "mean": 5023,
+          "sigma": 0,
+          "min": 5023,
+          "max": 5023,
+          "samples": [
+            5023,
+            5023,
+            5023,
+            5023,
+            5023
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 363,
+          "mean": 363,
+          "sigma": 0,
+          "min": 363,
+          "max": 363,
+          "samples": [
+            363,
+            363,
+            363,
+            363,
+            363
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 137,
+          "mean": 137,
+          "sigma": 0,
+          "min": 137,
+          "max": 137,
+          "samples": [
+            137,
+            137,
+            137,
+            137,
+            137
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57.47,
+          "mean": 58,
+          "sigma": 1.96,
+          "min": 55.74,
+          "max": 60.98,
+          "samples": [
+            60.98,
+            55.74,
+            57.17,
+            58.63,
+            57.47
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 42.99,
+          "mean": 43.3,
+          "sigma": 2.02,
+          "min": 41.29,
+          "max": 46.65,
+          "samples": [
+            42.35,
+            41.29,
+            42.99,
+            46.65,
+            43.22
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 347,
+          "mean": 347,
+          "sigma": 0,
+          "min": 347,
+          "max": 347,
+          "samples": [
+            347,
+            347,
+            347,
+            347,
+            347
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-build-output",
+      "title": "Build output (100+ lines)",
+      "link": "../a-sandbox/README.md#a-build-output",
+      "inputs": [
+        "build-output.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-build-output",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6594,
+          "mean": 6594,
+          "sigma": 0,
+          "min": 6594,
+          "max": 6594,
+          "samples": [
+            6594,
+            6594,
+            6594,
+            6594,
+            6594
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 421,
+          "mean": 421,
+          "sigma": 0,
+          "min": 421,
+          "max": 421,
+          "samples": [
+            421,
+            421,
+            421,
+            421,
+            421
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 202,
+          "mean": 202,
+          "sigma": 0,
+          "min": 202,
+          "max": 202,
+          "samples": [
+            202,
+            202,
+            202,
+            202,
+            202
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 56.03,
+          "mean": 57.14,
+          "sigma": 2.43,
+          "min": 54.94,
+          "max": 60.89,
+          "samples": [
+            56.03,
+            58.22,
+            60.89,
+            54.94,
+            55.64
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 45.91,
+          "mean": 46.3,
+          "sigma": 2.43,
+          "min": 43.36,
+          "max": 50.1,
+          "samples": [
+            46.46,
+            43.36,
+            45.66,
+            45.91,
+            50.1
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 405,
+          "mean": 405,
+          "sigma": 0,
+          "min": 405,
+          "max": 405,
+          "samples": [
+            405,
+            405,
+            405,
+            405,
+            405
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-mcp-tools",
+      "title": "MCP tools (40 tools)",
+      "link": "../a-sandbox/README.md#a-mcp-tools",
+      "inputs": [
+        "mcp-tools.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-mcp-tools",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 17362,
+          "mean": 17362,
+          "sigma": 0,
+          "min": 17362,
+          "max": 17362,
+          "samples": [
+            17362,
+            17362,
+            17362,
+            17362,
+            17362
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 758,
+          "mean": 758,
+          "sigma": 0,
+          "min": 758,
+          "max": 758,
+          "samples": [
+            758,
+            758,
+            758,
+            758,
+            758
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 192,
+          "mean": 192,
+          "sigma": 0,
+          "min": 192,
+          "max": 192,
+          "samples": [
+            192,
+            192,
+            192,
+            192,
+            192
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57.29,
+          "mean": 57.18,
+          "sigma": 1.19,
+          "min": 55.47,
+          "max": 58.68,
+          "samples": [
+            58.68,
+            56.74,
+            57.29,
+            57.73,
+            55.47
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 50.22,
+          "mean": 50.14,
+          "sigma": 2.4,
+          "min": 47.47,
+          "max": 53.74,
+          "samples": [
+            50.76,
+            53.74,
+            48.53,
+            47.47,
+            50.22
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 742,
+          "mean": 742,
+          "sigma": 0,
+          "min": 742,
+          "max": 742,
+          "samples": [
+            742,
+            742,
+            742,
+            742,
+            742
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-access",
+      "title": "Access log (500 req)",
+      "link": "../a-sandbox/README.md#a-access",
+      "inputs": [
+        "access.log"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-access",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 46216,
+          "mean": 46216,
+          "sigma": 0,
+          "min": 46216,
+          "max": 46216,
+          "samples": [
+            46216,
+            46216,
+            46216,
+            46216,
+            46216
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 171,
+          "mean": 171,
+          "sigma": 0,
+          "min": 171,
+          "max": 171,
+          "samples": [
+            171,
+            171,
+            171,
+            171,
+            171
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 134,
+          "mean": 134,
+          "sigma": 0,
+          "min": 134,
+          "max": 134,
+          "samples": [
+            134,
+            134,
+            134,
+            134,
+            134
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 58.65,
+          "mean": 62.49,
+          "sigma": 5.91,
+          "min": 57.29,
+          "max": 68.93,
+          "samples": [
+            58.65,
+            68.93,
+            68.93,
+            58.64,
+            57.29
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 53.47,
+          "mean": 54.97,
+          "sigma": 4.63,
+          "min": 49.83,
+          "max": 62.21,
+          "samples": [
+            53.47,
+            49.83,
+            53.18,
+            62.21,
+            56.16
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 155,
+          "mean": 155,
+          "sigma": 0,
+          "min": 155,
+          "max": 155,
+          "samples": [
+            155,
+            155,
+            155,
+            155,
+            155
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-git-log",
+      "title": "Git log (150+ commits)",
+      "link": "../a-sandbox/README.md#a-git-log",
+      "inputs": [
+        "git-log.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-git-log",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 11895,
+          "mean": 11895,
+          "sigma": 0,
+          "min": 11895,
+          "max": 11895,
+          "samples": [
+            11895,
+            11895,
+            11895,
+            11895,
+            11895
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 123,
+          "mean": 123,
+          "sigma": 0,
+          "min": 123,
+          "max": 123,
+          "samples": [
+            123,
+            123,
+            123,
+            123,
+            123
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 135,
+          "mean": 135,
+          "sigma": 0,
+          "min": 135,
+          "max": 135,
+          "samples": [
+            135,
+            135,
+            135,
+            135,
+            135
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 58.17,
+          "mean": 57.47,
+          "sigma": 2.45,
+          "min": 54.7,
+          "max": 59.98,
+          "samples": [
+            58.17,
+            59.98,
+            54.7,
+            55.06,
+            59.41
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 48.51,
+          "mean": 48.1,
+          "sigma": 1.21,
+          "min": 46.47,
+          "max": 49.26,
+          "samples": [
+            49.04,
+            49.26,
+            48.51,
+            47.19,
+            46.47
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 107,
+          "mean": 107,
+          "sigma": 0,
+          "min": 107,
+          "max": 107,
+          "samples": [
+            107,
+            107,
+            107,
+            107,
+            107
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-analytics",
+      "title": "Analytics CSV (500 rows)",
+      "link": "../a-sandbox/README.md#a-analytics",
+      "inputs": [
+        "analytics.csv"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs a-analytics",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 87517,
+          "mean": 87517,
+          "sigma": 0,
+          "min": 87517,
+          "max": 87517,
+          "samples": [
+            87517,
+            87517,
+            87517,
+            87517,
+            87517
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 238,
+          "mean": 238,
+          "sigma": 0,
+          "min": 238,
+          "max": 238,
+          "samples": [
+            238,
+            238,
+            238,
+            238,
+            238
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 137,
+          "mean": 137,
+          "sigma": 0,
+          "min": 137,
+          "max": 137,
+          "samples": [
+            137,
+            137,
+            137,
+            137,
+            137
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 46.58,
+          "mean": 50.14,
+          "sigma": 8.92,
+          "min": 45.44,
+          "max": 66.05,
+          "samples": [
+            66.05,
+            46.58,
+            46.98,
+            45.44,
+            45.64
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 59.76,
+          "mean": 59.31,
+          "sigma": 1.45,
+          "min": 57.16,
+          "max": 60.58,
+          "samples": [
+            60.5,
+            60.58,
+            59.76,
+            58.58,
+            57.16
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 222,
+          "mean": 222,
+          "sigma": 0,
+          "min": 222,
+          "max": 222,
+          "samples": [
+            222,
+            222,
+            222,
+            222,
+            222
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-github-api-issues-large",
+      "title": "Large JSON payload (Next.js issues, 30 items)",
+      "link": "../a-sandbox/README.md#a-github-api-issues-large",
+      "inputs": [
+        "github-api-issues-large.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-github-api-issues-large",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 219175,
+          "mean": 219175,
+          "sigma": 0,
+          "min": 219175,
+          "max": 219175,
+          "samples": [
+            219175,
+            219175,
+            219175,
+            219175,
+            219175
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 834,
+          "mean": 834,
+          "sigma": 0,
+          "min": 834,
+          "max": 834,
+          "samples": [
+            834,
+            834,
+            834,
+            834,
+            834
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 223,
+          "mean": 223,
+          "sigma": 0,
+          "min": 223,
+          "max": 223,
+          "samples": [
+            223,
+            223,
+            223,
+            223,
+            223
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57.42,
+          "mean": 58.52,
+          "sigma": 1.73,
+          "min": 57.1,
+          "max": 60.67,
+          "samples": [
+            57.42,
+            60.15,
+            60.67,
+            57.28,
+            57.1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 95.51,
+          "mean": 95.26,
+          "sigma": 1.51,
+          "min": 93.12,
+          "max": 97.23,
+          "samples": [
+            97.23,
+            94.67,
+            95.51,
+            93.12,
+            95.75
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-npm-install-log",
+      "title": "npm install log (--loglevel http)",
+      "link": "../a-sandbox/README.md#a-npm-install-log",
+      "inputs": [
+        "npm-install-log.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-npm-install-log",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 37761,
+          "mean": 37761,
+          "sigma": 0,
+          "min": 37761,
+          "max": 37761,
+          "samples": [
+            37761,
+            37761,
+            37761,
+            37761,
+            37761
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 451,
+          "mean": 451,
+          "sigma": 0,
+          "min": 451,
+          "max": 451,
+          "samples": [
+            451,
+            451,
+            451,
+            451,
+            451
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 207,
+          "mean": 207,
+          "sigma": 0,
+          "min": 207,
+          "max": 207,
+          "samples": [
+            207,
+            207,
+            207,
+            207,
+            207
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 57.89,
+          "mean": 57.33,
+          "sigma": 1.49,
+          "min": 55.34,
+          "max": 58.7,
+          "samples": [
+            55.34,
+            57.89,
+            56.18,
+            58.7,
+            58.55
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 52.29,
+          "mean": 51.51,
+          "sigma": 1.67,
+          "min": 49.57,
+          "max": 53.38,
+          "samples": [
+            49.57,
+            49.94,
+            52.29,
+            53.38,
+            52.39
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-source-big",
+      "title": "Big source file (constants.ts, 61 KB)",
+      "link": "../a-sandbox/README.md#a-source-big",
+      "inputs": [
+        "source-big.ts"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-source-big",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 61576,
+          "mean": 61576,
+          "sigma": 0,
+          "min": 61576,
+          "max": 61576,
+          "samples": [
+            61576,
+            61576,
+            61576,
+            61576,
+            61576
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 489,
+          "mean": 489,
+          "sigma": 0,
+          "min": 489,
+          "max": 489,
+          "samples": [
+            489,
+            489,
+            489,
+            489,
+            489
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 199,
+          "mean": 199,
+          "sigma": 0,
+          "min": 199,
+          "max": 199,
+          "samples": [
+            199,
+            199,
+            199,
+            199,
+            199
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 56.81,
+          "mean": 60.22,
+          "sigma": 7.16,
+          "min": 55.87,
+          "max": 72.76,
+          "samples": [
+            56.81,
+            55.87,
+            56.12,
+            59.54,
+            72.76
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 58.92,
+          "mean": 59.05,
+          "sigma": 1.23,
+          "min": 57.67,
+          "max": 60.57,
+          "samples": [
+            58.1,
+            58.92,
+            57.67,
+            60.02,
+            60.57
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-git-log-large",
+      "title": "Git log (2000 commits)",
+      "link": "../a-sandbox/README.md#a-git-log-large",
+      "inputs": [
+        "git-log-large.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-git-log-large",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 191120,
+          "mean": 191120,
+          "sigma": 0,
+          "min": 191120,
+          "max": 191120,
+          "samples": [
+            191120,
+            191120,
+            191120,
+            191120,
+            191120
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 153,
+          "mean": 153,
+          "sigma": 0,
+          "min": 153,
+          "max": 153,
+          "samples": [
+            153,
+            153,
+            153,
+            153,
+            153
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 204,
+          "mean": 204,
+          "sigma": 0,
+          "min": 204,
+          "max": 204,
+          "samples": [
+            204,
+            204,
+            204,
+            204,
+            204
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 60.61,
+          "mean": 61.26,
+          "sigma": 3.04,
+          "min": 58.1,
+          "max": 65.89,
+          "samples": [
+            65.89,
+            60.61,
+            62.42,
+            59.27,
+            58.1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 87.5,
+          "mean": 88.55,
+          "sigma": 2.33,
+          "min": 86.22,
+          "max": 92.06,
+          "samples": [
+            87.3,
+            87.5,
+            86.22,
+            92.06,
+            89.68
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-supabase-edge-functions-5-examples",
+      "title": "Supabase Edge Functions (5 examples)",
+      "link": "../b-retrieval/README.md#b-supabase-edge-functions-5-examples",
+      "inputs": [
+        "context7-supabase-edge.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-supabase-edge-functions-5-examples",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 3988,
+          "mean": 3988,
+          "sigma": 0,
+          "min": 3988,
+          "max": 3988,
+          "samples": [
+            3988,
+            3988,
+            3988,
+            3988,
+            3988
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 4455,
+          "mean": 4455,
+          "sigma": 0,
+          "min": 4455,
+          "max": 4455,
+          "samples": [
+            4455,
+            4455,
+            4455,
+            4455,
+            4455
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 16.02,
+          "mean": 15.73,
+          "sigma": 0.88,
+          "min": 14.79,
+          "max": 16.8,
+          "samples": [
+            16.17,
+            16.02,
+            16.8,
+            14.85,
+            14.79
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 5,
+          "mean": 5.29,
+          "sigma": 0.78,
+          "min": 4.81,
+          "max": 6.67,
+          "samples": [
+            4.89,
+            6.67,
+            4.81,
+            5.06,
+            5
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 5,
+          "mean": 5,
+          "sigma": 0,
+          "min": 5,
+          "max": 5,
+          "samples": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 5,
+          "mean": 5,
+          "sigma": 0,
+          "min": 5,
+          "max": 5,
+          "samples": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 2246,
+          "mean": 2246,
+          "sigma": 0,
+          "min": 2246,
+          "max": 2246,
+          "samples": [
+            2246,
+            2246,
+            2246,
+            2246,
+            2246
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-react-useeffect-docs",
+      "title": "React useEffect docs",
+      "link": "../b-retrieval/README.md#b-react-useeffect-docs",
+      "inputs": [
+        "context7-react-docs.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-react-useeffect-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6075,
+          "mean": 6075,
+          "sigma": 0,
+          "min": 6075,
+          "max": 6075,
+          "samples": [
+            6075,
+            6075,
+            6075,
+            6075,
+            6075
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 4841,
+          "mean": 4841,
+          "sigma": 0,
+          "min": 4841,
+          "max": 4841,
+          "samples": [
+            4841,
+            4841,
+            4841,
+            4841,
+            4841
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 16.69,
+          "mean": 17.64,
+          "sigma": 1.86,
+          "min": 16.13,
+          "max": 20.22,
+          "samples": [
+            16.69,
+            16.16,
+            20.22,
+            16.13,
+            18.99
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 4.91,
+          "mean": 5.05,
+          "sigma": 0.39,
+          "min": 4.74,
+          "max": 5.73,
+          "samples": [
+            4.74,
+            5.73,
+            4.91,
+            4.85,
+            5.02
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 5,
+          "mean": 5,
+          "sigma": 0,
+          "min": 5,
+          "max": 5,
+          "samples": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 1494,
+          "mean": 1494,
+          "sigma": 0,
+          "min": 1494,
+          "max": 1494,
+          "samples": [
+            1494,
+            1494,
+            1494,
+            1494,
+            1494
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-next-js-app-router-docs",
+      "title": "Next.js App Router docs",
+      "link": "../b-retrieval/README.md#b-next-js-app-router-docs",
+      "inputs": [
+        "context7-nextjs-docs.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-next-js-app-router-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6658,
+          "mean": 6658,
+          "sigma": 0,
+          "min": 6658,
+          "max": 6658,
+          "samples": [
+            6658,
+            6658,
+            6658,
+            6658,
+            6658
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 7170,
+          "mean": 7170,
+          "sigma": 0,
+          "min": 7170,
+          "max": 7170,
+          "samples": [
+            7170,
+            7170,
+            7170,
+            7170,
+            7170
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 16.23,
+          "mean": 19.3,
+          "sigma": 6.79,
+          "min": 15.55,
+          "max": 31.37,
+          "samples": [
+            17.56,
+            31.37,
+            16.23,
+            15.55,
+            15.77
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 5.52,
+          "mean": 5.42,
+          "sigma": 0.3,
+          "min": 4.97,
+          "max": 5.72,
+          "samples": [
+            5.27,
+            5.72,
+            5.63,
+            5.52,
+            4.97
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 9,
+          "mean": 9,
+          "sigma": 0,
+          "min": 9,
+          "max": 9,
+          "samples": [
+            9,
+            9,
+            9,
+            9,
+            9
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 9,
+          "mean": 9,
+          "sigma": 0,
+          "min": 9,
+          "max": 9,
+          "samples": [
+            9,
+            9,
+            9,
+            9,
+            9
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 3311,
+          "mean": 3311,
+          "sigma": 0,
+          "min": 3311,
+          "max": 3311,
+          "samples": [
+            3311,
+            3311,
+            3311,
+            3311,
+            3311
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-tailwind-css-docs",
+      "title": "Tailwind CSS docs",
+      "link": "../b-retrieval/README.md#b-tailwind-css-docs",
+      "inputs": [
+        "context7-tailwind-docs.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-tailwind-css-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 4102,
+          "mean": 4102,
+          "sigma": 0,
+          "min": 4102,
+          "max": 4102,
+          "samples": [
+            4102,
+            4102,
+            4102,
+            4102,
+            4102
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 4385,
+          "mean": 4385,
+          "sigma": 0,
+          "min": 4385,
+          "max": 4385,
+          "samples": [
+            4385,
+            4385,
+            4385,
+            4385,
+            4385
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 15.88,
+          "mean": 16.67,
+          "sigma": 1.91,
+          "min": 15.56,
+          "max": 20.08,
+          "samples": [
+            16.08,
+            15.56,
+            20.08,
+            15.88,
+            15.78
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 4.31,
+          "mean": 4.25,
+          "sigma": 0.26,
+          "min": 3.83,
+          "max": 4.53,
+          "samples": [
+            4.31,
+            4.35,
+            4.53,
+            3.83,
+            4.24
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 6,
+          "mean": 6,
+          "sigma": 0,
+          "min": 6,
+          "max": 6,
+          "samples": [
+            6,
+            6,
+            6,
+            6,
+            6
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 6,
+          "mean": 6,
+          "sigma": 0,
+          "min": 6,
+          "max": 6,
+          "samples": [
+            6,
+            6,
+            6,
+            6,
+            6
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 620,
+          "mean": 620,
+          "sigma": 0,
+          "min": 620,
+          "max": 620,
+          "samples": [
+            620,
+            620,
+            620,
+            620,
+            620
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-skill-context-mode-main-prompt",
+      "title": "Skill: context-mode (main prompt)",
+      "link": "../b-retrieval/README.md#b-skill-context-mode-main-prompt",
+      "inputs": [
+        "skills/skill-main.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-skill-context-mode-main-prompt",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 16683,
+          "mean": 16683,
+          "sigma": 0,
+          "min": 16683,
+          "max": 16683,
+          "samples": [
+            16683,
+            16683,
+            16683,
+            16683,
+            16683
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 6380,
+          "mean": 6380,
+          "sigma": 0,
+          "min": 6380,
+          "max": 6380,
+          "samples": [
+            6380,
+            6380,
+            6380,
+            6380,
+            6380
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 17.5,
+          "mean": 17.34,
+          "sigma": 0.57,
+          "min": 16.62,
+          "max": 18.06,
+          "samples": [
+            16.62,
+            17.59,
+            16.91,
+            17.5,
+            18.06
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 5.24,
+          "mean": 5.51,
+          "sigma": 0.52,
+          "min": 5.07,
+          "max": 6.32,
+          "samples": [
+            5.24,
+            5.19,
+            6.32,
+            5.72,
+            5.07
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 8,
+          "mean": 8,
+          "sigma": 0,
+          "min": 8,
+          "max": 8,
+          "samples": [
+            8,
+            8,
+            8,
+            8,
+            8
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-skill-references-4-files-combined",
+      "title": "Skill references (4 files combined)",
+      "link": "../b-retrieval/README.md#b-skill-references-4-files-combined",
+      "inputs": [
+        "skills/patterns-javascript.md",
+        "skills/patterns-python.md",
+        "skills/patterns-shell.md",
+        "skills/anti-patterns.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-skill-references-4-files-combined",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 36090,
+          "mean": 36090,
+          "sigma": 0,
+          "min": 36090,
+          "max": 36090,
+          "samples": [
+            36090,
+            36090,
+            36090,
+            36090,
+            36090
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 10874,
+          "mean": 10874,
+          "sigma": 0,
+          "min": 10874,
+          "max": 10874,
+          "samples": [
+            10874,
+            10874,
+            10874,
+            10874,
+            10874
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 20.04,
+          "mean": 19.95,
+          "sigma": 0.83,
+          "min": 18.86,
+          "max": 21.1,
+          "samples": [
+            19.54,
+            20.19,
+            21.1,
+            18.86,
+            20.04
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 6.23,
+          "mean": 6.21,
+          "sigma": 0.2,
+          "min": 6,
+          "max": 6.43,
+          "samples": [
+            6.01,
+            6.39,
+            6,
+            6.23,
+            6.43
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 37,
+          "mean": 37,
+          "sigma": 0,
+          "min": 37,
+          "max": 37,
+          "samples": [
+            37,
+            37,
+            37,
+            37,
+            37
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 9,
+          "mean": 9,
+          "sigma": 0,
+          "min": 9,
+          "max": 9,
+          "samples": [
+            9,
+            9,
+            9,
+            9,
+            9
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 2412,
+          "mean": 2412,
+          "sigma": 0,
+          "min": 2412,
+          "max": 2412,
+          "samples": [
+            2412,
+            2412,
+            2412,
+            2412,
+            2412
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-mcp-tools-list-40-tools",
+      "title": "MCP tools/list (40 tools)",
+      "link": "../b-retrieval/README.md#b-mcp-tools-list-40-tools",
+      "inputs": [
+        "mcp-tools.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": true,
+      "command": "node run.mjs b-mcp-tools-list-40-tools",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 2509,
+          "mean": 2509,
+          "sigma": 0,
+          "min": 2509,
+          "max": 2509,
+          "samples": [
+            2509,
+            2509,
+            2509,
+            2509,
+            2509
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 1255,
+          "mean": 1255,
+          "sigma": 0,
+          "min": 1255,
+          "max": 1255,
+          "samples": [
+            1255,
+            1255,
+            1255,
+            1255,
+            1255
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 16.03,
+          "mean": 15.73,
+          "sigma": 0.82,
+          "min": 14.6,
+          "max": 16.52,
+          "samples": [
+            14.6,
+            15.16,
+            16.52,
+            16.03,
+            16.31
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 4.88,
+          "mean": 4.7,
+          "sigma": 0.26,
+          "min": 4.39,
+          "max": 4.91,
+          "samples": [
+            4.39,
+            4.91,
+            4.45,
+            4.89,
+            4.88
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "v1_bytes": {
+          "n": 5,
+          "median": 1016,
+          "mean": 1016,
+          "sigma": 0,
+          "min": 1016,
+          "max": 1016,
+          "samples": [
+            1016,
+            1016,
+            1016,
+            1016,
+            1016
+          ]
+        }
+      }
+    },
+    {
+      "group": "b-retrieval",
+      "id": "b-html-docs-page-sqlite-org-fts5-215-kb",
+      "title": "HTML docs page (sqlite.org FTS5, 215 KB)",
+      "link": "../b-retrieval/README.md#b-html-docs-page-sqlite-org-fts5-215-kb",
+      "inputs": [
+        "sqlite-fts5-docs.html"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs b-html-docs-page-sqlite-org-fts5-215-kb",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 215354,
+          "mean": 215354,
+          "sigma": 0,
+          "min": 215354,
+          "max": 215354,
+          "samples": [
+            215354,
+            215354,
+            215354,
+            215354,
+            215354
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 15400,
+          "mean": 15400,
+          "sigma": 0,
+          "min": 15400,
+          "max": 15400,
+          "samples": [
+            15400,
+            15400,
+            15400,
+            15400,
+            15400
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 101.94,
+          "mean": 101.54,
+          "sigma": 3.46,
+          "min": 97.06,
+          "max": 104.91,
+          "samples": [
+            104.91,
+            97.06,
+            104.74,
+            101.94,
+            99.05
+          ]
+        },
+        "search_ms": {
+          "n": 5,
+          "median": 12.01,
+          "mean": 12.22,
+          "sigma": 0.5,
+          "min": 11.83,
+          "max": 13.08,
+          "samples": [
+            11.83,
+            12.2,
+            13.08,
+            12.01,
+            11.98
+          ]
+        },
+        "queries": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "queries_hit": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "blocks_in_source": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "blocks_whole": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "answers_found": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "answers_expected": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "markup_in_reply": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "group": "c-batch",
+      "id": "c-triage",
+      "title": "Triage: tests, tsc, build, nginx log, git log (5 commands, 5 queries)",
+      "link": "../c-batch/README.md#c-triage",
+      "inputs": [
+        "test-output.txt",
+        "tsc-errors.txt",
+        "build-output.txt",
+        "access.log",
+        "git-log.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs c-triage",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 75913,
+          "mean": 75913,
+          "sigma": 0,
+          "min": 75913,
+          "max": 75913,
+          "samples": [
+            75913,
+            75913,
+            75913,
+            75913,
+            75913
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 6256,
+          "mean": 6256,
+          "sigma": 0,
+          "min": 6256,
+          "max": 6256,
+          "samples": [
+            6256,
+            6256,
+            6256,
+            6256,
+            6256
+          ]
+        },
+        "batch_ms": {
+          "n": 5,
+          "median": 50.9,
+          "mean": 50.81,
+          "sigma": 2.16,
+          "min": 47.7,
+          "max": 53.04,
+          "samples": [
+            49.82,
+            53.04,
+            52.57,
+            50.9,
+            47.7
+          ]
+        },
+        "commands": {
+          "n": 5,
+          "median": 5,
+          "mean": 5,
+          "sigma": 0,
+          "min": 5,
+          "max": 5,
+          "samples": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "query_sections": {
+          "n": 5,
+          "median": 5,
+          "mean": 5,
+          "sigma": 0,
+          "min": 5,
+          "max": 5,
+          "samples": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "group": "c-batch",
+      "id": "c-install-log",
+      "title": "Install log and big git log (2 commands, 3 queries)",
+      "link": "../c-batch/README.md#c-install-log",
+      "inputs": [
+        "npm-install-log.txt",
+        "git-log-large.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs c-install-log",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 228881,
+          "mean": 228881,
+          "sigma": 0,
+          "min": 228881,
+          "max": 228881,
+          "samples": [
+            228881,
+            228881,
+            228881,
+            228881,
+            228881
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 12831,
+          "mean": 12831,
+          "sigma": 0,
+          "min": 12831,
+          "max": 12831,
+          "samples": [
+            12831,
+            12831,
+            12831,
+            12831,
+            12831
+          ]
+        },
+        "batch_ms": {
+          "n": 5,
+          "median": 57.69,
+          "mean": 58.9,
+          "sigma": 2.47,
+          "min": 56.65,
+          "max": 61.85,
+          "samples": [
+            56.65,
+            61.28,
+            61.85,
+            57.05,
+            57.69
+          ]
+        },
+        "commands": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "query_sections": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "group": "c-batch",
+      "id": "c-small",
+      "title": "Small outputs (3 tiny commands, 2 queries): batch has fixed overhead",
+      "link": "../c-batch/README.md#c-small",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs c-small",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 19,
+          "mean": 19,
+          "sigma": 0,
+          "min": 19,
+          "max": 19,
+          "samples": [
+            19,
+            19,
+            19,
+            19,
+            19
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 128,
+          "mean": 128,
+          "sigma": 0,
+          "min": 128,
+          "max": 128,
+          "samples": [
+            128,
+            128,
+            128,
+            128,
+            128
+          ]
+        },
+        "batch_ms": {
+          "n": 5,
+          "median": 55.99,
+          "mean": 55.5,
+          "sigma": 2.55,
+          "min": 52.19,
+          "max": 59.06,
+          "samples": [
+            56.13,
+            55.99,
+            59.06,
+            52.19,
+            54.16
+          ]
+        },
+        "commands": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "query_sections": {
+          "n": 5,
+          "median": 2,
+          "mean": 2,
+          "sigma": 0,
+          "min": 2,
+          "max": 2,
+          "samples": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "group": "d-externalize",
+      "id": "d-synth-120k",
+      "title": "Synthetic log, about 120 KB (seeded)",
+      "link": "../d-externalize/README.md#d-synth-120k",
+      "inputs": [],
+      "synthetic": true,
+      "v1_scenario": null,
+      "command": "node run.mjs d-synth-120k",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 80008,
+          "mean": 80008,
+          "sigma": 0,
+          "min": 80008,
+          "max": 80008,
+          "samples": [
+            80008,
+            80008,
+            80008,
+            80008,
+            80008
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 14610,
+          "mean": 14610,
+          "sigma": 0,
+          "min": 14610,
+          "max": 14610,
+          "samples": [
+            14610,
+            14610,
+            14610,
+            14610,
+            14610
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 58.51,
+          "mean": 60.62,
+          "sigma": 5.65,
+          "min": 56.99,
+          "max": 70.63,
+          "samples": [
+            70.63,
+            57.95,
+            59,
+            58.51,
+            56.99
+          ]
+        },
+        "markers": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "markers_found": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "search_bytes_per_query": {
+          "n": 5,
+          "median": 868,
+          "mean": 868,
+          "sigma": 0,
+          "min": 868,
+          "max": 868,
+          "samples": [
+            868,
+            868,
+            868,
+            868,
+            868
+          ]
+        },
+        "search_ms_per_query": {
+          "n": 5,
+          "median": 2.49,
+          "mean": 2.72,
+          "sigma": 0.58,
+          "min": 2.29,
+          "max": 3.72,
+          "samples": [
+            3.72,
+            2.65,
+            2.49,
+            2.29,
+            2.44
+          ]
+        }
+      }
+    },
+    {
+      "group": "d-externalize",
+      "id": "d-synth-1m",
+      "title": "Synthetic log, about 1 MB (seeded)",
+      "link": "../d-externalize/README.md#d-synth-1m",
+      "inputs": [],
+      "synthetic": true,
+      "v1_scenario": null,
+      "command": "node run.mjs d-synth-1m",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 666796,
+          "mean": 666796,
+          "sigma": 0,
+          "min": 666796,
+          "max": 666796,
+          "samples": [
+            666796,
+            666796,
+            666796,
+            666796,
+            666796
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 15671,
+          "mean": 15671,
+          "sigma": 0,
+          "min": 15671,
+          "max": 15671,
+          "samples": [
+            15671,
+            15671,
+            15671,
+            15671,
+            15671
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 106,
+          "mean": 106.58,
+          "sigma": 3.32,
+          "min": 103.56,
+          "max": 111.5,
+          "samples": [
+            103.74,
+            103.56,
+            106,
+            108.11,
+            111.5
+          ]
+        },
+        "markers": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "markers_found": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "search_bytes_per_query": {
+          "n": 5,
+          "median": 870,
+          "mean": 870,
+          "sigma": 0,
+          "min": 870,
+          "max": 870,
+          "samples": [
+            870,
+            870,
+            870,
+            870,
+            870
+          ]
+        },
+        "search_ms_per_query": {
+          "n": 5,
+          "median": 3.37,
+          "mean": 3.36,
+          "sigma": 0.28,
+          "min": 2.94,
+          "max": 3.7,
+          "samples": [
+            3.7,
+            3.37,
+            3.33,
+            3.49,
+            2.94
+          ]
+        }
+      }
+    },
+    {
+      "group": "d-externalize",
+      "id": "d-real-github-json",
+      "title": "Real GitHub API payload printed whole (219 KB)",
+      "link": "../d-externalize/README.md#d-real-github-json",
+      "inputs": [
+        "github-api-issues-large.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs d-real-github-json",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 219175,
+          "mean": 219175,
+          "sigma": 0,
+          "min": 219175,
+          "max": 219175,
+          "samples": [
+            219175,
+            219175,
+            219175,
+            219175,
+            219175
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 16353,
+          "mean": 16353,
+          "sigma": 0,
+          "min": 16353,
+          "max": 16353,
+          "samples": [
+            16353,
+            16353,
+            16353,
+            16353,
+            16353
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 81.63,
+          "mean": 81.27,
+          "sigma": 1.82,
+          "min": 78.22,
+          "max": 82.89,
+          "samples": [
+            81.63,
+            78.22,
+            81.25,
+            82.89,
+            82.34
+          ]
+        },
+        "markers": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "markers_found": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "search_bytes_per_query": {
+          "n": 5,
+          "median": 4560,
+          "mean": 4560,
+          "sigma": 0,
+          "min": 4560,
+          "max": 4560,
+          "samples": [
+            4560,
+            4560,
+            4560,
+            4560,
+            4560
+          ]
+        },
+        "search_ms_per_query": {
+          "n": 5,
+          "median": 5.2,
+          "mean": 5.05,
+          "sigma": 0.35,
+          "min": 4.5,
+          "max": 5.39,
+          "samples": [
+            5.39,
+            5.2,
+            4.94,
+            4.5,
+            5.25
+          ]
+        }
+      }
+    },
+    {
+      "group": "d-externalize",
+      "id": "d-real-git-log",
+      "title": "Real git log printed whole (191 KB)",
+      "link": "../d-externalize/README.md#d-real-git-log",
+      "inputs": [
+        "git-log-large.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs d-real-git-log",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 191120,
+          "mean": 191120,
+          "sigma": 0,
+          "min": 191120,
+          "max": 191120,
+          "samples": [
+            191120,
+            191120,
+            191120,
+            191120,
+            191120
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 15133,
+          "mean": 15133,
+          "sigma": 0,
+          "min": 15133,
+          "max": 15133,
+          "samples": [
+            15133,
+            15133,
+            15133,
+            15133,
+            15133
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 84.94,
+          "mean": 87.77,
+          "sigma": 6.19,
+          "min": 81.44,
+          "max": 96.91,
+          "samples": [
+            84.94,
+            96.91,
+            91.08,
+            81.44,
+            84.48
+          ]
+        },
+        "markers": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "markers_found": {
+          "n": 5,
+          "median": 3,
+          "mean": 3,
+          "sigma": 0,
+          "min": 3,
+          "max": 3,
+          "samples": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        "search_bytes_per_query": {
+          "n": 5,
+          "median": 4500,
+          "mean": 4500,
+          "sigma": 0,
+          "min": 4500,
+          "max": 4500,
+          "samples": [
+            4500,
+            4500,
+            4500,
+            4500,
+            4500
+          ]
+        },
+        "search_ms_per_query": {
+          "n": 5,
+          "median": 7.94,
+          "mean": 8.09,
+          "sigma": 0.43,
+          "min": 7.7,
+          "max": 8.81,
+          "samples": [
+            8.81,
+            7.88,
+            7.94,
+            7.7,
+            8.1
+          ]
+        }
+      }
+    },
+    {
+      "group": "e-continuity",
+      "id": "e-debug-session",
+      "title": "Debugging session: 6 real outputs, then compaction",
+      "link": "../e-continuity/README.md#e-debug-session",
+      "inputs": [
+        "test-output.txt",
+        "tsc-errors.txt",
+        "build-output.txt",
+        "git-log.txt",
+        "access.log",
+        "github-issues.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs e-debug-session",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 136223,
+          "mean": 136223,
+          "sigma": 0,
+          "min": 136223,
+          "max": 136223,
+          "samples": [
+            136223,
+            136223,
+            136223,
+            136223,
+            136223
+          ]
+        },
+        "hook_bytes_total": {
+          "n": 5,
+          "median": 1703,
+          "mean": 1703,
+          "sigma": 0,
+          "min": 1703,
+          "max": 1703,
+          "samples": [
+            1703,
+            1703,
+            1703,
+            1703,
+            1703
+          ]
+        },
+        "resume_bytes": {
+          "n": 5,
+          "median": 522,
+          "mean": 522,
+          "sigma": 0,
+          "min": 522,
+          "max": 522,
+          "samples": [
+            522,
+            522,
+            522,
+            522,
+            522
+          ]
+        },
+        "compact_block_bytes": {
+          "n": 5,
+          "median": 254,
+          "mean": 254,
+          "sigma": 0,
+          "min": 254,
+          "max": 254,
+          "samples": [
+            254,
+            254,
+            254,
+            254,
+            254
+          ]
+        },
+        "recall_bytes": {
+          "n": 5,
+          "median": 463,
+          "mean": 463,
+          "sigma": 0,
+          "min": 463,
+          "max": 463,
+          "samples": [
+            463,
+            463,
+            463,
+            463,
+            463
+          ]
+        },
+        "recall_found": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "resume_ms": {
+          "n": 5,
+          "median": 9.54,
+          "mean": 9.4,
+          "sigma": 0.46,
+          "min": 8.79,
+          "max": 9.91,
+          "samples": [
+            9.09,
+            8.79,
+            9.91,
+            9.69,
+            9.54
+          ]
+        },
+        "events": {
+          "n": 5,
+          "median": 6,
+          "mean": 6,
+          "sigma": 0,
+          "min": 6,
+          "max": 6,
+          "samples": [
+            6,
+            6,
+            6,
+            6,
+            6
+          ]
+        }
+      }
+    },
+    {
+      "group": "e-continuity",
+      "id": "e-long-session",
+      "title": "Long session: 40 synthetic outputs (seeded), then compaction",
+      "link": "../e-continuity/README.md#e-long-session",
+      "inputs": [],
+      "synthetic": true,
+      "v1_scenario": null,
+      "command": "node run.mjs e-long-session",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 442893,
+          "mean": 442893,
+          "sigma": 0,
+          "min": 442893,
+          "max": 442893,
+          "samples": [
+            442893,
+            442893,
+            442893,
+            442893,
+            442893
+          ]
+        },
+        "hook_bytes_total": {
+          "n": 5,
+          "median": 11736,
+          "mean": 11736,
+          "sigma": 0,
+          "min": 11736,
+          "max": 11736,
+          "samples": [
+            11736,
+            11736,
+            11736,
+            11736,
+            11736
+          ]
+        },
+        "resume_bytes": {
+          "n": 5,
+          "median": 2019,
+          "mean": 2019,
+          "sigma": 0,
+          "min": 2019,
+          "max": 2019,
+          "samples": [
+            2019,
+            2019,
+            2019,
+            2019,
+            2019
+          ]
+        },
+        "compact_block_bytes": {
+          "n": 5,
+          "median": 254,
+          "mean": 254,
+          "sigma": 0,
+          "min": 254,
+          "max": 254,
+          "samples": [
+            254,
+            254,
+            254,
+            254,
+            254
+          ]
+        },
+        "recall_bytes": {
+          "n": 5,
+          "median": 2166,
+          "mean": 2166,
+          "sigma": 0,
+          "min": 2166,
+          "max": 2166,
+          "samples": [
+            2166,
+            2166,
+            2166,
+            2166,
+            2166
+          ]
+        },
+        "recall_found": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "resume_ms": {
+          "n": 5,
+          "median": 17.84,
+          "mean": 16.38,
+          "sigma": 2.85,
+          "min": 12.42,
+          "max": 19.04,
+          "samples": [
+            14.35,
+            12.42,
+            19.04,
+            17.84,
+            18.26
+          ]
+        },
+        "events": {
+          "n": 5,
+          "median": 40,
+          "mean": 40,
+          "sigma": 0,
+          "min": 40,
+          "max": 40,
+          "samples": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-read-large-file",
+      "title": "Read of a 46 KB log (denied, routed to ctx_execute)",
+      "link": "../f-hook-redirect/README.md#f-read-large-file",
+      "inputs": [
+        "access.log"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-read-large-file",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 46216,
+          "mean": 46216,
+          "sigma": 0,
+          "min": 46216,
+          "max": 46216,
+          "samples": [
+            46216,
+            46216,
+            46216,
+            46216,
+            46216
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 371,
+          "mean": 371,
+          "sigma": 0,
+          "min": 371,
+          "max": 371,
+          "samples": [
+            371,
+            371,
+            371,
+            371,
+            371
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 42.46,
+          "mean": 48.91,
+          "sigma": 15.4,
+          "min": 39.21,
+          "max": 76.27,
+          "samples": [
+            76.27,
+            44.19,
+            42.41,
+            42.46,
+            39.21
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-read-big-source",
+      "title": "Read of a 61 KB source file (denied, routed to ctx_execute)",
+      "link": "../f-hook-redirect/README.md#f-read-big-source",
+      "inputs": [
+        "source-big.ts"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-read-big-source",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 61576,
+          "mean": 61576,
+          "sigma": 0,
+          "min": 61576,
+          "max": 61576,
+          "samples": [
+            61576,
+            61576,
+            61576,
+            61576,
+            61576
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 374,
+          "mean": 374,
+          "sigma": 0,
+          "min": 374,
+          "max": 374,
+          "samples": [
+            374,
+            374,
+            374,
+            374,
+            374
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 37.95,
+          "mean": 38.83,
+          "sigma": 1.67,
+          "min": 37.62,
+          "max": 41.61,
+          "samples": [
+            39.14,
+            37.62,
+            37.82,
+            41.61,
+            37.95
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-read-small-file",
+      "title": "Read of a small file (allowed: nothing to save)",
+      "link": "../f-hook-redirect/README.md#f-read-small-file",
+      "inputs": [
+        "SOURCE.md"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-read-small-file",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 1764,
+          "mean": 1764,
+          "sigma": 0,
+          "min": 1764,
+          "max": 1764,
+          "samples": [
+            1764,
+            1764,
+            1764,
+            1764,
+            1764
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 1764,
+          "mean": 1764,
+          "sigma": 0,
+          "min": 1764,
+          "max": 1764,
+          "samples": [
+            1764,
+            1764,
+            1764,
+            1764,
+            1764
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 0,
+          "mean": 0,
+          "sigma": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 39.87,
+          "mean": 39.23,
+          "sigma": 2.07,
+          "min": 37.15,
+          "max": 42.03,
+          "samples": [
+            37.15,
+            37.19,
+            39.89,
+            39.87,
+            42.03
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-webfetch",
+      "title": "WebFetch of a docs page (denied, routed to ctx_index + ctx_search)",
+      "link": "../f-hook-redirect/README.md#f-webfetch",
+      "inputs": [
+        "sqlite-fts5-docs.html"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-webfetch",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 215354,
+          "mean": 215354,
+          "sigma": 0,
+          "min": 215354,
+          "max": 215354,
+          "samples": [
+            215354,
+            215354,
+            215354,
+            215354,
+            215354
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 435,
+          "mean": 435,
+          "sigma": 0,
+          "min": 435,
+          "max": 435,
+          "samples": [
+            435,
+            435,
+            435,
+            435,
+            435
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 40.15,
+          "mean": 40.62,
+          "sigma": 3.61,
+          "min": 37.39,
+          "max": 46.55,
+          "samples": [
+            37.39,
+            46.55,
+            38.13,
+            40.9,
+            40.15
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-bash-dump-post",
+      "title": "Bash dump of a 191 KB git log (PostToolUse replace)",
+      "link": "../f-hook-redirect/README.md#f-bash-dump-post",
+      "inputs": [
+        "git-log-large.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-bash-dump-post",
+      "ok": true,
+      "note": "PreToolUse allowed",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 191120,
+          "mean": 191120,
+          "sigma": 0,
+          "min": 191120,
+          "max": 191120,
+          "samples": [
+            191120,
+            191120,
+            191120,
+            191120,
+            191120
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 204,
+          "mean": 204,
+          "sigma": 0,
+          "min": 204,
+          "max": 204,
+          "samples": [
+            204,
+            204,
+            204,
+            204,
+            204
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 107.14,
+          "mean": 109.08,
+          "sigma": 4.98,
+          "min": 105.13,
+          "max": 117.74,
+          "samples": [
+            107.14,
+            117.74,
+            105.13,
+            108.47,
+            106.95
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-bash-curl-post",
+      "title": "Bash curl of a 219 KB API payload (allowed before, replaced after)",
+      "link": "../f-hook-redirect/README.md#f-bash-curl-post",
+      "inputs": [
+        "github-api-issues-large.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-bash-curl-post",
+      "ok": true,
+      "note": "PreToolUse allowed",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 219175,
+          "mean": 219175,
+          "sigma": 0,
+          "min": 219175,
+          "max": 219175,
+          "samples": [
+            219175,
+            219175,
+            219175,
+            219175,
+            219175
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 291,
+          "mean": 291,
+          "sigma": 0,
+          "min": 291,
+          "max": 291,
+          "samples": [
+            291,
+            291,
+            291,
+            291,
+            291
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 113.7,
+          "mean": 127.83,
+          "sigma": 19.61,
+          "min": 113.18,
+          "max": 149.47,
+          "samples": [
+            113.67,
+            113.7,
+            149.16,
+            113.18,
+            149.47
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-claude-code",
+      "title": "Hook latency, claude-code adapter (PostToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-claude-code",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-claude-code",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 42.56,
+          "mean": 42.87,
+          "sigma": 1.29,
+          "min": 41.54,
+          "max": 45.02,
+          "samples": [
+            42.71,
+            42.56,
+            45.02,
+            42.53,
+            41.54
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 32.29,
+          "mean": 32.24,
+          "sigma": 1.03,
+          "min": 30.64,
+          "max": 33.37,
+          "samples": [
+            32.09,
+            30.64,
+            32.83,
+            32.29,
+            33.37
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 10.62,
+          "mean": 10.63,
+          "sigma": 1.6,
+          "min": 8.17,
+          "max": 12.19,
+          "samples": [
+            10.62,
+            11.92,
+            12.19,
+            10.24,
+            8.17
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-codex",
+      "title": "Hook latency, codex adapter (PreToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-codex",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-codex",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 40.28,
+          "mean": 40.55,
+          "sigma": 0.76,
+          "min": 39.86,
+          "max": 41.5,
+          "samples": [
+            41.22,
+            39.86,
+            40.28,
+            41.5,
+            39.91
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 32.29,
+          "mean": 32.29,
+          "sigma": 0.49,
+          "min": 31.64,
+          "max": 33.01,
+          "samples": [
+            32.29,
+            32.38,
+            33.01,
+            31.64,
+            32.12
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 7.79,
+          "mean": 8.27,
+          "sigma": 1.1,
+          "min": 7.27,
+          "max": 9.86,
+          "samples": [
+            8.93,
+            7.48,
+            7.27,
+            9.86,
+            7.79
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-gemini",
+      "title": "Hook latency, gemini adapter (AfterTool, small payload)",
+      "link": "../g-overhead/README.md#g-hook-gemini",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-gemini",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 43.59,
+          "mean": 44.73,
+          "sigma": 3.13,
+          "min": 40.96,
+          "max": 48.71,
+          "samples": [
+            40.96,
+            43.27,
+            48.71,
+            47.1,
+            43.59
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 32.5,
+          "mean": 32.66,
+          "sigma": 0.82,
+          "min": 31.73,
+          "max": 33.6,
+          "samples": [
+            32.05,
+            33.6,
+            33.41,
+            31.73,
+            32.5
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 11.09,
+          "mean": 12.07,
+          "sigma": 3.08,
+          "min": 8.91,
+          "max": 15.37,
+          "samples": [
+            8.91,
+            9.67,
+            15.3,
+            15.37,
+            11.09
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-qwen",
+      "title": "Hook latency, qwen adapter (PreToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-qwen",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-qwen",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 40.82,
+          "mean": 43.07,
+          "sigma": 5.37,
+          "min": 37.46,
+          "max": 49.8,
+          "samples": [
+            47.69,
+            49.8,
+            39.6,
+            40.82,
+            37.46
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 31.01,
+          "mean": 32.42,
+          "sigma": 3.46,
+          "min": 30.71,
+          "max": 38.61,
+          "samples": [
+            38.61,
+            31.03,
+            30.71,
+            31.01,
+            30.74
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 9.08,
+          "mean": 10.65,
+          "sigma": 4.68,
+          "min": 6.72,
+          "max": 18.77,
+          "samples": [
+            9.08,
+            18.77,
+            8.89,
+            9.81,
+            6.72
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-copilot-cli",
+      "title": "Hook latency, copilot-cli adapter (postToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-copilot-cli",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-copilot-cli",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 40.79,
+          "mean": 40.96,
+          "sigma": 0.44,
+          "min": 40.53,
+          "max": 41.58,
+          "samples": [
+            41.58,
+            40.53,
+            41.25,
+            40.79,
+            40.63
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 30.78,
+          "mean": 30.67,
+          "sigma": 0.53,
+          "min": 29.98,
+          "max": 31.3,
+          "samples": [
+            30.3,
+            29.98,
+            31.3,
+            30.98,
+            30.78
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 9.95,
+          "mean": 10.29,
+          "sigma": 0.63,
+          "min": 9.81,
+          "max": 11.28,
+          "samples": [
+            11.28,
+            10.55,
+            9.95,
+            9.81,
+            9.85
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-vscode",
+      "title": "Hook latency, vscode adapter (PreToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-vscode",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-vscode",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 38.57,
+          "mean": 38.38,
+          "sigma": 0.49,
+          "min": 37.72,
+          "max": 38.8,
+          "samples": [
+            38.03,
+            37.72,
+            38.8,
+            38.8,
+            38.57
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 30.93,
+          "mean": 30.92,
+          "sigma": 0.83,
+          "min": 29.99,
+          "max": 31.79,
+          "samples": [
+            31.79,
+            30.18,
+            31.7,
+            30.93,
+            29.99
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 7.54,
+          "mean": 7.47,
+          "sigma": 0.87,
+          "min": 6.24,
+          "max": 8.58,
+          "samples": [
+            6.24,
+            7.54,
+            7.1,
+            7.87,
+            8.58
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-kiro",
+      "title": "Hook latency, kiro adapter (PreToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-kiro",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-kiro",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 38.22,
+          "mean": 42.02,
+          "sigma": 5.57,
+          "min": 37.92,
+          "max": 49.84,
+          "samples": [
+            38.06,
+            37.92,
+            38.22,
+            46.04,
+            49.84
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 31.35,
+          "mean": 32.07,
+          "sigma": 2.16,
+          "min": 30.61,
+          "max": 35.87,
+          "samples": [
+            30.96,
+            31.35,
+            30.61,
+            35.87,
+            31.56
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 7.61,
+          "mean": 9.95,
+          "sigma": 4.86,
+          "min": 6.57,
+          "max": 18.28,
+          "samples": [
+            7.1,
+            6.57,
+            7.61,
+            10.17,
+            18.28
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-zcode",
+      "title": "Hook latency, zcode adapter (PreToolUse, small payload)",
+      "link": "../g-overhead/README.md#g-hook-zcode",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-zcode",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 39.65,
+          "mean": 40.37,
+          "sigma": 2.1,
+          "min": 38.98,
+          "max": 44.05,
+          "samples": [
+            44.05,
+            40.05,
+            39.11,
+            39.65,
+            38.98
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 31.09,
+          "mean": 31.52,
+          "sigma": 1.12,
+          "min": 30.54,
+          "max": 33.14,
+          "samples": [
+            33.14,
+            31.09,
+            30.54,
+            30.62,
+            32.2
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 8.96,
+          "mean": 8.85,
+          "sigma": 1.47,
+          "min": 6.78,
+          "max": 10.91,
+          "samples": [
+            10.91,
+            8.96,
+            8.57,
+            9.03,
+            6.78
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-pi",
+      "title": "Hook latency, pi adapter (tool_result, small payload)",
+      "link": "../g-overhead/README.md#g-hook-pi",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-pi",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 41.12,
+          "mean": 41.7,
+          "sigma": 1.89,
+          "min": 40.12,
+          "max": 44.87,
+          "samples": [
+            44.87,
+            40.12,
+            41.12,
+            40.55,
+            41.83
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 31.13,
+          "mean": 32.16,
+          "sigma": 2.19,
+          "min": 30.34,
+          "max": 35.76,
+          "samples": [
+            35.76,
+            31.13,
+            30.34,
+            30.9,
+            32.67
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 9.16,
+          "mean": 9.54,
+          "sigma": 0.74,
+          "min": 8.99,
+          "max": 10.78,
+          "samples": [
+            9.11,
+            8.99,
+            10.78,
+            9.65,
+            9.16
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-hook-opencode",
+      "title": "Hook latency, opencode adapter (execute.before, small payload)",
+      "link": "../g-overhead/README.md#g-hook-opencode",
+      "inputs": [],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-hook-opencode",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "hook_ms": {
+          "n": 5,
+          "median": 38.6,
+          "mean": 43.32,
+          "sigma": 10.19,
+          "min": 37.88,
+          "max": 61.46,
+          "samples": [
+            38.2,
+            37.88,
+            38.6,
+            40.44,
+            61.46
+          ]
+        },
+        "bare_node_ms": {
+          "n": 5,
+          "median": 30.89,
+          "mean": 32.65,
+          "sigma": 3.77,
+          "min": 30.78,
+          "max": 39.38,
+          "samples": [
+            30.78,
+            31.32,
+            30.89,
+            30.87,
+            39.38
+          ]
+        },
+        "overhead_ms": {
+          "n": 5,
+          "median": 7.71,
+          "mean": 10.67,
+          "sigma": 6.47,
+          "min": 6.56,
+          "max": 22.08,
+          "samples": [
+            7.42,
+            6.56,
+            7.71,
+            9.57,
+            22.08
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-search-latency",
+      "title": "ctx_search latency (20 queries over 8 indexed fixtures)",
+      "link": "../g-overhead/README.md#g-search-latency",
+      "inputs": [
+        "test-output.txt",
+        "tsc-errors.txt",
+        "build-output.txt",
+        "git-log.txt",
+        "access.log",
+        "github-issues.json",
+        "analytics.csv",
+        "playwright-snapshot.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-search-latency",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "search_ms_median": {
+          "n": 5,
+          "median": 1.89,
+          "mean": 2.11,
+          "sigma": 0.54,
+          "min": 1.76,
+          "max": 3.06,
+          "samples": [
+            3.06,
+            1.97,
+            1.88,
+            1.89,
+            1.76
+          ]
+        },
+        "search_ms_max": {
+          "n": 5,
+          "median": 7.29,
+          "mean": 7.33,
+          "sigma": 0.45,
+          "min": 6.81,
+          "max": 8.05,
+          "samples": [
+            8.05,
+            7.29,
+            6.81,
+            7.35,
+            7.17
+          ]
+        },
+        "reply_bytes_median": {
+          "n": 5,
+          "median": 3782.5,
+          "mean": 3782.5,
+          "sigma": 0,
+          "min": 3782.5,
+          "max": 3782.5,
+          "samples": [
+            3782.5,
+            3782.5,
+            3782.5,
+            3782.5,
+            3782.5
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-index-per-mb",
+      "title": "ctx_index time per MB (3 real files, 0.6 MB)",
+      "link": "../g-overhead/README.md#g-index-per-mb",
+      "inputs": [
+        "github-api-issues-large.json",
+        "git-log-large.txt",
+        "sqlite-fts5-docs.html"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-index-per-mb",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "total_bytes": {
+          "n": 5,
+          "median": 625649,
+          "mean": 625649,
+          "sigma": 0,
+          "min": 625649,
+          "max": 625649,
+          "samples": [
+            625649,
+            625649,
+            625649,
+            625649,
+            625649
+          ]
+        },
+        "index_ms": {
+          "n": 5,
+          "median": 99.58,
+          "mean": 100.98,
+          "sigma": 3.83,
+          "min": 98.62,
+          "max": 107.78,
+          "samples": [
+            99.69,
+            98.62,
+            99.23,
+            107.78,
+            99.58
+          ]
+        },
+        "index_ms_per_mb": {
+          "n": 5,
+          "median": 166.9,
+          "mean": 169.24,
+          "sigma": 6.41,
+          "min": 165.28,
+          "max": 180.65,
+          "samples": [
+            167.08,
+            165.28,
+            166.3,
+            180.65,
+            166.9
+          ]
+        }
+      }
+    },
+    {
+      "group": "g-overhead",
+      "id": "g-session-total",
+      "title": "Full debugging session: 8 outputs through the hooks, 3 follow-up searches",
+      "link": "../g-overhead/README.md#g-session-total",
+      "inputs": [
+        "test-output.txt",
+        "tsc-errors.txt",
+        "build-output.txt",
+        "git-log.txt",
+        "access.log",
+        "github-issues.json",
+        "analytics.csv",
+        "playwright-snapshot.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs g-session-total",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 281261,
+          "mean": 281261,
+          "sigma": 0,
+          "min": 281261,
+          "max": 281261,
+          "samples": [
+            281261,
+            281261,
+            281261,
+            281261,
+            281261
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 3461,
+          "mean": 3461,
+          "sigma": 0,
+          "min": 3461,
+          "max": 3461,
+          "samples": [
+            3461,
+            3461,
+            3461,
+            3461,
+            3461
+          ]
+        },
+        "hook_left_bytes": {
+          "n": 5,
+          "median": 1305,
+          "mean": 1305,
+          "sigma": 0,
+          "min": 1305,
+          "max": 1305,
+          "samples": [
+            1305,
+            1305,
+            1305,
+            1305,
+            1305
+          ]
+        },
+        "follow_up_bytes": {
+          "n": 5,
+          "median": 2156,
+          "mean": 2156,
+          "sigma": 0,
+          "min": 2156,
+          "max": 2156,
+          "samples": [
+            2156,
+            2156,
+            2156,
+            2156,
+            2156
+          ]
+        },
+        "hook_ms_total": {
+          "n": 5,
+          "median": 472.18,
+          "mean": 493,
+          "sigma": 36.62,
+          "min": 458.69,
+          "max": 539.61,
+          "samples": [
+            525.05,
+            472.18,
+            458.69,
+            469.44,
+            539.61
+          ]
+        }
+      }
+    }
+  ]
+}

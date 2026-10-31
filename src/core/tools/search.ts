@@ -67,8 +67,6 @@ function callText(queries: string[], scope: SearchScope, source: string | undefi
   return "ctx_search({queries:" + JSON.stringify(queries) + ", scope:" + JSON.stringify(scope) + src + ", " + cursor + "})";
 }
 
-interface Entry { qi: number; pos: number; hit: Hit; }
-
 // ADR-0009 §8.2: with source:"decision", empty `queries` (or a query with no words) lists every
 // decision row in scope, newest first, paged by `offset` like any relevance page.
 function decisionQueries(input: CtxSearchInput): string[] {
@@ -80,8 +78,9 @@ function pageSize(input: CtxSearchInput): number {
   return input.source === DECISION_SOURCE ? SEARCH_PAGE_SIZE : SEARCH_REPLY_HITS;
 }
 
-function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, offset: number): Hit[] {
-  const size = pageSize(input);
+// `extra` asks for hits past the page, so the caller knows whether a `More:` line has anything behind it.
+function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, offset: number, extra = 0): Hit[] {
+  const size = pageSize(input) + extra;
   if (input.source === DECISION_SOURCE && q.trim() === "") {
     return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, size, offset);
   }
@@ -138,28 +137,35 @@ function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, 
   return shown === 0 && !more ? null : reply(out.join("\n"), false);
 }
 
+// D-SEARCH-SMALL-1: the hit bytes of one reply, per source, stay within this share of that source's bytes. A reply
+// that is most of the source it searches saves nothing over reading the source. The first new hit of a source in
+// each query is always shown, and the share is spread over the queries (query k may spend k/n of it, so a first
+// query cannot use up the room of the later ones); the hits left out stay behind the `More:` line (nothing is cut).
+const SMALL_SOURCE_SHARE = 0.5;
+const SOURCE_BYTES = "SELECT id, bytes_total FROM sources WHERE id IN (SELECT value FROM json_each(:ids))";
+
+function sourceBytes(db: DbHandle, ids: number[]): Map<number, number> {
+  const out = new Map<number, number>();
+  if (ids.length === 0) return out;
+  for (const r of db.raw.prepare(SOURCE_BYTES).all({ ids: JSON.stringify(ids) }) as unknown as Array<{ id: number; bytes_total: number }>) {
+    out.set(Number(r.id), Number(r.bytes_total));
+  }
+  return out;
+}
+
 // impl/05 §6 steps 5-10. Hits are kept whole: when the next hit line would not fit OUTPUT_CAP, that
 // query (and every later one) gets a `More:` line starting at the first hit not shown (D-M2-6).
+// D-SEARCH-SMALL-1: a hit already shown for an earlier query of the call is named in one `Same as above:` line,
+// so a query never gets an empty block; a hit that was only left out of an earlier query still shows here.
 function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx: ToolContext): ToolReply {
   const input: CtxSearchInput = { ...given, queries: decisionQueries(given) };
   const offset = input.offset ?? 0;
   const size = pageSize(input);
-  const seen = new Set<string>();
-  const entries: Entry[] = [];
-  const full = new Set<number>(); // query indexes whose page came back full
-  input.queries.forEach((q, qi) => {
-    const hits = page(db, q, input, scope, ctx, offset);
-    if (hits.length === size) full.add(qi);
-    hits.forEach((hit, i) => {
-      // Step 6: a (sourceId, ord) pair already returned by an earlier query of this call is dropped.
-      const key = hit.sourceId + ":" + hit.ord;
-      if (seen.has(key)) return;
-      seen.add(key);
-      entries.push({ qi, pos: offset + i, hit });
-    });
-  });
-  // Step 9: the first query's hits are never deduped, so no entries means every query had zero hits.
-  if (entries.length === 0) return zeroHits(db, scope, ctx, input.source);
+  // One hit past the page: a `More:` line is printed only when a hit is left behind it (D-SEARCH-SMALL-1).
+  const fetched: Hit[][] = input.queries.map((q) => page(db, q, input, scope, ctx, offset, 1));
+  const pages: Hit[][] = fetched.map((h) => h.slice(0, size));
+  // Step 9: every query had zero hits.
+  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source);
 
   const moreLine = (q: string, pos: number): string =>
     "More: " + callText([q], scope, input.source, "offset:" + pos);
@@ -167,30 +173,57 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   let reserve = 0;
   for (const q of input.queries) reserve += bytes(moreLine(q, offset + size)) + 1;
 
+  const total = input.source === DECISION_SOURCE ? new Map<number, number>() : sourceBytes(db, [...new Set(pages.flat().map((h) => h.sourceId))]);
+  const spent = new Map<number, number>(); // hit bytes shown so far, per source
+
   const lines: string[] = [];
   const more: string[] = [];
+  const shown = new Set<string>(); // "sourceId:ord" of every hit line already in the reply
   let used = 0;
   let stopped = false;
   input.queries.forEach((q, qi) => {
-    const mine = entries.filter((e) => e.qi === qi);
+    const hits = pages[qi];
     if (stopped) {
-      more.push(moreLine(q, mine.length > 0 ? mine[0].pos : offset));
+      more.push(moreLine(q, offset));
       return;
     }
     const head = "Query " + JSON.stringify(q) + ":";
     lines.push(head);
     used += bytes(head) + 1;
-    for (const e of mine) {
-      const line = e.hit.label + " #" + e.hit.ord + ": " + e.hit.snippet;
+    const again = new Map<string, number[]>(); // label -> chunk numbers already shown above
+    const mine = new Set<number>(); // sources with a new hit line in this query
+    let cut = -1; // position of the first hit left out
+    for (let i = 0; i < hits.length; i++) {
+      const hit = hits[i];
+      const key = hit.sourceId + ":" + hit.ord;
+      if (shown.has(key)) {
+        again.set(hit.label, [...(again.get(hit.label) ?? []), hit.ord]);
+        continue;
+      }
+      const line = hit.label + " #" + hit.ord + ": " + hit.snippet;
       if (used + bytes(line) + 1 + reserve > OUTPUT_CAP) {
-        more.push(moreLine(q, e.pos));
+        cut = offset + i;
         stopped = true;
         break;
       }
+      const room = total.get(hit.sourceId);
+      if (room !== undefined && mine.has(hit.sourceId) && (spent.get(hit.sourceId) ?? 0) + bytes(line) + 1 > room * SMALL_SOURCE_SHARE * (qi + 1) / input.queries.length) {
+        cut = offset + i;
+        break;
+      }
+      lines.push(line);
+      shown.add(key);
+      used += bytes(line) + 1;
+      spent.set(hit.sourceId, (spent.get(hit.sourceId) ?? 0) + bytes(line) + 1);
+      mine.add(hit.sourceId);
+    }
+    if (again.size > 0) {
+      const line = "Same as above: " + [...again].map(([label, ords]) => label + " (chunk " + ords.join(",") + ")").join("; ");
       lines.push(line);
       used += bytes(line) + 1;
     }
-    if (!stopped && full.has(qi)) more.push(moreLine(q, offset + size));
+    if (cut >= 0) more.push(moreLine(q, cut));
+    else if (fetched[qi].length > size) more.push(moreLine(q, offset + size));
   });
   return reply(lines.concat(more).join("\n"), false);
 }
