@@ -5,7 +5,8 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, rmSync, existsSync, statSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync, existsSync, statSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
@@ -79,5 +80,70 @@ describe("ADR-0012 / M2 bench fixtures run", () => {
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
+  });
+});
+
+// D-BENCH-SUITE-1: the shareable suite (bench/run.mjs, 7 use-case folders). Committed results are checked, not re-measured.
+describe("ADR-0012 / bench suite (bench/run.mjs)", () => {
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const BENCH = path.join(REPO, "bench");
+  const GROUPS = ["a-sandbox", "b-retrieval", "c-batch", "d-externalize", "e-continuity", "f-hook-redirect", "g-overhead"];
+  const files = readdirSync(path.join(BENCH, "results")).filter((f) => /^\d{4}-\d{2}-\d{2}-[a-z0-9]+-[a-z0-9]+\.json$/.test(f));
+
+  test("one folder per group, each with an index.mjs and a README", () => {
+    for (const g of GROUPS) {
+      assert.ok(existsSync(path.join(BENCH, g, "index.mjs")), g + "/index.mjs");
+      assert.ok(existsSync(path.join(BENCH, g, "README.md")), g + "/README.md");
+    }
+  });
+
+  test("a committed results file holds raw samples, env, version, commit and fixture hashes", () => {
+    assert.ok(files.length >= 1, "no results/<date>-<os>-<arch>.json");
+    const r = JSON.parse(readFileSync(path.join(BENCH, "results", files.at(-1)), "utf8"));
+    assert.ok(r.runs >= 5, "committed run has n >= 5");
+    assert.match(r.context_mode.commit, /^[0-9a-f]{40}$/);
+    assert.equal(typeof r.context_mode.dirty, "boolean");
+    for (const k of ["node", "os", "cpu", "arch"]) assert.ok(r.env[k], k);
+    assert.match(r.token_method, /estimate/);
+    assert.equal(r.results.length, 54);
+    for (const row of r.results) {
+      assert.equal(row.error, null, row.id);
+      assert.ok(GROUPS.includes(row.group), row.id);
+      for (const [k, m] of Object.entries(row.metrics)) {
+        assert.equal(m.samples.length, r.runs, row.id + "." + k);
+        assert.ok(m.min <= m.median && m.median <= m.max, row.id + "." + k);
+      }
+    }
+    for (const [f, h] of Object.entries(r.fixtures)) {
+      assert.ok(h, f + " missing");
+      assert.equal(createHash("sha256").update(readFileSync(path.join(BENCH, "fixtures", "data", f))).digest("hex"), h.sha256, f);
+    }
+  });
+
+  test("every scenario that has an own check passed it (no row failed ok)", () => {
+    const r = JSON.parse(readFileSync(path.join(BENCH, "results", files.at(-1)), "utf8"));
+    const bad = r.results.filter((x) => !x.ok).map((x) => x.id + " " + x.note);
+    assert.deepEqual(bad, []);
+  });
+
+  test("tables keep the rows where context-mode saves little or costs more", () => {
+    const md = readFileSync(path.join(BENCH, "results", files.at(-1).replace(/\.json$/, ".md")), "utf8");
+    assert.match(md, /Network requests/);
+    assert.match(md, /Small outputs/);
+    assert.match(md, /-\d+%/, "a negative saving is shown");
+    assert.match(md, /Footnote: Hardware .*Median of \d+ run/);
+  });
+
+  test("each table row links to a scenario heading that exists", () => {
+    for (const g of GROUPS) {
+      const readme = readFileSync(path.join(BENCH, g, "README.md"), "utf8");
+      const md = readFileSync(path.join(BENCH, "results", files.at(-1).replace(/\.json$/, ".md")), "utf8");
+      for (const m of md.matchAll(new RegExp("\\(\\.\\./" + g + "/README\\.md#([a-z0-9-]+)\\)", "g"))) assert.ok(readme.includes("## " + m[1] + "\n"), g + " " + m[1]);
+    }
+  });
+
+  test("a one-scenario run works and a bad --runs is refused", () => {
+    const bad = spawnSync(process.execPath, [path.join(BENCH, "run.mjs"), "--runs", "0", "--no-write"], { encoding: "utf8" });
+    assert.equal(bad.status, 2);
   });
 });

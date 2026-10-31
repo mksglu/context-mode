@@ -1,4 +1,44 @@
-# bench/ - offline context-saving replay (method)
+# bench/ - context-mode benchmark suite and offline replay
+
+## Suite: one folder per use case, one command
+
+```
+cd bench && node run.mjs                 # all 54 scenarios, 3 runs each
+node run.mjs a-sandbox                   # one group, or one scenario id
+node run.mjs --runs 5                    # n runs; median, min, max and sigma are over these
+```
+
+Plain Node, no dependencies, no network, no API keys, no model calls. It builds the bundle into `release-out` if it is missing,
+starts the built MCP server over stdio and runs the built hooks as separate processes. Each run uses a fresh temp home and project.
+
+| Folder | Use case |
+|---|---|
+| [a-sandbox](a-sandbox/README.md) | tool output processed in the sandbox (the 14 v1 scenarios plus large JSON, npm log, big source, long git log) |
+| [b-retrieval](b-retrieval/README.md) | ctx_index + ctx_search with fixed queries; code blocks whole; the exact answer string in the hits (HTML docs page) |
+| [c-batch](c-batch/README.md) | ctx_batch against separate raw calls, including a case with nothing to save |
+| [d-externalize](d-externalize/README.md) | output over 100 KB kept whole in FTS5; first, middle and last line found by search |
+| [e-continuity](e-continuity/README.md) | compaction state block, ctx_resume and the recall block against a transcript replay |
+| [f-hook-redirect](f-hook-redirect/README.md) | Read, WebFetch and Bash dumps denied or replaced; bytes that would have entered against bytes that did |
+| [g-overhead](g-overhead/README.md) | hook ms over bare node for all 10 host adapters, ctx_search latency, index time per MB, full session total |
+
+Output: `results/<date>-<os>-<arch>.json` (raw samples, median, min, max, sigma, n, node, os, cpu, context-mode version and git
+commit, dirty flag, sha256 of every input) and `results/<date>-<os>-<arch>.md` (one table per group, each with a footnote line).
+Each table row links to its scenario in the group README, which lists the command and the input hashes.
+
+Method notes.
+- Tokens are bytes / 4. That is an estimate. No tokenizer is vendored.
+- "Saved" is 1 - bytes the model sees / bytes the raw output would put into the context. A negative number means context-mode
+  costs more on that input; those rows stay in the tables (B search replies on small docs, C with tiny outputs).
+- Group A reuses the v1 summary scripts byte for byte. The summary a script prints is not the answer to your question; it shows
+  how small a script-made summary is.
+- Inputs live in `fixtures/data`. Real captures carry source and date in `fixtures/data/SOURCE.md`. Where no real capture exists the
+  input is generated with seed 20261031 and the row says "synthetic".
+- Numbers never fail a run. A scenario that errors fails it. CI runs `node run.mjs --runs 1` on ubuntu to prove it runs.
+- Bytes are exact and repeat; milliseconds depend on the machine, so compare ranges, not single numbers.
+
+---
+
+## Offline replay (method)
 
 `bench/replay.mjs` replays real Claude Code transcripts through the v2 policy code and counts bytes.
 It is not a model run. It measures what the v2 hooks would change in the bytes the model receives.

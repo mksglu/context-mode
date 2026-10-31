@@ -4,6 +4,10 @@ What Context Mode v2 does: when a tool result is large, the model gets the best-
 
 Setup for all live runs unless a section says otherwise: Claude Code 2.1.303, model `claude-sonnet-5-5`, effort `low`, keyless `claude -p`, `--max-budget-usd 0.25` per session, env `ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`. Build step: `npm install --no-package-lock` then `node build/build.mjs --out release-out`.
 
+## Run it yourself
+
+Offline suite, 54 scenarios in 7 use-case folders, no network and no API key: [bench/README.md](../../bench/README.md). It writes raw samples, median, min, max and sigma to `bench/results/`.
+
 ## v2 against v1: one page
 
 All v1 and v2 results side by side, with the losses and the gateway as the upgrade path: [v2-vs-v1/README.md](v2-vs-v1/README.md).

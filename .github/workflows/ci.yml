@@ -118,6 +118,10 @@ jobs:
       # under 60 s. Fails on any scenario error or a part total off by more than 5% from results.json.
       - run: node bench/fixtures/run.mjs --check --bundle release-out
         name: fixture benchmark check (bench/fixtures/results.json, 5% tolerance)
+      # Benchmark suite (bench/README.md, DEVIATIONS D-BENCH-SUITE-1): proves every scenario runs once. Never gates on numbers.
+      - run: node bench/run.mjs --runs 1 --no-write --bundle release-out
+        name: benchmark suite runs (--runs 1, no numbers gate)
+        if: runner.os == 'Linux'
       # The repo checks below do not depend on the test steps above. `!cancelled()` runs them after a
       # red test step too, so a test fail never hides their result on any OS (the job stays red).
       - run: node scripts/ci-gs4-lint.mjs
