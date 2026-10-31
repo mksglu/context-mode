@@ -757,11 +757,37 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.equal(r.status, "PASS", r.detail);
   });
 
+  // D-D5-MORE-PAIRS-1: a noisy runner (parallel test files, macOS file scans) can slow the first pairs only. Pairs go on, up to 9,
+  // while the estimate is over the bound; a hook that is really slow stays over it in every pair and still FAILs.
+  test("[M5] doctor-hook/D5-noisy-first-pairs-then-quiet-PASSes (D-D5-MORE-PAIRS-1)", async (t) => {
+    // pairs 1-3: hook 100 over bare 10 (90 ms over); pair 4: hook 45 over bare 10 (35 ms over, inside the 40 ms bound).
+    const walls = [0, 100, 100, 200, 200, 300, 300, 345];
+    const r = await checkHookRoundTrip(input(bundle(t, native), { samples: undefined, now: clock(...walls), bareMs: async () => 10 }));
+    assert.equal(r.status, "PASS", r.detail);
+  });
+
+  test("[M5] doctor-hook/D5-really-slow-hook-FAILs-after-the-last-pair (D-D5-MORE-PAIRS-1)", async (t) => {
+    const walls = [];
+    for (let n = 0; n < 12; n++) walls.push(n * 100, n * 100 + 100);
+    let bareRuns = 0;
+    const r = await checkHookRoundTrip(input(bundle(t, native), { samples: undefined, now: clock(...walls), bareMs: async () => { bareRuns++; return 10; } }));
+    assert.equal(r.status, "FAIL");
+    assert.equal(r.detail, C.D5_SLOW_DETAIL(90));
+    assert.equal(bareRuns, 9, "stops at the 9th pair");
+  });
+
+  test("[M5] doctor-hook/D5-quiet-hook-stops-after-the-3-pair-minimum (D-D5-MORE-PAIRS-1)", async (t) => {
+    let bareRuns = 0;
+    const r = await checkHookRoundTrip(input(bundle(t, native), { samples: undefined, now: clock(0, 15, 15, 30, 30, 45, 45, 60), bareMs: async () => { bareRuns++; return 10; } }));
+    assert.equal(r.status, "PASS");
+    assert.equal(bareRuns, 3);
+  });
+
   test("[M5] doctor-hook/D5-default-baseline-is-a-real-bare-node-run (D-D5-BARE-1)", async (t) => {
     // No bareMs override: the baseline is measured with a real `node -e ""`, so a stub hook that only sleeps 150 ms
     // is slow over it, and a stub that answers at once is not.
     const dir = bundle(t, native);
-    const base = { ...input(dir), samples: 2, now: undefined };
+    const base = { ...input(dir), samples: undefined, now: undefined };
     delete base.bareMs;
     delete base.now;
     const fast = await checkHookRoundTrip(base);
