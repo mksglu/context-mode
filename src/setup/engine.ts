@@ -279,10 +279,16 @@ function isStaleOwnPlugin(e: unknown, entry: string): boolean {
   if (n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === "context-mode") return true;
   return n >= 2 && seg[n - 1] === "context-mode" && seg[n - 2] === "node_modules"; // a package dir entry of ours that is gone
 }
-function wantedPluginList(list: unknown[], entry: string): unknown[] {
-  const native = list.some(isNativeSpec);
+function wantedPluginList(list: unknown[], entry: string, nativeElsewhere = false): unknown[] {
+  const native = nativeElsewhere || list.some(isNativeSpec);
   const kept = list.filter((e) => !(native && e === entry) && !isStaleOwnPlugin(e, entry));
   return native || kept.includes(entry) ? kept : [...kept, entry];
+}
+/** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode@next` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin"). */
+const OC2_NATIVE_KEY = "plugins";
+function nativePluginsKey(doc: unknown): boolean {
+  const v = isObj(doc) ? doc[OC2_NATIVE_KEY] : undefined;
+  return Array.isArray(v) && v.some(isNativeSpec);
 }
 /** The one-line reason hook-registered fails on a plugin-list channel, from the file as it is now. */
 function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
@@ -292,7 +298,7 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   try { doc = parseHostConfig("opencode", h.file, text, fileFormat({ id: "opencode" } as CheckRow, h.file)); } catch { return undefined; }
   const cur = isObj(doc) ? doc[h.key[0]] : undefined;
   const list = Array.isArray(cur) ? cur : [];
-  if (list.some(isNativeSpec) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  if ((list.some(isNativeSpec) || nativePluginsKey(doc)) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
   const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
   if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
   return undefined;
@@ -319,7 +325,8 @@ function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["en
     planJsonKeys(row, edits, h.file, fileFormat(row, h.file), (doc) => {
       const cur = doc[h.key[0]];
       const list = Array.isArray(cur) ? cur : [];
-      const want = wantedPluginList(list, h.entry);
+      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc));
+      if (cur === undefined && want.length === 0) return [];
       return [[h.key, want.length === list.length && want.every((e, i) => e === list[i]) ? list : want]];
     });
   }
@@ -384,12 +391,14 @@ function statusOf(row: CheckRow, text: string): PluginStatus {
 
 /** D-OC2-DOCTOR-1: OpenCode 2 (npm @opencode/cli) has no --pure and talks to a background service unless --standalone
  *  is given; OpenCode 1.x keeps --pure (D-HF-OPENCODE-LIST-1). The host version picks the form. */
-function opencodeListArgs(bin: string, env: SetupContext["env"]): string[] {
+function opencodeMajor(bin: string, env: SetupContext["env"]): number {
   const r = runBin(bin, ["--version"], env);
   const text = `${r.stdout}${r.stderr}`;
   const digits = text.split("").filter((c) => (c >= "0" && c <= "9") || c === ".").join("");
-  const major = Number(digits.split(".")[0]);
-  return major >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+  return Number(digits.split(".")[0]);
+}
+function opencodeListArgs(bin: string, env: SetupContext["env"]): string[] {
+  return opencodeMajor(bin, env) >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
 }
 
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
@@ -563,7 +572,9 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   const trust = h.kind === "file" ? h.trust : undefined;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
   const issue = h.kind === "plugin-list" ? pluginListIssue(h) : h.kind === "file" && row.id === "kiro" ? kiroDisabledIssue(h) : undefined;
-  return { name: "hook-registered", ok: false, detail: issue ?? `${h.file} lacks the context-mode hook entry` };
+  // D-OC2-NATIVE-CMD-1: on OpenCode 2 the native command is `opencode plugin add context-mode@next` (the 1.19 form is an error there).
+  const oc2 = issue === undefined && row.id === "opencode" && h.kind === "plugin-list" && hostBin("opencode", env).file !== undefined && opencodeMajor("opencode", env) >= 2;
+  return { name: "hook-registered", ok: false, detail: issue ?? `${h.file} lacks the context-mode hook entry${oc2 ? "; run: opencode plugin add context-mode@next" : ""}` };
 }
 
 /**
@@ -1015,7 +1026,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     if (res.status === "PASS") {
       // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
       if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
-      else if (res.changes.length && !onlyTrust(row, res.changes) && !hasPluginIssue(row)) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
+      else if (res.changes.length && !onlyTrust(row, res.changes) && !hasPluginIssue(row)) { res.status = "FAIL"; res.reason = notSetUpReason(row, res, ctx.env); }
       else {
         res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
@@ -1026,6 +1037,14 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     opts.onAgent?.(id, "done", res);
   }
   return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents };
+}
+
+/** D-OC2-NATIVE-CMD-1: doctor on OpenCode 2 with no plugin entry names the host's own command next to the setup fix. */
+function notSetUpReason(row: CheckRow, res: AgentResult, env: SetupContext["env"]): string {
+  const h = row.hookInstall;
+  const missing = row.id === "opencode" && h.kind === "plugin-list" && res.changes.some((c) => c.path === h.key[0]);
+  const oc2 = missing && hostBin("opencode", env).file !== undefined && opencodeMajor("opencode", env) >= 2;
+  return oc2 ? `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode@next` : NOT_SET_UP_REASON;
 }
 
 /** D-HF-OPENCODE-GATE-1: a plugin list that loads twice or names a missing file of ours is a hook-registered FAIL with its own fix line. */

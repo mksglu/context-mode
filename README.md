@@ -27,7 +27,7 @@ Use your agent's own install command. You need Node 24.15.0 or later (v2 uses th
 | Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | `gemini extensions update context-mode` |
 | Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | `qwen extensions update context-mode` |
 | Pi | `pi install npm:context-mode@next` | `pi update --extensions` |
-| OpenCode | `opencode plugin context-mode@next --global` | `opencode plugin context-mode@next --global --force` |
+| OpenCode | `opencode plugin add context-mode@next` (1.19: `opencode plugin context-mode@next --global`) | `opencode plugin update` (1.19: `opencode plugin context-mode@next --global --force`) |
 
 Until v2 is on `main`, `main` holds the old build (1.0.169), so the four GitHub-source rows name the `release` branch with each agent's own syntax.
 
@@ -57,7 +57,7 @@ Every agent gets hooks, the MCP server and the skills. The Install column is the
 | Copilot CLI | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install) |
 | Gemini CLI | yes, package | yes | yes | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | [docs/install/gemini.md](docs/install/gemini.md#install) |
 | Kiro | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/kiro.md](docs/install/kiro.md#install) |
-| OpenCode | yes, in-process | yes | yes | `opencode plugin context-mode@next --global` | [docs/install/opencode.md](docs/install/opencode.md#install) |
+| OpenCode | yes, in-process | yes | yes | `opencode plugin add context-mode@next` | [docs/install/opencode.md](docs/install/opencode.md#install) |
 | Pi | yes, in-process | in-process | yes | `pi install npm:context-mode@next` | [docs/install/pi.md](docs/install/pi.md#install) |
 | Qwen Code | yes, package | yes | yes | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | [docs/install/qwen.md](docs/install/qwen.md#install) |
 | VS Code (Copilot) | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/vscode.md](docs/install/vscode.md#install) |

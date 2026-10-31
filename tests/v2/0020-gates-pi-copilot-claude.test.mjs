@@ -631,6 +631,46 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       assert.deepEqual(plugins(s), [theirs, own(s)]);
     });
 
+    // D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode@next` (2.x) writes "plugins": [...] (1.19 writes "plugin"). Doctor reads
+    // the host version: on 2.x with no entry its fix line names the native command; the 2.x native key counts as registered.
+    const SKIP_SH_OC = { skip: process.platform === "win32" && "fake opencode is an sh script" };
+    function fakeOpencode(s, version) {
+      const file = path.join(s.root, "bin", "opencode");
+      writeFileSync(file, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "${version}"; exit 0; fi\necho context-mode connected\n`);
+      chmodSync(file, 0o755);
+    }
+
+    test("OpenCode 2 with no plugin entry: doctor FAILs and the fix line is opencode plugin add context-mode@next", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.5");
+      put(s, {});
+      const d0 = await runDoctor(opts(s));
+      assert.ok(d0.agents.length, String(d0.error));
+      assert.equal(d0.agents[0].status, "FAIL");
+      assert.ok(d0.agents[0].reason.includes("opencode plugin add context-mode@next"), d0.agents[0].reason);
+    });
+
+    test("OpenCode 1.19 with no plugin entry: doctor FAILs and the fix line stays context-mode setup, no OpenCode 2 command", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "1.19.5");
+      put(s, {});
+      const d0 = await runDoctor(opts(s));
+      assert.ok(d0.agents.length, String(d0.error));
+      assert.equal(d0.agents[0].status, "FAIL");
+      assert.ok(!d0.agents[0].reason.includes("opencode plugin add"), d0.agents[0].reason);
+      assert.ok(d0.agents[0].reason.includes("context-mode setup"), d0.agents[0].reason);
+    });
+
+    test("the OpenCode 2 native entry in the plugins key is registered: doctor passes, setup adds no second entry", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.5");
+      put(s, { plugins: ["context-mode@next"] });
+      const res = await runSetup({ ...opts(s), runId: "g" });
+      assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+      assert.equal(plugins(s), undefined, "no plugin list written next to the native plugins entry");
+      assert.equal(registered(await runDoctor(opts(s))).ok, true);
+    });
+
     test("remove after the native-entry setup restores the original bytes", async (t) => {
       const s = sandbox(t);
       put(s, { plugin: ["context-mode@next", own(s)] });

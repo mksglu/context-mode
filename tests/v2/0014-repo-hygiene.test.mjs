@@ -568,6 +568,14 @@ describe("ADR-0013 repo: scheduled workflows", () => {
     assert.ok(step.includes("T-F5"), step);
   });
 
+  test("ci.yml: the OpenCode 2 native install check runs on every OS of the test job (D-OC2-NATIVE-CMD-1)", () => {
+    const l = lines(read(".github/workflows/ci.yml"));
+    const i = l.indexOf("- run: node e2e/checks/opencode2-native-install.mjs");
+    assert.ok(i > 0, "step missing");
+    assert.ok(!l.slice(i, i + 3).some((x) => x.startsWith("if:")), "no OS filter");
+    assert.ok(l.indexOf("- run: echo \"CM_OPENCODE2_DIR=${{ runner.temp }}/opencode2\" >> \"$GITHUB_ENV\"") < i, "CM_OPENCODE2_DIR is set before the step");
+  });
+
   // D-RN-GEM-1: v2.0.0-next.2 smoke hung on the gemini step until the 20-minute job timeout cancelled the job, so
   // continue-on-error never applied. The tier-2 gemini step has its own short timeout.
   test("release.yml: the tier-2 gemini smoke step has its own timeout under the job timeout (D-RN-GEM-1)", () => {

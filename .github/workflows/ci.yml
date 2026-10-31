@@ -102,6 +102,9 @@ jobs:
         shell: bash
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts for v2 unit tests (D-M2-arch-6)
+      # D-OC2-NATIVE-CMD-1: the documented OpenCode 2 install, update and remove lines run with the real @opencode/cli 2.2.5 in a temp HOME.
+      - run: node e2e/checks/opencode2-native-install.mjs
+        name: OpenCode 2 native install, update, remove (D-OC2-NATIVE-CMD-1)
       - run: npm run typecheck
         name: typecheck, tsc --noEmit (D-TSC-GATE-1)
       - run: node --test "tests/v2/**/*.test.mjs"

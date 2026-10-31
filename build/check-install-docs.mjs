@@ -182,6 +182,27 @@ export function installSection(text) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
+// D-OC2-NATIVE-CMD-1: OpenCode 2 (@opencode/cli 2.2.5) installs with `opencode plugin add context-mode@next`, updates with
+// `opencode plugin update` and removes with `opencode plugin remove context-mode@next`. `opencode plugin context-mode@next --global`
+// is the 1.19 (opencode-ai) form: on 2.x it is 'Unknown subcommand' plus 'Unrecognized flag: --global'. The 1.19 form may only
+// stand on a line that names 1.19. Plain string search, no regex.
+export const OPENCODE2_INSTALL = "opencode plugin add context-mode@next";
+export const OPENCODE2_UPDATE = "opencode plugin update";
+export const OPENCODE2_REMOVE = "opencode plugin remove context-mode@next";
+const OPENCODE1_FORM = "opencode plugin context-mode@next --global";
+
+/** Every line with the 1.19 form that does not name 1.19, and an opencode install page whose first install line is not the OpenCode 2 command. */
+export function checkOpencodeCommands(pages) {
+  const bad = [];
+  for (const [name, text] of Object.entries(pages)) {
+    text.split("\n").forEach((line, i) => {
+      if (line.includes(OPENCODE1_FORM) && !line.includes("1.19")) bad.push(`${name}:${i + 1} has the OpenCode 1.19 command as the OpenCode 2 line; OpenCode 2 is ${OPENCODE2_INSTALL}`);
+    });
+    if (path.basename(name) === "opencode.md" && fencedBlocks(installSection(text))[0]?.[0] !== OPENCODE2_INSTALL) bad.push(`${name} first install line must be ${OPENCODE2_INSTALL}`);
+  }
+  return bad;
+}
+
 /** ADR-0023 page rules: a native host opens with its own command and then its update command; every page has the check line and the next line. */
 export function checkNativePages(pages) {
   const bad = [];
@@ -193,6 +214,7 @@ export function checkNativePages(pages) {
     const blocks = fencedBlocks(install);
     const first = blocks[0]?.[0] ?? "";
     const second = blocks[1]?.[0] ?? "";
+    if (id === "opencode" && first !== OPENCODE2_INSTALL) bad.push(`${name} first block must be the OpenCode 2 command: ${OPENCODE2_INSTALL}`);
     if (NATIVE_HOSTS.includes(id)) {
       if (first.startsWith("npm i -g context-mode")) bad.push(`${name} first block is the npm route; a native host opens with its own command`);
       if (!UPDATE_WORDS.some((w) => second.includes(w))) bad.push(`${name} needs an update block (the native update command) right after the install block`);

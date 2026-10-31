@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SWITCH_HEADING, checkLines, checkNativePages, checkNoV1, checkPages, checkReleaseRef, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, switchSection, v1FreeFiles } from "../../build/check-install-docs.mjs";
+import { SWITCH_HEADING, checkLines, checkNativePages, checkNoV1, checkOpencodeCommands, OPENCODE2_INSTALL, checkPages, checkReleaseRef, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, switchSection, v1FreeFiles } from "../../build/check-install-docs.mjs";
 import { getAdapter } from "../../src/adapters/table.ts";
 
 describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () => {
@@ -105,7 +105,8 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     gemini: [["gemini extensions install https://github.com/mksglu/context-mode --ref release"], ["gemini extensions update context-mode"]],
     qwen: [["qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release"], ["qwen extensions update context-mode"]],
     pi: [["pi install npm:context-mode@next"], ["pi update --extensions"]],
-    opencode: [["opencode plugin context-mode@next --global"], ["opencode plugin context-mode@next --global --force"]],
+    // D-OC2-NATIVE-CMD-1: OpenCode 2 first (@opencode/cli 2.2.5: `plugin add`, `plugin update`); the 1.19 form is a plain line after the block.
+    opencode: [["opencode plugin add context-mode@next"], ["opencode plugin update"]],
   };
   const FALLBACK = ["copilot-cli", "vscode", "kiro", "zcode"];
 
@@ -123,6 +124,39 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
       assert.deepEqual(blocks[0], ["npm i -g context-mode@next", `context-mode setup --agents ${id}`], `${id}.md first block`);
       assert.deepEqual(blocks[1], ["context-mode upgrade"], `${id}.md second block`);
     }
+  });
+
+  // D-OC2-NATIVE-CMD-1 (owner side, real @opencode/cli 2.2.5 in a temp HOME): `opencode plugin context-mode@next --global` is
+  // 'Unknown subcommand "context-mode@next" for "opencode plugin"' plus 'Unrecognized flag: --global' on 2.x; it is the 1.19 form.
+  test("install-native: opencode.md opens with the OpenCode 2 command and names the 1.19 form on its own line", () => {
+    const page = read("docs", "install", "opencode.md");
+    assert.equal(OPENCODE2_INSTALL, "opencode plugin add context-mode@next");
+    const install = installSection(page);
+    assert.ok(install.split("\n").some((l) => l.includes("1.19") && l.includes("opencode plugin context-mode@next --global")), "1.19 line");
+    assert.ok(install.split("\n").some((l) => l.includes("1.19") && l.includes("opencode plugin context-mode@next --global --force")), "1.19 update line");
+    const remove = page.slice(page.indexOf("\n## Remove\n"));
+    assert.equal(fencedBlocks(remove)[0][0], "opencode plugin remove context-mode@next", "native remove first");
+  });
+
+  test("install-native: the real docs pass checkOpencodeCommands", () => {
+    const names = ["README.md", "docs/install/README.md", "docs/install/opencode.md", "docs/v2/release/NATIVE-INSTALL.md", "docs/v2/release/HOOKS-FIRE.md", "docs/v2/release/WINDOWS.md", "docs/v2/review/opencode2-reply.md"];
+    assert.deepEqual(checkOpencodeCommands(Object.fromEntries(names.map((n) => [n, read(...n.split("/"))]))), []);
+  });
+
+  test("install-native: checkOpencodeCommands fails the 1.19 form as the OpenCode 2 line, in a fence, a table row and the reply", () => {
+    const fence = "# x\n\n## Install\n\n```sh\nopencode plugin context-mode@next --global\n```\n\nOpenCode 1.19: `opencode plugin context-mode@next --global`\n";
+    const out = checkOpencodeCommands({ "docs/install/opencode.md": fence }).join("\n");
+    assert.ok(out.includes("docs/install/opencode.md:6"), out);
+    assert.ok(!out.includes("opencode.md:9"), "a line that names 1.19 is the 1.19 form, allowed: " + out);
+    assert.ok(out.includes("first install line"), out);
+    const row = "| OpenCode | `opencode plugin context-mode@next --global` | `opencode plugin context-mode@next --global --force` |\n";
+    assert.equal(checkOpencodeCommands({ "README.md": row }).length, 1, "one row, one finding");
+    assert.deepEqual(checkOpencodeCommands({ "README.md": "| OpenCode | `opencode plugin add context-mode@next` (1.19: `opencode plugin context-mode@next --global`) | `opencode plugin update` |\n" }), []);
+  });
+
+  test("install-native: checkNativePages fails an opencode page whose first block is the 1.19 form", () => {
+    const bad = "# Install context-mode v2 on OpenCode\n\n## Install\n\n```sh\nopencode plugin context-mode@next --global\n```\n\n```sh\nopencode plugin update\n```\n\nCheck: `context-mode doctor`\n\n`next` is the v2 prerelease tag\n";
+    assert.ok(checkNativePages({ "opencode.md": bad }).join("\n").includes("OpenCode 2 command"), "first block must be the OpenCode 2 command");
   });
 
   test("install-native: every page says check: context-mode doctor and what next is, and has no node -e", () => {

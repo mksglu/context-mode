@@ -3,18 +3,20 @@
 ## Install
 
 ```sh
-opencode plugin context-mode@next --global
+opencode plugin add context-mode@next
 ```
 
 Update:
 
 ```sh
-opencode plugin context-mode@next --global --force
+opencode plugin update
 ```
+
+OpenCode 1.19 (`opencode-ai`) installs with `opencode plugin context-mode@next --global` and updates with `opencode plugin context-mode@next --global --force`. On OpenCode 2 that form is an error (`Unknown subcommand`, `Unrecognized flag: --global`).
 
 Check: `context-mode doctor`
 
-Two OpenCode lines exist: `opencode-ai` (1.19.x, stops at 1.19.5) and `@opencode/cli` (2.x, binary `opencode`; latest 2.2.5). The same command installs on both. One plugin serves both: OpenCode 1.19 and KiloCode call `server`; OpenCode 2 reads `exports["./server"]` and calls `setup(ctx)` (D-OC2-SETUP-1). On 2.x, `ctx_*` tools register through `ctx.tool.transform`, and the hooks through `ctx.tool.hook` (execute.before, execute.after), `ctx.session.hook` (prompt, context, compaction) and `ctx.event.subscribe` (session.step.ended).
+Two OpenCode lines exist: `opencode-ai` (1.19.x, stops at 1.19.5) and `@opencode/cli` (2.x, binary `opencode`; latest 2.2.5). The install command differs: `plugin add` on 2.x, `plugin <module> --global` on 1.19. One plugin serves both: OpenCode 1.19 and KiloCode call `server`; OpenCode 2 reads `exports["./server"]` and calls `setup(ctx)` (D-OC2-SETUP-1). On 2.x, `ctx_*` tools register through `ctx.tool.transform`, and the hooks through `ctx.tool.hook` (execute.before, execute.after), `ctx.session.hook` (prompt, context, compaction) and `ctx.event.subscribe` (session.step.ended).
 
 OpenCode loads the plugin from the npm package `main`. `2.0.0-next.5` has no `main`, so OpenCode refuses it; the next npm release has it (D-NI-OPENCODE-1). The MCP entry may still need the fallback below.
 
@@ -52,6 +54,12 @@ opencode mcp list --standalone    # OpenCode 2
 ## Remove
 
 ```sh
+opencode plugin remove context-mode@next
+```
+
+Then put back what setup changed (OpenCode 1.19 has no `plugin remove`, so use this line there too):
+
+```sh
 context-mode setup --remove --agents opencode
 ```
 
@@ -61,7 +69,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 - Setup adds the hooks plugin to the `plugin` list in `~/.config/opencode/opencode.json`. On its first start after that, OpenCode installs `@opencode-ai/plugin` into `~/.config/opencode` (30-60 s on OpenCode 1.19.4, needs the network). Setup checks the server with `opencode mcp list --pure`, so it does not wait on that install (D-HF-OPENCODE-LIST-1).
 
-- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin context-mode@next --global` the list holds `context-mode@next`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1).
+- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin add context-mode@next` (OpenCode 2, key `plugins`) or `opencode plugin context-mode@next --global` (1.19, key `plugin`) the config holds `context-mode@next`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1). On OpenCode 2 with no entry the fix line is `opencode plugin add context-mode@next` (D-OC2-NATIVE-CMD-1).
 
 ## Report a problem
 

@@ -19,7 +19,7 @@ Use your agent's own install command. Each line below is the native command, the
 | Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | `gemini extensions update context-mode` |
 | Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | `qwen extensions update context-mode` |
 | Pi | `pi install npm:context-mode@next` | `pi update --extensions` |
-| OpenCode | `opencode plugin context-mode@next --global` | `opencode plugin context-mode@next --global --force` |
+| OpenCode | `opencode plugin add context-mode@next` (1.19: `opencode plugin context-mode@next --global`) | `opencode plugin update` (1.19: `opencode plugin context-mode@next --global --force`) |
 | Copilot CLI, Kiro, VS Code, ZCode | `npm i -g context-mode@next`, then `context-mode setup --agents <id>` | `context-mode upgrade` |
 
 Until v2 is on `main`, `main` holds the old build (1.0.169), so the four GitHub-source rows name the `release` branch with each agent's own syntax.

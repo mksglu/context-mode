@@ -15,14 +15,16 @@ v1 is frozen, so the fix is in v2 only. The v2 plugin now has a `setup(ctx)` ent
 Use the OpenCode native command:
 
 ```sh
-opencode plugin context-mode@next --global
+opencode plugin add context-mode@next
 ```
 
 Update an old install:
 
 ```sh
-opencode plugin context-mode@next --global --force
+opencode plugin update
 ```
+
+OpenCode 1.19 uses the older form: `opencode plugin context-mode@next --global`, and `opencode plugin context-mode@next --global --force` to update. On OpenCode 2 that form fails with `Unknown subcommand` and `Unrecognized flag: --global`. If you ran it, we are sorry; the earlier version of this reply gave that line by mistake.
 
 `next` is 2.0.0-next.20 or newer. `latest` stays on the old release.
 
