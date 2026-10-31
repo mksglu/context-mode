@@ -1,4 +1,4 @@
-# TEMPORARY [D5PROBE] workflow, removed after the run (D-D5-WARM-1). Push-triggered by its own path only.
+# TEMPORARY [D5PROBE] workflow, removed after the run (D-D5-SAMPLES-1). Push-triggered by its own path only.
 name: d5-probe
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
   probe:
     name: probe (${{ matrix.os }}, node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -23,25 +23,10 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: node scripts/ci-install.mjs
       - run: node build/build.mjs --generated-only
-      - name: quiet probe
-        run: node .github/probe/d5-probe.mjs 50 quiet
-      - name: probe beside the full suite, default concurrency
+      - name: probe beside the full suite looping (default concurrency)
         shell: bash
         run: |
-          node --test "tests/v2/**/*.test.mjs" > load-default.log 2>&1 &
-          SUITE=$!
-          node .github/probe/d5-probe.mjs 50 load-default
-          wait $SUITE || true
-          grep -E "D5-default-baseline|over bare node|^ℹ (pass|fail)" load-default.log | sed 's/^/[D5PROBE] suite-default /' || true
-      - name: probe beside the full suite, --test-concurrency=1
-        shell: bash
-        run: |
-          node --test --test-concurrency=1 "tests/v2/**/*.test.mjs" > load-one.log 2>&1 &
-          SUITE=$!
-          node .github/probe/d5-probe.mjs 50 load-one
-          wait $SUITE || true
-          grep -E "D5-default-baseline|over bare node|^ℹ (pass|fail)" load-one.log | sed 's/^/[D5PROBE] suite-one /' || true
-      - name: the D5 test 0010 file alone, 10x
-        shell: bash
-        run: |
-          for i in 1 2 3 4 5 6 7 8 9 10; do node --test --test-name-pattern="D5-default-baseline" tests/v2/0010-doctor-upgrade.test.mjs 2>&1 | grep -E "over bare|^ℹ fail" | sed "s/^/[D5PROBE] alone-$i /"; done
+          ( while [ ! -f stop.flag ]; do node --test "tests/v2/**/*.test.mjs" > /dev/null 2>&1; done ) &
+          LOOP=$!
+          node .github/probe/d5-probe.mjs 60 load
+          touch stop.flag; pkill -P $LOOP 2>/dev/null || true; kill $LOOP 2>/dev/null || true
