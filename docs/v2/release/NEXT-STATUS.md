@@ -4,9 +4,27 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.18 (provenance present, SLSA v1, 2 signatures, gitHead ea4179fd). `latest` is still 1.0.169. Checked 2026-10-31 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.18: 2026-10-31T12:56:03Z. The previous version, next.17, was published 2026-10-30T14:02:42Z (gitHead d526f1e5).
+`next` is 2.0.0-next.20 (provenance present, SLSA v1, 2 signatures, gitHead efe519b1). `latest` is still 1.0.169. Checked 2026-10-31 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.20: 2026-10-31T20:20:37Z. The previous version, next.18, was published 2026-10-31T12:56:03Z (gitHead ea4179fd).
+
+Tag v2.0.0-next.19 (ecf32676) exists on origin but was never published: release.yml run 41225374690 failed in its ci job (macOS, node 26), step "v2 unit tests", the D5 hook round-trip timing test. The tag stays where it is and is never reused. next.20 replaces it and carries the D5 fix.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.20 ships
+
+Changes since v2.0.0-next.18: the OpenCode 2 fix and the D5 timing fix. Reply for the OpenCode reporter: docs/v2/review/opencode2-reply.md.
+
+- 2600c92b, ecf32676 (D-OC2-SETUP-1): the plugin loads on OpenCode 2.x. `setup(ctx)` is the 2.x entry, `exports["./server"]` is in the release package.json, setup writes the package directory (not a file path) to the `plugin` list, and the doctor knows both OpenCode lines. Proven on the real @opencode/cli 2.2.5 loader.
+- 37a48049 (D-D5-MORE-PAIRS-1): D5 (`checkHookRoundTrip`) runs 3 hook/bare pairs and stops when the estimate is inside 40 ms. Over 40 ms, it runs up to 9 pairs. The 40 ms bound and the 5 s timeout are unchanged. A healthy host costs the same as before (3 pairs). A hook that is really slow stays over 40 ms and fails.
+
+## Release numbers (next.20)
+
+- Tag v2.0.0-next.20 on efe519b1. N = highest 2.0.0-next.N in the origin tags (next.19, never published) plus 1; the registry highest was next.18. v2-design was quiet for 15 minutes before the tag (head commit efe519b1 from 22:32 +03).
+- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/v2/**/*.test.mjs"` exit 0, 2437 tests, 2401 pass, 0 fail, 36 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on efe519b1 (run 41234706070): all 12 jobs green.
+- release.yml run 41236521013: green on the first run, no rerun. ci x12, plan, build, publish-stage, smoke x3, publish-promote, publish-npm and github-release all green.
+- Registry version published 2026-10-31T20:20:37Z (gitHead efe519b1, SLSA v1 provenance, 2 signatures). GitHub prerelease v2.0.0-next.20 (not draft) at 20:18:47Z. The registry document lagged the publish step by about 2 minutes.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.20 (release commit 4307dbd1).
 
 ## What 2.0.0-next.18 ships
 
