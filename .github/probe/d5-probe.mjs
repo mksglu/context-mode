@@ -17,21 +17,29 @@ const run = (argv, cwd, stdin) => new Promise((res) => {
   if (stdin !== undefined) c.stdin.write(stdin);
   c.stdin.end();
 });
+const K = 9;
 async function trial(src) {
   const dir = mkdtempSync(path.join(tmpdir(), "cm-d5probe-"));
   writeFileSync(path.join(dir, "hook.mjs"), src);
   const h = [], b = [];
-  for (let k = 0; k < Math.max(...KS); k++) {
+  for (let k = 0; k < K; k++) {
     h.push(await run([process.execPath, path.join(dir, "hook.mjs"), "--agent", "claude-code"], dir, "{}"));
     b.push(await run([process.execPath, "-e", ""], dir));
   }
   rmSync(dir, { recursive: true, force: true });
-  return Object.fromEntries(KS.map((k) => [k, Math.min(...h.slice(0, k)) - Math.min(...b.slice(0, k))]));
+  return { h, b };
 }
-const fast = Object.fromEntries(KS.map((k) => [k, []])), slow = Object.fromEntries(KS.map((k) => [k, []]));
-for (let i = 0; i < N; i++) { const r = await trial(FAST); for (const k of KS) fast[k].push(r[k]); }
-for (let i = 0; i < Math.min(N, 15); i++) { const r = await trial(SLOW); for (const k of KS) slow[k].push(r[k]); }
-for (const k of KS) {
-  const f = fast[k], s = slow[k];
-  console.log(`[D5PROBE] ${label} ${process.platform} node${process.versions.node} pairs=${k} fastOver40=${f.filter((x) => x > 40).length}/${f.length} fastMax=${Math.max(...f).toFixed(1)} slowFail=${s.filter((x) => x > 40).length}/${s.length} slowMin=${Math.min(...s).toFixed(1)}`);
+const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+const EST = {
+  minmin: (h, b, k) => Math.min(...h.slice(0, k)) - Math.min(...b.slice(0, k)),
+  minpaired: (h, b, k) => Math.min(...h.slice(0, k).map((x, i) => x - b[i])),
+  medpaired: (h, b, k) => med(h.slice(0, k).map((x, i) => x - b[i])),
+  medmed: (h, b, k) => med(h.slice(0, k)) - med(b.slice(0, k)),
+};
+const fast = [], slow = [];
+for (let i = 0; i < N; i++) fast.push(await trial(FAST));
+for (let i = 0; i < 25; i++) slow.push(await trial(SLOW));
+for (const [name, f] of Object.entries(EST)) for (const k of [2, 3, 5, 7, 9]) {
+  const fv = fast.map((t) => f(t.h, t.b, k)), sv = slow.map((t) => f(t.h, t.b, k));
+  console.log(`[D5PROBE] ${label} ${process.platform} node${process.versions.node} ${name} k=${k} fastOver40=${fv.filter((x) => x > 40).length}/${fv.length} fastMax=${Math.max(...fv).toFixed(0)} slowPass=${sv.filter((x) => x <= 40).length}/${sv.length} slowMin=${Math.min(...sv).toFixed(0)}`);
 }
