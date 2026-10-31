@@ -42,7 +42,7 @@ Each FAIL row gives the cause and a one-line fix, in one exact string per host (
 | D2 | Node is at or above the minimum, and `node:sqlite` loads | process. Also probes for a Bun runtime (`process.versions.bun`) and reports which runtime is actually executing — the one place the GS6 fallback-chain decision (REVIEW-r4a.md item 31) has to change if the detection logic changes |
 | D3 | host config for **this** agent | parse the config and compare it **as data** with what `adapters/table.ts` generates: MCP entry, 4 hooks, timeouts |
 | D4 | v1 leftovers | the ADR-0011 detect function; each finding is listed with its fix |
-| D5 | hook round trip | run the hook entry with the recorded fixture shipped in the bundle; check the output shape and that wall time is ≤ 40 ms |
+| D5 | hook round trip | run the hook entry with the recorded fixture shipped in the bundle; check the output shape and that the hook's cost is ≤ 40 ms: hook wall minus bare `node -e ""` wall, fastest of 3 pairs (D-D5-BARE-1) |
 | D5b | double-fire | both the Claude Code `settings.json` hooks **and** VS Code's `chat.useClaudeHooks` are active for the same repo (the latter re-runs the former's hook commands). FAIL with the fix: disable one of the two |
 | D6 | MCP | this process was started by the host: client name and protocol version from the request |
 | D7 | project and worktree | resolved from the agent's single source: for most hosts, the MCP `roots/list` root; for Pi, the extension API's `ctx.cwd` at plugin-load time (Pi has no `roots/list`). A live check confirms the resolved path matches the host's actual cwd across worktrees; mismatch is a FAIL, not a silent wrong answer |

@@ -618,7 +618,7 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     return {
       agent: "claude-code", bundleDir: dir, env: { PATH: process.env.PATH ?? "" },
       signal: new AbortController().signal, codexConfigDir: path.join(dir, "no-codex"), db: null,
-      now: clock(0, 5), ...extra,
+      now: clock(0, 5), samples: 1, bareMs: async () => 0, ...extra,
     };
   }
 
@@ -664,6 +664,50 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const ms = C.HOOK_P95_MS + 1;
     const r = await checkHookRoundTrip(input(bundle(t, native), { now: clock(0, ms) }));
     assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_SLOW_DETAIL(ms), fixCommand: C.D5_FIX });
+  });
+
+  // D-D5-BARE-1 (Viet round, Windows Claude Desktop): D5 FAIL at 72 ms and 58 ms. On windows-latest bare `node -e ""`
+  // alone is 42.7 ms p50, so a wall budget of 40 ms fails for node.exe start that the host pays with or without the hook.
+  // D5 measures the hook's own cost: hook wall minus bare node wall, same run, same spawn path. The 40 ms bound stays.
+  test("[M5] doctor-hook/D5-slow-node-start-is-not-the-hook (D-D5-BARE-1)", async (t) => {
+    const r = await checkHookRoundTrip(input(bundle(t, native), { now: clock(0, 72), bareMs: async () => 50 }));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail: C.DOCTOR_PASS_DETAIL });
+  });
+
+  test("[M5] doctor-hook/D5-hook-cost-over-bare-node-still-FAILs-slow (D-D5-BARE-1)", async (t) => {
+    const r = await checkHookRoundTrip(input(bundle(t, native), { now: clock(0, 100), bareMs: async () => 50 }));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_SLOW_DETAIL(50), fixCommand: C.D5_FIX });
+  });
+
+  test("[M5] doctor-hook/D5-exactly-HOOK_P95_MS-over-bare-node-passes (D-D5-BARE-1)", async (t) => {
+    const ok = await checkHookRoundTrip(input(bundle(t, native), { now: clock(0, 50 + C.HOOK_P95_MS), bareMs: async () => 50 }));
+    assert.equal(ok.status, "PASS");
+    const slow = await checkHookRoundTrip(input(bundle(t, native), { now: clock(0, 51 + C.HOOK_P95_MS), bareMs: async () => 50 }));
+    assert.equal(slow.status, "FAIL");
+  });
+
+  test("[M5] doctor-hook/D5-uses-the-fastest-of-several-pairs, noise only adds time (D-D5-BARE-1)", async (t) => {
+    // hook walls 200, 60, 90 and bare walls 50, 45, 80: min 60 minus min 45 = 15 ms, a PASS; the first pair alone is 150 ms.
+    const walls = [0, 200, 200, 260, 260, 350];
+    const bares = [50, 45, 80];
+    let b = 0;
+    const r = await checkHookRoundTrip(input(bundle(t, native), { samples: 3, now: clock(...walls), bareMs: async () => bares[b++] }));
+    assert.equal(r.status, "PASS", r.detail);
+  });
+
+  test("[M5] doctor-hook/D5-default-baseline-is-a-real-bare-node-run (D-D5-BARE-1)", async (t) => {
+    // No bareMs override: the baseline is measured with a real `node -e ""`, so a stub hook that only sleeps 150 ms
+    // is slow over it, and a stub that answers at once is not.
+    const dir = bundle(t, native);
+    const base = { ...input(dir), samples: 2, now: undefined };
+    delete base.bareMs;
+    delete base.now;
+    const fast = await checkHookRoundTrip(base);
+    assert.equal(fast.status, "PASS", fast.detail);
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), `setTimeout(()=>{process.stdout.write(${JSON.stringify(native)});},${C.HOOK_P95_MS + 400});process.stdin.resume();process.stdin.on("end",()=>{});`);
+    const slow = await checkHookRoundTrip(base);
+    assert.equal(slow.status, "FAIL");
+    assert.equal(slow.fixCommand, C.D5_FIX);
   });
 
   test("[M5] doctor-hook/D5-exactly-HOOK_P95_MS-passes", async (t) => {

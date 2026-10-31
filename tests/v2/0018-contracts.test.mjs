@@ -497,7 +497,7 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
       assert.equal(C.LS_REMOTE_FIELD_SEP, "\t");
       assert.equal(C.GIT_SHA_HEX_LEN, 40);
       assert.equal(C.D3_DETAIL(["MCP entry", "hook timeout"]), "wrong: MCP entry, hook timeout");
-      assert.equal(C.D5_SLOW_DETAIL(55), `hook round trip took 55 ms, over ${C.HOOK_P95_MS} ms`);
+      assert.equal(C.D5_SLOW_DETAIL(55), `hook round trip took 55 ms over bare node, over ${C.HOOK_P95_MS} ms`);
       assert.equal(C.D10_DETAIL("deny-reason"), "enforcement mode: deny-reason");
       assert.equal(C.PRAGMA_INTEGRITY_CHECK, "PRAGMA integrity_check");
       assert.deepEqual(C.DB_SIBLING_SUFFIXES, ["", "-wal", "-shm"]);

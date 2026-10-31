@@ -106,3 +106,9 @@ Fix: D-RN-ORDER-1. The GitHub release is now the last job of `release.yml`, afte
 
 - Q-WIN-5 (qwen hook on Windows cmd.exe): the quoted hook path `node "${CLAUDE_PLUGIN_ROOT}/hook.mjs"` is broken under qwen's `cmd.exe /d /s /c` spawn (Node re-quotes, node.exe sees literal quotes). Qwen replaces only `${CLAUDE_PLUGIN_ROOT}`. Choices: (a) setup writes a platform-specific qwen hook file at install time (no inner quotes on win32, a short junction or 8.3 path for spaced homes); (b) a PATH launcher bin so the command has no path; (c) report upstream to qwen to spawn with windowsVerbatimArguments. Decide, then drop `todo` in tests/v2/build/qwen-hook-shell.test.mjs. See D-WIN-QWEN-SHELL-1.
 - KIRO-WIN-4 (kiro hook on Windows): Kiro's open-source base runs `cmd /C <command>` without verbatim arguments, so the quoted `"node.exe" "hook.js"` string may break on a spaced node path (same class as Q-WIN-5). Not PowerShell. Kiro V3 not run on Windows. Next step: run a logged-in kiro-cli on Windows with a spaced path, or pick the Q-WIN-5 design (launcher bin / short path). Then drop `todo` in tests/v2/setup/kiro-hook-shell.test.mjs. See D-WIN-KIRO-SHELL-1.
+
+## Hook timing on Windows (Viet round, next.17)
+
+| # | Item | Status | Next step |
+|---|---|---|---|
+| W-HOOK-1 | PostToolUse on windows-latest: p50 86 ms wall against bare node 42.7 ms (hook process 48.7 ms after node bootstrap vs 30.9 ms for PreToolUse; the extra 18 ms is the journal write: node:sqlite load, open, migrations check, append). Run 41188599098, `e2e/checks/hook-phase-profile.mjs`. D5 runs the PreToolUse fixture only, so D-D5-BARE-1 does not cover it. A p95 of 346 to 589 ms was seen once on the shared runner (Defender or runner noise, one outlier batch). | open | Measure a lazy sqlite open that skips the schema check when user_version matches (needs a profile on windows-latest first); never cut the journal row. |

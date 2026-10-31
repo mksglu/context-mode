@@ -536,7 +536,7 @@ export const REGEX_ESCAPE = "\\";
 export const CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"] as const); // no key = Codex default hooks=true (#1152)
 // doctor-hook.ts: D5 round trip, D5b double-fire (impl/07 §5).
 export const D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
-export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms, over ${HOOK_P95_MS} ms`; }
+export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`; }
 export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken install
 // doctor-db.ts: D8 checks, D9 counts, D10 mode (impl/07 §5).
 export const PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";

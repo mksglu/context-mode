@@ -2,7 +2,9 @@
 // Spec: impl/07 §5 D5 + "D5 Codex trust sub-case", DECISIONS-r9 R6, DEVIATIONS D-M5-arch-4, D-M5-U1-6, D-M5-D3-1.
 // D5 runs `hook.mjs --agent <id>` from the running server bundle's directory (D-M3-arch-3) with that agent's
 // recorded payload from `<bundle>/fixtures/hook-roundtrip.json` on stdin, then checks the native shape and
-// the wall time against HOOK_P95_MS. An agent with no recorded payload is UNKNOWN, never a guessed payload.
+// the hook's own cost against HOOK_P95_MS. An agent with no recorded payload is UNKNOWN, never a guessed payload.
+// D-D5-BARE-1: the cost is hook wall minus bare `node -e ""` wall, the D3 rule (ADR-0019 D3), fastest of D5_SAMPLES pairs.
+// node.exe start is paid by the host with or without the hook (42.7 ms p50 on windows-latest), so it is not in the budget.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
@@ -26,7 +28,11 @@ export interface HookCheckInput {
   codexConfigDir: string;           // codex only: where hooks.json lives (CODEX_HOME or ~/.codex)
   db: DbHandle | null;              // codex only: this project's context.db, null when none exists yet
   now?: () => number;               // wall clock in ms; tests pin it, default performance.now
+  samples?: number;                 // hook and bare-node pairs; the fastest of each is compared (default D5_SAMPLES)
+  bareMs?: () => Promise<number>;   // one bare node wall in ms; tests pin it, default a real `node -e ""` run
 }
+
+const D5_SAMPLES = 3; // noise only adds time; a hook over budget is over it in every pair (D-CI-PERF-1)
 
 const row = (status: DoctorRow["status"], detail: string, fixCommand?: string): DoctorRow =>
   fixCommand === undefined
@@ -85,16 +91,28 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
   const fixture = loadFixture(i.bundleDir, i.agent);
   if (fixture === null) return row("UNKNOWN", D5_NO_FIXTURE_DETAIL(i.agent));
   const now = i.now ?? (() => performance.now());
-  const start = now();
-  const r = await runProcess([process.execPath, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
-    cwd: i.bundleDir,
-    env: i.env,
-    signal: i.signal,
-    timeoutMs: HOOK_TIMEOUT_MS,
-    stdin: JSON.stringify(fixture.payload),
+  const samples = Math.max(1, i.samples ?? D5_SAMPLES);
+  const bareMs = i.bareMs ?? (async () => {
+    const t = performance.now();
+    await runProcess([process.execPath, "-e", ""], { cwd: i.bundleDir, env: i.env, signal: i.signal, timeoutMs: HOOK_TIMEOUT_MS });
+    return performance.now() - t;
   });
-  const ms = Math.round(now() - start);
-  if (!isNativeShape(r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+  const hookWalls: number[] = [];
+  const bareWalls: number[] = [];
+  for (let n = 0; n < samples; n++) {
+    const start = now();
+    const r = await runProcess([process.execPath, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir,
+      env: i.env,
+      signal: i.signal,
+      timeoutMs: HOOK_TIMEOUT_MS,
+      stdin: JSON.stringify(fixture.payload),
+    });
+    hookWalls.push(now() - start);
+    if (!isNativeShape(r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+    bareWalls.push(await bareMs());
+  }
+  const ms = Math.max(0, Math.round(Math.min(...hookWalls) - Math.min(...bareWalls)));
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
