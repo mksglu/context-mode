@@ -23,7 +23,7 @@ import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/a
 import { editHostConfigText, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
 import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, LOCK_FILE, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
-import type { CheckRow, HookFile, NativePlugin, SetupContext } from "./registry.ts";
+import type { CheckRow, HookFile, HookInstall, NativePlugin, SetupContext } from "./registry.ts";
 import { pathEntries, spawnForm, spawnShim, whichBin, winCmdLine } from "./spawn-bin.ts";
 export { spawnForm, spawnShim, whichBin, winCmdLine };
 import { SAMPLE_FILE, hookSample, sampleText, sampleVerdict } from "./hook-sample.ts";

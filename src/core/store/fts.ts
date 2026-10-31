@@ -361,7 +361,7 @@ export function ftsQuery(
   const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
   // D-SEARCH-2: AND first, then OR. The OR form matches; chunks that also match the AND form (every term)
   // rank before partial matches inside each session/worktree tier.
-  const rrf = scope === "project" ? { k: RRF_K } : {};
+  const rrf: Record<string, number> = scope === "project" ? { k: RRF_K } : {};
   const porter = (t: string[]): RankRow[] =>
     stmt(db.raw, porterRankSql(scope)).all({ ...filter, match: t.join(" OR "), all: t.join(" "), ...rrf }) as unknown as RankRow[];
   let pList = porter(terms);

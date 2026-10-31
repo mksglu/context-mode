@@ -85,6 +85,12 @@ function v2Unit() {
     dumpChild("v2-unit", g);
     return { status: "FAIL", detail: `build/build.mjs --generated-only exit ${g.status}` };
   }
+  // D-TSC-GATE-1: tsc --noEmit runs before the unit tests. next.17 shipped with 3 type errors because no layer ran it.
+  const t = run(process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"]);
+  if (t.status !== 0) {
+    dumpChild("v2-unit", t);
+    return { status: "FAIL", detail: `tsc --noEmit exit ${t.status}` };
+  }
   const r = run(process.execPath, ["--test", "--test-reporter=tap", "tests/v2/"]);
   const count = (key) => {
     const line = r.stdout.split("\n").find((l) => l.startsWith(`# ${key} `));

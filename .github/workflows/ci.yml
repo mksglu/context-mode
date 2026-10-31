@@ -89,6 +89,8 @@ jobs:
         name: codex version (info)
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts for v2 unit tests (D-M2-arch-6)
+      - run: npm run typecheck
+        name: typecheck, tsc --noEmit (D-TSC-GATE-1)
       - run: node --test "tests/v2/**/*.test.mjs"
         name: v2 unit tests (TECH-SPEC 6.2a, DEVIATIONS D-M1-13, same as gate layer v2-unit)
       # Keyless local live cases (ADR-0012: kind "local" runs no model). They failed on a dev machine while CI never ran
