@@ -98,7 +98,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     assert.ok(zc.mcp.servers["context-mode"], "zcode MCP entry kept next to the hooks (D-HF-ZCODE-SHAPE-1)");
     assert.equal(zc.features.mcp, true, "zcode features.mcp");
     const oc = JSON.parse(readFileSync(path.join(s.home, ".config", "opencode", "opencode.json"), "utf8"));
-    assert.deepEqual(oc.plugin, [path.join(s.pkgDir, "opencode", "plugin.js")], "opencode plugin entry");
+    assert.deepEqual(oc.plugin, [s.pkgDir], "opencode plugin entry is the package dir (D-OC2-ENTRY-1)");
   });
 
   test("ADR-0020: setup writes the three skills per agent with that agent's tool name prefix", async (t) => {
@@ -421,7 +421,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     const doc = JSON.parse(after.slice(1));
     assert.equal(doc.theme, "dark", "user key kept");
     assert.ok(doc.plugin.includes("my-own-plugin"), "user plugin kept");
-    assert.ok(doc.plugin.includes(path.join(s.pkgDir, "opencode", "plugin.js")), "our plugin entry added");
+    assert.ok(doc.plugin.includes(s.pkgDir), "our plugin entry added");
     const { runDoctor } = await import("../../src/setup/index.ts");
     const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"] });
     assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));

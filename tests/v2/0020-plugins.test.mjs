@@ -27,32 +27,133 @@ describe("ADR-0020 plugins", () => {
       assert.equal(typeof mod.setup, "function");
     });
 
+    // D-OC2-SETUP-1: these two drive the default export's setup(ctx) with the real 2.x ctx shape (@opencode/plugin 2.2.5).
+    const ctx2 = (hooks, names) => ({
+      location: { directory: tmpdir() },
+      tool: { hook: async () => ({}), transform: async (cb) => { cb({ add: (t) => names.push(t.name) }); return {}; }, list: async () => [] },
+      session: { hook: async (n, fn) => { hooks[n] = fn; return {}; } },
+      event: { subscribe: () => (async function* () {})() },
+    });
+
     test("[M5] plugins/opencode2-plugin-dual-export: the ctx_* tools register successfully (#1171)", async () => {
       const mod = opencodePlugin.default ?? opencodePlugin;
       const registered = [];
-      const ctx = { tool: (name, _def) => registered.push(name) };
-      await mod.setup(ctx);
+      const dispose = await mod.setup(ctx2({}, registered));
       assert.ok(registered.some((n) => n.startsWith("ctx_")), "at least one ctx_* tool must register");
+      await dispose();
     });
 
     test("[M5] plugins/opencode-single-system-message: SessionStart lines merge into one output.system entry (#1085)", async () => {
       const mod = opencodePlugin.default ?? opencodePlugin;
-      let systemMessages = [];
       const hooks = {};
-      const ctx = {
-        tool: () => {},
-        event: (name, fn) => { hooks[name] = fn; },
-      };
-      await mod.setup(ctx);
-      const before = { system: [] };
-      if (hooks["chat.system.transform"]) {
-        await hooks["chat.system.transform"]({}, before);
-      }
+      const dispose = await mod.setup(ctx2(hooks, []));
+      assert.equal(typeof hooks.context, "function");
+      const before = { sessionID: "ses_1", system: [] };
+      await hooks.context(before);
       const lenBefore = before.system.length;
-      if (hooks["chat.system.transform"]) {
-        await hooks["chat.system.transform"]({}, before);
-      }
+      await hooks.context(before);
       assert.equal(before.system.length, lenBefore, "multiple SessionStart-equivalent lines must merge into one output.system entry");
+      await dispose();
+    });
+  });
+
+  describe("ADR-0020 opencode 2.x setup(ctx) (#1199 follow-up, D-OC2-SETUP-1)", () => {
+    // Shape source: @opencode/plugin 2.2.5 dist/promise (plugin.d.ts, session.d.ts, tool.d.ts) and the 2.2.5 loader, read from
+    // the real npm package and probed live: the loader accepts a default `{id, setup}` (or `effect`) and calls setup(ctx) with
+    // ctx.location, ctx.tool.{hook,transform,list}, ctx.session.hook and ctx.event.subscribe; setup returns a dispose function.
+    // Before D-OC2-SETUP-1 setup took the 1.19 shape {directory, tool()} and died with "app.tool is not a function".
+    // Red run (2.2.5 loader, built plugin): failed to load plugin ... TypeError: app.tool is not a function.
+    const SHELL = "shell"; // 2.2.5 names its built-in shell tool "shell" (1.19 names it "bash")
+
+    function fakeCtx(directory) {
+      const hooks = { tool: {}, session: {} };
+      const tools = new Map();
+      const subs = [];
+      const ctx = {
+        location: { directory, project: { id: "p", directory, canonical: directory } },
+        tool: {
+          hook: async (name, cb) => { hooks.tool[name] = cb; return {}; },
+          transform: async (cb) => { cb({ add: (t) => tools.set(t.name, t), list: () => [...tools.values()], get: (n) => tools.get(n), update() {}, remove() {}, namespace() {} }); return {}; },
+          list: async () => [...tools.values()],
+        },
+        session: { hook: async (name, cb) => { hooks.session[name] = cb; return {}; } },
+        event: { subscribe: (opts) => { subs.push(opts); return (async function* () {})(); } },
+      };
+      return { ctx, hooks, tools, subs };
+    }
+
+    // The loader rule of 2.2.5 (`Plugin must export a default definition with an id and an effect or setup function`).
+    function loaderAccepts(def) {
+      return def !== null && typeof def === "object" && typeof def.id === "string" && def.id !== "" && (typeof def.setup === "function" || typeof def.effect === "function");
+    }
+
+    test("the default export passes the 2.x loader rule and still carries server for OpenCode 1.19 and KiloCode", () => {
+      const def = opencodePlugin.default;
+      assert.ok(loaderAccepts(def));
+      assert.equal(typeof def.server, "function");
+    });
+
+    test("setup(ctx) registers the hooks through ctx.tool.hook, ctx.session.hook and ctx.event.subscribe, and returns a dispose function", async () => {
+      const f = fakeCtx(tmpdir());
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      assert.equal(typeof dispose, "function");
+      for (const n of ["execute.before", "execute.after"]) assert.equal(typeof f.hooks.tool[n], "function", n);
+      for (const n of ["prompt", "context", "compaction"]) assert.equal(typeof f.hooks.session[n], "function", n);
+      assert.deepEqual(f.subs.map((s) => s.types), [["session.step.ended"]]);
+      await dispose();
+    });
+
+    test("setup(ctx) registers every ctx_* tool through ctx.tool.transform with a JSON Schema input and a working execute", async () => {
+      const f = fakeCtx(tmpdir());
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      const names = [...f.tools.keys()];
+      for (const n of ["ctx_execute", "ctx_search", "ctx_stats"]) assert.ok(names.includes(n), n);
+      for (const n of names) assert.ok(n.startsWith("ctx_"), n);
+      const t = f.tools.get("ctx_execute");
+      assert.equal(typeof t.description, "string");
+      assert.equal(t.input.type, "object");
+      assert.equal(t.options?.codemode, false, "listed to the model as its own tool, not behind the code tool");
+      const r = await t.execute({}, { sessionID: "ses_x", signal: new AbortController().signal, progress: async () => {} });
+      assert.equal(typeof r.content, "string"); // an invalid call returns the usage line, it does not throw
+      await dispose();
+    });
+
+    test("execute.before: the shell tool is routed like every host (curl denied by throwing the ctx_ redirect), webfetch is denied, ls passes", async () => {
+      const f = fakeCtx(tmpdir());
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      const before = f.hooks.tool["execute.before"];
+      const call = (tool, input) => ({ tool, sessionID: "ses_b", agent: "build", messageID: "msg_1", id: "call_1", input });
+      await assert.rejects(before(call(SHELL, { command: "curl https://example.com" })), (e) => e instanceof Error && e.message.includes("ctx_"));
+      await assert.rejects(before(call("webfetch", { url: "https://example.com" })), (e) => e instanceof Error && e.message !== "");
+      await before(call(SHELL, { command: "ls" }));
+      await dispose();
+    });
+
+    test("execute.after reads result.content parts and an error result without throwing; empty input does not throw", async () => {
+      const f = fakeCtx(tmpdir());
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      const after = f.hooks.tool["execute.after"];
+      const base = { sessionID: "ses_a", agent: "build", messageID: "msg_1", id: "call_1", tool: SHELL, input: { command: "git status" } };
+      await after({ ...base, status: "completed", result: { content: [{ type: "text", text: "clean" }] } });
+      await after({ ...base, id: "call_2", status: "error", error: { _tag: "Tool.Error", message: "boom" } });
+      await f.hooks.tool["execute.before"]({});
+      await after({});
+      await dispose();
+    });
+
+    test("session context adds exactly one text part with the same bytes on every request (#1085); prompt and compaction do not throw", async () => {
+      const f = fakeCtx(tmpdir());
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      const c = { sessionID: "ses_c", agent: "build", system: [{ type: "text", text: "host prompt" }], messages: [], tools: {}, options: {} };
+      await f.hooks.session.context(c);
+      const n = c.system.length;
+      assert.equal(n, 2);
+      assert.equal(c.system[1].type, "text");
+      await f.hooks.session.context(c);
+      assert.equal(c.system.length, n);
+      await f.hooks.session.prompt({ sessionID: "ses_c", prompt: { text: "hello" } });
+      await f.hooks.session.compaction({ sessionID: "ses_c", system: [], messages: [], tools: {}, options: {} });
+      await dispose();
     });
   });
 
@@ -95,7 +196,7 @@ describe("ADR-0020 plugins", () => {
 
     async function load() {
       const registered = new Map();
-      const hooks = await opencodePlugin.setup({ directory: repo, tool: (name, def) => registered.set(name, def) });
+      const hooks = await opencodePlugin.setupLegacy({ directory: repo, tool: (name, def) => registered.set(name, def) });
       return { hooks, registered };
     }
 

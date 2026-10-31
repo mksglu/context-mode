@@ -21,8 +21,10 @@ const OPENCODE_EVENTS: Readonly<Record<string, CanonicalEventName | AuxEventName
 
 // OpenCode native tool name -> canonical name decide() knows (#1052). Names not listed stay as received.
 // D-HF-OPENCODE-SHELL-1: OpenCode's built-in shell tool is `bash` with `args.command` (opencode.ai/docs/tools, opencode-ai 1.19.4).
+// D-OC2-SETUP-1: OpenCode 2.2.5 names the same tool `shell` (args.command); 1.19 and KiloCode keep `bash`.
 export const SHELL_TOOL_NAME = "bash";
-const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { webfetch: "WebFetch", [SHELL_TOOL_NAME]: "Bash" };
+export const SHELL_TOOL_NAMES: readonly string[] = Object.freeze([SHELL_TOOL_NAME, "shell"]); // both map to canonical Bash; the table row keeps "bash" (nativeTools is the 1.19 name)
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { webfetch: "WebFetch", ...Object.fromEntries(SHELL_TOOL_NAMES.map((n) => [n, "Bash"])) };
 
 export function toCanonicalTool(name: string): string {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);

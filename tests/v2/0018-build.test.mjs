@@ -447,6 +447,7 @@ describe("ADR-0018 build: manifests", () => {
       ...META,
       bin: { "context-mode": "cli.mjs" },
       engines: { node: ">=24.15.0" },
+      exports: { ".": "./opencode/plugin.js", "./server": "./opencode/plugin.js" }, // D-OC2-SETUP-1: the OpenCode 2 loader reads exports["./server"]
       files: D1_FILES,
       main: "./opencode/plugin.js", // ADR-0023 D-NI-OPENCODE-1
       name: "context-mode",
@@ -462,7 +463,7 @@ describe("ADR-0018 build: manifests", () => {
     const ok = {
       ...META,
       name: "context-mode", version: "2.0.0", type: "module", bin: { "context-mode": "cli.mjs" }, engines: { node: ">=24.15.0" },
-      files: D1_FILES, main: "./opencode/plugin.js", pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
+      files: D1_FILES, main: "./opencode/plugin.js", exports: { ".": "./opencode/plugin.js", "./server": "./opencode/plugin.js" }, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" },
     };
     assert.doesNotThrow(() => assertOutPackageJson(ok));
@@ -837,6 +838,7 @@ describe("ADR-0019 build: npm package", () => {
       license: DEV.license,
       bin: { "context-mode": "cli.mjs" },
       engines: { node: ">=24.15.0" },
+      exports: { ".": "./opencode/plugin.js", "./server": "./opencode/plugin.js" }, // D-OC2-SETUP-1: the OpenCode 2 loader reads exports["./server"]
       files: top,
       main: "./opencode/plugin.js", // ADR-0023 D-NI-OPENCODE-1: OpenCode imports the plugin by package name
       name: "context-mode",

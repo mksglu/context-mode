@@ -9,7 +9,7 @@ import type { AST } from "toml-eslint-parser";
 import {
   AGENT_ARG, HOST_CONFIG_TEXT_PATH, HOST_NODE_COMMAND, JSON_INDENT_UNIT, JSONC_EXT,
   MCP_ARGS_FIELD, MCP_COMMAND_FIELD, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY, OWN_MCP_ENTRY,
-  OPENCODE_PLUGIN_PATH, PI_GIT_PACKAGE, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_OPENCODE_PLUGIN_SPEC, V1_PATH_SEPS, V1_PI_PACKAGE,
+  PI_GIT_PACKAGE, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_OPENCODE_PLUGIN_SPEC, V1_PATH_SEPS, V1_PI_PACKAGE,
   VSCODE_WORKSPACE_VAR, WORKSPACE_FOLDER_FLAG, EXE_SUFFIX,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
@@ -462,9 +462,9 @@ export interface OwnAccept {
   listEntries?: readonly string[]; // list entries setup writes in place of the upgrade form (OpenCode plugin file path)
 }
 
-/** D-DOC-RT-1: the OpenCode plugin file setup lists (D-WIN-OCENTRY-1), next to the running server bundle. */
+/** D-DOC-RT-1, D-OC2-ENTRY-1: the OpenCode plugin entry setup lists (D-WIN-OCENTRY-1): the package dir, the running server bundle's dir. */
 export function opencodePluginFile(): string {
-  return join(dirname(process.argv[1] ?? ""), ...OPENCODE_PLUGIN_PATH);
+  return dirname(process.argv[1] ?? "");
 }
 
 function listTarget(key: string, own: string, v1: string, alt: readonly string[] = []): OwnTarget {

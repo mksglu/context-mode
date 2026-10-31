@@ -27,7 +27,7 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
     try { execFileSync("opencode", ["--version"], { stdio: "ignore" }); } catch { hasOpencode = false; }
 
     const chunk = (n, delta, fin) => `data: ${JSON.stringify({ id: "c" + n, object: "chat.completion.chunk", created: 1, model: "fake-model", choices: [{ index: 0, delta, finish_reason: fin ?? null }] })}\n\n`;
-    function provider(cmd, bodies) {
+    function provider(cmd, bodies, toolName = "bash") {
       let n = 0;
       return http.createServer((req, res) => {
         let b = "";
@@ -38,7 +38,7 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
           n++;
           res.writeHead(200, { "content-type": "text/event-stream" });
           if (!b.includes('"role":"tool"')) {
-            res.write(chunk(n, { role: "assistant", content: null, tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "bash", arguments: JSON.stringify({ command: cmd, description: "show log" }) } }] }));
+            res.write(chunk(n, { role: "assistant", content: null, tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: toolName, arguments: JSON.stringify({ command: cmd, description: "show log" }) } }] }));
             res.write(chunk(n, {}, "tool_calls"));
           } else {
             res.write(chunk(n, { role: "assistant", content: "done" }));
@@ -61,17 +61,31 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
       return built;
     }
 
+    // D-OC2-FIRE-1: OpenCode 2 (npm @opencode/cli) is a second host: own binary, own shell tool name ("shell"), --standalone
+    // so no background service is touched. CI installs it into its own prefix (CM_OPENCODE2_DIR) because both packages
+    // own the `opencode` bin name. Locally it is found through CM_OPENCODE2_DIR or skipped.
+    const OC2_DIR = process.env.CM_OPENCODE2_DIR;
+    const OC2_BIN = OC2_DIR ? join(OC2_DIR, "node_modules", "@opencode", "cli", "bin", "opencode.exe") : undefined;
+    let hasOpencode2 = false;
+    if (OC2_BIN) { try { execFileSync(OC2_BIN, ["--version"], { stdio: "ignore" }); hasOpencode2 = true; } catch { hasOpencode2 = false; } }
+    const HOST_1 = { bin: "opencode", tool: "bash", args: [] };
+    const HOST_2 = { bin: OC2_BIN, tool: "shell", args: ["--standalone", "--auto", "--print-logs", "--log-level", "info"] };
+
     /** Runs opencode once; returns the content of the tool message the model got on its second request. */
-    async function run(cmd, pluginEntry) {
+    async function run(cmd, pluginEntry) { return (await runHost(cmd, pluginEntry, HOST_1)).out; }
+
+    /** The same run for a host row: the tool text, the tool names of the first model request, and the host log. */
+    async function runHost(cmd, pluginEntry, host) {
       const d = mkdtempSync(join(tmpdir(), "cm-ocfire-"));
       const work = join(d, "work");
       const home = join(d, "home");
       mkdirSync(work); mkdirSync(join(home, ".config", "opencode"), { recursive: true });
       writeFileSync(join(work, "big.log"), "line lorem ipsum dolor sit amet\n".repeat(6500));
       const bodies = [];
-      const srv = provider(cmd, bodies);
+      const srv = provider(cmd, bodies, host.tool);
       await new Promise((r) => srv.listen(0, "127.0.0.1", r));
       const port = srv.address().port;
+      const logFile = join(d, "host.log");
       writeFileSync(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({
         $schema: "https://opencode.ai/config.json",
         provider: { fake: { npm: "@ai-sdk/openai-compatible", name: "fake", options: { baseURL: `http://127.0.0.1:${port}/v1`, apiKey: "x" }, models: { "fake-model": { name: "fake-model", tool_call: true, limit: { context: 200000, output: 8000 } } } } },
@@ -79,16 +93,20 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
       }));
       const env = { ...process.env, PWD: work, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), XDG_DATA_HOME: join(home, ".local", "share"), XDG_CACHE_HOME: join(home, ".cache"), XDG_STATE_HOME: join(home, ".local", "state"), OPENCODE_DISABLE_MODELS_FETCH: "1", OPENCODE_DISABLE_AUTOUPDATE: "1" };
       await new Promise((resolveRun) => {
-        const c = spawn("opencode", ["run", "-m", "fake/fake-model", ...(process.env.CM_OC_DEBUG ? ["--print-logs", "--log-level", "INFO"] : []), "show the log"], { cwd: work, env, stdio: process.env.CM_OC_DEBUG ? ["ignore", openSync(process.env.CM_OC_DEBUG, "w"), 2] : "ignore" });
+        const debug = process.env.CM_OC_DEBUG ? ["--print-logs", "--log-level", "INFO"] : [];
+        const args = ["run", ...(host.args.length ? host.args : debug), "-m", "fake/fake-model", "show the log"];
+        const c = spawn(host.bin, args, { cwd: work, env, stdio: ["ignore", openSync(logFile, "w"), openSync(logFile, "a")] });
         const t = setTimeout(() => c.kill("SIGKILL"), 150000);
         c.on("close", () => { clearTimeout(t); resolveRun(); });
       });
       srv.close();
+      const log = existsSync(logFile) ? readFileSync(logFile, "utf8") : "";
       rmSync(d, { recursive: true, force: true });
       // opencode also sends side requests (title); the one that carries the tool result is the one to read
       const tools = bodies.flatMap((b) => JSON.parse(b).messages.filter((m) => m.role === "tool"));
       const tool = tools.reduce((a, m) => (a === undefined || String(m.content).length >= String(a.content).length ? m : a), undefined);
-      return tool ? String(tool.content) : "";
+      const first = bodies.map((b) => JSON.parse(b)).find((b) => (b.tools ?? []).length > 0);
+      return { out: tool ? String(tool.content) : "", toolNames: (first?.tools ?? []).map((t) => t.function.name), log };
     }
 
     const opts = { skip: !hasOpencode && "opencode not on PATH", timeout: 400000 };
@@ -103,6 +121,25 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
       const out = await run("cat big.log", join(tmpdir(), "cm-ocfire-gone", "opencode", "plugin.js"));
       assert.ok(!out.includes("ctx_execute"), out.slice(0, 200));
       assert.ok(out.length > 20000, "the model got " + out.length + " bytes");
+    });
+    test("D-OC2-ENTRY-1: OpenCode 1.19 loads the package dir entry (the entry setup writes) and denies the large cat", opts, async () => {
+      const b = buildPlugin();
+      const out = await run("cat big.log", b.out);
+      assert.ok(out.includes("ctx_execute"), out.slice(0, 400));
+      assert.ok(out.length < 4000, "the model got " + out.length + " bytes, not the file");
+    });
+    // D-OC2-FIRE-1: the real OpenCode 2.2.5 loader against the built package dir. Red before D-OC2-SETUP-1: "failed to load
+    // plugin ... Plugin must export a default definition with an id and an effect or setup function" and later
+    // "app.tool is not a function", no ctx_* tool, the file reaches the model.
+    const opts2 = { skip: !hasOpencode2 && "CM_OPENCODE2_DIR has no @opencode/cli", timeout: 400000 };
+    test("D-OC2-FIRE-1: OpenCode 2.2.5 loads the plugin with no warning, lists the ctx_* tools and denies the large cat", opts2, async () => {
+      const b = buildPlugin();
+      const r = await runHost("cat big.log", b.out, HOST_2);
+      assert.ok(!r.log.includes("failed to load plugin"), r.log.split("\n").filter((l) => l.includes("WARN")).join("\n").slice(0, 600));
+      assert.ok(!r.log.includes("level=WARN") || !r.log.includes("plugin"), "no plugin warning");
+      for (const n of ["ctx_execute", "ctx_search", "ctx_stats"]) assert.ok(r.toolNames.includes(n), n + " listed: " + r.toolNames.join(","));
+      assert.ok(r.out.includes("ctx_execute"), r.out.slice(0, 400));
+      assert.ok(r.out.length < 4000, "the model got " + r.out.length + " bytes, not the file");
     });
     test.after?.(() => { if (built) rmSync(built.out, { recursive: true, force: true }); });
   });

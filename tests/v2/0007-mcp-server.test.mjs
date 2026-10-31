@@ -259,7 +259,7 @@ describe("ADR-0007 call shape on every host", () => {
 
     test(`OpenCode ${name} ${JSON.stringify(input)}: the returned line shows the exact call`, async () => {
       const registered = new Map();
-      await opencodePlugin.setup({ directory: repo, tool: (n, def) => registered.set(n, def) });
+      await opencodePlugin.setupLegacy({ directory: repo, tool: (n, def) => registered.set(n, def) });
       const out = await registered.get(name).execute(input, { sessionID: "oc-1" });
       assert.equal(typeof out, "string");
       assert.ok(oneLine(out), out);
@@ -270,7 +270,7 @@ describe("ADR-0007 call shape on every host", () => {
   test("Pi and OpenCode register the description and the schema the MCP hosts get", async () => {
     const pi = await fakePi();
     const registered = new Map();
-    await opencodePlugin.setup({ directory: repo, tool: (n, def) => registered.set(n, def) });
+    await opencodePlugin.setupLegacy({ directory: repo, tool: (n, def) => registered.set(n, def) });
     for (const tool of TOOLS) {
       assert.equal(pi.get(tool.name).description, tool.description);
       assert.equal(registered.get(tool.name).description, tool.description);

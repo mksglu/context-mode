@@ -9,6 +9,7 @@ import { ownJournal } from "../core/journal/own-call.ts";
 import { resolveProject } from "../core/project/resolve.ts";
 import { TOOLS, checkCall, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "../prompt/_generated.ts";
+import { z } from "zod/v4";
 
 const AGENT = "opencode";
 
@@ -32,8 +33,9 @@ interface BusEvent { type?: string; properties?: { part?: { type?: string; sessi
 /** impl/12 §4.1: OpenCode 2.x plugin API `{id, setup}`; id reuses SERVER_KEY (A28). */
 export const id = PLUGIN_ID;
 
-/** impl/12 §4.3. Registers the ctx_* tools once and returns the hook object, closed over `cwd`. */
-export async function setup(app: OpenCodeApp) {
+/** impl/12 §4.3, the OpenCode 1.19 / KiloCode shape: registers the ctx_* tools through `app.tool` and returns the
+ *  hook object, closed over `cwd`. OpenCode 2 does not call this; it calls `setup(ctx)` below (D-OC2-SETUP-1). */
+export async function setupLegacy(app: OpenCodeApp) {
   const cwd = app.directory; // §4.2 step 2: read once per plugin load
   const env = process.env;
   const turns = new Map<string, number>(); // sessionID -> turn, counted by chat.message
@@ -116,12 +118,12 @@ export async function setup(app: OpenCodeApp) {
     },
 
     // §4.5. OpenCode's encode has no replace field (impl/10 §11), so output.output is never changed here.
-    "tool.execute.after": async (input: ToolInput, output: { output?: unknown }) => {
+    "tool.execute.after": async (input: ToolInput, output: { output?: unknown; isError?: boolean }) => {
       const sessionId = input.sessionID ?? "";
       await payloadFor(sessionId);
       await call({
         type: "execute.after", sessionID: sessionId, tool: input.tool, callID: input.callID, args: input.args,
-        output: output.output, turn: turnOf(sessionId),
+        output: output.output, isError: output.isError, turn: turnOf(sessionId),
       });
     },
 
@@ -148,11 +150,99 @@ export async function setup(app: OpenCodeApp) {
   };
 }
 
+// ---- OpenCode 2 (D-OC2-SETUP-1) ----------------------------------------------------------------------------------
+// Shapes read from @opencode/plugin 2.2.5 (dist/promise: plugin.d.ts, session.d.ts, tool.d.ts) and probed live on the 2.2.5
+// loader. 1.19 hook -> 2.x hook: tool.execute.before -> ctx.tool.hook("execute.before") (throw = deny, the message reaches
+// the model), tool.execute.after -> "execute.after" (status completed | error), chat.message -> ctx.session.hook("prompt"),
+// experimental.chat.system.transform -> ctx.session.hook("context") (push a text part to `system`),
+// experimental.session.compacting -> ctx.session.hook("compaction"), event step-finish -> ctx.event.subscribe
+// ("session.step.ended"), plugin tools -> ctx.tool.transform(editor.add). setup returns a dispose function.
+
+interface Oc2Content { type?: string; text?: string }
+interface Oc2BeforeInput { tool?: string; sessionID?: string; id?: string; input?: unknown }
+interface Oc2AfterInput extends Oc2BeforeInput {
+  status?: string;
+  result?: { content?: string | Oc2Content[]; output?: unknown };
+  error?: { message?: string };
+}
+interface Oc2Part { type?: string; text?: string }
+interface Oc2Tool {
+  name: string;
+  description: string;
+  input: unknown;
+  options: { codemode: boolean };
+  execute(input: unknown, context: { sessionID?: string; signal?: AbortSignal }): Promise<{ content: string }>;
+}
+/** The part of the OpenCode 2 `setup(ctx)` argument this plugin uses. */
+export interface OpenCode2Context {
+  location: { directory: string };
+  tool: {
+    hook(name: string, cb: (input: never) => Promise<void> | void): Promise<unknown>;
+    transform(cb: (editor: { add(tool: Oc2Tool): void }) => void): Promise<unknown>;
+  };
+  session: { hook(name: string, cb: (input: never) => Promise<void> | void): Promise<unknown> };
+  event: { subscribe(options?: { types?: string[]; signal?: AbortSignal }): AsyncIterable<{ data?: { sessionID?: string } }> };
+}
+
+function oc2Text(content: string | Oc2Content[] | undefined): string {
+  if (typeof content === "string") return content;
+  return (content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+}
+
+/** impl/12 §4.1, OpenCode 2 `{id, setup}`: the same handlers as `setupLegacy`, wired to the 2.x ctx. */
+export async function setup(ctx: OpenCode2Context): Promise<() => void> {
+  const tools = new Map<string, Oc2Tool>();
+  const hooks = await setupLegacy({
+    directory: ctx.location.directory,
+    tool(name, def) {
+      tools.set(name, {
+        name, description: def.description,
+        input: z.toJSONSchema(def.args as z.ZodType, { target: "draft-2020-12", io: "input" }),
+        options: { codemode: false }, // a ctx_* tool is listed to the model by name, not behind the host's code tool
+        async execute(input, context) {
+          return { content: await def.execute(input, { sessionID: context.sessionID, abort: context.signal }) };
+        },
+      });
+    },
+  });
+
+  await ctx.tool.transform((editor) => { for (const t of tools.values()) editor.add(t); });
+
+  await ctx.tool.hook("execute.before", async (i: Oc2BeforeInput) => {
+    await hooks["tool.execute.before"]({ tool: i.tool, sessionID: i.sessionID, callID: i.id }, { args: i.input });
+  });
+  await ctx.tool.hook("execute.after", async (i: Oc2AfterInput) => {
+    const failed = i.status === "error";
+    const output = failed ? i.error?.message ?? "" : oc2Text(i.result?.content);
+    await hooks["tool.execute.after"]({ tool: i.tool, sessionID: i.sessionID, callID: i.id, args: i.input }, { output, isError: failed });
+  });
+  await ctx.session.hook("prompt", async (p: { sessionID?: string; prompt?: { text?: string } }) => {
+    await hooks["chat.message"]({ sessionID: p.sessionID }, { parts: [{ type: "text", text: p.prompt?.text ?? "" }] });
+  });
+  await ctx.session.hook("context", async (c: { sessionID?: string; system: Oc2Part[] }) => {
+    const system: string[] = [];
+    await hooks["experimental.chat.system.transform"]({ sessionID: c.sessionID }, { system });
+    for (const text of system) if (!c.system.some((p) => p.text === text)) c.system.push({ type: "text", text });
+  });
+  await ctx.session.hook("compaction", async (c: { sessionID?: string }) => {
+    await hooks["experimental.session.compacting"]({ sessionID: c.sessionID });
+  });
+
+  // step-finish is the Usage event: one cost row per (session, turn). The loop ends when dispose aborts it.
+  const stop = new AbortController();
+  void (async () => {
+    for await (const e of ctx.event.subscribe({ types: ["session.step.ended"], signal: stop.signal })) {
+      await hooks.event({ event: { type: "message.part.updated", properties: { part: { type: "step-finish", sessionID: e.data?.sessionID } } } });
+    }
+  })().catch(() => { /* a hook never errors (ADR-0001); an ended stream is the dispose path */ });
+  return () => stop.abort();
+}
+
 /** ADR-0020, D-HA-6: the OpenCode 1.19.4 loader takes `export default { id, server }`; `server(input)` returns the
  *  hook object, and plugin tools ride in its `tool` map with `args` as a record of zod fields (the object shape). */
 export async function server(input: { directory?: string }, _options?: unknown) {
   const tool: Record<string, Omit<OpenCodeToolDef, "args"> & { args: unknown }> = {};
-  const hooks = await setup({
+  const hooks = await setupLegacy({
     directory: input.directory,
     tool(name, def) {
       const shape = (def.args as { shape?: unknown }).shape;
@@ -162,5 +252,5 @@ export async function server(input: { directory?: string }, _options?: unknown) 
   return { ...hooks, tool };
 }
 
-// The 1.19.4 loader reads only id, server and tui on the default export; setup stays for the M5 plugin API tests.
+// The 1.19.4 loader reads only id, server and tui on the default export; the 2.x loader reads id and setup (or effect).
 export default { id: PLUGIN_ID, server, setup };

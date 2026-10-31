@@ -87,6 +87,19 @@ jobs:
         name: codex 0.166.0 for the codex fire tests (D-C166-WIN-FIRE-1)
       - run: codex --version
         name: codex version (info)
+      # D-OC2-FIRE-1: both OpenCode lines on all 3 OS for the opencode fire tests (tests/v2/0020-fire-plugin-ext). 1.19.5 is the
+      # global `opencode`; 2.2.5 (npm @opencode/cli) owns the same bin name, so it goes into its own prefix, found through
+      # CM_OPENCODE2_DIR. Fake local provider, temp HOME, no login, no key.
+      - run: npm i -g opencode-ai@1.19.5
+        name: opencode 1.19.5 for the opencode fire tests (D-OC2-FIRE-1)
+      - run: opencode --version
+        name: opencode 1.19.5 version (info)
+      - run: npm i --prefix "${{ runner.temp }}/opencode2" @opencode/cli@2.2.5
+        name: opencode 2.2.5 (@opencode/cli) for the opencode 2 fire test (D-OC2-FIRE-1)
+        shell: bash
+      - run: echo "CM_OPENCODE2_DIR=${{ runner.temp }}/opencode2" >> "$GITHUB_ENV"
+        name: CM_OPENCODE2_DIR
+        shell: bash
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts for v2 unit tests (D-M2-arch-6)
       - run: npm run typecheck

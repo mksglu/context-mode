@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, DB_FILE_NAME, PROJECTS_DIR_NAME, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, DB_FILE_NAME, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
@@ -269,10 +269,15 @@ function planCodexTrust(row: CheckRow, edits: FileEdit[], hooksFile: string, fil
 const NATIVE_PLUGIN_PREFIX = "context-mode@";
 function isNativeSpec(e: unknown): boolean { return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX); }
 function isStaleOwnPlugin(e: unknown, entry: string): boolean {
-  if (typeof e !== "string" || e === entry || !path.isAbsolute(e) || existsSync(e)) return false;
+  if (typeof e !== "string" || e === entry || !path.isAbsolute(e)) return false;
+  // D-OC2-ENTRY-1: the file form <pkg>/opencode/plugin.js of an earlier setup loads twice next to the dir entry and
+  // OpenCode 2 refuses it, so it goes whether or not the file is still there.
+  if (e === path.join(entry, ...OPENCODE_PLUGIN_PATH)) return true;
+  if (existsSync(e)) return false;
   const seg = e.split("\\").join("/").split("/");
   const n = seg.length;
-  return n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === "context-mode";
+  if (n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === "context-mode") return true;
+  return n >= 2 && seg[n - 1] === "context-mode" && seg[n - 2] === "node_modules"; // a package dir entry of ours that is gone
 }
 function wantedPluginList(list: unknown[], entry: string): unknown[] {
   const native = list.some(isNativeSpec);
@@ -377,10 +382,21 @@ function statusOf(row: CheckRow, text: string): PluginStatus {
   return undefined;
 }
 
+/** D-OC2-DOCTOR-1: OpenCode 2 (npm @opencode/cli) has no --pure and talks to a background service unless --standalone
+ *  is given; OpenCode 1.x keeps --pure (D-HF-OPENCODE-LIST-1). The host version picks the form. */
+function opencodeListArgs(bin: string, env: SetupContext["env"]): string[] {
+  const r = runBin(bin, ["--version"], env);
+  const text = `${r.stdout}${r.stderr}`;
+  const digits = text.split("").filter((c) => (c >= "0" && c <= "9") || c === ".").join("");
+  const major = Number(digits.split(".")[0]);
+  return major >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+}
+
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
 function listState(row: CheckRow, env: SetupContext["env"]): { check?: Check; status: PluginStatus } {
-  const l = row.listCommand;
-  if (!l || !hostBin(l.bin, env).file) return { status: undefined };
+  const l0 = row.listCommand;
+  if (!l0 || !hostBin(l0.bin, env).file) return { status: undefined };
+  const l = row.id === "opencode" ? { bin: l0.bin, args: opencodeListArgs(l0.bin, env) } : l0;
   const r = runBin(l.bin, l.args, env);
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
   const ok = r.status === 0 && `${r.stdout}${r.stderr}`.includes("context-mode");

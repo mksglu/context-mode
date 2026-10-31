@@ -723,7 +723,7 @@ describe("ADR-0009 section 0: journal write path from the in-process entries (Op
 
   test("H6: opencode in-process ctx_execute writes a journal row and ctx_stats counts it", async () => {
     const registered = new Map();
-    await opencodePlugin.setup({ directory: repo, tool: (name, def) => registered.set(name, def) });
+    await opencodePlugin.setupLegacy({ directory: repo, tool: (name, def) => registered.set(name, def) });
     await registered.get("ctx_execute").execute(CODE, { sessionID: "oc-1" });
     const r = rows("opencode");
     assert.equal(r.length, 1, "one journal row per in-process call");

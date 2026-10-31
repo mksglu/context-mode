@@ -198,6 +198,8 @@ const OUT_PACKAGE_JSON = "package.json";
 const PI_EXTENSION = "./pi/index.js";
 const PI_SKILLS = "./pi/skills"; // D-HQ-SKILLS-1: pi's own rendered copy
 const OPENCODE_MAIN = "./opencode/plugin.js"; // ADR-0023 (D-NI-OPENCODE-1): OpenCode imports the plugin by package name
+// D-OC2-SETUP-1: the OpenCode 2 loader resolves a package plugin through exports["./server"] (main alone finds no entry).
+const OPENCODE_EXPORTS = { ".": OPENCODE_MAIN, "./server": OPENCODE_MAIN };
 const CLI_BUNDLE = "cli.mjs";
 const NODE_ENGINE = ">=" + NODE_MIN; // D1, the runtime check constant (D-PKG-META-1)
 
@@ -210,14 +212,14 @@ export const OUT_FILES: readonly string[] = [
 // D-RN-REPO-1: npm provenance rejects a publish (E422) unless repository.url names the source repo. This is the
 // `npm pkg fix` form, so check-npm-tarball.mjs's "npm pkg fix is a no-op" gate still holds.
 const REPOSITORY = { type: "git", url: "git+https://github.com/mksglu/context-mode.git" };
-const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "bugs", "description", "engines", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"];
+const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"];
 const PI_KEYS: readonly string[] = ["extensions", "skills"];
 
 function npmPackageJson(version: string): JsonObject {
   const meta = devMeta();
   return {
     name: SERVER_KEY, version, type: "module", bin: { [SERVER_KEY]: CLI_BUNDLE }, engines: { node: NODE_ENGINE },
-    files: [...OUT_FILES], main: OPENCODE_MAIN, pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] },
+    files: [...OUT_FILES], main: OPENCODE_MAIN, exports: OPENCODE_EXPORTS, pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] },
     description: meta.description, keywords: [...meta.keywords], license: meta.license, homepage: meta.homepage, bugs: meta.bugs, repository: meta.repository,
   };
 }
@@ -237,6 +239,7 @@ export function assertOutPackageJson(pkg: unknown): void {
   if (JSON.stringify(obj.engines) !== JSON.stringify({ node: NODE_ENGINE })) throw new Error("package.json: engines must be {node: " + NODE_ENGINE + "}");
   if (JSON.stringify(obj.files) !== JSON.stringify(OUT_FILES)) throw new Error("package.json: files must be " + OUT_FILES.join(","));
   if (obj.main !== OPENCODE_MAIN) throw new Error("package.json: main must be " + OPENCODE_MAIN);
+  if (JSON.stringify(obj.exports) !== JSON.stringify(OPENCODE_EXPORTS)) throw new Error("package.json: exports must be " + JSON.stringify(OPENCODE_EXPORTS));
   if (JSON.stringify(obj.repository) !== JSON.stringify(REPOSITORY)) throw new Error("package.json: repository must be " + JSON.stringify(REPOSITORY));
   const meta = devMeta(); // D-PKG-META-1: the shared fields must equal the repo package.json
   for (const key of ["description", "keywords", "license", "homepage", "bugs"] as const) {

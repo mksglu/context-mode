@@ -4,7 +4,7 @@
 import path from "node:path";
 
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
-import { AGENT_HOME_DIR, HOST_NODE_COMMAND, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OPENCODE_PLUGIN_PATH, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, HOST_NODE_COMMAND, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
 import type { AgentId, AdapterRow, HostConfigFormat } from "../core/contracts/types.ts";
 import { claudeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf } from "../core/project/config-dir.ts";
 import { ownMcpValue } from "../core/ops/host-config.ts";
@@ -247,7 +247,7 @@ function hookInstallFor(ctx: SetupContext, row: AdapterRow, command: string): Ho
   }
   if (row.id === "opencode") {
     return { kind: "plugin-list", file: path.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE), key: ["plugin"],
-      entry: path.join(ctx.pkgDir, ...OPENCODE_PLUGIN_PATH) }; // OpenCode 1.19.4 turns an absolute or drive-letter path into a file URL itself (D-WIN-OCENTRY-1)
+      entry: ctx.pkgDir }; // D-OC2-ENTRY-1: the package dir loads on OpenCode 1.19.5 and 2.2.x (2.x rejects a file path: "configured plugin path must be a directory"); the host turns an absolute or drive-letter path into a file URL itself (D-WIN-OCENTRY-1)
   }
   return { kind: "package", via: ch.path };
 }

@@ -2440,7 +2440,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
     async function opencodeRun(proj, calls) {
       const mod = await import("../../src/entries/opencode.ts");
       const tools = new Map();
-      await mod.default.setup({ directory: proj, tool: (name, def) => tools.set(name, def) });
+      await mod.setupLegacy({ directory: proj, tool: (name, def) => tools.set(name, def) });
       const out = [];
       for (const [name, a] of calls) {
         const text = await tools.get(name).execute(a, { sessionID: "parity-oc" });

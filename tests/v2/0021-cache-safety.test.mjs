@@ -279,7 +279,7 @@ describe("ADR-0021 prefix determinism across starts", () => {
     process.env.HOME = path.join(root, "oc-home"); process.env.USERPROFILE = path.join(root, "oc-home");
     delete process.env.CLAUDE_PROJECT_DIR;
     try {
-      const hooks = await opencodePlugin.setup({ directory: repo, tool: () => {} });
+      const hooks = await opencodePlugin.setupLegacy({ directory: repo, tool: () => {} });
       const seen = [];
       for (let i = 0; i < 6; i++) {
         await hooks["chat.message"]({ sessionID: "prefix-oc" }, { parts: [{ type: "text", text: "work " + i }] });
@@ -430,17 +430,17 @@ describe("ADR-0021 OpenCode cache break guard", () => {
   }
 
   test("opencode cache: a compaction in session A leaves the next session's system payload byte-identical", async () => {
-    const plain = await opencodePlugin.setup({ directory: repo, tool: () => {} });
+    const plain = await opencodePlugin.setupLegacy({ directory: repo, tool: () => {} });
     const ref = await systemOf(plain, "oc-ref");
 
-    const a = await opencodePlugin.setup({ directory: repo, tool: () => {} });
+    const a = await opencodePlugin.setupLegacy({ directory: repo, tool: () => {} });
     await a["chat.message"]({ sessionID: "oc-a" }, { parts: [{ type: "text", text: "work" }] });
     await a["tool.execute.after"]({ sessionID: "oc-a", tool: "bash", callID: "c1", args: { command: "ls" } }, { output: "a b" });
     await systemOf(a, "oc-a");
     await a["experimental.session.compacting"]({ sessionID: "oc-a" });
 
     // A new process (new plugin load), as when the user starts a new session within minutes.
-    const b = await opencodePlugin.setup({ directory: repo, tool: () => {} });
+    const b = await opencodePlugin.setupLegacy({ directory: repo, tool: () => {} });
     assert.deepEqual(await systemOf(b, "oc-b"), ref, "session B system[] differs from a session with no compaction before it");
     await b["chat.message"]({ sessionID: "oc-b" }, { parts: [{ type: "text", text: "next" }] });
     assert.deepEqual(await systemOf(b, "oc-b"), ref, "session B turn 2 system[] differs");

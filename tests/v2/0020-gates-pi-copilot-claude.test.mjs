@@ -572,7 +572,8 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       writeFileSync(s.file, JSON.stringify(doc, null, 2) + "\n");
     }
     const plugins = (s) => JSON.parse(readFileSync(s.file, "utf8")).plugin;
-    const own = (s) => path.join(s.pkgDir, "opencode", "plugin.js");
+    const own = (s) => s.pkgDir; // D-OC2-ENTRY-1: the package dir
+    const ownFile = (s) => path.join(s.pkgDir, "opencode", "plugin.js"); // the file form of an earlier setup
     const opts = (s) => ({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"] });
     const registered = (d) => d.agents[0].checks.find((c) => c.name === "hook-registered");
 
@@ -612,6 +613,16 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       assert.equal(registered(await runDoctor(opts(s))).ok, true);
     });
 
+    test("the file entry of an earlier setup (<pkg>/opencode/plugin.js, OpenCode 2 refuses it) is swapped for the package dir", async (t) => {
+      const s = sandbox(t);
+      mkdirSync(path.dirname(ownFile(s)), { recursive: true });
+      writeFileSync(ownFile(s), "export default {};\n");
+      put(s, { plugin: ["my-own-plugin", ownFile(s)] });
+      const res = await runSetup({ ...opts(s), runId: "f" });
+      assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+      assert.deepEqual(plugins(s), ["my-own-plugin", own(s)]);
+    });
+
     test("a user plugin that is a missing file but not ours is never touched", async (t) => {
       const s = sandbox(t);
       const theirs = path.join(s.root, "gone", "my-plugin.js");
@@ -632,7 +643,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   });
 
   describe("ADR-0020 OpenCode plugin entry path", { concurrency: CONC }, () => {
-    // OC-WIN-4 (D-WIN-OCENTRY-1): the opencode plugin entry is the absolute path of opencode/plugin.js, written bare.
+    // OC-WIN-4 (D-WIN-OCENTRY-1, D-OC2-ENTRY-1): the opencode plugin entry is the absolute package dir, written bare.
     // OpenCode 1.19.4 (binary strings, resolver for config `plugin` entries): a value that is `file://`, starts with `.`,
     // is absolute, or starts with a drive letter + `:` + `\` or `/` is a file entry, and an absolute or drive-letter
     // value is turned into a file URL with pathToFileURL (so spaces and backslashes are encoded by OpenCode itself).
@@ -653,8 +664,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       const row = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {} }).find((r) => r.id === "opencode");
       assert.equal(row.hookInstall.kind, "plugin-list");
       const entry = row.hookInstall.entry;
-      assert.ok(entry.startsWith(WIN_PKG), "entry is under the package dir: " + entry);
-      assert.ok(entry.endsWith("plugin.js"), "entry names plugin.js: " + entry);
+      assert.equal(entry, WIN_PKG, "entry is the package dir: " + entry);
       assert.ok(isDriveLetterPath(entry), "entry is a drive-letter path: " + entry);
       assert.ok(!entry.startsWith("file:"), "no file URL spelling: " + entry);
     });
@@ -662,7 +672,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     test("OC-WIN-4: a POSIX package dir with a space stays a bare absolute path", () => {
       const pkg = "/Users/jane doe/.npm-global/lib/node_modules/context-mode";
       const row = buildRegistry({ home: "/Users/jane doe", pkgDir: pkg, env: {} }).find((r) => r.id === "opencode");
-      assert.equal(row.hookInstall.entry, path.join(pkg, "opencode", "plugin.js"));
+      assert.equal(row.hookInstall.entry, pkg);
       assert.ok(!row.hookInstall.entry.startsWith("file:"));
     });
   });
