@@ -45,6 +45,7 @@ import {
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
 import { sanitizeSchemaForStrictClients, resolveExecTimeout, AGY_DEFAULT_EXEC_TIMEOUT_MS, REGISTERED_CTX_TOOLS } from "../../src/server.js";
+import { PLATFORM_ENV_VARS } from "../../src/adapters/detect.js";
 import { stripJsonComments, parseJsonc } from "../../src/util/jsonc.js";
 
 // ─── Shared setup ───────────────────────────────────────────────────────────
@@ -1255,9 +1256,12 @@ describe("ctx_index: projectRoot path resolution (#365)", () => {
     // detectPlatform() can pick that host, enter strict mode, and ban
     // IDEA_INITIAL_DIRECTORY as a foreign var.
     const cleanEnv = { ...process.env };
+    const platformEnvNames = new Set(
+      [...PLATFORM_ENV_VARS.values()].flatMap((entries) => entries.map((entry) => entry.name)),
+    );
     for (const key of Object.keys(cleanEnv)) {
       if (
-        /^(CLAUDE|CODEX|GEMINI|VSCODE|CURSOR|OPENCODE|KILO|KIRO|PI|OMP|ZED|QWEN|KIMI|ANTIGRAVITY|OPENCLAW|COPILOT)_/.test(key) ||
+        platformEnvNames.has(key) ||
         key === "CONTEXT_MODE_PLATFORM" ||
         key === "CONTEXT_MODE_PROJECT_DIR"
       ) {

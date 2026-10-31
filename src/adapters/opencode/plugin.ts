@@ -28,7 +28,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolveSessionDbPath, SessionDB } from "../../session/db.js";
 import { extractEvents, extractUserEvents, parseOpencodeUsage, buildAgentUsageEvent } from "../../session/extract.js";
 import type { HookInput } from "../../session/extract.js";
-import { buildResumeSnapshot } from "../../session/snapshot.js";
+import { buildResumeSnapshot, RESUME_SNAPSHOT_MAX_BYTES } from "../../session/snapshot.js";
 import type { SessionEvent } from "../../types.js";
 import { AdapterPlatformType, OpenCodeAdapter } from "./index.js";
 import { PLATFORM_ENV_VARS } from "../detect.js";
@@ -630,6 +630,7 @@ async function createContextModePlugin(ctx: PluginContext) {
         const stats = db.getSessionStats(sessionId);
         const snapshot = buildResumeSnapshot(events, {
           compactCount: (stats?.compact_count ?? 0) + 1,
+          maxBytes: RESUME_SNAPSHOT_MAX_BYTES,
         });
 
         db.upsertResume(sessionId, snapshot, events.length);

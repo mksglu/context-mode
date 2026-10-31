@@ -200,4 +200,31 @@ describe("Issue #117 — Session hooks without build/session/", () => {
 
     expect(result.exitCode).toBe(0);
   });
+
+  test("precompact.mjs enforces the resume snapshot byte budget", () => {
+    const sessionId = "precompact-budget-1022";
+    const largeResponse = "event-data-".repeat(300);
+    for (let index = 0; index < 20; index += 1) {
+      const result = runHook("posttooluse.mjs", {
+        session_id: sessionId,
+        tool_name: "apply_patch",
+        tool_input: { command: `*** Update File: /src/file-${index}.ts` },
+        tool_response: largeResponse,
+        tool_output: { is_error: true },
+      });
+      expect(result.exitCode).toBe(0);
+    }
+
+    const compact = runHook("precompact.mjs", { session_id: sessionId });
+    expect(compact.exitCode).toBe(0);
+
+    const dbFile = getDBFiles().find((file) => file.endsWith(".db"));
+    if (dbFile === undefined) throw new Error("precompact did not create a session database");
+    const db = new SessionDB({ dbPath: join(sessionDBDir, dbFile) });
+    const resume = db.getResume(sessionId);
+    db.close();
+
+    expect(resume).not.toBeNull();
+    expect(Buffer.byteLength(resume?.snapshot ?? "", "utf8")).toBeLessThanOrEqual(2048);
+  });
 });

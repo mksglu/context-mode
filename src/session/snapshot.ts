@@ -9,8 +9,7 @@
  * contains a natural summary plus a runnable search tool call that retrieves
  * full details from the indexed knowledge base on demand.
  *
- * Zero truncation. Zero information loss. Full data lives in SessionDB;
- * the snapshot is a table of contents.
+ * Full data lives in SessionDB; the snapshot is a table of contents.
  */
 
 import { escapeXML } from "../truncate.js";
@@ -27,10 +26,13 @@ export interface StoredEvent {
 }
 
 export interface BuildSnapshotOpts {
-  maxBytes?: number;      // KEPT for backward compat but IGNORED
+  maxBytes?: number;
   compactCount?: number;
   searchTool?: string;    // platform-specific tool name, default "ctx_search"
 }
+
+export const RESUME_SNAPSHOT_MAX_BYTES = 2_048;
+const SNAPSHOT_TRUNCATION_MARKER = "  <snapshot_truncated/>";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -458,6 +460,95 @@ function buildRecentMessagesSection(userPromptEvents: StoredEvent[]): string {
   ].join("\n");
 }
 
+function snapshotSectionPriority(section: string): number {
+  const tag = /^\s*<([a-z_]+)/.exec(section)?.[1];
+  const priorities: Record<string, number> = {
+    how_to_search: 0,
+    session_goal: 1,
+    recent_user_messages: 2,
+    task_state: 3,
+    files: 4,
+    rules: 5,
+    decisions: 6,
+    errors: 7,
+    git: 8,
+    environment: 9,
+    subagents: 10,
+    roles: 11,
+    skills: 12,
+    intent: 13,
+  };
+  return tag === undefined ? Number.MAX_SAFE_INTEGER : (priorities[tag] ?? Number.MAX_SAFE_INTEGER);
+}
+
+function snapshotByteLength(
+  header: string,
+  sections: string[],
+  footer: string,
+  truncated: boolean,
+): number {
+  const body = truncated ? [...sections, SNAPSHOT_TRUNCATION_MARKER] : sections;
+  if (body.length === 0) {
+    return Buffer.byteLength(header, "utf8") + 1 + Buffer.byteLength(footer, "utf8");
+  }
+
+  return (
+    Buffer.byteLength(header, "utf8") +
+    Buffer.byteLength(footer, "utf8") +
+    body.reduce((total, section) => total + Buffer.byteLength(section, "utf8"), 0) +
+    (2 * body.length) +
+    2
+  );
+}
+
+function assembleSnapshot(
+  header: string,
+  sections: string[],
+  footer: string,
+  truncated: boolean,
+): string {
+  const body = truncated ? [...sections, SNAPSHOT_TRUNCATION_MARKER] : sections;
+  if (body.length === 0) return `${header}\n${footer}`;
+  return `${header}\n\n${body.join("\n\n")}\n\n${footer}`;
+}
+
+function buildBoundedSnapshot(
+  header: string,
+  sections: string[],
+  footer: string,
+  maxBytes: number,
+): string {
+  if (snapshotByteLength(header, [], footer, true) > maxBytes) {
+    throw new RangeError(`maxBytes is too small for a valid session snapshot: ${maxBytes}`);
+  }
+
+  if (snapshotByteLength(header, sections, footer, false) <= maxBytes) {
+    return assembleSnapshot(header, sections, footer, false);
+  }
+
+  const ranked = sections
+    .map((section, index) => ({ index, priority: snapshotSectionPriority(section), section }))
+    .sort((a, b) => a.priority - b.priority || a.index - b.index);
+  const selected: number[] = [];
+
+  for (const candidate of ranked) {
+    if (Buffer.byteLength(candidate.section, "utf8") > maxBytes) continue;
+    const candidateIndexes = [...selected, candidate.index].sort((a, b) => a - b);
+    const candidateSections = candidateIndexes.map(index => sections[index]);
+    if (snapshotByteLength(header, candidateSections, footer, true) <= maxBytes) {
+      selected.push(candidate.index);
+    }
+  }
+
+  selected.sort((a, b) => a - b);
+  return assembleSnapshot(
+    header,
+    selected.map(index => sections[index]),
+    footer,
+    selected.length !== sections.length,
+  );
+}
+
 // ── Main builder ─────────────────────────────────────────────────────────────
 
 /**
@@ -467,12 +558,16 @@ function buildRecentMessagesSection(userPromptEvents: StoredEvent[]): string {
  * 1. Group events by category
  * 2. For each non-empty category, build a summary section with a runnable
  *    search tool call containing exact queries for full details
- * 3. Assemble ALL non-empty sections — no priority dropping, no byte budget
+ * 3. Assemble all non-empty sections, or priority-select closed sections within maxBytes
  */
 export function buildResumeSnapshot(
   events: StoredEvent[],
   opts?: BuildSnapshotOpts,
 ): string {
+  const maxBytes = opts?.maxBytes;
+  if (maxBytes !== undefined && (!Number.isInteger(maxBytes) || maxBytes <= 0)) {
+    throw new RangeError(`maxBytes must be a positive integer: ${maxBytes}`);
+  }
   const compactCount = opts?.compactCount ?? 1;
   const searchTool = opts?.searchTool ?? "ctx_search";
   const now = new Date().toISOString();
@@ -565,13 +660,8 @@ export function buildResumeSnapshot(
   const recentMessages = buildRecentMessagesSection(userPromptEvents);
   if (recentMessages) sections.push(recentMessages);
 
-  // ── Assemble ──
   const header = `<session_resume events="${events.length}" compact_count="${compactCount}" generated_at="${now}">`;
   const footer = `</session_resume>`;
-
-  const body = sections.join("\n\n");
-  if (body) {
-    return `${header}\n\n${body}\n\n${footer}`;
-  }
-  return `${header}\n${footer}`;
+  if (maxBytes === undefined) return assembleSnapshot(header, sections, footer, false);
+  return buildBoundedSnapshot(header, sections, footer, maxBytes);
 }
