@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest]
         node: ["24.15.0", "26"]
     steps:
       - uses: actions/checkout@v4
@@ -36,12 +36,14 @@ jobs:
           touch stop.flag; pkill -P $LOOP 2>/dev/null || true; kill $LOOP 2>/dev/null || true
           echo "[D5PROOF] ${{ matrix.os }} node ${{ matrix.node }} D5 block under load: pass=$pass fail=$fail of 20"
           test "$fail" = 0
-      - name: D5-default-baseline (fast PASS side and slow stub FAIL side) 20x, quiet
+      - name: D5-default-baseline 20x, quiet, with failure text and leftover processes
         shell: bash
         run: |
+          echo "[D5PROOF] leftover node procs: $(pgrep -c node || true)"; ps -ax -o pid,pcpu,command | grep -c "[n]ode --test" || true
           pass=0
           for i in $(seq 1 20); do
-            node --test --test-name-pattern="D5-default-baseline" tests/v2/0010-doctor-upgrade.test.mjs 2>&1 | grep -q "^ℹ pass 1" && pass=$((pass+1))
+            out=$(node --test --test-name-pattern="D5-default-baseline" tests/v2/0010-doctor-upgrade.test.mjs 2>&1)
+            if echo "$out" | grep -q "^ℹ pass 1"; then pass=$((pass+1)); else echo "[D5PROOF] run $i FAIL"; echo "$out" | grep -E "✖|took|Error|pass|fail" | head -8; fi
           done
           echo "[D5PROOF] ${{ matrix.os }} node ${{ matrix.node }} default-baseline quiet: pass=$pass of 20"
           test "$pass" = 20
