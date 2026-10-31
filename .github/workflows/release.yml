@@ -512,3 +512,23 @@ jobs:
         env:
           SHA: ${{ inputs.sha }}
         run: node scripts/release/commit-main.mjs --rollback-to "$SHA"
+  # D-DEV-VERSION-1: release-out carries the tag version; this job writes it back to the dev tree so v2-design never reports
+  # an old release (bench, package.json, source-tree manifests). Tag start only; a failure here never fails the release.
+  dev-version:
+    needs: [github-release]
+    if: ${{ startsWith(github.ref, 'refs/tags/v2.') && needs.github-release.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-design
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: tag version into package.json and the source-tree manifests, one commit on v2-design
+        run: node scripts/release/dev-version.mjs --write --push v2-design

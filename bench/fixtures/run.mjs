@@ -11,6 +11,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { devVersionLabel } from "../../scripts/release/dev-version.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
@@ -170,7 +171,7 @@ let sha = null;
 try { sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: REPO, encoding: "utf8" }).trim(); } catch { /* not a git checkout */ }
 const result = {
   date: new Date().toISOString().slice(0, 10),
-  versions: { v1: v1.v1_version, v2: JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")).version, node: process.version },
+  versions: { v1: v1.v1_version, v2: devVersionLabel(JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")).version, null), node: process.version },
   shas: { v1: v1.v1_commit, v2: sha },
   v1_source: v1.note, run_ms: runMs, totals, rows,
 };

@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { devVersionLabel } from "../scripts/release/dev-version.mjs";
 import { BENCH, REPO, DATA, sandbox, startServer, stats, sha256, tokens } from "./suite/lib.mjs";
 
 const argv = process.argv.slice(2);
@@ -77,10 +78,10 @@ for (const r of results) for (const f of r.inputs) if (!manifest[f]) { const p =
 const runMs = Math.round(performance.now() - T0);
 const out = {
   schema: 1, date, runs: RUNS, run_ms: runMs, token_method: "bytes / 4, an estimate (no tokenizer is vendored)",
-  context_mode: { version: pkg.version, commit, dirty }, env, fixtures: manifest, results,
+  context_mode: { version: devVersionLabel(pkg.version, commit), commit, dirty }, env, fixtures: manifest, results,
 };
 
-const foot = `Hardware ${env.cpu} (${env.cores} cores, ${env.ram_gb} GB), ${env.os}. Node ${env.node}. context-mode ${pkg.version} at ${commit?.slice(0, 8)}${dirty ? " (dirty tree)" : ""}, built bundle, default settings, claude-code adapter unless a row names another. Median of ${RUNS} run${RUNS === 1 ? "" : "s"}, ranges as [min-max]. Tokens are bytes / 4, an estimate. Date ${date}. Reproduce: \`cd bench && node run.mjs --runs ${RUNS}\`.`;
+const foot = `Hardware ${env.cpu} (${env.cores} cores, ${env.ram_gb} GB), ${env.os}. Node ${env.node}. context-mode ${devVersionLabel(pkg.version, null)} at ${commit?.slice(0, 8)}${dirty ? " (dirty tree)" : ""}, built bundle, default settings, claude-code adapter unless a row names another. Median of ${RUNS} run${RUNS === 1 ? "" : "s"}, ranges as [min-max]. Tokens are bytes / 4, an estimate. Date ${date}. Reproduce: \`cd bench && node run.mjs --runs ${RUNS}\`.`;
 const md = [`# context-mode benchmark tables (${tag})`, "", foot, ""];
 for (const g of groups) {
   const rows = results.filter((r) => r.group === g.dir && !r.error);

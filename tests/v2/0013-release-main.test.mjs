@@ -865,3 +865,171 @@ describe("ADR-0013: branch protection check", { concurrency: CONC }, () => {
     assert.match(r.stderr, /branch protection check failed: gh api exited 1/);
   });
 });
+
+// D-DEV-VERSION-1: the dev tree version (package.json and the source-tree manifests) must not fall behind the highest
+// pushed v2.0.0-next.* tag. release.yml stamps the tag version into release-out only; nothing wrote it back to v2-design,
+// so bench results said "2.0.0-next.8" while npm next was 2.0.0-next.20.
+describe("ADR-0013: dev tree version", { concurrency: CONC }, () => {
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const SCRIPT = path.join(REPO, "scripts", "release", "dev-version.mjs");
+  const GIT_ID = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "-c", "init.defaultBranch=v2-design"];
+  const SOURCES = ["package.json", "package-lock.json", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", ".codex-plugin/plugin.json"];
+
+  const git = (dir, ...args) => {
+    const r = spawnSync("git", [...GIT_ID, ...args], { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const run = (dir, ...args) => spawnSync(process.execPath, [SCRIPT, "--repo", dir, ...args], { encoding: "utf8" });
+  const put = (dir, rel, obj) => {
+    mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    writeFileSync(path.join(dir, rel), JSON.stringify(obj, null, 2) + "\n");
+  };
+  const get = (dir, rel) => JSON.parse(readFileSync(path.join(dir, rel), "utf8"));
+  const writeTree = (dir, v) => {
+    put(dir, "package.json", { name: "context-mode", version: v });
+    put(dir, "package-lock.json", { name: "context-mode", version: v, lockfileVersion: 3, packages: { "": { name: "context-mode", version: v }, "node_modules/x": { version: "1.5.1" } } });
+    put(dir, ".claude-plugin/plugin.json", { name: "context-mode", version: v });
+    put(dir, ".claude-plugin/marketplace.json", { name: "m", metadata: { version: v }, plugins: [{ name: "context-mode", version: v }] });
+    put(dir, ".codex-plugin/plugin.json", { name: "context-mode", version: v });
+  };
+  // A work repo (branch v2-design) with a local bare origin. Commit A holds tree version `v`, tagged each of `tags` (annotated, pushed).
+  function seed(t, v, tags) {
+    const root = mkdtempSync(path.join(tmpdir(), "cm-devver-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const bare = path.join(root, "origin.git");
+    const dir = path.join(root, "work");
+    git(root, "init", "-q", "--bare", bare);
+    git(root, "init", "-q", dir);
+    git(dir, "remote", "add", "origin", bare);
+    writeTree(dir, v);
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "a");
+    for (const tag of tags) git(dir, "tag", "-a", tag, "-m", tag);
+    git(dir, "push", "-q", "origin", "HEAD:refs/heads/v2-design", "--tags");
+    return dir;
+  }
+  const next = (dir, msg) => { git(dir, "commit", "--allow-empty", "-q", "-m", msg); };
+
+  test("--check: tree version behind the highest pushed tag fails with the fix command", (t) => {
+    const dir = seed(t, "2.0.0-next.8", ["v2.0.0-next.8", "v2.0.0-next.20", "v2.0.0-next.9"]);
+    next(dir, "later work");
+    const r = run(dir, "--check");
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /dev version 2\.0\.0-next\.8 is behind v2\.0\.0-next\.20\. Fix: node scripts\/release\/dev-version\.mjs --write/);
+  });
+
+  test("--check: next.9 < next.20 is a numeric compare, equal passes, ahead passes", (t) => {
+    const dir = seed(t, "2.0.0-next.20", ["v2.0.0-next.20", "v2.0.0-next.9"]);
+    next(dir, "later work");
+    assert.equal(run(dir, "--check").status, 0);
+    writeTree(dir, "2.0.0-next.21");
+    assert.equal(run(dir, "--check").status, 0, "a tree ahead of the tags is not behind");
+  });
+
+  test("--check: the tag on HEAD is the release being built, so it does not count (release.yml runs ci on the tag)", (t) => {
+    const dir = seed(t, "2.0.0-next.20", ["v2.0.0-next.20"]);
+    next(dir, "release commit");
+    git(dir, "tag", "-a", "v2.0.0-next.21", "-m", "v2.0.0-next.21");
+    git(dir, "push", "-q", "origin", "--tags");
+    const r = run(dir, "--check");
+    assert.equal(r.status, 0, r.stderr);
+  });
+
+  test("--check: no network or no v2 tag is exit 2 with a reason, never a pass or a fail", (t) => {
+    const none = seed(t, "2.0.0-next.8", []);
+    const r = run(none, "--check");
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /no v2 release tag on origin/);
+    const gone = seed(t, "2.0.0-next.8", ["v2.0.0-next.8"]);
+    git(gone, "remote", "set-url", "origin", path.join(gone, "no-such-remote"));
+    const r2 = run(gone, "--check");
+    assert.equal(r2.status, 2);
+    assert.match(r2.stderr, /cannot read tags from origin/);
+  });
+
+  test("--write: every dev version source gets the highest tag version, other versions and formatting stay", (t) => {
+    const dir = seed(t, "2.0.0-next.8", ["v2.0.0-next.8", "v2.0.0-next.20"]);
+    next(dir, "later work");
+    const before = SOURCES.map((f) => readFileSync(path.join(dir, f), "utf8"));
+    const r = run(dir, "--write");
+    assert.equal(r.status, 0, r.stderr);
+    for (const f of SOURCES) assert.ok(readFileSync(path.join(dir, f), "utf8").endsWith("}\n"), f);
+    assert.equal(get(dir, "package.json").version, "2.0.0-next.20");
+    const lock = get(dir, "package-lock.json");
+    assert.equal(lock.version, "2.0.0-next.20");
+    assert.equal(lock.packages[""].version, "2.0.0-next.20");
+    assert.equal(lock.packages["node_modules/x"].version, "1.5.1", "a dependency version is not touched");
+    for (const f of [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"]) assert.equal(get(dir, f).version, "2.0.0-next.20", f);
+    const market = get(dir, ".claude-plugin/marketplace.json");
+    assert.equal(market.metadata.version, "2.0.0-next.20");
+    assert.equal(market.plugins[0].version, "2.0.0-next.20");
+    assert.equal(run(dir, "--check").status, 0);
+    assert.deepEqual(SOURCES.map((f) => readFileSync(path.join(dir, f), "utf8").split("\n").length), before.map((s) => s.split("\n").length));
+  });
+
+  test("--write --push: one commit on the branch, pushed; a second run changes nothing; a moved branch is rebased onto", (t) => {
+    const dir = seed(t, "2.0.0-next.8", ["v2.0.0-next.8", "v2.0.0-next.20"]);
+    const r = run(dir, "--write", "--push", "v2-design");
+    assert.equal(r.status, 0, r.stderr);
+    const bare = git(dir, "remote", "get-url", "origin");
+    assert.equal(git(bare, "show", "v2-design:package.json").includes("2.0.0-next.20"), true);
+    assert.match(git(dir, "log", "-1", "--format=%s"), /^chore\(release\): dev tree version 2\.0\.0-next\.20$/);
+    const head = git(dir, "rev-parse", "HEAD");
+    assert.equal(run(dir, "--write", "--push", "v2-design").status, 0);
+    assert.equal(git(dir, "rev-parse", "HEAD"), head, "already current: no new commit");
+    // Another agent pushes first: the push is rejected, the script rebases and pushes again.
+    const other = path.join(path.dirname(dir), "other");
+    git(path.dirname(dir), "clone", "-q", "--branch", "v2-design", bare, other);
+    writeTree(dir, "2.0.0-next.8");
+    git(dir, "commit", "-qam", "back to old");
+    git(other, "commit", "--allow-empty", "-q", "-m", "other agent");
+    git(other, "push", "-q", "origin", "HEAD:refs/heads/v2-design");
+    const r2 = run(dir, "--write", "--push", "v2-design");
+    assert.equal(r2.status, 0, r2.stderr);
+    assert.equal(git(bare, "show", "v2-design:package.json").includes("2.0.0-next.20"), true);
+    assert.match(git(bare, "log", "--format=%s", "v2-design"), /other agent/);
+  });
+
+  test("--write --push: a tag whose commit is not on the branch changes nothing", (t) => {
+    const dir = seed(t, "2.0.0-next.8", ["v2.0.0-next.8"]);
+    git(dir, "checkout", "-q", "-b", "side");
+    next(dir, "side commit");
+    git(dir, "tag", "-a", "v2.0.0-next.30", "-m", "x");
+    git(dir, "push", "-q", "origin", "v2.0.0-next.30");
+    git(dir, "checkout", "-q", "v2-design");
+    const r = run(dir, "--write", "--push", "v2-design");
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /not on v2-design/);
+    assert.equal(get(dir, "package.json").version, "2.0.0-next.8");
+  });
+
+  test("label: a source tree reports <version>+dev, one function for every reader", async () => {
+    const { devVersionLabel } = await import("../../scripts/release/dev-version.mjs");
+    assert.equal(devVersionLabel("2.0.0-next.20", "0123456789abcdef"), "2.0.0-next.20+dev 01234567");
+    assert.equal(devVersionLabel("2.0.0-next.20", null), "2.0.0-next.20+dev");
+    const bench = readFileSync(path.join(REPO, "bench", "run.mjs"), "utf8");
+    assert.ok(bench.includes("devVersionLabel("), "bench/run.mjs prints the released version of a dev tree through devVersionLabel");
+    assert.ok(readFileSync(path.join(REPO, "bench", "fixtures", "run.mjs"), "utf8").includes("devVersionLabel("), "bench/fixtures/run.mjs too");
+  });
+
+  test("this repo: package.json and every source-tree manifest are not behind the highest pushed v2 tag", (t) => {
+    const r = spawnSync(process.execPath, [SCRIPT, "--check"], { cwd: REPO, encoding: "utf8" });
+    if (r.status === 2) return t.skip("no tags readable from origin here: " + r.stderr.trim());
+    assert.equal(r.status, 0, r.stderr);
+    const v = get(REPO, "package.json").version;
+    for (const f of SOURCES) assert.ok(readFileSync(path.join(REPO, f), "utf8").includes('"version": "' + v + '"'), f + " is not at " + v);
+  });
+
+  test("release.yml: a pushed v2.* tag ends with a job that writes the tag version back to v2-design (tag, not main, not release)", () => {
+    const yml = readFileSync(path.join(REPO, ".github", "workflows", "release.yml"), "utf8");
+    const at = yml.indexOf("\n  dev-version:");
+    assert.ok(at > 0, "dev-version job");
+    const job = yml.slice(at + 1); // the last job in the file
+    for (const s of ["needs: [github-release]", "startsWith(github.ref, 'refs/tags/v2.')", "contents: write", "ref: v2-design", "fetch-depth: 0",
+      'run: node scripts/release/dev-version.mjs --write --push v2-design', "continue-on-error: true"]) assert.ok(job.includes(s), s);
+    for (const l of job.split("\n").filter((x) => x.trim().startsWith("run:"))) assert.ok(!l.includes("${{"), l);
+    assert.ok(!job.includes("refs/heads/main") && !job.includes("ref: main") && !job.includes("ref: release"), "never main or release");
+    assert.ok(yml.indexOf("\n  github-release:") < at, "after the GitHub release");
+  });
+});
