@@ -1,0 +1,58 @@
+export const meta = {
+  name: 'v2-viet-next17',
+  description: 'Tester retest of next.17 (Windows, Codex 0.166 alpha, Claude Desktop): 5 findings. Native plugin MCP resolves the plugin cache as project; PowerShell Get-Content not intercepted; shipped Codex doctor fixture decode error + native D3 FAIL; typecheck fails on next.17; D5 hook timing 58-72 ms > 40 ms on Windows Claude Desktop. Fix test-first in parallel, then ship',
+  phases: [{ title: 'Fix', detail: '5 agents in parallel' }, { title: 'Release', detail: 'ship' }],
+}
+
+const SNH = { model: 'claude-sonnet-5-5', effort: 'high' }
+const RESULT = { type: 'object', properties: {
+  done: { type: 'boolean' }, rootCause: { type: 'string' }, commits: { type: 'array', items: { type: 'string' } },
+  numbers: { type: 'string' }, summary: { type: 'string' } }, required: ['done', 'rootCause', 'commits', 'numbers', 'summary'] }
+const REL = { type: 'object', properties: {
+  published: { type: 'boolean' }, version: { type: 'string' }, failingStep: { type: 'string' }, logLines: { type: 'string' }, summary: { type: 'string' } },
+  required: ['published', 'version', 'failingStep', 'logLines', 'summary'] }
+
+const auth = `This job is the owner's own request: Mert pasted the tester report into this chat; his standing words are "tek istegim surekli pushlasin" and "hepsinin yuzde yuz hooks u olmak ZORUNDA". He approved clone, gh reads, commit as mksglu and push to v2-design. Do not wait for a reply. If git push has no credentials in a temp HOME, push from the real HOME; never print a credential.`
+const rules = `OWNER MAIN RULES: every agent gets hooks, no exception; native install per host (ADR-0023); a hook never errors; TRUNCATE forbidden, no lossy cut; profile first (owner rule: always profile); tests first (keep the red run output); TEST LAYOUT (ADR-0024, docs/v2/TEST-LAYOUT.md): add each red test inside the existing ADR area file, never a new test file; never weaken an assertion; never raise a budget or timeout; DEVIATIONS row per behaviour change; no regex as a mechanism; do not re-apply D-HOOK-SYNC-1.`
+const repo = (id) => `Repo github.com/mksglu/context-mode, branch v2-design (fresh clone /private/tmp/cm-v2-v17-${id}; delete after a successful push). Four other agents push in parallel: pull --rebase before every push, keep both sides. Commit as git -c user.name=mksglu -c user.email=mksglu@users.noreply.github.com. Never touch main, the release branch, tags or npm. Temp HOME/USERPROFILE/CODEX_HOME only; never edit the real ~/.codex or ~/.claude. Setup: node scripts/ci-install.mjs; node build/build.mjs --generated-only; node build/build.mjs --out release-out. node --test "tests/v2/**/*.test.mjs" 0 fail before your last push; watch ci.yml (Windows jobs matter).`
+const ctx = `Tester environment: Windows x64 10.0.26300, Node 24.18.0, Codex 0.166.0-alpha.5.1 (npm @openai/codex@0.166.0-alpha.5.1 exists), Claude Desktop 4.4212.0.0 with Claude Code 2.1.309, context-mode 2.0.0-next.17 (tag v2.0.0-next.17). Native Codex route = local marketplace from release checkout, codex plugin add context-mode@context-mode, then context-mode setup; npm route = npm i -g + context-mode setup. Confirmed fixed on next.17: both routes setup PASS, 4/4 hooks trusted, codex exec denies plain and chained cat, bounded Get-Content -TotalCount 3 allowed, setup repair next.15->next.17 with zero changes on the second run.`
+
+async function retry(prompt, opts, n = 3) {
+  for (let i = 0; i < n; i++) {
+    const r = await agent(i ? prompt + '\n\nA previous attempt died on an API error. Continue from what is pushed.' : prompt, i ? { ...opts, label: opts.label + '-retry' + i } : opts)
+    if (r) return r
+    log(`${opts.label}: no result, retry ${i + 1}`)
+  }
+  return null
+}
+const head = (id, role) => `You are a batch job, not a chat: no person reads your reply. Do only the task below.\n${auth}\n${repo(id)}\n${rules}\n${ctx}\nRole: ${role}`
+
+phase('Fix')
+const results = await parallel([
+  () => retry(`${head('proj', 'native plugin MCP resolves the wrong project.')}
+Finding 1: native plugin route, codex exec -C <workspace>; native pwd = <workspace>, Test-Path application.log True. ctx_index({path:"application.log"}) -> "Invalid argument path. Fix: pass an existing file or folder."; ctx_index({path:"<abs workspace>/application.log"}) -> "Path ... is outside the project. Fix: use a path inside <CODEX_HOME>/plugins/cache/context-mode/context-mode". npm route indexes the same file. Content indexing, execute, search work on native. Native ctx_doctor D3 "wrong: MCP entry, hook entries" (D4 PASS); npm route D3/D4 PASS.
+Cause to confirm: the plugin MCP server starts with cwd = the plugin cache dir (Codex .codex-plugin/mcp.json "cwd": "."), and our project resolution takes process.cwd(). Find how each host tells an MCP server its workspace (Codex: MCP roots / initialize params, env such as CODEX_* or PWD, the documented way; read codex 0.166 bundle and 0.156.1). Also check the same for every host that runs our MCP from a plugin/extension cache: Claude Code plugin (CLAUDE_PROJECT_DIR), Gemini/Qwen extension, Copilot, OpenCode, Pi. Fix at the root: project = the host's workspace, never the package/plugin dir; if the host gives none, a clear error that names the fix, never the cache dir. Fix native D3 too (it must accept the plugin's own MCP and hook entries). Red tests in the ADR-0002/0019 area files; live proof with real codex 0.166 alpha + native plugin in a temp CODEX_HOME. Return done, rootCause, commits, numbers, summary.`, { label: 'v17-proj', phase: 'Fix', schema: RESULT, ...SNH }),
+  () => retry(`${head('pwsh', 'PowerShell file dumps are not intercepted.')}
+Finding 2: on both routes, codex exec on Windows runs "Get-Content application.log" (371,243 bytes) with no deny; plain and chained cat are denied; Get-Content -TotalCount 3 allowed. Direct hook replay of PreToolUse/Bash {command:"Get-Content large.log"} also allows. Codex 0.166 runs commands in PowerShell on Windows.
+Fix the shell-dump policy (src/core/policy) for PowerShell: Get-Content / gc / cat / type aliases, -Path/-LiteralPath, -Raw, -Encoding, pipes to Out-String/Select-Object -First N (bounded), -TotalCount/-Head/-Tail N (bounded), Get-Content x | Select-String (filtered), [IO.File]::ReadAllText(...), type file.txt in cmd. Parse with the existing parser approach (no regex as a mechanism); add a PowerShell tokenizer if the shell parser is POSIX-only. Same deny text and redirect as cat. Apply to every host whose shell can be PowerShell (Codex Windows, Copilot CLI powershell tool, VS Code, Claude Code PowerShell tool if any). Red tests in the policy ADR area file (ADR-0008), including the tester's repro cases: large cat deny, large Get-Content deny, bounded allowed, small-file allowed. Live proof in the Windows CI job with real codex 0.166.0 (tests/v2 0020-fire area). Return done, rootCause, commits, numbers, summary.`, { label: 'v17-pwsh', phase: 'Fix', schema: RESULT, ...SNH }),
+  () => retry(`${head('fixture', 'shipped Codex doctor fixture is stale.')}
+Finding 3: release-out fixtures/hook-roundtrip.json codex.payload has event:"exec", command:"ls" and no hook_event_name, tool_name, tool_input; hook.mjs --agent codex answers "hooks: decode failed: codex: unknown hook event undefined"; ctx_doctor then reports that decode error in D5. Make every host's doctor fixture be generated from (or checked against) the same recorded native payload the adapter tests use, so it can never drift: a red test in the ADR-0010 doctor area file that feeds every shipped fixture through the built hook for its host and asserts no decode error and the expected decision. Also: D5 must not report an old hook-errors.log line from before the current doctor run as a current failure (the tester saw an old OpenCode fuzz-test SyntaxError line); show only errors newer than the last successful hook run or label them with their time. No lossy cut: the log stays whole. Return done, rootCause, commits, numbers, summary.`, { label: 'v17-fixture', phase: 'Fix', schema: RESULT, ...SNH }),
+  () => retry(`${head('tsc', 'typecheck is red.')}
+Tester on tag v2.0.0-next.17: npm run typecheck fails: TS2769 at src/core/store/fts.ts:366 and missing HookInstall at src/setup/engine.ts:283 and :297. Several agents saw the same errors and left them. Fix the types at the root (no any, no ts-ignore, no behaviour change). Then add "npm run typecheck" (tsc --noEmit) as a required step in ci.yml on one OS and in scripts/gate.mjs so it can never go red again unnoticed; red-first: show the gate failing on the current tree before the fix. Return done, rootCause, commits, numbers, summary.`, { label: 'v17-tsc', phase: 'Fix', schema: RESULT, ...SNH }),
+  () => retry(`${head('d5', 'hook timing on Windows Claude Desktop.')}
+Real Claude Desktop on Windows (Claude Code 2.1.309), 6 rounds: everything functional passed (Read deny, paging 5/5/2/0, /compact recovery, new-session retrieval, worktree isolation both ways), but ctx_doctor D5 hook overhead FAIL 72 ms and 58 ms against 40 ms. Profile first: measure the claude-code hook path on windows-latest (node --cpu-prof, per phase: node start, bundle parse ~126 KB, project resolve, sqlite open, policy, encode) for PreToolUse and PostToolUse, 50 runs each, idle and with load, and compare with macOS/linux. Find what Windows pays extra (Defender scanning, realpath, git dir lookup, sqlite open, module parse). Cut real work (lazy store open for PreToolUse that needs no store, smaller hot path, avoid sync fs probes) so the D5 p95 has margin on windows-latest. Never raise the 40 ms budget; if the budget measures something that is not the hook (node.exe start that the host pays anyway), prove it with numbers and fix the measurement, keeping the assertion strength, with a DEVIATIONS row. Tests in the ADR-0008/D3 hook perf area file. Return done, rootCause, commits, numbers (p50/p95 per OS before/after), summary.`, { label: 'v17-d5', phase: 'Fix', schema: RESULT, ...SNH }),
+])
+
+phase('Release')
+const fixed = results.filter((r) => r && r.commits && r.commits.length).map((r) => `${String(r.rootCause).slice(0, 200)}: ${String(r.summary).slice(0, 300)}`).join('\n- ')
+const rel = await retry(`You are a batch job, not a chat: no person reads your reply. Do only the task below.
+${auth} Also approved: npm next releases (tags v2.0.0-next.* for this release only; never move or delete a pushed tag; npm latest stays 1.0.169; never npm publish / dist-tag yourself; no token).
+Repo github.com/mksglu/context-mode, branch v2-design (fresh clone /private/tmp/cm-v2-v17-rel; delete it before you return). ${rules}
+Finished:
+- ${fixed || '(none)'}
+1. If git diff <raw registry next gitHead>..origin/v2-design touches no src/, build/, scripts/release/, hooks or skills: published=false.
+2. N = highest 2.0.0-next.N in registry and origin tags plus 1. Wait until v2-design is quiet for 15 minutes. Fresh clone: install, build --generated-only, npm run typecheck (must pass), node --test "tests/v2/**/*.test.mjs" (0 fail), gate --all, check-install-docs, check-secrets. ci.yml green on ALL jobs (one rerun only for registry/timing shown in the log).
+3. Tag, push only that tag, watch release.yml, verify the raw registry (next, latest 1.0.169, provenance), GitHub prerelease, release branch marketplace.json. Update NEXT-STATUS.md and one line in docs/v2/review/RESUME-2026-10-28.md. Write docs/v2/review/viet/next18-reply.md (per finding: cause, fix, what to rerun). Commit, push.
+Return published, version, failingStep, logLines, summary.`, { label: 'v17-rel', phase: 'Release', schema: REL, ...SNH })
+
+return { results: results.map((r) => r && { done: r.done, cause: String(r.rootCause).slice(0, 300) }), rel }
