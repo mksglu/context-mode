@@ -283,8 +283,16 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
     const mod = await import(pathToFileURL(bundlePath).href);
     const plugin = mod.default ?? mod;
     const registered = [];
-    await plugin.setup({ tool: (name) => registered.push(name) });
+    // D-OC2-SETUP-1: the real OpenCode 2 ctx shape (@opencode/plugin 2.2.5); tools register through ctx.tool.transform.
+    const ctx = {
+      location: { directory: process.cwd() },
+      tool: { hook: async () => ({}), transform: async (cb) => { cb({ add: (t) => registered.push(t.name) }); return {}; }, list: async () => [] },
+      session: { hook: async () => ({}) },
+      event: { subscribe: () => (async function* () {})() },
+    };
+    const dispose = await plugin.setup(ctx);
     assert.ok(registered.some((n) => n.startsWith("ctx_")));
+    await dispose();
   });
 
   test("[M5] GP1/pi-bridge-retry-next-turn: tools/list failing once is retried on the next before_agent_start (#1098)", async () => {

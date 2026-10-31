@@ -119,12 +119,21 @@ test("[M5] GP2/opencode-single-system-message: SessionStart lines merge into one
   const mod = await import(path.toNamespacedPath ? new URL(`file://${bundlePath}`).href : bundlePath);
   const plugin = mod.default ?? mod;
   const hooks = {};
-  await plugin.setup({ tool: () => {}, event: (n, fn) => { hooks[n] = fn; } });
-  const out = { system: [] };
-  if (hooks["chat.system.transform"]) await hooks["chat.system.transform"]({}, out);
+  // D-OC2-SETUP-1: the real OpenCode 2 ctx shape; the context hook is the system-prompt channel.
+  const ctx = {
+    location: { directory: process.cwd() },
+    tool: { hook: async () => ({}), transform: async () => ({}), list: async () => [] },
+    session: { hook: async (n, fn) => { hooks[n] = fn; return {}; } },
+    event: { subscribe: () => (async function* () {})() },
+  };
+  const dispose = await plugin.setup(ctx);
+  assert.equal(typeof hooks.context, "function");
+  const out = { sessionID: "ses_1", system: [] };
+  await hooks.context(out);
   const len1 = out.system.length;
-  if (hooks["chat.system.transform"]) await hooks["chat.system.transform"]({}, out);
+  await hooks.context(out);
   assert.equal(out.system.length, len1);
+  await dispose();
 });
 
 test("[M5] GP2/pi-hint-not-user-role: a context-mode hint on Pi is never role user (#1263)", async () => {

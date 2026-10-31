@@ -186,7 +186,7 @@ describe("GP11 release build audit", () => {
   // publishes it); no package.json below the root.
   // D-RN-REPO-1: repository (npm provenance needs repository.url to match the source repo).
   // D-PKG-META-1: description, keywords, license, homepage, bugs are copied from the repo package.json.
-  const ALLOWED_ROOT_KEYS = ["bin", "bugs", "description", "engines", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"]; // main: D-NI-OPENCODE-1
+  const ALLOWED_ROOT_KEYS = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"]; // main: D-NI-OPENCODE-1; exports: D-OC2-SETUP-1
   const DEV = JSON.parse(readFileSync(path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."), "package.json"), "utf8"));
 
   test("[M6] GP11/npm-audit-zero-high-critical: release-out has no runtime dependencies, no node_modules, no nested package.json (#1225)", () => {

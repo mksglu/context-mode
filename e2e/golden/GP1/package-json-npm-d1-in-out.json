@@ -5,6 +5,7 @@
     "bugs",
     "description",
     "engines",
+    "exports",
     "files",
     "homepage",
     "keywords",
@@ -26,6 +27,10 @@
     "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
     "engines": {
       "node": ">=24.15.0"
+    },
+    "exports": {
+      ".": "./opencode/plugin.js",
+      "./server": "./opencode/plugin.js"
     },
     "files": [
       ".claude-plugin",
