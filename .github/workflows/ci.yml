@@ -73,7 +73,7 @@ jobs:
       # Viet round (Windows Claude Desktop): ctx_doctor D5 FAIL 72 ms and 58 ms against 40 ms. Info only: splits the claude-code hook wall
       # into bare node, empty module, hook bundle, idle and under load, sync and async spawn, so the Windows cost is read from numbers.
       - run: node e2e/checks/hook-phase-profile.mjs
-        name: hook phase profile (info, owner rule: always profile)
+        name: hook phase profile (info only)
         continue-on-error: true
       - run: node docs/v2/prompt/lint.mjs --out release-out
         name: prompt lint, bundle mode (impl/13 §7; gate layer prompt-lint from M2, D-M0-1)
