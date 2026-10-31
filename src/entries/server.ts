@@ -2,8 +2,8 @@
 // inlined (src/prompt/_generated.ts, impl/13 §2.2 step 3). M1 wires the store (DEVIATIONS D-M1-10,
 // D-M1-11, D-M1-T10-1); adapters (M3) and the tool modules (M2-M5) come with their own milestones.
 import { randomUUID } from "node:crypto";
-import { existsSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, realpathSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer, type ServerContext, type StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
@@ -96,6 +96,41 @@ export function sessionIdOf(meta: Record<string, unknown> | undefined, agent: Ag
   return RUN_SESSION_PREFIX + serverId;
 }
 
+// D-C166-NATIVE-CWD-1: a plugin host starts this server in the plugin dir (Codex mcp.json "cwd": "."), so the spawn cwd
+// is not the workspace. Codex 0.166 sends the workspace as _meta["codex/sandbox-state-meta"].sandboxCwd (a file URL) to
+// a server that declares that experimental capability at initialize (roots is [], no workspace env: probed live).
+const CODEX_SANDBOX_STATE_META = "codex/sandbox-state-meta";
+const FILE_URL_PREFIX = "file:";
+
+function workspaceFromMeta(meta: Record<string, unknown> | undefined): string | undefined {
+  const state = meta?.[CODEX_SANDBOX_STATE_META];
+  const cwd = typeof state === "object" && state !== null ? (state as Record<string, unknown>).sandboxCwd : undefined;
+  if (typeof cwd !== "string" || cwd === "") return undefined;
+  if (!cwd.startsWith(FILE_URL_PREFIX)) return cwd;
+  try {
+    return fileURLToPath(cwd);
+  } catch {
+    return undefined;
+  }
+}
+
+function realOrSame(p: string): string {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    return p;
+  }
+}
+
+/** The dir the project is resolved from: the host's workspace when it sent one, else the spawn cwd, never the dir this
+ *  bundle runs from (that is the plugin cache dir, not a project): "" then, and resolveProject throws NO_PROJECT. */
+export function workspaceCwdOf(meta: Record<string, unknown> | undefined, spawnCwd: string, script: string | undefined): string {
+  const fromHost = workspaceFromMeta(meta);
+  if (fromHost !== undefined) return fromHost;
+  if (script === undefined || script === "") return spawnCwd;
+  return realOrSame(spawnCwd) === realOrSame(dirname(script)) ? "" : spawnCwd;
+}
+
 // §5 step 7d: one line to the client, the stack to stderr only.
 function errorReply(err: unknown): ToolReply {
   if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0 };
@@ -176,7 +211,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
       let project: ProjectContext | undefined;
       const projectOf = (): ProjectContext => {
         if (agent === undefined) throw new CtxError("NO_PROJECT", { kind: "--agent" });
-        project ??= resolveProject(agent, { env, argv, cwd: process.cwd(), piCwd: undefined });
+        project ??= resolveProject(agent, { env, argv, cwd: workspaceCwdOf(meta, process.cwd(), process.argv[1]), piCwd: undefined });
         return project;
       };
       const ctx: ToolContext = {
@@ -237,6 +272,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
       { name: SERVER_KEY, version: "dev" }, // DEVIATIONS: no version constant in contracts yet
       {
         instructions: INSTRUCTIONS,
+        capabilities: { experimental: { [CODEX_SANDBOX_STATE_META]: {} } },
         cacheHints: {
           "tools/list": { ttlMs: TOOLS_TTL_MS, cacheScope: "public" },
           "server/discover": { ttlMs: TOOLS_TTL_MS, cacheScope: "public" },

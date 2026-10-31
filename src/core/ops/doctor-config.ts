@@ -3,9 +3,10 @@
 // D3 diffs parsed data (never text): the MCP entry, the own hook entries (command + matcher composed from the
 // row), and the hook timeout. D4 folds detectV1's findings into one row. D5b flags Claude Code hooks that VS
 // Code's chat.useClaudeHooks re-runs in the same repo.
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  AGENT_ARG, AGENT_HOME_DIR, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
@@ -127,7 +128,56 @@ function mcpFile(row: AdapterRow, home: string, env: NodeJS.ProcessEnv): string 
   return null; // marketplace/extension/plugin: the MCP entry ships in the plugin manifest under the plugin root
 }
 
+// D-C166-NATIVE-CWD-1: `codex plugin add context-mode@context-mode` writes no mcp_servers entry and no hooks.json. Codex
+// keeps the plugin's own .codex-plugin/{mcp,hooks}.json in <CODEX_HOME>/plugins/cache/<marketplace>/context-mode/<version>
+// and the switch in config.toml [plugins."context-mode@context-mode"]. D3 reads those when the switch is on.
+const CODEX_PLUGIN_KEY = `${SERVER_KEY}@${SERVER_KEY}`;
+const CODEX_PLUGIN_SUBDIR = ".codex-plugin";
+const CODEX_PLUGIN_MCP_FILE = "mcp.json";
+const CODEX_PLUGIN_HOOKS_FILE = "hooks.json";
+const MCP_SERVERS_FIELD = "mcpServers";
+
+/** The .codex-plugin dir of the newest cached version of our plugin, when config.toml switches the plugin on. */
+function codexNativeDir(env: NodeJS.ProcessEnv, home: string): string | null {
+  const codexDir = codexDirOf(env, home);
+  let enabled: unknown;
+  try {
+    enabled = hostConfigValueAt(readParsed("codex", join(codexDir, CONFIG_TOML_FILE)).value, ["plugins", CODEX_PLUGIN_KEY, "enabled"]);
+  } catch {
+    return null;
+  }
+  if (enabled !== true) return null;
+  const cache = join(codexDir, "plugins", PLUGIN_CACHE_DIR_NAME);
+  if (!existsSync(cache)) return null;
+  const found: string[] = [];
+  for (const market of readdirSync(cache)) {
+    const plugin = join(cache, market, SERVER_KEY);
+    if (!existsSync(plugin)) continue;
+    for (const version of readdirSync(plugin).sort()) {
+      const dir = join(plugin, version, CODEX_PLUGIN_SUBDIR);
+      if (existsSync(join(dir, CODEX_PLUGIN_MCP_FILE))) found.push(dir);
+    }
+  }
+  return found.length === 0 ? null : found[found.length - 1];
+}
+
+/** The plugin's MCP entry: node, the bundle, --agent codex. cwd "." is the plugin dir; the server finds the workspace in _meta. */
+function nativeMcpWrong(dir: string, row: AdapterRow): boolean {
+  try {
+    const entry = hostConfigValueAt(readParsed(row.id, join(dir, CODEX_PLUGIN_MCP_FILE)).value, [MCP_SERVERS_FIELD, SERVER_KEY]);
+    if (!isObject(entry)) return true;
+    const args = list(entry[MCP_ARGS_FIELD]);
+    const script = args[0];
+    return entry.command !== HOST_NODE_COMMAND || typeof script !== "string" || !script.endsWith(SERVER_ENTRY_FILE)
+      || args[1] !== AGENT_ARG || args[2] !== row.id || args.length !== 3;
+  } catch {
+    return true;
+  }
+}
+
 function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv): boolean {
+  const native = row.id === "codex" ? codexNativeDir(env, home) : null;
+  if (native !== null) return nativeMcpWrong(native, row);
   const file = mcpFile(row, home, env);
   try {
     if (file === null) {
@@ -149,7 +199,9 @@ function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktr
   let block: unknown;
   try {
     const root = spec.root === "plugin" ? resolvePluginRoot(row, env) : spec.root === "home" ? home : worktree;
-    const file = row.id === "codex" ? join(codexDirOf(env, home), HOOKS_JSON_FILE) // D-N6-CODEX-HOME-2
+    const native = row.id === "codex" ? codexNativeDir(env, home) : null;
+    const file = native !== null ? join(native, CODEX_PLUGIN_HOOKS_FILE) // D-C166-NATIVE-CWD-1: the plugin's own hook file
+      : row.id === "codex" ? join(codexDirOf(env, home), HOOKS_JSON_FILE) // D-N6-CODEX-HOME-2
       : row.id === "copilot-cli" ? join(copilotDirOf(env, home), ...spec.file.slice(1)) // D-WIN-COPILOT-HOME-1: file = [".copilot", ...]
       : row.id === "kiro" ? join(kiroDirOf(env, home), ...spec.file.slice(1)) // D-WIN-KIRO-HOME-1: file = [".kiro", ...]
       : join(root, ...spec.file);

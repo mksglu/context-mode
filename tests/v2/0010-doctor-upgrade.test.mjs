@@ -95,6 +95,68 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     assert.equal(d3.fixCommand, "run ctx_upgrade");
   });
 
+  // D-C166-NATIVE-CWD-1 (tester report, Codex 0.166.0-alpha.5.1): the native route (`codex plugin add context-mode@context-mode`)
+  // writes no mcp_servers entry and no hooks.json. Codex holds the entries in the plugin cache, <CODEX_HOME>/plugins/cache/
+  // <marketplace>/context-mode/<version>/.codex-plugin/{mcp,hooks}.json, and the plugin switch in config.toml.
+  function codexNative(home, opts = {}) {
+    const codexDir = path.join(home, ".codex");
+    const out = path.join(home, "release");
+    generateManifests(out);
+    const dir = path.join(codexDir, "plugins", "cache", "context-mode", "context-mode", "1.0.0");
+    mkdirSync(dir, { recursive: true });
+    cpSync(path.join(out, ".codex-plugin"), path.join(dir, ".codex-plugin"), { recursive: true });
+    if (opts.edit !== undefined) opts.edit(path.join(dir, ".codex-plugin"));
+    put(path.join(codexDir, "config.toml"), `model = "o1"\n[plugins."context-mode@context-mode"]\nenabled = ${opts.enabled ?? true}\n`);
+    return getAdapter("codex");
+  }
+  const editJson = (name, fn) => (dir) => {
+    const file = path.join(dir, name);
+    const value = JSON.parse(readFileSync(file, "utf8"));
+    fn(value);
+    writeFileSync(file, JSON.stringify(value));
+  };
+
+  test("D3 codex native plugin: the plugin's own MCP and hook entries PASS (tester: 'wrong: MCP entry, hook entries')", (t) => {
+    const home = tmp(t);
+    const row = codexNative(home);
+    const d3 = checkHostConfig(row, { HOME: home, USERPROFILE: home }, home);
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
+
+  test("D3 codex native plugin: CODEX_HOME moves where the plugin cache is read", (t) => {
+    const home = tmp(t);
+    const row = codexNative(home);
+    const elsewhere = path.join(home, "elsewhere");
+    cpSync(path.join(home, ".codex"), elsewhere, { recursive: true });
+    rmSync(path.join(home, ".codex"), { recursive: true });
+    const d3 = checkHostConfig(row, { HOME: home, USERPROFILE: home, CODEX_HOME: elsewhere }, home);
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
+
+  test("D3 codex native plugin switched off in config.toml is still wrong", (t) => {
+    const home = tmp(t);
+    const row = codexNative(home, { enabled: false });
+    const d3 = checkHostConfig(row, { HOME: home, USERPROFILE: home }, home);
+    assert.equal(d3.status, "FAIL");
+    assert.equal(d3.detail, "wrong: MCP entry, hook entries");
+  });
+
+  test("D3 codex native plugin: an MCP entry for another agent names MCP entry only", (t) => {
+    const home = tmp(t);
+    const row = codexNative(home, { edit: editJson("mcp.json", (v) => { v.mcpServers["context-mode"].args = ["./server.mjs", "--agent", "gemini"]; }) });
+    const d3 = checkHostConfig(row, { HOME: home, USERPROFILE: home }, home);
+    assert.equal(d3.status, "FAIL");
+    assert.equal(d3.detail, "wrong: MCP entry");
+  });
+
+  test("D3 codex native plugin: a plugin hook file with a wrong matcher names hook entries only", (t) => {
+    const home = tmp(t);
+    const row = codexNative(home, { edit: editJson("hooks.json", (v) => { v.hooks.PreToolUse[0].matcher = "Bash"; }) });
+    const d3 = checkHostConfig(row, { HOME: home, USERPROFILE: home }, home);
+    assert.equal(d3.status, "FAIL");
+    assert.equal(d3.detail, "wrong: hook entries");
+  });
+
   test("[M5] doctor-config/D3-wrong-matcher-names-hook-entries", (t) => {
     const home = tmp(t);
     const row = codexInstall(home, { matcher: "Bash" });

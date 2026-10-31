@@ -14,6 +14,7 @@ const CLOSE_TIMEOUT_MS = 2000;
  * @param {string} bundlePath
  * @param {Record<string,string>} [env]
  * @param {string[]} [args] - argv after the bundle path, e.g. ["--agent", "vscode"] (DEVIATIONS D-M1-F1-1)
+ * @param {{cwd?: string}} [opts] - spawn cwd: a plugin host starts the server in its plugin dir (D-C166-NATIVE-CWD-1)
  * @returns {{request:Function, notify:Function, close:Function, kill:Function}}
  */
 // D-CR2-SID-2: the server reads the host session id from CLAUDE_CODE_SESSION_ID (D-CR2-SID-1). A case
@@ -26,10 +27,11 @@ function childEnv(env) {
   return out;
 }
 
-export function spawnBundle(bundlePath, env, args = []) {
+export function spawnBundle(bundlePath, env, args = [], opts = {}) {
   const child = spawn(process.execPath, [bundlePath, ...args], {
     stdio: ["pipe", "pipe", "pipe"],
     env: childEnv(env),
+    ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
   });
 
   let buf = "";

@@ -8,6 +8,8 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import vm from "node:vm";
 import { z } from "zod/v4";
 import { TOOLS, checkCall } from "../../src/core/tools/registry.ts";
@@ -276,6 +278,65 @@ describe("ADR-0007 call shape on every host", () => {
       const got = pi.get(tool.name).parameters.required ?? [];
       assert.deepEqual(got, want, tool.name);
     }
+  });
+
+  // D-C166-NATIVE-CWD-1 (tester report, Codex 0.166.0-alpha.5.1, Windows): the native plugin route starts the MCP
+  // server with cwd = the plugin cache dir (mcp.json "cwd": "."), roots [] and no workspace env. Codex sends the
+  // workspace only as _meta["codex/sandbox-state-meta"].sandboxCwd (file URL), and only to a server that declares
+  // that experimental capability at initialize (probed on 0.166.0-alpha.5.1, macOS). Project = that workspace.
+  const SANDBOX_META = "codex/sandbox-state-meta";
+  const codexClient = (cwd) => spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root }, ["--agent", "codex"], { cwd });
+  const hello = (client) => client.request("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "codex-mcp-client", version: "0" } });
+
+  test("server declares the codex/sandbox-state-meta capability, so Codex sends the workspace", async (t) => {
+    const client = codexClient(repo);
+    t.after(() => client.kill());
+    const init = await hello(client);
+    assert.ok(init.capabilities.experimental?.[SANDBOX_META] !== undefined, JSON.stringify(init.capabilities));
+    await client.close();
+  });
+
+  test("codex native plugin: started in the plugin dir, a relative path resolves in the _meta workspace (ctx_index application.log)", async (t) => {
+    writeFileSync(join(repo, "application.log"), "2026-10-31 ERROR payment gateway timeout\n");
+    const client = codexClient(bundleDir);
+    t.after(() => client.kill());
+    await hello(client);
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: "application.log" }, _meta: { [SANDBOX_META]: { sandboxCwd: pathToFileURL(repo).href } } });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.ok(r.content[0].text.includes("application.log"), r.content[0].text);
+    await client.close();
+  });
+
+  test("codex native plugin: an absolute path in the workspace is inside the project, not 'outside the project'", async (t) => {
+    const client = codexClient(bundleDir);
+    t.after(() => client.kill());
+    await hello(client);
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: join(repo, "application.log") }, _meta: { [SANDBOX_META]: { sandboxCwd: pathToFileURL(repo).href } } });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    await client.close();
+  });
+
+  test("a server started in its own plugin dir with no host workspace never uses that dir: one line names the fix", async (t) => {
+    const client = codexClient(bundleDir);
+    t.after(() => client.kill());
+    await hello(client);
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: "application.log" } });
+    assert.equal(r.isError, true);
+    const text = r.content[0].text;
+    assert.ok(oneLine(text), text);
+    assert.ok(text.startsWith("Project source "), text);
+    assert.ok(text.includes(". Fix: "), text);
+    assert.ok(!text.includes(bundleDir), "must not name the plugin dir as the project: " + text);
+    await client.close();
+  });
+
+  test("a codex server started in the workspace (npm route) keeps using its cwd, no _meta needed", async (t) => {
+    const client = codexClient(repo);
+    t.after(() => client.kill());
+    await hello(client);
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: "application.log" } });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    await client.close();
   });
 
   const MCP_AGENTS = AGENT_IDS.filter((a) => a !== "pi" && a !== "opencode");
