@@ -40,7 +40,10 @@ try {
   steps.push({ ...rm, pass: rm.exit === 0 && Array.isArray(rm.plugins) && !rm.plugins.includes("context-mode@next") });
   const old = run("opencode plugin context-mode@next --global");
   steps.push({ ...old, pass: old.exit !== 0 || old.out.includes("Unknown subcommand") || old.out.includes("Unrecognized flag") });
-} finally { rmSync(home, { recursive: true, force: true }); }
+} finally {
+  // Windows keeps a handle on the temp HOME for a moment after the host exits (EPERM on rm); the dir is in the OS temp, so a failed clean-up is not a failed check.
+  try { rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* temp dir, left for the OS */ }
+}
 const ok = steps.every((s) => s.pass);
 console.log(JSON.stringify({ ok, steps }));
 process.exit(ok ? 0 : 1);
