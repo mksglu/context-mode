@@ -23,7 +23,7 @@ Read of a 61 KB source file (denied, routed to ctx_execute)
 Read of a small file (allowed: nothing to save)
 
 - Command: `node run.mjs f-read-small-file`
-- Input: `fixtures/data/SOURCE.md`, 551 B, sha256 485500ba1dae92cf5b0ae83d0a30ba5abdc7af571d385febc4707cc899a276fd
+- Input: `fixtures/data/SOURCE.md`, 1764 B, sha256 393bd16d6603959c06d2bbc8e1f7c0a61b0d66a034874e69f2dd6e1e0858e8af
 
 ## f-webfetch
 
