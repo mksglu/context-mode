@@ -25,6 +25,7 @@ export interface HookCheckInput {
   bundleDir: string;                // directory of the running server bundle; hook.mjs and fixtures/ sit here
   env: Record<string, string>;      // env for the hook child (caller builds it)
   signal: AbortSignal;
+  worktree?: string;                // the project worktree; the fixture's cwd, so the hook finds a repository (D-D5-FIXTURE-1)
   codexConfigDir: string;           // codex only: where hooks.json lives (CODEX_HOME or ~/.codex)
   db: DbHandle | null;              // codex only: this project's context.db, null when none exists yet
   now?: () => number;               // wall clock in ms; tests pin it, default performance.now
@@ -57,6 +58,11 @@ function loadFixture(bundleDir: string, agent: AgentId): FixtureEntry | null {
   const e = all[agent];
   if (!isObject(e) || typeof e.event !== "string" || !Object.hasOwn(e, "payload")) return null;
   return { event: e.event, payload: e.payload };
+}
+
+/** The fixture payload with `cwd` set to the project worktree: a recorded /tmp/project is no repository and would log a hook error each run. */
+function payloadFor(payload: unknown, worktree: string | undefined): unknown {
+  return worktree !== undefined && isObject(payload) ? { ...payload, cwd: worktree } : payload;
 }
 
 /**
@@ -106,7 +112,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
       env: i.env,
       signal: i.signal,
       timeoutMs: HOOK_TIMEOUT_MS,
-      stdin: JSON.stringify(fixture.payload),
+      stdin: JSON.stringify(payloadFor(fixture.payload, i.worktree)),
     });
     hookWalls.push(now() - start);
     if (!isNativeShape(r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);

@@ -1,14 +1,14 @@
 // tests/v2/0010-doctor-upgrade.test.mjs
 // Area: ADR-0010 (ctx_doctor, ctx_upgrade), PRD-v2 section 13, TECH-SPEC GP11.
 // One file per ADR area (ADR-0024). A new doctor or upgrade test goes into the describe block of its section.
-import { describe, test } from "node:test";
+import { after, before, describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync, chmodSync, readdirSync, renameSync, symlinkSync, unlinkSync, readlinkSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../../src/core/ops/doctor-config.ts";
@@ -828,6 +828,67 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const r = await checkHookRoundTrip(input(dir, { agent: "codex" }));
     assert.equal(r.status, "PASS");
   });
+
+  // Finding 3 (Viet, Windows, next.17): the shipped codex fixture had no hook_event_name, so the real hook said
+  // "decode failed: codex: unknown hook event undefined". Every shipped fixture runs through the built hook of its host,
+  // and its keys must equal the recorded native PreToolUse payload the adapter tests use (e2e/fixtures/<host>/<ver>/).
+  test("[D-D5-FIXTURE-1] D5 sends the fixture with the project worktree as cwd, so the hook finds a repository", async (t) => {
+    const dir = bundle(t, native);
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
+      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);process.stdout.write(p.cwd===${JSON.stringify("/the/worktree")}?${JSON.stringify(native)}:"bad");});`);
+    const r = await checkHookRoundTrip(input(dir, { worktree: "/the/worktree" }));
+    assert.equal(r.status, "PASS");
+  });
+
+  describe("shipped fixtures through the built hook (D-D5-FIXTURE-1)", () => {
+    const REPO = path.resolve(import.meta.dirname, "..", "..");
+    let out;
+    let fixtures;
+    before(() => {
+      out = mkdtempSync(path.join(tmpdir(), "cm-d5-fixture-build-"));
+      const b = spawnSync(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", out], { encoding: "utf8" });
+      assert.equal(b.status, 0, b.stderr);
+      fixtures = JSON.parse(readFileSync(path.join(out, C.HOOK_FIXTURE_DIR, C.HOOK_FIXTURE_FILE), "utf8"));
+    });
+    after(() => rmSync(out, { recursive: true, force: true }));
+
+    function recordedPreToolUse(host) {
+      const root = path.join(REPO, "e2e", "fixtures", host);
+      const versions = readdirSync(root).sort().filter((v) => existsSync(path.join(root, v, "PreToolUse.json")));
+      assert.ok(versions.length > 0, host + " has no recorded PreToolUse payload");
+      return JSON.parse(readFileSync(path.join(root, versions[versions.length - 1], "PreToolUse.json"), "utf8"));
+    }
+
+    test("every shipped fixture has the key set of the recorded native PreToolUse payload", () => {
+      assert.deepEqual(Object.keys(fixtures).sort(), ["claude-code", "codex"]);
+      for (const [host, entry] of Object.entries(fixtures)) {
+        assert.equal(entry.event, "PreToolUse", host);
+        assert.equal(entry.payload.hook_event_name, "PreToolUse", host);
+        assert.deepEqual(Object.keys(entry.payload).sort(), Object.keys(recordedPreToolUse(host)).sort(), host);
+        assert.equal(entry.payload.tool_name, recordedPreToolUse(host).tool_name, host);
+      }
+    });
+
+    test("every shipped fixture passes the built hook of its host: exit 0, no decode error, allow", () => {
+      for (const [host, entry] of Object.entries(fixtures)) {
+        const home = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-d5-fixture-home-")));
+        try {
+          spawnSync("git", ["init", "-q", home]);
+          const env = { PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, ".codex"), CLAUDE_PROJECT_DIR: home };
+          const r = spawnSync(process.execPath, [path.join(out, C.HOOK_ENTRY_FILE), C.AGENT_ARG, host], {
+            input: JSON.stringify({ ...entry.payload, cwd: home }), encoding: "utf8", env, cwd: home,
+          });
+          assert.equal(r.status, 0, host + " " + r.stderr);
+          assert.ok(!r.stderr.includes("decode failed"), host + " " + r.stderr);
+          assert.equal(r.stdout, "", host + " expected allow, got " + r.stdout);
+          const log = path.join(home, ".context-mode", "hook-errors.log");
+          assert.equal(existsSync(log) ? readFileSync(log, "utf8") : "", "", host + " logged a hook error");
+        } finally {
+          rmSync(home, { recursive: true, force: true });
+        }
+      }
+    });
+  });
 });
 
 describe("ADR-0010 D8 heal: lossless heal and rename-aside", { concurrency: CONC }, () => {
@@ -1316,6 +1377,29 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
     const corrupt = (await doctor(home)).rows.find((r) => r.id === "D8");
     assert.ok(!corrupt.detail.includes("stale schema"), corrupt.detail);
     assert.match(corrupt.detail, /healed/);
+  });
+
+  // Finding 3 part 2 (D-D5-PAST-1): an old line in hook-errors.log is history, not a current failure. The log stays whole.
+  test("[D-D5-PAST-1] D5 labels a hook error older than this doctor run as past, with its time", async (t) => {
+    const home = tmp(t);
+    const log = path.join(home, ".context-mode", "hook-errors.log");
+    const old = JSON.stringify({ ts: "2020-01-02T03:04:05.000Z", agent: "opencode", stage: "decode", label: "SyntaxError", message: "fuzz", stack: "s" });
+    put(log, old + "\n");
+    const { rows } = await doctor(home);
+    const d5 = rows.find((r) => r.id === "D5");
+    assert.match(d5.detail, /past hook error 2020-01-02T03:04:05\.000Z at decode \(SyntaxError\)/);
+    assert.ok(!d5.detail.includes("last hook error"), d5.detail);
+    assert.equal(readFileSync(log, "utf8"), old + "\n", "the log file stays whole");
+  });
+
+  test("[D-D5-PAST-1] D5 names a hook error newer than the start of this doctor run as the last hook error", async (t) => {
+    const home = tmp(t);
+    const ts = new Date(Date.now() + 3_600_000).toISOString();
+    put(path.join(home, ".context-mode", "hook-errors.log"), JSON.stringify({ ts, agent: "codex", stage: "decode", label: "Error", message: "m", stack: "s" }) + "\n");
+    const { rows } = await doctor(home);
+    const d5 = rows.find((r) => r.id === "D5");
+    assert.match(d5.detail, new RegExp("last hook error " + ts.replace(/\./g, "\\.") + " at decode \\(Error\\)"));
+    assert.ok(!d5.detail.includes("past hook error"), d5.detail);
   });
 
   test("[M5] doctor/D9-empty-index-is-not-FAIL", async (t) => {

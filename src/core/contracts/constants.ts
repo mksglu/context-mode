@@ -236,6 +236,8 @@ export const HOOK_FAIL_REDIRECT = Object.freeze({
   fetch: "Index the URL with ctx_index and query it with ctx_search.",
 });
 export function D5_LAST_HOOK_ERROR(ts: string, stage: string, label: string): string { return `; last hook error ${ts} at ${stage} (${label}), stack in ${HOOK_ERROR_LOG_FILE}`; }
+// D-D5-PAST-1: a line older than the start of this doctor run is history, shown with its time, never as a current failure.
+export function D5_PAST_HOOK_ERROR(ts: string, stage: string, label: string): string { return `; past hook error ${ts} at ${stage} (${label}), before this run, stack in ${HOOK_ERROR_LOG_FILE}`; }
 
 // impl/08 §6.1 step 5d, DECISIONS-r9 E4. D-M7-RR-2: step 5d (bounded -> no hint) is retired with the hints; the
 // set stays only because tests/v2/contracts pins it (not owned by this change).

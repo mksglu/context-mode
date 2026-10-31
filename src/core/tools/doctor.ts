@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
-  D5_LAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
+  D5_LAST_HOOK_ERROR, D5_PAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
   PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
@@ -64,8 +64,10 @@ async function codexDb(ctx: ToolContext, adapter: AdapterRow): Promise<DbHandle 
 
 async function hookRow(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost): Promise<DoctorRow> {
   const db = await codexDb(ctx, adapter);
+  const runStart = Date.now();
   try {
     const row = await checkHookRoundTrip({
+      worktree: ctx.project.worktree,
       agent: adapter.id,
       bundleDir: host.bundleDir,
       env: buildChildEnv(host.env),
@@ -75,7 +77,10 @@ async function hookRow(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost):
     });
     // D-HNE-GUARD-1: the hook never errors, it logs; D5 names the last logged failure so the user sees it.
     const last = lastHookError(host.env);
-    return last === null ? row : { ...row, detail: row.detail + D5_LAST_HOOK_ERROR(last.ts, last.stage, last.label) };
+    if (last === null) return row;
+    // D-D5-PAST-1: only an error logged since this run began is current; an older line is labelled past (the log stays whole).
+    const text = Date.parse(last.ts) >= runStart ? D5_LAST_HOOK_ERROR : D5_PAST_HOOK_ERROR;
+    return { ...row, detail: row.detail + text(last.ts, last.stage, last.label) };
   } finally {
     if (db !== null) closeDb(db);
   }
