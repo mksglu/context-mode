@@ -1046,5 +1046,21 @@ describe("ADR-0024 test layout: every test file is in the table", { concurrency:
   test("the guard finds an unlisted file (self-check on a name that is not in the table)", () => {
     assert.deepEqual(unlisted(["tests/v2/9999-not-an-area.test.mjs"]), ["tests/v2/9999-not-an-area.test.mjs"]);
   });
+
+  test("no tracked text file holds a merge conflict marker line (D-NO-CONFLICT-MARKER-1)", () => {
+    const out = execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, encoding: "utf8" });
+    const exts = [".md", ".mjs", ".ts", ".json", ".yml", ".yaml"];
+    const hits = [];
+    for (const rel of out.split("\0")) {
+      if (!exts.some((e) => rel.endsWith(e))) continue;
+      let text;
+      try { text = readFileSync(path.join(ROOT, rel), "utf8"); } catch { continue; }
+      const lines = text.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("<<<<<<< ") || lines[i].startsWith(">>>>>>> ")) hits.push(rel + ":" + (i + 1));
+      }
+    }
+    assert.deepEqual(hits, [], "merge conflict marker left in: " + hits.join(", "));
+  });
 });
 });

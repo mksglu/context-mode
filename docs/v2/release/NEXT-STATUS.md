@@ -4,11 +4,31 @@ Checked 2026-10-28 against the raw registry JSON (https://registry.npmjs.org/con
 
 ## npm version on next
 
-`next` is 2.0.0-next.20 (provenance present, SLSA v1, 2 signatures, gitHead efe519b1). `latest` is still 1.0.169. Checked 2026-10-31 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.20: 2026-10-31T20:20:37Z. The previous version, next.18, was published 2026-10-31T12:56:03Z (gitHead ea4179fd).
+`next` is 2.0.0-next.21 (provenance present, SLSA v1, 2 signatures, gitHead fa9bffea). `latest` is still 1.0.169. Checked 2026-11-01 against the raw registry JSON (dist-tags endpoint and version document). Registry time of next.21: 2026-10-31T23:20:45Z. The previous version, next.20, was published 2026-10-31T20:20:37Z (gitHead efe519b1).
 
 Tag v2.0.0-next.19 (ecf32676) exists on origin but was never published: release.yml run 41225374690 failed in its ci job (macOS, node 26), step "v2 unit tests", the D5 hook round-trip timing test. The tag stays where it is and is never reused. next.20 replaces it and carries the D5 fix.
 
 Tag v2.0.0-next.10 (a79fde9d) exists on origin but was never published: release.yml run 40750085948 failed in its ci job (macOS, cli/report-no-input). The tag stays where it is and is never reused. next.11 replaces it.
+
+## What 2.0.0-next.21 ships
+
+Changes since v2.0.0-next.20: OpenCode 2 native install is `opencode plugin add context-mode@next`, smaller `ctx_search` replies on small sources, and the dev tree version follows the highest v2 tag. Reply for the OpenCode reporter: docs/v2/review/opencode2-reply.md.
+
+- 591197c6, fa9bffea (D-OC2-NATIVE-CMD-1): the OpenCode 2 install text in README, docs/install and the reply is the OpenCode native command; the CI check treats a failed temp-dir clean-up on Windows as not a failed check.
+- 0841fda6, 30736879 (D-SEARCH-SMALL-1): `ctx_search` replies are smaller on small sources and have no empty query blocks. v2 is still behind v1 on the skill-refs row (10.7 KB against 6.3 KB); that needs a smaller hit cap and is not done.
+- 630a61c6 (D-DEV-VERSION-1): `scripts/release/dev-version.mjs` keeps the dev tree version at the highest pushed v2 tag; release.yml has a last job `dev-version`.
+- Post-release fix (D-NO-CONFLICT-MARKER-1): the merge of the OpenCode row left a conflict marker in docs/v2/DEVIATIONS.md. Marker removed, a test in the ADR-0014 area file now fails on any such line. Docs only; no new tag.
+
+## Release numbers (next.21)
+
+- Tag v2.0.0-next.21 on fa9bffea. N = highest 2.0.0-next.N in the registry and origin tags (next.20) plus 1. v2-design was quiet for 47 minutes before the tag (head commit fa9bffea from 00:53 +03).
+- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/v2/**/*.test.mjs"` 2464 tests, 2428 pass, 0 fail, 36 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- CI on fa9bffea (run 41245667620): all 12 jobs green.
+- release.yml run 41249251428: one rerun. First attempt failed in ci / ci (windows-latest, node 26), test "H5: doctor hook-runs PASSES on all 10 hosts" ("claude-code: hook did not finish" after 12 s); it passed on the rerun with no change. This is a timing flake on a loaded Windows runner; root cause not proven, test and timeout not changed. After the rerun: ci x12, plan, build, publish-stage, smoke x3, publish-promote, publish-npm, github-release and dev-version all green.
+- Registry version published 2026-10-31T23:20:45Z (gitHead fa9bffea, SLSA v1 provenance). GitHub prerelease v2.0.0-next.21 (not draft) at 23:19:27Z. The registry document lagged the publish step by about 1 minute.
+- `latest` stays 1.0.169. The `release` branch marketplace.json shows 2.0.0-next.21 (release commit 58c35153).
+- The packed context-mode@2.0.0-next.21 reports 2.0.0-next.21 in package.json, the three plugin manifests, and `node cli.mjs --version`.
+- dev-version job: the tag is on HEAD, so it counts as the release being built and pushed no commit; the dev tree package.json says next.20 until the next push after this tag.
 
 ## What 2.0.0-next.20 ships
 
