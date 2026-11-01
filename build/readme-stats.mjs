@@ -12,12 +12,12 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = "context-mode";
-const STEP_DAYS = 7;
+const STEP_DAYS = 1; // one point per day (D-README-STAR-1)
 const DAY_MS = 86_400_000;
 const ISO_DAY = 10; // "YYYY-MM-DD"
 const PAGE = 100;
 
-/** [[day, cumulative stars at the end of that day], ...]: one point per 7 days from the first star day; the last point is the total on readDay. */
+/** [[day, cumulative stars at the end of that day], ...]: one point per day from the first star day; the last point is the total on readDay. */
 export function starTimeline(starredAt, readDay, total) {
   const days = starredAt.map((t) => t.slice(0, ISO_DAY)).sort();
   if (days.length === 0) return [[readDay, total]];

@@ -7,7 +7,8 @@
 import { createRequire } from 'module';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
-import { statSync } from 'fs';
+import { readFileSync, statSync } from 'fs';
+import { chartInkProblems, drawProblems } from './render-guard.mjs';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const nm = process.env.PLAYWRIGHT_DIR || '/tmp/web-sol/node_modules';
@@ -17,7 +18,7 @@ const FIGS = [
   { name: 'fig-saving', w: 1280, h: 720 },
   { name: 'fig-flow', w: 1280, h: 640 },
   { name: 'fig-oss', w: 1280, h: 720 },
-  { name: 'star-history', w: 1280, h: 640 },
+  { name: 'star-history', w: 1280, h: 640, drawn: true }, // drawn from star-data.js: wait for window.__drawn (D-README-STAR-1)
 ];
 const MAX = 400 * 1024; // 2x PNGs; the README total stays under 2 MB (build/readme-links.mjs)
 const only = process.argv[2];
@@ -27,8 +28,11 @@ for (const f of FIGS) {
   if (only && only !== f.name) continue;
   for (const theme of ['dark', 'light']) {
     const page = await browser.newPage({ viewport: { width: f.w, height: f.h }, deviceScaleFactor: 2 });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push('page error: ' + e.message));
     await page.goto(pathToFileURL(join(dir, f.name + '.html')).href + '?theme=' + theme);
     await page.evaluate(() => document.fonts.ready);
+    if (f.drawn) await page.waitForFunction(() => window.__drawn !== undefined, null, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(150);
     // checks: fonts loaded, nothing outside the canvas, no text wider than its box
     const probs = await page.evaluate(() => {
@@ -48,8 +52,11 @@ for (const f of FIGS) {
       }
       return out;
     });
+    probs.unshift(...errors);
+    if (f.drawn) probs.push(...drawProblems(await page.evaluate(() => window.__drawn)));
     const file = join(dir, '..', f.name + '-' + theme + '.png');
     await page.screenshot({ path: file });
+    if (f.drawn) probs.push(...chartInkProblems(readFileSync(file), theme));
     const kb = statSync(file).size / 1024;
     if (probs.length || statSync(file).size > MAX) { bad++; console.log(f.name, theme, kb.toFixed(0) + ' KB', probs.join(' | ')); }
     else console.log(f.name, theme, kb.toFixed(0) + ' KB ok');

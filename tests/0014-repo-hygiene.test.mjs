@@ -1232,12 +1232,13 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
   const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
   const SRC = "docs/assets/readme/src/";
 
-  test("starTimeline: one point per 7 days from the first star day, cumulative to the end of that day; last point is the total", async () => {
+  test("starTimeline: one point per day from the first star day, cumulative to the end of that day; last point is the total (D-README-STAR-1)", async () => {
     const { starTimeline } = await import("../build/readme-stats.mjs");
     const at = ["2026-02-23T06:21:45Z", "2026-02-23T23:59:59Z", "2026-02-25T01:00:00Z", "2026-03-02T00:00:01Z", "2026-03-04T10:00:00Z"];
-    assert.deepEqual(starTimeline(at, "2026-03-05", 5), [["2026-02-23", 2], ["2026-03-02", 4], ["2026-03-05", 5]]);
+    assert.deepEqual(starTimeline(at, "2026-03-05", 5), [["2026-02-23", 2], ["2026-02-24", 2], ["2026-02-25", 3], ["2026-02-26", 3], ["2026-02-27", 3],
+      ["2026-02-28", 3], ["2026-03-01", 3], ["2026-03-02", 4], ["2026-03-03", 4], ["2026-03-04", 5], ["2026-03-05", 5]]);
     assert.deepEqual(starTimeline([], "2026-03-05", 0), [["2026-03-05", 0]]);
-    assert.deepEqual(starTimeline(at, "2026-03-02", 6), [["2026-02-23", 2], ["2026-03-02", 6]], "a step on the read day is the total");
+    assert.deepEqual(starTimeline(at, "2026-02-25", 6), [["2026-02-23", 2], ["2026-02-24", 2], ["2026-02-25", 6]], "the read day is the total");
   });
 
   test("statsJson: fields named by what they count, no users label", async () => {
@@ -1263,6 +1264,32 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     for (const bad of ["query=%24.message", "query=%24.marketplace", "label=users", "747.4k", "683.2k", "64.1k", "33,053"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
     const hero = readRepo(SRC + "hero.html");
     for (const bad of ["Users", "GitHub stars", "33,053", "747.4k", "683.2k"]) assert.ok(!hero.includes(bad), `hero.html has ${bad}`);
+  });
+
+  test("render guard: the page must say it drew 2+ points and a non-empty path, else render.mjs exits 1 (D-README-STAR-1)", async () => {
+    const { drawProblems } = await import("../" + SRC + "render-guard.mjs");
+    assert.deepEqual(drawProblems({ points: 252, pathLength: 4100 }), []);
+    assert.deepEqual(drawProblems(undefined), ["no drawn signal from the page"], "a page script that threw never sets the signal");
+    assert.deepEqual(drawProblems({ points: 1, pathLength: 10 }), ["fewer than 2 data points: 1"]);
+    assert.deepEqual(drawProblems({ points: 30, pathLength: 0 }), ["drawn path is empty"]);
+    const r = readRepo(SRC + "render.mjs");
+    for (const need of ["waitForFunction", "__drawn", "drawProblems(", "chartInkProblems("]) assert.ok(r.includes(need), `render.mjs lacks ${need}`);
+    assert.ok(readRepo(SRC + "star-history.html").includes("window.__drawn="), "star-history.html sets the drawn signal after it draws");
+    assert.ok(readRepo(".github/workflows/readme-stats.yml").includes("node docs/assets/readme/src/render.mjs star-history"), "the daily job uses the same guarded render");
+  });
+
+  test("star chart PNGs: the chart area of both themes carries the drawn curve, not an empty band (D-README-STAR-1)", async () => {
+    const { chartInkProblems, decodePng, inkShare, STAR_CHART } = await import("../" + SRC + "render-guard.mjs");
+    for (const theme of ["dark", "light"]) {
+      const buf = readFileSync(path.join(REPO, "docs/assets/readme/star-history-" + theme + ".png"));
+      const img = decodePng(buf);
+      assert.deepEqual([img.width, img.height], [2560, 1280], theme + ": 1280x640 at 2x");
+      assert.deepEqual(chartInkProblems(buf, theme), [], theme);
+      // The lower half of the chart (where the area under the curve sits) must not be empty either.
+      const c = STAR_CHART.css;
+      const low = inkShare(img, { x: c.x * 2, y: (c.y + c.h / 2) * 2, w: c.w * 2, h: (c.h / 2) * 2 }, STAR_CHART.bg[theme], 8);
+      assert.ok(low > 0.2, theme + ": lower chart half has the filled area, share " + low.toFixed(3));
+    }
   });
 
   test("figure sources: 10 px card radius, 12 px eyebrows, no upper-casing, hex colors only from the brand tokens, render at 2x", () => {
