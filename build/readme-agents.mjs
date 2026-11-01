@@ -3,7 +3,7 @@
 // table (src/adapters/table.ts) and the setup registry (src/setup/registry.ts).
 // Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
 // Columns (DEVIATIONS D-README-2): Hooks = the row's hookChannel kind in table.ts (every agent has one, ADR-0020);
-// MCP = "yes", or "in-process" when the registry row has no MCP config and the agent runs in process (Pi);
+// MCP = "yes", or "plugin inside the agent" when the registry row has no MCP config and the agent runs in process (Pi);
 // Skills = the row's skillChannel; Install = the last command of the first fence in the page's Install section when
 // it is the agent's own command, else "npm + context-mode setup".
 // Usage: node build/readme-agents.mjs [--write]. Without --write it prints the tables; --write puts them into
@@ -17,7 +17,7 @@ import { buildRegistry } from "../src/setup/registry.ts";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const README = path.join(REPO_ROOT, "README.md");
 const TITLE_PREFIX = "# Install context-mode v2 on ";
-export const HOOK_WORDS = Object.freeze({ package: "package", "home-file": "hook file", "in-process": "in-process" });
+export const HOOK_WORDS = Object.freeze({ package: "package", "home-file": "hook file", "in-process": "the plugin's own event handlers" });
 const FALLBACK_INSTALL = "npm + `context-mode setup`";
 const SECTIONS = { install: { heading: "## Install", anchor: "install" } };
 
@@ -59,7 +59,7 @@ export function agentRows() {
     const { rel, name, lines } = pageOf(a.id);
     if (!(a.hookChannel.kind in HOOK_WORDS)) throw new Error(`${a.id}: unknown hook channel ${a.hookChannel.kind}`);
     const hooks = `yes, ${HOOK_WORDS[a.hookChannel.kind]}`;
-    const mcp = a.installMode === "in-process" && !reg.config ? "in-process" : "yes";
+    const mcp = a.installMode === "in-process" && !reg.config ? "plugin inside the agent" : "yes";
     const bin = reg.nativePlugin?.bin ?? reg.cli?.bin ?? (a.installMode === "in-process" ? a.id : "");
     return { id: a.id, name, hooks, mcp, skills: a.skillChannel ? "yes" : "no", install: installCell(lines, bin), page: rel };
   }).sort((x, y) => x.name.localeCompare(y.name));

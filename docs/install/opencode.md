@@ -35,7 +35,7 @@ To do the setup step by hand, run `context-mode setup --print opencode` and foll
 ## What setup changes
 
 - Adds `mcp.context-mode` (`type: local`, `enabled: true`) to `~/.config/opencode/opencode.json`. Other keys stay.
-- Adds the package directory to the `plugin` list (OpenCode 2 refuses a file path, D-OC2-ENTRY-1) in the same file. It runs the hooks in process (execute.before, execute.after, prompt, context, compaction).
+- Adds the package directory to the `plugin` list (OpenCode 2 refuses a file path, D-OC2-ENTRY-1) in the same file. It runs the hooks as the plugin's own event handlers inside OpenCode (execute.before, execute.after, prompt, context, compaction).
 - Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.config/opencode/skills/<name>/SKILL.md`.
 - Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect).
 - Backs up each file first. A failed step is rolled back byte for byte.

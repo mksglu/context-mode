@@ -157,8 +157,8 @@ Every agent gets hooks, the MCP server and the skills. The Install column is the
 | Copilot CLI | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install) |
 | Gemini CLI | yes, package | yes | yes | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | [docs/install/gemini.md](docs/install/gemini.md#install) |
 | Kiro | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/kiro.md](docs/install/kiro.md#install) |
-| OpenCode | yes, in-process | yes | yes | `opencode plugin add context-mode@next` | [docs/install/opencode.md](docs/install/opencode.md#install) |
-| Pi | yes, in-process | in-process | yes | `pi install npm:context-mode@next` | [docs/install/pi.md](docs/install/pi.md#install) |
+| OpenCode | yes, the plugin's own event handlers | yes | yes | `opencode plugin add context-mode@next` | [docs/install/opencode.md](docs/install/opencode.md#install) |
+| Pi | yes, the plugin's own event handlers | plugin inside the agent | yes | `pi install npm:context-mode@next` | [docs/install/pi.md](docs/install/pi.md#install) |
 | Qwen Code | yes, package | yes | yes | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | [docs/install/qwen.md](docs/install/qwen.md#install) |
 | VS Code (Copilot) | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/vscode.md](docs/install/vscode.md#install) |
 | ZCode | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/zcode.md](docs/install/zcode.md#install) |
@@ -239,7 +239,7 @@ Full reference: [docs/tools.md](docs/tools.md).
 ## 5. Harness: ten agents
 
 Every agent in the Install table gets hooks, the MCP server and the skills, through that agent's own install command.
-Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in-process (OpenCode, Pi).
+Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi).
 
 Live proof, written for 2.0.0-next.15: we watched the real agent binary run our hook in a clean temp home, logged out and with zero API keys, for 8 of 10 agents.
 VS Code and Kiro are at an earlier step: the VS Code hook command works with the documented payload (VS Code 1.144.0 sent 0 requests in the live run), and kiro-cli 2.35.2 loads all 6 hook entries (the live run recorded 0 hook fires).

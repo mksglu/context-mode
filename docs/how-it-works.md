@@ -121,7 +121,7 @@ names are prefixed with (`toolNamePrefix`), how a compaction-recovery block is d
 | Qwen | extension | spawn cwd | `SessionStart(source=compact)` |
 | Kiro | MCP entry | `--agent` + cwd | none |
 | ZCode | hooks + MCP | spawn cwd | `SessionStart(source=compact)` (unverified) |
-| Pi, OpenCode | in-process | in-process cwd | agent-specific flag/cache |
+| Pi, OpenCode | plugin inside the agent | the agent's own cwd | agent-specific flag/cache |
 
 One mechanism, ten adapters: the rules in the sections above (deny, chunk, search, compact) are the same
 everywhere; only how a host is told about them changes.

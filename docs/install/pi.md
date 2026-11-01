@@ -31,7 +31,7 @@ To do the setup step by hand, run `context-mode setup --print pi` and follow wha
 ## What setup changes
 
 - Runs `pi install` on the installed package folder. It writes `~/.pi/agent/settings.json`.
-- Pi gets the extension (`pi/index.js`), which runs the hooks in process (session_start, input, tool_call, tool_result), and the shipped skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade`. Pi needs no MCP entry.
+- Pi gets the extension (`pi/index.js`), which runs the hooks as the plugin's own event handlers inside Pi (session_start, input, tool_call, tool_result), and the shipped skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade`. Pi needs no MCP entry.
 - Effect: the call runs, then a large result is replaced by a short selection that names `ctx_search` (replace). tool_result sets new content and details.
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.

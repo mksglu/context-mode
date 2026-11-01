@@ -112,8 +112,8 @@ Every agent gets hooks and the skills `/ctx-doctor`, `/ctx-stats`, `/ctx-upgrade
 | VS Code (Copilot) | `~/.copilot/hooks/context-mode-vscode.json` | `~/.agents/skills` | D | pass: 204,513 -> 560 | 2026-10-26 | not run | partly: no loader run |
 | Kiro | `~/.kiro/hooks/context-mode.json` | `~/.kiro/skills` | D | pass: 183,551 -> 242 | 2026-10-26 | not installed | partly: stdin payload from adapter, not docs |
 | ZCode | `~/.zcode/cli/config.json` `hooks` | `~/.zcode/skills` | D | pass: 169,068 -> 443 | 2026-10-26 | not installed | partly: skills dir not in docs |
-| Pi | in process `pi/index.js` | package `skills/` | R | pass: 200,062 -> 160 | 2026-10-26 | 0.73.1 | yes: docs shipped in the installed package |
-| OpenCode | in process `opencode/plugin.js` | `~/.config/opencode/skills` | D | pass: 198,645 -> 235 | 2026-10-26 | not installed | partly: plugin tool name unproven live |
+| Pi | plugin inside the agent `pi/index.js` | package `skills/` | R | pass: 200,062 -> 160 | 2026-10-26 | 0.73.1 | yes: docs shipped in the installed package |
+| OpenCode | plugin inside the agent `opencode/plugin.js` | `~/.config/opencode/skills` | D | pass: 198,645 -> 235 | 2026-10-26 | not installed | partly: plugin tool name unproven live |
 
 ## From source
 
