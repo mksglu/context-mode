@@ -2,7 +2,7 @@
 
 The agent runs a small script over the output; only the script's printed summary enters the context. Compared with the raw output entering the context (native) and with what the PostToolUse hook leaves of the same raw output. The summary script is the v1 benchmark script, so the summary shows what that script prints, not the answer to your question.
 
-Run this group: `cd bench && node run.mjs a-sandbox`. Latest tables: [results/2026-10-31-darwin-arm64.md](../results/2026-10-31-darwin-arm64.md).
+Run this group: `cd bench && node run.mjs a-sandbox`. Latest tables: [results/2026-11-01-darwin-arm64.md](../results/2026-11-01-darwin-arm64.md).
 
 ## a-context7-react-docs
 

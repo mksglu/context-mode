@@ -2,7 +2,7 @@
 
 The document goes into the FTS5 store; the agent asks fixed queries and gets the best chunks back. Native = the whole document entering the context. ctx_fetch_and_index is not run: it needs the network and the suite is offline. The same index path serves it (the page body is indexed the same way).
 
-Run this group: `cd bench && node run.mjs b-retrieval`. Latest tables: [results/2026-10-31-darwin-arm64.md](../results/2026-10-31-darwin-arm64.md).
+Run this group: `cd bench && node run.mjs b-retrieval`. Latest tables: [results/2026-11-01-darwin-arm64.md](../results/2026-11-01-darwin-arm64.md).
 
 ## b-supabase-edge-functions-5-examples
 

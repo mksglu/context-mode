@@ -105,7 +105,7 @@ describe("ADR-0012 / bench suite (bench/run.mjs)", () => {
     assert.equal(typeof r.context_mode.dirty, "boolean");
     for (const k of ["node", "os", "cpu", "arch"]) assert.ok(r.env[k], k);
     assert.match(r.token_method, /estimate/);
-    assert.equal(r.results.length, 54);
+    assert.equal(r.results.length, 66);
     for (const row of r.results) {
       assert.equal(row.error, null, row.id);
       assert.ok(GROUPS.includes(row.group), row.id);

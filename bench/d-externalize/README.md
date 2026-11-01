@@ -2,7 +2,7 @@
 
 The script prints everything; the agent gets a capped reply with a pointer, and the full output is searchable. 'Found' counts the first, middle and last line markers returned by ctx_search. For the real files the markers are the first, middle and last line of the file.
 
-Run this group: `cd bench && node run.mjs d-externalize`. Latest tables: [results/2026-10-31-darwin-arm64.md](../results/2026-10-31-darwin-arm64.md).
+Run this group: `cd bench && node run.mjs d-externalize`. Latest tables: [results/2026-11-01-darwin-arm64.md](../results/2026-11-01-darwin-arm64.md).
 
 ## d-synth-120k
 

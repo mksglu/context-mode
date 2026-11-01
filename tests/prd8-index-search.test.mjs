@@ -2135,6 +2135,79 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         }
       });
 
+      // D-SEARCH-LEAN-1 (bench/b-retrieval, 2026-11-01): v1 1.0.169 answered with at most 2 hits; v2 still sent 5 even when
+      // the top hit held every query word and the rest held only some. Nothing is cut: the rest stays behind `More:`.
+      test("D-SEARCH-LEAN-1: when the top hit holds every query word the reply shows 3 hits and the rest is behind More:", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-lean1-"));
+        try {
+          const ctx = ctxFor(root);
+          const chunks = ["## Top\n\nalpha beta gamma are all here in one chunk about wiring.\n"];
+          for (let i = 0; i < 29; i++) chunks.push(`## Part ${i}\n\nalpha appears here alone in part ${i} with filler text about handlers.\n`);
+          await ctxIndex.handler({ content: chunks.join("\n"), source: "lean" }, ctx);
+          const seen = [];
+          let offset = 0;
+          let firstHits = -1;
+          for (let guard = 0; guard < 10; guard++) {
+            const out = await ctxSearch.handler({ queries: ["alpha beta gamma"], source: "lean", offset }, ctx);
+            const n = [...out.text.matchAll(/^lean #(\d+): /gm)].length;
+            if (firstHits < 0) firstHits = n;
+            for (const m of out.text.matchAll(/^lean #(\d+): /gm)) seen.push(Number(m[1]));
+            const more = out.text.split("\n").find((l) => l.startsWith("More: "));
+            if (more === undefined) break;
+            offset = Number(/offset:(\d+)/.exec(more)[1]);
+            assert.equal(offset, seen.length, "the cursor starts at the first hit not shown");
+          }
+          assert.equal(firstHits, 3, "top hit holds every word: 3 hits, not 5");
+          assert.equal(new Set(seen).size, seen.length, "no hit twice");
+          assert.equal(seen.length, 30, "paging reaches every matching chunk");
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("D-SEARCH-LEAN-1: hits that also hold every word stay in the reply (up to the page of 5)", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-lean2-"));
+        try {
+          const ctx = ctxFor(root);
+          const doc = Array.from({ length: 30 }, (_, i) => `## Part ${i}\n\nalpha beta gamma number ${i} stands here.\n`).join("\n");
+          await ctxIndex.handler({ content: doc, source: "lean" }, ctx);
+          const out = await ctxSearch.handler({ queries: ["alpha beta gamma"], source: "lean" }, ctx);
+          assert.equal([...out.text.matchAll(/^lean #\d+: /gm)].length, 5);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("D-SEARCH-LEAN-1: when the top hit lacks a word the reply keeps the page of 5", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-lean3-"));
+        try {
+          const ctx = ctxFor(root);
+          const doc = Array.from({ length: 30 }, (_, i) => `## Part ${i}\n\nalpha stands alone in part ${i}.\n`).join("\n");
+          await ctxIndex.handler({ content: doc, source: "lean" }, ctx);
+          const out = await ctxSearch.handler({ queries: ["alpha beta gamma"], source: "lean" }, ctx);
+          assert.equal([...out.text.matchAll(/^lean #\d+: /gm)].length, 5);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("D-SEARCH-LEAN-1: queries that share a cursor share one More: line, and that line pages every one of them", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-lean4-"));
+        try {
+          const ctx = ctxFor(root);
+          const doc = Array.from({ length: 40 }, (_, i) => `## Gadget ${i}\n\nThe gadget handler number ${i}. ${"Words about gadget wiring and handlers. ".repeat(6)}\n`).join("\n");
+          await ctxIndex.handler({ content: doc, source: "lean" }, ctx);
+          const out = await ctxSearch.handler({ queries: ["gadget", "gadget handler"], source: "lean" }, ctx);
+          const mores = out.text.split("\n").filter((l) => l.startsWith("More: "));
+          const cursors = mores.map((l) => /offset:(\d+)/.exec(l)[1]);
+          assert.equal(new Set(cursors).size, cursors.length, "no two More: lines with one cursor:\n" + out.text);
+          assert.equal(mores.length, 1, "both queries sit at one cursor");
+          assert.ok(mores[0].includes('"gadget"') && mores[0].includes('"gadget handler"'), mores[0]);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
       test("D-SEARCH-SMALL-1: the first hit of a query is shown whole even when it is most of a small source", async () => {
         const root = mkdtempSync(join(tmpdir(), "cm-sm3-"));
         try {

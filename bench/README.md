@@ -3,7 +3,7 @@
 ## Suite: one folder per use case, one command
 
 ```
-cd bench && node run.mjs                 # all 54 scenarios, 3 runs each
+cd bench && node run.mjs                 # all 66 scenarios, 3 runs each
 node run.mjs a-sandbox                   # one group, or one scenario id
 node run.mjs --runs 5                    # n runs; median, min, max and sigma are over these
 ```

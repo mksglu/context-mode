@@ -394,7 +394,7 @@ export function ftsQuery(
   }
   return page.map((e) => {
     const r = rows.get(Number(e.r.rid)) as PageRow;
-    return { sourceId: Number(r.source_id), label: r.label, ord: Number(r.ord), snippet: highlight(r.body, q, SNIPPET_MAX_BYTES), score: e.s };
+    return { sourceId: Number(r.source_id), label: r.label, ord: Number(r.ord), snippet: highlight(r.body, q, SNIPPET_MAX_BYTES), score: e.s, full: e.full === 1 };
   });
 }
 

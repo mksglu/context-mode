@@ -110,7 +110,7 @@ export interface SourceRow {
 }
 export interface Chunk { ord: number; text: string; bytes: number; title?: string; }
 export type SearchScope = "session" | "worktree" | "project";
-export interface Hit { sourceId: number; label: string; ord: number; snippet: string; score: number; }
+export interface Hit { sourceId: number; label: string; ord: number; snippet: string; score: number; full?: boolean; }
 
 // ctx_search sort:"timeline" rows (ADR-0009 §8.1, DECISIONS-r9 M14-M18, DEVIATIONS D-M2-3).
 // One row shape for the three sources the timeline merges: ContentStore ("content"), SessionDB

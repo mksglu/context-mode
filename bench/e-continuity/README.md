@@ -2,7 +2,7 @@
 
 Native = the raw tool outputs that a transcript replay would carry. context-mode = the SessionStart(compact) state block, ctx_resume, and the UserPromptSubmit recall block. 'Recall found' means the recall block for a prompt holds a line that answers it. This measures bytes and presence of the answer, not whether a model keeps working well after compaction.
 
-Run this group: `cd bench && node run.mjs e-continuity`. Latest tables: [results/2026-10-31-darwin-arm64.md](../results/2026-10-31-darwin-arm64.md).
+Run this group: `cd bench && node run.mjs e-continuity`. Latest tables: [results/2026-11-01-darwin-arm64.md](../results/2026-11-01-darwin-arm64.md).
 
 ## e-debug-session
 

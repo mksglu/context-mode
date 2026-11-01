@@ -2,7 +2,7 @@
 
 Each hook row is the median of 5 hook processes inside one run, a fresh process each (no daemon), minus the median of 5 bare `node -e ""` starts. The small payload is an allowed command, so this is the fixed cost of every tool call.
 
-Run this group: `cd bench && node run.mjs g-overhead`. Latest tables: [results/2026-10-31-darwin-arm64.md](../results/2026-10-31-darwin-arm64.md).
+Run this group: `cd bench && node run.mjs g-overhead`. Latest tables: [results/2026-11-01-darwin-arm64.md](../results/2026-11-01-darwin-arm64.md).
 
 ## g-hook-claude-code
 

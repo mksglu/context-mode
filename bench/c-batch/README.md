@@ -2,7 +2,7 @@
 
 Native = the sum of the raw outputs of the same commands run as separate Bash calls. The last row has tiny outputs on purpose: the batch reply header is a fixed cost and there is nothing to save.
 
-Run this group: `cd bench && node run.mjs c-batch`. Latest tables: [results/2026-10-31-darwin-arm64.md](../results/2026-10-31-darwin-arm64.md).
+Run this group: `cd bench && node run.mjs c-batch`. Latest tables: [results/2026-11-01-darwin-arm64.md](../results/2026-11-01-darwin-arm64.md).
 
 ## c-triage
 

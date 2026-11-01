@@ -153,6 +153,17 @@ function sourceBytes(db: DbHandle, ids: number[]): Map<number, number> {
   return out;
 }
 
+// D-SEARCH-LEAN-1: when the top hit holds every query word (`full`), the answer is in it; the reply shows
+// LEAN_HITS (3) hits, plus any further hit that also holds every word, up to the page. Nothing is cut: the rest
+// stays behind `More:`. A top hit that lacks a word keeps the whole page (held-out ranks 3-5 live there).
+const LEAN_HITS = 3;
+function replyHits(hits: Hit[], size: number): number {
+  if (hits.length === 0 || hits[0].full !== true) return Math.min(size, hits.length);
+  let n = Math.min(LEAN_HITS, size, hits.length);
+  while (n < size && n < hits.length && hits[n].full === true) n++;
+  return n;
+}
+
 // impl/05 §6 steps 5-10. Hits are kept whole: when the next hit line would not fit OUTPUT_CAP, that
 // query (and every later one) gets a `More:` line starting at the first hit not shown (D-M2-6).
 // D-SEARCH-SMALL-1: a hit already shown for an earlier query of the call is named in one `Same as above:` line,
@@ -163,7 +174,8 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const size = pageSize(input);
   // One hit past the page: a `More:` line is printed only when a hit is left behind it (D-SEARCH-SMALL-1).
   const fetched: Hit[][] = input.queries.map((q) => page(db, q, input, scope, ctx, offset, 1));
-  const pages: Hit[][] = fetched.map((h) => h.slice(0, size));
+  const take: number[] = fetched.map((h) => replyHits(h, size));
+  const pages: Hit[][] = fetched.map((h, i) => h.slice(0, take[i]));
   // Step 9: every query had zero hits.
   if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source);
 
@@ -177,14 +189,14 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const spent = new Map<number, number>(); // hit bytes shown so far, per source
 
   const lines: string[] = [];
-  const more: string[] = [];
+  const more: Array<{ q: string; pos: number }> = []; // grouped by cursor when the reply is built
   const shown = new Set<string>(); // "sourceId:ord" of every hit line already in the reply
   let used = 0;
   let stopped = false;
   input.queries.forEach((q, qi) => {
     const hits = pages[qi];
     if (stopped) {
-      more.push(moreLine(q, offset));
+      more.push({ q, pos: offset });
       return;
     }
     const head = "Query " + JSON.stringify(q) + ":";
@@ -222,10 +234,15 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       lines.push(line);
       used += bytes(line) + 1;
     }
-    if (cut >= 0) more.push(moreLine(q, cut));
-    else if (fetched[qi].length > size) more.push(moreLine(q, offset + size));
+    if (cut >= 0) more.push({ q, pos: cut });
+    else if (fetched[qi].length > take[qi]) more.push({ q, pos: offset + take[qi] });
   });
-  return reply(lines.concat(more).join("\n"), false);
+  // D-SEARCH-LEAN-1: queries that stop at one cursor share one `More:` line (the call pages them all from there).
+  const moreLines: string[] = [];
+  const byPos = new Map<number, string[]>();
+  for (const m of more) byPos.set(m.pos, [...(byPos.get(m.pos) ?? []), m.q]);
+  for (const [pos, qs] of byPos) moreLines.push("More: " + callText(qs, scope, input.source, "offset:" + pos));
+  return reply(lines.concat(moreLines).join("\n"), false);
 }
 
 // ADR-0009 §8.1 rule 8 line; `#<seq>` only for journal rows (D-M2-T9-2).
