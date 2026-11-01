@@ -1230,6 +1230,21 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const bad of ["$7.24", "-59.0%"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
     for (const l of readme.split("\n").filter((x) => x.includes("43.8%"))) assert.ok(l.includes("15 of 20"), "-43.8% without its task-check loss");
   });
+
+  test("README: Gateway screenshots gallery names six existing images and the README holds no email address (D-README-GW-SHOTS-1)", () => {
+    const readme = readRepo("README.md");
+    const dir = "docs/assets/readme/gateway/";
+    const named = [];
+    for (let i = readme.indexOf(dir); i >= 0; i = readme.indexOf(dir, i + 1)) {
+      const end = readme.slice(i).search(/["')\s]/);
+      named.push(readme.slice(i, i + end));
+    }
+    const files = [...new Set(named)];
+    for (const f of files) assert.ok(existsSync(path.join(REPO, f)), `README names ${f}, the file is missing`);
+    for (const shot of ["overview", "analytics", "spend", "memory", "skills", "protect"]) assert.ok(files.some((f) => f.includes("/" + shot)), `README has no ${shot} screenshot`);
+    assert.ok(readme.includes("author's own account over 30 days"), "README says where the screenshot numbers come from");
+    assert.ok(!/[\w.+-]+@[\w-]+\.[\w.-]*[a-z]/i.test(readme), "README names an email address");
+  });
 });
 
 describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {

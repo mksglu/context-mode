@@ -273,6 +273,41 @@ Code from `ctx_execute` runs on your host as your user, with your environment (m
 The plugin keeps tool output out of the context window. In a long session the rest of the request still grows: the agent re-sends the whole history on every request, compacts at the window limit, and keeps what it learned inside one session and one agent.
 Context Mode Gateway works on that part. It runs between your agent and the model API, on every request and the whole account: Recall for sessions longer than the window, Memory shared by all your agents, Skills, Search over everything that passed through, and Protect.
 
+<a href="docs/assets/readme/gateway/overview.webp"><img src="docs/assets/readme/gateway/overview-1200.webp" alt="Gateway Overview: money saved, AI spend, prompt-cache discount and cost per request over 30 days" width="100%"></a>
+
+**Overview.** A long session bills you late and in pieces. This screen shows what you paid and what the Gateway saved, per day.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/readme/gateway/analytics.webp"><img src="docs/assets/readme/gateway/analytics-1200.webp" alt="Gateway Analytics: saved money over time, split by source" width="100%"></a><br>
+      <b>Analytics.</b> You want to know where a saving comes from. This screen splits it into hidden tools, archived old results, kept-out large outputs and trimmed context.
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/readme/gateway/spend.webp"><img src="docs/assets/readme/gateway/spend-1200.webp" alt="Gateway Spend: spend per day by model, cost per request and cache hit rate" width="100%"></a><br>
+      <b>Spend.</b> The bill grows by day and by model. This screen shows spend per day, cost per request and the cache hit rate.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/readme/gateway/memory.webp"><img src="docs/assets/readme/gateway/memory-top-1200.webp" alt="Gateway Memory: money saved by Recall and searches per day" width="100%"></a><br>
+      <b>Memory.</b> Facts and decisions carry across sessions and agents. This screen shows what Recall saved and how many searches found an answer.
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/readme/gateway/skills.webp"><img src="docs/assets/readme/gateway/skills-1200.webp" alt="Gateway Skills: import from GitHub and the list of installed skills" width="100%"></a><br>
+      <b>Skills.</b> You add a skill once and all your clients use it when it helps. This screen imports skills from GitHub and lists the installed ones.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <a href="docs/assets/readme/gateway/protect.webp"><img src="docs/assets/readme/gateway/protect-1200.webp" alt="Gateway Protect: a new command rule that blocks terraform destroy" width="50%"></a><br>
+      <b>Protect.</b> One wrong shell command can wipe a disk. This screen writes a rule that blocks such a command before it runs.
+    </td>
+  </tr>
+</table>
+
+Numbers in these screenshots come from the author's own account over 30 days (Oct 3 - Nov 1, 2026), so read them as one account's usage. Click an image for the full size.
+
 **Table 4.** Context Mode Gateway features, from [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works).
 
 | Feature | What it does | What you get | Details |
