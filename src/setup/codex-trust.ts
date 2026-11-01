@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 import { SERVER_KEY } from "../core/contracts/constants.ts";
 import { spawnForm, spawnShim, whichBin } from "./spawn-bin.ts";
@@ -157,7 +157,7 @@ export function listPluginHooks(env: Record<string, string | undefined>, pluginI
       done = true;
       clearTimeout(timer);
       child.stdin.destroy();
-      child.kill();
+      stopTree(child.pid, () => child.kill());
       resolve(v);
     };
     const timer = setTimeout(() => finish(undefined), LIST_TIMEOUT_MS);
@@ -180,6 +180,15 @@ export function listPluginHooks(env: Record<string, string | undefined>, pluginI
     });
     send({ id: 1, method: "initialize", params: { clientInfo: { name: "context-mode-setup", version: "2.0.0" } } });
   });
+}
+
+/** D-NI-CODEX-TRUST-3: on Windows `codex` is a .cmd shim, so kill() ends the shim and leaves the real codex running with
+ *  its cwd open (the next rmSync of that dir fails with EPERM). taskkill /T ends the whole tree. */
+function stopTree(pid: number | undefined, kill: () => void): void {
+  if (process.platform === "win32" && pid !== undefined) {
+    try { spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore", timeout: 5000 }); } catch { /* fall through to kill */ }
+  }
+  kill();
 }
 
 const HASH_PART_SEP = "/";
