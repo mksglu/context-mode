@@ -1206,7 +1206,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
 
   test("README has the paper parts and CITATION.cff names the same title", () => {
     const readme = readRepo("README.md");
-    for (const part of ["## Abstract", "## Limitations", "## License", "## Cite", "```bibtex", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
+    for (const part of ["## Abstract", "## Scope", "## License", "## Cite", "```bibtex", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
     const cff = readRepo("CITATION.cff");
     assert.ok(cff.startsWith("cff-version: 1.2.0\n"));
     assert.ok(cff.includes("title: \"Context Mode"));
