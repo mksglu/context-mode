@@ -91,21 +91,28 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
     return fail("project", err, "hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n"); // D-HNE-GUARD-1 supersedes D-FU-PS-1: a flooding call is denied, the rest allowed
   }
   let decision: Decision;
+  const settle: Settle = {};
   try {
     fault(env, "policy");
-    decision = await dispatch(ev, row, project, env); // step 4
+    decision = await dispatch(ev, row, project, env, settle); // step 4
   } catch (err) {
     return fail("store", err);
   }
   try {
     fault(env, "encode");
-    return row.encode(ev, decision); // step 6
+    const out = row.encode(ev, decision); // step 6
+    settle.run?.(true);
+    return out;
   } catch (err) {
+    settle.run?.(false); // D-STATS-RET-3: the host gets the failure output, the whole tool output
     return fail("encode", err);
   }
 }
 
-function dispatch(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv): Promise<Decision> {
+/** D-STATS-RET-3: PostToolUse leaves its journal write here; handleHook runs it once the encode stage is known. */
+interface Settle { run?: (encoded: boolean) => void }
+
+function dispatch(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv, settle: Settle): Promise<Decision> {
   switch (ev.event) {
     case "SessionStart":
       return sessionStart(ev, row, project);
@@ -114,7 +121,7 @@ function dispatch(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectConte
     case "PreToolUse":
       return preToolUse(ev, row, project, env);
     case "PostToolUse":
-      return postToolUse(ev, row, project, env);
+      return postToolUse(ev, row, project, env, settle);
     case "PreCompact":
       return preCompact(ev, row, project);
     case "Usage":
@@ -389,7 +396,7 @@ function pathOf(input: Record<string, unknown>): string | null {
   return null;
 }
 
-async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv): Promise<Decision> {
+async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv, settle: Settle): Promise<Decision> {
   const tool = ev.tool;
   if (tool === undefined || tool.canonicalName.startsWith(OWN_TOOL_PREFIX)) return ALLOW; // step 1 (ADR-0009 §0)
   const result = ev.result ?? { isError: false, bytes: 0 };
@@ -399,6 +406,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const kind = journalKind(tool, row, result.isError); // step 2
   // D-STATS-RET-1: the row is written once, after the decision, so returned_bytes is what the model got:
   // the replace text when the hook replaced the output, result.bytes when it allowed it whole. Same detached write.
+  // D-STATS-RET-3: and after the encode stage, so a failed encode (the host gets the whole output) is not a saving.
   const journal = (returned: number): void => {
     if (kind === null) return;
     const key = kind === "cmd" ? canonicalKey(tool.canonicalName, str(tool.input.command))
@@ -416,7 +424,8 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
     journal(result.bytes); // the call still gets its row; the caller turns the throw into the failure output
     throw err;
   }
-  journal(decision.kind === "replace" ? Buffer.byteLength(decision.output) : result.bytes);
+  const decided = decision;
+  settle.run = (encoded) => journal(encoded && decided.kind === "replace" ? Buffer.byteLength(decided.output) : result.bytes);
   return decision;
 }
 
@@ -426,13 +435,15 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
   if (result.keep === true) return ALLOW; // D-M2-MCP-1: an MCP result with a non-text block stays as the host made it
+  // ADR-0001: one path per row, no runtime fallback. A row with no replace channel gets no replace decision on
+  // any path, the subagent one too (D-STATS-RET-2): its encoder drops it, so the model gets the whole output.
+  if (!hasReplace(row)) return ALLOW;
   let label: string;
   if (isSubagentCall(ev)) {
     const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
     if (subCase === "A") return ALLOW;
     label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + String(ev.turn ?? 0);
   } else {
-    if (!hasReplace(row)) return ALLOW; // ADR-0001: one path per row, no runtime fallback
     label = mainLabel(tool, ev);
   }
   // D-M7-RR-3: no description -> the command text, file path, pattern or URL, never an empty query.

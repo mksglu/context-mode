@@ -454,6 +454,29 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.deepEqual(rows.map((r) => ({ ...r })), [{ bytes: Buffer.byteLength(text), returned_bytes: Buffer.byteLength(text) }]);
   });
 
+  // D-STATS-RET-2: a subagent call on a row with no replace channel gets no replace decision, so the model got the whole output.
+  for (const host of ["codex", "qwen", "zcode"]) {
+    test("D-STATS-RET-2: " + host + " subagent case C, large output, journals returned_bytes = its bytes and replaces nothing", async () => {
+      const text = bigText(160000);
+      const p = cc({ hook_event_name: "PostToolUse", agent_id: "sub-1", agent_type: "unknown-type", tool_name: "Bash", tool_input: { command: "cat x" }, tool_use_id: "toolu_c", tool_response: { stdout: text, stderr: "", interrupted: false, isImage: false } });
+      assert.deepEqual(await handleHook(host, p, env), { stdout: "", exitCode: 0 });
+      const rows = await waitRows("SELECT bytes, returned_bytes FROM events WHERE session_id = ? AND kind = 'cmd'", [p.session_id], 1);
+      assert.deepEqual(rows.map((r) => ({ ...r })), [{ bytes: Buffer.byteLength(text), returned_bytes: Buffer.byteLength(text) }]);
+    });
+  }
+
+  // D-STATS-RET-3: if the encode stage fails after a replace decision, the host gets the failure output (the whole
+  // tool output), so the row says returned_bytes = result.bytes, not the replace length.
+  test("D-STATS-RET-3: an encode failure after a replace decision journals returned_bytes = the output bytes", async () => {
+    const text = bigText(160000);
+    const p = mainBashPost(text);
+    const out = await handleHook("claude-code", p, { ...env, CM_HOOK_FAULT: "encode" });
+    assert.equal(out.exitCode, 0);
+    assert.ok(!out.stdout.includes("updatedToolOutput"), "the host got no replace: " + out.stdout.slice(0, 200));
+    const rows = await waitRows("SELECT bytes, returned_bytes FROM events WHERE session_id = ? AND kind = 'cmd'", [p.session_id], 1);
+    assert.deepEqual(rows.map((r) => ({ ...r })), [{ bytes: Buffer.byteLength(text), returned_bytes: Buffer.byteLength(text) }]);
+  });
+
   test("D-M7-SV-1: a 4-16K Bash output is replaced by at most REPLACE_RETURN_BYTES of whole small chunks plus the more line", async () => {
     const text = bigText(REPLACE_TRIGGER_BYTES * 2);
     const p = mainBashPost(text);
