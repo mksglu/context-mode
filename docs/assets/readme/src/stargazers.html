@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README stargazers 1280x440</title>
+<script>var T=new URLSearchParams(location.search).get('theme')||'dark';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<style>:root{--w:1280px;--h:440px}.h2{position:absolute;left:64px;top:84px;font-size:40px}
+.grid{position:absolute;left:64px;right:64px;top:160px;display:flex;flex-wrap:wrap;gap:10px}
+.chip{background:var(--card);border:1px solid var(--card-b);border-radius:10px;padding:11px 16px;display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.chip .n{font-weight:600;font-size:18px;letter-spacing:-.01em;color:var(--fg)}
+.chip .c{font-family:var(--mono);font-size:12.5px;color:var(--muted)}</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="abs eyebrow" style="left:64px;top:52px">GitHub stargazers by company, mksglu/context-mode</div>
+<div class="h h2">Starred by developers at <em id="hn"></em></div>
+<div class="grid" id="grid"></div>
+<div class="cap" id="cap"></div>
+</main>
+<script>
+// D-README-STARRED-1: every name and number comes from window.COMPANIES, which render.mjs sets from
+// ../data/stargazer-companies.json. Shown: companies with MIN or more stargazers, in the JSON's order.
+var MIN=5,C=window.COMPANIES,list=C.companies.filter(function(c){return c.count>=MIN});
+document.getElementById("hn").textContent=list.length+" companies.";
+var g=document.getElementById("grid");
+list.forEach(function(c){var d=document.createElement("div");d.className="chip";d.setAttribute("data-box","");
+  var n=document.createElement("span");n.className="n";n.textContent=c.name;var k=document.createElement("span");k.className="c";k.textContent=c.count;
+  d.appendChild(n);d.appendChild(k);g.appendChild(d)});
+document.getElementById("cap").innerHTML="Public company field of <b>"+C.total_stargazers.toLocaleString("en-US")+"</b> stargazers, read with the GitHub GraphQL API on "+C.read_at.slice(0,10)+
+  ". <b>"+C.with_company.toLocaleString("en-US")+"</b> list a company. Shown: companies with "+MIN+" or more stargazers; the number is the stargazer count.";
+</script></body></html>
