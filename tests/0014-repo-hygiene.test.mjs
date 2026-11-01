@@ -964,6 +964,21 @@ describe("ADR-0015 repo: README agent tables", () => {
     }
   });
 
+  test("readme-agents: D-README-INPROC-WORDS-1 user text says plugin inside the agent, never in-process", () => {
+    const rows = Object.fromEntries(agentRows().map((r) => [r.id, r]));
+    for (const id of ["pi", "opencode"]) {
+      assert.ok(rows[id].hooks.includes("the plugin's own event handlers"), `${id} hooks cell: ${rows[id].hooks}`);
+    }
+    assert.equal(rows.pi.mcp, "plugin inside the agent");
+    assert.ok(!/in[- ]process/i.test(Object.values(HOOK_WORDS).join(" ")), "HOOK_WORDS has no in-process wording");
+    for (const rel of ["README.md", "docs/install/README.md", "docs/how-it-works.md", "docs/install/pi.md", "docs/install/opencode.md"]) {
+      const text = readFileSync(path.join(REPO, rel), "utf8");
+      assert.ok(!/in[- ]process/i.test(text), `${rel} still says in-process / in process`);
+    }
+    assert.ok(README.includes("Hooks reach each agent in one of three ways"), "the README sentence stays");
+    assert.ok(README.includes("plugin inside the agent (OpenCode, Pi)"), "the README sentence names the plugin inside the agent");
+  });
+
   test("readme-agents: the table has the columns Agent | Hooks | MCP | Skills | Install | Guide and never says MCP only", () => {
     const header = "| Agent | Hooks | MCP | Skills | Install | Guide |";
     assert.ok(renderAgentTables().install.startsWith(header), renderAgentTables().install.split("\n")[0]);
