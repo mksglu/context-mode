@@ -1218,15 +1218,16 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const bad of ["## Cite", "```bibtex", "CITATION.cff"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
   });
 
-  test("README: Gateway section comes first after the badges, and no failed run is quoted", () => {
+  test("README: Gateway text comes first after the badges, reads problem-first, and no failed run is quoted", () => {
     const readme = readRepo("README.md");
     const gw = readme.indexOf("Context Mode Gateway");
     assert.ok(gw > 0 && gw < readme.indexOf("## Abstract"), "the Gateway line must sit above the Abstract");
-    assert.ok(readme.includes("1,000 requests a month"));
-    assert.ok(readme.includes("https://contextmode.ai/pricing"));
+    // Owner 2026-11-01 (D-README-GW-PROBLEM-1): the Gateway text reads problem-first; quota, price and sign-up lines read as an ad.
+    for (const ad of ["1,000 requests", "card-free", "Start at", "Every plan has every feature", "contextmode.ai/pricing"]) assert.ok(!readme.includes(ad), `README has ${ad} (D-README-GW-PROBLEM-1)`);
     // Runs that failed their own pre-registered rule (gateway-paid.md §2) and claims with no raw source.
     for (const bad of ["65.5%", "54.9%", "$2.49", "$1.88", "80x", "315 KB becomes"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
-    assert.ok(readme.includes("3 of 4 pairs passed the exact-accuracy rule"));
+    // The 1M-window run missed its own pre-registered accuracy rule, so the README leaves it out.
+    for (const bad of ["$7.24", "-59.0%"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
     for (const l of readme.split("\n").filter((x) => x.includes("43.8%"))) assert.ok(l.includes("15 of 20"), "-43.8% without its task-check loss");
   });
 });

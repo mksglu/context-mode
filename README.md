@@ -4,8 +4,7 @@
 
 [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.npm_downloads&label=npm%20downloads&color=blue)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 
-> **Context Mode Gateway** is the paid layer. It runs between your agent and the model API and adds Recall for long sessions, Memory, Skills, Search, Protect and request-level saving.
-> Free: 1,000 requests a month, every feature, card-free. Start at [contextmode.ai](https://contextmode.ai). Plans: [https://contextmode.ai/pricing](https://contextmode.ai/pricing).
+> **When a session runs long.** Context Mode keeps tool output out of the context window. The conversation itself still grows with every turn, and at the window limit the agent compacts and forgets earlier steps. Context Mode Gateway works on that part. It sits between your agent and the model API, keeps older turns in an archive the agent can search (Recall) and carries facts across sessions and agents (Memory). On a long Claude Code session with a 200K window, it cut the mean cost per session from $4.86 to $3.04 (-37.6%), and the session ran to the end with zero compactions. [How the Gateway works](https://contextmode.ai/docs/how-saving-works)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-dark.png">
@@ -271,15 +270,15 @@ Code from `ctx_execute` runs on your host as your user, with your environment (m
 
 ## 8. Context Mode Gateway
 
-Context Mode Gateway is the paid product. The plugin works beside the agent, on tool output. The Gateway runs between your agent and the model API and works on every request and the whole account.
-It adds account-wide features: Recall for sessions longer than the window, Memory shared by all your agents, Skills, Search over everything that passed through, and Protect.
+The plugin keeps tool output out of the context window. In a long session the rest of the request still grows: the agent re-sends the whole history on every request, compacts at the window limit, and keeps what it learned inside one session and one agent.
+Context Mode Gateway works on that part. It runs between your agent and the model API, on every request and the whole account: Recall for sessions longer than the window, Memory shared by all your agents, Skills, Search over everything that passed through, and Protect.
 
 **Table 4.** Context Mode Gateway features, from [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works).
 
 | Feature | What it does | What you get | Details |
 |---|---|---|---|
 | Context Saving | Folds old tool output, runs data work as code (Thinking in Code), trims tool schemas, places cache marks | Tool schemas 102,784 B to 33,611 B per request (-67.3%); a tool output over 2,048 B becomes a pointer of about 285 B, with the full copy archived | Saves the most on sessions with many tool calls; A/B measured in Claude Code |
-| Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | 200K window, 2026-10-04: $4.86 to $3.04 (-37.6%), 3 of 3 pre-registered pairs passed, 0 compactions against 3 | Cost measured in Claude Code on Claude Opus 5.5 |
+| Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | 200K window, 2026-10-04: $4.86 to $3.04 (-37.6%), zero compactions against 3 on Claude Code alone | Cost measured in Claude Code on Claude Opus 5.5 |
 | Memory | Each fact keeps two times: when it was true and when the Gateway learned it | Claude Code and Codex on one account share one store, tested end to end | The memory block goes into the first request of a new session |
 | Skills | A skill catalog on the Gateway for your account; it loads the skill that matches your message | The matching skill loads on the message that needs it | Import skills from GitHub; a loaded skill joins the prompt in full |
 | Search | Searches the prompts, commands and tool output that passed through, in the console and as an agent tool | Find any past prompt, command or tool output, from the console or your agent | The console searches the first 4,000 characters of each tool result |
@@ -292,21 +291,17 @@ It adds account-wide features: Recall for sessions longer than the window, Memor
 
 Gateway cost against Claude Code alone, Claude Opus 5.5, mean dollars per session at list price:
 
-- Six short tasks (2026-09-29): 21% to 29% cheaper per task, 24.5% pooled, cheaper in 84 of 88 pairs. [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json)
-- Long session, 200K window (2026-10-03/04): $4.86 to $3.04 (-37.6%), 3 of 3 pre-registered pairs passed. [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json)
-- Long session, 1M window, 30 steps (2026-10-03): $7.24 to $2.97 (-59.0%), 3 of 4 pairs passed the exact-accuracy rule. [ab.json](https://contextmode.ai/benchmarks/long-session/amendment-4/ab.json)
+- Six short tasks (2026-09-29): 24.5% cheaper pooled over 176 sessions (21% to 29% per task). [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json)
+- Long session, 200K window (2026-10-03/04): $4.86 to $3.04 (-37.6%), zero compactions against 3 on Claude Code alone. [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json)
 - We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks).
 
 Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi.
 Setup is one command, `npx @context-mode/cli`. It signs you in and writes one config change per agent (it needs Node 20.12 or later).
 Your own Claude or OpenAI account pays the model directly, at the provider's price.
-Every plan has every feature. Free: 1,000 requests a month, card-free; the count starts again on the first day of each month (UTC).
-Plans and prices: [https://contextmode.ai/pricing](https://contextmode.ai/pricing). Enterprise can run in your own Cloudflare account, where you hold the data, the keys and the logs.
 
 The Gateway routes to Anthropic and OpenAI. Requests pass through the Gateway server on their way to the model.
 Keep your agent's own sandbox on next to Protect.
-
-**Start free at [contextmode.ai](https://contextmode.ai).**
+More at [contextmode.ai](https://contextmode.ai).
 
 ## 9. Adoption
 
