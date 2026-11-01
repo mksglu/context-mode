@@ -1,6 +1,6 @@
 {
   "name": "context-mode",
-  "version": "2.0.0-next.23",
+  "version": "2.0.0-next.24",
   "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
   "author": {
     "name": "Mert Koseoglu",
