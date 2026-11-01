@@ -4,8 +4,8 @@
 // Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
 // Columns (DEVIATIONS D-README-2): Hooks = the row's hookChannel kind in table.ts (every agent has one, ADR-0020);
 // MCP = "yes", or "plugin inside the agent" when the registry row has no MCP config and the agent runs in process (Pi);
-// Skills = the row's skillChannel; Install = the last command of the first fence in the page's Install section when
-// it is the agent's own command, else "npm + context-mode setup".
+// Skills = the row's skillChannel; Install = every command of the first fence in the page's Install section, joined by
+// <br>, when it is the agent's own command (D-README-INSTALL-CELL-1), else "npm + context-mode setup".
 // Usage: node build/readme-agents.mjs [--write]. Without --write it prints the tables; --write puts them into
 // README.md between the markers. build/check-readme.mjs calls checkAgentTables() and fails on any problem.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -37,7 +37,8 @@ function pageOf(id) {
   return { rel, name: title.slice(TITLE_PREFIX.length).trim(), lines };
 }
 
-/** The Install cell: the page's own agent command (last line of the first fence under "## Install"), else the npm route. */
+/** The Install cell: every line of the first fence under "## Install" when it is the agent's own command, joined by <br>
+ * (D-README-INSTALL-CELL-1: a reader who copies the cell runs the whole install), else the npm route. */
 function installCell(lines, bin) {
   const at = lines.indexOf(SECTIONS.install.heading);
   const open = lines.findIndex((l, i) => i > at && l.startsWith("```"));
@@ -45,7 +46,7 @@ function installCell(lines, bin) {
   const cmds = lines.slice(open + 1, close).filter((l) => l.trim() !== "");
   const last = cmds[cmds.length - 1] ?? "";
   if (cmds[0]?.startsWith("npm ") || !last.startsWith(`${bin} `)) return FALLBACK_INSTALL;
-  return `\`${last}\``;
+  return cmds.map((c) => `\`${c.trim()}\``).join("<br>");
 }
 
 /** One row per adapter, sorted by agent name. */
