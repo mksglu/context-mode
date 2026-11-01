@@ -5,7 +5,7 @@
 // the hook's own cost against HOOK_P95_MS. An agent with no recorded payload is UNKNOWN, never a guessed payload.
 // D-D5-BARE-1: the cost is hook wall minus bare `node -e ""` wall, the D3 rule (ADR-0019 D3), fastest of 3 to 9 pairs (D-D5-MORE-PAIRS-1).
 // node.exe start is paid by the host with or without the hook (42.7 ms p50 on windows-latest), so it is not in the budget.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
 import {
@@ -16,7 +16,8 @@ import {
 import type { AgentId } from "../contracts/agents.ts";
 import type { DbHandle, DoctorRow } from "../contracts/types.ts";
 import { runProcess } from "../sandbox/spawn.ts";
-import { CODEX_PLUGIN_ID, listPluginHooks, untrustedPluginHooksDetail } from "../../setup/codex-trust.ts";
+import { CODEX_PLUGIN_ID, askPluginHooks, sameDir, untrustedPluginHooksDetail } from "../../setup/codex-trust.ts";
+import { codexPluginHomeOf } from "../project/config-dir.ts";
 
 /** One recorded hook call (D-M5-arch-4): the native event name and the payload the host sent. */
 interface FixtureEntry { event: string; payload: unknown; }
@@ -27,7 +28,7 @@ export interface HookCheckInput {
   env: Record<string, string>;      // env for the hook child (caller builds it)
   signal: AbortSignal;
   worktree?: string;                // the project worktree; the fixture's cwd, so the hook finds a repository (D-D5-FIXTURE-1)
-  codexConfigDir: string;           // codex only: where hooks.json lives (CODEX_HOME or ~/.codex)
+  codexConfigDir: string;           // codex only: the Codex home the server runs for (codexRunDirOf); hooks/list is asked for it
   db: DbHandle | null;              // codex only: this project's context.db, null when none exists yet
   now?: () => number;               // wall clock in ms; tests pin it, default performance.now
   samples?: number;                 // fixed number of hook and bare-node pairs; default: D5_MIN_PAIRS up to D5_MAX_PAIRS (D-D5-MORE-PAIRS-1)
@@ -42,6 +43,11 @@ const D5_MAX_PAIRS = 9;
 
 // The terminal doctor prints the same fix (hook-registered): setup trusts our own plugin hooks.
 const D5_CODEX_TRUST_FIX = "context-mode setup --agents codex";
+// D-CODEX-HOME-RUN-1: the native plugin route, when Codex cannot vouch for our hooks in the plugin's home.
+const D5_CODEX_ABSENT_DETAIL = (home: string): string => `codex is not on PATH, so the trust of the context-mode plugin hooks in ${home} is not known`;
+const D5_CODEX_SILENT_DETAIL = (home: string): string => `codex app-server gave no hooks/list answer for ${home} in time, so the context-mode plugin hooks are not known to run`;
+const D5_CODEX_OTHER_HOME_DETAIL = (asked: string, home: string): string => `codex answers for ${asked}, but the context-mode plugin runs from ${home}`;
+const D5_CODEX_NONE_DETAIL = (home: string): string => `codex lists no context-mode plugin hooks in ${home}, so they do not run`;
 
 const row = (status: DoctorRow["status"], detail: string, fixCommand?: string): DoctorRow =>
   fixCommand === undefined
@@ -96,14 +102,41 @@ export function codexHookJournaled(db: DbHandle | null): boolean {
   return db.raw.prepare("SELECT 1 FROM events WHERE agent = ? LIMIT 1").get("codex") !== undefined;
 }
 
+/** A dir by its real path when it exists (Codex canonicalizes CODEX_HOME), else as given. */
+function realDir(p: string): string {
+  try { return realpathSync(p); } catch { return p; }
+}
+
+/** D-NI-CODEX-TRUST-3, D-CODEX-HOME-RUN-1: Codex's own word on our plugin hooks, asked for the home the server runs for
+ *  (CODEX_HOME set in the app-server env). A row when that word decides D5, null when the round trip decides.
+ *  The running bundle is the native plugin (it sits in <home>/plugins/cache): only a list from that home with every own
+ *  hook trusted lets D5 go on; no Codex is UNKNOWN, no answer, another home or no own hook listed is FAIL.
+ *  npm route (bundle elsewhere, hooks.json): an untrusted own hook is FAIL, anything else is no claim. */
+async function codexPluginTrust(i: HookCheckInput): Promise<DoctorRow | null> {
+  const home = i.codexConfigDir;
+  const plugin = codexPluginHomeOf(i.bundleDir) !== null;
+  const reply = await askPluginHooks({ ...i.env, CODEX_HOME: home }, CODEX_PLUGIN_ID, i.worktree ?? i.bundleDir);
+  if (reply.kind === "list") {
+    const detail = untrustedPluginHooksDetail(reply.hooks);
+    if (detail !== undefined) return row("FAIL", detail, D5_CODEX_TRUST_FIX);
+  }
+  if (!plugin) return null;
+  if (reply.kind === "absent") return row("UNKNOWN", D5_CODEX_ABSENT_DETAIL(home), D5_CODEX_TRUST_FIX);
+  if (reply.kind === "silent") return row("FAIL", D5_CODEX_SILENT_DETAIL(home), D5_CODEX_TRUST_FIX);
+  if (reply.codexHome !== undefined && !sameDir(realDir(reply.codexHome), realDir(home))) {
+    return row("FAIL", D5_CODEX_OTHER_HOME_DETAIL(reply.codexHome, home), D5_CODEX_TRUST_FIX);
+  }
+  if (reply.hooks.length === 0) return row("FAIL", D5_CODEX_NONE_DETAIL(home), D5_CODEX_TRUST_FIX);
+  return null;
+}
+
 /** D5 row. Never throws: a hook that cannot start is a FAIL on shape, a missing fixture is UNKNOWN. */
 export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> {
   // D-NI-CODEX-TRUST-3: the native plugin route leaves no hooks.json, so the host is asked (hooks/list), as the terminal doctor does.
   // A hook Codex lists untrusted never runs, whatever hook.mjs answers here. No answer from Codex: no claim, the round trip decides.
   if (i.agent === "codex") {
-    const hooks = await listPluginHooks(i.env, CODEX_PLUGIN_ID, i.worktree ?? i.bundleDir);
-    const detail = hooks === undefined ? undefined : untrustedPluginHooksDetail(hooks);
-    if (detail !== undefined) return row("FAIL", detail, D5_CODEX_TRUST_FIX);
+    const trust = await codexPluginTrust(i);
+    if (trust !== null) return trust;
   }
   // Codex trust sub-case (R6): hooks file on disk but Codex never ran one -> the one-time trust step.
   if (i.agent === "codex" && existsSync(path.join(i.codexConfigDir, HOOKS_JSON_FILE)) && !codexHookJournaled(i.db)) {

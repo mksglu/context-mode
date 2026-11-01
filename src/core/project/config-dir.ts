@@ -2,8 +2,8 @@
 // The one config-dir reader: every module gets ~/.context-mode from here, none reads HOME again.
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
 const { mkdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
-import { join, posix, win32 } from "node:path";
-import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, DATA_ROOT, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
+import { basename, dirname, join, posix, resolve, win32 } from "node:path";
+import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 
 /** The one home rule. An empty value counts as unset; null when nothing is set (D-M3-F-8).
@@ -28,6 +28,28 @@ export function homeDirOf(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = pr
 export function codexDirOf(env: NodeJS.ProcessEnv, home: string): string {
   const dir = env[CODEX_HOME_ENV];
   return dir !== undefined && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR.codex);
+}
+
+/** D-CODEX-HOME-RUN-1: the Codex home whose plugins/cache holds the running bundle: Codex installs a plugin in
+ *  <codex home>/plugins/cache/<marketplace>/<plugin>/<version>. Null when the bundle sits in no plugins/cache dir (npm route).
+ *  Claude Code keeps its plugins in the same shape under ~/.claude, so only the codex server asks this. */
+export function codexPluginHomeOf(bundleDir: string): string | null {
+  let dir = resolve(bundleDir);
+  while (dirname(dir) !== dir) {
+    const up = dirname(dir);
+    if (basename(dir) === PLUGIN_CACHE_DIR_NAME && basename(up) === HOST_PLUGINS_DIR_NAME) return dirname(up);
+    dir = up;
+  }
+  return null;
+}
+
+/** D-CODEX-HOME-RUN-1: the Codex home the running codex server belongs to: $CODEX_HOME when set and not empty; else the
+ *  home whose plugins/cache holds the bundle (codexPluginHomeOf); else <home>/.codex. The MCP child env of a Codex session
+ *  may carry neither HOME nor CODEX_HOME, and Codex then reads the OS profile home, so the doctor names this dir to Codex. */
+export function codexRunDirOf(env: NodeJS.ProcessEnv, home: string, bundleDir: string): string {
+  const dir = env[CODEX_HOME_ENV];
+  if (dir !== undefined && dir !== "") return dir;
+  return codexPluginHomeOf(bundleDir) ?? codexDirOf(env, home);
 }
 
 /** D-WIN-COPILOT-HOME-1: the dir Copilot CLI reads hooks/ and skills/ from: $COPILOT_HOME when set and not empty (it replaces

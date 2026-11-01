@@ -75,7 +75,7 @@ export function askCodexHome(env: Record<string, string | undefined>): string | 
 }
 
 /** A dir compared the way the platform compares it: Windows ignores case, the \\?\ prefix, / vs \\ and a trailing separator. */
-function sameDir(a: string, b: string, platform: NodeJS.Platform): boolean {
+export function sameDir(a: string, b: string, platform: NodeJS.Platform = process.platform): boolean {
   if (platform !== "win32") return path.posix.normalize(a) === path.posix.normalize(b);
   const norm = (p: string): string => {
     const bare = p.startsWith(WIN_VERBATIM_PREFIX) ? p.slice(WIN_VERBATIM_PREFIX.length) : p;
@@ -141,21 +141,33 @@ export function pluginHooksFromReply(m: unknown, pluginId: string): PluginHook[]
   return out;
 }
 
-/** Ask `codex app-server` (hooks/list) for the hooks of plugin `pluginId`. The server answers only while its stdin
- *  stays open, so the requests go one after the other and the process is stopped after the reply. Undefined: no Codex
- *  on PATH, or no answer in time (the caller cannot tell, so it does not claim untrusted). */
-export function listPluginHooks(env: Record<string, string | undefined>, pluginId: string, cwd: string): Promise<PluginHook[] | undefined> {
+/** D-CODEX-HOME-RUN-1: what one hooks/list call gave: no Codex on PATH, no answer in time, or the plugin's hooks and the
+ *  config dir Codex named in its initialize reply (undefined when it named none). */
+export type PluginHooksReply = { kind: "absent" } | { kind: "silent" } | { kind: "list"; hooks: PluginHook[]; codexHome: string | undefined };
+
+/** Ask `codex app-server` (hooks/list) for the hooks of plugin `pluginId`. Undefined: no Codex on PATH, or no answer in
+ *  time (the caller cannot tell, so it does not claim untrusted). */
+export async function listPluginHooks(env: Record<string, string | undefined>, pluginId: string, cwd: string): Promise<PluginHook[] | undefined> {
+  const r = await askPluginHooks(env, pluginId, cwd);
+  return r.kind === "list" ? r.hooks : undefined;
+}
+
+/** The hooks/list call. The server answers only while its stdin stays open, so the requests go one after the other and
+ *  the process is stopped after the reply. */
+export function askPluginHooks(env: Record<string, string | undefined>, pluginId: string, cwd: string): Promise<PluginHooksReply> {
   const bin = whichBin("codex", env);
-  if (!bin) return Promise.resolve(undefined);
+  if (!bin) return Promise.resolve({ kind: "absent" });
   return new Promise((resolve) => {
+    let asked: string | undefined;
+    const done_ = (hooks: PluginHook[] | undefined): PluginHooksReply => hooks === undefined ? { kind: "silent" } : { kind: "list", hooks, codexHome: asked };
     let f;
-    try { f = spawnForm(bin, ["app-server"], env as NodeJS.ProcessEnv); } catch { resolve(undefined); return; }
+    try { f = spawnForm(bin, ["app-server"], env as NodeJS.ProcessEnv); } catch { resolve({ kind: "silent" }); return; }
     const child = spawn(f.command, f.args, { env: env as NodeJS.ProcessEnv, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
     let buf = "";
     let done = false;
     let exited = false;
     let result: PluginHook[] | undefined;
-    const settle = (): void => { clearTimeout(grace); resolve(result); };
+    const settle = (): void => { clearTimeout(grace); resolve(done_(result)); };
     let grace: ReturnType<typeof setTimeout> | undefined;
     const finish = (v: PluginHook[] | undefined): void => {
       if (done) return;
@@ -181,7 +193,7 @@ export function listPluginHooks(env: Record<string, string | undefined>, pluginI
         let m: unknown;
         try { m = JSON.parse(line); } catch { continue; }
         if (!isObj(m)) continue;
-        if (m.id === 1) { send({ method: "initialized" }); send({ id: 2, method: "hooks/list", params: { cwds: [cwd] } }); }
+        if (m.id === 1) { asked = codexHomeFromReply(line); send({ method: "initialized" }); send({ id: 2, method: "hooks/list", params: { cwds: [cwd] } }); }
         else if (m.id === 2) finish(pluginHooksFromReply(m, pluginId));
       }
     });

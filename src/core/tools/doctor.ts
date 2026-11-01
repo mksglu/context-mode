@@ -21,7 +21,7 @@ import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
 import { lastHookError } from "../hooks/fallback.ts";
 import { healD8 } from "../ops/db-heal.ts";
 import { buildReport, buildReportHead } from "../ops/report.ts";
-import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
+import { claudeDirOf, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { indexText } from "../index/text.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
 import { closeDb, openDb } from "../store/db.ts";
@@ -72,7 +72,7 @@ async function hookRow(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost):
       bundleDir: host.bundleDir,
       env: buildChildEnv(host.env),
       signal: ctx.signal,
-      codexConfigDir: codexDirOf(host.env, requireHomeDir(host.env)), // same Codex dir D3 reads (D-N6-CODEX-HOME-2)
+      codexConfigDir: codexDirOf(host.env, requireHomeDir(host.env)), // = codexRunDirOf: runDoctorChecks sets CODEX_HOME for codex (D-CODEX-HOME-RUN-1)
       db,
     });
     // D-HNE-GUARD-1: the hook never errors, it logs; D5 names the last logged failure so the user sees it.
@@ -98,7 +98,10 @@ function ownServerId(configDir: string, projectKey: string): string {
 }
 
 /** impl/07 §5: D1-D10 one at a time in DOCTOR_CHECK_ORDER, then step 7 (D8 heal) after every row is built. */
-export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost): Promise<DoctorRow[]> {
+export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, host0: DoctorHost): Promise<DoctorRow[]> {
+  // D-CODEX-HOME-RUN-1: a Codex session may start the server with HOME and CODEX_HOME unset; D3, D4, D5 and every codex
+  // app-server call then read the Codex home the running plugin sits in, so CODEX_HOME names it from here on.
+  const host = adapter.id === "codex" ? { ...host0, env: { ...host0.env, CODEX_HOME: codexRunDirOf(host0.env, homeDirOf(host0.env) ?? "", host0.bundleDir) } } : host0;
   const env = host.env;
   const project = ctx.project;
   let integrityFailed = false;

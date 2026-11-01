@@ -1514,6 +1514,78 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
     assert.notEqual(d5home.detail, C.D5_CODEX_UNTRUSTED_DETAIL);
   });
 
+  // D-CODEX-HOME-RUN-1 (tester, candidate baaa3149, Windows, Codex 0.166.0-alpha.5.1): the native plugin sits in
+  // <test-home>/.codex/plugins/cache, but the MCP child env has HOME and CODEX_HOME unset. Codex then answers hooks/list for the
+  // OS profile home, lists none of our hooks, and D5 said PASS while Codex listed 4 of 4 untrusted in the test home.
+  // The fake codex answers for $CODEX_HOME, else <HOME>/.codex, else <FAKE_OS_PROFILE>/.codex, and lists our plugin hooks
+  // only where config.toml switches the plugin on.
+  const RUN_NATIVE = JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: "x" } });
+  const RUN_SKIP = { skip: process.platform === "win32" && "fake codex is an sh script" };
+  function codexRunHome(t, { toml = "", env = {} } = {}) {
+    const root = tmp(t);
+    const home = path.join(root, "test-home");
+    const codexDir = path.join(home, ".codex");
+    const bundleDir = path.join(codexDir, "plugins", "cache", "context-mode", "context-mode", "1.0.0");
+    generateManifests(bundleDir);
+    put(path.join(codexDir, "config.toml"), `[plugins."context-mode@context-mode"]\nenabled = true\n\n${toml}`);
+    writeFileSync(path.join(bundleDir, C.HOOK_ENTRY_FILE), `process.stdin.resume().on("end",()=>process.stdout.write(${JSON.stringify(RUN_NATIVE)}));`);
+    put(path.join(bundleDir, C.HOOK_FIXTURE_DIR, C.HOOK_FIXTURE_FILE), { codex: { event: "PreToolUse", payload: { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } } } });
+    const profile = path.join(root, "os-profile");
+    mkdirSync(path.join(profile, ".codex"), { recursive: true });
+    const bin = fakeCodexBin(root, process.execPath);
+    const hostEnv = { USERPROFILE: home, PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), FAKE_OS_PROFILE: profile, FAKE_PLUGIN_BY_HOME: "1", ...env };
+    const ctx = ctxFor(home, "codex");
+    return { home, codexDir, run: async () => runDoctorChecks(ctx, getAdapter("codex"), { env: hostEnv, bundleDir, piCwd: undefined }) };
+  }
+  const rowOf = (rows, id) => rows.find((r) => r.id === id);
+
+  test("[D-CODEX-HOME-RUN-1] D5 native plugin in <test-home>/.codex, HOME and CODEX_HOME unset, hooks untrusted: FAIL with 4 of 4, never PASS", RUN_SKIP, async (t) => {
+    const rows = await codexRunHome(t).run();
+    const d5 = rowOf(rows, "D5");
+    assert.equal(d5.status, "FAIL", JSON.stringify(d5));
+    assert.equal(d5.detail, "codex lists 4 of 4 context-mode plugin hooks untrusted, so they do not run; run: context-mode setup");
+    assert.equal(d5.fixCommand, "context-mode setup --agents codex");
+  });
+
+  test("[D-CODEX-HOME-RUN-1] D5 native plugin in <test-home>/.codex, HOME and CODEX_HOME unset, hooks trusted: PASS", RUN_SKIP, async (t) => {
+    const d5 = rowOf(await codexRunHome(t, { toml: trustedToml() }).run(), "D5");
+    assert.deepEqual(d5, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail: C.DOCTOR_PASS_DETAIL });
+  });
+
+  test("[D-CODEX-HOME-RUN-1] D3 reads the Codex home the running plugin sits in, not <home>/.codex of another home", RUN_SKIP, async (t) => {
+    const s = codexRunHome(t, { env: { USERPROFILE: undefined, HOME: tmp(t) } });
+    const d3 = rowOf(await s.run(), "D3");
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
+
+  test("[D-CODEX-HOME-RUN-1] D5 native plugin: Codex answers for another home than the plugin's: FAIL that names both homes", RUN_SKIP, async (t) => {
+    const s = codexRunHome(t, { toml: trustedToml(), env: { FAKE_IGNORE_CODEX_HOME: "1" } });
+    const d5 = rowOf(await s.run(), "D5");
+    assert.equal(d5.status, "FAIL", JSON.stringify(d5));
+    assert.ok(d5.detail.includes(s.codexDir), d5.detail);
+    assert.equal(d5.fixCommand, "context-mode setup --agents codex");
+  });
+
+  test("[D-CODEX-HOME-RUN-1] D5 native plugin: Codex gives no answer: FAIL, never PASS", RUN_SKIP, async (t) => {
+    const d5 = rowOf(await codexRunHome(t, { toml: trustedToml(), env: { FAKE_SILENT: "1" } }).run(), "D5");
+    assert.equal(d5.status, "FAIL", JSON.stringify(d5));
+    assert.equal(d5.fixCommand, "context-mode setup --agents codex");
+  });
+
+  test("[D-CODEX-HOME-RUN-1] D5 native plugin: no codex on PATH: UNKNOWN with the setup fix, never PASS", RUN_SKIP, async (t) => {
+    const d5 = rowOf(await codexRunHome(t, { toml: trustedToml(), env: { PATH: "/usr/bin:/bin" } }).run(), "D5");
+    assert.equal(d5.status, "UNKNOWN", JSON.stringify(d5));
+    assert.equal(d5.fixCommand, "context-mode setup --agents codex");
+  });
+
+  test("[D-CODEX-HOME-RUN-1] D5 native plugin switched off in config.toml: Codex lists none of our hooks: FAIL", RUN_SKIP, async (t) => {
+    const s = codexRunHome(t, { toml: trustedToml() });
+    const file = path.join(s.codexDir, "config.toml");
+    writeFileSync(file, readFileSync(file, "utf8").replace("enabled = true", "enabled = false"));
+    const d5 = rowOf(await s.run(), "D5");
+    assert.equal(d5.status, "FAIL", JSON.stringify(d5));
+  });
+
   test("[M5] doctor/user-hook-timeout-kept (doctor reads, never rewrites settings.json)", async (t) => {
     const home = tmp(t);
     const file = path.join(home, ".claude", "settings.json");
