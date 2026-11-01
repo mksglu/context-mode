@@ -6,8 +6,8 @@ authors:
   - family-names: Koseoglu
     given-names: Mert
     alias: mksglu
-version: 2.0.0-next.20
-date-released: "2026-11-01"
+version: 2.0.0-next.21
+date-released: "2026-10-31"
 license: Elastic-2.0
 repository-code: "https://github.com/mksglu/context-mode"
 url: "https://github.com/mksglu/context-mode"

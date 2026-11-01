@@ -394,6 +394,7 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
   const HOSTS = ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "opencode", "pi", "qwen", "vscode", "zcode"];
   const RETIRED_TOOLS = ["ctx_fetch_and_index", "ctx_batch_execute"];
   const BUG_FORM = "https://github.com/mksglu/context-mode/issues/new?template=bug.yml";
+  const DISCORD = "https://discord.gg/DCN9jUgN5v";
 
   const read = (rel) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
   const h2 = (text) => text.split("\n").filter((l) => l.startsWith("## ")).map((l) => l.slice(3).trim());
@@ -440,13 +441,24 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
     }
   });
 
-  test("[M6] GP1/install-docs-per-host: README and every guide link the v2 bug form", () => {
-    for (const rel of ["README.md", ...HOSTS.map((h) => `docs/install/${h}.md`)]) {
+  test("[M6] GP1/install-docs-per-host: every guide links the v2 bug form", () => {
+    for (const rel of HOSTS.map((h) => `docs/install/${h}.md`)) {
       const text = read(rel);
       assert.ok(text.includes(BUG_FORM), `${rel}: no link to the bug form`);
       assert.ok(!text.includes("issues/new/choose"), `${rel}: links the chooser, not the form`);
       assert.ok(!text.includes("bug_report"), `${rel}: names the v1 template`);
     }
+  });
+
+  test("[M6] GP1/install-docs-per-host: README sends defects to Discord with the /ctx-doctor report (D-README-THESIS-2)", () => {
+    // GitHub Issues are off on the repo (has_issues=false), so the issue form answers 404 from the README.
+    const text = read("README.md");
+    const line = text.split("\n").find((l) => l.startsWith("Report a defect on "));
+    assert.ok(line, "README.md: no 'Report a defect on' line");
+    assert.ok(line.includes(DISCORD), "README.md: the defect line does not link Discord");
+    assert.ok(line.includes("/ctx-doctor"), "README.md: the defect line does not name the /ctx-doctor report");
+    assert.ok(!text.includes("issues/new"), "README.md: links an issue form while Issues are off");
+    assert.ok(!text.includes("bug_report"), "README.md: names the v1 template");
   });
 
   test("[M6] GP1/install-docs-per-host: no retired tool name in README or the install guides", () => {
