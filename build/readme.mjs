@@ -1,11 +1,13 @@
 // D-NPM-README-1: the README that ships in the npm tarball. npmjs.com renders it away from the repo, so every
 // relative link and image target must be absolute. The repo README is not changed; only the copy in release-out is.
-// Markdown links go to github.com/<repo>/blob/main/, images to raw.githubusercontent.com/<repo>/main/ (the PNGs stay out
-// of the tarball). Targets that are already absolute, anchors, mailto: and data: stay. Fenced code stays. No regex:
+// D-NPM-README-2: targets point at the release tag v<version>, not at main, so the npm page works before the merge to main.
+// Markdown links go to github.com/<repo>/blob/v<version>/, images to raw.githubusercontent.com/<repo>/v<version>/ (the PNGs
+// stay out of the tarball). Targets that are already absolute, anchors, mailto: and data: stay. Fenced code stays. No regex:
 // plain index scans over one line at a time.
+import { isReleaseVersion } from "../scripts/release/release-tags.mjs";
 export const REPO_SLUG = "mksglu/context-mode";
-export const BLOB_BASE = `https://github.com/${REPO_SLUG}/blob/main/`;
-export const RAW_BASE = `https://raw.githubusercontent.com/${REPO_SLUG}/main/`;
+export const blobBase = (version) => `https://github.com/${REPO_SLUG}/blob/v${version}/`;
+export const rawBase = (version) => `https://raw.githubusercontent.com/${REPO_SLUG}/v${version}/`;
 
 const KEEP_PREFIXES = ["https://", "http://", "#", "mailto:", "data:"];
 // [attribute text, kind]: the attribute must follow a space or a tag start.
@@ -15,12 +17,12 @@ function isAbsolute(target) {
   return target === "" || KEEP_PREFIXES.some((p) => target.startsWith(p));
 }
 
-function absolute(target, kind) {
+function absolute(target, kind, version) {
   if (isAbsolute(target)) return target;
   let rest = target;
   while (rest.startsWith("./")) rest = rest.slice(2);
   if (rest.startsWith("/")) rest = rest.slice(1);
-  return (kind === "image" ? RAW_BASE : BLOB_BASE) + rest;
+  return (kind === "image" ? rawBase(version) : blobBase(version)) + rest;
 }
 
 /** Index of the "[" that opens the "]" at closeAt, counting nested brackets; -1 when there is none. */
@@ -83,9 +85,10 @@ function mapTargets(text, map) {
   }).join("\n");
 }
 
-/** README text for the npm tarball: every relative target made absolute. */
-export function rewriteReadmeLinks(text) {
-  return mapTargets(text, absolute);
+/** README text for the npm tarball: every relative target made absolute, at the tag v<version>. */
+export function rewriteReadmeLinks(text, version) {
+  if (!isReleaseVersion(version)) throw new Error(`rewriteReadmeLinks needs a release version x.y.z[-pre], got ${String(version)}`);
+  return mapTargets(text, (target, kind) => absolute(target, kind, version));
 }
 
 /** Every link and image target outside fenced code, in order of the scan (markdown first, then HTML attributes per line). */

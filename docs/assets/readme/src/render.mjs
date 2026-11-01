@@ -19,14 +19,14 @@ const FIGS = [
   { name: 'fig-layers', w: 1280, h: 720 },
   { name: 'star-history', w: 1280, h: 640 },
 ];
-const MAX = 250 * 1024;
+const MAX = 400 * 1024; // 2x PNGs; the README total stays under 2 MB (build/readme-links.mjs)
 const only = process.argv[2];
 const browser = await chromium.launch();
 let bad = 0;
 for (const f of FIGS) {
   if (only && only !== f.name) continue;
   for (const theme of ['dark', 'light']) {
-    const page = await browser.newPage({ viewport: { width: f.w, height: f.h }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: f.w, height: f.h }, deviceScaleFactor: 2 });
     await page.goto(pathToFileURL(join(dir, f.name + '.html')).href + '?theme=' + theme);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(150);

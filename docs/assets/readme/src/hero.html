@@ -8,8 +8,8 @@
 .h1{position:absolute;left:76px;top:150px;font-size:66px}
 .lead{position:absolute;left:76px;top:314px;font-size:20px;line-height:1.5;color:var(--fg2)}
 .tiles{position:absolute;left:76px;right:76px;bottom:56px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.tile{background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:20px 22px;height:196px;display:flex;flex-direction:column}
-.k{font-family:var(--mono);font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.tile{background:var(--card);border:1px solid var(--card-b);border-radius:10px;padding:20px 22px;height:196px;display:flex;flex-direction:column}
+.k{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted)}
 .n{font-weight:600;font-size:58px;letter-spacing:-.045em;line-height:1;color:var(--fg);margin-top:14px}
 .n i{font-style:normal;color:var(--save)}
 .r{font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--muted);margin-top:auto}
@@ -19,8 +19,8 @@
 <div class="h h1">Tool output stays out of context.<br><em>Only the answer comes back.</em></div>
 <div class="lead">A free plugin for 10 coding agents. Local. Elastic License 2.0.</div>
 <div class="tiles">
- <div class="tile" data-box><div class="k">Users</div><div class="n">747.4k+</div><div class="r">npm 683.2k+, marketplace 64.1k+. As of 2026-11-01.</div></div>
- <div class="tile" data-box><div class="k">GitHub stars</div><div class="n">33,053</div><div class="r">github.com/mksglu/context-mode. As of 2026-11-01.</div></div>
+ <div class="tile" data-box><div class="k">Coding agents</div><div class="n">10</div><div class="r">Claude Code, Codex, Gemini CLI, Qwen Code, Copilot CLI, VS Code, Kiro, Z Code, Pi, OpenCode. One hook layer each.</div></div>
+ <div class="tile" data-box><div class="k">MCP tools</div><div class="n">9</div><div class="r">Run code, index, search, resume, stats, doctor, upgrade, purge, batch. Reference: docs/tools.md.</div></div>
  <div class="tile" data-box><div class="k">Output bytes saved</div><div class="n">98.8%</div><div class="r">Median of 25 rows with 10 KB or more of raw output, 5 runs each. Bench on 2.0.0-next.8, 2026-10-31.</div></div>
 </div></main>
 <script>document.getElementById('wm').src='brand/wordmark-on-'+T+'.svg';</script>

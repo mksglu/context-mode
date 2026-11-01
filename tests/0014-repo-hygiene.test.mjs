@@ -207,17 +207,17 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     assert.ok(SOURCE.includes('"ls-files", "-z"'), "tracked tree via git ls-files -z");
   });
 
-  test("badge data: stats.json and update-stats.yml pass the target tree; the workflow runs only on main (D-REPO-CLEAN-1)", () => {
-    const ok = run(fixture({ ...ALLOWED, "stats.json": "{}", ".github/workflows/update-stats.yml": "x" }));
+  test("badge data: stats.json passes the target tree; readme-stats.yml replaces update-stats.yml (D-README-STATS-1)", () => {
+    const ok = run(fixture({ ...ALLOWED, "stats.json": "{}", ".github/workflows/readme-stats.yml": "x" }));
     assert.equal(ok.status, 0, ok.lines.join("\n"));
     assert.deepEqual(ok.lines, ["check-removed: clean"]);
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") + path.sep;
-    const y = readFileSync(root + ".github/workflows/update-stats.yml", "utf8");
-    assert.ok(y.includes("if: github.ref == 'refs/heads/main'"), "update-stats.yml: job must run only on main");
-    assert.ok(y.includes("cron:"), "update-stats.yml: needs the schedule");
-    assert.ok(y.includes("stats.json"), "update-stats.yml: must write stats.json");
+    assert.ok(!existsSync(root + ".github/workflows/update-stats.yml"), "update-stats.yml wrote a users label from clone counts; it is gone");
     const j = JSON.parse(readFileSync(root + "stats.json", "utf8"));
-    for (const k of ["message", "npm", "marketplace"]) assert.equal(typeof j[k], "string", "stats.json: " + k);
+    assert.deepEqual(Object.keys(j).sort(), ["npm_downloads", "read_at", "stars"], "stats.json: only fields named by what they count");
+    assert.equal(typeof j.npm_downloads, "number");
+    assert.equal(typeof j.stars, "number");
+    assert.equal(typeof j.read_at, "string");
   });
 
   test("allow-list: bench/evidence/ passes, a stray root file still fails (D-FU-RF-BENCH-1)", () => {
@@ -1199,7 +1199,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   test("README line cap is 400 and its DEVIATIONS row quotes the owner", async () => {
     const { README_MAX_LINES } = await import("../src/core/contracts/constants.ts");
     assert.equal(README_MAX_LINES, 400);
-    const rows = readRepo("docs/architecture/modules/DEVIATIONS.md").split("\n").filter((l) => l.includes("D-README-THESIS-1"));
+    const rows = readRepo("docs/architecture/modules/DEVIATIONS.md").split("\n").filter((l) => l.includes("(D-README-THESIS-1)")); // the row id; later rows may name it in their text
     assert.equal(rows.length, 1);
     assert.ok(rows[0].includes("akademik bir tez"));
   });
@@ -1221,5 +1221,67 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const bad of ["65.5%", "54.9%", "$2.49", "$1.88", "80x", "315 KB becomes"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
     assert.ok(readme.includes("3 of 4 pairs passed the exact-accuracy rule"));
     for (const l of readme.split("\n").filter((x) => x.includes("43.8%"))) assert.ok(l.includes("15 of 20"), "-43.8% without its task-check loss");
+  });
+});
+
+describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
+  // Owner 2026-11-01: counts live in badges and in one star chart that a daily job renders; the hero holds no live count.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
+  const SRC = "docs/assets/readme/src/";
+
+  test("starTimeline: one point per 7 days from the first star day, cumulative to the end of that day; last point is the total", async () => {
+    const { starTimeline } = await import("../build/readme-stats.mjs");
+    const at = ["2026-02-23T06:21:45Z", "2026-02-23T23:59:59Z", "2026-02-25T01:00:00Z", "2026-03-02T00:00:01Z", "2026-03-04T10:00:00Z"];
+    assert.deepEqual(starTimeline(at, "2026-03-05", 5), [["2026-02-23", 2], ["2026-03-02", 4], ["2026-03-05", 5]]);
+    assert.deepEqual(starTimeline([], "2026-03-05", 0), [["2026-03-05", 0]]);
+    assert.deepEqual(starTimeline(at, "2026-03-02", 6), [["2026-02-23", 2], ["2026-03-02", 6]], "a step on the read day is the total");
+  });
+
+  test("statsJson: fields named by what they count, no users label", async () => {
+    const { statsJson } = await import("../build/readme-stats.mjs");
+    assert.deepEqual(statsJson({ npmDownloads: 683261, stars: 33053, readAt: "2026-11-01" }), { npm_downloads: 683261, stars: 33053, read_at: "2026-11-01" });
+    assert.throws(() => statsJson({ npmDownloads: -1, stars: 1, readAt: "2026-11-01" }), /npm_downloads/);
+    assert.throws(() => statsJson({ npmDownloads: 1, stars: 1.5, readAt: "2026-11-01" }), /stars/);
+    assert.throws(() => statsJson({ npmDownloads: 1, stars: 1, readAt: "yesterday" }), /read_at/);
+  });
+
+  test("readme-stats.yml: daily plus manual, GITHUB_TOKEN only, main only, commits only on change, says it is live after the merge", () => {
+    const y = readRepo(".github/workflows/readme-stats.yml");
+    for (const need of ["schedule:", "cron:", "workflow_dispatch:", "contents: write", "secrets.GITHUB_TOKEN", "if: github.ref == 'refs/heads/main'",
+      "build/readme-stats.mjs", "render.mjs star-history", "git diff --quiet", "PLAYWRIGHT_DIR"]) assert.ok(y.includes(need), `readme-stats.yml lacks ${need}`);
+    for (const bad of ["TRAFFIC_TOKEN", "secrets.", "curl "]) if (bad !== "secrets.") assert.ok(!y.includes(bad), `readme-stats.yml has ${bad}`);
+    assert.equal(y.split("secrets.").length - 1, 1, "only secrets.GITHUB_TOKEN");
+    assert.ok(y.split("\n").slice(0, 8).join("\n").includes("default branch"), "header: scheduled jobs run only on the default branch");
+  });
+
+  test("README badges read the stats.json fields; no users or marketplace badge, no live count in the hero alt or figure text", () => {
+    const readme = readRepo("README.md");
+    assert.ok(readme.includes("query=%24.npm_downloads"), "npm downloads badge reads $.npm_downloads");
+    for (const bad of ["query=%24.message", "query=%24.marketplace", "label=users", "747.4k", "683.2k", "64.1k", "33,053"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
+    const hero = readRepo(SRC + "hero.html");
+    for (const bad of ["Users", "GitHub stars", "33,053", "747.4k", "683.2k"]) assert.ok(!hero.includes(bad), `hero.html has ${bad}`);
+  });
+
+  test("figure sources: 10 px card radius, 12 px eyebrows, no upper-casing, hex colors only from the brand tokens, render at 2x", () => {
+    // Palette = every "hex" in contextmode.ai/brand tokens.json (2026-10-08) that the figures may use.
+    const TOKENS = ["#0a0a0a", "#3f3f46", "#6b6b74", "#a1a1aa", "#e4e4e7", "#efeff1", "#d4d4d8", "#ffffff", "#fafafa", "#f4f4f5", "#1a56db", "#e8effc",
+      "#143faa", "#0e9f6e", "#ecfdf5", "#31c48d", "#e5484d", "#fef2f2", "#fecaca", "#bbf7d0", "#dbe7ff", "#141416", "#27272a", "#8b8b93", "#71717a",
+      "#111113", "#232326", "#18181b", "#26262a", "#93c5fd", "#fbbf24", "#6ee7b7", "#fca5a5", "#d77757", "#0b0b0c", "#4ade80", "#f87171", "#e7f5f1", "#e8eefb"];
+    const files = readdirSync(path.join(REPO, SRC)).filter((f) => f.endsWith(".html") || f.endsWith(".css"));
+    assert.ok(files.includes("cm.css") && files.includes("hero.html"));
+    for (const f of files) {
+      const t = readRepo(SRC + f);
+      assert.ok(!t.includes("text-transform"), `${f}: no text-transform`);
+      assert.ok(!t.includes("border-radius:12px"), `${f}: card radius is 10px`);
+      for (let i = t.indexOf("#"); i >= 0; i = t.indexOf("#", i + 1)) {
+        const hex = t.slice(i, i + 7).toLowerCase();
+        if (hex.length === 7 && [...hex.slice(1)].every((c) => "0123456789abcdef".includes(c))) assert.ok(TOKENS.includes(hex), `${f}: ${hex} is not a brand token`);
+      }
+    }
+    const css = readRepo(SRC + "cm.css");
+    assert.ok(css.includes(".box{") && css.includes("border-radius:10px"));
+    assert.ok(css.includes(".eyebrow{font-family:var(--mono);font-size:12px"));
+    assert.ok(readRepo(SRC + "render.mjs").includes("deviceScaleFactor: 2"));
   });
 });

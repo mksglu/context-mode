@@ -2,17 +2,17 @@
 
 **Keeping tool output out of a coding agent's context window: a local plugin for 10 agents, and the Gateway that works on the whole request.**
 
-[![users](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.message&label=users&color=brightgreen)](https://www.npmjs.com/package/context-mode) [![npm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.npm&label=npm&color=blue)](https://www.npmjs.com/package/context-mode) [![marketplace](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.marketplace&label=marketplace&color=blue)](https://github.com/mksglu/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
+[![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.npm_downloads&label=npm%20downloads&color=blue)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 
 > **Context Mode Gateway** is the paid layer. It runs between your agent and the model API and adds Recall for long sessions, Memory, Skills, Search, Protect and request-level saving.
 > Free: 1,000 requests a month, every feature, card-free. Start at [contextmode.ai](https://contextmode.ai). Plans: [https://contextmode.ai/pricing](https://contextmode.ai/pricing).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-dark.png">
-  <img src="docs/assets/readme/hero-light.png" alt="Context Mode: tool output stays out of context. 747.4k+ users, 33,053 GitHub stars, 98.8% of output bytes saved (median of 25 rows with 10 KB or more of raw output).">
+  <img src="docs/assets/readme/hero-light.png" alt="Context Mode: tool output stays out of context. 10 coding agents, 9 MCP tools, 98.8% of output bytes saved (median of 25 rows with 10 KB or more of raw output).">
 </picture>
 
-**Figure 1.** Context Mode at a glance. Counts as of 2026-11-01 (33,053 stars, read once from the GitHub API). The 98.8% is the median over the 25 bench rows with 10 KB or more of raw output, 5 runs each.
+**Figure 1.** Context Mode at a glance. The 98.8% is the median over the 25 bench rows with 10 KB or more of raw output, 5 runs each.
 
 <p align="center">
 <sub>Starred by engineers at</sub>
@@ -311,12 +311,12 @@ Keep your agent's own sandbox on next to Protect.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/star-history-dark.png">
-  <img src="docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode, from 0 on 2026-02-23 to 33,053 on 2026-11-01.">
+  <img src="docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode since 2026-02-23. A daily job redraws it.">
 </picture>
 
-**Figure 5.** GitHub stars over time, from the stargazers API; the last point is the live count, 33,053, read on 2026-11-01.
+**Figure 5.** GitHub stars over time, from the stargazers API (GraphQL, `starredAt`). A daily job redraws the chart; the date it was read is in the chart caption.
 
-- **Users.** 747.4k+ users: 683.2k+ from npm and 64.1k+ from the plugin marketplace ([stats.json](stats.json), 2026-11-01).
+- **npm downloads.** The badge at the top shows all-time downloads of the npm package, read daily from the npm API ([stats.json](stats.json)). We have no count for plugin marketplace installs.
 - **Hacker News.** "MCP server that reduces Claude Code context consumption by 98%" reached the front page with 570+ points and 107 comments on 2026-02-28 ([thread](https://news.ycombinator.com/item?id=47193064)).
 - **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
 - **Companies.** Engineers at the companies under Figure 1 starred the repo.

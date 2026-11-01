@@ -228,12 +228,14 @@ function copyFixture(outDir) {
 // D-NPM-README-1: npmjs.com shows README.md of the tarball (next.21 and next.22 had none, so the page was empty).
 // LICENSE is copied verbatim. README.md is the repo README with every relative target made absolute (build/readme.mjs);
 // the repo README stays as it is and the docs/assets PNGs stay out of the tarball.
-function copyPackageDocs(outDir) {
+// D-NPM-README-2: the links point at the tag v<version>; a build without --version uses package.json.
+function copyPackageDocs(outDir, version) {
+  const tagVersion = version ?? JSON.parse(readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")).version;
   for (const name of ["README.md", "LICENSE"]) {
     const src = path.join(REPO_ROOT, name);
     if (!existsSync(src)) throw new BuildError(`missing ${name}`);
     const text = readFileSync(src);
-    writeFileSync(path.join(outDir, name), name === "README.md" ? rewriteReadmeLinks(text.toString("utf8")) : text);
+    writeFileSync(path.join(outDir, name), name === "README.md" ? rewriteReadmeLinks(text.toString("utf8"), tagVersion) : text);
   }
 }
 
@@ -285,7 +287,7 @@ async function main(outDir, sha, version) {
   generateManifests(outDir, version); // §2.2 step 4: manifests + hook configs from adapters/table.ts (impl/13 §3)
   copyFixture(outDir); // §2.2 step 5
   copySkills(outDir); // §2.2 step 6
-  copyPackageDocs(outDir); // D-NPM-README-1
+  copyPackageDocs(outDir, version); // D-NPM-README-1, D-NPM-README-2
   writeHashes(outDir); // §2.2 step 8: last, so SHA256SUMS covers the full tree
   assertOutTree(outDir); // read-only check of the finished tree (ADR-0019 D1)
 }

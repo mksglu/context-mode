@@ -866,19 +866,19 @@ describe("ADR-0019 build: npm package", () => {
     const { rewriteReadmeLinks, targetsOf } = await import("../build/readme.mjs");
     const npmText = readFileSync(path.join(out, "README.md"), "utf8");
     const repoText = readFileSync(path.join(REPO, "README.md"), "utf8");
-    assert.equal(npmText, rewriteReadmeLinks(repoText), "out README is the rewrite of the repo README");
+    assert.equal(npmText, rewriteReadmeLinks(repoText, "2.0.0"), "out README is the rewrite of the repo README at the release tag");
     assert.ok(targetsOf(repoText).some((t) => t.startsWith("docs/")), "the repo README keeps its relative paths");
     const rel = targetsOf(npmText).filter((t) => !t.startsWith("https://") && !t.startsWith("http://") && !t.startsWith("#"));
     assert.deepEqual(rel, [], "every target of the npm README is absolute");
-    assert.ok(npmText.includes('srcset="https://raw.githubusercontent.com/mksglu/context-mode/main/docs/assets/readme/hero-dark.png"'));
-    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/main/docs/install/README.md)"));
-    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/main/LICENSE)"));
+    assert.ok(npmText.includes('srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.0.0/docs/assets/readme/hero-dark.png"'));
+    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/v2.0.0/docs/install/README.md)"));
+    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/v2.0.0/LICENSE)"));
   });
 
-  test("[NPM-README] build/readme-rewrite: markdown links go to blob, images to raw, absolute and anchor targets stay, fenced code stays", async () => {
+  test("[NPM-README] build/readme-rewrite: markdown links go to blob, images to raw, both at the release tag; absolute and anchor targets stay, fenced code stays", async () => {
     const { rewriteReadmeLinks } = await import("../build/readme.mjs");
-    const B = "https://github.com/mksglu/context-mode/blob/main/";
-    const R = "https://raw.githubusercontent.com/mksglu/context-mode/main/";
+    const B = "https://github.com/mksglu/context-mode/blob/v2.0.0/";
+    const R = "https://raw.githubusercontent.com/mksglu/context-mode/v2.0.0/";
     const fence = "`".repeat(3);
     const input = [
       "[a](docs/a.md#x) [b](https://x.test/b) [c](#top) [d](mailto:a@b.c) ![i](docs/i.png) [![bd](https://img.test/b.svg)](LICENSE)",
@@ -890,7 +890,26 @@ describe("ADR-0019 build: npm package", () => {
       `<img src="${R}docs/p.png" alt="p"> <source srcset="${R}docs/q.png"> <a href="#"><img src="https://img.test/z.svg"></a> <a href="${B}docs/h.md">h</a>`,
       fence, "[keep](docs/k.md)", '<img src="docs/k.png">', fence, "",
     ].join("\n");
-    assert.equal(rewriteReadmeLinks(input), want);
+    assert.equal(rewriteReadmeLinks(input, "2.0.0"), want);
+    assert.equal(rewriteReadmeLinks("[a](docs/a.md)", "2.0.0-next.24"), "[a](https://github.com/mksglu/context-mode/blob/v2.0.0-next.24/docs/a.md)", "a prerelease tag is used as it is");
+    for (const bad of [undefined, "", "main", "v2.0.0", "2.0"]) {
+      assert.throws(() => rewriteReadmeLinks("[a](docs/a.md)", bad), /release version/, `version ${String(bad)} must fail`);
+    }
+  });
+
+  test("[NPM-README] build/readme-tag-default: a build without --version links to v<package.json version> (D-NPM-README-2)", () => {
+    const pkgVersion = JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")).version;
+    const scratchDir = mkdtempSync(path.join(tmpdir(), "cm-v2-npmtag-"));
+    try {
+      const dest = path.join(scratchDir, "out");
+      const r = spawnSync(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", dest], { encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr);
+      const text = readFileSync(path.join(dest, "README.md"), "utf8");
+      assert.ok(text.includes(`https://github.com/mksglu/context-mode/blob/v${pkgVersion}/LICENSE)`), "links use the package.json version tag");
+      assert.ok(!text.includes("/blob/main/") && !text.includes("context-mode/main/"), "no link points at main");
+    } finally {
+      rmSync(scratchDir, { recursive: true, force: true });
+    }
   });
 
   test("[M7] build/npm-sums-cover-entry: SHA256SUMS lists package.json and cli.mjs", () => {
