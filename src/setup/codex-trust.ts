@@ -121,6 +121,7 @@ export function codexTrustEntries(hooksFile: string, doc: unknown, command: stri
 export interface PluginHook { key: string; hash: string; trusted: boolean; }
 
 const LIST_TIMEOUT_MS = 15_000;
+const EXIT_GRACE_MS = 5_000; // after hooks/list the caller waits this long at most for the codex process to exit (it may hold its cwd open)
 const PLUGIN_SOURCE = "plugin";
 const TRUSTED = "trusted";
 
@@ -152,18 +153,24 @@ export function listPluginHooks(env: Record<string, string | undefined>, pluginI
     const child = spawn(f.command, f.args, { env: env as NodeJS.ProcessEnv, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
     let buf = "";
     let done = false;
+    let exited = false;
+    let result: PluginHook[] | undefined;
+    const settle = (): void => { clearTimeout(grace); resolve(result); };
+    let grace: ReturnType<typeof setTimeout> | undefined;
     const finish = (v: PluginHook[] | undefined): void => {
       if (done) return;
       done = true;
       clearTimeout(timer);
+      result = v;
       child.stdin.destroy();
+      if (exited) { settle(); return; }
+      grace = setTimeout(settle, EXIT_GRACE_MS);
       stopTree(child.pid, () => child.kill());
-      resolve(v);
     };
     const timer = setTimeout(() => finish(undefined), LIST_TIMEOUT_MS);
     const send = (o: unknown): void => { try { child.stdin.write(JSON.stringify(o) + "\n"); } catch { finish(undefined); } };
     child.on("error", () => finish(undefined));
-    child.on("close", () => finish(undefined));
+    child.on("close", () => { exited = true; if (done) settle(); else finish(undefined); });
     child.stdin.on("error", () => finish(undefined));
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d: string) => {
