@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // e2e/checks/hook-budget.mjs — local check for live case e2e/live/cases/gs6-hook-budget.json (T-GS6).
-// Docs: docs/v2/review/DECISIONS-r9.md §V row V14 (200 calls per agent class); docs/v2/impl/14-tests.md §6
-// (T-GS6 row); docs/v2/impl/09-hooks.md §5.3 "Wall-time budget (GS6)"; docs/v2/adr/0008-enforcement-rewrite-
+// Docs: https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/DECISIONS-r9.md §V row V14 (200 calls per agent class); docs/architecture/modules/14-tests.md §6
+// (T-GS6 row); docs/architecture/modules/09-hooks.md §5.3 "Wall-time budget (GS6)"; docs/architecture/adr/0008-enforcement-rewrite-
 // and-cap.md "Hook budget (GS6) — decided".
 //
 // Two agent classes (09-hooks.md §5.3):

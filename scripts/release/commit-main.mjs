@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/release/commit-main.mjs — the last write step of the one-click release (docs/v2/release/MAIN-ONLY.md,
+// scripts/release/commit-main.mjs — the last write step of the one-click release (docs/architecture/release/MAIN-ONLY.md,
 // DEVIATIONS D-MO-1). Run in a checkout of the repo; the remote's `main` is the base.
 //   release:  node scripts/release/commit-main.mjs --pkg <unpacked package dir> --version <v> [--remote origin]
 //             writes the main tree (build/main-tree.mjs), one commit `chore(release): v<v>`, annotated tag v<v> on it,

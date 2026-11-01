@@ -1,4 +1,4 @@
-# v2 CI (docs/v2/impl/13-build-release.md §8, impl/14-tests.md §8, TECH-SPEC §6.6).
+# v2 CI (docs/architecture/modules/13-build-release.md §8, impl/14-tests.md §8, TECH-SPEC §6.6).
 # 3 OS x 2 Node lines. No live layer, no secrets, no key env (ADR-0012).
 # Pull requests are disabled on the repo (ADR-0014 §5), so push is the only event trigger.
 # release.yml reuses this job through workflow_call (impl/13 A10).
@@ -30,20 +30,14 @@ jobs:
       - run: node scripts/ci-install.mjs
         id: install
         name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
-      # Gate selection (DEVIATIONS D-M2-arch-4, D-M2-CI-4, D-M7-CLN-5): milestone = the highest
-      # milestone in .impl/progress.json "done" (M0 if none), the same milestone the local gate
-      # passed before "done"; the one in progress has its own gate run.
+      # Gate selection (DEVIATIONS D-M2-arch-4, D-M2-CI-4, D-M7-CLN-5, D-REPO-CLEAN-1): the milestone is the highest one
+      # the local gate passed before it was marked done. The old source, .impl/progress.json, left the repo; its last
+      # value was M6. Raise it here to M7 when the M7 gate is the one to run.
       - name: gate milestone selection (D-M2-arch-4)
         shell: bash
         run: |
-          node - >> "$GITHUB_ENV" <<'JS'
-          const fs = require("node:fs");
-          const MS = ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7"];
-          const done = JSON.parse(fs.readFileSync(".impl/progress.json", "utf8")).done;
-          const ms = Math.max(0, ...done.map((d) => MS.indexOf(d)));
-          console.error(`gate milestone ${MS[ms]}`);
-          console.log(`GATE_MILESTONE=${MS[ms]}`);
-          JS
+          echo "gate milestone M6" >&2
+          echo "GATE_MILESTONE=M6" >> "$GITHUB_ENV"
       - run: node build/build.mjs --out release-out
         name: build (esbuild, no package.json in output)
       # T-F5 (DECISIONS-r9 F5, impl/03 section 4): grandchild kill, Windows only. Runs right after the build,
@@ -57,7 +51,7 @@ jobs:
         name: T-F5 kill timing probe (info)
         if: runner.os == 'Windows'
         continue-on-error: true
-      # Viet report 1 (docs/v2/review/viet/README.md): ctx_stats / ctx_search after ctx_index took 1.45 s on Windows, all in
+      # Viet report 1 (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/viet/README.md): ctx_stats / ctx_search after ctx_index took 1.45 s on Windows, all in
       # PRAGMA wal_checkpoint(TRUNCATE). Per-call latency of the tester's repro on all 3 OS; the trace run prints the checkpoint ms (info).
       - run: node e2e/checks/checkpoint-latency.mjs --trace
         name: ckpt latency, trace of wal_checkpoint ms (info)
@@ -75,7 +69,7 @@ jobs:
       - run: node e2e/checks/hook-phase-profile.mjs
         name: hook phase profile (info only)
         continue-on-error: true
-      - run: node docs/v2/prompt/lint.mjs --out release-out
+      - run: node build/prompt-lint.mjs --out release-out
         name: prompt lint, bundle mode (impl/13 §7; gate layer prompt-lint from M2, D-M0-1)
       - run: node e2e/cases/run.mjs --milestone "$GATE_MILESTONE"
         name: GP cases tagged <= gate milestone (D-M0-2, D-M2-arch-4)
@@ -117,7 +111,7 @@ jobs:
       - run: node e2e/live/run.mjs --only v1-migration-gemini
         name: live local case v1-migration-gemini (hook file and ${extensionPath} fill)
         if: runner.os != 'Windows'
-      # Fixture benchmark (docs/benchmarks/fixtures, DEVIATIONS D-BENCH-FX-1): 21 v1 scenarios, no network,
+      # Fixture benchmark (bench/evidence/fixtures, DEVIATIONS D-BENCH-FX-1): 21 v1 scenarios, no network,
       # under 60 s. Fails on any scenario error or a part total off by more than 5% from results.json.
       - run: node bench/fixtures/run.mjs --check --bundle release-out
         name: fixture benchmark check (bench/fixtures/results.json, 5% tolerance)
@@ -171,7 +165,7 @@ jobs:
       - run: node --test e2e/cases/GP-SETUP-npm-install.e2e.mjs
         name: GP-SETUP npm pack, global install, setup twice, remove byte for byte
 
-  # Windows host proof (docs/v2/review/windows-all.workflow.js): npm pack -> npm i -g under a prefix with a space, install each
+  # Windows host proof (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/windows-all.workflow.js): npm pack -> npm i -g under a prefix with a space, install each
   # host CLI npm can install without login, then per agent: setup, doctor, the 200 KB shell-cat hook payload piped into the
   # registered hook command, and an MCP initialize + tools/list from the host config. No key, no login.
   windows-hosts:

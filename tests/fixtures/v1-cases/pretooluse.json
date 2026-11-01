@@ -1,6 +1,6 @@
 {
  "v1Version": "1.0.169",
- "generatedBy": "scripts/v1-cases/{instrument,convert}.mjs on a vitest run of tests/hooks tests/core/routing tests/guidance-throttle",
+ "generatedBy": "scripts/v1-cases/{instrument,convert}.mjs (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/scripts/v1-cases) on a vitest run of tests/hooks tests/core/routing tests/guidance-throttle",
  "count": 371,
  "settings": {
   "S1": {

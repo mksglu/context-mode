@@ -1,6 +1,6 @@
 // ADR-0020: hook gates for pi, Copilot CLI, Claude Code, Codex and OpenCode; hook path changes.
-// Area: 0020-gates-pi-copilot-claude (docs/v2/TEST-LAYOUT.md).
-// Merged by ADR-0024 from 7 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
+// Area: 0020-gates-pi-copilot-claude (docs/architecture/TEST-LAYOUT.md).
+// Merged by ADR-0024 from 7 files (see docs/architecture/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // pi-gate is serial because its tests call process.chdir; the other blocks use own temp dirs and explicit env, so they run concurrently.
 import { describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";

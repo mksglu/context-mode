@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { PROTECTION_ENDPOINT, SETTINGS, protectionDrift } from "../scripts/release/branch-protection.mjs";
 
 describe("ADR-0013: plan.mjs on main", { concurrency: CONC }, () => {
-  // Main-only release plan (docs/v2/release/MAIN-ONLY.md, owner decision 2026-10-28): `plan.mjs --main --channel next|latest`
+  // Main-only release plan (docs/architecture/release/MAIN-ONLY.md, owner decision 2026-10-28): `plan.mjs --main --channel next|latest`
   // reads the v2 tags on origin and the commits on main. Each test seeds a scratch repo with a local bare origin and
   // runs the real script in it. No release branch, no Source-Commit trailer.
 
@@ -644,7 +644,7 @@ describe("ADR-0013: release-next (plan then publish)", { concurrency: CONC }, ()
 });
 
 describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
-  // MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): scripts/release/commit-main.mjs makes the release commit on `main` from an unpacked
+  // MAIN-ONLY (docs/architecture/release/MAIN-ONLY.md): scripts/release/commit-main.mjs makes the release commit on `main` from an unpacked
   // package, tags it (annotated) and pushes both to the remote in one push. Local bare remote; no network.
 
   const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

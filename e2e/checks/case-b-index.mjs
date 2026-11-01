@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // e2e/checks/case-b-index.mjs — local check for live case T-F1 (e2e/live/cases/case-b-index.json),
-// DECISIONS-r9.md F1/T-F1, docs/v2/impl/09-hooks.md §4.6 step 5, docs/v2/impl/14-tests.md §6.
+// DECISIONS-r9.md F1/T-F1, docs/architecture/modules/09-hooks.md §4.6 step 5, docs/architecture/modules/14-tests.md §6.
 //
 // Drives the built release-out/hook.mjs PostToolUse directly, as a command-hook host would (spawn,
 // write JSON on stdin, read stdout, wait for exit). No model call, imports nothing from src/.
@@ -14,7 +14,7 @@
 // §5.1): the B/C distinction only changes PreToolUse deny/rewrite behaviour, not this PostToolUse split. So
 // the 50-run perf budget below is measured once, on Case B (the agentType row named in DECISIONS-r9 F1's own
 // evidence file, `out/r9/perf-f1.md`); Case C runs the same three sizes at reduced count (10) to prove the
-// branch is case-independent, per docs/v2/impl/DEVIATIONS.md (this file's own deviation row).
+// branch is case-independent, per docs/architecture/modules/DEVIATIONS.md (this file's own deviation row).
 //
 // Sizes: 16 KB (== OUTPUT_CAP, the allow boundary), 64 KB (== SYNC_INDEX_MAX_BYTES, the sync-vs-in-memory
 // boundary), 1 MB (well above it, the detached-write path). Every input byte is ASCII, built from fixed,

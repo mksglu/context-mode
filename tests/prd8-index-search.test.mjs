@@ -1,4 +1,4 @@
-// PRD-v2 section 8 (index, search, fetch, snippets) and TECH-SPEC GP5. One file for the area (ADR-0024, docs/v2/TEST-LAYOUT.md).
+// PRD-v2 section 8 (index, search, fetch, snippets) and TECH-SPEC GP5. One file for the area (ADR-0024, docs/architecture/TEST-LAYOUT.md).
 // A fix for this area adds its red test inside the describe block of its section below. Do not add a new file.
 //
 // Layout of this file:
@@ -128,7 +128,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
 
     // Moved from tests/index/chunk-md-sections.test.mjs
     describe("PRD-v2 section 8 / chunking: markdown sections", () => {
-      // Search layer 1 (docs/v2/spikes/search/DIAGNOSIS.md §5 step 2): heading-aware markdown chunking.
+      // Search layer 1 (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/search/DIAGNOSIS.md §5 step 2): heading-aware markdown chunking.
       // A fenced code block is never split below the hard cap; chunks split on headings and carry the
       // heading path as `title`; a code block over the cap splits on blank lines with the fence repeated.
 

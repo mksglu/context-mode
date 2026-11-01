@@ -1,5 +1,5 @@
 // impl/10 §8 + shared decode/encode pseudocode; impl/09 §5.2 item 6 + A28; DECISIONS-r3 Q24.
-// Kiro CLI V3 hooks are plain text only (tickets/spike-hooks-verified.md §2): exit 0 stdout goes to context,
+// Kiro CLI V3 hooks are plain text only (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/spike-hooks-verified.md §2): exit 0 stdout goes to context,
 // any non-zero exit blocks. denyChannel "hint-only" (impl/10 A3): no structured hint, deny or replace field.
 import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, ToolResultInfo } from "../core/contracts/types.ts";
 

@@ -1,0 +1,201 @@
+{
+  "date": "2026-10-26",
+  "workflow": "https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/hooks-fast.workflow.js",
+  "method": "doc-verified: documented hook payload for a shell cat of a ~200 KB log with one FATAL line, piped into the hook command setup registered; output checked against the host hook docs; bytesV2 = what the model would see (replaced output, or deny text + redirected ctx tool result)",
+  "pass": "hookRegistered && hookFired && bytesV2 < bytesOff/2 && answerOk && skillOk",
+  "rows": [
+    {
+      "run": "t-claude-code",
+      "agent": "claude-code",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 196149,
+      "bytesV2": 286,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "doc-verified. Docs: https://code.claude.com/docs/en/hooks (PostToolUse output hookSpecificOutput.updatedToolOutput; plugin hooks in hooks/hooks.json; ${CLAUDE_PLUGIN_ROOT}) and https://code.claude.com/docs/en/skills (plugin skills in skills/<name>/SKILL.md). Build: node build/build.mjs, then npm pack in release-out (context-mode-0.0.0-dev.tgz), then npm i -g into a temp prefix, with a temp HOME. Setup: \"context-mode setup --yes --agents claude-code\" returned PASS. Doctor returned PASS with \"parse, list, mcp, hook, hook-registered, hook-runs, hook-seen, skills\" and one WARN, \"hook-seen: not seen yet, run one tool call\". Host view: \"claude plugin list\" (claude 2.1.310) shows \"context-mode@context-mode, Version 0.0.0-dev, Scope: user, Status: enabled\". The plugin manifest .claude-plugin/plugin.json points hooks to ./hooks/claude-code.json. That file registers PreToolUse, PostToolUse, SessionStart and UserPromptSubmit with \"node ${CLAUDE_PLUGIN_ROOT}/hook.mjs --agent claude-code\". Hook test: 196149 B app.log with one FATAL line (code=E7731). I piped the documented PostToolUse payload for Bash \"cat app.log\" into the registered command (same argv, cwd = temp project, CLAUDE_PLUGIN_ROOT set). The payload used tool_response {stdout, stderr, interrupted}; the docs page says tool_output, and the hook accepted the tool_response form. Result: exit 0, JSON {\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"updatedToolOutput\":{stdout:<tail + ctx_search pointer>,stderr:\"\",interrupted:false}}}. This matches the documented schema; it keeps the object shape of the Bash tool_response. PreToolUse returned empty output with exit 0, so it allows the call. The hook output was 286 B (bytesV2) against 196149 B raw (bytesOff). The ctx tool result came from the installed server.mjs over stdio MCP: ctx_search queries [\"FATAL\"], source \"s1\" returned \"FATAL disk controller panic code=E7731\", which gives answerOk. The server lists tools ctx_execute, ctx_batch, ctx_index, ctx_search, ctx_resume, ctx_stats, ctx_doctor, ctx_upgrade, ctx_purge. The skills (ctx-doctor, ctx-stats, ctx-upgrade) are in the plugin cache skills/<name>/SKILL.md. Each names the real MCP tool (ctx_stats, ctx_doctor, ctx_upgrade). Host loader: \"claude plugin list\" parsed the plugin without a login. Temp space deleted. No commits made.",
+      "problems": [
+        "Test setup: the first setup run failed because the temp project git repo had no commit (git worktree add failed: not a valid object name HEAD) and because the claude-worktree shim was first on PATH. Setup passed after I made a commit in the temp repo and put the real claude binary on PATH. Setup does not tell the user about either cause; the first error was unclear.",
+        "The first failed setup left a cw/plugin worktree in the temp project; harmless, it was deleted with the temp space.",
+        "Doctor reports WARN hook-seen: not seen yet. I did not run a live Claude session because there is no login. The hook run was a manual pipe, not the host.",
+        "The hooks doc page shows the PostToolUse input field as tool_output, but Claude Code sends tool_response for Bash. The hook accepts the tool_response form; I did not check whether it also accepts tool_output.",
+        "package.json has no package-lock.json, so npm ci fails; I used npm install.",
+        "The skill text says only 'Call the ctx_stats tool'. It does not use the full host tool name mcp__plugin_context-mode_context-mode__ctx_stats. It passes by naming the real tool, but I did not test host resolution of the short name.",
+        "ctx_search output looks truncated: 'Bash:cat app.log#toolu_1 #2886: 2026-10-26FATAL disk controller panic ...' shows no space or newline between the timestamp and FATAL. This is a display glitch; the value is intact."
+      ]
+    },
+    {
+      "run": "t-codex",
+      "agent": "codex",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 217858,
+      "bytesV2": 392,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Head b5848ef6 on v2-design, full build, npm pack in release-out, installed into temp prefix with temp HOME. `setup --yes --agents codex` and `doctor --agents codex` both PASS (checks: parse, list, mcp, hook, hook-registered, hook-runs, hook-seen, skills). doctor WARNs that hook-seen has not been seen yet, which is expected before a real host run. Host view: ~/.codex/hooks.json registers SessionStart, UserPromptSubmit, PreToolUse and PostToolUse. Each runs `node <prefix>/hook.mjs --agent codex`. The PreToolUse and PostToolUse matcher is ^(Bash|apply_patch|mcp__context_mode__ctx_.*)$. `codex mcp list` (codex-cli 0.156.1) shows context-mode enabled. config.toml holds [hooks.state.*] trusted_hash entries for all 4 hooks. `codex features list` shows hooks stable=true. doc-verified: https://developers.openai.com/codex/hooks (308 redirect to https://learn.chatgpt.com/docs/hooks). It documents ~/.codex/hooks.json, stdin fields tool_name, tool_use_id, tool_input.command and tool_response, PreToolUse deny as hookSpecificOutput.{hookEventName,permissionDecision:\"deny\",permissionDecisionReason}, exit 2 with stderr as the other block path, and regex matchers on tool name. Fire test: I built the PreToolUse payload for Bash `cat app.log` (217858 B log, one FATAL line) and ran the registered command with cwd set to the temp project. rc=0. Output was exactly {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: 217858-byte file, over the one-read limit. Run ctx_execute(language, code, file=...) and print only the answer.\"}}. That matches the documented schema. The deny text was 279 B. I then called ctx_execute over MCP stdio on the installed server.mjs (the redirect the deny asks for). It returned \"exit 0 · 41 B / FATAL disk_failure code=XK-4417 aborting\", a 113 B result. bytesV2 = 279 + 113 = 392, against bytesOff 217858. skillOk: ~/.codex/skills/ctx-stats/SKILL.md (also ctx-doctor, ctx-upgrade) says \"Call the mcp__context_mode__ctx_stats tool\", and the matcher uses the same mcp__context_mode__ prefix. Temp space deleted.",
+      "problems": [
+        "The codex docs page has no skills directory, so skillOk rests on the skill text naming the registered MCP tool, not on a documented path.",
+        "I did not run codex itself with a login. I used the registered hook command and the MCP server directly, as instructed.",
+        "`npm ci` fails because the repo has no package-lock.json. I used `npm install`.",
+        "The MCP server prints a zod warning (zod < 4.2.0, falls back to z.toJSONSchema()). The server ignored my first ctx_execute call's code and file env name, but the grep fallback still found the FATAL line.",
+        "The first git clone took more than 10 minutes because 14 agents were cloning at once.",
+        "I did not run node --test tests/ and did not commit, per the task."
+      ]
+    },
+    {
+      "run": "t-gemini",
+      "agent": "gemini",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 168875,
+      "bytesV2": 343,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Head a48113c8 of v2-design, full build, npm pack in release-out, install into a temp prefix with temp HOME, gemini-cli 0.65.0 (npm). setup --yes --agents gemini: PASS. doctor --agents gemini: PASS (parse, list, mcp, hook, hook-registered, hook-runs, skills checked; WARN hook-seen: not seen yet). Host view: `gemini extensions list` shows context-mode (0.0.0-dev) Enabled (User/Workspace), MCP server context-mode, Agent skills ctx-upgrade/ctx-stats/ctx-doctor. Hooks are in the extension hooks/hooks.json: AfterTool, BeforeAgent, BeforeTool and PreCompress run `node \"${extensionPath}${/}hook.mjs\" --agent gemini`. doc-verified: https://geminicli.com/docs/hooks/reference/ (hooks.json in the extension dir, ${extensionPath}; BeforeTool and AfterTool input with tool_name, tool_input and tool_response.llmContent/returnDisplay; AfterTool output decision deny + reason replaces the tool result sent to the model; exit 0 = parse stdout JSON). Test: 168875 B log with one FATAL line. A BeforeTool payload for run_shell_command `cat big.log` gave exit 0 and empty output (allow). The AfterTool payload with tool_response.llmContent = full log gave {\"decision\":\"deny\",\"reason\":\"...last line...ctx_search({queries:[\\\"cat big.log\\\"], source:\\\"s1\\\"}) searches the whole output (168875 B).\"} = 192 B, which matches the documented schema. The installed MCP server (stdio JSON-RPC, --agent gemini) answered ctx_search queries FATAL source s1 with `FATAL disk controller failure code=E-7731` (151 B result). bytesV2 = 192 + 151 = 343 (about 0.2% of bytesOff). Skill: the extension skills/ctx-stats/SKILL.md says \"Call the mcp_context-mode_ctx_stats tool\", which is Gemini's mcp_<server>_<tool> naming. The host loader (`gemini extensions list`) parsed the extension, MCP server and skills. Temp space deleted.",
+      "problems": [
+        "The AfterTool deny reason tells the model to call `ctx_search(...)`, but Gemini names the tool mcp_context-mode_ctx_search (the skills use the right name). The model may call a tool that does not exist. Fix: use the host tool name in the hook text.",
+        "BeforeTool does nothing for `cat` (empty output). All savings come from AfterTool, so the raw output is already read by the host before it is replaced.",
+        "The reason text shows only the last log line (INFO), not the FATAL line. The FATAL value is only found after the ctx_search call.",
+        "doctor warns hook-seen: not seen yet, because no live host session ran. I fed the hook payload by hand, not through a real gemini model run (a login is needed).",
+        "The skill dir check used the extension skills/ dir, which `gemini extensions list` parsed. I did not fetch the skill doc URL, so the skill location is not doc-verified. Only the hooks doc is.",
+        "No commit made, as the task said."
+      ]
+    },
+    {
+      "run": "t-qwen",
+      "agent": "qwen",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 212544,
+      "bytesV2": 332,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "doc-verified. Docs: https://qwenlm.github.io/qwen-code-docs/en/users/features/hooks/ (timeout is in seconds, default 60; extension hooks live in hooks/hooks.json or the manifest \"hooks\" path; PreToolUse deny schema is hookSpecificOutput{hookEventName,permissionDecision,permissionDecisionReason}). Also https://github.com/QwenLM/qwen-code/blob/main/docs/users/features/hooks.md. Setup: fresh clone of v2-design, npm install, npm run build, npm pack in release-out, install into temp prefix with temp HOME, qwen 0.26.1 installed from npm @qwen-code/qwen-code. `context-mode setup --yes --agents qwen` gave PASS. `context-mode doctor --agents qwen` gave PASS, checks parse, list, mcp, hook, hook-registered, hook-runs, hook-seen, skills (WARN hook-seen: not seen yet). Host view: `qwen extensions list` shows context-mode Enabled (User and Workspace), Skills ctx-doctor/ctx-stats/ctx-upgrade, MCP server context-mode. `qwen mcp list` shows context-mode node server.mjs --agent qwen, Connected. Registration: qwen-extension.json \"hooks\":\"hooks/qwen.json\" (loader in qwen chunk-Q3NSK7FV reads a string hooks path and replaces ${CLAUDE_PLUGIN_ROOT} with the extension path). hooks/qwen.json has PreToolUse, PostToolUse (matcher ^(run_shell_command|Shell|read_file|grep_search|web_fetch|mcp__context-mode__ctx_.*)$), SessionStart, UserPromptSubmit, command `node \"${CLAUDE_PLUGIN_ROOT}/hook.mjs\" --agent qwen`, timeout 5 (seconds, correct per docs). Fire test: 212544-byte app.log with one FATAL line; documented PreToolUse stdin {session_id,transcript_path,cwd,hook_event_name,tool_name:run_shell_command,tool_input:{command:\"cat app.log\"},tool_use_id,permission_mode}, cwd = temp project, CLAUDE_PLUGIN_ROOT set to the extension path as the host does. Exit 0, stdout 278 B: {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: 212544-byte file, over the one-read limit. Run ctx_execute(... file=...) and print only the answer.\"}}, which matches the documented schema. Redirect: installed server.mjs over stdio, ctx_execute with file=app.log, returned 54 B: \"2026-10-26 FATAL disk controller failure code=QX-7731\". bytesV2 = 278 deny + 54 tool result = 332, about 0.16 percent of raw. answerOk: FATAL value QX-7731 present. Skill: ~/.qwen/skills/ctx-stats/SKILL.md says \"Call the mcp__context-mode__ctx_stats tool\", which is qwen's mcp__server__tool naming. Temp space deleted. No commits made.",
+      "problems": [
+        "`qwen hooks list` does not exist in 0.26.1 (only /hooks in interactive mode), so the host's own hook list could not be shown headless; registration was shown via the manifest and the loader source, and `qwen extensions list` parsed the extension.",
+        "No live model run (no login), so the hook was piped by hand instead of fired by the host.",
+        "doctor WARN hook-seen: not seen yet (expected before a real tool call).",
+        "Fresh clone had no lockfile; `npm ci` failed and the first build failed until `npm install` was run (esbuild missing). Build then passed.",
+        "Docs say extension hooks are at hooks/hooks.json by default. We use manifest hooks path hooks/qwen.json, which the loader supports as a string path. The shipped hooks/hooks.json is the gemini one, and qwen ignores it because the manifest names qwen.json."
+      ]
+    },
+    {
+      "run": "t-copilot-cli-r2",
+      "agent": "copilot-cli",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 203669,
+      "bytesV2": 384,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "doc-verified: https://docs.github.com/en/copilot/reference/hooks-configuration. Head a48113c8 (v2-design), full build, npm pack in release-out, installed in a temp prefix with a temp HOME. Real host @github/copilot 1.0.103 installed without login. setup --yes --agents copilot-cli returned PASS. doctor returned PASS (parse, list, mcp, hook, hook-registered, hook-runs, hook-seen, skills), with a WARN on hook-seen: not seen yet. `copilot mcp list` shows \"context-mode (local)\". `copilot skill list` shows \"Personal skills: ctx-doctor, ctx-stats, ctx-upgrade\". Hook file ~/.copilot/hooks/context-mode.json has version 1 and the events sessionStart, userPromptSubmitted, preToolUse and postToolUse. Each is type command, with timeoutSec 5 and a command of node hook.mjs --agent copilot-cli. The docs quote: version 1 file in ~/.copilot/hooks/, command/bash fields, timeoutSec, and preToolUse input toolName/toolArgs/cwd/timestamp. The docs quote the output permissionDecision allow/deny/ask with permissionDecisionReason required on deny. The host tool name for shell is \"bash\". Test: big.log is 203669 B with one FATAL line. Payload {\"timestamp\":1,\"cwd\":proj,\"toolName\":\"bash\",\"toolArgs\":\"{\\\"command\\\":\\\"cat big.log\\\"}\"} was piped to the registered command with sh -c, cwd = temp project, rc=0. Output was {\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: 203669-byte file ... Run ctx_execute(language, code, file=...)\"}, which is 236 B and matches the documented schema. The installed MCP server (stdio JSON-RPC) ran ctx_execute with a grep and returned 148 B JSON containing \"FATAL: disk controller failure code=E-7731\". bytesV2 = 236 + 148 = 384, under half of 203669. SKILL.md in ~/.copilot/skills/ctx-stats names mcp_context-mode_context-mode-ctx_stats and mcp_context-mode_ctx_stats. The temp space is deleted.",
+      "problems": [
+        "Doctor WARN hook-seen: not seen yet, because the real host was not driven with a model login. The hook was fired by hand with a documented payload instead.",
+        "I did not verify the exact MCP tool-name prefix format (mcp_context-mode_...) that the host builds. The skill lists two names, and neither one was checked against host docs or host source.",
+        "Plain npm ci failed because the repo has no package-lock.json. npm install worked.",
+        "Nothing committed, as the task required."
+      ]
+    },
+    {
+      "run": "t-opencode-r1",
+      "agent": "opencode",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 198645,
+      "bytesV2": 235,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Head e52388ac, built with pnpm 10.23.0, npm pack in release-out, installed to temp prefix, temp HOME. setup --yes --agents opencode: PASS. doctor: PASS (checked parse, mcp, hook-registered, hook-runs, hook-seen, skills; WARN hook-seen not seen yet). Host view: opencode 1.19.4 `opencode debug config` shows \"plugin\": [\"file:///.../context-mode/opencode/plugin.js\"]; `opencode mcp list` shows context-mode connected; `opencode debug skill` lists ctx-stats, ctx-doctor, ctx-upgrade from ~/.config/opencode/skills/<name>/SKILL.md (loader parses our files, no login needed). doc-verified: https://opencode.ai/docs/plugins/ (\"plugin\" key in opencode.json; tool.execute.before(input, output) with input.tool \"bash\" and output.args.command; block by throwing Error). Skill dir and plugin array shape also match opencode's built-in customize-opencode skill text. Hook run: OpenCode hooks are in-process, not spawned. I loaded the installed plugin.js default export, called server({directory: proj}), then tool.execute.before({tool:\"bash\",sessionID,callID},{args:{command:\"cat big.log\"}}) on a 198645-byte log with one FATAL line. It threw Error (the documented deny path): \"context-mode: 198645-byte file, over the one-read limit. Run ctx_execute(language, code, file=...) and print only the answer.\" (172 B). Installed MCP server over stdio, ctx_execute shell grep FATAL returned 63 B: \"FATAL disk controller panic code=ZX-4417-QUARTZ\". bytesV2 = 172 + 63 = 235 versus 198645 raw (under 1/800).",
+      "problems": [
+        "Hook was driven by calling the plugin hook function directly, not inside a live opencode session (no model login), so host-side handling of the thrown Error was not observed; only the documented throw contract was checked.",
+        "Skill bodies say 'ctx_stats tool'; the MCP wire name in OpenCode is context-mode_ctx_stats, while the plugin tool map registers ctx_stats. skillOk assumes the plugin tool name is the host's real name; not proven in a live session.",
+        "Skills dir was checked against the built-in customize-opencode skill text and loader output; I did not fetch opencode.ai/docs/skills separately.",
+        "Temp space already deleted as required; no commits made."
+      ]
+    },
+    {
+      "run": "t-pi",
+      "agent": "pi",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 200062,
+      "bytesV2": 160,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Head a48113c8 (v2-design, fresh clone, npm install + node build/build.mjs --out release-out, npm pack in release-out, installed to temp prefix with temp HOME). setup --yes --agents pi: PASS. doctor --agents pi: PASS (parse, list, mcp, hook-registered, hook-runs, hook-seen, skills; WARN hook-seen only because no tool call ran before). Host view: pi 0.73.1 (@mariozechner/pi-coding-agent) `pi list` shows \"User packages: ../../../prefix/lib/node_modules/context-mode\"; ~/.pi/agent/settings.json = {\"packages\":[\"../../../prefix/lib/node_modules/context-mode\"]}. So pi parsed and loads our package. The package.json pi key has extensions ./pi/index.js and skills ./pi/skills. Pi hooks are in-process extension events, not a shell command. Doc-verified against the docs shipped in pi 0.73.1 (docs/extensions.md \"tool_call\" and \"tool_result\"; docs/skills.md \"Packages: skills/ directories or pi.skills entries in package.json\"). I did not fetch the upstream web URL; the shipped docs are the same text as the pi-mono repo docs (https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/docs/extensions.md). Fire test: loaded the installed pi/index.js extension, registered handlers before_agent_start, input, tool_call, tool_result, session_compact and 9 tools (ctx_execute, ctx_batch, ctx_index, ctx_search, ctx_resume, ctx_stats, ctx_doctor, ctx_upgrade, ctx_purge). Sent the documented event for bash `cat app.log` (200,062 B, one FATAL disk=ZX-4417 line) with cwd = temp git project. tool_call returned undefined (allow, matches doc: only {block, reason} allowed). tool_result returned the documented patch {content:[{type:\"text\",text}],details}, replaced text 160 B, contains \"FATAL disk=ZX-4417 failed\" and a ctx_search pointer. bytesOff 200062, bytesV2 160 (0.08 percent). Skill: pi/skills/ctx-stats/SKILL.md names ctx_stats, the bare name pi registers. Temp space deleted. No commits.",
+      "problems": [
+        "Not run through a real pi model turn (no login); the extension was driven with the documented event objects, so this does not prove what a live model saw.",
+        "Upstream web docs were not fetched; doc check used the docs shipped inside the installed pi 0.73.1 package.",
+        "The FATAL line in the replaced output is prefixed '2026' because my test log cut a line at the 100000-byte point; the FATAL value itself is intact.",
+        "doctor hook-seen shows WARN until a real tool call happens.",
+        "Also the ctx_search pointer in the replaced output was not followed up with an installed-MCP ctx tool call; the replace path alone gave the saving."
+      ]
+    },
+    {
+      "run": "t-vscode",
+      "agent": "vscode",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 204513,
+      "bytesV2": 560,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Build and pack at v2-design head b5848ef6, installed into a temp prefix with a temp HOME. setup --yes --agents vscode printed PASS, with all checks listed (parse, mcp, hook, hook-registered, hook-runs, hook-seen, skills) and only a WARN that hook-seen has not seen a call yet. Registration: ~/.copilot/hooks/context-mode-vscode.json holds version 1 and the 5 events SessionStart, UserPromptSubmit, PreToolUse, PostToolUse and PreCompact. Each entry is type command, runs `node hook.mjs --agent vscode`, timeout 5. ~/.vscode/mcp.json holds server context-mode with --workspace-folder ${workspaceFolder}. doc-verified: https://code.visualstudio.com/docs/copilot/customization/hooks says user hook files are read from ~/.copilot/hooks/ and a permissionDecision deny needs a permissionDecisionReason. doc-verified: https://code.visualstudio.com/docs/copilot/customization/agent-skills lists ~/.copilot/skills/ as a personal skills dir. Test: a 204513 B app.log with one FATAL line, PreToolUse payload {hook_event_name, session_id, cwd=temp project, tool_name run_in_terminal, tool_input.command \"cat app.log\"}, piped to the registered command through sh -c. Output (280 B): {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: ... Run ctx_execute(...)\"}}. I then called the installed server.mjs over MCP stdio with ctx_execute (shell: grep FATAL app.log). It returned 68 B: \"FATAL disk controller panic code=ZX-7731-QUARTZ\". bytesV2 = about 280 deny text + about 280 MCP result envelope, rounded up to 560, against 204513 raw (0.3%). The skill ~/.copilot/skills/ctx-stats/SKILL.md says \"Call the mcp_context-mode_ctx_stats tool\". The tool name run_in_terminal comes from adapter source D-HF-VSCODE-PROJECT-1; I did not check it against the docs.",
+      "problems": [
+        "doctor --agents vscode printed FAIL: 'hook overhead p95 17 ms > 15 ms' (cold laptop run while other builds ran; likely noise, but the check is flaky under load). Run with 'context-mode doctor --agents vscode', a second run is untested.",
+        "No VS Code loader or list command was run. The `code` CLI exists on this machine, but it has no documented hook list command, so I did not prove the host parses the files.",
+        "The deny output uses the Claude-style hookSpecificOutput wrapper. The VS Code hooks page fetched through WebFetch showed a top-level permissionDecision example for the camelCase format and said the snake_case PreToolUse alias exists but did not give its exact output shape. This was not checked against the page's full text.",
+        "The MCP result of the 204 KB file read was measured with a regenerated log (204513 B), not the earlier 169082 B one; both gave the same deny.",
+        "npm ci produced no node_modules (no lockfile), so npm install was needed to build. Not a product bug but the build instructions assume ci."
+      ]
+    },
+    {
+      "run": "t-kiro",
+      "agent": "kiro",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 183551,
+      "bytesV2": 242,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Build and install: fresh clone of v2-design at 69e14ba3, npm install and npm run build, npm pack in release-out, global install into a temp prefix with a temp HOME. `context-mode setup --yes --agents kiro` printed \"kiro: PASS\". `context-mode doctor --agents kiro` printed PASS for parse, mcp, hook, hook-registered, hook-runs, hook-seen and skills, with WARN hook-seen: \"not seen yet, run one tool call\". No kiro CLI was found on this machine (no kiro or kiro-cli binary), so the host's list command was not run. The host view is the config file ~/.kiro/hooks/context-mode.json in the temp HOME. It has version \"v1\" and 6 hooks: SessionStart, UserPromptSubmit, PreToolUse and PostToolUse with matcher \"@mcp\", and PreToolUse and PostToolUse with matcher \"shell\". Each hook is action {type:\"command\", command:'\"<node>\" \"<prefix>/lib/node_modules/context-mode/hook.mjs\" --agent kiro'}, timeout 5, enabled true. doc-verified: https://kiro.dev/docs/hooks/ confirms hooks are JSON files in .kiro/hooks/ or ~/.kiro/hooks/ with the shape {version:\"v1\", hooks:[{name, trigger, matcher, action:{type:\"command\", command}}]}. It also says PreToolUse and PostToolUse commands get JSON on STDIN with tool_name, tool_input, and tool_response (PostToolUse only), and that exit code 2 blocks a PreToolUse hook with stderr as the message. https://kiro.dev/docs/custom-agents/configuration-reference/ confirms the triggers SessionStart, PreToolUse and PostToolUse, and the matchers \"shell\" and \"@mcp\". https://kiro.dev/docs/hooks/actions/ says a non-zero exit blocks the PreToolUse tool call and exit 0 stdout is added to context. It does not document the exact payload fields, and I could not find a source for hook_event_name or cwd. The hook payload I built uses these fields, taken from the repo's own fixture and adapter (src/adapters/kiro.ts) and not from the docs. The tool_name \"execute_bash\" also comes from the adapter, which cites the Kiro CLI V3 hooks-migration docs. I did not verify that tool_name against a current Kiro page. Hook run: I made a 183,551-byte app.log with one FATAL line (\"FATAL disk controller panic code=ZX-4471\"). The payload was {hook_event_name:\"PreToolUse\", cwd:<temp project>, session_id, tool_name:\"execute_bash\", tool_input:{command:\"cat app.log\"}}. I piped it into the registered shell PreToolUse command, run via sh -c from the temp project. The result was exit 2, empty stdout, and this stderr (166 B): \"context-mode: 183551-byte file, over the one-read limit. Run ctx_execute(language, code, file=...) and print only the answer.\" This matches the documented schema (exit 2 blocks the tool, stderr goes to the agent). I then called ctx_execute (shell, grep FATAL, file=app.log) on the installed MCP server over stdio. It returned 76 B of text: \"exit 0 · 61 B\\n2026-10-26T10:28:20 FATAL disk controller panic code=ZX-4471\\n\". bytesV2 = 166 + 76 = 242, against bytesOff = 183551 (raw cat output). Skills: ~/.kiro/skills/ctx-stats, ctx-doctor and ctx-upgrade each have a SKILL.md with name and description frontmatter. Each body says \"Call the mcp_context-mode_ctx_* tool\", which is the Kiro MCP tool name format used in src/adapters/kiro.ts. doc-verified at https://kiro.dev/docs/skills/: the skill dirs are .kiro/skills/ and ~/.kiro/skills/, and SKILL.md needs name and description frontmatter. That page does not state the MCP tool name format. Nothing was committed. The temp space /private/tmp/cm-v2-hq-t-kiro is deleted.",
+      "problems": [
+        "No kiro CLI was available, so I could not run its list or loader command. I did not prove that Kiro itself parses our hook file or skills; I only checked them against the docs.",
+        "The Kiro docs do not give the full stdin payload (hook_event_name, cwd, the shell tool_name value). I took these from the repo's adapter and fixture, and the tool_name was not re-verified against a current Kiro page. The same limit applies to the claim that Kiro returns the denial stderr to the model.",
+        "The doctor check hook-seen shows WARN: no real host tool call has been seen yet.",
+        "The deny text and the ctx_execute result were not seen by a real Kiro model session. The MCP call was made by a test client, not by Kiro, and the mcp_context-mode_ prefix is from the adapter, not the docs.",
+        "The package-lock.json file is missing from the repo, so I used npm install and not npm ci. The first npm ci produced no node_modules, and I did not investigate why."
+      ]
+    },
+    {
+      "run": "t-zcode",
+      "agent": "zcode",
+      "pass": true,
+      "hookRegistered": true,
+      "hookFired": true,
+      "bytesOff": 169068,
+      "bytesV2": 443,
+      "answerOk": true,
+      "skillOk": true,
+      "evidence": "Head 69e14ba3 (v2-design). Built (npm install + npm run build), npm pack in release-out, installed to temp prefix, temp HOME. setup --yes --agents zcode: PASS. doctor --agents zcode: PASS (checked parse, mcp, hook, hook-registered, hook-runs, hook-seen, skills; WARN hook-seen not seen yet, expected without a host session). Host config ~/.zcode/cli/config.json: hooks.enabled=true, hooks.events SessionStart/UserPromptSubmit/PreToolUse/PostToolUse, entries type \"command\", command \"node .../hook.mjs --agent zcode\", timeoutMs 5000, matcher \"^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$\". Test: 169068-byte log (2400 lines, one FATAL ... code=ZX-7731). Payload {session_id, transcript_path, cwd, permission_mode, hook_event_name:PreToolUse, tool_name:Bash, tool_input.command:\"cat big.log\", tool_use_id}. Piped into the registered command via sh -c with cwd = temp project: rc 0, 279-byte stdout {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"... Run ctx_execute(...)\"}}. Then called installed MCP server ctx_execute (stdio JSON-RPC) as the deny text directs: result 164 bytes containing \"FATAL db pool exhausted code=ZX-7731\". bytesV2 = 279 + 164 = 443 (0.26% of raw). doc-verified: https://zcode.z.ai/en/docs/hooks (hooks.events config; \"type\":\"command\" full shell string executor supported, process executor recommended; matcher pipe-list exact or JS regex; stdin has tool_name/tool_input/tool_use_id; stdout permissionDecision allow|deny + permissionDecisionReason, updatedInput full replacement); https://github.com/zai-org/zcode-plugins/blob/main/docs/PLUGIN_DEVELOPMENT.md (Bash is the shell tool name in matcher examples; SKILL.md needs name + description frontmatter). Rendered skill ~/.zcode/skills/ctx-stats/SKILL.md has name/description frontmatter and says \"Call the mcp__context-mode__ctx_stats tool\" (host MCP tool naming mcp__<server>__<tool> matches our matcher). Temp space deleted.",
+      "problems": [
+        "Host zcode CLI is not installed and not on npm (@zcode/cli 404; only builds from the zai-org/ZCode repo with pnpm), so no loader/list command was run; parsing was proven only by our doctor.",
+        "Docs do not state the user skills directory (~/.zcode/skills) and do not state the full hook-stdin field list in the fetched text; skill dir is unverified against official docs.",
+        "Docs recommend type \"process\" (command + args argv); we register type \"command\" (shell string). It is documented as supported, but I ran it through sh -c, not the host's real executor.",
+        "Config uses timeoutMs while docs mention timeout for command executor; unverified which key the host reads for type command.",
+        "Repo has no package-lock.json so npm ci fails; used npm install --no-package-lock. esbuild postinstall warning appeared but build worked.",
+        "Doctor WARN hook-seen: not seen yet (needs a real host session)."
+      ]
+    }
+  ]
+}

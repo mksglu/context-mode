@@ -1,11 +1,11 @@
 // e2e/harness/mcp-client.mjs
 // Spawns an MCP server bundle and speaks newline-delimited JSON-RPC over
-// its stdio. Spec: docs/v2/impl/14-tests.md §2, 00-architecture.md e2e table.
+// its stdio. Spec: docs/architecture/modules/14-tests.md §2, 00-architecture.md e2e table.
 //
 // The 2000 ms close() timeout below is a harness-local literal, not a
 // src/core/contracts/constants.ts value: e2e/ never imports src/ (GS4),
 // so this file cannot import the real constant. See
-// docs/v2/impl/DEVIATIONS.md D-M0-4.
+// docs/architecture/modules/DEVIATIONS.md D-M0-4.
 import { spawn } from "node:child_process";
 
 const CLOSE_TIMEOUT_MS = 2000;

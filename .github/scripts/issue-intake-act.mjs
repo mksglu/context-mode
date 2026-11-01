@@ -1,7 +1,7 @@
 // .github/scripts/issue-intake-act.mjs
 // Reads the result from issue-intake.mjs and labels/comments/closes/reopens the issue through `gh`.
 // Acts only on the structured finding codes from the checker, never on free text.
-// docs/v2/review/agent-issue-intake/VALIDATION.md "What it does with the result", ADR-0014 §5.
+// https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/agent-issue-intake/VALIDATION.md "What it does with the result", ADR-0014 §5.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 

@@ -2,7 +2,7 @@
 // child; a model-run grandchild (`find /`) keeps the stdout pipe open, so "close" never fires and the run
 // hangs. spawnGroup starts the child as a process-group leader (detached: true on POSIX); killGroup sends
 // SIGKILL to the whole group (negative pid). New runs only: the frozen runners (e2e/live/compact-hard/run.mjs,
-// bench/m2/eval.mjs) import no shared harness and stay unchanged; see docs/v2/spikes/compact/RESULT.md.
+// bench/m2/eval.mjs) import no shared harness and stay unchanged; see https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/compact/RESULT.md.
 import { spawn } from "node:child_process";
 
 /** spawn() with the child as the leader of its own process group (POSIX). */

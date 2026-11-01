@@ -25,7 +25,7 @@ import { dumpDb } from "../harness/db-dump.mjs";
 // globstar-zero-depth / nested-gitignore-negation (tests/index/walk.test.mjs), non-ascii-auto-
 // memory-match (tests/index/auto-memory.test.mjs), snippet-code-point-safe
 // (tests/store/fts.test.mjs). Black-box only: calls release-out/server.mjs over MCP, no src/
-// import, per docs/v2/impl/14-tests.md §4/§5 and docs/v2/impl/05-tools-index.md.
+// import, per docs/architecture/modules/14-tests.md §4/§5 and docs/architecture/modules/05-tools-index.md.
 // Constants cited below (MAX_CHUNK_BYTES=4096, SNIPPET_MAX_BYTES=800, OUTPUT_CAP=16384,
 // RETENTION_SIZE_CAP_BYTES=524288000) are src/core/contracts/constants.ts values repeated as
 // literals here, per the e2e/ never-imports-src/ rule (same pattern as D-M0-4's CLOSE_TIMEOUT_MS).
@@ -61,7 +61,7 @@ async function withClient(fn) {
   }
 }
 
-// Skeptic-M2 (.impl/skeptic-M2.md): the three recall@5 cases below must search a corpus that
+// Skeptic-M2 (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/.impl/skeptic-M2.md): the three recall@5 cases below must search a corpus that
 // actually holds a relevant row and distractor rows, never an empty project — a reply of
 // "No hits ... across 0 source(s)" would still byte-match a frozen golden even if ranking were
 // deleted or ctx_search returned a constant string, so each case now indexes a relevant doc plus

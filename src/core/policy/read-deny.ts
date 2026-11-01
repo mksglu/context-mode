@@ -1,5 +1,5 @@
 // D-DU-DENY-1: the Read (or one-file shell dump) deny over OUTPUT_CAP, impl/08 §6.1 step 6.
-// One line from src/prompt/hooks/read-deny.md (inlined by build/build.mjs, lint-covered by docs/v2/prompt/lint.mjs):
+// One line from src/prompt/hooks/read-deny.md (inlined by build/build.mjs, lint-covered by build/prompt-lint.mjs):
 // the exact ctx_execute call for this file. A ranged Read stays allowed (decide.ts); the text no longer lists it.
 import { READ_DENY_TEMPLATE } from "../../prompt/_generated.ts";
 import { prefixToolNames } from "../contracts/constants.ts";

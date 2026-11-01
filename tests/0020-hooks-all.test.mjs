@@ -17,7 +17,7 @@ import { hookSample } from "../src/setup/hook-sample.ts";
 
   // serial: runSetup and runDoctor share in-process state; the tests fail when they overlap
 describe("ADR-0020 fire matrix: hook channel and skill channel per agent", () => {
-  // Spec: docs/v2/adr/0020-hooks-and-skills-on-every-agent.md. Setup writes each agent's one hook channel and one
+  // Spec: docs/architecture/adr/0020-hooks-and-skills-on-every-agent.md. Setup writes each agent's one hook channel and one
   // skill channel on a fresh HOME; a second run changes nothing; --remove restores every byte.
 
 

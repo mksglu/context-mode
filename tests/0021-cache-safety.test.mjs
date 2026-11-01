@@ -19,7 +19,7 @@ import * as opencodePlugin from "../src/entries/opencode.ts";
 import piExtension from "../src/entries/pi.ts";
 
 describe("ADR-0021 Codex cache usage analysis", { concurrency: CONC }, () => {
-  // Codex cache-usage analysis (docs/v2/spikes/cache). Pure: no spawn, no network.
+  // Codex cache-usage analysis (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/cache). Pure: no spawn, no network.
   // Codex reports input_tokens (which INCLUDES cached_input_tokens) and no cache write count, so the
   // definitions map as: cache_read = cached, cache_creation = input - cached, uncached "input" = 0.
 

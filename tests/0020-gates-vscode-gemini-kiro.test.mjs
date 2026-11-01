@@ -1,6 +1,6 @@
 // ADR-0020: hook gates for VS Code, Gemini CLI and Kiro.
-// Area: 0020-gates-vscode-gemini-kiro (docs/v2/TEST-LAYOUT.md).
-// Merged by ADR-0024 from 3 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
+// Area: 0020-gates-vscode-gemini-kiro (docs/architecture/TEST-LAYOUT.md).
+// Merged by ADR-0024 from 3 files (see docs/architecture/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // vscode-gate and gemini-gate are serial because their tests call process.chdir; kiro-gate runs concurrently.
 
 import { describe, test } from "node:test";

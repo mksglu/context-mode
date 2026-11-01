@@ -2,7 +2,7 @@
 // Parses an issue body by heading and by line prefix, not by regex (owner rule). Checks the
 // required headings, the ctx_doctor report keys, and scans free text for secret prefixes.
 // Prints a structured JSON result for issue-intake-act.mjs to act on.
-// ADR-0014 §2/§3/§5, docs/v2/review/agent-issue-intake/VALIDATION.md, DEVIATIONS D-M6-arch-6, D-M6-I2-1.
+// ADR-0014 §2/§3/§5, https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/agent-issue-intake/VALIDATION.md, DEVIATIONS D-M6-arch-6, D-M6-I2-1.
 import { pathToFileURL } from "node:url";
 
 export const REQUIRED_HEADINGS = ["Summary", "ctx-report", "What happened", "Expected", "Steps", "Environment"];

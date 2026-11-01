@@ -1,4 +1,4 @@
-// Held-out search eval (docs/v2/spikes/search/DIAGNOSIS.md §4). Plain Node, no network, no model calls.
+// Held-out search eval (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/search/DIAGNOSIS.md §4). Plain Node, no network, no model calls.
 // Indexes every source of e2e/fixtures/search/heldout.json over MCP (ctx_index), asks each query in its
 // own ctx_search call (source-scoped), and scores the reply against the frozen `expect` substrings.
 // Also runs the 7 part-2 bench scenarios (no-hit count, code blocks whole) and a p95 latency pass with
@@ -35,14 +35,14 @@ function part2Content(s) {
   return JSON.parse(readFileSync(path.join(DATA, s.mcpTools), "utf8")).map((t) => `### ${t.name}\n\n${t.description}`).join("\n\n---\n\n");
 }
 const fences = (t) => t.match(/```[\s\S]*?```/g) ?? [];
-// 1 MB of extra markdown for the latency pass: docs/v2 files (review/out excluded), in name order.
+// 1 MB of extra markdown for the latency pass: https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2 files (review/out excluded), in name order.
 function megabyte() {
   const files = [];
   const walk = (d) => { for (const e of readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const p = path.join(d, e.name);
     if (e.isDirectory()) { if (!p.includes(path.join("review", "out"))) walk(p); } else if (e.name.endsWith(".md")) files.push(p);
   } };
-  walk(path.join(REPO, "docs", "v2"));
+  walk(path.join(REPO, "docs", "architecture"));
   const parts = []; let n = 0;
   for (const f of files) { if (n >= 1_048_576) break; const t = readFileSync(f, "utf8"); parts.push(t); n += Buffer.byteLength(t); }
   return parts;

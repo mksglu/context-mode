@@ -1,3 +1,0 @@
-There is a file big.log in this repo (about 60000 lines). Near the very end of the file there is a
-line naming the last reviewer on this release. Find that reviewer's name/id. Reply with exactly one
-line: REVIEWER <value>

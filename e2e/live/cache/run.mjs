@@ -1,4 +1,4 @@
-// Prompt-cache A/B on Claude Code (docs/v2/spikes/cache). Arms: off (no plugin) and v2 (--plugin-dir <release-out>).
+// Prompt-cache A/B on Claude Code (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/cache). Arms: off (no plugin) and v2 (--plugin-dir <release-out>).
 // Parts: (1) main: n 6-turn sessions per arm, one `claude -p` process per turn, turn 1 --session-id, later turns --resume
 // on the same id; (2) cross: two fresh sessions back to back in the same project, turn-1 cache_read of the second;
 // (3) compact: one session with /compact after turn 3, the turns after it recorded.

@@ -1,6 +1,6 @@
 // e2e/harness/normalize.mjs
 // Replaces volatile fields in a captured value with stable placeholders.
-// Spec: docs/v2/impl/14-tests.md §3, TECH-SPEC §6.4. Regex is allowed here
+// Spec: docs/architecture/modules/14-tests.md §3, TECH-SPEC §6.4. Regex is allowed here
 // (CI/test code only, per 00-architecture.md line 9 and Assumption A4).
 // normalize() never throws and never mutates its input.
 

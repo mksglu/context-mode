@@ -1,4 +1,4 @@
-// impl/02 §2, impl/00 §3.1 ProjectContext + §4, docs/v2/PRD-v2.md §5, ADR-0007 decision 4,
+// impl/02 §2, impl/00 §3.1 ProjectContext + §4, docs/architecture/PRD.md §5, ADR-0007 decision 4,
 // DEVIATIONS D-M1-1, D-M1-5, D-M1-T3-2, D-M1-T3-3, D-M1-T3-5.
 // One project source per host. Claude Code has one fixed order (D-FU-PS-1, ADR-0001): CLAUDE_PROJECT_DIR,
 // then the hook payload cwd, then process.cwd(). Every other host: its one source; missing -> NO_PROJECT.

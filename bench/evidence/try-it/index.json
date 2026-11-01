@@ -1,0 +1,310 @@
+{
+ "title": "README try-it prompts: direct vs OSS v1 vs OSS v2 vs the Context Mode gateway: evidence index",
+ "source": "bench/evidence/try-it/analyze.mjs",
+ "files": [
+  {
+   "date": "2026-10-22",
+   "file": "ab.json",
+   "model": "claude-opus-5-5",
+   "client": "Claude Code 2.1.303",
+   "prereg": "bench/evidence/try-it/prereg.md",
+   "prompts": [
+    {
+     "id": "repo-research",
+     "label": "Deep repo research",
+     "n": 4,
+     "v1": {
+      "pct": 37.3,
+      "pct_ci95": [
+       -35.5,
+       110
+      ],
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": -20.7,
+      "pct_ci95": [
+       -42.2,
+       0.8
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -29.5,
+      "pct_ci95": [
+       -56,
+       -3
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "3/4"
+     }
+    },
+    {
+     "id": "git-history",
+     "label": "Git history analysis",
+     "n": 4,
+     "v1": {
+      "pct": -2.8,
+      "pct_ci95": [
+       -31.2,
+       25.6
+      ],
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": -2.5,
+      "pct_ci95": [
+       -45.1,
+       40.1
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -46.3,
+      "pct_ci95": [
+       -81.5,
+       -11
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "4/4"
+     }
+    },
+    {
+     "id": "web-scrape",
+     "label": "Web scraping",
+     "n": 4,
+     "v1": {
+      "pct": 30.7,
+      "pct_ci95": [
+       -15.4,
+       76.8
+      ],
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": 37.2,
+      "pct_ci95": [
+       11,
+       63.4
+      ],
+      "verdict": "more"
+     },
+     "gateway": {
+      "pct": -48.9,
+      "pct_ci95": [
+       -80.5,
+       -17.3
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "4/4"
+     }
+    },
+    {
+     "id": "large-json",
+     "label": "Large JSON API",
+     "n": 4,
+     "v1": {
+      "pct": 92.9,
+      "pct_ci95": [
+       27.6,
+       158.1
+      ],
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 61.8,
+      "pct_ci95": [
+       -8.6,
+       132.2
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -41.4,
+      "pct_ci95": [
+       -83.2,
+       0.5
+      ],
+      "verdict": "same"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "1/4",
+      "v2": "2/4",
+      "gateway": "0/4"
+     }
+    },
+    {
+     "id": "docs-search",
+     "label": "Documentation search",
+     "n": 4,
+     "v1": {
+      "pct": 19.9,
+      "pct_ci95": [
+       4.6,
+       35.3
+      ],
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 39.5,
+      "pct_ci95": [
+       -18.1,
+       97.2
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -61.2,
+      "pct_ci95": [
+       -69.6,
+       -52.8
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "4/4"
+     }
+    },
+    {
+     "id": "session-continuity",
+     "label": "Session continuity",
+     "demonstration_only": true,
+     "n": 2
+    }
+   ],
+   "readme_claims": [
+    {
+     "id": "repo-research",
+     "claim": "5 calls",
+     "verdict": "HOLDS"
+    },
+    {
+     "id": "repo-research",
+     "claim": "62 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "repo-research",
+     "claim": "raw: 986 KB",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "repo-research",
+     "claim": "94% saved",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "git-history",
+     "claim": "1 call",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "git-history",
+     "claim": "5.6 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "web-scrape",
+     "claim": "1 call",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "web-scrape",
+     "claim": "3.2 KB context",
+     "verdict": "HOLDS"
+    },
+    {
+     "id": "large-json",
+     "claim": "7.5 MB raw",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "large-json",
+     "claim": "0.9 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "large-json",
+     "claim": "99% saved",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "docs-search",
+     "claim": "2 calls",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "docs-search",
+     "claim": "1.8 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "session-continuity",
+     "claim": "compaction recovery with full state",
+     "verdict": "INCONCLUSIVE"
+    }
+   ]
+  },
+  {
+   "file": "tool-result-bytes.json",
+   "sha256": "d6becd733712e2d12a1f66cc347f43099157846db9612cc339e238ca07bab344",
+   "writer": "measure-bytes.mjs (needs the private transcripts)"
+  }
+ ],
+ "preregistrations": [
+  {
+   "file": "prereg.md",
+   "commit": "f924eda2ec61692f08aa3fe8dc9bcdf1512dc0e6",
+   "committed": "2026-10-22T10:51:33Z"
+  },
+  {
+   "file": "prereg-amendment-1.md",
+   "commit": "c091a4cb227170db6875340cce3844ee77a97544",
+   "committed": "2026-10-22T13:38:00Z"
+  }
+ ],
+ "superseded": [
+  {
+   "id": "web-scrape",
+   "run_lines": 20,
+   "reason": "Gateway arm: the completion check counted only client tool_use blocks, but the gateway ran the fetch at its edge (gateway record edge_calls >= 1), so all gateway sessions failed no-tool-call. The tenant was shared per prompt with memory and skills on, so a later cycle could see an earlier one."
+  },
+  {
+   "id": "large-json",
+   "run_lines": 20,
+   "reason": "All arms: the record check read the served data from disk, but every session built the data in memory, so every arm failed no-served-data-on-disk. The tenant was shared per prompt with memory and skills on."
+  },
+  {
+   "id": "docs-search",
+   "run_lines": 20,
+   "reason": "Gateway arm: the completion check counted only client tool_use blocks, but the gateway ran the fetch at its edge (gateway record edge_calls >= 1), so all gateway sessions failed no-tool-call. The tenant was shared per prompt with memory and skills on, so a later cycle could see an earlier one."
+  }
+ ],
+ "runs": [
+  "runs/repo-research.jsonl",
+  "runs/git-history.jsonl",
+  "runs/web-scrape.jsonl",
+  "runs/large-json.jsonl",
+  "runs/docs-search.jsonl",
+  "runs/session-continuity.jsonl"
+ ]
+}

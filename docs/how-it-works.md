@@ -1,7 +1,7 @@
 # How context-mode works
 
 This page is for users and contributors. It describes v2 as built on `v2-design`, from `PRD-v2.md` and
-`docs/v2/`. `docs/v2/impl/DEVIATIONS.md` records each place where the code differs from the design docs.
+`https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/`. `docs/architecture/modules/DEVIATIONS.md` records each place where the code differs from the design docs.
 
 ## In one line
 
@@ -17,7 +17,7 @@ context-mode has two parts that run together inside one coding agent session:
    sees the real output after the call ran, and can replace it.
 2. **The MCP server.** A small set of tools the agent can call itself: `ctx_execute`, `ctx_batch`,
    `ctx_index`, `ctx_search`, `ctx_resume`, `ctx_stats`, `ctx_doctor`, `ctx_upgrade`, `ctx_purge`
-   (`TOOL_ORDER`, `docs/v2/impl/00-architecture.md` §3.2).
+   (`TOOL_ORDER`, `docs/architecture/modules/00-architecture.md` §3.2).
 
 The hook is the gate: it stops a huge file or log before it lands in context. The MCP tools are the way
 around the gate: they let the agent run the same work, get a search-able record of the full output, and
@@ -52,7 +52,7 @@ MCP server process can both read and write it without stepping on each other (`0
    guess, because the real size is known after the run (DECISIONS-r10).
    Measured (2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low): outputs of 8,893 to 60,090 bytes reached the model
    as 152 to 190 chars and the answer was right in 16 of 16 runs. On small tasks the plugin adds a fixed prompt cost of
-   about 2,000 tokens (`docs/v2/benchmarks.md`).
+   about 2,000 tokens (`bench/RESULTS.md`).
 
 ## Search: scope, ranking, and time
 
@@ -110,7 +110,7 @@ Every coding agent host (Claude Code, Codex, Gemini, Qwen, Copilot CLI, VS Code,
 OpenCode) wires hooks and the MCP server in a different way. The adapter table names, per host: how
 context-mode installs (`installMode`), how it finds the project root (`projectSource`), what its MCP tool
 names are prefixed with (`toolNamePrefix`), how a compaction-recovery block is delivered
-(`compactDelivery`), and how deny messages reach the host (`denyChannel`) (`docs/v2/impl/10-adapters.md`
+(`compactDelivery`), and how deny messages reach the host (`denyChannel`) (`docs/architecture/modules/10-adapters.md`
 §lines 51-61):
 
 | Host | install | project source | compaction delivery |
@@ -128,7 +128,7 @@ everywhere; only how a host is told about them changes.
 
 ## What is still open
 
-`docs/v2/impl/DEVIATIONS.md` is the one place a gap between the design docs and the code at a given commit
+`docs/architecture/modules/DEVIATIONS.md` is the one place a gap between the design docs and the code at a given commit
 is recorded — date, file, question, decision, reason. A number on this page comes from `src/core/contracts/constants.ts`
-or a `DECISIONS-r*.md` file; measured results are in `docs/v2/benchmarks.md`. See `docs/algorithms.md` for the
+or a `DECISIONS-r*.md` file; measured results are in `bench/RESULTS.md`. See `docs/algorithms.md` for the
 per-algorithm sources.

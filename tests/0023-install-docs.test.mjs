@@ -1,6 +1,6 @@
 // ADR-0023 / PRD-setup: install docs facts and rules.
-// Area: 0023-install-docs (docs/v2/TEST-LAYOUT.md).
-// Merged by ADR-0024 from 8 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
+// Area: 0023-install-docs (docs/architecture/TEST-LAYOUT.md).
+// Merged by ADR-0024 from 8 files (see docs/architecture/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // Every block only reads files, so all run concurrently.
 
 import { describe, test } from "node:test";
@@ -139,7 +139,7 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
   });
 
   test("install-native: the real docs pass checkOpencodeCommands", () => {
-    const names = ["README.md", "docs/install/README.md", "docs/install/opencode.md", "docs/v2/release/NATIVE-INSTALL.md", "docs/v2/release/HOOKS-FIRE.md", "docs/v2/release/WINDOWS.md", "docs/v2/review/opencode2-reply.md"];
+    const names = ["README.md", "docs/install/README.md", "docs/install/opencode.md", "docs/architecture/release/NATIVE-INSTALL.md", "docs/architecture/release/HOOKS-FIRE.md", "docs/architecture/release/WINDOWS.md"];
     assert.deepEqual(checkOpencodeCommands(Object.fromEntries(names.map((n) => [n, read(...n.split("/"))]))), []);
   });
 
@@ -194,7 +194,7 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     }
   });
 
-  // ADR-0023 + tickets/release-on-demand-no-release-branch.md: until v2 is on main, main holds the old build (1.0.169), so
+  // ADR-0023 + https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/release-on-demand-no-release-branch.md: until v2 is on main, main holds the old build (1.0.169), so
   // every command a user copies for the 4 GitHub-source hosts names the release ref in the host's own syntax. D-NI-DOCS-REF-2
   // (D-NI-DOCS-REF-1 proved the syntax live). Only the "After v2 is on main:" line may hold the command without the ref.
   const AFTER = {
@@ -448,7 +448,7 @@ describe("ADR-0023 source install", { concurrency: CONC }, () => {
 
 describe("ADR-0023 no v1 text in docs", { concurrency: CONC }, () => {
   // D-V1OUT-1 (owner 2026-10-25): users see one product. The word "v1" must not appear in README.md, docs/install/**,
-  // src/prompt/**, issue templates or CLI help/output. docs/benchmarks/** and docs/v2/** are exempt.
+  // src/prompt/**, issue templates or CLI help/output. bench/evidence/** and docs/architecture/** are exempt.
 
   const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -458,10 +458,10 @@ describe("ADR-0023 no v1 text in docs", { concurrency: CONC }, () => {
     assert.ok(!out.includes("a.md:1") && !out.includes("a.md:5"), out);
   });
 
-  test("v1-out: the file list covers README, install docs, prompts and issue templates, not benchmarks or docs/v2", () => {
+  test("v1-out: the file list covers README, install docs, prompts and issue templates, not benchmarks or docs/architecture", () => {
     const files = v1FreeFiles(REPO).map((f) => path.relative(REPO, f).split(path.sep).join("/"));
     for (const must of ["README.md", "docs/install/README.md", "docs/install/codex.md", "src/prompt/instructions.md", ".github/ISSUE_TEMPLATE/bug.yml", "e2e/golden/cli/help-main.txt"]) assert.ok(files.includes(must), must);
-    assert.ok(files.every((f) => !f.startsWith("docs/benchmarks/") && !f.startsWith("docs/v2/")), files.join(","));
+    assert.ok(files.every((f) => !f.startsWith("bench/evidence/") && !f.startsWith("docs/architecture/")), files.join(","));
   });
 
   test("v1-out: the real user-facing files have no v1 mention", () => {

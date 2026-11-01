@@ -1,3 +1,0 @@
-There is a file big_source.js in this repo. Use the Read tool with no offset and no limit to read
-the entire file in one call. After that, tell me the value of CONFIG.region from the file. Reply
-with exactly one line: REGION <value>

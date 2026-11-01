@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // e2e/cases/run.mjs
 // Runs the GP1..GP11 node:test suites in one process. Spec:
-// docs/v2/impl/14-tests.md §5. Milestone filter per DEVIATIONS D-M0-2.
+// docs/architecture/modules/14-tests.md §5. Milestone filter per DEVIATIONS D-M0-2.
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

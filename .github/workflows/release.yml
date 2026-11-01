@@ -3,7 +3,7 @@
 # Started by the /release skill with `gh workflow run`. mode=rollback runs only ci -> rollback.
 # A pushed v2.* tag also starts it: the tag is the version, stage/promote reuse it, a x.y.z-<pre> version is a
 # GitHub prerelease, never Latest, and npm gets dist-tag next (D-RN-TAG-1).
-# MAIN-ONLY (docs/v2/release/MAIN-ONLY.md, D-MO-2): a dispatch on main takes the main-* jobs (one click: channel next or
+# MAIN-ONLY (docs/architecture/release/MAIN-ONLY.md, D-MO-2): a dispatch on main takes the main-* jobs (one click: channel next or
 # latest; version from the commits since the last tag on main; npm; one release commit and tag on main; GitHub release).
 # Every other start keeps the old jobs until merge day. Job route decides; the merge-day checklist deletes the old jobs.
 # Every ${{ }} value a shell reads goes through env, never into the run text.
@@ -131,7 +131,7 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           VERSION: ${{ needs.plan.outputs.version }}
         run: node build/build.mjs --out release-out --sha "$SHA" --version "$VERSION"
-      - run: node docs/v2/prompt/lint.mjs --out release-out
+      - run: node build/prompt-lint.mjs --out release-out
       - run: npm install -g "$CLAUDE_CODE_NPM"
       - run: claude plugin validate release-out
       - uses: actions/attest-build-provenance@v1
@@ -347,7 +347,7 @@ jobs:
           SHA: ${{ needs.main-plan.outputs.sha }}
           VERSION: ${{ needs.main-plan.outputs.version }}
         run: node build/build.mjs --out release-out --sha "$SHA" --version "$VERSION"
-      - run: node docs/v2/prompt/lint.mjs --out release-out
+      - run: node build/prompt-lint.mjs --out release-out
       - run: npm install -g "$CLAUDE_CODE_NPM"
       - run: claude plugin validate release-out
       - uses: actions/attest-build-provenance@v1

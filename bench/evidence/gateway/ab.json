@@ -1,0 +1,8493 @@
+{
+ "schema": "context-mode.benchmark-evidence/2",
+ "title": "Opus 5.5 short tasks: direct vs OSS v1 vs OSS v2, beside the published gateway rows",
+ "date": "2026-10-21",
+ "client": "Claude Code 2.1.303",
+ "model": "claude-opus-5-5",
+ "harness": "start-cost-ab (gateway commit 408333a4) + bench/gateway-ab/harness.patch",
+ "harness_commit": "f7a22f4bbc90594256b1adeec865444283fedda6",
+ "workload_source": "scripts/e2e/short-workloads.mjs at gateway commit 408333a48d082830f5813b3f539ec03993830a89, blob 20b2adfb0c33c3e791a26dcd2f9c6d34ae216756",
+ "prereg": {
+  "file": "bench/evidence/gateway/prereg.md",
+  "commit": "bcc45e33b521bb23fc5c6409a40d4f7c5ee2e536",
+  "committed": "2026-10-21T19:47:18Z",
+  "first_run_commit": "2026-10-21T20:13:44Z"
+ },
+ "arms": {
+  "plain": "Claude Code alone (direct). Empty strict MCP map, no plugin.",
+  "v1": "OSS plugin v1: origin/main a92cf6a77ac02971fb5fafe2155e5ee229491884, version 1.0.169, built with npm install --omit=dev.",
+  "v2": "OSS plugin v2: v2-design 8f38bdbca6d2be974d90492e683b1b3073f1b63c built to release-out (manifest version 0.0.0-dev).",
+  "gateway": "Claude Code talks to Anthropic through the Context Mode gateway. Published rows (2026-09-29) and the bridge pairs only."
+ },
+ "plugin_revisions": {
+  "v1": {
+   "git_head": "a92cf6a77ac02971fb5fafe2155e5ee229491884",
+   "version": "1.0.169",
+   "dirty": false
+  },
+  "v2": {
+   "git_head": "8f38bdbca6d2be974d90492e683b1b3073f1b63c",
+   "version": "0.0.0-dev",
+   "dirty": false
+  }
+ },
+ "warmup_pairs": 1,
+ "prices": {
+  "as_of": "2026-09-29",
+  "source_url": "https://www.anthropic.com/pricing",
+  "unit": "USD per million tokens",
+  "models": {
+   "claude-opus-5-5": {
+    "in": 4,
+    "out": 20,
+    "cr": 0.2,
+    "cw5": 5,
+    "cw1h": 8
+   },
+   "claude-haiku-4-5": {
+    "in": 1,
+    "out": 5,
+    "cr": 0.1,
+    "cw5": 1.25,
+    "cw1h": 2
+   }
+  }
+ },
+ "cost_basis": "List price on the token counts in each session's result event, per model. Cache writes whose lifetime is not split are priced at the 1 hour rate (usd) and the 5 minute rate (usd_low). Claude Code's own total_cost_usd is kept as usd_client; a gap above 1% sets client_gap_flag. Bridge gateway sessions: the gateway's per-call record, hidden calls included. The runs used a claude.ai login: there is no per-token invoice, so every figure is a list-price equivalent.",
+ "analysis_method": "Every measured cycle, failures included, no outlier dropped. Per workload, d = arm - plain per cycle. % = 100 x mean(d) / mean(plain), with the 95% t interval. Verdict: less when the whole interval is below zero, more when above, else same. arm_wins: cycles where the arm cost less than plain. v2 against v1 is secondary. Gateway rows are the published rows, cited by workload id, each against its own published plain arm.",
+ "spend_usd_list_price": 14.82575,
+ "sessions": 186,
+ "void_sessions": 0,
+ "inputs": [
+  {
+   "file": "published/v3-opus55-short.json",
+   "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce"
+  },
+  {
+   "file": "runs/tests.jsonl",
+   "sha256": "be48042ad3e821ad6b2ca3643b229acfd1aaf63718f6f3ff63f6751d418d161b",
+   "sessions": 31
+  },
+  {
+   "file": "runs/json.jsonl",
+   "sha256": "64fa0e6e74cdfeab3e43296a62130eb659e99dcb843638a0fc4194740a5a3581",
+   "sessions": 31
+  },
+  {
+   "file": "runs/log.jsonl",
+   "sha256": "199fa02cafbb9e9176c91c4a8b9ce836a626cb9ed0af7ed98dcd821a66eac9b1",
+   "sessions": 31
+  },
+  {
+   "file": "runs/git.jsonl",
+   "sha256": "10ccf2c46771e158b1bab1d988c0aaabe04a4c44c58245c5446ed382e79e2316",
+   "sessions": 31
+  },
+  {
+   "file": "runs/grep.jsonl",
+   "sha256": "b85ba54a2a26f4e0ac2b568ee653607b12f13bee906e56f4256a330b127ac02a",
+   "sessions": 31
+  },
+  {
+   "file": "runs/edit.jsonl",
+   "sha256": "f33f6a21ab1dd70eb9640cbb2fd83ef3436c74bc594d7a8fe8b1fddf54a30135",
+   "sessions": 31
+  }
+ ],
+ "pooled": {
+  "pairs": 48,
+  "plain_usd_sum": 3.41866,
+  "v1_usd_sum": 4.60115,
+  "v2_usd_sum": 3.49345,
+  "v1_cost_less": 9,
+  "v2_cost_less": 23,
+  "note": "A sum over pairs, not a mean of rows. No interval: the rows are different tasks.",
+  "v1_pct_of_sums": 34.6,
+  "v2_pct_of_sums": 2.2
+ },
+ "withheld": [
+  "prompt and answer text",
+  "session ids",
+  "tenant ids",
+  "gateway host",
+  "local paths",
+  "raw transcripts",
+  "credentials"
+ ],
+ "legend": {
+  "col.cr": "cache read tokens",
+  "col.cw1h": "cache write tokens, 1 hour lifetime",
+  "col.cw5": "cache write tokens, 5 minute lifetime",
+  "col.cwx": "cache write tokens whose lifetime was not saved: usd_recomputed prices them at the 1 hour rate (Claude Code's main thread), usd_recomputed_low at the 5 minute rate",
+  "col.in": "input tokens not read from or written to the cache",
+  "col.missing": "a token column left out of a block is all zeros; model indexes into models",
+  "col.out": "output tokens; null = not saved per call",
+  "from.client_first_call": "Claude Code's stream: the first call's input-side usage only",
+  "from.ledger_first_row": "the gateway ledger: the first row of the session only",
+  "rest.after_first_call": "the gateway ledger's session totals minus the first row",
+  "why.first_call_only": "Only the first call's input-side tokens were saved for this arm. The run folders with the other calls were deleted after the run."
+ },
+ "workloads": [
+  {
+   "id": "tests",
+   "label": "npm test fix loop, short",
+   "pairs_planned": 8,
+   "invalid_attempts": 0,
+   "warmup_sessions": 3,
+   "analysis": {
+    "n": 8,
+    "plain_usd_mean": 0.07504,
+    "v1_usd_mean": 0.09551,
+    "v2_usd_mean": 0.07828,
+    "success_plain": "8/8",
+    "success_v1": "8/8",
+    "success_v2": "8/8",
+    "routed_v1": "0/8",
+    "routed_v2": "0/8",
+    "v1_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.07504,
+     "arm_usd_mean": 0.09551,
+     "pct": 27.3,
+     "pct_ci95": [
+      6.9,
+      47.7
+     ],
+     "verdict": "more",
+     "median_diff_usd": 0.0259764,
+     "arm_wins": 1,
+     "per_1000_tasks_usd": -20.5
+    },
+    "v2_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.07504,
+     "arm_usd_mean": 0.07828,
+     "pct": 4.3,
+     "pct_ci95": [
+      -18.5,
+      27.1
+     ],
+     "verdict": "same",
+     "median_diff_usd": 0.0030191,
+     "arm_wins": 3,
+     "per_1000_tasks_usd": -3.2
+    },
+    "v2_vs_v1_secondary": {
+     "n": 8,
+     "base_usd_mean": 0.09551,
+     "arm_usd_mean": 0.07828,
+     "pct": -18,
+     "pct_ci95": [
+      -34.8,
+      -1.3
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0232593,
+     "arm_wins": 5,
+     "per_1000_tasks_usd": 17.2
+    }
+   },
+   "gateway_published": {
+    "source_file": "/benchmarks/data/v3-opus55-short.json",
+    "copy": "published/v3-opus55-short.json",
+    "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+    "workload_id": "tests",
+    "date": "2026-09-29",
+    "client": "Claude Code 2.1.283",
+    "model": "claude-opus-5-5",
+    "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+    "prereg": "/benchmarks/prereg/v3-opus55-short-prereg.md",
+    "analysis": {
+     "gateway_usd_mean": 0.06832,
+     "gateway_wins": 15,
+     "n": 16,
+     "pct": -21.8,
+     "pct_ci95": [
+      -27.7,
+      -15.8
+     ],
+     "plain_usd_mean": 0.08731,
+     "success_gateway": "16/16",
+     "success_plain": "16/16",
+     "verdict": "less"
+    },
+    "reanalysed_from_pairs": {
+     "pct": -21.8,
+     "pct_ci95": [
+      -27.7,
+      -15.8
+     ],
+     "verdict": "less",
+     "wins": 15,
+     "per_1000_tasks_usd": 19,
+     "ci_end_gap_points": 0,
+     "matches_published": true,
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
+    }
+   },
+   "bridge": {
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0803652,
+       "usd_low": 0.0803652,
+       "usd_client": 0.0803652,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48286
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8008
+        ],
+        "out": [
+         331
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.06244,
+       "usd_low": 0.06244,
+       "usd_client": 0.0624402,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         728
+        ],
+        "cr": [
+         49021
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5148
+        ],
+        "out": [
+         427
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 54897,
+         "output": 427,
+         "cache_read": 49021,
+         "cache_write": 5148
+        },
+        "anthropic_usd": 0.06244,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -22.3,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0804732,
+       "usd_low": 0.0804732,
+       "usd_client": 0.08047320000000001,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48286
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8014
+        ],
+        "out": [
+         334
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.0618,
+       "usd_low": 0.0618,
+       "usd_client": 0.0618,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         728
+        ],
+        "cr": [
+         49020
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5128
+        ],
+        "out": [
+         403
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 54876,
+         "output": 403,
+         "cache_read": 49020,
+         "cache_write": 5128
+        },
+        "anthropic_usd": 0.0618,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -23.2,
+      "inside_published_range": true
+     }
+    ],
+    "plain_usd_mean": 0.08042,
+    "gateway_usd_mean": 0.06212,
+    "pct_of_means": -22.8,
+    "inside_published_range": "2 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0574926,
+      "usd_low": 0.0574926,
+      "usd_client": 0.0574926,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45183
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4984
+       ],
+       "out": [
+        428
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.084704,
+      "usd_low": 0.084704,
+      "usd_client": 0.084704,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51360
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8201
+       ],
+       "out": [
+        440
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0881124,
+      "usd_low": 0.0881124,
+      "usd_client": 0.08811240000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50722
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8598
+       ],
+       "out": [
+        458
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 2,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0819294,
+      "usd_low": 0.0819294,
+      "usd_client": 0.0819294,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48327
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8095
+       ],
+       "out": [
+        374
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.0814024,
+      "usd_low": 0.0814024,
+      "usd_client": 0.0814024,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51292
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8065
+       ],
+       "out": [
+        330
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0584086,
+      "usd_low": 0.0584086,
+      "usd_client": 0.058408600000000005,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47483
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5286
+       ],
+       "out": [
+        330
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 3,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.0804052,
+      "usd_low": 0.0804052,
+      "usd_client": 0.0804052,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48286
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8008
+       ],
+       "out": [
+        333
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.0820106,
+      "usd_low": 0.0820106,
+      "usd_client": 0.0820106,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51293
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8066
+       ],
+       "out": [
+        360
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.08451360000000001,
+      "usd_low": 0.08451360000000001,
+      "usd_client": 0.0845136,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        53788
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8429
+       ],
+       "out": [
+        315
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 4,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0539112,
+      "usd_low": 0.0539112,
+      "usd_client": 0.0539112,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45116
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4838
+       ],
+       "out": [
+        308
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.10751580000000001,
+      "usd_low": 0.10751580000000001,
+      "usd_client": 0.1075158,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57599
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11219
+       ],
+       "out": [
+        311
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.083743,
+      "usd_low": 0.083743,
+      "usd_client": 0.083743,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50655
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8446
+       ],
+       "out": [
+        301
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 5,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0843778,
+      "usd_low": 0.0843778,
+      "usd_client": 0.08437779999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51489
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8127
+       ],
+       "out": [
+        452
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.1111334,
+      "usd_low": 0.1111334,
+      "usd_client": 0.11113340000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57667
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11367
+       ],
+       "out": [
+        432
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.084255,
+      "usd_low": 0.084255,
+      "usd_client": 0.08425500000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50655
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8450
+       ],
+       "out": [
+        325
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 6,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.08199719999999999,
+      "usd_low": 0.08199719999999999,
+      "usd_client": 0.0819972,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48326
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8086
+       ],
+       "out": [
+        381
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.1074518,
+      "usd_low": 0.1074518,
+      "usd_client": 0.10745180000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57599
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11221
+       ],
+       "out": [
+        307
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.083927,
+      "usd_low": 0.083927,
+      "usd_client": 0.08392700000000002,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50655
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8449
+       ],
+       "out": [
+        309
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 7,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0822894,
+      "usd_low": 0.0822894,
+      "usd_client": 0.0822894,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48327
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8095
+       ],
+       "out": [
+        392
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.10878760000000001,
+      "usd_low": 0.10878760000000001,
+      "usd_client": 0.1087876,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57598
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11218
+       ],
+       "out": [
+        375
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.058489,
+      "usd_low": 0.058489,
+      "usd_client": 0.058489000000000006,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47485
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5276
+       ],
+       "out": [
+        338
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 8,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0778798,
+      "usd_low": 0.0778798,
+      "usd_client": 0.0778798,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48259
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7948
+       ],
+       "out": [
+        231
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.0810706,
+      "usd_low": 0.0810706,
+      "usd_client": 0.0810706,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51293
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8066
+       ],
+       "out": [
+        313
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.084763,
+      "usd_low": 0.084763,
+      "usd_client": 0.084763,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50655
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8446
+       ],
+       "out": [
+        352
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    }
+   ]
+  },
+  {
+   "id": "json",
+   "label": "One large JSON file",
+   "pairs_planned": 8,
+   "invalid_attempts": 0,
+   "warmup_sessions": 3,
+   "analysis": {
+    "n": 8,
+    "plain_usd_mean": 0.07259,
+    "v1_usd_mean": 0.09473,
+    "v2_usd_mean": 0.07618,
+    "success_plain": "8/8",
+    "success_v1": "8/8",
+    "success_v2": "8/8",
+    "routed_v1": "0/8",
+    "routed_v2": "6/8",
+    "v1_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.07259,
+     "arm_usd_mean": 0.09473,
+     "pct": 30.5,
+     "pct_ci95": [
+      8.6,
+      52.4
+     ],
+     "verdict": "more",
+     "median_diff_usd": 0.0261507,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": -22.1
+    },
+    "v2_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.07259,
+     "arm_usd_mean": 0.07618,
+     "pct": 5,
+     "pct_ci95": [
+      -21.4,
+      31.4
+     ],
+     "verdict": "same",
+     "median_diff_usd": 0.0022365,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": -3.6
+    },
+    "v2_vs_v1_secondary": {
+     "n": 8,
+     "base_usd_mean": 0.09473,
+     "arm_usd_mean": 0.07618,
+     "pct": -19.6,
+     "pct_ci95": [
+      -35.4,
+      -3.8
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0228697,
+     "arm_wins": 6,
+     "per_1000_tasks_usd": 18.5
+    }
+   },
+   "gateway_published": {
+    "source_file": "/benchmarks/data/v3-opus55-short.json",
+    "copy": "published/v3-opus55-short.json",
+    "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+    "workload_id": "json",
+    "date": "2026-09-29",
+    "client": "Claude Code 2.1.283",
+    "model": "claude-opus-5-5",
+    "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+    "prereg": "/benchmarks/prereg/v3-opus55-short-prereg.md",
+    "analysis": {
+     "gateway_usd_mean": 0.06751,
+     "gateway_wins": 12,
+     "n": 12,
+     "pct": -21.4,
+     "pct_ci95": [
+      -29.9,
+      -12.9
+     ],
+     "plain_usd_mean": 0.08588,
+     "success_gateway": "12/12",
+     "success_plain": "12/12",
+     "verdict": "less"
+    },
+    "reanalysed_from_pairs": {
+     "pct": -21.4,
+     "pct_ci95": [
+      -29.9,
+      -12.9
+     ],
+     "verdict": "less",
+     "wins": 12,
+     "per_1000_tasks_usd": 18.4,
+     "ci_end_gap_points": 0,
+     "matches_published": true,
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
+    }
+   },
+   "bridge": {
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.055931800000000004,
+       "usd_low": 0.055931800000000004,
+       "usd_client": 0.055931800000000004,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         45339
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5360
+        ],
+        "out": [
+         198
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.041643,
+       "usd_low": 0.041643,
+       "usd_client": 0.0416426,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         728
+        ],
+        "cr": [
+         44953
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         3195
+        ],
+        "out": [
+         209
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 48876,
+         "output": 209,
+         "cache_read": 44953,
+         "cache_write": 3195
+        },
+        "anthropic_usd": 0.041643,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -25.5,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.08181719999999999,
+       "usd_low": 0.08181719999999999,
+       "usd_client": 0.0818172,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48506
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8524
+        ],
+        "out": [
+         195
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.068315,
+       "usd_low": 0.068315,
+       "usd_client": 0.06831480000000001,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 4,
+       "calls": {
+        "in": [
+         732
+        ],
+        "cr": [
+         69134
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5900
+        ],
+        "out": [
+         218
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 3
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 4,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 75766,
+         "output": 218,
+         "cache_read": 69134,
+         "cache_write": 5900
+        },
+        "anthropic_usd": 0.068315,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -16.5,
+      "inside_published_range": true
+     }
+    ],
+    "plain_usd_mean": 0.06887,
+    "gateway_usd_mean": 0.05498,
+    "pct_of_means": -20.2,
+    "inside_published_range": "2 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0558064,
+      "usd_low": 0.0558064,
+      "usd_client": 0.055806400000000006,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45332
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5352
+       ],
+       "out": [
+        195
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.0817492,
+      "usd_low": 0.0817492,
+      "usd_client": 0.08174920000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51506
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8343
+       ],
+       "out": [
+        234
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0826828,
+      "usd_low": 0.0826828,
+      "usd_client": 0.0826828,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49974
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8073
+       ],
+       "out": [
+        404
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 2,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.054546,
+      "usd_low": 0.054546,
+      "usd_client": 0.054546,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45330
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5112
+       ],
+       "out": [
+        228
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.08229760000000001,
+      "usd_low": 0.08229760000000001,
+      "usd_client": 0.0822976,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51508
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8364
+       ],
+       "out": [
+        253
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0823102,
+      "usd_low": 0.0823102,
+      "usd_client": 0.0823102,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49971
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8099
+       ],
+       "out": [
+        375
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 3,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.08189260000000001,
+      "usd_low": 0.08189260000000001,
+      "usd_client": 0.08189260000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48503
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8526
+       ],
+       "out": [
+        198
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.080854,
+      "usd_low": 0.080854,
+      "usd_client": 0.08085400000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51510
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8286
+       ],
+       "out": [
+        212
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.055756599999999996,
+      "usd_low": 0.055756599999999996,
+      "usd_client": 0.055756599999999996,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46803
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4919
+       ],
+       "out": [
+        351
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 4,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.08162760000000001,
+      "usd_low": 0.08162760000000001,
+      "usd_client": 0.0816276,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48498
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8493
+       ],
+       "out": [
+        198
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.1081582,
+      "usd_low": 0.1081582,
+      "usd_client": 0.1081582,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57811
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11489
+       ],
+       "out": [
+        233
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0866466,
+      "usd_low": 0.0866466,
+      "usd_client": 0.0866466,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49973
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8276
+       ],
+       "out": [
+        521
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 5,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.08162760000000001,
+      "usd_low": 0.08162760000000001,
+      "usd_client": 0.0816276,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48498
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8493
+       ],
+       "out": [
+        198
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.1072904,
+      "usd_low": 0.1072904,
+      "usd_client": 0.10729040000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57812
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11433
+       ],
+       "out": [
+        212
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.056355800000000005,
+      "usd_low": 0.056355800000000005,
+      "usd_client": 0.0563558,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46799
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4929
+       ],
+       "out": [
+        377
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 6,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.0538498,
+      "usd_low": 0.0538498,
+      "usd_client": 0.0538498,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45329
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5085
+       ],
+       "out": [
+        204
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.1075426,
+      "usd_low": 0.1075426,
+      "usd_client": 0.10754260000000002,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57813
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11472
+       ],
+       "out": [
+        209
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.08331480000000001,
+      "usd_low": 0.08331480000000001,
+      "usd_client": 0.0833148,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49974
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8097
+       ],
+       "out": [
+        426
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 7,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.081816,
+      "usd_low": 0.081816,
+      "usd_client": 0.081816,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48500
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8519
+       ],
+       "out": [
+        197
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.10817460000000001,
+      "usd_low": 0.10817460000000001,
+      "usd_client": 0.10817460000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57813
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11491
+       ],
+       "out": [
+        233
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.08127,
+      "usd_low": 0.08127,
+      "usd_client": 0.08127,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49970
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8069
+       ],
+       "out": [
+        335
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 8,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.08952439999999999,
+      "usd_low": 0.08952439999999999,
+      "usd_client": 0.0895244,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 4,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        69222
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8686
+       ],
+       "out": [
+        308
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 3
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.08176560000000001,
+      "usd_low": 0.08176560000000001,
+      "usd_client": 0.08176560000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51508
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8345
+       ],
+       "out": [
+        234
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.08111339999999999,
+      "usd_low": 0.08111339999999999,
+      "usd_client": 0.0811134,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49967
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8067
+       ],
+       "out": [
+        328
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    }
+   ]
+  },
+  {
+   "id": "log",
+   "label": "One large log",
+   "pairs_planned": 8,
+   "invalid_attempts": 0,
+   "warmup_sessions": 3,
+   "analysis": {
+    "n": 8,
+    "plain_usd_mean": 0.07749,
+    "v1_usd_mean": 0.10359,
+    "v2_usd_mean": 0.07488,
+    "success_plain": "8/8",
+    "success_v1": "8/8",
+    "success_v2": "8/8",
+    "routed_v1": "0/8",
+    "routed_v2": "6/8",
+    "v1_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.07749,
+     "arm_usd_mean": 0.10359,
+     "pct": 33.7,
+     "pct_ci95": [
+      8.9,
+      58.4
+     ],
+     "verdict": "more",
+     "median_diff_usd": 0.021678,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": -26.1
+    },
+    "v2_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.07749,
+     "arm_usd_mean": 0.07488,
+     "pct": -3.4,
+     "pct_ci95": [
+      -24.2,
+      17.5
+     ],
+     "verdict": "same",
+     "median_diff_usd": -0.0050171,
+     "arm_wins": 5,
+     "per_1000_tasks_usd": 2.6
+    },
+    "v2_vs_v1_secondary": {
+     "n": 8,
+     "base_usd_mean": 0.10359,
+     "arm_usd_mean": 0.07488,
+     "pct": -27.7,
+     "pct_ci95": [
+      -42.6,
+      -12.9
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0332847,
+     "arm_wins": 7,
+     "per_1000_tasks_usd": 28.7
+    }
+   },
+   "gateway_published": {
+    "source_file": "/benchmarks/data/v3-opus55-short.json",
+    "copy": "published/v3-opus55-short.json",
+    "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+    "workload_id": "log",
+    "date": "2026-09-29",
+    "client": "Claude Code 2.1.283",
+    "model": "claude-opus-5-5",
+    "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+    "prereg": "/benchmarks/prereg/v3-opus55-short-prereg.md",
+    "analysis": {
+     "gateway_usd_mean": 0.07051,
+     "gateway_wins": 15,
+     "n": 16,
+     "pct": -22.4,
+     "pct_ci95": [
+      -30.2,
+      -14.7
+     ],
+     "plain_usd_mean": 0.09089,
+     "success_gateway": "16/16",
+     "success_plain": "16/16",
+     "verdict": "less"
+    },
+    "reanalysed_from_pairs": {
+     "pct": -22.4,
+     "pct_ci95": [
+      -30.2,
+      -14.7
+     ],
+     "verdict": "less",
+     "wins": 15,
+     "per_1000_tasks_usd": 20.4,
+     "ci_end_gap_points": 0,
+     "matches_published": true,
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
+    }
+   },
+   "bridge": {
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.08201860000000001,
+       "usd_low": 0.08201860000000001,
+       "usd_client": 0.0820186,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48573
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8480
+        ],
+        "out": [
+         222
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.153107,
+       "usd_low": 0.153107,
+       "usd_client": 0.1531068,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         726
+        ],
+        "cr": [
+         31394
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         17258
+        ],
+        "out": [
+         293
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 49378,
+         "output": 293,
+         "cache_read": 31394,
+         "cache_write": 17258
+        },
+        "anthropic_usd": 0.153107,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": 86.7,
+      "inside_published_range": false
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0936384,
+       "usd_low": 0.0936384,
+       "usd_client": 0.09363840000000001,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 4,
+       "calls": {
+        "in": [
+         8
+        ],
+        "cr": [
+         69272
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8749
+        ],
+        "out": [
+         488
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 3
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.035054,
+       "usd_low": 0.035054,
+       "usd_client": 0.0350542,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         726
+        ],
+        "cr": [
+         46071
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         2427
+        ],
+        "out": [
+         176
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 49224,
+         "output": 176,
+         "cache_read": 46071,
+         "cache_write": 2427
+        },
+        "anthropic_usd": 0.035054,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -62.6,
+      "inside_published_range": false
+     }
+    ],
+    "plain_usd_mean": 0.08783,
+    "gateway_usd_mean": 0.09408,
+    "pct_of_means": 7.1,
+    "inside_published_range": "0 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.061461,
+      "usd_low": 0.061461,
+      "usd_client": 0.061461,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45405
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5527
+       ],
+       "out": [
+        407
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.1092968,
+      "usd_low": 0.1092968,
+      "usd_client": 0.10929680000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57884
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11672
+       ],
+       "out": [
+        216
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.074848,
+      "usd_low": 0.074848,
+      "usd_client": 0.074848,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 5,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        82620
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5613
+       ],
+       "out": [
+        669
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 2,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0864982,
+      "usd_low": 0.0864982,
+      "usd_client": 0.0864982,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8690
+       ],
+       "out": [
+        362
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.0853856,
+      "usd_low": 0.0853856,
+      "usd_client": 0.0853856,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51648
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8614
+       ],
+       "out": [
+        306
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.07917260000000001,
+      "usd_low": 0.07917260000000001,
+      "usd_client": 0.0791726,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49923
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7893
+       ],
+       "out": [
+        301
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 3,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.0580162,
+      "usd_low": 0.0580162,
+      "usd_client": 0.058016200000000004,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45401
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5284
+       ],
+       "out": [
+        332
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.10912480000000001,
+      "usd_low": 0.10912480000000001,
+      "usd_client": 0.1091248,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57884
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11663
+       ],
+       "out": [
+        211
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0712716,
+      "usd_low": 0.0712716,
+      "usd_client": 0.0712716,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 5,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        82538
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5533
+       ],
+       "out": [
+        523
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 4,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.087782,
+      "usd_low": 0.087782,
+      "usd_client": 0.087782,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48570
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8788
+       ],
+       "out": [
+        387
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.10971760000000001,
+      "usd_low": 0.10971760000000001,
+      "usd_client": 0.1097176,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57908
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11684
+       ],
+       "out": [
+        232
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.07554960000000001,
+      "usd_low": 0.07554960000000001,
+      "usd_client": 0.07554960000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 5,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        82588
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5619
+       ],
+       "out": [
+        702
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 5,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.08895739999999999,
+      "usd_low": 0.08895739999999999,
+      "usd_client": 0.08895739999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51707
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8844
+       ],
+       "out": [
+        392
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.1103778,
+      "usd_low": 0.1103778,
+      "usd_client": 0.1103778,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        54749
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11758
+       ],
+       "out": [
+        267
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1122204,
+      "usd_low": 0.1122204,
+      "usd_client": 0.11222040000000003,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 6,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        113622
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9036
+       ],
+       "out": [
+        858
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 3,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 6,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.088926,
+      "usd_low": 0.088926,
+      "usd_client": 0.088926,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48570
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8826
+       ],
+       "out": [
+        429
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.0833176,
+      "usd_low": 0.0833176,
+      "usd_client": 0.0833176,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51608
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8539
+       ],
+       "out": [
+        233
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.050916199999999995,
+      "usd_low": 0.050916199999999995,
+      "usd_client": 0.0509162,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46701
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4639
+       ],
+       "out": [
+        222
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 7,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.058648599999999995,
+      "usd_low": 0.058648599999999995,
+      "usd_client": 0.05864860000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45403
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5313
+       ],
+       "out": [
+        352
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.1122852,
+      "usd_low": 0.1122852,
+      "usd_client": 0.1122852,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57886
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11678
+       ],
+       "out": [
+        363
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.05594,
+      "usd_low": 0.05594,
+      "usd_client": 0.055940000000000004,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46720
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4724
+       ],
+       "out": [
+        439
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 8,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0896694,
+      "usd_low": 0.0896694,
+      "usd_client": 0.08966940000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48567
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8839
+       ],
+       "out": [
+        461
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.10923680000000001,
+      "usd_low": 0.10923680000000001,
+      "usd_client": 0.10923680000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57884
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11667
+       ],
+       "out": [
+        215
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0791312,
+      "usd_low": 0.0791312,
+      "usd_client": 0.0791312,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49896
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7906
+       ],
+       "out": [
+        294
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     }
+    }
+   ]
+  },
+  {
+   "id": "git",
+   "label": "Repo history question (git log, 320 commits)",
+   "pairs_planned": 8,
+   "invalid_attempts": 0,
+   "warmup_sessions": 3,
+   "analysis": {
+    "n": 8,
+    "plain_usd_mean": 0.05227,
+    "v1_usd_mean": 0.08686,
+    "v2_usd_mean": 0.06236,
+    "success_plain": "8/8",
+    "success_v1": "8/8",
+    "success_v2": "8/8",
+    "routed_v1": "0/8",
+    "routed_v2": "0/8",
+    "v1_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.05227,
+     "arm_usd_mean": 0.08686,
+     "pct": 66.2,
+     "pct_ci95": [
+      30.5,
+      101.8
+     ],
+     "verdict": "more",
+     "median_diff_usd": 0.0464874,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -34.6
+    },
+    "v2_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.05227,
+     "arm_usd_mean": 0.06236,
+     "pct": 19.3,
+     "pct_ci95": [
+      -13,
+      51.6
+     ],
+     "verdict": "same",
+     "median_diff_usd": 0.0130412,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": -10.1
+    },
+    "v2_vs_v1_secondary": {
+     "n": 8,
+     "base_usd_mean": 0.08686,
+     "arm_usd_mean": 0.06236,
+     "pct": -28.2,
+     "pct_ci95": [
+      -44.2,
+      -12.2
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0222762,
+     "arm_wins": 7,
+     "per_1000_tasks_usd": 24.5
+    }
+   },
+   "gateway_published": {
+    "source_file": "/benchmarks/data/v3-opus55-short.json",
+    "copy": "published/v3-opus55-short.json",
+    "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+    "workload_id": "git",
+    "date": "2026-09-29",
+    "client": "Claude Code 2.1.283",
+    "model": "claude-opus-5-5",
+    "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+    "prereg": "/benchmarks/prereg/v3-opus55-short-prereg.md",
+    "analysis": {
+     "gateway_usd_mean": 0.05296,
+     "gateway_wins": 15,
+     "n": 16,
+     "pct": -25.2,
+     "pct_ci95": [
+      -33.9,
+      -16.5
+     ],
+     "plain_usd_mean": 0.07079,
+     "success_gateway": "16/16",
+     "success_plain": "16/16",
+     "verdict": "less"
+    },
+    "reanalysed_from_pairs": {
+     "pct": -25.2,
+     "pct_ci95": [
+      -33.9,
+      -16.5
+     ],
+     "verdict": "less",
+     "wins": 15,
+     "per_1000_tasks_usd": 17.8,
+     "ci_end_gap_points": 0,
+     "matches_published": true,
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
+    }
+   },
+   "bridge": {
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0678868,
+       "usd_low": 0.0678868,
+       "usd_client": 0.0678868,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 2,
+       "calls": {
+        "in": [
+         4
+        ],
+        "cr": [
+         28574
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         7372
+        ],
+        "out": [
+         159
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 1
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.055598,
+       "usd_low": 0.055598,
+       "usd_client": 0.055597999999999995,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 2,
+       "calls": {
+        "in": [
+         724
+        ],
+        "cr": [
+         28550
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5519
+        ],
+        "out": [
+         142
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 1
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 2,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 34793,
+         "output": 142,
+         "cache_read": 28550,
+         "cache_write": 5519
+        },
+        "anthropic_usd": 0.055598,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -18.1,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.042846800000000004,
+       "usd_low": 0.042846800000000004,
+       "usd_client": 0.0428468,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 2,
+       "calls": {
+        "in": [
+         4
+        ],
+        "cr": [
+         28574
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         4202
+        ],
+        "out": [
+         175
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 1
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.021142,
+       "usd_low": 0.021142,
+       "usd_client": 0.0211416,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 2,
+       "calls": {
+        "in": [
+         724
+        ],
+        "cr": [
+         29788
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         1056
+        ],
+        "out": [
+         192
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 1
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 2,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 31568,
+         "output": 192,
+         "cache_read": 29788,
+         "cache_write": 1056
+        },
+        "anthropic_usd": 0.021142,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -50.7,
+      "inside_published_range": false
+     }
+    ],
+    "plain_usd_mean": 0.05537,
+    "gateway_usd_mean": 0.03837,
+    "pct_of_means": -30.7,
+    "inside_published_range": "1 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.050685,
+      "usd_low": 0.050685,
+      "usd_client": 0.050684999999999994,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        25945
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5305
+       ],
+       "out": [
+        152
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.093015,
+      "usd_low": 0.093015,
+      "usd_client": 0.093015,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        34675
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10408
+       ],
+       "out": [
+        140
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0713168,
+      "usd_low": 0.0713168,
+      "usd_client": 0.07131680000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7680
+       ],
+       "out": [
+        193
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 2,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.042666199999999994,
+      "usd_low": 0.042666199999999994,
+      "usd_client": 0.0426662,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4207
+       ],
+       "out": [
+        164
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.093311,
+      "usd_low": 0.093311,
+      "usd_client": 0.093311,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        34675
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10410
+       ],
+       "out": [
+        154
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.045940800000000004,
+      "usd_low": 0.045940800000000004,
+      "usd_client": 0.0459408,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4518
+       ],
+       "out": [
+        189
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 3,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.0662382,
+      "usd_low": 0.0662382,
+      "usd_client": 0.0662382,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7201
+       ],
+       "out": [
+        145
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.093155,
+      "usd_low": 0.093155,
+      "usd_client": 0.093155,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        34675
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10418
+       ],
+       "out": [
+        143
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.046184800000000005,
+      "usd_low": 0.046184800000000005,
+      "usd_client": 0.0461848,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4521
+       ],
+       "out": [
+        200
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 4,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0661982,
+      "usd_low": 0.0661982,
+      "usd_client": 0.0661982,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7201
+       ],
+       "out": [
+        143
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.06726839999999999,
+      "usd_low": 0.06726839999999999,
+      "usd_client": 0.0672684,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        31522
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7261
+       ],
+       "out": [
+        143
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0502602,
+      "usd_low": 0.0502602,
+      "usd_client": 0.050260200000000005,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        29201
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5118
+       ],
+       "out": [
+        173
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 5,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.042598199999999996,
+      "usd_low": 0.042598199999999996,
+      "usd_client": 0.042598199999999996,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4206
+       ],
+       "out": [
+        161
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.093859,
+      "usd_low": 0.093859,
+      "usd_client": 0.09385900000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        34675
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10446
+       ],
+       "out": [
+        167
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0706808,
+      "usd_low": 0.0706808,
+      "usd_client": 0.07068079999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7658
+       ],
+       "out": [
+        170
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 6,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.0427542,
+      "usd_low": 0.0427542,
+      "usd_client": 0.042754200000000006,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4208
+       ],
+       "out": [
+        168
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.094195,
+      "usd_low": 0.094195,
+      "usd_client": 0.094195,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        34675
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10438
+       ],
+       "out": [
+        187
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.07134080000000001,
+      "usd_low": 0.07134080000000001,
+      "usd_client": 0.0713408,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7678
+       ],
+       "out": [
+        195
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 7,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0661982,
+      "usd_low": 0.0661982,
+      "usd_client": 0.0661982,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7201
+       ],
+       "out": [
+        143
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.06729239999999999,
+      "usd_low": 0.06729239999999999,
+      "usd_client": 0.0672924,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        31522
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7269
+       ],
+       "out": [
+        141
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0716488,
+      "usd_low": 0.0716488,
+      "usd_client": 0.0716488,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7704
+       ],
+       "out": [
+        200
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 8,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0408382,
+      "usd_low": 0.0408382,
+      "usd_client": 0.040838200000000005,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        28571
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4031
+       ],
+       "out": [
+        143
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.0927524,
+      "usd_low": 0.0927524,
+      "usd_client": 0.09275240000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        31522
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10444
+       ],
+       "out": [
+        144
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0715448,
+      "usd_low": 0.0715448,
+      "usd_client": 0.07154479999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 2,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        30004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7691
+       ],
+       "out": [
+        200
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    }
+   ]
+  },
+  {
+   "id": "grep",
+   "label": "Code search (grep over 150 files)",
+   "pairs_planned": 8,
+   "invalid_attempts": 0,
+   "warmup_sessions": 3,
+   "analysis": {
+    "n": 8,
+    "plain_usd_mean": 0.09251,
+    "v1_usd_mean": 0.0994,
+    "v2_usd_mean": 0.07679,
+    "success_plain": "8/8",
+    "success_v1": "8/8",
+    "success_v2": "8/8",
+    "routed_v1": "0/8",
+    "routed_v2": "1/8",
+    "v1_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.09251,
+     "arm_usd_mean": 0.0994,
+     "pct": 7.4,
+     "pct_ci95": [
+      -7.3,
+      22.1
+     ],
+     "verdict": "same",
+     "median_diff_usd": -0.0008656,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": -6.9
+    },
+    "v2_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.09251,
+     "arm_usd_mean": 0.07679,
+     "pct": -17,
+     "pct_ci95": [
+      -27.7,
+      -6.3
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0155746,
+     "arm_wins": 7,
+     "per_1000_tasks_usd": 15.7
+    },
+    "v2_vs_v1_secondary": {
+     "n": 8,
+     "base_usd_mean": 0.0994,
+     "arm_usd_mean": 0.07679,
+     "pct": -22.7,
+     "pct_ci95": [
+      -31.6,
+      -13.9
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0242907,
+     "arm_wins": 8,
+     "per_1000_tasks_usd": 22.6
+    }
+   },
+   "gateway_published": {
+    "source_file": "/benchmarks/data/v3-opus55-short.json",
+    "copy": "published/v3-opus55-short.json",
+    "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+    "workload_id": "grep",
+    "date": "2026-09-29",
+    "client": "Claude Code 2.1.283",
+    "model": "claude-opus-5-5",
+    "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+    "prereg": "/benchmarks/prereg/v3-opus55-short-prereg.md",
+    "analysis": {
+     "gateway_usd_mean": 0.06599,
+     "gateway_wins": 16,
+     "n": 16,
+     "pct": -28.7,
+     "pct_ci95": [
+      -34.1,
+      -23.4
+     ],
+     "plain_usd_mean": 0.0926,
+     "success_gateway": "16/16",
+     "success_plain": "16/16",
+     "verdict": "less"
+    },
+    "reanalysed_from_pairs": {
+     "pct": -28.7,
+     "pct_ci95": [
+      -34.1,
+      -23.4
+     ],
+     "verdict": "less",
+     "wins": 16,
+     "per_1000_tasks_usd": 26.6,
+     "ci_end_gap_points": 0,
+     "matches_published": true,
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
+    }
+   },
+   "bridge": {
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0947036,
+       "usd_low": 0.0947036,
+       "usd_client": 0.0947036,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 4,
+       "calls": {
+        "in": [
+         8
+        ],
+        "cr": [
+         69338
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8843
+        ],
+        "out": [
+         503
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 3
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.112013,
+       "usd_low": 0.112013,
+       "usd_client": 0.1120134,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         46167
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         11638
+        ],
+        "out": [
+         338
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 58534,
+         "output": 338,
+         "cache_read": 46167,
+         "cache_write": 11638
+        },
+        "anthropic_usd": 0.112013,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": 18.3,
+      "inside_published_range": false
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0850478,
+       "usd_low": 0.0850478,
+       "usd_client": 0.08504779999999999,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48499
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8468
+        ],
+        "out": [
+         379
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.066839,
+       "usd_low": 0.066839,
+       "usd_client": 0.0668394,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         48117
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         6365
+        ],
+        "out": [
+         169
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 55211,
+         "output": 169,
+         "cache_read": 48117,
+         "cache_write": 6365
+        },
+        "anthropic_usd": 0.066839,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -21.4,
+      "inside_published_range": false
+     }
+    ],
+    "plain_usd_mean": 0.08988,
+    "gateway_usd_mean": 0.08943,
+    "pct_of_means": -0.5,
+    "inside_published_range": "0 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.09895,
+      "usd_low": 0.09895,
+      "usd_client": 0.09895000000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 4,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        69370
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8873
+       ],
+       "out": [
+        703
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 3
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.09121839999999999,
+      "usd_low": 0.09121839999999999,
+      "usd_client": 0.09121839999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51492
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8697
+       ],
+       "out": [
+        566
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.07952160000000001,
+      "usd_low": 0.07952160000000001,
+      "usd_client": 0.07952160000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49908
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7912
+       ],
+       "out": [
+        311
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 2,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0970018,
+      "usd_low": 0.0970018,
+      "usd_client": 0.09700180000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48489
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8905
+       ],
+       "out": [
+        802
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.0914708,
+      "usd_low": 0.0914708,
+      "usd_client": 0.09147079999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51494
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8776
+       ],
+       "out": [
+        547
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.08160139999999999,
+      "usd_low": 0.08160139999999999,
+      "usd_client": 0.0816014,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49907
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7922
+       ],
+       "out": [
+        411
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 3,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.0958566,
+      "usd_low": 0.0958566,
+      "usd_client": 0.09585660000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48483
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8932
+       ],
+       "out": [
+        734
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.09141980000000001,
+      "usd_low": 0.09141980000000001,
+      "usd_client": 0.0914198,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51499
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8707
+       ],
+       "out": [
+        572
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0801078,
+      "usd_low": 0.0801078,
+      "usd_client": 0.08010779999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49899
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7893
+       ],
+       "out": [
+        348
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 4,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0881144,
+      "usd_low": 0.0881144,
+      "usd_client": 0.08811440000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48492
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8664
+       ],
+       "out": [
+        454
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.1144972,
+      "usd_low": 0.1144972,
+      "usd_client": 0.1144972,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57806
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11764
+       ],
+       "out": [
+        440
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.092297,
+      "usd_low": 0.092297,
+      "usd_client": 0.092297,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 4,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        70545
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8382
+       ],
+       "out": [
+        555
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 5,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0866216,
+      "usd_low": 0.0866216,
+      "usd_client": 0.0866216,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48488
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8615
+       ],
+       "out": [
+        399
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.1148254,
+      "usd_low": 0.1148254,
+      "usd_client": 0.1148254,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57807
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11815
+       ],
+       "out": [
+        436
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.078377,
+      "usd_low": 0.078377,
+      "usd_client": 0.078377,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49905
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7839
+       ],
+       "out": [
+        283
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 6,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.088949,
+      "usd_low": 0.088949,
+      "usd_client": 0.088949,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51625
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8665
+       ],
+       "out": [
+        464
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.1125648,
+      "usd_low": 0.1125648,
+      "usd_client": 0.11256479999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        57804
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11670
+       ],
+       "out": [
+        381
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0791612,
+      "usd_low": 0.0791612,
+      "usd_client": 0.0791612,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49906
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7867
+       ],
+       "out": [
+        311
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 7,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0868014,
+      "usd_low": 0.0868014,
+      "usd_client": 0.0868014,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48487
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8610
+       ],
+       "out": [
+        410
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.089507,
+      "usd_low": 0.089507,
+      "usd_client": 0.089507,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51495
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8723
+       ],
+       "out": [
+        470
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.059994599999999995,
+      "usd_low": 0.059994599999999995,
+      "usd_client": 0.059994599999999995,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 4,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        64093
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4828
+       ],
+       "out": [
+        426
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 3
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 8,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.097818,
+      "usd_low": 0.097818,
+      "usd_client": 0.097818,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48490
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9007
+       ],
+       "out": [
+        802
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.08967860000000001,
+      "usd_low": 0.08967860000000001,
+      "usd_client": 0.0896786,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51493
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8727
+       ],
+       "out": [
+        477
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0632974,
+      "usd_low": 0.0632974,
+      "usd_client": 0.0632974,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 4,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        64147
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5082
+       ],
+       "out": [
+        489
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 3
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    }
+   ]
+  },
+  {
+   "id": "edit",
+   "label": "One-line edit",
+   "pairs_planned": 8,
+   "invalid_attempts": 0,
+   "warmup_sessions": 3,
+   "analysis": {
+    "n": 8,
+    "plain_usd_mean": 0.05743,
+    "v1_usd_mean": 0.09506,
+    "v2_usd_mean": 0.06818,
+    "success_plain": "8/8",
+    "success_v1": "8/8",
+    "success_v2": "8/8",
+    "routed_v1": "0/8",
+    "routed_v2": "0/8",
+    "v1_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.05743,
+     "arm_usd_mean": 0.09506,
+     "pct": 65.5,
+     "pct_ci95": [
+      30.9,
+      100.1
+     ],
+     "verdict": "more",
+     "median_diff_usd": 0.0536105,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -37.6
+    },
+    "v2_vs_plain": {
+     "n": 8,
+     "base_usd_mean": 0.05743,
+     "arm_usd_mean": 0.06818,
+     "pct": 18.7,
+     "pct_ci95": [
+      -14.2,
+      51.7
+     ],
+     "verdict": "same",
+     "median_diff_usd": 0.0170672,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": -10.8
+    },
+    "v2_vs_v1_secondary": {
+     "n": 8,
+     "base_usd_mean": 0.09506,
+     "arm_usd_mean": 0.06818,
+     "pct": -28.3,
+     "pct_ci95": [
+      -42.9,
+      -13.7
+     ],
+     "verdict": "less",
+     "median_diff_usd": -0.0239521,
+     "arm_wins": 7,
+     "per_1000_tasks_usd": 26.9
+    }
+   },
+   "gateway_published": {
+    "source_file": "/benchmarks/data/v3-opus55-short.json",
+    "copy": "published/v3-opus55-short.json",
+    "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+    "workload_id": "edit",
+    "date": "2026-09-29",
+    "client": "Claude Code 2.1.283",
+    "model": "claude-opus-5-5",
+    "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+    "prereg": "/benchmarks/prereg/v3-opus55-short-prereg.md",
+    "analysis": {
+     "gateway_usd_mean": 0.05422,
+     "gateway_wins": 11,
+     "n": 12,
+     "pct": -27.8,
+     "pct_ci95": [
+      -42.2,
+      -13.5
+     ],
+     "plain_usd_mean": 0.07514,
+     "success_gateway": "12/12",
+     "success_plain": "12/12",
+     "verdict": "less"
+    },
+    "reanalysed_from_pairs": {
+     "pct": -27.8,
+     "pct_ci95": [
+      -42.2,
+      -13.5
+     ],
+     "verdict": "less",
+     "wins": 11,
+     "per_1000_tasks_usd": 20.9,
+     "ci_end_gap_points": 0,
+     "matches_published": true,
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
+    }
+   },
+   "bridge": {
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0479372,
+       "usd_low": 0.0479372,
+       "usd_client": 0.0479372,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         44266
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         4315
+        ],
+        "out": [
+         227
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.03223,
+       "usd_low": 0.03223,
+       "usd_client": 0.0322298,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         43569
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         2145
+        ],
+        "out": [
+         172
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 46443,
+         "output": 172,
+         "cache_read": 43569,
+         "cache_write": 2145
+        },
+        "anthropic_usd": 0.03223,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -32.8,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0480834,
+       "usd_low": 0.0480834,
+       "usd_client": 0.0480834,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         44217
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         4292
+        ],
+        "out": [
+         244
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.059649,
+       "usd_low": 0.059649,
+       "usd_client": 0.059649,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         47085
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5482
+        ],
+        "out": [
+         173
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 53296,
+         "output": 173,
+         "cache_read": 47085,
+         "cache_write": 5482
+        },
+        "anthropic_usd": 0.059649,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": 24.1,
+      "inside_published_range": false
+     }
+    ],
+    "plain_usd_mean": 0.04801,
+    "gateway_usd_mean": 0.04594,
+    "pct_of_means": -4.3,
+    "inside_published_range": "1 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.047735400000000004,
+      "usd_low": 0.047735400000000004,
+      "usd_client": 0.0477354,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        44237
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4283
+       ],
+       "out": [
+        230
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.101479,
+      "usd_low": 0.101479,
+      "usd_client": 0.10147899999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56695
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10657
+       ],
+       "out": [
+        243
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.07758939999999999,
+      "usd_low": 0.07758939999999999,
+      "usd_client": 0.0775894,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49747
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7857
+       ],
+       "out": [
+        238
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 2,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.0721632,
+      "usd_low": 0.0721632,
+      "usd_client": 0.0721632,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47356
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7371
+       ],
+       "out": [
+        185
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.07472619999999999,
+      "usd_low": 0.07472619999999999,
+      "usd_client": 0.07472619999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50391
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7483
+       ],
+       "out": [
+        238
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.051787599999999996,
+      "usd_low": 0.051787599999999996,
+      "usd_client": 0.051787599999999996,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46578
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4711
+       ],
+       "out": [
+        238
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 3,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.073946,
+      "usd_low": 0.073946,
+      "usd_client": 0.073946,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47430
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7482
+       ],
+       "out": [
+        229
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.0754916,
+      "usd_low": 0.0754916,
+      "usd_client": 0.07549159999999999,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50358
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7362
+       ],
+       "out": [
+        325
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0777102,
+      "usd_low": 0.0777102,
+      "usd_client": 0.07771020000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49751
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7862
+       ],
+       "out": [
+        242
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 4,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0480622,
+      "usd_low": 0.0480622,
+      "usd_client": 0.0480622,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        44211
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4287
+       ],
+       "out": [
+        245
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.10153960000000001,
+      "usd_low": 0.10153960000000001,
+      "usd_client": 0.10153960000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56698
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10657
+       ],
+       "out": [
+        246
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0784134,
+      "usd_low": 0.0784134,
+      "usd_client": 0.0784134,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        52887
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7864
+       ],
+       "out": [
+        245
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 5,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.048015,
+      "usd_low": 0.048015,
+      "usd_client": 0.048014999999999995,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        44215
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4281
+       ],
+       "out": [
+        245
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.1019968,
+      "usd_low": 0.1019968,
+      "usd_client": 0.1019968,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56664
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10515
+       ],
+       "out": [
+        326
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0779822,
+      "usd_low": 0.0779822,
+      "usd_client": 0.0779822,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49751
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7881
+       ],
+       "out": [
+        248
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 6,
+     "order": [
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.047904,
+      "usd_low": 0.047904,
+      "usd_client": 0.047904,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        44260
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4301
+       ],
+       "out": [
+        231
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0
+     },
+     "v1": {
+      "usd": 0.1019768,
+      "usd_low": 0.1019768,
+      "usd_client": 0.1019768,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56664
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10515
+       ],
+       "out": [
+        325
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.052268199999999994,
+      "usd_low": 0.052268199999999994,
+      "usd_client": 0.0522682,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46581
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4711
+       ],
+       "out": [
+        262
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 7,
+     "order": [
+      "v1",
+      "v2",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0736604,
+      "usd_low": 0.0736604,
+      "usd_client": 0.0736604,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47382
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7425
+       ],
+       "out": [
+        238
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2
+     },
+     "v1": {
+      "usd": 0.101283,
+      "usd_low": 0.101283,
+      "usd_client": 0.101283,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56695
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10635
+       ],
+       "out": [
+        242
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0519882,
+      "usd_low": 0.0519882,
+      "usd_client": 0.051988200000000005,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        46581
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4711
+       ],
+       "out": [
+        248
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    },
+    {
+     "pair": 8,
+     "order": [
+      "v2",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.047956,
+      "usd_low": 0.047956,
+      "usd_client": 0.047956,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        44260
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4310
+       ],
+       "out": [
+        230
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 1
+     },
+     "v1": {
+      "usd": 0.1019768,
+      "usd_low": 0.1019768,
+      "usd_client": 0.1019768,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56664
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10515
+       ],
+       "out": [
+        325
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 2,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.0777262,
+      "usd_low": 0.0777262,
+      "usd_client": 0.07772620000000001,
+      "client_gap_flag": false,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49751
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7864
+       ],
+       "out": [
+        242
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "tools": {
+       "Bash": 2
+      },
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "order_position": 0,
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     }
+    }
+   ]
+  }
+ ]
+}

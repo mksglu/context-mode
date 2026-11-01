@@ -1,4 +1,4 @@
-// Prompt-cache A/B on Codex (docs/v2/spikes/cache). Arms: off (no plugin) and v2 (setup --agents codex into a temp
+// Prompt-cache A/B on Codex (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/cache). Arms: off (no plugin) and v2 (setup --agents codex into a temp
 // CODEX_HOME). A 5-turn session through `codex exec --json` then `codex exec resume <thread>`; usage per model
 // request is read from the rollout file (token_usage_record), per turn from the exec JSON (turn.completed.usage).
 // Codex reports input_tokens INCLUDING cached_input_tokens and no write count: cache_read = cached,

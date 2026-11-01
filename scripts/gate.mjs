@@ -13,8 +13,8 @@
 //                    build/check-prompt-static.mjs: the ci.yml steps no other layer runs (D-M4-GS4-1, D-C5-PREFIX-1)
 //   2 gp-cases       node build/build.mjs --out release-out, then
 //                    node e2e/cases/run.mjs --milestone Mn                   (DEVIATIONS D-M0-2, D-M0-F1-1)
-//   3 prompt-lint    node docs/v2/prompt/lint.mjs drafts docs/v2/prompt/drafts.md   (< M2)
-//                    node docs/v2/prompt/lint.mjs --out release-out                 (>= M2)
+//   3 prompt-lint    node build/prompt-lint.mjs drafts docs/architecture/prompt-drafts.md   (< M2)
+//                    node build/prompt-lint.mjs --out release-out                 (>= M2)
 //   4 check-removed  node build/check-removed.mjs                            (>= M7, D-M6-arch-2)
 //   5 live           node e2e/live/run.mjs --base <merge-base HEAD origin/v2-design>
 // Each layer prints exactly one stdout line: "PASS|FAIL|SKIP <layer> <detail>". Layers after a
@@ -159,20 +159,20 @@ function gpCases(ms) {
 // ---- layer 3: prompt lint; mode chosen by milestone, one rule (impl/13 §7) ----
 function promptLint(ms) {
   if (ms < PROMPT_LINT_BUNDLE_FROM) {
-    const gone = missing(["docs/v2/prompt/lint.mjs", "docs/v2/prompt/drafts.md"]);
+    const gone = missing(["build/prompt-lint.mjs", "docs/architecture/prompt-drafts.md"]);
     if (gone) return gone;
-    const r = run(process.execPath, ["docs/v2/prompt/lint.mjs", "drafts", "docs/v2/prompt/drafts.md"]);
+    const r = run(process.execPath, ["build/prompt-lint.mjs", "drafts", "docs/architecture/prompt-drafts.md"]);
     let fail;
     try { fail = JSON.parse(r.stdout).fail; } catch { fail = undefined; }
     if (r.status !== 0 || !Array.isArray(fail) || fail.length) {
       dumpChild("prompt-lint", r);
       return { status: "FAIL", detail: `drafts mode: exit ${r.status}, fail ${Array.isArray(fail) ? `[${fail.join(",")}]` : "unreadable"}` };
     }
-    return { status: "PASS", detail: "drafts mode: docs/v2/prompt/drafts.md fail []" };
+    return { status: "PASS", detail: "drafts mode: docs/architecture/prompt-drafts.md fail []" };
   }
-  const gone = missing(["docs/v2/prompt/lint.mjs"]);
+  const gone = missing(["build/prompt-lint.mjs"]);
   if (gone) return gone;
-  const r = run(process.execPath, ["docs/v2/prompt/lint.mjs", "--out", "release-out"]);
+  const r = run(process.execPath, ["build/prompt-lint.mjs", "--out", "release-out"]);
   if (r.status !== 0) {
     dumpChild("prompt-lint", r);
     return { status: "FAIL", detail: `bundle mode (--out release-out) exit ${r.status} (output on stderr)` };

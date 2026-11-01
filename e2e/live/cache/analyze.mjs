@@ -1,4 +1,4 @@
-// Cache-break analysis over `claude -p --output-format stream-json --verbose` usage (docs/v2/spikes/cache).
+// Cache-break analysis over `claude -p --output-format stream-json --verbose` usage (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/cache).
 // Pure functions, no I/O, no regex, no truncation: every call's usage is kept whole.
 // Claude Code reports per model call: input_tokens (uncached), cache_read_input_tokens, cache_creation_input_tokens.
 // The prompt of a call = input + cache_read + cache_creation. Call k should read the whole prompt of call k-1

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/release/plan.mjs — next version and release notes (docs/v2/impl/13-build-release.md §10,
+// scripts/release/plan.mjs — next version and release notes (docs/architecture/modules/13-build-release.md §10,
 // A11, DEVIATIONS D-M6-arch-4). No dependency: plain string ops over `git log` subjects.
 // Usage: node scripts/release/plan.mjs [--dry-run] [--skip-live] [--tag <v-tag>]
 //   default:    prints "version=<v>\nnotes<<EOF\n<notes>\nEOF\n" for $GITHUB_OUTPUT
@@ -14,7 +14,7 @@
 // never a bump. The tag must be on origin at HEAD. Notes: commits since the newest older v2+ tag on origin
 // (prereleases count): a tag on a HEAD ancestor starts the range at its commit, a tag in `release` at its
 // Source-Commit trailer; none -> all history.
-// --main --channel next|latest [--confirm latest] (main-only release, docs/v2/release/MAIN-ONLY.md): no release
+// --main --channel next|latest [--confirm latest] (main-only release, docs/architecture/release/MAIN-ONLY.md): no release
 // branch. Base = newest stable v2+ tag that is in HEAD's history (none: 2.0.0), bumped by the conventional commits
 // since it. latest = the base; next = <base>-next.<N>, N = 1 + the highest N of that base among all tags on origin.
 // Notes and the "releasable" check cover the commits since the newest tag (any kind) in HEAD's history. latest

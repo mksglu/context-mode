@@ -1,5 +1,5 @@
 // e2e/live/cases/v1-migration-setup.mjs — plants a v1 install in a temp HOME for the v1-migration-* cases.
-// Spec: docs/v2/impl/15-v1-transition.md §3.1, §7 A3 (literal fixtures from ADR-0011's "v1 cleanup" table);
+// Spec: docs/architecture/modules/15-v1-transition.md §3.1, §7 A3 (literal fixtures from ADR-0011's "v1 cleanup" table);
 // DECISIONS-r4 A37 (Kiro agents/*.json name == context-mode, .kiro/steering/KIRO.md), B28 (VS Code both
 // session-data dirs, .vscode/mcp.json entry); DEVIATIONS D-M7-arch-6 (fake global bin under a temp npm prefix).
 // npm global layout: POSIX <prefix>/bin + <prefix>/lib/node_modules, Windows <prefix> + <prefix>/node_modules.

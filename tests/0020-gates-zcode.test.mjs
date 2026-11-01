@@ -1,5 +1,5 @@
 // ADR-0020: the zcode gate and config shape. Doctor must fail on one invalid key; setup keeps the user's other keys.
-// One file per area (docs/v2/TEST-LAYOUT.md).
+// One file per area (docs/architecture/TEST-LAYOUT.md).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";

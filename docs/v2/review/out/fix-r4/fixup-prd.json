@@ -1,5 +1,0 @@
-{
-  "file": "PRD-v2.md",
-  "edits": [],
-  "note": "Verified all owners.prd plan.json items (A5, A35, B40, B70) and the one sync.json mismatch (owner=prd, line 204, ctx_doctor/ctx_upgrade kept-as-tools) are already correctly applied in PRD-v2.md: lines 132/176 (A5), 128 (A35), 220 (B40), 113/135/202-204/294 (B70 + sync mismatch). The §18 Changes line (305) already documents these as r4 fixes. No stale contradictions found; no edits made."
-}

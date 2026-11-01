@@ -1,5 +1,5 @@
 // bench/hook-large-post.mjs — PostToolUse wall on the 222 KB compact-hard serverLog (serverLog(101).text),
-// main agent Bash "cat -n logs/server.log", the event docs/v2/spikes/compact/RESULT.md "D3 on the merged head"
+// main agent Bash "cat -n logs/server.log", the event https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/compact/RESULT.md "D3 on the merged head"
 // measures. Interleaves one or more bundles (A B A B ...), n runs each, and prints one JSON line per bundle:
 // { bundle, medianMs, p95Ms }, plus the paired median difference of each bundle against the first.
 // Usage: node bench/hook-large-post.mjs [--runs 20] [--cpu-prof <dir>] <bundle.mjs> [<bundle.mjs> ...]

@@ -1,9 +1,0 @@
-{
-  "owner": "adr-b",
-  "checked_at": "2026-10-15",
-  "result": "already_applied",
-  "plan_items_checked": ["A3","A4","A6","A13","A33","A36","A49","A54","A68","B3","B12","B18","B23","B26","B46","B47","B48","B50","B68","I2-8"],
-  "sync_mismatches_for_owner": 0,
-  "edits_made_this_run": [],
-  "note": "0006-0009 already carried every owners.adr-b edit from plan.json, each with text rewritten in place (no contradicted text left) and a Changes line at the end. Verified no stale wording remains: '7 tools' only in the Alternatives-considered line (correct, not a count claim), no 'v1 parity', no 'server never writes' standing rule, no 'LV1' mislabel, no old 'same selection as ADR-0009' unqualified claim, no clientInfo-as-identity claim. sync.json has no mismatches with owner adr-b. No file changes needed; persist.mjs not run since nothing was written or edited this run."
-}

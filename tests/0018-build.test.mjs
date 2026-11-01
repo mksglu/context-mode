@@ -1,5 +1,5 @@
 // ADR-0018 (module map and build), ADR-0019 (npm channel), ADR-0023 (native install): build output, generated files, host manifests,
-// hook shells and the npm package. One file per ADR area (docs/v2/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
+// hook shells and the npm package. One file per ADR area (docs/architecture/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
 import { after, before, describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
@@ -169,7 +169,7 @@ describe("ADR-0018 build: generated prompt file stays stable", () => {
 });
 
 describe("ADR-0018 build: SHA256SUMS and hashes", () => {
-  // Unit tests for build/hash.mjs (docs/v2/impl/13-build-release.md §4): SHA256SUMS over the
+  // Unit tests for build/hash.mjs (docs/architecture/modules/13-build-release.md §4): SHA256SUMS over the
   // release tree — sorted relative POSIX paths, `<hex>  <path>\n` lines, no trailing blank line,
   // SHA256SUMS itself excluded. Covers the export writeHashes(outDir) and the CLI `--out <dir>`.
 
@@ -531,7 +531,7 @@ describe("ADR-0018 build: package metadata and dependency use", () => {
   test("package-meta: description is short, names the host count, has no unmeasured number", () => {
     assert.ok(pkg.description.length <= 160, "description is " + pkg.description.length + " chars");
     assert.ok(pkg.description.includes(ADAPTERS.length + " coding agents"), pkg.description);
-    assert.ok(!pkg.description.includes("%"), "no percentage: it is not in docs/benchmarks");
+    assert.ok(!pkg.description.includes("%"), "no percentage: it is not in bench/evidence");
     assert.ok(!pkg.description.includes("98"), "v1 claim");
     assert.ok(!/openclaw/i.test(pkg.description));
   });
@@ -1153,7 +1153,7 @@ describe("ADR-0023 build: native host manifests", () => {
     assertSkills(root, m.skills, "mcp__context_mode__", "codex-main");
   });
 
-  // MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): Gemini and Qwen install the repo root of the tagged release commit.
+  // MAIN-ONLY (docs/architecture/release/MAIN-ONLY.md): Gemini and Qwen install the repo root of the tagged release commit.
   // Their root manifests point into the one built copy under plugins/claude-code (D-MO-1), so nothing is built twice.
   const BUILT = "plugins/claude-code/";
   test("[MAIN-ONLY] native/gemini-main: root gemini-extension.json and hooks/hooks.json name files shipped in plugins/claude-code", () => {
@@ -1206,17 +1206,14 @@ describe("ADR-0023 build: hook templates in docs", () => {
   }
 
   test("impl/10-adapters.md marks the codex, vscode and copilot-cli hook files as templates", () => {
-    const md = read("docs/v2/impl/10-adapters.md");
+    const md = read("docs/architecture/modules/10-adapters.md");
     assert.match(md, /Template hook files[^\n]*codex[^\n]*vscode[^\n]*copilot-cli/);
   });
 
-  test("claude-code guide states the native marketplace command (ADR-0023) and the claude mcp add limit; LAUNCH keeps ADR-0011 step b", () => {
+  test("claude-code guide states the native marketplace command (ADR-0023) and the claude mcp add limit", () => {
     const guide = read("docs/install/claude-code.md");
     assert.match(guide, /claude plugin marketplace add mksglu\/context-mode/, "guide: no native marketplace command");
     assert.match(guide, /claude mcp add/, "guide: no claude mcp add limit");
-    const launch = read("docs/v2/LAUNCH.md");
-    assert.match(launch, /ADR-0011 step b/, "LAUNCH: no ADR-0011 step b");
-    assert.match(launch, /claude mcp add/, "LAUNCH: no claude mcp add fallback");
   });
 });
 

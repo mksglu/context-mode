@@ -1,5 +1,5 @@
 // GP2 — prompt surface (14-tests.md §4). M2 case.
-// Case source: TECH-SPEC §6.2 GP2 row. covers: src/prompt/, docs/v2/prompt/lint.mjs.
+// Case source: TECH-SPEC §6.2 GP2 row. covers: src/prompt/, build/prompt-lint.mjs.
 //
 // Imports e2e/harness/mcp-client.mjs and e2e/harness/normalize.mjs (M0 harness files);
 // requires release-out/server.mjs from build/build.mjs. Fails on a missing module/bundle
@@ -64,7 +64,7 @@ test("[M2] GP2/tool-schema-timeout-unit", async () => {
 });
 
 test("[M2] GP2/lint-exit-zero", () => {
-  const lintScript = path.join(REPO_ROOT, "docs", "v2", "prompt", "lint.mjs");
+  const lintScript = path.join(REPO_ROOT, "build", "prompt-lint.mjs");
   assert.ok(existsSync(lintScript), `lint.mjs not found: ${lintScript}`);
   const outDir = path.join(REPO_ROOT, "release-out");
   let exitCode = 0;

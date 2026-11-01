@@ -32,7 +32,7 @@ import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
 import { generateManifests } from "../build/manifests.ts";
 
 describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §5 D3, D4, D5b; DEVIATIONS D-M5-arch-3, D-M5-D2-1..4.
+  // Spec: docs/architecture/modules/07-tools-ops.md §5 D3, D4, D5b; DEVIATIONS D-M5-arch-3, D-M5-D2-1..4.
 
 
   function tmp(t) {
@@ -380,7 +380,7 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
 });
 
 describe("ADR-0010 doctor D8, D9: database and index checks", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §5 D8 D9, impl/02 (store), DEVIATIONS D-M5-U1-6, D-M5-D4-1..4.
+  // Spec: docs/architecture/modules/07-tools-ops.md §5 D8 D9, impl/02 (store), DEVIATIONS D-M5-U1-6, D-M5-D4-1..4.
   // D8: stale schema and integrity_check are two distinct FAIL causes under one row id (A-T5).
   // D9: empty index is PASS with "0 sources, 0 chunks indexed" (#1014).
 
@@ -516,7 +516,7 @@ describe("ADR-0010 doctor D8, D9: database and index checks", { concurrency: CON
 });
 
 describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §5 D1 D2 D6 D7 D10, ADR-0010, DEVIATIONS D-M5-arch-3, D-M5-arch-5,
+  // Spec: docs/architecture/modules/07-tools-ops.md §5 D1 D2 D6 D7 D10, ADR-0010, DEVIATIONS D-M5-arch-3, D-M5-arch-5,
   // D-M5-C2-1, D-M5-U1-6, D-M5-D1-1.
 
 
@@ -652,7 +652,7 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
 });
 
 describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §5 D5 + "D5 Codex trust sub-case", DECISIONS-r9 R6,
+  // Spec: docs/architecture/modules/07-tools-ops.md §5 D5 + "D5 Codex trust sub-case", DECISIONS-r9 R6,
   // DEVIATIONS D-M5-arch-4 (fixture keyed by agent, hook.mjs --agent from the bundle dir), D-M5-D3-1.
 
 
@@ -1046,7 +1046,7 @@ describe("ADR-0010 D8 heal: lossless heal and rename-aside", { concurrency: CONC
 });
 
 describe("ADR-0010 upgrade step 4a: release fetch", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §6 step 4a, ADR-0010 §3, DEVIATIONS D-M5-U1-1, D-M5-U2-1.
+  // Spec: docs/architecture/modules/07-tools-ops.md §6 step 4a, ADR-0010 §3, DEVIATIONS D-M5-U1-1, D-M5-U2-1.
   // fetchRelease(agent, url, env, signal) clones one branch (RELEASE_BRANCH) of url with depth 1 into
   // <DATA_ROOT>/plugins/<agent>/.fetch-<pid>, reads HEAD, renames the dir to <sha>. Local repo fixture, no network.
 
@@ -1191,7 +1191,7 @@ describe("ADR-0010 upgrade step 4a: release fetch", { concurrency: CONC }, () =>
 });
 
 describe("ADR-0010 doctor report text", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md (exports buildReport). 14a GP11/redact-secrets-in-debug-report
+  // Spec: docs/architecture/modules/07-tools-ops.md (exports buildReport). 14a GP11/redact-secrets-in-debug-report
   // (#1144) and GP11/redact-secrets-in-doctor-output (#1141): a token-shaped env value must never
   // appear verbatim in a doctor/debug report.
 
@@ -1213,7 +1213,7 @@ describe("ADR-0010 doctor report text", { concurrency: CONC }, () => {
 });
 
 describe("ADR-0010 upgrade step 4b: SHA256SUMS check", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §6 step 4b + Errors, docs/v2/impl/13-build-release.md §4,
+  // Spec: docs/architecture/modules/07-tools-ops.md §6 step 4b + Errors, docs/architecture/modules/13-build-release.md §4,
   // DEVIATIONS D-M5-U3-1. verifySums(dir) checks every file of the fetched tree against
   // <dir>/SHA256SUMS ("<hex>  <relative/posix/path>\n", sha256); any mismatch throws
   // CtxError BUNDLE_HASH_MISMATCH.
@@ -1347,7 +1347,7 @@ describe("ADR-0010 upgrade step 4b: SHA256SUMS check", { concurrency: CONC }, ()
 });
 
 describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §5 (ctxDoctor ToolDef + runDoctorChecks), ADR-0010, TECH-SPEC §6.2 GP11;
+  // Spec: docs/architecture/modules/07-tools-ops.md §5 (ctxDoctor ToolDef + runDoctorChecks), ADR-0010, TECH-SPEC §6.2 GP11;
   // DEVIATIONS D-M5-arch-3/4/5, D-M5-D6-1 (test drives runDoctorChecks(ctx, adapter, host), the impl/07 shape).
   // D8 is one row whose detail names which of stale-schema / integrity_check failed (A-T5).
 
@@ -1501,7 +1501,7 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
 });
 
 describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §6 (ctxUpgrade ToolDef, mode "upgrade"|"uninstall", confirmDelete),
+  // Spec: docs/architecture/modules/07-tools-ops.md §6 (ctxUpgrade ToolDef, mode "upgrade"|"uninstall", confirmDelete),
   // DEVIATIONS D-M5-U7-4, D-M5-U8-1..3. GP11 rows: keep-user-hooks-on-upgrade (#1239 #1235),
   // opencode-merge-sibling-plugins (#1160), v1 entries removed, no baked paths, rollback works, change table.
   // D-M5-U8-1: the handler takes (input, ToolContext) (impl/07 §6 Export); tests drive runUpgrade(input, deps)
@@ -1668,7 +1668,7 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
 });
 
 describe("ADR-0010 doctor: hook-runs check per agent (GP11)", { concurrency: CONC }, () => {
-  // Spec: docs/v2/OPEN-ITEMS.md H5, docs/v2/adr/0020-hooks-and-skills-on-every-agent.md (saving effect per host).
+  // Spec: https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/OPEN-ITEMS.md H5, docs/architecture/adr/0020-hooks-and-skills-on-every-agent.md (saving effect per host).
   // Doctor hook-runs sends one large shell read, in the host's own wire shape, through the installed hook bundle. It
   // passes only when the answer is that host's saving effect (deny + ctx_execute redirect, or replace + ctx_search
   // line) with the project resolved. A silent hook or a NO_PROJECT hook was a false PASS before: pi before

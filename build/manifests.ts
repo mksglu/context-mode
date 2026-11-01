@@ -1,4 +1,4 @@
-// build/manifests.ts — manifest + hook config generation (docs/v2/impl/13-build-release.md §3; impl/10 §1.5;
+// build/manifests.ts — manifest + hook config generation (docs/architecture/modules/13-build-release.md §3; impl/10 §1.5;
 // DECISIONS-r9 R1, R4; DEVIATIONS D-M3-arch-4, D-M3-A7-1..5). Build-time only: reads adapters/table.ts rows and
 // writes files; never shipped as code. M6 adds the release-only part: `version` from plan.mjs via build.mjs --version
 // (D-M6-arch-3, D-M6-B2-1); hashes are build/hash.mjs.

@@ -14,12 +14,12 @@ import { ctxSearch } from "../src/core/tools/search.ts";
 
 describe("ADR-0017: every v1 PreToolUse call through the built v2 hook bundle", () => {
   // Differential test: every PreToolUse call the v1 suite makes (tests/fixtures/v1-cases/pretooluse.json, recorded from
-  // context-mode 1.0.169 by scripts/v1-cases/) goes through the built v2 hook bundle. v1 allow/deny must equal v2 allow/deny,
+  // context-mode 1.0.169 by https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/scripts/v1-cases/) goes through the built v2 hook bundle. v1 allow/deny must equal v2 allow/deny,
   // or the difference must sit in ALLOW below with a DEVIATIONS row id. A difference in neither fails the test: no silent skips.
   // Serial: one shared before/after (built bundle and temp dir), and each test spawns the hook once.
   const ROOT = join(import.meta.dirname, "..");
   const FIX = JSON.parse(readFileSync(join(ROOT, "tests/fixtures/v1-cases/pretooluse.json"), "utf8"));
-  const DEVIATIONS = readFileSync(join(ROOT, "docs/v2/DEVIATIONS.md"), "utf8");
+  const DEVIATIONS = readFileSync(join(ROOT, "docs/architecture/DEVIATIONS.md"), "utf8");
 
   // v1 platform name -> v2 agent id. A v1 host with no v2 hook entry runs as codex (the plain Claude hook shape, no replace).
   const HOST = { "claude-code": "claude-code", codex: "codex", "gemini-cli": "gemini", "qwen-code": "qwen", "vscode-copilot": "vscode", kiro: "kiro" };
@@ -114,7 +114,7 @@ describe("ADR-0017: every v1 PreToolUse call through the built v2 hook bundle", 
   });
 
   test("every ALLOW entry cites a DEVIATIONS row", () => {
-    for (const [k, [id]] of Object.entries(ALLOW)) assert.ok(DEVIATIONS.includes("| " + id + " |"), `${k}: ${id} is not in docs/v2/DEVIATIONS.md`);
+    for (const [k, [id]] of Object.entries(ALLOW)) assert.ok(DEVIATIONS.includes("| " + id + " |"), `${k}: ${id} is not in docs/architecture/DEVIATIONS.md`);
   });
 });
 

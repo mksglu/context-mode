@@ -1,7 +1,7 @@
 # Algorithms
 
 Each entry: what it does, why we chose it, source, measured result, constants, code location.
-Numbers come from `docs/v2/benchmarks.md`, `docs/v2/prompt/results.md` and the `docs/v2/review/DECISIONS-r*.md` files (see per-row source).
+Numbers come from `bench/RESULTS.md`, `bench/routing-results.md` and the `DECISIONS-r*.md` files (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review) (see per-row source).
 Every number has a source file and a date. A number with no measured source is not written here.
 
 ## 1. Shell parser + deny rules
@@ -13,7 +13,7 @@ each part against `permissions.deny` and the built-in safety rules (WebFetch). B
 **Why:** A single regex over the raw string misses a command hidden inside `bash -c "..."` or a heredoc. The
 parser recurses into those forms instead.
 
-**Source:** `docs/v2/impl/08-enforcement.md` §2.3, ADR-0008.
+**Source:** `docs/architecture/modules/08-enforcement.md` §2.3, ADR-0008.
 
 **Measured:** not a timed benchmark; correctness is proven by the enforcement test suite (§6, `14-tests.md`).
 
@@ -30,7 +30,7 @@ Read, `ctx_execute` with `file`, or `grep`/`tail`. No part of the file is ever t
 **Why:** A hint-then-allow path was tried and removed (DECISIONS-r10); the model often ignored the hint and the full file still landed in
 context. A deny with no path around it is the only rule that holds every time.
 
-**Source:** `docs/v2/adr/0008-enforcement-rewrite-and-cap.md`; `docs/v2/impl/00-architecture.md` §3.2.
+**Source:** `docs/architecture/adr/0008-enforcement-rewrite-and-cap.md`; `docs/architecture/modules/00-architecture.md` §3.2.
 
 **Measured:** `READ_MAX_LINES` (200) is text only, not enforced — on denied reads the median line is 48,848
 bytes, so a 200-line slice would still exceed `OUTPUT_CAP` in 30.8% of cases (`DECISIONS-r8.md`). This is why
@@ -54,7 +54,7 @@ call and no regex, fixes both.
 **Source:** ADR-0009; best-practice basis: Anthropic context editing (observation masking), Generative
 Agents (recency decay + importance), JetBrains "The Complexity Trap" (arXiv 2508.21433).
 
-**Measured:** weights unchanged after a 12-case deterministic sweep, 0 model calls (`tickets/memory-r6/eval/results.md`,
+**Measured:** weights unchanged after a 12-case deterministic sweep, 0 model calls (`https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/memory-r6/eval/results.md`,
 `DECISIONS-r6` D1) — no tested alternative weighting beat the current one.
 
 **Constants:** `STATE_BUDGET = 2048` B; `POINTER_MIN = 640` B; `MAX_CANDIDATES = 85` per section;
@@ -72,10 +72,10 @@ fused with a separate recency rank list by Reciprocal Rank Fusion: `1/(RRF_K + r
 fuse (Cormack et al., SIGIR '09). It lets two different kinds of ranking (text match, recency) combine
 without one swamping the other.
 
-**Source:** `docs/v2/impl/05-tools-index.md` §5 step 5; ADR-0009 §8.3/§9; Cormack et al., SIGIR '09.
+**Source:** `docs/architecture/modules/05-tools-index.md` §5 step 5; ADR-0009 §8.3/§9; Cormack et al., SIGIR '09.
 
 **Measured:** an MMR (diversity) step on top of RRF was tried and dropped: no gain, about 2x latency at p50,
-equal at p95 (`DECISIONS-r7`, `tickets/memory-retrieval/eval/results.md`). Search itself measured 27 ms
+equal at p95 (`DECISIONS-r7`, `https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/memory-retrieval/eval/results.md`). Search itself measured 27 ms
 against a 30 ms target (`SEARCH_P95_MS`).
 
 **Constants:** `RRF_K = 60`; `SEARCH_PAGE_SIZE = 20` per source before merge (decision list page); `SEARCH_REPLY_HITS = 5` hits per `ctx_search` relevance reply (D-SEARCH-REPLY-1); `SEARCH_P95_MS = 30` (target).
@@ -107,7 +107,7 @@ rather than the row id (`seq`), so paging keeps working even if rows from two di
 **Why:** Time-aware retrieval research (LongMemEval, arXiv:2410.10813) found that timestamps need one
 shape before they can be ordered or compared; an id-based cursor does not give that.
 
-**Source:** `docs/v2/impl/05-tools-index.md` §5 (DECISIONS-r9, M18); LongMemEval arXiv:2410.10813.
+**Source:** `docs/architecture/modules/05-tools-index.md` §5 (DECISIONS-r9, M18); LongMemEval arXiv:2410.10813.
 
 **Measured:** no separate benchmark; covered by the same `SEARCH_P95_MS = 30` ms target as BM25 search (§4),
 measured at 27 ms.
@@ -137,13 +137,13 @@ not match the Bash output shape `{stdout, stderr, interrupted}`, so the adapter 
 Past a size line the write moves off the hook's critical path because of the hook budget
 (`HOOK_COMBINED_P95_MS = 60` ms).
 
-**Source:** `docs/v2/review/DECISIONS-r10.md`; `docs/v2/impl/05-tools-index.md` §5 `selectChunksInMemory`
-(DECISIONS-r9 F1); `docs/v2/impl/DEVIATIONS.md` D-M7-RR-1..3, D-M7-SV-1..5.
+**Source:** `https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/DECISIONS-r10.md`; `docs/architecture/modules/05-tools-index.md` §5 `selectChunksInMemory`
+(DECISIONS-r9 F1); `docs/architecture/modules/DEVIATIONS.md` D-M7-RR-1..3, D-M7-SV-1..5.
 
 **Measured:** saving score, median of 3 runs (`bench/saving-score.mjs`, v2-design `980272a5`, 2026-10-21): offline M1 94.21,
 live M2 87.23 (runs 89.32, 85.83, 87.23); target 90, M2 not met; `guardsOk` false in all 3 runs (gate guard, layer
 `check-removed`). Live proof: outputs of 8,893 to 60,090 bytes reached the model as 152 to 190 chars, answer right 16 of 16
-(2026-10-21). Rounds are in `docs/v2/benchmarks.md` "Saving loop". Sweeps of
+(2026-10-21). Rounds are in `bench/RESULTS.md` "Saving loop". Sweeps of
 the return and chunk sizes (offline replay, same corpus) are in D-M7-SV-2 and D-M7-SV-3. Hook-path cost:
 `docs/performance.md`.
 
@@ -164,7 +164,7 @@ chunks); `INDEX_WRITE_CHUNK = 1048576` B; `SNIPPET_MAX_BYTES = 800` B (under flo
 close to the same moment. WAL plus a busy timeout is SQLite's own answer to that, and needs no extra lock
 file or queue in our code.
 
-**Source:** `docs/v2/impl/02-store.md` lines 105-106, 359.
+**Source:** `docs/architecture/modules/02-store.md` lines 105-106, 359.
 
 **Measured:** not separately benchmarked; `DB_TIMEOUT_MS = 5000` is the driver-side mirror of the same
 pragma value, so client and database agree on one wait limit.
@@ -184,7 +184,7 @@ groups.
 leaves those running. This mechanism is proven, so it stays rather than moving to a Windows Job Object,
 pending a live check.
 
-**Source:** `docs/v2/impl/03-sandbox.md` lines 155-171, 221-225, 295 (A6); PRD §9; TECH-SPEC GP4.
+**Source:** `docs/architecture/modules/03-sandbox.md` lines 155-171, 221-225, 295 (A6); PRD §9; TECH-SPEC GP4.
 
 **Measured:** T-F5 (Windows-only live check, GP4): spawn a child that spawns a grandchild with no
 intermediary shell, call `killTree` on the top PID, confirm the grandchild is gone within `KILL_GRACE_MS`.
@@ -198,13 +198,13 @@ Not yet run at this commit — see `DEVIATIONS.md`.
 
 | Metric | Value | Source, date, agent |
 |---|---|---|
-| Live proof, bytes the model saw (4 sizes x git/non-git x 2 = 16 runs) | full 8,893 / 19,998 / 28,003 / 60,090 bytes; model saw 152 / 187 / 182 / 190 chars; correct 16/16 | `docs/v2/benchmarks.md` "Replace live proof (final)", `980272a5`, 2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low |
-| Final A/B, large tasks, median tool_result bytes | off 4,694.5; with the plugin 734.5 | `bench/live/results/ab-final2.json`, `docs/v2/benchmarks.md`, 2026-10-21 |
+| Live proof, bytes the model saw (4 sizes x git/non-git x 2 = 16 runs) | full 8,893 / 19,998 / 28,003 / 60,090 bytes; model saw 152 / 187 / 182 / 190 chars; correct 16/16 | `bench/RESULTS.md` "Replace live proof (final)", `980272a5`, 2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low |
+| Final A/B, large tasks, median tool_result bytes | off 4,694.5; with the plugin 734.5 | `bench/live/results/ab-final2.json`, `bench/RESULTS.md`, 2026-10-21 |
 | Final A/B, large tasks (36 sessions), median session tokens | off 55,897; with the plugin 60,390; 12/12 pass per arm | same |
 | Final A/B, small tasks (45 sessions), median session tokens | off 36,184; with the plugin 38,210; 15/15 pass per arm; fixed plugin cost about 2,000 tokens | same |
 | Saving score, median of 3 runs | M1 94.21, M2 87.23, `guardsOk` false (gate guard) | `bench/saving-score.mjs`, `980272a5`, 2026-10-21 |
-| Offline replay, corpus byte saving (23175 tool calls, 820 sessions; old policy with hints) | 1.1%; -1.5% with the re-run bound | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
+| Offline replay, corpus byte saving (23175 tool calls, 820 sessions; old policy with hints) | 1.1%; -1.5% with the re-run bound | `bench/RESULTS.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
 | Offline replay, Read byte saving (28 denies of large unranged reads) | 21.2%; 10.4% with the re-run bound | same |
-| Live routing, run 4, under / over (new rule, `ROUTE_BYTES` 2048) | under 0/20 all models; over 0, 0, 1 of 20 | `docs/v2/prompt/results.md`, 2026-10-19, Claude Code 2.1.303 |
+| Live routing, run 4, under / over (new rule, `ROUTE_BYTES` 2048) | under 0/20 all models; over 0, 0, 1 of 20 | `bench/routing-results.md`, 2026-10-19, Claude Code 2.1.303 |
 
 Hook latency against the GS6 budgets is in `docs/performance.md`.

@@ -1,7 +1,7 @@
 // e2e/harness/hook-runner.mjs
 // Spawns a hook entry bundle with argv --agent <id> --event <name>,
 // writes the payload to stdin, and returns stdout/stderr/exitCode/ms.
-// Spec: docs/v2/impl/14-tests.md §1, 00-architecture.md e2e table.
+// Spec: docs/architecture/modules/14-tests.md §1, 00-architecture.md e2e table.
 import { spawn } from "node:child_process";
 
 /**

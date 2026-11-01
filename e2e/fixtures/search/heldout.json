@@ -40,15 +40,15 @@
   },
   {
    "label": "docs: 02-store",
-   "fixture": "docs/v2/impl/02-store.md"
+   "fixture": "docs/architecture/modules/02-store.md"
   },
   {
    "label": "docs: PRD-v2",
-   "fixture": "docs/v2/PRD-v2.md"
+   "fixture": "docs/architecture/PRD.md"
   },
   {
    "label": "docs: LAUNCH",
-   "fixture": "docs/v2/LAUNCH.md"
+   "fixture": "bench/fixtures/data/launch-plan.md"
   }
  ],
  "queries": [

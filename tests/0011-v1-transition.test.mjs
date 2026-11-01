@@ -1,5 +1,5 @@
 // ADR-0011, GP11: the v1 to v2 transition. Detect v1 footprints, remove them, plant them in e2e setup, and the
-// merge-traffic script. One file per area (docs/v2/TEST-LAYOUT.md).
+// merge-traffic script. One file per area (docs/architecture/TEST-LAYOUT.md).
 import { test, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 import { fileURLToPath } from "node:url";
 
 describe("ADR-0011: detect v1", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md (exports detectV1). ADR-0011 "v1 cleanup": finds leftover
+  // Spec: docs/architecture/modules/07-tools-ops.md (exports detectV1). ADR-0011 "v1 cleanup": finds leftover
   // v1 entries (files/config keys) so ctx_upgrade can remove them. Signature per impl/07 §3
   // detectV1(agent, home) plus the optional scope (DEVIATIONS D-M5-O2-1); scope.tmp is an empty dir
   // so a real machine's <os tmp>/context-mode-* files do not leak into these cases.
@@ -189,7 +189,7 @@ describe("ADR-0011: detect v1 on kiro", { concurrency: CONC }, () => {
 });
 
 describe("ADR-0011: remove v1", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/07-tools-ops.md §6 step 6, ADR-0011 "v1 cleanup", DEVIATIONS D-M5-U1-4/5, D-M5-U6-1..3.
+  // Spec: docs/architecture/modules/07-tools-ops.md §6 step 6, ADR-0011 "v1 cleanup", DEVIATIONS D-M5-U1-4/5, D-M5-U6-1..3.
   // removeV1(agent, findings) -> { rows, commit, rollback }: one UpgradeChangeRow per finding; remove rows
   // delete the file or strip the entry; report-only rows leave the file untouched and carry the fix text.
   function tmp(t) {
@@ -315,7 +315,7 @@ describe("ADR-0011: remove v1", { concurrency: CONC }, () => {
 });
 
 describe("GP11: v1 migration setup plants detectable footprints", { concurrency: CONC }, () => {
-  // Spec: docs/v2/impl/15-v1-transition.md §3.1, §7 A3; ADR-0011 "v1 cleanup" table and "Facts";
+  // Spec: docs/architecture/modules/15-v1-transition.md §3.1, §7 A3; ADR-0011 "v1 cleanup" table and "Facts";
   // DECISIONS-r4 A37 (Kiro agents/*.json + steering KIRO.md), B28 (VS Code session dirs + .vscode/mcp.json);
   // DEVIATIONS D-M7-arch-6 (temp npm prefix with a fake global bin). The planted footprint is proved
   // against detectV1 (impl/07 §3), the same reader ctx_doctor's D4 row and ctx_upgrade use.

@@ -1,2 +1,0 @@
-There is a file big.log in this repo (about 60000 lines). Count how many lines contain the literal
-text "ERROR". Reply with exactly one line: COUNT <number>

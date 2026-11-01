@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // e2e/checks/windows-grandchild-kill.mjs — local check for live case e2e/live/cases/windows-grandchild-kill.json (T-F5).
-// Docs: DECISIONS-r9 F5 + row T-F5, docs/v2/impl/03-sandbox.md §4 E2E case, 00-architecture A6
+// Docs: DECISIONS-r9 F5 + row T-F5, docs/architecture/modules/03-sandbox.md §4 E2E case, 00-architecture A6
 // (taskkill /F /T /PID, shell:false, no Job Object), impl/14 §6 (kind local, Windows only).
 // Black box: spawns release-out/server.mjs only; imports nothing from src/ (GS4).
 // Windows: 10 runs. Each run: ctx_execute runs a JavaScript child that spawns a grandchild direct

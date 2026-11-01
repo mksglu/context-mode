@@ -1,5 +1,5 @@
 // ADR-0013 (release automation), ADR-0019 (npm channel), PRD-v2 section 14: release plan, smoke, rollback, npm tarball check.
-// One file per ADR area (docs/v2/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
+// One file per ADR area (docs/architecture/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
 import { describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
@@ -623,7 +623,7 @@ if (!process.env.STUB_GEMINI_CHILD) {
     assert.ok(!existsSync(path.join(fx.root, "shim-ran")));
   });
 
-  // MAIN-ONLY (docs/v2/release/MAIN-ONLY.md): --layout main smokes the tree a release commit on main holds: the built
+  // MAIN-ONLY (docs/architecture/release/MAIN-ONLY.md): --layout main smokes the tree a release commit on main holds: the built
   // plugin under plugins/claude-code, root manifests for Gemini and Qwen. The "remote" is a bare repo with branch main.
   function mainFixture(t, opts) {
     const fx = fixture(t, opts);

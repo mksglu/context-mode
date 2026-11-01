@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// e2e/checks/checkpoint-latency.mjs — Viet report 1 (docs/v2/review/viet/README.md): ctx_stats / ctx_search after a
+// e2e/checks/checkpoint-latency.mjs — Viet report 1 (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/viet/README.md): ctx_stats / ctx_search after a
 // ctx_index took ~1.45 s each on Windows, all inside PRAGMA wal_checkpoint(TRUNCATE).
 // Black box: spawns release-out/server.mjs only; imports nothing from src/ (GS4).
 // Method (the tester's): fresh temp HOME, empty project, `server.mjs --agent codex`, MCP initialize, then

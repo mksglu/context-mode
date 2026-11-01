@@ -1064,7 +1064,7 @@ describe("ADR-0020 adapters", () => {
 
     // Unit tests for src/adapters/kiro.ts (impl/10 §8, impl/09 §5.2 item 6 + A28; DECISIONS-r3 Q24).
     // Unit tests may import src/ (TECH-SPEC §6.2a); e2e/ never does (GS4).
-    // Payloads follow the Kiro CLI V3 hook shape (tickets/spike-hooks-verified.md §2): hook_event_name,
+    // Payloads follow the Kiro CLI V3 hook shape (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/spike-hooks-verified.md §2): hook_event_name,
     // session_id, cwd on every hook; tool_input on tool hooks; the prompt comes from env USER_PROMPT.
 
 
@@ -1236,7 +1236,7 @@ describe("ADR-0020 adapters", () => {
   });
 
   describe("ADR-0020 opencode adapter", () => {
-    // Spec: docs/v2/impl/12-plugins.md + 00-architecture.md adapters table. OpenCode's AdapterRow:
+    // Spec: docs/architecture/modules/12-plugins.md + 00-architecture.md adapters table. OpenCode's AdapterRow:
     // installMode "in-process". 14a rows: opencode-single-system-message (#1085),
     // tool-name-map-opencode-webfetch (#1052), default-timeout-every-host, call-row-language-code-line.
 
@@ -1290,7 +1290,7 @@ describe("ADR-0020 adapters", () => {
   });
 
   describe("ADR-0020 pi adapter", () => {
-    // Spec: docs/v2/impl/12-plugins.md + 00-architecture.md adapters table. Pi's AdapterRow:
+    // Spec: docs/architecture/modules/12-plugins.md + 00-architecture.md adapters table. Pi's AdapterRow:
     // installMode "in-process", toolNamePrefix "" (no mcp__ prefix, D-M5 plugin rows pi-hint-not-user-role,
     // pi-system-role-injection, pi-injected-message-timestamp, pi-project-permissions-honored,
     // pi-read-hint-parity, pi-collapsed-view-plain-text-first-line, pi-bridge-per-session-workspace, pi-reload-no-leak).

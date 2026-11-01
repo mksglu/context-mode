@@ -2,7 +2,7 @@
 
 `harness.patch` extends the gateway repo's `start-cost-ab` harness (the one that produced the published
 `v3-opus55-short.json`) with the arms `v1`, `v2` and `gateway` beside `plain` (alias `direct`). The pre-registration is
-`docs/benchmarks/v1-v2-gateway/prereg.md`.
+`bench/evidence/gateway/prereg.md`.
 
 - Base: gateway commit `408333a48d082830f5813b3f539ec03993830a89`. The harness files are restored from that commit
   unchanged (`scripts/e2e/start-cost-ab*.mjs`, `short-workloads.mjs`, `unified-ab.mjs`, `tenant-preflight.mjs`,

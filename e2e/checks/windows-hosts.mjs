@@ -1,4 +1,4 @@
-// e2e/checks/windows-hosts.mjs: the Windows host proof (docs/v2/review/windows-all.workflow.js, phase Matrix).
+// e2e/checks/windows-hosts.mjs: the Windows host proof (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/windows-all.workflow.js, phase Matrix).
 // Runs on windows-latest, ubuntu-latest and macos-latest from ci.yml job "windows hosts". Black box (GS4): spawns the
 // packed npm bin and the host CLIs; no src/ import.
 //

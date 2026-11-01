@@ -109,5 +109,5 @@ node build/build.mjs --out /tmp/cm-bench-release-out
 node bench/replay.mjs [--out <aggregate.json>]
 ```
 
-Output: the aggregate JSON (committed values are copied to `docs/v2/benchmarks.md`, section "Offline replay")
+Output: the aggregate JSON (committed values are copied to `bench/RESULTS.md`, section "Offline replay")
 and the private per-session rows in `/private/tmp/cm-v2-impl-private/bench/sessions.json`.

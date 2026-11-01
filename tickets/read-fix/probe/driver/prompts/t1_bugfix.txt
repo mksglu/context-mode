@@ -1,4 +1,0 @@
-There is a file big_source.js in this repo (about 4000 lines). It has a function called addTotals
-that is supposed to return the sum of its two arguments, but it has a bug: it subtracts instead of
-adding. Find and fix that bug in the file, using whatever tools you need. When done, reply with exactly
-one line: DONE <old_line> -> <new_line>

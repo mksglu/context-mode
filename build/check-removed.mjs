@@ -13,6 +13,11 @@ import path from "node:path";
 // One entry per removed path. kind "file": exact path. kind "dir": every tracked path under it.
 // kind "glob": prefix + anything + suffix (impl/15 §2.3 "configs/**/*.json", ".mcp.json*.example").
 const REMOVED_PATHS = [
+  // D-REPO-CLEAN-1: dev folders left the repo for the release. Restore: git checkout 274600e2 -- <path>.
+  { kind: "dir", path: "tickets/" },
+  { kind: "dir", path: ".impl/" },
+  { kind: "dir", path: "docs/v2/" },
+  { kind: "dir", path: "scripts/v1-cases/" },
   // impl/15 §2.3 (ADR-0015 "Largest items deleted"), at their tracked paths in the repo.
   { kind: "dir", path: "web/" },
   { kind: "file", path: "start.mjs" },
@@ -98,10 +103,10 @@ const SELF = "build/check-removed.mjs";
 const ALLOWED_DIRS = [
   "src/core/", "src/prompt/", "src/entries/",
   "src/cli/", "src/setup/", // ADR-0019 D5-D7: npm CLI and setup engine (D-CR-0019-1)
-  "tests/_lib/", "tests/fixtures/", "tests/e2e/", "tests/ops/", "e2e/", "build/", "bench/", "tickets/", "metrics/",
-  "docs/v2/", "docs/install/", "docs/benchmarks/",
-  "scripts/release/", "scripts/v1-cases/", // v1 differential harness inputs (D-CR-SCRIPTS-1)
-  ".github/", ".impl/",
+  "tests/_lib/", "tests/fixtures/", "tests/e2e/", "tests/ops/", "e2e/", "build/", "bench/", "metrics/",
+  "docs/architecture/", "docs/install/",
+  "scripts/release/",
+  ".github/",
   ".claude-plugin/", ".codex-plugin/", ".agents/plugins/",
 ];
 const ALLOWED_FILES = [
@@ -115,7 +120,7 @@ const ALLOWED_FILES = [
   ".claude/settings.json",
   // Scripts.
   "scripts/gate.mjs", "scripts/ci-gs4-lint.mjs", "scripts/record-fixtures.mjs", "scripts/ci-install.mjs",
-  // v2 user docs outside docs/v2 and docs/install (cleanup-plan §2).
+  // v2 user docs outside docs/architecture and docs/install (cleanup-plan §2).
   "docs/how-it-works.md", "docs/tools.md", "docs/algorithms.md", "docs/performance.md", "docs/UPSTREAM-CREDITS.md",
   // Root files.
   "README.md", "CONTRIBUTING.md", "LICENSE", "package.json", "tsconfig.json", ".gitignore", ".gitattributes",

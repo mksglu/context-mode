@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Coding agents start here
-    url: https://github.com/mksglu/context-mode/blob/main/.github/AGENT_ISSUE.md
-    about: The body format, the data to collect with ctx_doctor, and what not to send. Every issue is checked against it.
-  - name: Security problem
-    url: https://github.com/mksglu/context-mode/security/advisories/new
-    about: Report security problems here, in private. Do not open a public issue.

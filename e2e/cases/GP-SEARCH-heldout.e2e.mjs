@@ -1,4 +1,4 @@
-// GP-SEARCH-heldout: search quality floor over MCP (DEVIATIONS D-SEARCH-1..4, docs/v2/spikes/search/DIAGNOSIS.md).
+// GP-SEARCH-heldout: search quality floor over MCP (DEVIATIONS D-SEARCH-1..4, https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/search/DIAGNOSIS.md).
 // Black box: calls release-out/server.mjs over MCP stdio, reads context.db read-only, no src/ import (GS4).
 // Fails when:
 //   - held-out recall@5 or MRR@10 (e2e/fixtures/search/heldout.json, frozen) falls below the measured value
@@ -77,7 +77,7 @@ function hitsOf(text, label) {
   return text.split("\n" + label + " #").slice(1).map((h) => h.slice(h.indexOf(": ") + 2));
 }
 
-// 1 MB of extra markdown for the latency pass: docs/v2 files (review/out excluded), in name order.
+// 1 MB of extra markdown for the latency pass: https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2 files (review/out excluded), in name order.
 function megabyte() {
   const files = [];
   const walk = (d) => {
@@ -86,7 +86,7 @@ function megabyte() {
       if (e.isDirectory()) { if (!p.includes(path.join("review", "out"))) walk(p); } else if (e.name.endsWith(".md")) files.push(p);
     }
   };
-  walk(path.join(REPO, "docs", "v2"));
+  walk(path.join(REPO, "docs", "architecture"));
   const out = [];
   let total = 0;
   for (const f of files) {

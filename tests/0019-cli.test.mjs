@@ -16,7 +16,7 @@ import { isEntry } from "../src/entries/is-entry.ts";
 // Serial: tests share one scratch dir and one built package from before(); every CLI call is spawnSync, which blocks the event loop.
 describe("ADR-0019 cli", () => {
   describe("ADR-0019 setup, doctor and CLI conventions", () => {
-    // Spec: docs/v2/adr/0019-interactive-setup-and-npm-channel.md sections 4-8 and Owner decisions D4-D7.
+    // Spec: docs/architecture/adr/0019-interactive-setup-and-npm-channel.md sections 4-8 and Owner decisions D4-D7.
     // E2E style: build the real release tree once, copy the bundled cli.mjs next to a fake server.mjs and hook.mjs
     // (the CLI finds its siblings from its own path), then drive `context-mode` with a temp HOME and a temp PATH.
     // Interactive runs go through a real pty (python3 pty, tests/_lib/pty-run.py).

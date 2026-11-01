@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // e2e/checks/v1-migration.mjs <agent> [--root <dir>] — the R8 v1 -> v2 switch rehearsal for one agent.
-// Spec: docs/v2/impl/15-v1-transition.md §3; ADR-0017 R3, R4, R6, R8; ADR-0011 "v1 cleanup";
+// Spec: docs/architecture/modules/15-v1-transition.md §3; ADR-0017 R3, R4, R6, R8; ADR-0011 "v1 cleanup";
 // DECISIONS-r4 A37 (Kiro steering doc), B28 (VS Code session paths, .vscode/mcp.json); DEVIATIONS D-M7-arch-6.
 //
 // Steps (one path, no fallback):

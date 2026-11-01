@@ -1,6 +1,6 @@
 // ADR-0019 / ADR-0023 / PRD-setup: host config files, atomic writes, plugin root and swap, uninstall.
-// Area: 0019-host-config (docs/v2/TEST-LAYOUT.md).
-// Merged by ADR-0024 from 8 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
+// Area: 0019-host-config (docs/architecture/TEST-LAYOUT.md).
+// Merged by ADR-0024 from 8 files (see docs/architecture/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // Serial where a test sets process.env (host-text); the other blocks use own temp dirs and run their tests concurrently.
 
 import { describe, test } from "node:test";
@@ -328,7 +328,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
 
   describe("ADR-0019 host config edit keeps user content (M5)", { concurrency: CONC }, () => {
     // tests/ops/host-config.test.mjs
-    // Spec: docs/v2/impl/07-tools-ops.md §2. 14a GP11/jsonc-comment-boundaries (#1271): a JSONC
+    // Spec: docs/architecture/modules/07-tools-ops.md §2. 14a GP11/jsonc-comment-boundaries (#1271): a JSONC
     // config with a URL string containing // keeps that string and existing comments intact
     // through a read/edit/write round trip.
 
@@ -543,7 +543,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
 
   describe("ADR-0019 host config write, rollback, Windows retry", { concurrency: CONC }, () => {
     // tests/ops/host-write.test.mjs
-    // Spec: docs/v2/impl/07-tools-ops.md §6 step 5, §2; DEVIATIONS D-M5-O1-3, D-M5-O1-4, D-M5-U5-1.
+    // Spec: docs/architecture/modules/07-tools-ops.md §6 step 5, §2; DEVIATIONS D-M5-O1-3, D-M5-O1-4, D-M5-U5-1.
     // GP11: keep user values, sibling plugins survive (#1160), .jsonc wins (#849), rollback on write failure,
     // no baked build paths.
 
@@ -739,7 +739,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
 
   describe("ADR-0019 plugin root resolution", { concurrency: CONC }, () => {
     // tests/ops/plugin-root.test.mjs
-    // Spec: docs/v2/impl/07-tools-ops.md §1. resolvePluginRoot(adapter, env) switches on
+    // Spec: docs/architecture/modules/07-tools-ops.md §1. resolvePluginRoot(adapter, env) switches on
     // adapter.installMode, realpaths the result, never caches across calls, and throws
     // PLUGIN_ROOT_MISSING when the resolved path does not exist.
 
@@ -896,7 +896,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
 
   describe("ADR-0019 plugin current swap and rollback generation", { concurrency: CONC }, () => {
     // tests/ops/plugin-swap.test.mjs
-    // Spec: docs/v2/impl/07-tools-ops.md §6 step 4c-4d; DEVIATIONS D-M5-U1-6 (current.swap symlink, then rename),
+    // Spec: docs/architecture/modules/07-tools-ops.md §6 step 4c-4d; DEVIATIONS D-M5-U1-6 (current.swap symlink, then rename),
     // D-M5-U4-1 (signature, which dirs count as a generation), D-M7-W3-1 (current -> current.old, current.swap -> current:
     // Windows cannot rename a link over a dir link).
 
@@ -1102,7 +1102,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
 
   describe("ADR-0019 uninstall areas (Q21)", { concurrency: CONC }, () => {
     // tests/ops/uninstall.test.mjs
-    // Spec: docs/v2/impl/07-tools-ops.md §6 "Steps (Uninstall)", DECISIONS-r3 Q16 Q21,
+    // Spec: docs/architecture/modules/07-tools-ops.md §6 "Steps (Uninstall)", DECISIONS-r3 Q16 Q21,
     // DEVIATIONS D-M5-U1-3, D-M5-U1-6, D-M5-U7-1..3.
     // Q21: stop, cache and own config entries always run, with or without confirmDelete.
 

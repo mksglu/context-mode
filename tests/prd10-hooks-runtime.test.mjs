@@ -1,5 +1,5 @@
 // PRD-v2 section 10, GP3, GP6, GP7: the hook process. stdin, entry, dispatch, replace and saving, compaction delivery,
-// decisions, errors, throttle and tool names. One file per area (docs/v2/TEST-LAYOUT.md); a describe per ADR/PRD section.
+// decisions, errors, throttle and tool names. One file per area (docs/architecture/TEST-LAYOUT.md); a describe per ADR/PRD section.
 import { test, before, after, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
@@ -312,7 +312,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(first.startsWith("node \""));
     assert.ok(first.includes(sep + "run.mjs\" " + Buffer.from(cmd).toString("base64url") + " "));
     // D-M3-F-7: the rest is the case-B text (drafts.md deny-subagent-run); it names no ctx_* tool the subagent lacks.
-    const md = readFileSync(new URL("../docs/v2/prompt/drafts.md", import.meta.url), "utf8");
+    const md = readFileSync(new URL("../docs/architecture/prompt-drafts.md", import.meta.url), "utf8");
     const at = md.indexOf("<!-- id: deny-subagent-run -->");
     const open = md.indexOf("```text\n", at) + "```text\n".length;
     assert.ok(at >= 0);
@@ -580,7 +580,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
   // call over the stored source by its short id, and the full size. The line counts inside the budget, so a
   // replace is never larger than the 18e4a6cd form (selection within REPLACE_RETURN_BYTES + the more line).
   test("D-CR3-HANDLE-1: golden handle line: short id, exact call, full size, inside the 18e4a6cd byte bound", async () => {
-    const { lintPromptText } = await import("../docs/v2/prompt/lint.mjs");
+    const { lintPromptText } = await import("../build/prompt-lint.mjs");
     const { moreLine } = await import("../src/core/index/select.ts");
     const text = bigText(40000);
     const p = mainBashPost(text);
@@ -1908,7 +1908,7 @@ describe("PRD-v2 section 10: replace on the live golden payload", () => {
   // captured live from Claude Code 2.1.303 (`seq 1 2000`, 8892 bytes of stdout), with session, cwd and
   // transcript paths made neutral. Claude Code 2.1.303 applies updatedToolOutput for Bash only when it
   // has Bash's output shape {stdout, stderr, interrupted}; a plain string is ignored and the model sees
-  // the full output (live check in docs/v2/benchmarks.md, "Replace live root cause").
+  // the full output (live check in bench/RESULTS.md, "Replace live root cause").
   const ROOT = join(import.meta.dirname, "..");
   const ENTRY = join(ROOT, "src", "entries", "hook.ts");
   const GOLDEN = join(ROOT, "e2e", "fixtures", "claude-code", "2.1.303", "PostToolUse-Bash-large.json");
@@ -1951,7 +1951,7 @@ describe("PRD-v2 section 10: replace on the live golden payload", () => {
 
 // serial: tests set process.env.HOME
 describe("PRD-v2 section 10: saving decision per host (ADR-0020)", () => {
-  // Spec: docs/v2/adr/0020-hooks-and-skills-on-every-agent.md decision 4 and the "Saving" column. Per host, the
+  // Spec: docs/architecture/adr/0020-hooks-and-skills-on-every-agent.md decision 4 and the "Saving" column. Per host, the
   // dispatch uses the strongest effect the host allows: replace (R) on claude-code and pi; deny + redirect (D) to
   // the ctx tool on PreToolUse everywhere else. One effect per host, no fallback.
   const SAVING = {
@@ -2026,7 +2026,7 @@ describe("PRD-v2 section 10: saving decision per host (ADR-0020)", () => {
 
 // serial: tests set process.env.HOME
 describe("PRD-v2 section 10: saving on live payload shapes", () => {
-  // Spec: docs/v2/adr/0020-hooks-and-skills-on-every-agent.md decision 4 (every agent saves, one effect per host).
+  // Spec: docs/architecture/adr/0020-hooks-and-skills-on-every-agent.md decision 4 (every agent saves, one effect per host).
   // Live probe failures of 2026-10-26 (D-HA-QWEN-DUMP-1, D-HA-COPILOT-NAMES-1, D-HA-COPILOT-REPLACE-1, D-HA-PI-PROJECT-1):
   // a `cat` of a large log reached the model whole on qwen 0.26.1, copilot-cli 1.0.103 and pi 1.4.0.
   // Payloads are the host's documented shapes: qwen hooks doc (Claude shape, run_shell_command), copilot SDK

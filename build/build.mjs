@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// build/build.mjs — esbuild build (docs/v2/impl/13-build-release.md §2).
+// build/build.mjs — esbuild build (docs/architecture/modules/13-build-release.md §2).
 // Usage: node build/build.mjs [--out <dir>] [--sha <commit>] [--version <x.y.z>]   (default release-out/)
 //   --version is plan.mjs's release version, written into every manifest `version`; without it the
 //   manifests keep 0.0.0-dev (D-M6-arch-3, D-M6-B2-1).
@@ -122,7 +122,7 @@ function readPrompt(rel) {
 
 // §2.2 step 3: inline prompt md as plain string literals, enforce Q5/Q13 caps.
 // SURFACE_CAP here covers the description half; the schema half is checked on the
-// built server's live tools/list by docs/v2/prompt/lint.mjs (impl/13 §7 step 4),
+// built server's live tools/list by build/prompt-lint.mjs (impl/13 §7 step 4),
 // because the Zod-derived schemas exist only once the server bundle runs.
 function writeGeneratedPrompt() {
   const instructions = readPrompt("instructions.md");

@@ -1,6 +1,6 @@
 # Live A/B of context saving (Claude Code, keyless)
 
-Status: run done 2026-10-19 (120 sessions). Result: docs/v2/benchmarks.md, section Live A/B. Aggregate: bench/live/results/aggregate.json.
+Status: run done 2026-10-19 (120 sessions). Result: bench/RESULTS.md, section Live A/B. Aggregate: bench/live/results/aggregate.json.
 
 ## Question
 Does the v2 plugin cut the tokens a Claude Code session reads, on tasks with large tool output?

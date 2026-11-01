@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// build/hash.mjs — SHA256SUMS over the release tree (docs/v2/impl/13-build-release.md §4).
+// build/hash.mjs — SHA256SUMS over the release tree (docs/architecture/modules/13-build-release.md §4).
 // Usage: node build/hash.mjs --out <dir>
 //   Walks <dir> (plain readdirSync recursion), hashes every file except <dir>/SHA256SUMS,
 //   sorts by relative POSIX path and writes `<hex>  <relative/path>\n` lines (sha256sum format,

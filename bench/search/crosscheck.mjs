@@ -160,13 +160,13 @@ try {
     const bad = [a, b].filter((r) => r.err || r.isError || r.text.startsWith("Internal error"));
     out.probes.push({ q, ok: bad.length === 0, hits: hitsV2(a.text, "Context7: React").length, first: bad.length ? (bad[0].err ?? bad[0].text).slice(0, 200) : undefined });
   }
-  // p95 with ~1 MB extra (docs/v2 *.md in path order, review/out skipped), unscoped, 3 rounds
+  // p95 with ~1 MB extra (https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2 *.md in path order, review/out skipped), unscoped, 3 rounds
   const files = [];
   const walk = (d) => { for (const e of readdirSync(d, { withFileTypes: true }).sort((x, y) => (x.name < y.name ? -1 : 1))) {
     const pth = path.join(d, e.name);
     if (e.isDirectory()) { if (!pth.endsWith(path.join("review", "out"))) walk(pth); } else if (e.name.endsWith(".md")) files.push(pth);
   } };
-  walk(path.join(REPO, "docs", "v2"));
+  walk(path.join(REPO, "docs", "architecture"));
   let extra = 0, k = 0;
   for (const f of files) { if (extra >= 1 << 20) break; const t = readFileSync(f, "utf8"); await tool(v2, "ctx_index", { content: t, source: "mb-" + k++ }); extra += Buffer.byteLength(t); }
   const ms = [];

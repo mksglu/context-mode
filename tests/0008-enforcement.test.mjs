@@ -1,6 +1,6 @@
 // ADR-0001 / ADR-0008 / PRD-v2 section 10 / GP3: the enforcement rewrite, deny policy and routing.
-// Area: 0008-enforcement (docs/v2/TEST-LAYOUT.md).
-// Merged by ADR-0024 from 9 files (see docs/v2/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
+// Area: 0008-enforcement (docs/architecture/TEST-LAYOUT.md).
+// Merged by ADR-0024 from 9 files (see docs/architecture/TEST-LAYOUT.md). One describe block per old file; test names are unchanged.
 // Serial blocks (decide, user-deny, routing) set process.env; the pure blocks run concurrently.
 
 import { after, before, describe, test } from "node:test";
@@ -13,7 +13,7 @@ import { unwrap } from "../src/core/policy/unwrap.ts";
 import { psDump, psWords } from "../src/core/policy/powershell.ts";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { READ_DENY_MESSAGE, READ_DENY_TEMPLATE } from "../src/core/policy/read-deny.ts";
-import { lintHookText } from "../docs/v2/prompt/lint.mjs";
+import { lintHookText } from "../build/prompt-lint.mjs";
 import { buildMatcher } from "../build/manifests.ts";
 import { getAdapter } from "../src/adapters/table.ts";
 import { decide, denyMessage } from "../src/core/policy/decide.ts";
@@ -897,7 +897,7 @@ describe("ADR-0008 decide rule table and golden rows", () => {
   });
 
   test("B2: drafts.md deny-* blocks equal the code's text (hint-* blocks retired, D-M7-RR-2)", () => {
-    const md = readFileSync(new URL("../docs/v2/prompt/drafts.md", import.meta.url), "utf8");
+    const md = readFileSync(new URL("../docs/architecture/prompt-drafts.md", import.meta.url), "utf8");
     const block = (id) => {
       const at = md.indexOf(`<!-- id: ${id} -->`);
       assert.ok(at >= 0, id);

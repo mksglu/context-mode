@@ -19,8 +19,8 @@ import { vscodeUserDirOf } from "../src/core/project/config-dir.ts";
 
   // serial: runSetup and runDoctor share in-process state; the tests fail when they overlap
 describe("ADR-0019 section 3: setup engine (setup, doctor, remove, spawn, lock, backup)", () => {
-  // Spec: docs/v2/adr/0019-interactive-setup-and-npm-channel.md section 3 (setup flow) and Owner decisions D3, D4;
-  // docs/v2/spikes/setup/S-V1.md (v1 entries). E2E style: temp HOME, a fake package dir (server.mjs answers MCP
+  // Spec: docs/architecture/adr/0019-interactive-setup-and-npm-channel.md section 3 (setup flow) and Owner decisions D3, D4;
+  // https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/setup/S-V1.md (v1 entries). E2E style: temp HOME, a fake package dir (server.mjs answers MCP
   // initialize + tools/list, hook.mjs answers a hook call), fake agent binaries on a temp PATH.
 
 

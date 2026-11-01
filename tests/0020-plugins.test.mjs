@@ -16,7 +16,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 // Serial: opencode-ported, pi-ops-ported and pi-search-whole-line set process.env.HOME in before()/after(); a concurrent describe would see the wrong HOME.
 describe("ADR-0020 plugins", () => {
   describe("ADR-0020 opencode plugin", () => {
-    // Spec: docs/v2/impl/12-plugins.md, §1a nativeTools filtering (DECISIONS-r9 R4).
+    // Spec: docs/architecture/modules/12-plugins.md, §1a nativeTools filtering (DECISIONS-r9 R4).
     // 14a: opencode-v2-plugin-api (#1199) default export has id + setup; opencode2-plugin-dual-export
     // (#1171) ctx_* tools register successfully; opencode-single-system-message (#1085).
 
@@ -158,7 +158,7 @@ describe("ADR-0020 plugins", () => {
   });
 
   describe("ADR-0020 opencode plugin ported cases", () => {
-    // Ported from tests/opencode-plugin.test.ts (cleanup-plan W1-ops, PORT row). Spec: docs/v2/impl/12-plugins.md §4.
+    // Ported from tests/opencode-plugin.test.ts (cleanup-plan W1-ops, PORT row). Spec: docs/architecture/modules/12-plugins.md §4.
     // Drives the real src/entries/opencode.ts against a real git repo and a real store under a temp HOME.
     // Not ported (behaviour gone in v2, DEVIATIONS D-M7-CLN-2): the v1 AGENTS.md/CLAUDE.md capture (OC-4),
     // the OC-1 marker quorum, the OC-3 auto-injection budget, and the v1 native zod preprocessing (#621/#627).
@@ -294,7 +294,7 @@ describe("ADR-0020 plugins", () => {
   });
 
   describe("ADR-0020 pi plugin", () => {
-    // Spec: docs/v2/impl/12-plugins.md. src/entries/pi.ts is the in-process Pi extension: default
+    // Spec: docs/architecture/modules/12-plugins.md. src/entries/pi.ts is the in-process Pi extension: default
     // export, translates host events to CanonicalHookEvent, calls handleHook, never touches
     // context.db/decide()/journal directly. 14a GP1/opencode-v2-plugin-api sibling case for Pi:
     // pi-bridge-retry-next-turn (#1098), pi-utf8-incremental-decode (#1249).
@@ -397,7 +397,7 @@ describe("ADR-0020 plugins", () => {
 
   describe("ADR-0020 pi plugin ops ported cases", () => {
     // tests/plugins/pi-ported.test.mjs
-    // Ported from tests/pi-extension.test.ts (cleanup-plan W1-ops, PORT row). Spec: docs/v2/impl/12-plugins.md §3.
+    // Ported from tests/pi-extension.test.ts (cleanup-plan W1-ops, PORT row). Spec: docs/architecture/modules/12-plugins.md §3.
     // Drives the real src/entries/pi.ts with a fake Pi API over a real git repo and a real store under a temp HOME.
     // Not ported (gone in v2, DEVIATIONS D-M7-CLN-2): the v1 MCP stdio bridge (#426, #472, MCPStdioClient), the
     // v1 SessionDB path resolvers (#473, #645), /ctx-stats as a Pi command, active_memory and role injection.

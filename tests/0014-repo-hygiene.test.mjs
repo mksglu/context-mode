@@ -1,5 +1,5 @@
 // ADR-0013 (release automation), ADR-0014 (issue forms), ADR-0015 (README and repo cleanup): repo shape, gates, workflows, docs facts.
-// One file per ADR area (docs/v2/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
+// One file per ADR area (docs/architecture/TEST-LAYOUT.md, ADR-0024); a fix adds its red test here.
 import { describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
@@ -104,7 +104,7 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     const r = run(fixture({
       ...ALLOWED,
       "README.md": "ctx_fetch_and_index was renamed\n",
-      "docs/v2/x.md": "ctx_batch_execute\n",
+      "docs/architecture/x.md": "ctx_batch_execute\n",
       "e2e/x.mjs": "ctx_batch_execute\n",
       "top.mjs": "ctx_batch_execute\n",
     }));
@@ -129,9 +129,9 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     "src/adapters/vscode.ts": "x", "src/adapters/kiro.ts": "x", "src/adapters/zcode.ts": "x",
     "src/adapters/pi.ts": "x", "src/adapters/opencode.ts": "x",
     "tests/0001-a.test.mjs": "x", "tests/_lib/a.mjs": "x", "e2e/cases/a.mjs": "x", "build/build.mjs": "x", "bench/a.mjs": "x",
-    "docs/v2/TECH-SPEC.md": "x", "docs/install/README.md": "x", "docs/tools.md": "x", "docs/UPSTREAM-CREDITS.md": "x",
+    "docs/architecture/TECH-SPEC.md": "x", "docs/install/README.md": "x", "docs/tools.md": "x", "docs/UPSTREAM-CREDITS.md": "x",
     "scripts/gate.mjs": "x", "scripts/ci-gs4-lint.mjs": "x", "scripts/record-fixtures.mjs": "x", "scripts/release/plan.mjs": "x",
-    ".github/workflows/ci.yml": "x", ".impl/progress.json": "{}", "tickets/v2-test-ledger.md": "x", "metrics/traffic.json": "{}",
+    ".github/workflows/ci.yml": "x", "metrics/traffic.json": "{}",
     ".claude/settings.json": "{}", ".claude-plugin/plugin.json": "{}", ".codex-plugin/mcp.json": "{}",
     ".agents/plugins/marketplace.json": "{}",
     "README.md": "x", "CONTRIBUTING.md": "x", "LICENSE": "x", "tsconfig.json": "{}", ".gitignore": "x", ".gitattributes": "x",
@@ -207,14 +207,14 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     assert.ok(SOURCE.includes('"ls-files", "-z"'), "tracked tree via git ls-files -z");
   });
 
-  test("allow-list: docs/benchmarks/ passes, a stray root file still fails (D-FU-RF-BENCH-1)", () => {
-    const ok = run(fixture({ ...ALLOWED, "docs/benchmarks/README.md": "x", "docs/benchmarks/data/a.json": "{}" }));
+  test("allow-list: bench/evidence/ passes, a stray root file still fails (D-FU-RF-BENCH-1)", () => {
+    const ok = run(fixture({ ...ALLOWED, "bench/evidence/README.md": "x", "bench/evidence/data/a.json": "{}" }));
     assert.equal(ok.status, 0);
     assert.deepEqual(ok.lines, ["check-removed: clean"]);
-    const bad = run(fixture({ ...ALLOWED, "docs/benchmarks/README.md": "x", "stray.txt": "x" }));
+    const bad = run(fixture({ ...ALLOWED, "bench/evidence/README.md": "x", "stray.txt": "x" }));
     assert.equal(bad.status, 1);
     assert.deepEqual(bad.lines, [OUT + "stray.txt"]);
-    const sibling = run(fixture({ ...ALLOWED, "docs/benchmarks-old/a.md": "x" }));
+    const sibling = run(fixture({ ...ALLOWED, "docs/architecture-old/a.md": "x" }));
     assert.equal(sibling.status, 1);
   });
 
@@ -233,13 +233,16 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     assert.deepEqual(r.lines, ["check-removed: still present: bench/fixtures/data/skills/SKILL.md"]);
   });
 
-  test("allow-list: scripts/ci-install.mjs and scripts/v1-cases/ pass; near-miss names still fail (D-CR-SCRIPTS-1)", () => {
-    const ok = run(fixture({ ...ALLOWED, "scripts/ci-install.mjs": "x", "scripts/v1-cases/convert.mjs": "x", "scripts/v1-cases/inventory.mjs": "x" }));
+  test("allow-list: scripts/ci-install.mjs passes; scripts/v1-cases/ and near-miss names fail (D-CR-SCRIPTS-1, D-REPO-CLEAN-1)", () => {
+    const ok = run(fixture({ ...ALLOWED, "scripts/ci-install.mjs": "x" }));
     assert.equal(ok.status, 0);
     assert.deepEqual(ok.lines, ["check-removed: clean"]);
-    const bad = run(fixture({ ...ALLOWED, "scripts/ci-install.mjs.bak": "x", "scripts/v1-cases-x/a.mjs": "x", "scripts/v1-case/a.mjs": "x" }));
+    const bad = run(fixture({ ...ALLOWED, "scripts/ci-install.mjs.bak": "x", "scripts/v1-cases/convert.mjs": "x", "scripts/v1-cases-x/a.mjs": "x", "scripts/v1-case/a.mjs": "x" }));
     assert.equal(bad.status, 1);
-    assert.deepEqual(bad.lines.slice().sort(), ["scripts/ci-install.mjs.bak", "scripts/v1-case/a.mjs", "scripts/v1-cases-x/a.mjs"].map((p) => OUT + p));
+    assert.deepEqual(bad.lines.slice().sort(), [
+      ...["scripts/ci-install.mjs.bak", "scripts/v1-case/a.mjs", "scripts/v1-cases-x/a.mjs"].map((p) => OUT + p),
+      "check-removed: still present: scripts/v1-cases/convert.mjs",
+    ].sort());
   });
 
   // D-CR-SCRIPTS-1 follow-up: the live gate caught scripts/ci-install.mjs because no unit test ran the script on the
@@ -350,9 +353,9 @@ describe("ADR-0015 repo: no TRUNCATE and no lossy cut", () => {
     assert.deepEqual(hits, [], `user-facing text must not say truncat:\n${hits.join("\n")}`);
   });
 
-  // Every capBytes call site is listed as lossless in docs/v2/release/NO-LOSSY-CUT.md (same file, same count).
+  // Every capBytes call site is listed as lossless in docs/architecture/NO-LOSSY-CUT.md (same file, same count).
   test("no-lossy-cut: every capBytes call site is a lossless row in NO-LOSSY-CUT.md", () => {
-    const table = readFileSync("docs/v2/release/NO-LOSSY-CUT.md", "utf8").split("\n").filter((l) => l.startsWith("|"));
+    const table = readFileSync("docs/architecture/NO-LOSSY-CUT.md", "utf8").split("\n").filter((l) => l.startsWith("|"));
     const calls = new Map();
     for (const root of ROOTS) {
       for (const file of walk(root, [])) {
@@ -590,7 +593,7 @@ describe("ADR-0013 repo: scheduled workflows", () => {
 });
 
 describe("ADR-0013 repo: main-only release workflow", () => {
-  // MAIN-ONLY (docs/v2/release/MAIN-ONLY.md, DEVIATIONS D-MO-2): shape of the one-click release in release.yml.
+  // MAIN-ONLY (docs/architecture/release/MAIN-ONLY.md, DEVIATIONS D-MO-2): shape of the one-click release in release.yml.
   // A dispatch on `main` takes the main path (jobs main-*); every other start keeps the release-branch path until merge day.
   // Line-based, no regex.
 
@@ -824,7 +827,7 @@ describe("ADR-0015 repo: command skills", () => {
   // drafts.md block skill_<name> verbatim (frontmatter + body), plus one trailing newline.
 
   const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const DRAFTS = readFileSync(path.join(REPO, "docs", "v2", "prompt", "drafts.md"), "utf8");
+  const DRAFTS = readFileSync(path.join(REPO, "docs", "architecture", "prompt-drafts.md"), "utf8");
   const SKILLS = ["ctx-stats", "ctx-doctor", "ctx-upgrade"];
   const TOOL = { "ctx-stats": "ctx_stats", "ctx-doctor": "ctx_doctor", "ctx-upgrade": "ctx_upgrade" };
 
@@ -893,10 +896,10 @@ describe("ADR-0015 repo: doc facts", () => {
     }
   });
 
-  test("docs/benchmarks/README.md try-it numbers equal try-it/ab.json", () => {
-    const ab = json("docs/benchmarks/try-it/ab.json");
+  test("bench/evidence/README.md try-it numbers equal try-it/ab.json", () => {
+    const ab = json("bench/evidence/try-it/ab.json");
     const p = ab.pooled;
-    const md = read("docs/benchmarks/README.md");
+    const md = read("bench/evidence/README.md");
     const line = md.split("\n").find((l) => l.startsWith('The six "Try It" prompts'));
     assert.ok(line);
     assert.ok(line.includes(`v1 cost ${p.v1.pct}% more`));
@@ -910,13 +913,13 @@ describe("ADR-0015 repo: doc facts", () => {
   });
 
   test("MAIN-ONLY.md does not name a plugins/gemini folder: Gemini and Qwen point into plugins/claude-code (D-MO-1)", () => {
-    const rows = read("docs/v2/release/MAIN-ONLY.md").split("\n").filter((l) => l.startsWith("|"));
+    const rows = read("docs/architecture/release/MAIN-ONLY.md").split("\n").filter((l) => l.startsWith("|"));
     assert.ok(rows.every((l) => !l.includes("plugins/gemini/")));
   });
 
   test("both DEVIATIONS files say which file holds which rows", () => {
-    assert.ok(read("docs/v2/DEVIATIONS.md").includes("docs/v2/impl/DEVIATIONS.md"));
-    assert.ok(read("docs/v2/impl/DEVIATIONS.md").includes("docs/v2/DEVIATIONS.md"));
+    assert.ok(read("docs/architecture/DEVIATIONS.md").includes("docs/architecture/modules/DEVIATIONS.md"));
+    assert.ok(read("docs/architecture/modules/DEVIATIONS.md").includes("docs/architecture/DEVIATIONS.md"));
   });
 });
 
@@ -1008,10 +1011,10 @@ describe("ADR-0014 repo: issue forms", async () => {
   });
 });
 
-// ADR-0024: every test file is listed in docs/v2/TEST-LAYOUT.md. A fix puts its red test in the file of its area, never in a new file.
+// ADR-0024: every test file is listed in docs/architecture/TEST-LAYOUT.md. A fix puts its red test in the file of its area, never in a new file.
 describe("ADR-0024 test layout: every test file is in the table", { concurrency: CONC }, () => {
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const TABLE = readFileSync(path.join(ROOT, "docs", "v2", "TEST-LAYOUT.md"), "utf8");
+  const TABLE = readFileSync(path.join(ROOT, "docs", "architecture", "TEST-LAYOUT.md"), "utf8");
 
   function walk(dir, suffix, acc) {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -1027,16 +1030,16 @@ describe("ADR-0024 test layout: every test file is in the table", { concurrency:
     return files.filter((f) => !TABLE.includes("`" + f + "`"));
   }
 
-  const hint = (f) => f.map((x) => x + ": add the test to the file that owns its ADR area (see docs/v2/TEST-LAYOUT.md); a new area needs a table row and an ADR first").join("\n");
+  const hint = (f) => f.map((x) => x + ": add the test to the file that owns its ADR area (see docs/architecture/TEST-LAYOUT.md); a new area needs a table row and an ADR first").join("\n");
 
-  test("every *.test.mjs under tests is listed in docs/v2/TEST-LAYOUT.md", () => {
+  test("every *.test.mjs under tests is listed in docs/architecture/TEST-LAYOUT.md", () => {
     const files = walk(path.join(ROOT, "tests"), ".test.mjs", []);
     assert.ok(files.length > 0);
     const bad = unlisted(files);
     assert.deepEqual(bad, [], hint(bad));
   });
 
-  test("every case file under e2e/cases is listed in docs/v2/TEST-LAYOUT.md", () => {
+  test("every case file under e2e/cases is listed in docs/architecture/TEST-LAYOUT.md", () => {
     const files = walk(path.join(ROOT, "e2e", "cases"), ".e2e.mjs", []);
     assert.ok(files.length > 0);
     const bad = unlisted(files);

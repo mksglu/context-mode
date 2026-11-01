@@ -23,7 +23,7 @@ const SERVER_FILE = "server.mjs";
 const HOOK_FILE = "hook.mjs";
 const PACKAGE_FILE = "package.json";
 
-// D4: v1 `context-mode hook <platform> <event>` platform names (docs/v2/spikes/setup/S-V1.md) -> v2 agent id.
+// D4: v1 `context-mode hook <platform> <event>` platform names (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/setup/S-V1.md) -> v2 agent id.
 export const V1_PLATFORM_AGENT: Readonly<Record<string, AgentId>> = Object.freeze({
   "claude-code": "claude-code",
   codex: "codex",

@@ -1,4 +1,4 @@
-// ADR-0018 (module map and contracts). One file for the area (ADR-0024, docs/v2/TEST-LAYOUT.md).
+// ADR-0018 (module map and contracts). One file for the area (ADR-0024, docs/architecture/TEST-LAYOUT.md).
 // A fix for this area adds its red test inside the describe block of its section. Do not add a new file.
 // Concurrent: both sections only read files and constants; they share no state.
 

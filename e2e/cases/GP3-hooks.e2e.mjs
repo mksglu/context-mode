@@ -209,7 +209,7 @@ import { DatabaseSync } from "node:sqlite";
       // stderr must also be checked: src/entries/hook.ts catches any decode/encode error and
       // falls back to the same { stdout: "", exitCode: 0 } shape as a real allow. Without a
       // stderr check, a broken decode()/encode() for this agent is indistinguishable from a
-      // working one (skeptic-M0, .impl/skeptic-M0.md). An empty stderr proves the catch branch
+      // working one (skeptic-M0, https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/.impl/skeptic-M0.md). An empty stderr proves the catch branch
       // was not taken, i.e. decode() actually parsed this fixture and encode() actually ran.
       const normalized = normalize({
         agent: fx.agent,

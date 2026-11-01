@@ -105,7 +105,7 @@ Read more: [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](do
 
 ## Benchmarks
 
-Every number links to a data file and a reproduce command: [docs/benchmarks/](docs/benchmarks/README.md).
+Every number links to a data file and a reproduce command: [bench/evidence/](bench/evidence/README.md).
 Gateway and plugin side by side: [context-mode.com/benchmarks](https://context-mode.com/benchmarks).
 
 ## Context Mode Gateway (paid)
@@ -113,7 +113,7 @@ Gateway and plugin side by side: [context-mode.com/benchmarks](https://context-m
 The Gateway is the paid plan. It sits between the agent and the model API: you set `ANTHROPIC_BASE_URL` to it, and the model needs no plugin tool calls.
 On the same six short tasks it cost 24.5 % less than Claude Code alone (84 of 88 pairs cost less).
 Loss: on the try-it prompts it passed the task check in 15 of 20 sessions; direct passed 20 of 20.
-Requests go through the Gateway server, so it is not local only. [Measured rows](docs/benchmarks/README.md), [plans](https://context-mode.com/pricing).
+Requests go through the Gateway server, so it is not local only. [Measured rows](bench/evidence/README.md), [plans](https://context-mode.com/pricing).
 
 ## Privacy
 
@@ -127,8 +127,8 @@ Requests go through the Gateway server, so it is not local only. [Measured rows]
 
 - [docs/install/README.md](docs/install/README.md): install, options, uninstall, troubleshooting.
 - [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](docs/algorithms.md) (search, ranking, size limits, deny rules), [docs/tools.md](docs/tools.md).
-- [docs/benchmarks/](docs/benchmarks/README.md): all benchmarks, with data files and reproduce commands.
-- [docs/v2/OPEN-ITEMS.md](docs/v2/OPEN-ITEMS.md): known gaps.
+- [bench/evidence/](bench/evidence/README.md): all benchmarks, with data files and reproduce commands.
+- [https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/OPEN-ITEMS.md](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/OPEN-ITEMS.md): known gaps.
 
 ## Issues and license
 

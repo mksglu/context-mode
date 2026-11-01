@@ -1,5 +1,5 @@
 // ADR-0016: subagent routing. Policy cases, the run wrapper, and the vscode project and tool-name handling.
-// One file per area (docs/v2/TEST-LAYOUT.md).
+// One file per area (docs/architecture/TEST-LAYOUT.md).
 import { test, before, after, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";

@@ -1,5 +1,5 @@
 // e2e/harness/db-dump.mjs
-// Read-only node:sqlite dump, sorted rows. Spec: docs/v2/impl/14-tests.md §1.
+// Read-only node:sqlite dump, sorted rows. Spec: docs/architecture/modules/14-tests.md §1.
 import { DatabaseSync } from "node:sqlite";
 
 /**

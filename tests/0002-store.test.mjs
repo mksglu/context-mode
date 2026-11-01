@@ -995,7 +995,7 @@ describe("ADR-0002: retention cleanup and dead-project sweep", { concurrency: CO
 
 // Serial on purpose: its spy patches DatabaseSync.prototype for the whole process.
 describe("ADR-0002: close and WAL checkpoint (GP8, GP9)", () => {
-  // Viet report 1 (docs/v2/review/viet/README.md, D-CKPT-LAT-1): ctx_stats and ctx_search took ~1.45 s each on Windows, all inside
+  // Viet report 1 (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/viet/README.md, D-CKPT-LAT-1): ctx_stats and ctx_search took ~1.45 s each on Windows, all inside
   // PRAGMA wal_checkpoint(TRUNCATE) run by closeDb on a read-only handle (now PASSIVE, D-NO-TRUNCATE-1). A read-only handle writes nothing, so it has nothing to
   // checkpoint. The server's own writer keeps its checkpoint on close (impl/02 §6.3), so committed data still reaches the main file.
 
