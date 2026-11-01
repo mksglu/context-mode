@@ -1231,9 +1231,39 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(rows[0].includes("akademik bir tez"));
   });
 
-  test("README has its parts, and no citation file or block (D-README-NO-CITE-1)", () => {
+  test("README has its parts, and no citation file or block (D-README-NO-CITE-1, D-README-OSS-1)", () => {
     const readme = readRepo("README.md");
-    for (const part of ["## Abstract", "## License", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
+    // Owner 2026-11-01: "fazla akademik olmus, oss community nin kullandigi terimleri kullan". OSS section names, in this order.
+    const SECTIONS = ["## Why", "## Install", "## Supported agents", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
+      "## Security and privacy", "## Context Mode Gateway", "## Star history", "## License", "## Community"];
+    let at = -1;
+    for (const part of SECTIONS) {
+      const i = readme.indexOf("\n" + part + "\n");
+      assert.ok(i > at, `README lacks ${part} after the section before it`);
+      at = i;
+    }
+    for (const bad of ["## Abstract", "This paper", "**Figure ", "**Table ", "**Case ", "## 1.", "### 2.1", "Playwright"]) assert.ok(!readme.includes(bad), `README has ${bad} (D-README-OSS-1)`);
+    assert.ok(!readme.includes('href="#"'), "README links a badge to #");
+    assert.ok(!readme.includes("img.shields.io/badge/Microsoft"), "company badges are one rendered image now (D-README-OSS-1)");
+    assert.ok(readme.includes("<details>") && readme.includes("> [!TIP]") && readme.includes("> [!NOTE]"), "README uses details blocks and GitHub alerts");
+    for (const id of ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "opencode", "pi", "qwen", "vscode", "zcode"]) {
+      assert.ok(readme.includes(`<details id="install-${id}">`), `README has a collapsed install block for ${id}`);
+    }
+    // Owner 2026-11-01: positive wording only. Prose lines (fences skipped) hold none of these words.
+    const NEG = ["not", "no", "never", "without", "cannot", "forget", "forgets", "lose", "loses", "flood", "floods", "fills"];
+    let fence = false;
+    readme.split("\n").forEach((line, i) => {
+      if (line.startsWith("```")) { fence = !fence; return; }
+      if (fence) return;
+      const words = [];
+      let w = "";
+      for (const ch of line.toLowerCase() + " ") {
+        if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) w += ch;
+        else { if (w) words.push(w); w = ""; }
+      }
+      for (const n of NEG) assert.ok(!words.includes(n), `README line ${i + 1} has the word "${n}": ${line.slice(0, 120)}`);
+      assert.ok(!line.includes("n't"), `README line ${i + 1} has n't`);
+    });
     for (const bad of ["## Scope", "## Limitations", "## Known"]) assert.ok(!readme.includes(bad), `README has ${bad} (D-README-NO-SCOPE-1)`);
     assert.ok(!readme.includes("OPEN-ITEMS"), "README points to OPEN-ITEMS (D-README-NO-SCOPE-1)");
     assert.ok(!existsSync(path.join(REPO, "CITATION.cff")), "CITATION.cff is back (owner 2026-11-01: CITATION.cff e gerek yok)");
@@ -1243,7 +1273,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   test("README: Gateway text comes first after the badges, and no failed run is quoted", () => {
     const readme = readRepo("README.md");
     const gw = readme.indexOf("Context Mode Gateway");
-    assert.ok(gw > 0 && gw < readme.indexOf("## Abstract"), "the Gateway line must sit above the Abstract");
+    assert.ok(gw > 0 && gw < readme.indexOf("\n## Why\n"), "the Gateway line must sit above the first section");
     // Owner 2026-11-01 (D-README-GW-PROBLEM-1, D-README-GW-CALM-1): quota, price and sign-up lines read as an ad.
     for (const ad of ["1,000 requests", "card-free", "Start at", "Every plan has every feature", "contextmode.ai/pricing"]) assert.ok(!readme.includes(ad), `README has ${ad} (D-README-GW-PROBLEM-1)`);
     // Runs that failed their own pre-registered rule (gateway-paid.md §2) and claims with no raw source.
@@ -1261,10 +1291,11 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const quote = lines.find((l) => l.startsWith("> ") && l.includes("Context Mode Gateway"));
     assert.ok(quote, "README has no top Gateway blockquote");
     assert.ok(lines.indexOf(quote) < lines.findIndex((l) => l.startsWith("## ")), "the Gateway blockquote sits above the first section");
-    assert.ok(quote.includes("free, local and open source"), "the blockquote says the plugin stays free, local and open source");
-    const start = readme.indexOf("## 8. Context Mode Gateway");
-    const end = readme.indexOf("\n## 9.", start);
-    assert.ok(start > 0 && end > start, "README has no section 8 Context Mode Gateway");
+    // D-README-PRIVACY-1: ELv2 is source-available, so the line says "source open on GitHub", not "open source".
+    assert.ok(quote.includes("free and local, with its source open on GitHub"), "the blockquote says the plugin stays free and local, with its source open on GitHub");
+    const start = readme.indexOf("\n## Context Mode Gateway\n");
+    const end = readme.indexOf("\n## Star history\n", start);
+    assert.ok(start > 0 && end > start, "README has no Context Mode Gateway section");
     const words = (text) => {
       const out = [];
       let w = "";
@@ -1301,6 +1332,51 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const shot of ["overview", "analytics", "spend", "memory", "skills", "protect"]) assert.ok(files.some((f) => f.includes("/" + shot)), `README has no ${shot} screenshot`);
     assert.ok(readme.includes("author's own account over 30 days"), "README says where the screenshot numbers come from");
     assert.ok(!/[\w.+-]+@[\w-]+\.[\w.-]*[a-z]/i.test(readme), "README names an email address");
+    // D-README-GW-VIDEO-1 (owner 2026-11-01: "bu ekran videosunu ... GIF yap ya da video yap OSS icin GitHub icin iyi cozunurlukte bunu ekle").
+    for (const f of ["live.webp", "live.mp4"]) {
+      assert.ok(existsSync(path.join(REPO, dir + f)), `${dir + f} is missing`);
+      assert.ok(files.includes(dir + f), `README names ${dir + f}`);
+    }
+    const gw = readme.indexOf("\n## Context Mode Gateway\n");
+    const firstImg = readme.indexOf("<img ", gw);
+    assert.ok(readme.slice(firstImg, firstImg + 80).includes(dir + "live.webp"), "the live video is the first visual of the Gateway section");
+    assert.ok(readme.includes(`[Full video](${dir}live.mp4)`), "README links the full mp4");
+  });
+
+  test("README: every Gateway screen has a docs line under its caption, and every contextmode.ai link carries the README UTM fields (D-README-FUNNEL-1)", async () => {
+    // Owner 2026-11-01: "Her bir SS'in altina onlarla alakali Docs linklerini ver textlerin altina bulunsun"; "funnel imizi gelistirmemiz gerek".
+    // contextmode.ai/attribution.js reads utm_source, utm_medium, utm_campaign, utm_term and utm_content into its first-party touch.
+    const { readmeTargets } = await import("../build/readme-links.mjs");
+    const readme = readRepo("README.md");
+    const dir = "docs/assets/readme/gateway/";
+    const SHOTS = ["live", "overview", "analytics", "spend", "memory", "skills", "protect"];
+    const at = SHOTS.map((s) => readme.indexOf(dir + s));
+    SHOTS.forEach((s, i) => {
+      assert.ok(at[i] > 0, `README has no ${s} screen`);
+      const next = i + 1 < SHOTS.length ? at[i + 1] : readme.indexOf("\n## Star history\n");
+      const block = readme.slice(at[i], next);
+      assert.ok(block.includes("Docs: "), `${s} screen has no docs line`);
+      assert.ok(block.includes("https://contextmode.ai/docs/") && block.includes("utm_content=" + s), `${s} docs line has no contextmode.ai/docs link tagged ${s}`);
+    });
+    const site = readmeTargets(readme).filter((t) => t.startsWith("https://contextmode.ai") || t.startsWith("https://context-mode.com"));
+    assert.ok(site.length >= SHOTS.length);
+    for (const t of site) {
+      assert.ok(t.startsWith("https://contextmode.ai/"), `${t}: link the canonical host`);
+      assert.ok(t.includes("utm_source=github&utm_medium=readme&utm_content="), `${t}: lacks the README UTM fields`);
+    }
+  });
+
+  test("README: free, local, privacy and zero telemetry come before the Gateway section (D-README-PRIVACY-1)", () => {
+    // Owner 2026-11-01: "Konu Gateway section'ina gelene kadar free, local, privacy, no telemetry, forever vs daha cok vurgulayalim".
+    const readme = readRepo("README.md");
+    const head = readme.slice(0, readme.indexOf("\n## Context Mode Gateway\n"));
+    const why = head.slice(head.indexOf("\n## Why\n"), head.indexOf("\n## Install\n"));
+    for (const need of ["Free forever", "Runs on your machine", "~/.context-mode", "Zero telemetry", "offline"]) assert.ok(why.includes(need), `Why lacks ${need}`);
+    const sec = head.slice(head.indexOf("\n## Security and privacy\n"));
+    for (const need of ["zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "tests/0008-enforcement.test.mjs"]) assert.ok(sec.includes(need), `Security and privacy lacks ${need}`);
+    assert.ok(head.split("\n")[2].includes("free") && head.split("\n")[2].includes("local"), "the tagline says free and local");
+    const lic = readme.slice(readme.indexOf("\n## License\n"), readme.indexOf("\n## Community\n"));
+    assert.ok(lic.includes("source-available") && lic.split("\n").filter((l) => l.startsWith("1. ") || l.startsWith("2. ") || l.startsWith("3. ")).length === 3, "License names the three ELv2 limits");
   });
 });
 

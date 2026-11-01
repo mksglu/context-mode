@@ -11,7 +11,7 @@ import { parseShell } from "../src/core/policy/parse.ts";
 import { MAX_NEST_DEPTH, OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, READ_DENY_FIXED_CAP, REQUIRE_SECURITY_ENV, USER_DENY_REASON_PREFIX, prefixToolNames } from "../src/core/contracts/constants.ts";
 import { unwrap } from "../src/core/policy/unwrap.ts";
 import { psDump, psWords } from "../src/core/policy/powershell.ts";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { READ_DENY_MESSAGE, READ_DENY_TEMPLATE } from "../src/core/policy/read-deny.ts";
 import { lintHookText } from "../build/prompt-lint.mjs";
 import { buildMatcher } from "../build/manifests.ts";
@@ -1298,5 +1298,58 @@ describe("ADR-0001 PreToolUse routing (ported from v1)", () => {
       assert.ok(msg.includes("Tool: " + row.toolNamePrefix + "ctx_execute"), id);
     }
     assert.ok(denyMessage("webfetch", "https://x.io", CC).includes(CC.toolNamePrefix + "ctx_index"));
+  });
+});
+
+// D-PRIVACY-NET-1 (owner 2026-11-01: "Konu Gateway section'ina gelene kadar free, local, privacy, no telemetry, forever vs daha cok
+// vurgulayalim"). The README says "zero telemetry" and names every network call site in src. This guard keeps that line true:
+// a new HTTP client, socket, DNS lookup, git network verb, gh or npm spawn anywhere in src fails here until it is listed below
+// and in README "Security and privacy". Comment lines are skipped. Plain string search, no regex.
+describe("ADR-0008 privacy: network call sites in src (D-PRIVACY-NET-1)", { concurrency: CONC }, () => {
+  const ROOT = join(import.meta.dirname, "..");
+  const MARKERS = ["node:http", "node:net", "node:tls", "node:dns", "node:dgram", "undici", "WebSocket", "XMLHttpRequest", "EventSource",
+    "sendBeacon", "fetch(", "GIT_LS_REMOTE", "GIT_CLONE_ARGS", 'spawnSync("gh"', "spawnSync(npm"];
+  // file -> markers it may hold, and why.
+  const ALLOWED = {
+    "src/cli/commands.ts": ['spawnSync("gh"', "spawnSync(npm"], // gh issue create after a keypress (debug report); npm i -g in `context-mode upgrade`
+    "src/core/contracts/constants.ts": ["fetch(", "GIT_LS_REMOTE", "GIT_CLONE_ARGS"], // the constants themselves (FETCH_CALL is a deny pattern)
+    "src/core/ops/doctor-env.ts": ["GIT_LS_REMOTE"], // doctor D1: git ls-remote <release repo> release
+    "src/core/ops/release-fetch.ts": ["GIT_CLONE_ARGS"], // ctx_upgrade: git clone --depth 1 of the release branch
+    "src/core/sandbox/fetch.ts": ["node:http", "node:net", "node:tls", "node:dns"], // ctx_index / ctx_fetch of a URL the agent asks for
+  };
+  const codeLines = (text) => text.split("\n").filter((l) => {
+    const t = l.trim();
+    return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*"));
+  });
+  const scan = (files) => {
+    const out = {};
+    for (const [name, text] of Object.entries(files)) {
+      const code = codeLines(text).join("\n");
+      const hit = MARKERS.filter((m) => code.includes(m));
+      if (hit.length) out[name] = hit;
+    }
+    return out;
+  };
+  const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
+
+  test("every network call site in src is on the allowed list, and every listed site still exists", () => {
+    const files = {};
+    for (const f of walk(join(ROOT, "src"))) {
+      if (!(f.endsWith(".ts") || f.endsWith(".mjs") || f.endsWith(".js"))) continue;
+      files[f.slice(ROOT.length + 1).split(sep).join("/")] = readFileSync(f, "utf8");
+    }
+    assert.deepEqual(scan(files), ALLOWED);
+  });
+
+  test("the scan finds a new call site and skips comment lines", () => {
+    assert.deepEqual(scan({ "a.ts": 'const r = await fetch("https://x.io");\n', "b.ts": "// node:http in a comment\n * fetch( in a doc block\n" }), { "a.ts": ["fetch("] });
+    assert.deepEqual(scan({ "c.ts": 'import { request } from "node:https";\nnew WebSocket(u);\n' }), { "c.ts": ["node:http", "WebSocket"] });
+  });
+
+  test("README names the zero telemetry line and each allowed call site", () => {
+    const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+    for (const need of ["Zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "git clone", "gh issue create", "npm i -g context-mode@next", "D-PRIVACY-NET-1"]) {
+      assert.ok(readme.includes(need), `README lacks ${need}`);
+    }
   });
 });

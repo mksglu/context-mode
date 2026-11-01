@@ -24,19 +24,19 @@
 <div class="p" id="pl" style="left:64px;width:500px"><div class="pt">Saved, by category (outputs of 10 KB or more)</div></div>
 <div class="p" id="pr" style="left:620px;width:596px"><div class="pt">Raw vs entered, log scale (bytes)</div></div>
 
-<div class="cap" id="cap"><b>Rule.</b> Rows whose raw output is 10 KB or more (25 of 54). Saved = 1 - entered / raw, median of 5 runs per row; a category is the median of its rows. Retrieval (ctx_search replies, 3 rows) carries the matched text and is in the full results file with every row. Bench on context-mode 2.0.0-next.8, Apple M1 Pro, 2026-10-31. Tokens = bytes / 4, an estimate.</div>
+<div class="cap" id="cap"><b>Rule.</b> Rows whose raw output is 10 KB or more (36 of 66). Saved = 1 - entered / raw, median of 5 runs per row; a category is the median of its rows. Retrieval (ctx_search replies, 3 rows) carries the matched text and is in the full results file with every row. Bench on context-mode 2.0.0-next.23 (commit 16a4bcc5), Apple M1 Pro, 2026-11-01. Tokens = bytes / 4, an estimate.</div>
 </main>
 <script>
-var cats=[['a','Sandbox','ctx_execute, 10 rows',99.3],['c','Batch','ctx_batch, 2 rows',93.1],['d','Externalize','4 rows',92.3],['f','Hook redirect','5 rows',99.8],['g','Session total','1 row',98.8]];
+var cats=[['a','Sandbox','ctx_execute, 19 rows',99.5],['c','Batch','ctx_batch, 2 rows',93.1],['d','Externalize','4 rows',98.3],['f','Hook redirect','7 rows',99.8],['g','Session total','1 row',98.8]];
 var pl=document.getElementById('pl'),y0=52,rh=62,tx=170,tw=250;
 cats.forEach(function(c,i){var y=y0+i*rh;
  var r=document.createElement('div');r.className='row';r.style.top=y+'px';r.innerHTML='<div class="lab" style="width:160px">'+c[1]+'<small>'+c[2]+'</small></div>';pl.appendChild(r);
  var tk=document.createElement('div');tk.className='track';tk.style.cssText='left:'+tx+'px;top:'+(y+14)+'px;width:'+tw+'px;background:var(--inner)';pl.appendChild(tk);
  var b=document.createElement('div');b.className='track';b.style.cssText='left:'+tx+'px;top:'+(y+14)+'px;width:'+(tw*c[3]/100)+'px;background:var(--save)';pl.appendChild(b);
  var v=document.createElement('div');v.className='val';v.style.cssText='left:'+(tx+tw+14)+'px;top:'+(y+14)+'px';v.textContent=c[3].toFixed(1)+'%';pl.appendChild(v);});
-var nb=document.createElement('div');nb.className='val m';nb.style.cssText='left:0;top:'+(y0+6*rh+4)+'px;white-space:normal;width:480px;line-height:1.5';nb.textContent='Rows with 10 KB or more of raw output (25 rows, groups a, b, c, d, f, g): median saved 98.8%.';pl.appendChild(nb);
+var nb=document.createElement('div');nb.className='val m';nb.style.cssText='left:0;top:'+(y0+6*rh+4)+'px;white-space:normal;width:480px;line-height:1.5';nb.textContent='Rows with 10 KB or more of raw output (36 rows, groups a, b, c, d, f, g): median saved 99.4%.';pl.appendChild(nb);
 
-var ex=[['Debug session','g-session-total',281261,3461],['Docs page, WebFetch','f-webfetch',215354,435],['2000-commit git log','a-git-log-large',191120,153],['GitHub API issues, JSON','a-github-api-issues-large',219175,834]];
+var ex=[['Debug session','g-session-total',281261,3266],['Docs page, WebFetch','f-webfetch',215354,435],['2000-commit git log','a-git-log-large',191120,137],['GitHub API issues, JSON','a-github-api-issues-large',219175,818]];
 var pr=document.getElementById('pr'),bx=192,W=290,lo=2,span=4,ey=62,eh=92;
 function L(v){return Math.log10(v/Math.pow(10,lo))/span*W}
 function fmt(n){return n.toLocaleString('en-US')+' B'}
