@@ -207,7 +207,7 @@ const NODE_ENGINE = ">=" + NODE_MIN; // D1, the runtime check constant (D-PKG-ME
 // build.mjs assertOutTree fails the build when the real tree and this list differ.
 export const OUT_FILES: readonly string[] = [
   ".claude-plugin", CODEX_PLUGIN_DIR, "claude-code", CLI_BUNDLE, "codex", "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
-  "qwen-extension.json", "run.mjs", "search.mjs", SERVER_BUNDLE, "skills", RELEASE_SUMS_FILE,
+  "qwen-extension.json", "run.mjs", "search.mjs", SERVER_BUNDLE, "skills", RELEASE_SUMS_FILE, "README.md", "LICENSE", // D-NPM-README-1
 ].slice().sort();
 // D-RN-REPO-1: npm provenance rejects a publish (E422) unless repository.url names the source repo. This is the
 // `npm pkg fix` form, so check-npm-tarball.mjs's "npm pkg fix is a no-op" gate still holds.

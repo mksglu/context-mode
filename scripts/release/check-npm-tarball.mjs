@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Gate before `npm publish` (ADR-0019 D1, S-NPM finding 1): the npm tarball of <dir> must equal <dir>/SHA256SUMS.
+// README.md and LICENSE must be listed and not empty (D-NPM-README-1).
 // File list = SHA256SUMS rows + SHA256SUMS itself; every row hash must match the packed bytes; `npm pkg fix` must be a no-op.
 // Usage: node check-npm-tarball.mjs [dir]   (default: cwd). Prints PASS|FAIL; exit 1 on FAIL. Publishes nothing.
 import { spawnSync } from "node:child_process";
@@ -14,7 +15,9 @@ const sh = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, encoding: "utf8", she
 const tmp = mkdtempSync(path.join(tmpdir(), "cm-npm-tarball-"));
 try {
   const sums = new Map(readFileSync(path.join(dir, "SHA256SUMS"), "utf8").trim().split("\n").map((l) => { const [h, ...r] = l.split("  "); return [r.join("  "), h]; }));
-  for (const need of ["package.json", "cli.mjs"]) if (!sums.has(need)) bad.push(`${need} is not listed in SHA256SUMS`);
+  for (const need of ["package.json", "cli.mjs", "README.md", "LICENSE"]) if (!sums.has(need)) bad.push(`${need} is not listed in SHA256SUMS`);
+  // D-NPM-README-1: npmjs.com shows README.md of the tarball; next.21 and next.22 had none, so the page was empty.
+  for (const doc of ["README.md", "LICENSE"]) if (sums.has(doc) && readFileSync(path.join(dir, doc)).length === 0) bad.push(`${doc} is empty`);
   const pack = sh("npm", ["pack", "--json", "--pack-destination", tmp], dir);
   if (pack.status !== 0) { bad.push(`npm pack failed: ${pack.stderr.trim()}`); }
   else {

@@ -31,6 +31,7 @@ import {
 } from "../src/core/contracts/constants.ts";
 import { OUT_FILES, CODEX_PLUGIN_SKILLS, assertOutPackageJson, generateManifests } from "./manifests.ts";
 import { writeHashes } from "./hash.mjs";
+import { rewriteReadmeLinks } from "./readme.mjs";
 import { isReleaseVersion } from "../scripts/release/release-tags.mjs"; // x.y.z[-pre], D-RN-TAG-1
 import { ADAPTERS, getAdapter } from "../src/adapters/table.ts";
 import { renderSkill } from "../src/setup/registry.ts";
@@ -224,6 +225,18 @@ function copyFixture(outDir) {
   }
 }
 
+// D-NPM-README-1: npmjs.com shows README.md of the tarball (next.21 and next.22 had none, so the page was empty).
+// LICENSE is copied verbatim. README.md is the repo README with every relative target made absolute (build/readme.mjs);
+// the repo README stays as it is and the docs/assets PNGs stay out of the tarball.
+function copyPackageDocs(outDir) {
+  for (const name of ["README.md", "LICENSE"]) {
+    const src = path.join(REPO_ROOT, name);
+    if (!existsSync(src)) throw new BuildError(`missing ${name}`);
+    const text = readFileSync(src);
+    writeFileSync(path.join(outDir, name), name === "README.md" ? rewriteReadmeLinks(text.toString("utf8")) : text);
+  }
+}
+
 // §2.2 step 6: verbatim copy of skills/<name>/SKILL.md for the 3 command skills (impl/13 §5).
 // D-HQ-SKILLS-1: gemini loads <extension>/skills and pi loads package.json pi.skills as they are, so each host
 // gets its own copy, rendered from the one skills/ source with that host's real tool names (split/join).
@@ -272,6 +285,7 @@ async function main(outDir, sha, version) {
   generateManifests(outDir, version); // §2.2 step 4: manifests + hook configs from adapters/table.ts (impl/13 §3)
   copyFixture(outDir); // §2.2 step 5
   copySkills(outDir); // §2.2 step 6
+  copyPackageDocs(outDir); // D-NPM-README-1
   writeHashes(outDir); // §2.2 step 8: last, so SHA256SUMS covers the full tree
   assertOutTree(outDir); // read-only check of the finished tree (ADR-0019 D1)
 }

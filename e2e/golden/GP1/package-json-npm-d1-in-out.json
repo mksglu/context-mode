@@ -35,6 +35,8 @@
     "files": [
       ".claude-plugin",
       ".codex-plugin",
+      "LICENSE",
+      "README.md",
       "SHA256SUMS",
       "claude-code",
       "cli.mjs",

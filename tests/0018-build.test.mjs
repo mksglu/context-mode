@@ -437,7 +437,7 @@ describe("ADR-0018 build: manifests", () => {
   // name, version, bin, type, engines, files and pi (Pi reads "pi".extensions from the package dir); no dependencies,
   // no scripts, no private.
   const D1_FILES = [
-    ".claude-plugin", ".codex-plugin", "SHA256SUMS", "claude-code", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
+    ".claude-plugin", ".codex-plugin", "LICENSE", "README.md", "SHA256SUMS", "claude-code", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
     "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
   ];
   test("package.json is the D1 npm shape: name, version, bin, type, engines, files, pi (extensions, skills)", (t) => {
@@ -848,6 +848,49 @@ describe("ADR-0019 build: npm package", () => {
       version: "2.0.0",
     });
     for (const key of ["dependencies", "scripts", "private", "devDependencies", "optionalDependencies"]) assert.ok(!(key in pkg), key);
+  });
+
+  // D-NPM-README-1: the npm page shows README.md of the tarball. npm packs README.md and LICENSE from the package root.
+  test("[NPM-README] build/npm-readme: npm pack --dry-run lists README.md and LICENSE, and no png", () => {
+    const p = spawnSync(NPM, ["pack", "--dry-run", "--json"], { cwd: out, encoding: "utf8", shell: process.platform === "win32" });
+    assert.equal(p.status, 0, p.stderr);
+    const listed = JSON.parse(p.stdout)[0].files.map((f) => f.path);
+    assert.ok(listed.includes("README.md"), "README.md is in the tarball");
+    assert.ok(listed.includes("LICENSE"), "LICENSE is in the tarball");
+    assert.deepEqual(listed.filter((f) => f.endsWith(".png") || f.startsWith("docs/")), [], "no image or docs file in the tarball");
+    assert.deepEqual(readFileSync(path.join(out, "LICENSE")), readFileSync(path.join(REPO, "LICENSE")), "LICENSE is a verbatim copy");
+    assert.ok(sums().map(([n]) => n).includes("README.md"), "SHA256SUMS covers README.md");
+  });
+
+  test("[NPM-README] build/npm-readme-links: the npm README has no relative link or image; the repo README is unchanged", async () => {
+    const { rewriteReadmeLinks, targetsOf } = await import("../build/readme.mjs");
+    const npmText = readFileSync(path.join(out, "README.md"), "utf8");
+    const repoText = readFileSync(path.join(REPO, "README.md"), "utf8");
+    assert.equal(npmText, rewriteReadmeLinks(repoText), "out README is the rewrite of the repo README");
+    assert.ok(targetsOf(repoText).some((t) => t.startsWith("docs/")), "the repo README keeps its relative paths");
+    const rel = targetsOf(npmText).filter((t) => !t.startsWith("https://") && !t.startsWith("http://") && !t.startsWith("#"));
+    assert.deepEqual(rel, [], "every target of the npm README is absolute");
+    assert.ok(npmText.includes('srcset="https://raw.githubusercontent.com/mksglu/context-mode/main/docs/assets/readme/hero-dark.png"'));
+    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/main/docs/install/README.md)"));
+    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/main/LICENSE)"));
+  });
+
+  test("[NPM-README] build/readme-rewrite: markdown links go to blob, images to raw, absolute and anchor targets stay, fenced code stays", async () => {
+    const { rewriteReadmeLinks } = await import("../build/readme.mjs");
+    const B = "https://github.com/mksglu/context-mode/blob/main/";
+    const R = "https://raw.githubusercontent.com/mksglu/context-mode/main/";
+    const fence = "`".repeat(3);
+    const input = [
+      "[a](docs/a.md#x) [b](https://x.test/b) [c](#top) [d](mailto:a@b.c) ![i](docs/i.png) [![bd](https://img.test/b.svg)](LICENSE)",
+      '<img src="docs/p.png" alt="p"> <source srcset="./docs/q.png"> <a href="#"><img src="https://img.test/z.svg"></a> <a href="docs/h.md">h</a>',
+      fence, "[keep](docs/k.md)", '<img src="docs/k.png">', fence, "",
+    ].join("\n");
+    const want = [
+      `[a](${B}docs/a.md#x) [b](https://x.test/b) [c](#top) [d](mailto:a@b.c) ![i](${R}docs/i.png) [![bd](https://img.test/b.svg)](${B}LICENSE)`,
+      `<img src="${R}docs/p.png" alt="p"> <source srcset="${R}docs/q.png"> <a href="#"><img src="https://img.test/z.svg"></a> <a href="${B}docs/h.md">h</a>`,
+      fence, "[keep](docs/k.md)", '<img src="docs/k.png">', fence, "",
+    ].join("\n");
+    assert.equal(rewriteReadmeLinks(input), want);
   });
 
   test("[M7] build/npm-sums-cover-entry: SHA256SUMS lists package.json and cli.mjs", () => {

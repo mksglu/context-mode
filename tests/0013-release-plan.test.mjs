@@ -838,15 +838,29 @@ describe("ADR-0019 release: npm tarball check and publish job", () => {
   const PKG = JSON.stringify({ name: "context-mode", version: "2.0.0", type: "module", bin: { "context-mode": "cli.mjs" } }, null, 2) + "\n";
   const run = (d) => spawnSync(process.execPath, [path.join(REPO, "scripts", "release", "check-npm-tarball.mjs"), d], { encoding: "utf8", env: { ...process.env, npm_config_cache: path.join(d, "..", "cm-npm-cache") } });
 
+  const DOCS = { "README.md": "# Context Mode\n", LICENSE: "Elastic License 2.0\n" };
+
   test("check-npm-tarball: passes when the tarball equals SHA256SUMS", (t) => {
-    const d = tree({ "package.json": PKG, "cli.mjs": "#!/usr/bin/env node\n", "server.mjs": "x\n" });
+    const d = tree({ "package.json": PKG, "cli.mjs": "#!/usr/bin/env node\n", "server.mjs": "x\n", ...DOCS });
     t.after(() => rmSync(d, { recursive: true, force: true }));
     const r = run(d);
     assert.equal(r.status, 0, r.stdout + r.stderr);
   });
 
+  // D-NPM-README-1: next.21 and next.22 shipped with no README.md, so the npm page was empty.
+  test("[NPM-README] check-npm-tarball: fails when README.md or LICENSE is missing, or README.md is empty", (t) => {
+    const base = { "package.json": PKG, "cli.mjs": "#!/usr/bin/env node\n", "server.mjs": "x\n" };
+    for (const [label, files] of [["README.md", { LICENSE: DOCS.LICENSE }], ["LICENSE", { "README.md": DOCS["README.md"] }], ["README.md", { ...DOCS, "README.md": "" }]]) {
+      const d = tree({ ...base, ...files });
+      t.after(() => rmSync(d, { recursive: true, force: true }));
+      const r = run(d);
+      assert.equal(r.status, 1, label + "\n" + r.stdout);
+      assert.ok((r.stdout + r.stderr).includes(label), label);
+    }
+  });
+
   test("check-npm-tarball: fails when a file differs from SHA256SUMS", (t) => {
-    const d = tree({ "package.json": PKG, "cli.mjs": "#!/usr/bin/env node\n", "server.mjs": "x\n" });
+    const d = tree({ "package.json": PKG, "cli.mjs": "#!/usr/bin/env node\n", "server.mjs": "x\n", ...DOCS });
     t.after(() => rmSync(d, { recursive: true, force: true }));
     writeFileSync(path.join(d, "server.mjs"), "changed\n");
     const r = run(d);
