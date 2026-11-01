@@ -925,7 +925,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
     function runIn(dir, call) {
       const script = path.join(dir, "server.mjs");
       const href = (p) => JSON.stringify(new URL(p, import.meta.url).href);
-      writeFileSync(script, `import { resolvePluginRoot } from ${href("../src/core/ops/plugin-root.ts")};\nimport { checkHostConfig } from ${href("../src/core/ops/doctor-config.ts")};\nimport { getAdapter } from ${href("../src/adapters/table.ts")};\nconsole.log(JSON.stringify(${call}));\n`);
+      writeFileSync(script, `import { resolvePluginRoot } from ${href("../src/core/ops/plugin-root.ts")};\nimport { checkHostConfig } from ${href("../src/core/ops/doctor-config.ts")};\nimport { getAdapter } from ${href("../src/adapters/table.ts")};\nimport { runUninstall } from ${href("../src/core/ops/uninstall.ts")};\nimport { runUpgrade } from ${href("../src/core/tools/upgrade.ts")};\nconsole.log(JSON.stringify(${call}));\n`);
       const r = spawnSync(process.execPath, [script], { encoding: "utf8" });
       assert.equal(r.status, 0, r.stderr);
       return JSON.parse(r.stdout);
@@ -953,6 +953,41 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       assert.equal(runIn(s.src, `resolvePluginRoot({ id: "claude-code", installMode: "marketplace" }, ${env}, ${JSON.stringify(s.wt)})`), s.src);
       const other = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.user });
       assert.equal(runIn(s.src, `resolvePluginRoot({ id: "claude-code", installMode: "marketplace" }, ${other}, ${JSON.stringify(s.wt)})`), s.cand, "CLAUDE_PLUGIN_ROOT of another dir is not this bundle");
+    });
+
+    // D-UNINST-CACHE-ONLY-1: verifier of D-DOC-D3-SCOPE-1. CLAUDE_PLUGIN_ROOT made the source dir the root, and
+    // ctx_upgrade uninstall then ran rmSync on it: the user's own tree was gone. Uninstall deletes only inside the cache.
+    const UNINSTALL = (env) => `runUninstall({ adapter: { id: "claude-code", installMode: "marketplace" }, project: { projectKey: "k" }, env: ${env}, confirmDelete: false }).rows`;
+    test("[D-UNINST-CACHE-ONLY-1] uninstall/running from a directory marketplace source dir: the source dir stays, the cache row says by hand", async (t) => {
+      const s = await twoInstalls(t);
+      put(path.join(s.src, "keep.txt"), "mine");
+      const env = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.src });
+      const rows = runIn(s.src, UNINSTALL(env));
+      assert.ok(existsSync(path.join(s.src, "keep.txt")), "the source dir is the user's tree: never deleted");
+      assert.deepEqual(rows.find((r) => r.area === C.UPGRADE_CACHE_AREA), { area: C.UPGRADE_CACHE_AREA, before: s.src, after: C.UPGRADE_CACHE_BY_HAND });
+      assert.ok(existsSync(s.user) && existsSync(s.cand), "no install was picked from the cache: both cached dirs stay");
+    });
+
+    test("[D-UNINST-CACHE-ONLY-1] uninstall/running from a cached dir with CLAUDE_PLUGIN_ROOT: that cached dir is removed, the other stays", async (t) => {
+      const s = await twoInstalls(t);
+      const env = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.cand });
+      const rows = runIn(s.cand, UNINSTALL(env));
+      assert.deepEqual(rows.find((r) => r.area === C.UPGRADE_CACHE_AREA), { area: C.UPGRADE_CACHE_AREA, before: s.cand, after: C.UPGRADE_REMOVED });
+      assert.equal(existsSync(s.cand), false);
+      assert.ok(existsSync(s.user));
+    });
+
+    test("[D-UNINST-CACHE-ONLY-1] upgrade/ctx_upgrade from a directory marketplace source dir: no plugin root row, the source dir stays, both modes", async (t) => {
+      const s = await twoInstalls(t);
+      put(path.join(s.src, "keep.txt"), "mine");
+      const env = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.src, PATH: process.env.PATH });
+      const deps = `{ project: { projectKey: "k", worktree: ${JSON.stringify(s.wt)}, agent: "claude-code" }, env: ${env}, signal: new AbortController().signal, releaseUrl: "file:///nonexistent" }`;
+      for (const mode of ["upgrade", "uninstall"]) {
+        const reply = runIn(s.src, `await runUpgrade({ mode: ${JSON.stringify(mode)} }, ${deps})`);
+        assert.equal(reply.isError, false, reply.text);
+        assert.ok(!reply.text.includes("| " + C.UPGRADE_PLUGIN_ROOT_AREA + " |"), mode + ": the running source dir is the root\n" + reply.text);
+        assert.ok(existsSync(path.join(s.src, "keep.txt")), mode + ": source dir kept\n" + reply.text);
+      }
     });
 
     test("[D-DOC-D3-SCOPE-1] doctor-config/D3 tester layout: PASS from the source dir and PASS from the CLI", async (t) => {

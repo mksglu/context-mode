@@ -4,7 +4,7 @@
 import { existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_HOME_DIR, DATA_PLUGINS_DIR_NAME, OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY,
+  AGENT_HOME_DIR, DATA_PLUGINS_DIR_NAME, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY,
   OWN_MCP_ENTRY, OWNER_STOP_EXT, OWNERS_DIR_NAME, PI_GIT_PACKAGE,
   PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, PROJECTS_DIR_NAME, SETTINGS_FILE, UPGRADE_AREA_KEY_SEP,
   UPGRADE_CACHE_AREA, UPGRADE_CACHE_BY_HAND, UPGRADE_CONFIG_AREA, UPGRADE_DATA_AREA, UPGRADE_DATA_DELETED,
@@ -14,7 +14,7 @@ import {
 import { CtxError } from "../contracts/errors.ts";
 import type { AdapterRow, AgentId, ProjectContext, UpgradeChangeRow } from "../contracts/types.ts";
 import { isInside } from "../project/contain.ts";
-import { opencodeDirOf, ownMcpFileOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
+import { claudeDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { listLiveOwners } from "../store/owners.ts";
 import { hostConfigValueAt, parseHostConfig, readHostConfig, writeHostConfigEdit } from "./host-config.ts";
 import { resolvePluginRoot } from "./plugin-root.ts";
@@ -66,6 +66,12 @@ function removeCache(adapter: UninstallInput["adapter"], env: NodeJS.ProcessEnv,
     case "extension": {
       const root = rootOrNull(adapter, env);
       if (root === null) return row(UPGRADE_CACHE_AREA, "", UPGRADE_NOT_FOUND);
+      // D-UNINST-CACHE-ONLY-1: a marketplace root outside <claude dir>/plugins/cache is a directory marketplace's
+      // source dir (CLAUDE_PLUGIN_ROOT, D-DOC-D3-SCOPE-1): the user's own tree, so report it, never delete it.
+      if (adapter.installMode === "marketplace") {
+        const cache = join(claudeDirOf(env, requireHomeDir(env)), HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME);
+        if (!isInside(cache, root) || isInside(root, cache)) return row(UPGRADE_CACHE_AREA, root, UPGRADE_CACHE_BY_HAND);
+      }
       rmSync(root, { recursive: true, force: true });
       return row(UPGRADE_CACHE_AREA, root, UPGRADE_REMOVED);
     }
