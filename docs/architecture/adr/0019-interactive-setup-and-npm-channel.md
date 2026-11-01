@@ -125,7 +125,7 @@ Tests: golden `--help` output per command; exit code per failure class; no-TTY r
 - Install is two commands for every agent, the same on macOS, Linux and Windows.
 - 10 install docs become one page plus per-agent troubleshooting.
 - `check-install-docs.mjs` changes: it allows `npm i -g context-mode` and `context-mode setup`, still bans user paths.
-- npm download counts return as a metric; GitHub traffic (G23) stays as a second source.
+- npm download counts return as a metric. The README badges read them from `stats.json`, written by `readme-stats.yml`.
 - The release job publishes by npm trusted publishing (OIDC, provenance, no long-lived token), behind the `npm-publish` environment with the owner as required reviewer (S-NPM).
 - The stored absolute path holds the node version dir under nvm, fnm, Volta and the CI toolcache, so it can go stale after a node switch. `doctor` checks that the stored path exists; `setup` and `upgrade` rewrite it (S-PATH).
 - More code than a doc page. It replaces the `node -e` writers in the docs, and it reuses the adapter table and `ctx_upgrade` logic.

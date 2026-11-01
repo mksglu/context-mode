@@ -18,7 +18,7 @@
 | `codex plugin marketplace add owner/repo@ref` also works with no login | same, for Codex |
 | release-please and changesets assume an npm package or a manifest at the branch tip | they do not fit a `release` branch that holds only build output. A dependency-free script of about 50 lines is used instead |
 | Pull requests are already disabled on the repo | no PR workflows and no Dependabot PRs |
-| GitHub disables scheduled workflows after 60 days with no repo activity | the weekly traffic commit keeps the schedules alive [U] |
+| GitHub disables scheduled workflows after 60 days with no repo activity | the daily `readme-stats.yml` commit keeps the schedules alive [U] |
 
 ## Design
 
@@ -45,7 +45,6 @@ Trigger: `workflow_dispatch` only (input `sha`, or `mode: rollback`). The `/rele
 ### Other workflows
 
 On `main` (one owner-approved commit; `package.json` is not touched):
-- `traffic.yml`: weekly
 - `weekly.yml`: install smoke from `@release`, a check that repo settings have not drifted, `npm audit` of a v2 checkout
 - removed at the same time: `bundle.yml`, `update-stats.yml`, `openclaw-e2e.yml`, `tier2-e2e-smoke.yml`
 
@@ -61,7 +60,7 @@ On `v2`:
 ## Decided 2026-10-14
 
 - Releases are frequent, so there is no per-release live-test gate in CI. The skill runs the live harness by default; `skip-live` is allowed and is written into the release notes.
-- `traffic.yml` and `weekly.yml` go to `main` (owner: "main'e ekleyelim").
+- `weekly.yml` goes to `main` (owner: "main'e ekleyelim").
 - No signed tags, no `release` environment approval.
 
 ## r3 decision (2026-10-14, `https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/DECISIONS-r3.md`)

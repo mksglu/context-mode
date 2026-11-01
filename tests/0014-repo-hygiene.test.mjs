@@ -131,7 +131,7 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     "tests/0001-a.test.mjs": "x", "tests/_lib/a.mjs": "x", "e2e/cases/a.mjs": "x", "build/build.mjs": "x", "bench/a.mjs": "x",
     "docs/architecture/TECH-SPEC.md": "x", "docs/install/README.md": "x", "docs/tools.md": "x", "docs/UPSTREAM-CREDITS.md": "x",
     "scripts/gate.mjs": "x", "scripts/ci-gs4-lint.mjs": "x", "scripts/record-fixtures.mjs": "x", "scripts/release/plan.mjs": "x",
-    ".github/workflows/ci.yml": "x", "metrics/traffic.json": "{}",
+    ".github/workflows/ci.yml": "x",
     ".claude/settings.json": "{}", ".claude-plugin/plugin.json": "{}", ".codex-plugin/mcp.json": "{}",
     ".agents/plugins/marketplace.json": "{}",
     "README.md": "x", "CONTRIBUTING.md": "x", "LICENSE": "x", "tsconfig.json": "{}", ".gitignore": "x", ".gitattributes": "x",
@@ -774,7 +774,7 @@ describe("ADR-0013 repo: /release skill", () => {
     "node e2e/cases/run.mjs",
     "npx vitest run",
     "node e2e/live/run.mjs --all",
-    "metrics/live-skip-streak.json",
+    "e2e/live/skip-streak.json",
     "e2e/live/cases/v1-migration-",
     "node scripts/release/plan.mjs --dry-run",
     "gh workflow run release.yml",
@@ -816,8 +816,8 @@ describe("ADR-0013 repo: /release skill", () => {
     for (const s of ['ref: "release"', "adding workflows to `main`", "npm deprecate"]) assert.ok(BODY.includes(s), s);
   });
 
-  test("metrics/live-skip-streak.json starts at streak 0", () => {
-    const j = JSON.parse(readFileSync(path.join(REPO, "metrics", "live-skip-streak.json"), "utf8"));
+  test("e2e/live/skip-streak.json starts at streak 0", () => {
+    const j = JSON.parse(readFileSync(path.join(REPO, "e2e", "live", "skip-streak.json"), "utf8"));
     assert.deepEqual(j, { streak: 0 });
   });
 });
@@ -1118,6 +1118,11 @@ describe("ADR-0015 / ADR-0024 repo: no dev folders, no v2 dir names (D-REPO-CLEA
   test("tickets/, .impl/ and scripts/v1-cases/ hold no tracked file", () => {
     const hits = tracked.filter((f) => f.startsWith("tickets/") || f.startsWith(".impl/") || f.startsWith("scripts/v1-cases/"));
     assert.deepEqual(hits, []);
+  });
+
+  test("metrics/ does not exist (D-REPO-NO-METRICS-1)", () => {
+    assert.deepEqual(tracked.filter((f) => f.startsWith("metrics/")), []);
+    assert.equal(existsSync(path.join(ROOT, "metrics")), false);
   });
 
   test("no tracked file names tests/v2/, docs/v2/, tickets/ or .impl/ outside a SHA-pinned permalink", () => {

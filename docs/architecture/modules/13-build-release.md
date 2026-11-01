@@ -368,34 +368,9 @@ Not shipped to users (release-only, repo-local skill, excluded from the built tr
 
 **E2E proof:** this skill's steps are rehearsed by the owner, not by an automated case (it is the thing that triggers the automated layers below it); `release.yml`'s `ci`+`smoke` jobs are the proof that what the skill dispatches actually works. ADR-0017 `covers`: `.claude/skills/release/SKILL.md`.
 
-## 14. `.github/workflows/traffic.yml` and `weekly.yml`
+## 14. `.github/workflows/weekly.yml`
 
-Named in ADR-0011 §Metrics and ADR-0013 §Other workflows; both go on `main` (owner: "main'e ekleyelim"), both owned by this module since they are CI/release-adjacent plumbing, not product code.
-
-### 14.1 `traffic.yml`
-```yaml
-name: traffic
-on:
-  schedule: [{ cron: "0 3 * * 1" }]
-  workflow_dispatch: {}
-permissions:
-  contents: write
-jobs:
-  traffic:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - env: { GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }} }
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/traffic/clones?per=day" > /tmp/clones.json
-          gh api "repos/$GITHUB_REPOSITORY/traffic/views?per=day" > /tmp/views.json
-          node scripts/release/merge-traffic.mjs /tmp/clones.json /tmp/views.json metrics/traffic.json
-      - run: |
-          git diff --quiet metrics/traffic.json && exit 0
-          git config user.name "context-mode-bot"; git config user.email "noreply@example.invalid"
-          git add metrics/traffic.json && git commit -m "traffic: weekly update" && git push
-```
-`merge-traffic.mjs` merges by timestamp into the 14-day rolling window file, so one missed weekly run loses no data (ADR-0011 §Metrics).
+Named in ADR-0013 §Other workflows; it goes on `main` (owner: "main'e ekleyelim"), owned by this module since it is CI/release-adjacent plumbing, not product code. The README badge counts come from `.github/workflows/readme-stats.yml` (`stats.json`, D-README-STATS-1); there is no traffic workflow (D-REPO-NO-METRICS-1).
 
 ### 14.2 `weekly.yml`
 ```yaml
@@ -417,14 +392,14 @@ jobs:
       - run: npm install && npm audit --audit-level=high
 ```
 
-**E2E proof:** both workflows run for real on `main` on a schedule; there is no GP/live case (they run outside the `v2` CI surface by design — ADR-0013 keeps them off `v2`). ADR-0017 `covers`: `.github/workflows/traffic.yml`, `.github/workflows/weekly.yml`, `scripts/release/merge-traffic.mjs`, `scripts/release/check-branch-protection.mjs`.
+**E2E proof:** the workflow runs for real on `main` on a schedule; there is no GP/live case (they run outside the `v2` CI surface by design — ADR-0013 keeps them off `v2`). ADR-0017 `covers`: `.github/workflows/weekly.yml`, `scripts/release/check-branch-protection.mjs`.
 
 ## Assumptions
 
-- A9: `scripts/release/{plan,publish,smoke,rollback}.mjs`, `branch-protection.mjs`, `branch-protection-settings.json`, `merge-traffic.mjs`, `check-branch-protection.mjs` are added as files this module owns, under `scripts/release/`. 00 §1 names `release.yml`'s jobs (plan/build/publish/smoke) and ADR-0013's branch-protection script by filename but 00's file tree table has no `scripts/` row; `scripts/` is the natural home (it already exists in the repo for other one-off tooling) and keeps `release.yml`'s YAML free of multi-step inline shell that 00's "no regex / staged git plumbing" needs real control flow for.
+- A9: `scripts/release/{plan,publish,smoke,rollback}.mjs`, `branch-protection.mjs`, `branch-protection-settings.json`, `check-branch-protection.mjs` are added as files this module owns, under `scripts/release/`. 00 §1 names `release.yml`'s jobs (plan/build/publish/smoke) and ADR-0013's branch-protection script by filename but 00's file tree table has no `scripts/` row; `scripts/` is the natural home (it already exists in the repo for other one-off tooling) and keeps `release.yml`'s YAML free of multi-step inline shell that 00's "no regex / staged git plumbing" needs real control flow for.
 - A10: `release.yml`'s `ci` job reuses `ci.yml` via `workflow_call`, so `ci.yml` declares both `on: push` and `on: workflow_call`. ADR-0013 says only "reuses `ci.yml`" without naming the GitHub Actions mechanism; `workflow_call` is the only reuse mechanism that runs the identical job definition rather than duplicating the matrix.
 - A11: `plan.mjs`'s version source when `release` does not exist yet is `0.0.0` bumped to `0.1.0` is replaced by the plugin manifest's literal first value `"2.0.0"` (ADR-0011 §Release steps 1a: "set `version: 2.0.0`... the first time"). The very first `/release` run is therefore a special case the owner runs once by hand, matching ADR-0011's "Each outward step is approved separately" — `plan.mjs` detects "no `release` branch" and prints version `2.0.0` instead of computing a bump, rather than failing.
-- A12: `LIVE_SKIP_LIMIT` streak tracking (§13 step 4) is stored in `metrics/live-skip-streak.json` on `v2` (committed by the skill run, like `metrics/traffic.json`'s commit-only-when-changed pattern) because ADR-0013 names the limit but not where the running count persists across separate `/release` invocations.
+- A12: `LIVE_SKIP_LIMIT` streak tracking (§13 step 4) is stored in `e2e/live/skip-streak.json` on `v2` (committed by the skill run only when the file changed) because ADR-0013 names the limit but not where the running count persists across separate `/release` invocations.
 - A13: `check-removed.mjs` (GS5 file-existence half) stays owned by `v1-transition` per 00 §1's module table; this file's §7 `lint.mjs` only implements the byte-level half (GS5's `lint.mjs` clause + GS9), not the file-existence half, to avoid owning across the module boundary 00 §2 draws.
 - A14 (S7): `build/build.mjs` step 2 names no esbuild version. No ADR or impl file pins one. Decided here with the smallest rule consistent with GS7 (no `node_modules`, no `dependencies` on `release`, dev-only tool): pin the exact version `esbuild@0.24.0` (current stable at doc time) as a dev dependency, no range operator, so a `npm install` on two machines builds byte-identical output. A version bump is a separate, reviewed change, never an automatic range update.
 - A15 (S7): the CI matrix's exact Node "current" line (§9/§13, "3 OS × Node 24.15.0 and current") is `24.15.0` (the `NODE_MIN` floor) and `26` (latest tested, per S-NODE) — already named at §9; this row only cross-references it so §2.2 readers do not re-ask the question.

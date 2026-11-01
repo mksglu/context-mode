@@ -9,7 +9,7 @@ Target length is about 165 lines, with a CI cap of 200. Written in English.
 
 | # | Section | Lines | Content |
 |---|---|---|---|
-| 1 | Title, tagline, badges | 7 | 3 badges: clones (`metrics/traffic.json`), stars, license. The npm, users, HN and 18 empty logo badges are removed |
+| 1 | Title, tagline, badges | 7 | 3 badges: npm downloads and stars (both read from `stats.json`, written by `readme-stats.yml`), license. The npm, users, HN and 18 empty logo badges are removed |
 | 2 | Callout | 4 | "Install with `npm i -g context-mode && context-mode setup` (ADR-0019; the Claude Code marketplace still uses the git `release` branch). Coming from v1? See Upgrading from v1." |
 | 3 | What it does | 12 | the problem in 3 lines, then 3 bullets: sandbox tools, one index per project with search, state after compaction |
 | 4 | `## Install` | 28 | Keep this exact heading: ADR-0019 removed the npm deprecate step; v1 reporters still reach the install steps through `#install`. A 10-row table: Agent, Command, Guide. **A row gets a command only after a live install test on that agent passes.** Until then it says "see guide" |

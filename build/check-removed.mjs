@@ -101,7 +101,7 @@ const SELF = "build/check-removed.mjs";
 const ALLOWED_DIRS = [
   "src/core/", "src/prompt/", "src/entries/",
   "src/cli/", "src/setup/", // ADR-0019 D5-D7: npm CLI and setup engine (D-CR-0019-1)
-  "tests/_lib/", "tests/fixtures/", "tests/e2e/", "tests/ops/", "e2e/", "build/", "bench/", "metrics/",
+  "tests/_lib/", "tests/fixtures/", "tests/e2e/", "tests/ops/", "e2e/", "build/", "bench/",
   "docs/architecture/", "docs/install/",
   "docs/assets/readme/", // README figures and their sources (D-README-THESIS-1)
   "scripts/release/",

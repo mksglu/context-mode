@@ -78,16 +78,8 @@ Facts:
 
 ## Metrics (G23)
 
-- New workflow `traffic.yml`:
-  - cron `0 3 * * 1` (weekly)
-  - `permissions: contents: write`
-  - token: secret `TRAFFIC_TOKEN`, a fine-grained PAT with Administration: read
-- It runs:
-  - `gh api "repos/$GITHUB_REPOSITORY/traffic/clones?per=day"`
-  - `gh api "repos/$GITHUB_REPOSITORY/traffic/views?per=day"`
-- It merges the results into `metrics/traffic.json` by timestamp. The 14-day window spans two weekly runs, so one failed run loses nothing.
-- It commits only when the file changed.
-- Retire `update-stats.yml`: it adds all-time npm counts to 14-day clone counts every 6 hours. Point the README badges at `metrics/traffic.json`.
+- The README badges read `stats.json` (`npm_downloads`, `stars`). The workflow `.github/workflows/readme-stats.yml` writes it each day with `GITHUB_TOKEN` only (D-README-STATS-1). It replaces `update-stats.yml`.
+- The repo has no `metrics/` directory (D-REPO-NO-METRICS-1). The live-skip streak is in `e2e/live/skip-streak.json`.
 
 ## r3 decision (2026-10-14, `https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/DECISIONS-r3.md`)
 
