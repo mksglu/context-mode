@@ -115,13 +115,59 @@ describe("PRD-v2 section 9: ctx_execute", { concurrency: CONC }, () => {
     };
   }
 
-  test("ctx_execute runs language:shell and returns a summary line plus stdout", async () => {
+  test("ctx_execute runs language:shell and returns stdout (D-EXEC-BARE-1: no head line on exit 0 with the whole output)", async () => {
     const root = mkdtempSync(join(tmpdir(), "cm-ex-"));
     try {
       const out = await ctxExecute.handler({ language: "shell", code: "echo hi" }, ctxFor(root));
       assert.equal(out.isError, false);
-      assert.ok(out.text.startsWith("exit 0"));
-      assert.ok(out.text.includes("hi"));
+      assert.equal(out.text, "hi\n");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // D-EXEC-BARE-1: exit 0 with the whole output in the reply carries nothing the head line adds.
+  test("[D-EXEC-BARE-1] exit 0 and the whole output in the reply: the reply is the output, no head line", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-ex-bare-"));
+    try {
+      const out = await ctxExecute.handler({ language: "shell", code: "echo hi" }, ctxFor(root));
+      assert.equal(out.isError, false);
+      assert.equal(out.text, "hi\n");
+      assert.equal(out.sandboxBytes, 3);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[D-EXEC-BARE-1] the head line stays where it carries information: empty output, non-zero exit, summary echo", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-ex-head-"));
+    try {
+      const none = await ctxExecute.handler({ language: "shell", code: "true" }, ctxFor(root));
+      assert.equal(none.text, "exit 0 · 0 B\n");
+      const bad = await ctxExecute.handler({ language: "shell", code: "echo boom >&2; exit 3" }, ctxFor(root));
+      assert.ok(bad.text.startsWith("exit 3 · "));
+      assert.ok(bad.text.includes("boom"));
+      const echo = await ctxExecute.handler({ language: "shell", code: "echo hi", summary: true }, ctxFor(root));
+      assert.ok(echo.text.startsWith("exit 0 · 3 B\n"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // D-EXEC-PREVIEW-1: output kept in the store gets a preview of EXEC_PREVIEW_BYTES; the rest is one ctx_search away.
+  test("[D-EXEC-PREVIEW-1] output over OUTPUT_CAP: the reply is a head, a preview of at most EXEC_PREVIEW_BYTES and the search pointer; every marker is found", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-ex-prev-"));
+    try {
+      const code = `for (let i = 0; i < 4000; i++) console.log((i === 0 ? "FIRSTMARK-a1 " : i === 2000 ? "MIDMARK-b2 " : i === 3999 ? "LASTMARK-c3 " : "") + "row " + i + " " + "p".repeat(40))`;
+      const out = await ctxExecute.handler({ language: "javascript", code }, ctxFor(root));
+      assert.equal(out.isError, false);
+      assert.ok(out.text.startsWith("exit 0 · "), "kept in the store: the head names the full size");
+      assert.ok(Buffer.byteLength(out.text, "utf8") <= C.EXEC_PREVIEW_BYTES, "reply " + Buffer.byteLength(out.text, "utf8") + " B");
+      assert.ok(out.text.includes("ctx_search({queries:["), "the reply names how to reach the rest");
+      for (const m of ["FIRSTMARK-a1", "MIDMARK-b2", "LASTMARK-c3"]) {
+        const hit = await ctxSearch.handler({ queries: [m], scope: "session" }, ctxFor(root));
+        assert.ok(hit.text.includes(m), m + " found by search");
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

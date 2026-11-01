@@ -3,7 +3,7 @@
     "content": [
       {
         "type": "text",
-        "text": "exit 0 · 4 B\nrun1"
+        "text": "run1"
       }
     ],
     "isError": false
@@ -12,7 +12,7 @@
     "content": [
       {
         "type": "text",
-        "text": "exit 0 · 4 B\nrun2"
+        "text": "run2"
       }
     ],
     "isError": false

@@ -158,7 +158,9 @@ describe("ADR-0017: v1 executor language cases through ctx_execute", { concurren
     test("v1 executor: " + name, { skip: skipUnless(bin) }, async () => {
       const out = await exec({ language, code });
       assert.equal(out.isError, false, out.text);
-      assert.ok(out.text.startsWith("exit 0"), out.text);
+      // D-EXEC-BARE-1: exit 0 with the whole output in the reply: the reply is the output, no head line.
+      assert.ok(!out.text.startsWith("exit "), out.text);
+      assert.equal(out.sandboxBytes, Buffer.byteLength(out.text, "utf8"), out.text);
       assert.ok(out.text.includes(want), out.text);
     });
   }

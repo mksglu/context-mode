@@ -187,14 +187,12 @@ test("[M2] GP4/project-cwd-temp-dir-cleanup", async () => {
   const scriptDir = path.dirname(line("SCRIPT="));
   assert.equal(scriptDir.startsWith(PROJECT), false); // temp file lives outside the project
   assert.equal(existsSync(scriptDir), false); // and its dir is removed after the run
-  // The summary byte count is the byte length of stdout, which holds two absolute paths whose
-  // length depends on the runner's TMPDIR and project dir (D-M2-CI-1): assert it equals the body's
-  // real byte length here, then golden on a placeholder. The per-run temp dir name is random
-  // (ctx-exec-<random>) and gets a placeholder too, so the case is deterministic across runners.
-  const nl = text.indexOf("\n");
-  const body = text.slice(nl + 1);
-  assert.equal(text.slice(0, nl), `exit 0 · ${Buffer.byteLength(body, "utf8")} B`);
-  const stableText = ("exit 0 · <bytes> B\n" + body).replace(scriptDir, "<tmp-script-dir>");
+  // D-EXEC-BARE-1: exit 0 with the whole output in the reply is the output itself, no head line. The body
+  // holds two absolute paths whose length depends on the runner's TMPDIR and project dir (D-M2-CI-1), and
+  // the per-run temp dir name is random (ctx-exec-<random>): golden on a placeholder, so the case is
+  // deterministic across runners.
+  assert.equal(text.startsWith("CWD="), true);
+  const stableText = text.replace(scriptDir, "<tmp-script-dir>");
   golden("project-cwd-temp-dir-cleanup", { ...reply, content: [{ ...reply.content[0], text: stableText }] });
 });
 

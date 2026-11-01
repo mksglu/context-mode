@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
 import { z } from "zod/v4";
 import {
-  BACKGROUND_REPLY_PREFIX, CANCELLED_LINE, EXEC_LANGUAGES, EXEC_TIMEOUT_MS, OUTPUT_CAP, SOURCE_LABEL_MAX_CHARS,
+  BACKGROUND_REPLY_PREFIX, CANCELLED_LINE, EXEC_LANGUAGES, EXEC_PREVIEW_BYTES, EXEC_TIMEOUT_MS, OUTPUT_CAP, SOURCE_LABEL_MAX_CHARS,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { ExecuteInput, JournalFacts, ToolContext, ToolReply } from "../contracts/types.ts";
@@ -142,13 +142,19 @@ async function finish(input: ExecuteInput, ctx: ToolContext, r: RunResult, exitC
   const head = summaryLine(exitCode, fullBytes);
   const intent = input.intent ?? "";
   // Step 14: the whole reply, summary and echo included, fits; nothing to index (D-M2-T10-6).
-  const direct = head + "\n" + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined;
-  if (intent === "" && Buffer.byteLength(direct, "utf8") <= OUTPUT_CAP) {
+  // D-EXEC-BARE-1: exit 0 and the whole output in the reply, no echo: the head line says nothing the
+  // reply does not already hold, so the reply is the output. Empty output keeps the head.
+  const bare = exitCode === 0 && input.summary !== true && combined !== "";
+  const direct = (bare ? "" : head + "\n") + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined;
+  const fits = Buffer.byteLength(head + "\n" + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined, "utf8") <= OUTPUT_CAP;
+  if (intent === "" && fits) {
     return { text: direct, isError, sandboxBytes: fullBytes, journal };
   }
   // Steps 15-17: index the full output, then select whole chunks within what is left of the cap.
+  // D-EXEC-PREVIEW-1: output that does not fit OUTPUT_CAP gets a preview of EXEC_PREVIEW_BYTES; a small
+  // output with an intent keeps the whole OUTPUT_CAP budget.
   const label = sourceLabel(input.code);
-  const budget = OUTPUT_CAP - Buffer.byteLength(head, "utf8") - 2 - moreReserve(intent, label);
+  const budget = (fits ? OUTPUT_CAP : EXEC_PREVIEW_BYTES) - Buffer.byteLength(head, "utf8") - 2 - moreReserve(intent, label);
   const db = await openDb(ctx.project);
   let picked: { text: string; more: string | null };
   try {

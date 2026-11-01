@@ -2,7 +2,7 @@
   "content": [
     {
       "type": "text",
-      "text": "exit 0 · <bytes> B\nCWD=<proj>\nSCRIPT=<tmp-script-dir>/code.js\n"
+      "text": "CWD=<proj>\nSCRIPT=<tmp-script-dir>/code.js\n"
     }
   ],
   "isError": false
