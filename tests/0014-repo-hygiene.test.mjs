@@ -1000,6 +1000,18 @@ describe("ADR-0015 repo: README agent tables", () => {
     for (const id of ["copilot-cli", "kiro", "vscode", "zcode"]) assert.ok(by[id].includes("context-mode setup"), by[id]);
   });
 
+  test("readme-agents: the install cell holds every command of the page's native fence, joined by <br> (D-README-INSTALL-CELL-1)", () => {
+    // Owner main rule: "tum agentlerin kendi native install commandleri ne ise onlari kullanalim userler yabancilik cekmesin".
+    // A reader who copies the cell runs the whole install: Claude Code and Codex need the marketplace step first.
+    const by = Object.fromEntries(agentRows().map((r) => [r.id, r.install]));
+    assert.equal(by["claude-code"], "`claude plugin marketplace add mksglu/context-mode#release`<br>`claude plugin install context-mode@context-mode`");
+    assert.equal(by.codex, "`codex plugin marketplace add mksglu/context-mode@release`<br>`codex plugin add context-mode@context-mode`");
+    assert.ok(!by.gemini.includes("<br>") && !by.pi.includes("<br>"), "one-command agents keep one command");
+    const rows = readFileSync(path.join(REPO, "docs/architecture/DEVIATIONS.md"), "utf8").split("\n").filter((l) => l.startsWith("| D-README-INSTALL-CELL-1 |"));
+    assert.equal(rows.length, 1, "DEVIATIONS has one D-README-INSTALL-CELL-1 row");
+    assert.ok(rows[0].includes("tum agentlerin kendi native install commandleri"), "the row quotes the owner");
+  });
+
   test("readme-agents: the README holds the rendered tables between the markers", () => {
     assert.deepEqual(checkAgentTables(README), []);
     for (const [start, end] of Object.values(MARKERS)) {
@@ -1247,7 +1259,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(!readme.includes("img.shields.io/badge/Microsoft"), "company badges are one rendered image now (D-README-OSS-1)");
     assert.ok(readme.includes("<details>") && readme.includes("> [!TIP]") && readme.includes("> [!NOTE]"), "README uses details blocks and GitHub alerts");
     for (const id of ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "opencode", "pi", "qwen", "vscode", "zcode"]) {
-      assert.ok(readme.includes(`<details id="install-${id}">`), `README has a collapsed install block for ${id}`);
+      assert.ok(readme.includes(`id="install-${id}">`), `README has an install block for ${id}`);
     }
     // Owner 2026-11-01: positive wording only. Prose lines (fences skipped) hold none of these words.
     const NEG = ["not", "no", "never", "without", "cannot", "forget", "forgets", "lose", "loses", "flood", "floods", "fills"];
@@ -1433,7 +1445,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     // Owner 2026-11-01: "install adimlarini collapse kullanarak yap ... README de kullanabilecegimiz tum stilleri kullan".
     const readme = readRepo("README.md");
     for (const id of AGENT_IDS) {
-      const start = readme.indexOf(`<details id="install-${id}">`);
+      const start = readme.indexOf(`id="install-${id}">`);
       assert.ok(start > 0, `README has a collapsed install block for ${id}`);
       const block = readme.slice(start, readme.indexOf("</details>", start));
       const page = readRepo(`docs/install/${id}.md`);
@@ -1476,6 +1488,86 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(readRepo("docs/assets/readme/src/render.mjs").includes("stargazer-companies.json"), "render.mjs feeds the JSON to the page");
     assert.ok(readme.split("\n").some((l) => l.includes("GitHub GraphQL API") && l.includes(data.read_at.slice(0, 10))), "README names the source and the date under the image");
     devRow("D-README-STARRED-1", "Starred by engineers at");
+  });
+
+  test("README review pass: table sums equal the headline, KB is 1,024 B, Speed rows name their bench row, hook runs name each agent (D-README-REVIEW-1)", () => {
+    // Owner 2026-11-01: "olumsuzluk eki olan olumsuz anlam tasiyan hicbir sey istemiyorum"; owner main rule on native install commands.
+    const readme = readRepo("README.md");
+    const names = readdirSync(path.join(REPO, "bench/results")).filter((f) => f.endsWith("-darwin-arm64.json") && f.length === "2026-11-01-darwin-arm64.json".length).sort();
+    const newest = names[names.length - 1];
+    const bench = JSON.parse(readRepo(`bench/results/${newest}`));
+    const med = (s) => { s = [...s].sort((a, b) => a - b); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
+    const big = bench.results.filter((r) => r.ok && r.metrics.raw_bytes && r.metrics.ctx_bytes && r.metrics.raw_bytes.median >= 10240);
+    // Benchmarks table: one row per category of the headline rows; the Rows cells add up to the headline count.
+    const sec = readme.slice(readme.indexOf("\n## Benchmarks\n"), readme.indexOf("\n### Longer sessions\n"));
+    const cats = [...new Set(big.map((r) => r.id.split("-")[0]))].sort();
+    let sum = 0;
+    for (const c of cats) {
+      const rows = big.filter((r) => r.id.split("-")[0] === c);
+      const line = sec.split("\n").find((l) => l.startsWith(`| ${c}. `));
+      assert.ok(line, `Benchmarks table lacks category ${c}`);
+      const cells = line.split("|").map((x) => x.trim());
+      assert.equal(cells[3], String(rows.length), `${c} rows`);
+      assert.equal(cells[4], med(rows.map((r) => 100 * (1 - r.metrics.ctx_bytes.median / r.metrics.raw_bytes.median))).toFixed(1) + "%", `${c} median`);
+      sum += rows.length;
+    }
+    assert.equal(sum, big.length, "the Rows cells add up to the headline count");
+    assert.ok(sec.includes("1 KB = 1,024 B"), "the rule line says what KB means");
+    assert.ok(readme.includes(bench.context_mode.commit.slice(0, 8)), "README names the bench commit");
+    // Use-case labels that name a size use KB = 1,024 B, rounded.
+    const uc = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
+    for (const row of uc.split("\n").filter((l) => l.startsWith("| [") && l.includes(" KB "))) {
+      const label = row.slice(3, row.indexOf("]"));
+      const kb = Number(label.split(" ").find((w, i, a) => a[i + 1] === "KB"));
+      const id = row.slice(row.indexOf("README.md#") + 10, row.indexOf(")", row.indexOf("README.md#")));
+      const raw = bench.results.find((x) => x.id === id).metrics.raw_bytes.median;
+      assert.equal(kb, Math.round(raw / 1024), `${id}: label says ${kb} KB, raw is ${raw} B`);
+    }
+    // Speed: each row links its bench row; the section points to the bench results file.
+    const speed = readme.slice(readme.indexOf("\n### Speed\n"), readme.indexOf("\n## How it works\n"));
+    assert.ok(speed.includes(`bench/results/${newest.replace(".json", ".md")}`) && !speed.includes("docs/performance.md"), "Speed links the bench results file");
+    for (const id of ["g-hook-kiro", "g-hook-claude-code", "g-search-latency", "g-index-per-mb"]) assert.ok(speed.includes(`bench/g-overhead/README.md#${id}`), `Speed links ${id}`);
+    const hooks = bench.results.filter((r) => r.id.startsWith("g-hook-")).map((r) => r.metrics.overhead_ms.median);
+    assert.ok(speed.includes(`${Math.min(...hooks).toFixed(1)} ms to ${Math.max(...hooks).toFixed(1)} ms`), "hook range from the bench rows");
+    // Hook runs: one positive line that names each agent.
+    const agents = readme.slice(readme.indexOf("\n## Supported agents\n"), readme.indexOf("\n## Use cases\n"));
+    assert.ok(!agents.includes("For 8 agents") && !agents.includes("earlier step"), "hook runs read as a list of agents");
+    const live = agents.split("\n").find((l) => l.startsWith("The real agent binary ran our hook"));
+    assert.ok(live, "README has the real-binary line");
+    for (const n of ["Claude Code", "Codex", "Gemini CLI", "Qwen Code", "Pi", "OpenCode", "Copilot CLI", "ZCode"]) assert.ok(live.includes(n), `real-binary line names ${n}`);
+    // Install: the channel line sits before the blocks; the first three blocks are open.
+    const firstBlock = readme.indexOf("<details open id=\"install-claude-code\">");
+    assert.ok(firstBlock > 0, "the Claude Code block is open");
+    assert.ok(readme.slice(readme.indexOf("\n## Install\n"), firstBlock).includes("`release` and `next` are the 2.0 channels"), "channel line before the blocks");
+    for (const id of ["codex", "gemini"]) assert.ok(readme.includes(`<details open id="install-${id}">`), `${id} block is open`);
+    for (const bad of ["old build", "old release", "rolls back", "recall block", "FAIL"]) assert.ok(!readme.includes(bad), `README has "${bad}"`);
+    // "zero" stays only in the owner's own "zero telemetry".
+    for (const line of readme.split("\n")) {
+      const rest = line.toLowerCase().split("zero telemetry").join("");
+      assert.ok(!rest.split(" ").some((w) => w.split(",").join("").split(".").join("") === "zero"), `README line has "zero": ${line.slice(0, 100)}`);
+    }
+    // Gateway: the intro names the same features as the table, in order.
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Star history\n"));
+    const table = gw.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Feature |")).map((l) => l.split("|")[1].trim());
+    assert.ok(table.length >= 10, `Gateway table has ${table.length} rows`);
+    const intro = gw.split("\n").find((l) => l.startsWith("The plugin works on tool output"));
+    assert.ok(intro.includes(`Its ${table.length} features, the full list: ${table.join(", ")}.`), "the intro lists the table features, in order, and says the list is full");
+    devRow("D-README-REVIEW-1", "olumsuzluk eki olan olumsuz anlam tasiyan hicbir sey istemiyorum");
+  });
+
+  test("README privacy: every data-stays or telemetry line before the Gateway names the plugin; the Gateway section links its privacy page (D-README-PRIVACY-2)", () => {
+    // Owner 2026-11-01: "Konu Gateway section'ina gelene kadar free, local, privacy, no telemetry, forever vs daha cok vurgulayalim".
+    // The plugin claim must read as a plugin claim: requests to the Gateway pass through its server.
+    const readme = readRepo("README.md");
+    const gwAt = readme.indexOf("\n## Context Mode Gateway\n");
+    for (const line of readme.slice(0, gwAt).split("\n")) {
+      const l = line.toLowerCase();
+      if (l.includes("telemetry") || l.includes("your data") || l.includes("all data")) assert.ok(l.includes("plugin"), `privacy line lacks "plugin": ${line.slice(0, 100)}`);
+    }
+    const gw = readme.slice(gwAt, readme.indexOf("\n## Star history\n"));
+    assert.ok(gw.includes("The Gateway sends your requests to its server on the way to the model."), "Gateway section says where requests go");
+    assert.ok(gw.includes("https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy"), "Gateway section links its privacy page");
+    devRow("D-README-PRIVACY-2", "free, local, privacy, no telemetry");
   });
 });
 
