@@ -86,7 +86,7 @@ The full results file has [every row, including small outputs, where the cut is 
 
 Search replies (category b) return text on purpose; they are in the full file. Bench on 2.0.0-next.8, macOS arm64, 2026-10-31.
 Reproduce: `cd bench && node run.mjs`. Method and every data file: [bench/README.md](bench/README.md), [bench/evidence/](bench/evidence/README.md).
-The plugin numbers are bytes; the dollar numbers come from the Gateway runs in Table 3.
+The plugin numbers are bytes; the dollar numbers come from the Gateway runs in section 8.
 
 ### 2.1 Case studies
 
@@ -102,26 +102,20 @@ Result: a 435 B reply instead of 215,354 B, a 99.8% cut. The hook took 54 ms.
 Action: the same task through Context Mode Gateway with Recall, 3 pairs, with a rule fixed before the run.
 Result: cost fell from $4.86 to $3.04 (2026-10-04) (-37.6%). Direct compacted 3 times; the Gateway session had 0 compactions. 3 of 3 pairs passed.
 
-### 2.2 Two layers: the gap grows with session length
+### 2.2 Longer sessions
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/fig-layers-dark.png">
-  <img src="docs/assets/readme/fig-layers-light.png" alt="Two layers. context-mode works beside the agent on tool output. Context Mode Gateway runs between the client and the model API and works on the whole request.">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/fig-oss-dark.png">
+  <img src="docs/assets/readme/fig-oss-light.png" alt="A session grows, the context stays small. The PreToolUse hook sends a tool call to ctx_execute or ctx_index; the full output goes into context.db and a small reply returns. At compaction a snapshot keeps the state, and ctx_resume and ctx_search read it back.">
 </picture>
 
-**Figure 3.** context-mode works beside the agent, on tool output, in a local sandbox. Context Mode Gateway runs between the client and the model API and works on the whole request and the whole account. You can use both together.
+**Figure 3.** Each tool call: the hook sends large output to the sandbox or the index, the full copy goes into `context.db`, and the agent gets a small reply. At compaction: a snapshot of at most 2,048 B keeps the state, and `ctx_resume` and `ctx_search` read it back.
 
-**Table 3.** Gateway cost against Claude Code alone, Claude Opus 5.5. Mean dollars per session at list price.
+The context grows with each reply, and the replies stay small. Bench of 2026-10-31, median of 5 runs, [bench/results/2026-10-31-darwin-arm64.json](bench/results/2026-10-31-darwin-arm64.json):
 
-| Session | Direct | Gateway | Change | Rule check | Raw file |
-|---|---:|---:|---:|---|---|
-| Six short tasks (2026-09-29) | | | -21% to -29% per task, -24.5% pooled | cheaper in 84 of 88 pairs; all 176 sessions passed the task check | [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json) |
-| Long session, 200K window (2026-10-03/04) | $4.86 | $3.04 | -37.6% | 3 of 3 pre-registered pairs passed; 0 compactions against 3 | [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json) |
-| Long session, 1M window, 30 steps (2026-10-03) | $7.24 | $2.97 | -59.0% | 3 of 4 pairs passed the exact-accuracy rule | [ab.json](https://contextmode.ai/benchmarks/long-session/amendment-4/ab.json) |
-
-The longer the session, the more the Gateway saves: a long session has more history to fold.
-On the five counted "try it" prompts (2026-10-22, Claude Opus 5.5) the Gateway cost 43.8% less, but it passed the task check in 15 of 20 sessions against 20 of 20 direct.
-We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks).
+- Debugging session, 8 real outputs and 3 searches: 274.7 KB raw, 3.4 KB entered the context. Row [g-session-total](bench/g-overhead/README.md#g-session-total).
+- Long session, 40 outputs, then compaction: a 432.5 KB transcript, a 2.0 KB `ctx_resume` block. Row [e-long-session](bench/e-continuity/README.md#e-long-session).
+- One large log: 651.2 KB of output, a 15.3 KB reply; `ctx_search` finds its first, middle and last line (3 of 3). Row [d-synth-1m](bench/d-externalize/README.md#d-synth-1m).
 
 ## Install
 
@@ -254,7 +248,7 @@ CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the pa
 
 ## 6. Performance
 
-**Table 4.** Time cost, median of 5 runs, bench of 2026-10-31.
+**Table 3.** Time cost, median of 5 runs, bench of 2026-10-31.
 
 | Measure | Result |
 |---|---|
@@ -280,7 +274,7 @@ Code from `ctx_execute` runs on your host as your user, with your environment (m
 Context Mode Gateway is the paid product. The plugin works beside the agent, on tool output. The Gateway runs between your agent and the model API and works on every request and the whole account.
 It adds account-wide features: Recall for sessions longer than the window, Memory shared by all your agents, Skills, Search over everything that passed through, and Protect.
 
-**Table 5.** Context Mode Gateway features, from [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works).
+**Table 4.** Context Mode Gateway features, from [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works).
 
 | Feature | What it does | What you get | Details |
 |---|---|---|---|
@@ -295,6 +289,13 @@ It adds account-wide features: Recall for sessions longer than the window, Memor
 | Protect | A tool-call firewall: checks shell commands, file reads and writes, web fetches and tool-server calls by what they do | Each call checked before it runs | Reads the call itself, so keep your agent's sandbox on for script files and paths built at run time; opt-in |
 | Prompt caching | Keeps requests cache-friendly: cache marks on the fixed part of the prompt and a cache for fetched pages | Inside the measured costs above | Uses up to 4 cache marks, the provider's maximum |
 | Live and Analytics | Shows each request and what the Gateway saved, as it happens and over time | See each request and its saving, live and over time | Covers every request that passes through the Gateway |
+
+Gateway cost against Claude Code alone, Claude Opus 5.5, mean dollars per session at list price:
+
+- Six short tasks (2026-09-29): 21% to 29% cheaper per task, 24.5% pooled, cheaper in 84 of 88 pairs. [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json)
+- Long session, 200K window (2026-10-03/04): $4.86 to $3.04 (-37.6%), 3 of 3 pre-registered pairs passed. [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json)
+- Long session, 1M window, 30 steps (2026-10-03): $7.24 to $2.97 (-59.0%), 3 of 4 pairs passed the exact-accuracy rule. [ab.json](https://contextmode.ai/benchmarks/long-session/amendment-4/ab.json)
+- We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks).
 
 Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi.
 Setup is one command, `npx @context-mode/cli`. It signs you in and writes one config change per agent (it needs Node 20.12 or later).

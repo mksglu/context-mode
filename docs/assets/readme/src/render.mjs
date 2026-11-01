@@ -16,7 +16,7 @@ const FIGS = [
   { name: 'hero', w: 1280, h: 640 },
   { name: 'fig-saving', w: 1280, h: 720 },
   { name: 'fig-flow', w: 1280, h: 640 },
-  { name: 'fig-layers', w: 1280, h: 720 },
+  { name: 'fig-oss', w: 1280, h: 720 },
   { name: 'star-history', w: 1280, h: 640 },
 ];
 const MAX = 400 * 1024; // 2x PNGs; the README total stays under 2 MB (build/readme-links.mjs)
