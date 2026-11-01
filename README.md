@@ -340,21 +340,6 @@ The license keeps two uses for the licensor:
 
 We chose ELv2 so the source stays open to all and the hosted service stays with the project.
 
-## Cite
-
-If you use Context Mode in research, cite it as below. GitHub also reads [CITATION.cff](CITATION.cff).
-
-```bibtex
-@software{koseoglu_context_mode_2026,
-  author  = {Koseoglu, Mert},
-  title   = {Context Mode: Keeping Tool Output Out of a Coding Agent's Context Window},
-  year    = {2026},
-  version = {2.0.0-next.21},
-  url     = {https://github.com/mksglu/context-mode},
-  license = {Elastic-2.0}
-}
-```
-
 ## Support
 
 Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report.

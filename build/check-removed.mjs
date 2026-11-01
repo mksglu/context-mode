@@ -123,7 +123,6 @@ const ALLOWED_FILES = [
   "docs/how-it-works.md", "docs/tools.md", "docs/algorithms.md", "docs/performance.md", "docs/UPSTREAM-CREDITS.md",
   // Root files.
   "README.md", "CONTRIBUTING.md", "LICENSE", "stats.json", "package.json", "tsconfig.json", ".gitignore", ".gitattributes",
-  "CITATION.cff", // D-README-THESIS-1
 ];
 
 // v1 test files that cleanup-plan §3 leaves open for an owner decision (platform rollup forward

@@ -4,7 +4,7 @@ import { describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1147,7 +1147,7 @@ describe("ADR-0015 / ADR-0024 repo: no dev folders, no v2 dir names (D-REPO-CLEA
 
 describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", () => {
   // Owner 2026-11-01: the README is written as a paper. Every relative link and image must exist, the figures stay
-  // under 2 MB and out of the npm tarball, the paper cites itself through CITATION.cff, and runs that failed their own
+  // under 2 MB and out of the npm tarball, there is no CITATION.cff (D-README-NO-CITE-1), and runs that failed their own
   // pre-registered rule never appear as a number.
   const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
@@ -1204,13 +1204,11 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(rows[0].includes("akademik bir tez"));
   });
 
-  test("README has the paper parts and CITATION.cff names the same title", () => {
+  test("README has its parts, and no citation file or block (D-README-NO-CITE-1)", () => {
     const readme = readRepo("README.md");
-    for (const part of ["## Abstract", "## Scope", "## License", "## Cite", "```bibtex", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
-    const cff = readRepo("CITATION.cff");
-    assert.ok(cff.startsWith("cff-version: 1.2.0\n"));
-    assert.ok(cff.includes("title: \"Context Mode"));
-    assert.ok(cff.includes("license: Elastic-2.0"));
+    for (const part of ["## Abstract", "## Scope", "## License", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
+    assert.ok(!existsSync(path.join(REPO, "CITATION.cff")), "CITATION.cff is back (owner 2026-11-01: CITATION.cff e gerek yok)");
+    for (const bad of ["## Cite", "```bibtex", "CITATION.cff"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
   });
 
   test("README: Gateway section comes first after the badges, and no failed run is quoted", () => {
