@@ -321,15 +321,6 @@ Keep your agent's own sandbox on next to Protect.
 - **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
 - **Companies.** Engineers at the companies under Figure 1 starred the repo.
 
-## Scope
-
-- The plugin bench measures bytes. A token count here is bytes / 4, an estimate. Dollar results come from the Gateway runs.
-- Big outputs gain the most. Search replies (category b) return text on purpose, with a smaller cut; the full file lists them.
-- The bench ran on macOS arm64 on 2.0.0-next.8; the live hook proof is for 2.0.0-next.15.
-- Live hook proof covers 8 of 10 agents (section 5). Two Windows shell defects are open (Qwen Code, Kiro).
-- Gateway costs come from Claude Code on Claude Opus 5.5. On the 1M-window run, 3 of 4 pairs passed the exact-accuracy rule.
-- Open work and its status: [OPEN-ITEMS.md](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/OPEN-ITEMS.md).
-
 ## License
 
 [Elastic License 2.0](LICENSE) (ELv2), source-available. You may use, copy, change and share the code, and use it at work.

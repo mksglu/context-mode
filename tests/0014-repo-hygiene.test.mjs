@@ -1206,7 +1206,9 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
 
   test("README has its parts, and no citation file or block (D-README-NO-CITE-1)", () => {
     const readme = readRepo("README.md");
-    for (const part of ["## Abstract", "## Scope", "## License", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
+    for (const part of ["## Abstract", "## License", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
+    for (const bad of ["## Scope", "## Limitations", "## Known"]) assert.ok(!readme.includes(bad), `README has ${bad} (D-README-NO-SCOPE-1)`);
+    assert.ok(!readme.includes("OPEN-ITEMS"), "README points to OPEN-ITEMS (D-README-NO-SCOPE-1)");
     assert.ok(!existsSync(path.join(REPO, "CITATION.cff")), "CITATION.cff is back (owner 2026-11-01: CITATION.cff e gerek yok)");
     for (const bad of ["## Cite", "```bibtex", "CITATION.cff"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
   });
