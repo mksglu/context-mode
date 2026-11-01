@@ -4,7 +4,7 @@ Thank you for the retest. Your regression checks on Codex 0.166 and Claude Deskt
 
 ## 1. npm README links
 
-The links in the npm README pointed at `main`. They now point at the release tag. We opened the README of `context-mode@next` (2.0.0-next.24): 80 links and images, 78 returned 200. The other 2 are the npm package page (it answers scripts with 403) and the Discord invite (our machine could not reach it). All 55 links and images that point into our repository use the tag `v2.0.0-next.24`, and every linked file exists at that tag.
+The links in the npm README pointed at `main`. They now point at the release tag. We opened the README of `context-mode@next` (2.0.0-next.24): 80 links and images, 78 returned 200. The other 2 are the npm package page (it answers scripts with 403) and the Discord invite (it timed out from our machine). All 55 links and images that point into our repository use the tag `v2.0.0-next.24`, and every linked file exists at that tag.
 
 ## 2. Source label
 
