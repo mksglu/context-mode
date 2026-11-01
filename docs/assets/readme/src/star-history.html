@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README star-history 1280x640</title>
+<script>var T=new URLSearchParams(location.search).get('theme')||'dark';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<style>:root{--w:1280px;--h:640px}.h2{position:absolute;left:64px;top:84px;font-size:40px}.tl{font-family:var(--mono);font-size:11px;fill:var(--muted)}</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="abs eyebrow" style="left:64px;top:52px">GitHub stars, mksglu/context-mode</div>
+<div class="h h2">33,046 stars <em>since 2026-02-23.</em></div>
+<svg id="sv" class="abs" style="left:64px;top:160px" width="1152" height="380"></svg>
+<div class="cap">Cumulative stars per day, from the GitHub stargazers API (starred_at), read 2026-11-01. Hacker News #1 on 2026-02-28.</div>
+</main>
+<script>
+var D=[["2026-02-23",5],["2026-03-02",1908],["2026-03-09",2984],["2026-03-16",4722],["2026-03-23",5566],["2026-03-30",6053],["2026-04-06",6461],["2026-04-13",6951],["2026-04-20",8193],["2026-04-27",10381],["2026-05-04",12228],["2026-05-11",13975],["2026-05-18",14693],["2026-05-25",15294],["2026-06-01",15821],["2026-06-08",16330],["2026-06-15",17140],["2026-06-22",17589],["2026-06-29",17996],["2026-07-06",18322],["2026-07-13",18585],["2026-07-20",18821],["2026-07-27",19092],["2026-08-03",19319],["2026-08-10",19517],["2026-08-17",19682],["2026-08-24",19893],["2026-08-31",20068],["2026-09-07",20607],["2026-09-14",22642],["2026-09-21",23681],["2026-09-28",24003],["2026-10-05",25332],["2026-10-12",27136],["2026-10-19",30973],["2026-10-26",32389],["2026-11-01",33046]];var sv=document.getElementById("sv"),NS="http://www.w3.org/2000/svg";
+var W=1152,H=380,L=60,B=30,max=35000;
+function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);sv.appendChild(e);return e}
+var t0=Date.parse(D[0][0]),t1=Date.parse(D[D.length-1][0]);
+function X(d){return L+(W-L-10)*(Date.parse(d)-t0)/(t1-t0)}function Y(v){return H-B-(H-B-10)*v/max}
+for(var v=0;v<=max;v+=5000){el("line",{x1:L,x2:W-10,y1:Y(v),y2:Y(v),stroke:"var(--card-b)","stroke-dasharray":"3 4"});var tx=el("text",{x:L-10,y:Y(v)+4,"text-anchor":"end",class:"tl"});tx.textContent=v.toLocaleString("en-US")}
+["2026-03-01","2026-05-01","2026-07-01","2026-09-01","2026-11-01"].forEach(function(d){var tx=el("text",{x:X(d),y:H-8,"text-anchor":"middle",class:"tl"});tx.textContent=d.slice(0,7)});
+var p=D.map(function(d,i){return (i?"L":"M")+X(d[0]).toFixed(1)+" "+Y(d[1]).toFixed(1)}).join(" ");
+el("path",{d:p+" L"+X(D[D.length-1][0])+" "+Y(0)+" L"+X(D[0][0])+" "+Y(0)+" Z",fill:"var(--accent)",opacity:"0.12"});
+el("path",{d:p,fill:"none",stroke:"var(--accent)","stroke-width":"3"});
+</script></body></html>

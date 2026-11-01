@@ -11,6 +11,7 @@ node_modules/
 !/build/manifests.ts
 !/build/main-tree.mjs
 !/build/readme-agents.mjs
+!/build/readme-links.mjs
 # v2 build output and the prompt file build.mjs generates and deletes (impl/13 §2.2)
 release-out/
 src/prompt/_generated.ts

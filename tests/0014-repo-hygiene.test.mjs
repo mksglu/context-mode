@@ -1144,3 +1144,84 @@ describe("ADR-0015 / ADR-0024 repo: no dev folders, no v2 dir names (D-REPO-CLEA
     assert.deepEqual(unpinned("a tickets/x and my-tickets/y", "tickets/"), [2]);
   });
 });
+
+describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", () => {
+  // Owner 2026-11-01: the README is written as a paper. Every relative link and image must exist, the figures stay
+  // under 2 MB and out of the npm tarball, the paper cites itself through CITATION.cff, and runs that failed their own
+  // pre-registered rule never appear as a number.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
+
+  test("readme-links: finds markdown targets and HTML src/srcset/href targets", async () => {
+    const { readmeTargets, localPath, missingTargets } = await import("../build/readme-links.mjs");
+    const text = '[a](docs/x.md#y) ![b](https://e.com/p.png)\n<img src="a/b.png" alt="b"> <source srcset="c.png" media="m"> <a href="#top">t</a>';
+    assert.deepEqual(readmeTargets(text), ["docs/x.md#y", "https://e.com/p.png", "a/b.png", "c.png", "#top"]);
+    assert.equal(localPath("./docs/x.md#y"), "docs/x.md");
+    assert.equal(localPath('LICENSE "title"'), "LICENSE");
+    const dir = mkdtempSync(path.join(tmpdir(), "readme-links-"));
+    try {
+      mkdirSync(path.join(dir, "a"));
+      writeFileSync(path.join(dir, "a", "b.png"), "x");
+      assert.deepEqual(missingTargets(text, dir), ["docs/x.md#y", "c.png"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("README: every relative link and image path exists", async () => {
+    const { missingTargets } = await import("../build/readme-links.mjs");
+    assert.deepEqual(missingTargets(readRepo("README.md"), REPO), []);
+  });
+
+  test("README figures: dark and light PNG per figure, used with <picture>, at most 2 MB in total", async () => {
+    const { README_ASSET_DIR, README_IMAGES_MAX_BYTES, readmeImageBytes } = await import("../build/readme-links.mjs");
+    const readme = readRepo("README.md");
+    const pngs = readdirSync(path.join(REPO, README_ASSET_DIR)).filter((f) => f.endsWith(".png")).sort();
+    assert.ok(pngs.length >= 2);
+    for (const f of pngs.filter((p) => p.endsWith("-dark.png"))) {
+      const light = f.replace("-dark.png", "-light.png");
+      assert.ok(pngs.includes(light), `${f} has no light twin`);
+      assert.ok(readme.includes(`srcset="${README_ASSET_DIR}/${f}"`), `README lacks the dark source ${f}`);
+      assert.ok(readme.includes(`src="${README_ASSET_DIR}/${light}"`), `README lacks the light img ${light}`);
+    }
+    assert.ok(readme.split("<picture>").length === readme.split("</picture>").length);
+    assert.ok(readmeImageBytes(REPO) <= README_IMAGES_MAX_BYTES, `README images ${readmeImageBytes(REPO)} B over 2 MB`);
+  });
+
+  test("README figures stay out of the npm tarball", () => {
+    const files = JSON.parse(readRepo("package.json")).files ?? [];
+    assert.ok(files.every((f) => !f.startsWith("docs")), `package.json files ships docs: ${files.join(", ")}`);
+    const manifests = readRepo("build/manifests.ts");
+    const out = manifests.slice(manifests.indexOf("export const OUT_FILES"), manifests.indexOf("].slice().sort()"));
+    assert.ok(!out.includes('"docs'), "OUT_FILES names a docs path");
+  });
+
+  test("README line cap is 400 and its DEVIATIONS row quotes the owner", async () => {
+    const { README_MAX_LINES } = await import("../src/core/contracts/constants.ts");
+    assert.equal(README_MAX_LINES, 400);
+    const rows = readRepo("docs/architecture/modules/DEVIATIONS.md").split("\n").filter((l) => l.includes("D-README-THESIS-1"));
+    assert.equal(rows.length, 1);
+    assert.ok(rows[0].includes("akademik bir tez"));
+  });
+
+  test("README has the paper parts and CITATION.cff names the same title", () => {
+    const readme = readRepo("README.md");
+    for (const part of ["## Abstract", "## Limitations", "## License", "## Cite", "```bibtex", "Figure 1.", "Table 1."]) assert.ok(readme.includes(part), `README lacks ${part}`);
+    const cff = readRepo("CITATION.cff");
+    assert.ok(cff.startsWith("cff-version: 1.2.0\n"));
+    assert.ok(cff.includes("title: \"Context Mode"));
+    assert.ok(cff.includes("license: Elastic-2.0"));
+  });
+
+  test("README: Gateway section comes first after the badges, and no failed run is quoted", () => {
+    const readme = readRepo("README.md");
+    const gw = readme.indexOf("Context Mode Gateway");
+    assert.ok(gw > 0 && gw < readme.indexOf("## Abstract"), "the Gateway line must sit above the Abstract");
+    assert.ok(readme.includes("1,000 requests a month"));
+    assert.ok(readme.includes("https://contextmode.ai/pricing"));
+    // Runs that failed their own pre-registered rule (gateway-paid.md §2) and claims with no raw source.
+    for (const bad of ["65.5%", "54.9%", "$2.49", "$1.88", "80x", "315 KB becomes"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
+    assert.ok(readme.includes("3 of 4 pairs passed the exact-accuracy rule"));
+    for (const l of readme.split("\n").filter((x) => x.includes("43.8%"))) assert.ok(l.includes("15 of 20"), "-43.8% without its task-check loss");
+  });
+});

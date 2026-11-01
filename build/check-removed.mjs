@@ -103,6 +103,7 @@ const ALLOWED_DIRS = [
   "src/cli/", "src/setup/", // ADR-0019 D5-D7: npm CLI and setup engine (D-CR-0019-1)
   "tests/_lib/", "tests/fixtures/", "tests/e2e/", "tests/ops/", "e2e/", "build/", "bench/", "metrics/",
   "docs/architecture/", "docs/install/",
+  "docs/assets/readme/", // README figures and their sources (D-README-THESIS-1)
   "scripts/release/",
   ".github/",
   ".claude-plugin/", ".codex-plugin/", ".agents/plugins/",
@@ -122,6 +123,7 @@ const ALLOWED_FILES = [
   "docs/how-it-works.md", "docs/tools.md", "docs/algorithms.md", "docs/performance.md", "docs/UPSTREAM-CREDITS.md",
   // Root files.
   "README.md", "CONTRIBUTING.md", "LICENSE", "stats.json", "package.json", "tsconfig.json", ".gitignore", ".gitattributes",
+  "CITATION.cff", // D-README-THESIS-1
 ];
 
 // v1 test files that cleanup-plan §3 leaves open for an owner decision (platform rollup forward
