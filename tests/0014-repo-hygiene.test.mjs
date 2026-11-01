@@ -1157,6 +1157,13 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
 
+  test("CONTRIBUTING.md links and the issue bot's AGENT_ISSUE.md exist in the repo (D-AGENT-ISSUE-1)", async () => {
+    const { missingTargets } = await import("../build/readme-links.mjs");
+    assert.deepEqual(missingTargets(readRepo("CONTRIBUTING.md"), REPO), []);
+    assert.ok(readRepo(".github/scripts/issue-intake-act.mjs").includes("/.github/AGENT_ISSUE.md"));
+    assert.ok(readRepo(".github/AGENT_ISSUE.md").startsWith("# Filing a context-mode issue (for coding agents)"));
+  });
+
   test("readme-links: finds markdown targets and HTML src/srcset/href targets", async () => {
     const { readmeTargets, localPath, missingTargets } = await import("../build/readme-links.mjs");
     const text = '[a](docs/x.md#y) ![b](https://e.com/p.png)\n<img src="a/b.png" alt="b"> <source srcset="c.png" media="m"> <a href="#top">t</a>';
