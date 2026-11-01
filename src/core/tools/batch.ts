@@ -106,7 +106,7 @@ async function runCommand(cmd: string, shell: string | null, ctx: ToolContext, d
 
 /** Why indexing stopped before the end: the Q8 deadline (or a cancel), or the ingest byte budget. */
 type IndexStop = "deadline" | "budget" | null;
-interface Indexed { bodies: Map<string, string>; indexed: number; total: number; stop: IndexStop; }
+interface Indexed { bodies: Map<string, string>; raw: Map<string, string>; indexed: number; total: number; stop: IndexStop; }
 
 function chunkKey(sourceId: number, ord: number): string {
   return sourceId + ":" + ord;
@@ -134,6 +134,7 @@ function indexCombined(db: DbHandle, ctx: ToolContext, label: string, ran: CmdOu
   const chunks = chunkText(ran.map((r) => r.block).join(BLOCK_SEP), "text");
   const display = shown(chunks, ran.map((r) => r.head));
   const bodies = new Map<string, string>();
+  const raw = new Map<string, string>(); // the indexed text with its `$ <command>` marker, for output no query showed
   let total = 0;
   for (const c of chunks) total += c.bytes;
   let indexed = 0;
@@ -156,7 +157,7 @@ function indexCombined(db: DbHandle, ctx: ToolContext, label: string, ran: CmdOu
       chunkCount: group.length,
       createdAt: Date.now(),
     }, group);
-    for (const c of group) bodies.set(chunkKey(id, c.ord), display[c.ord]);
+    for (const c of group) { bodies.set(chunkKey(id, c.ord), display[c.ord]); raw.set(chunkKey(id, c.ord), c.text); }
     indexed += groupBytes;
     group = [];
     groupBytes = 0;
@@ -165,15 +166,15 @@ function indexCombined(db: DbHandle, ctx: ToolContext, label: string, ran: CmdOu
   for (const c of chunks) {
     if (queued + c.bytes > budgetBytes) {
       const stop: IndexStop = flush() ? "budget" : "deadline"; // flush first: it adds to `indexed`
-      return { bodies, indexed, total, stop };
+      return { bodies, raw, indexed, total, stop };
     }
-    if (group.length > 0 && groupBytes + c.bytes > INDEX_WRITE_CHUNK && !flush()) return { bodies, indexed, total, stop: "deadline" };
+    if (group.length > 0 && groupBytes + c.bytes > INDEX_WRITE_CHUNK && !flush()) return { bodies, raw, indexed, total, stop: "deadline" };
     group.push(c);
     groupBytes += c.bytes;
     queued += c.bytes;
   }
   const stop: IndexStop = flush() ? null : "deadline";
-  return { bodies, indexed, total, stop };
+  return { bodies, raw, indexed, total, stop };
 }
 
 // ---- steps 6-8: answer each query inside its share ----
@@ -184,7 +185,7 @@ function bytes(s: string): number {
 
 // Each query is one LIMIT SEARCH_PAGE_SIZE lookup, a fixed cost, so the queries run after a timeout
 // too and show what ran (D-M2-T11-1); only a cancel stops them.
-function answer(db: DbHandle, ctx: ToolContext, label: string, queries: string[], share: number, own: Map<string, string>): string[] {
+function answer(db: DbHandle, ctx: ToolContext, label: string, queries: string[], share: number, own: Map<string, string>): { lines: string[]; seen: Set<string> } {
   const seen = new Set<string>(); // step 7: a (sourceId, ord) already shown is not shown again
   const lines: string[] = [];
   for (const [qi, q] of queries.entries()) {
@@ -211,7 +212,7 @@ function answer(db: DbHandle, ctx: ToolContext, label: string, queries: string[]
     else if (body.length === 0) body.push("No new section.");
     lines.push(head, ...body);
   }
-  return lines;
+  return { lines, seen };
 }
 
 // ---- handler ----
@@ -242,10 +243,12 @@ export async function runBatch(input: unknown, ctx: ToolContext, boundMs: number
     const db = await openDb(ctx.project);
     let sections: string[];
     let idx: Indexed;
-    const summary = commands.length + " command(s), " + queries.length + " querie(s), exit " + last.exitCode; // step 9
+    // D-BATCH-FRAMING-1: no counts line (the caller holds its commands and queries); the exit code only when it is news.
+    const exitLine = last.exitCode === null || last.exitCode === 0 ? null : "exit " + last.exitCode;
     // Step 8 template, `[...]` kept as written (D-M2-T11-1): the caller holds its queries.
     const footer = "more: ctx_search({queries:[...], source:" + JSON.stringify(label) + "})";
     let notice: string | null;
+    let showMore: boolean;
     try {
       // Steps 3-5: what ran is indexed, a stopped command's block carries its error line.
       idx = indexCombined(db, ctx, label, ran, deadline, budgetBytes);
@@ -255,13 +258,22 @@ export async function runBatch(input: unknown, ctx: ToolContext, boundMs: number
       // The cause in front of the cut line: a stopped command, else a cancel, else what ended the ingest.
       const cause = stop ?? (ctx.signal.aborted ? CANCELLED_LINE : idx.stop === "deadline" ? timeout : null);
       notice = cut === null ? stop : cause === null ? cut : cause + " " + cut;
-      const fixed = bytes(summary) + 1 + (notice === null ? 0 : bytes(notice) + 1) + bytes(footer);
+      // The footer budget is reserved always, so printing it later never pushes the reply past OUTPUT_CAP.
+      const fixed = (exitLine === null ? 0 : bytes(exitLine) + 1) + (notice === null ? 0 : bytes(notice) + 1) + bytes(footer);
       const share = Math.floor((OUTPUT_CAP - fixed) / queries.length);
-      sections = answer(db, ctx, label, queries, share, idx.bodies);
+      const answered = answer(db, ctx, label, queries, share, idx.bodies);
+      sections = answered.lines;
+      // Output no query showed: a little is printed with its marker (cheaper than the pointer, and nothing
+      // is left out); more than that, or an ingest cut, gets the pointer.
+      const unseen = [...idx.bodies].filter(([k, text]) => text !== "" && !answered.seen.has(k)).map(([k]) => idx.raw.get(k) as string);
+      const unseenBytes = unseen.reduce((n, t) => n + bytes(t) + 1, 0);
+      if (unseen.length === 0 && cut === null) showMore = false;
+      else if (cut === null && unseenBytes <= bytes(footer) + 1) { showMore = false; sections = [...sections, ...unseen.map((t) => t.endsWith(LINE_SEP) ? t.slice(0, -1) : t)]; }
+      else showMore = true;
     } finally {
       closeDb(db);
     }
-    const lines = [summary, ...(notice === null ? [] : [notice]), ...sections, footer];
+    const lines = [...(exitLine === null ? [] : [exitLine]), ...(notice === null ? [] : [notice]), ...sections, ...(showMore ? [footer] : [])];
     return {
       text: capBytes(lines.join(LINE_SEP), OUTPUT_CAP).text, // step 10: final bound (D-M2-6)
       isError: false, // step 11

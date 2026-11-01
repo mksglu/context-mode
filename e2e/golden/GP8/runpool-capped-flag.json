@@ -3,7 +3,7 @@
     "content": [
       {
         "type": "text",
-        "text": "2 command(s), 2 querie(s), exit 0\n## job1\njob1\n## job2\njob2\nmore: ctx_search({queries:[...], source:\"ctx_batch:0\"})"
+        "text": "## job1\njob1\n## job2\njob2"
       }
     ],
     "isError": false

@@ -2,7 +2,7 @@
   "content": [
     {
       "type": "text",
-      "text": "1 command(s), 1 querie(s), exit 0\n## v\n<node-version>\nmore: ctx_search({queries:[...], source:\"ctx_batch:0\"})"
+      "text": "## v\n<node-version>"
     }
   ],
   "isError": false

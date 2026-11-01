@@ -1579,13 +1579,13 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         } finally { rmSync(root, { recursive: true, force: true }); }
       });
 
-      test("[W1-core] #736: ctx_batch section names each command's output; summary line counts commands", async () => {
+      test("[W1-core] #736: ctx_batch section names each command's output; no counts line (D-BATCH-FRAMING-1)", async () => {
         const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-echo2-")));
         try {
           const out = await ctxBatch.handler({ commands: ["echo alpha", "echo beta"], queries: ["alpha"] }, ctxFor(root));
           assert.equal(out.isError, false);
-          assert.ok(out.text.startsWith("2 command(s)"));
-          assert.ok(out.text.includes("alpha"));
+          assert.equal(out.text.includes("command(s)"), false);
+          assert.ok(out.text.startsWith("## alpha\nalpha"));
         } finally { rmSync(root, { recursive: true, force: true }); }
       });
 

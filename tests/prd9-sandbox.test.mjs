@@ -396,11 +396,12 @@ describe("PRD-v2 section 9: ctx_batch", { concurrency: CONC }, () => {
     }
   });
 
-  test("ctxBatch summary line reports command and query counts plus last exit code", async () => {
+  test("ctxBatch reply carries no counts line (D-BATCH-FRAMING-1); a failing last command adds its exit code", async () => {
     const root = mkdtempSync(join(tmpdir(), "cm-ba5-"));
     try {
-      const out = await ctxBatch.handler({ commands: ["echo a", "echo b"], queries: ["a"] }, ctxFor(root));
-      assert.ok(/2 command\(s\), 1 querie\(s\), exit \d+/.test(out.text));
+      const out = await ctxBatch.handler({ commands: ["echo a", "echo b; exit 2"], queries: ["a"] }, ctxFor(root));
+      assert.equal(out.text.includes("command(s)"), false);
+      assert.ok(out.text.startsWith("exit 2\n## a\n"));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -444,9 +445,55 @@ describe("PRD-v2 section 9: ctx_batch", { concurrency: CONC }, () => {
     try {
       const out = await ctxBatch.handler({ commands: ["for i in $(seq 1 3000); do echo \"row $i needle\"; echo; done"], queries: ["needle", "row"] }, ctxFor(root));
       assert.ok(Buffer.byteLength(out.text) <= 16384);
-      assert.ok(out.text.startsWith("1 command(s), 2 querie(s), exit 0"));
+      assert.ok(out.text.startsWith("## needle\n")); // D-BATCH-FRAMING-1: no counts line, exit 0 is not printed
       assert.ok(out.text.trimEnd().endsWith('source:"ctx_batch:1"})'));
       assert.ok(out.sandboxBytes > 16384);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // D-BATCH-FRAMING-1: the reply repeats nothing the model already holds (its own command and query counts)
+  // and prints the `more:` pointer only when output was left out. A reply whose output is all shown is
+  // the query headings plus the output: the floor of a tiny reply.
+  test("ctx_batch (D-BATCH-FRAMING-1): tiny outputs come back plain, no counts line, no pointer", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-bf1-"));
+    try {
+      const out = await ctxBatch.handler({ commands: ["echo alpha-xyz", "echo beta-xyz"], queries: ["alpha-xyz", "beta-xyz"] }, ctxFor(root));
+      assert.equal(out.isError, false);
+      assert.equal(out.text, "## alpha-xyz\nalpha-xyz\n## beta-xyz\nbeta-xyz");
+      assert.equal(out.text.includes("command(s)"), false);
+      assert.equal(out.text.includes("more:"), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("ctx_batch (D-BATCH-FRAMING-1): output no query showed is printed whole when it is smaller than the pointer", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-bf2-"));
+    try {
+      const out = await ctxBatch.handler({ commands: ["echo one-aaa", "echo two-bbb"], queries: ["one-aaa"] }, ctxFor(root));
+      assert.equal(out.text, "## one-aaa\none-aaa\n$ echo two-bbb\ntwo-bbb"); // nothing left out, no pointer
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("ctx_batch (D-BATCH-FRAMING-1): the pointer is printed when unshown output is larger than the pointer", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-bf4-"));
+    try {
+      const out = await ctxBatch.handler({ commands: ["echo one-aaa", "echo two-" + "b".repeat(200)], queries: ["one-aaa"] }, ctxFor(root));
+      assert.equal(out.text, '## one-aaa\none-aaa\nmore: ctx_search({queries:[...], source:"ctx_batch:1"})');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("ctx_batch (D-BATCH-FRAMING-1): the exit line appears only when the last command did not exit 0", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-bf3-"));
+    try {
+      const out = await ctxBatch.handler({ commands: ["echo fail-xyz; exit 3"], queries: ["fail-xyz"] }, ctxFor(root));
+      assert.equal(out.text, "exit 3\n## fail-xyz\nfail-xyz");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

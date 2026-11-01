@@ -2,7 +2,7 @@
   "content": [
     {
       "type": "text",
-      "text": "1 command(s), 1 querie(s), exit 0\n## ok\nok\nmore: ctx_search({queries:[...], source:\"ctx_batch:0\"})"
+      "text": "## ok\nok"
     }
   ],
   "isError": false

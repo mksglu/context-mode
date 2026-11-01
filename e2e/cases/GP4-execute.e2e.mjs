@@ -274,7 +274,7 @@ test("[M2] GP4/node-options-no-leak-across-servers", async () => {
   // reply holds the version of the `node` the batch shell finds on PATH, then golden on a placeholder.
   const nodeV = execFileSync("node", ["-v"], { env: ENV, encoding: "utf8" }).trim();
   const textB = replyB.content?.[0]?.text ?? "";
-  assert.ok(textB.includes(`\n${nodeV}\n`), `reply holds ${nodeV}: ${textB}`);
+  assert.ok(textB.split("\n").includes(nodeV), `reply holds ${nodeV} as a whole line: ${textB}`); // D-BATCH-FRAMING-1: the reply may end on it (no pointer line)
   const stableB = textB.split(nodeV).join("<node-version>");
   golden("node-options-no-leak-across-servers", { ...replyB, content: [{ ...replyB.content[0], text: stableB }] });
 });

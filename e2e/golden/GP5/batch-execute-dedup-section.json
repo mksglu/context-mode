@@ -2,7 +2,7 @@
   "content": [
     {
       "type": "text",
-      "text": "1 command(s), 2 querie(s), exit 0\n## zebraquartz\nalpha zebraquartz omega\n## alpha zebraquartz\nNo new section.\nmore: ctx_search({queries:[...], source:\"ctx_batch:0\"})"
+      "text": "## zebraquartz\nalpha zebraquartz omega\n## alpha zebraquartz\nNo new section."
     }
   ],
   "isError": false

@@ -186,7 +186,7 @@ test("[M2] GP8/runpool-capped-flag: ctx_batch runs every queued command to compl
 
   assert.equal(reply.isError, false, "two commands, no stop condition: the batch must not report an error");
   const text = reply.content[0].text;
-  assert.ok(text.startsWith("2 command(s)"), "the summary must count both queued commands as run");
+  assert.ok(text.startsWith("## job1\njob1\n## job2\njob2"), "both queued commands ran and were answered (D-BATCH-FRAMING-1: no counts line)");
   assert.ok(text.includes("job1") && text.includes("job2"), "both queued commands' output must have been indexed and found");
   checkGolden("GP8", "runpool-capped-flag", normalize({ reply }));
 });
