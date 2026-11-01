@@ -9,6 +9,7 @@ import path from "node:path";
 
 import { spawn } from "node:child_process";
 
+import { SERVER_KEY } from "../core/contracts/constants.ts";
 import { spawnForm, spawnShim, whichBin } from "./spawn-bin.ts";
 
 type Json = Record<string, unknown>;
@@ -194,4 +195,17 @@ export function hookHashOf(currentHash: string): string {
  *  hook hash (hookHashOf of currentHash) are used: no hash is computed here. */
 export function pluginTrustEntries(hooks: PluginHook[]): [readonly string[], unknown][] {
   return hooks.filter((h) => !h.trusted).map((h): [readonly string[], unknown] => [[...TRUST_KEY, h.key], { [HASH_FIELD]: hookHashOf(h.hash) }]);
+}
+
+/** The plugin id Codex gives our package (`codex plugin add context-mode@context-mode`). */
+export const CODEX_PLUGIN_ID = `${SERVER_KEY}@${SERVER_KEY}`;
+/** The one-line fix both doctors print when Codex lists our plugin hooks untrusted. */
+export const CODEX_UNTRUSTED_FIX = "run: context-mode setup";
+
+/** D-NI-CODEX-TRUST-3: the one trust check for the terminal doctor (hook-registered) and ctx_doctor (D5). Undefined when
+ *  every own plugin hook is trusted, or Codex listed none (setup route: hooks.json, checked elsewhere). */
+export function untrustedPluginHooksDetail(hooks: PluginHook[]): string | undefined {
+  const bad = hooks.filter((h) => !h.trusted);
+  if (!bad.length) return undefined;
+  return `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks untrusted, so they do not run; ${CODEX_UNTRUSTED_FIX}`;
 }

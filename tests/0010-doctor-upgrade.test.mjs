@@ -30,6 +30,7 @@ import { ctxDoctor, runDoctorChecks } from "../src/core/tools/doctor.ts";
 import { ctxUpgrade, runUpgrade } from "../src/core/tools/upgrade.ts";
 import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
 import { generateManifests } from "../build/manifests.ts";
+import { fakeCodexBin, trustedToml } from "./_lib/codex-fake.mjs";
 
 describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", { concurrency: CONC }, () => {
   // Spec: docs/architecture/modules/07-tools-ops.md §5 D3, D4, D5b; DEVIATIONS D-M5-arch-3, D-M5-D2-1..4.
@@ -837,6 +838,48 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
   test("[M5] doctor-hook/D5-codex-without-hooks-file-runs-round-trip (no trust case)", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, "garbage"), { agent: "codex" }));
     assert.equal(r.detail, C.D5_SHAPE_DETAIL);
+  });
+
+  // D-NI-CODEX-TRUST-3 (tester report, native Codex plugin route, before the user trusts the plugin hooks): the terminal doctor
+  // FAILed hook-registered, but ctx_doctor showed D3/D4/D5 PASS while `cat` still ran. The plugin route leaves no hooks.json in
+  // CODEX_HOME, so the D5 trust sub-case never ran, and the round trip calls hook.mjs itself, which proves nothing about Codex.
+  // D5 now asks Codex (hooks/list) the way the terminal doctor does. The fake app-server reports the 0.156.1 hash (plain)
+  // and, with FAKE_COMPOSITE=1, the 0.166 hash ("<hook hash>/<plugin hash>").
+  const SKIP_SH = { skip: process.platform === "win32" && "fake codex is an sh script" };
+  function nativeCodex(t, { toml = "", composite = false, fake = true } = {}) {
+    const dir = bundle(t, native);
+    const codexHome = path.join(dir, "codex-home");
+    mkdirSync(codexHome);
+    if (toml !== "") writeFileSync(path.join(codexHome, "config.toml"), toml);
+    const bin = fake ? fakeCodexBin(dir, process.execPath) : path.join(dir, "no-codex-bin");
+    const env = { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), CODEX_HOME: codexHome, ...(composite ? { FAKE_COMPOSITE: "1" } : {}) };
+    return input(dir, { agent: "codex", env, codexConfigDir: codexHome, worktree: dir });
+  }
+
+  for (const [format, composite] of [["0.156.1 hash", false], ["0.166 hash", true]]) {
+    test(`[D-NI-CODEX-TRUST-3] D5 native codex plugin, hooks untrusted (${format}): FAIL, same detail as the terminal doctor, fix names context-mode setup`, SKIP_SH, async (t) => {
+      const r = await checkHookRoundTrip(nativeCodex(t, { composite }));
+      assert.equal(r.status, "FAIL", JSON.stringify(r));
+      assert.equal(r.detail, "codex lists 4 of 4 context-mode plugin hooks untrusted, so they do not run; run: context-mode setup");
+      assert.equal(r.fixCommand, "context-mode setup --agents codex");
+    });
+
+    test(`[D-NI-CODEX-TRUST-3] D5 native codex plugin, hooks trusted (${format}): PASS`, SKIP_SH, async (t) => {
+      const r = await checkHookRoundTrip(nativeCodex(t, { composite, toml: trustedToml() }));
+      assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail: C.DOCTOR_PASS_DETAIL });
+    });
+  }
+
+  test("[D-NI-CODEX-TRUST-3] D5 native codex plugin: one untrusted hook of four is a FAIL that counts it", SKIP_SH, async (t) => {
+    const lines = trustedToml().split("\n\n");
+    const r = await checkHookRoundTrip(nativeCodex(t, { toml: lines.slice(1).join("\n\n") }));
+    assert.equal(r.status, "FAIL");
+    assert.match(r.detail, /^codex lists 1 of 4 /);
+  });
+
+  test("[D-NI-CODEX-TRUST-3] D5 with no answer from Codex (not on PATH) does not claim untrusted: the round trip decides", async (t) => {
+    const r = await checkHookRoundTrip(nativeCodex(t, { fake: false }));
+    assert.equal(r.status, "PASS", JSON.stringify(r));
   });
 
   test("[M5] doctor-hook/codexHookJournaled-filters-agent-codex", (t) => {

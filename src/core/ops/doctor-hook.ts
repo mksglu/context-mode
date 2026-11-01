@@ -16,6 +16,7 @@ import {
 import type { AgentId } from "../contracts/agents.ts";
 import type { DbHandle, DoctorRow } from "../contracts/types.ts";
 import { runProcess } from "../sandbox/spawn.ts";
+import { CODEX_PLUGIN_ID, listPluginHooks, untrustedPluginHooksDetail } from "../../setup/codex-trust.ts";
 
 /** One recorded hook call (D-M5-arch-4): the native event name and the payload the host sent. */
 interface FixtureEntry { event: string; payload: unknown; }
@@ -38,6 +39,9 @@ export interface HookCheckInput {
 // estimate is over the bound, up to D5_MAX_PAIRS. A really slow hook stays over the bound in every pair (D-D5-MORE-PAIRS-1).
 const D5_MIN_PAIRS = 3;
 const D5_MAX_PAIRS = 9;
+
+// The terminal doctor prints the same fix (hook-registered): setup trusts our own plugin hooks.
+const D5_CODEX_TRUST_FIX = "context-mode setup --agents codex";
 
 const row = (status: DoctorRow["status"], detail: string, fixCommand?: string): DoctorRow =>
   fixCommand === undefined
@@ -94,6 +98,13 @@ export function codexHookJournaled(db: DbHandle | null): boolean {
 
 /** D5 row. Never throws: a hook that cannot start is a FAIL on shape, a missing fixture is UNKNOWN. */
 export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> {
+  // D-NI-CODEX-TRUST-3: the native plugin route leaves no hooks.json, so the host is asked (hooks/list), as the terminal doctor does.
+  // A hook Codex lists untrusted never runs, whatever hook.mjs answers here. No answer from Codex: no claim, the round trip decides.
+  if (i.agent === "codex") {
+    const hooks = await listPluginHooks(i.env, CODEX_PLUGIN_ID, i.worktree ?? i.bundleDir);
+    const detail = hooks === undefined ? undefined : untrustedPluginHooksDetail(hooks);
+    if (detail !== undefined) return row("FAIL", detail, D5_CODEX_TRUST_FIX);
+  }
   // Codex trust sub-case (R6): hooks file on disk but Codex never ran one -> the one-time trust step.
   if (i.agent === "codex" && existsSync(path.join(i.codexConfigDir, HOOKS_JSON_FILE)) && !codexHookJournaled(i.db)) {
     return row("UNKNOWN", D5_CODEX_UNTRUSTED_DETAIL);

@@ -6,7 +6,7 @@ import { zcodeConfigGate } from "./zcode-gate.ts";
 import { piSettingsGate } from "./pi-gate.ts";
 import { vscodeSettingsGate } from "./vscode-gate.ts";
 import { qwenHooksOff } from "./qwen-gate.ts";
-import { CODEX_TRUST_PATH, codexTrustEntries, listPluginHooks, pluginTrustEntries } from "./codex-trust.ts";
+import { CODEX_TRUST_PATH, CODEX_UNTRUSTED_FIX, codexTrustEntries, listPluginHooks, pluginTrustEntries, untrustedPluginHooksDetail } from "./codex-trust.ts";
 import type { PluginHook } from "./codex-trust.ts";
 import { listCopilotHooks } from "./copilot-hooks.ts";
 import { spawn, spawnSync } from "node:child_process";
@@ -766,13 +766,12 @@ function withHookGate(checks: Check[], detail: string | undefined): Check[] {
   return checks.map((c) => c.name === "hook-registered" ? { name: c.name, ok: false, detail } : c);
 }
 
-const UNTRUSTED_FIX = "run: context-mode setup";
+const UNTRUSTED_FIX = CODEX_UNTRUSTED_FIX;
 /** hook-registered says FAIL when Codex lists our plugin hooks untrusted (they never run); a hook-trust WARN when Codex gave no answer. */
 function withHookTrust(checks: Check[], hooks: PluginHook[] | undefined, dryRun: boolean): Check[] {
   if (hooks === undefined) return [...checks, { name: "hook-trust", ok: true, warn: true, detail: "codex did not report hook trust (codex app-server hooks/list)" }];
-  const bad = hooks.filter((h) => !h.trusted);
-  if (!bad.length || dryRun) return checks;
-  const detail = `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks untrusted, so they do not run; ${UNTRUSTED_FIX}`;
+  const detail = untrustedPluginHooksDetail(hooks);
+  if (detail === undefined || dryRun) return checks;
   return checks.map((c) => c.name === "hook-registered" ? { name: c.name, ok: false, detail } : c);
 }
 
