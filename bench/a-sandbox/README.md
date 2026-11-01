@@ -129,3 +129,73 @@ Git log (2000 commits)
 
 - Command: `node run.mjs a-git-log-large`
 - Input: `fixtures/data/git-log-large.txt`, 191120 B, sha256 028317819bc1a93fcfbeeba2d5ffea829fe4c439e3889d688f76fbb11bb913ad
+
+## a-devtools-mcp-snapshot
+
+Browser snapshot (take_snapshot, Wikipedia SQLite page)
+
+- Command: `node run.mjs a-devtools-mcp-snapshot`
+- Input: `fixtures/data/devtools-mcp-snapshot.txt`, 136514 B, sha256 93903f7b076c2086f45b487395eb4a72f99f1820d146dbb1d822108a275fd259
+
+## a-gh-issue-list-vite
+
+GitHub issues (gh issue list --json, vitejs/vite, 40 items)
+
+- Command: `node run.mjs a-gh-issue-list-vite`
+- Input: `fixtures/data/gh-issue-list-vite.json`, 182943 B, sha256 05eca692a67494a13e1d9025c5b2f3a767897dd5ca0ed9bb5b540520523a8201
+
+## a-gh-pr-list-vite
+
+GitHub pull requests with checks (gh pr list --json, vitejs/vite, 25 items)
+
+- Command: `node run.mjs a-gh-pr-list-vite`
+- Input: `fixtures/data/gh-pr-list-vite.json`, 195471 B, sha256 8cdc8086bc300aa2148977f0ef93ddd5ead40b4d33f8d1756673cbbf66a56879
+
+## a-context7-query-docs-vite
+
+Library docs (query-docs, vite build and proxy config)
+
+- Command: `node run.mjs a-context7-query-docs-vite`
+- Input: `fixtures/data/context7-query-docs-vite.txt`, 6917 B, sha256 576bc7940657b02bb38d8a1ace44e713cdb1e54059b832ef050e24863024b4f2
+
+## a-vitest-run-vite
+
+Test run, 1106 tests, 25 failing (vitest run --reporter=verbose, vitejs/vite)
+
+- Command: `node run.mjs a-vitest-run-vite`
+- Input: `fixtures/data/vitest-run-vite.txt`, 62909 B, sha256 d089c367e8ef502da66114fdf07ab6452aa3a080917f870c18a36baadc62fd41
+
+## a-biome-lint-vite
+
+Lint report as JSON (biome lint --reporter=json, packages/vite/src)
+
+- Command: `node run.mjs a-biome-lint-vite`
+- Input: `fixtures/data/biome-lint-vite.json`, 288523 B, sha256 50a1b9134671cf9311edb8bcad99b2caacea444d5ef7419788fc97b5b6e002af
+
+## a-pnpm-install-vite
+
+Workspace install log (pnpm install --frozen-lockfile, vitejs/vite)
+
+- Command: `node run.mjs a-pnpm-install-vite`
+- Input: `fixtures/data/pnpm-install-vite.txt`, 14988 B, sha256 50fdc94bb8c081bf8ecc56b73b679cf82dbee3b7bba50bc7b6f25a4c47ef42dd
+
+## a-docker-logs-mongo
+
+Container logs (docker logs, mongo:8.0 --verbose)
+
+- Command: `node run.mjs a-docker-logs-mongo`
+- Input: `fixtures/data/docker-logs-mongo.txt`, 60374 B, sha256 d4810c22ef63d6cc27d933e0fd89163ad3fb313f957ed8b907a1eeaae5ae9d1a
+
+## a-terraform-plan
+
+Plan output (terraform plan, 72 resources)
+
+- Command: `node run.mjs a-terraform-plan`
+- Input: `fixtures/data/terraform-plan.txt`, 34081 B, sha256 127d2218bf3fdeaec6514bb6a9cf4f1011e717e3dc434f7c959a683b629d56f4
+
+## a-git-log-stat-vite
+
+Commit history with file stats (git log --stat, 300 commits, vitejs/vite)
+
+- Command: `node run.mjs a-git-log-stat-vite`
+- Input: `fixtures/data/git-log-stat-vite.txt`, 164385 B, sha256 b520fe995fbf968ee726fc1a8eb1bca799b1e2d3a6f1230b4f218dcf86122f36

@@ -1,0 +1,1147 @@
+{
+  "schema": 1,
+  "date": "2026-11-01",
+  "runs": 5,
+  "run_ms": 18099,
+  "token_method": "bytes / 4, an estimate (no tokenizer is vendored)",
+  "context_mode": {
+    "version": "2.0.0-next.23+dev d4c98b3c",
+    "commit": "d4c98b3c65bc7c08e174a543d75c8b5e9f5f7254",
+    "dirty": true
+  },
+  "env": {
+    "node": "v26.8.1",
+    "os": "Darwin 23.5.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cores": 10,
+    "ram_gb": 32
+  },
+  "fixtures": {
+    "devtools-mcp-snapshot.txt": {
+      "sha256": "93903f7b076c2086f45b487395eb4a72f99f1820d146dbb1d822108a275fd259",
+      "bytes": 136514
+    },
+    "gh-issue-list-vite.json": {
+      "sha256": "05eca692a67494a13e1d9025c5b2f3a767897dd5ca0ed9bb5b540520523a8201",
+      "bytes": 182943
+    },
+    "gh-pr-list-vite.json": {
+      "sha256": "8cdc8086bc300aa2148977f0ef93ddd5ead40b4d33f8d1756673cbbf66a56879",
+      "bytes": 195471
+    },
+    "context7-query-docs-vite.txt": {
+      "sha256": "576bc7940657b02bb38d8a1ace44e713cdb1e54059b832ef050e24863024b4f2",
+      "bytes": 6917
+    },
+    "vitest-run-vite.txt": {
+      "sha256": "d089c367e8ef502da66114fdf07ab6452aa3a080917f870c18a36baadc62fd41",
+      "bytes": 62909
+    },
+    "biome-lint-vite.json": {
+      "sha256": "50a1b9134671cf9311edb8bcad99b2caacea444d5ef7419788fc97b5b6e002af",
+      "bytes": 288523
+    },
+    "pnpm-install-vite.txt": {
+      "sha256": "50fdc94bb8c081bf8ecc56b73b679cf82dbee3b7bba50bc7b6f25a4c47ef42dd",
+      "bytes": 14988
+    },
+    "docker-logs-mongo.txt": {
+      "sha256": "d4810c22ef63d6cc27d933e0fd89163ad3fb313f957ed8b907a1eeaae5ae9d1a",
+      "bytes": 60374
+    },
+    "terraform-plan.txt": {
+      "sha256": "127d2218bf3fdeaec6514bb6a9cf4f1011e717e3dc434f7c959a683b629d56f4",
+      "bytes": 34081
+    },
+    "git-log-stat-vite.txt": {
+      "sha256": "b520fe995fbf968ee726fc1a8eb1bca799b1e2d3a6f1230b4f218dcf86122f36",
+      "bytes": 164385
+    },
+    "vite-config.ts": {
+      "sha256": "65a62e65875835fbdd66ae3b0b1de9638dc1c046f9688422922a239ca72dce84",
+      "bytes": 91362
+    },
+    "vite-docs-features.html": {
+      "sha256": "1dca10c0a7b348c1b9ddb46733cfde706f46bee0554175716a415fe8609187c8",
+      "bytes": 271731
+    }
+  },
+  "results": [
+    {
+      "group": "a-sandbox",
+      "id": "a-devtools-mcp-snapshot",
+      "title": "Browser snapshot (take_snapshot, Wikipedia SQLite page)",
+      "link": "../a-sandbox/README.md#a-devtools-mcp-snapshot",
+      "inputs": [
+        "devtools-mcp-snapshot.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-devtools-mcp-snapshot",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 136514,
+          "mean": 136514,
+          "sigma": 0,
+          "min": 136514,
+          "max": 136514,
+          "samples": [
+            136514,
+            136514,
+            136514,
+            136514,
+            136514
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 479,
+          "mean": 479,
+          "sigma": 0,
+          "min": 479,
+          "max": 479,
+          "samples": [
+            479,
+            479,
+            479,
+            479,
+            479
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 223,
+          "mean": 223,
+          "sigma": 0,
+          "min": 223,
+          "max": 223,
+          "samples": [
+            223,
+            223,
+            223,
+            223,
+            223
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 70.54,
+          "mean": 72,
+          "sigma": 8.12,
+          "min": 65.14,
+          "max": 85.35,
+          "samples": [
+            72.94,
+            70.54,
+            66.04,
+            85.35,
+            65.14
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 85.6,
+          "mean": 88.8,
+          "sigma": 5.47,
+          "min": 84.22,
+          "max": 95.85,
+          "samples": [
+            93.57,
+            84.78,
+            85.6,
+            95.85,
+            84.22
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-gh-issue-list-vite",
+      "title": "GitHub issues (gh issue list --json, vitejs/vite, 40 items)",
+      "link": "../a-sandbox/README.md#a-gh-issue-list-vite",
+      "inputs": [
+        "gh-issue-list-vite.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-gh-issue-list-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 182943,
+          "mean": 182943,
+          "sigma": 0,
+          "min": 182943,
+          "max": 182943,
+          "samples": [
+            182943,
+            182943,
+            182943,
+            182943,
+            182943
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 866,
+          "mean": 866,
+          "sigma": 0,
+          "min": 866,
+          "max": 866,
+          "samples": [
+            866,
+            866,
+            866,
+            866,
+            866
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 148,
+          "mean": 148,
+          "sigma": 0,
+          "min": 148,
+          "max": 148,
+          "samples": [
+            148,
+            148,
+            148,
+            148,
+            148
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 64.77,
+          "mean": 66.6,
+          "sigma": 8.83,
+          "min": 57.31,
+          "max": 81.07,
+          "samples": [
+            66.82,
+            63.01,
+            57.31,
+            64.77,
+            81.07
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 82.37,
+          "mean": 88.88,
+          "sigma": 14.11,
+          "min": 74.97,
+          "max": 107.24,
+          "samples": [
+            107.24,
+            82.37,
+            74.97,
+            79.37,
+            100.43
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-gh-pr-list-vite",
+      "title": "GitHub pull requests with checks (gh pr list --json, vitejs/vite, 25 items)",
+      "link": "../a-sandbox/README.md#a-gh-pr-list-vite",
+      "inputs": [
+        "gh-pr-list-vite.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-gh-pr-list-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 195471,
+          "mean": 195471,
+          "sigma": 0,
+          "min": 195471,
+          "max": 195471,
+          "samples": [
+            195471,
+            195471,
+            195471,
+            195471,
+            195471
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 792,
+          "mean": 792,
+          "sigma": 0,
+          "min": 792,
+          "max": 792,
+          "samples": [
+            792,
+            792,
+            792,
+            792,
+            792
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 145,
+          "mean": 145,
+          "sigma": 0,
+          "min": 145,
+          "max": 145,
+          "samples": [
+            145,
+            145,
+            145,
+            145,
+            145
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 79.35,
+          "mean": 81.3,
+          "sigma": 8.54,
+          "min": 72.46,
+          "max": 93.85,
+          "samples": [
+            93.85,
+            79.35,
+            85.48,
+            72.46,
+            75.38
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 79.35,
+          "mean": 87.24,
+          "sigma": 12.43,
+          "min": 78.52,
+          "max": 107.03,
+          "samples": [
+            92.08,
+            79.22,
+            79.35,
+            107.03,
+            78.52
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-context7-query-docs-vite",
+      "title": "Library docs (query-docs, vite build and proxy config)",
+      "link": "../a-sandbox/README.md#a-context7-query-docs-vite",
+      "inputs": [
+        "context7-query-docs-vite.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-context7-query-docs-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 6917,
+          "mean": 6917,
+          "sigma": 0,
+          "min": 6917,
+          "max": 6917,
+          "samples": [
+            6917,
+            6917,
+            6917,
+            6917,
+            6917
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 489,
+          "mean": 489,
+          "sigma": 0,
+          "min": 489,
+          "max": 489,
+          "samples": [
+            489,
+            489,
+            489,
+            489,
+            489
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 228,
+          "mean": 228,
+          "sigma": 0,
+          "min": 228,
+          "max": 228,
+          "samples": [
+            228,
+            228,
+            228,
+            228,
+            228
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 65.09,
+          "mean": 64.59,
+          "sigma": 4.65,
+          "min": 57.71,
+          "max": 70.62,
+          "samples": [
+            70.62,
+            65.9,
+            63.62,
+            65.09,
+            57.71
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 48.39,
+          "mean": 53.39,
+          "sigma": 11.16,
+          "min": 44.47,
+          "max": 72.02,
+          "samples": [
+            48.39,
+            72.02,
+            55.26,
+            46.82,
+            44.47
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-vitest-run-vite",
+      "title": "Test run, 1106 tests, 25 failing (vitest run --reporter=verbose, vitejs/vite)",
+      "link": "../a-sandbox/README.md#a-vitest-run-vite",
+      "inputs": [
+        "vitest-run-vite.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-vitest-run-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 62909,
+          "mean": 62909,
+          "sigma": 0,
+          "min": 62909,
+          "max": 62909,
+          "samples": [
+            62909,
+            62909,
+            62909,
+            62909,
+            62909
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 445,
+          "mean": 445,
+          "sigma": 0,
+          "min": 445,
+          "max": 445,
+          "samples": [
+            445,
+            445,
+            445,
+            445,
+            445
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 211,
+          "mean": 211,
+          "sigma": 0,
+          "min": 211,
+          "max": 211,
+          "samples": [
+            211,
+            211,
+            211,
+            211,
+            211
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 60.44,
+          "mean": 60.99,
+          "sigma": 3.22,
+          "min": 57.09,
+          "max": 64.59,
+          "samples": [
+            58.92,
+            64.59,
+            57.09,
+            60.44,
+            63.93
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 58.72,
+          "mean": 58.41,
+          "sigma": 1.65,
+          "min": 55.56,
+          "max": 59.56,
+          "samples": [
+            59.56,
+            58.68,
+            59.51,
+            55.56,
+            58.72
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-biome-lint-vite",
+      "title": "Lint report as JSON (biome lint --reporter=json, packages/vite/src)",
+      "link": "../a-sandbox/README.md#a-biome-lint-vite",
+      "inputs": [
+        "biome-lint-vite.json"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-biome-lint-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 288523,
+          "mean": 288523,
+          "sigma": 0,
+          "min": 288523,
+          "max": 288523,
+          "samples": [
+            288523,
+            288523,
+            288523,
+            288523,
+            288523
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 593,
+          "mean": 593,
+          "sigma": 0,
+          "min": 593,
+          "max": 593,
+          "samples": [
+            593,
+            593,
+            593,
+            593,
+            593
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 145,
+          "mean": 145,
+          "sigma": 0,
+          "min": 145,
+          "max": 145,
+          "samples": [
+            145,
+            145,
+            145,
+            145,
+            145
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 65.26,
+          "mean": 64.53,
+          "sigma": 5.66,
+          "min": 58.2,
+          "max": 73.05,
+          "samples": [
+            60.78,
+            73.05,
+            65.26,
+            58.2,
+            65.35
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 76.28,
+          "mean": 78.08,
+          "sigma": 4.38,
+          "min": 74.49,
+          "max": 85.54,
+          "samples": [
+            78.23,
+            76.28,
+            74.49,
+            85.54,
+            75.87
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-pnpm-install-vite",
+      "title": "Workspace install log (pnpm install --frozen-lockfile, vitejs/vite)",
+      "link": "../a-sandbox/README.md#a-pnpm-install-vite",
+      "inputs": [
+        "pnpm-install-vite.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-pnpm-install-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 14988,
+          "mean": 14988,
+          "sigma": 0,
+          "min": 14988,
+          "max": 14988,
+          "samples": [
+            14988,
+            14988,
+            14988,
+            14988,
+            14988
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 215,
+          "mean": 215,
+          "sigma": 0,
+          "min": 215,
+          "max": 215,
+          "samples": [
+            215,
+            215,
+            215,
+            215,
+            215
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 204,
+          "mean": 204,
+          "sigma": 0,
+          "min": 204,
+          "max": 204,
+          "samples": [
+            204,
+            204,
+            204,
+            204,
+            204
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 59.3,
+          "mean": 59.68,
+          "sigma": 1.04,
+          "min": 58.69,
+          "max": 61.42,
+          "samples": [
+            58.69,
+            59.68,
+            61.42,
+            59.3,
+            59.29
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 49,
+          "mean": 50.63,
+          "sigma": 5.59,
+          "min": 46.36,
+          "max": 60.12,
+          "samples": [
+            60.12,
+            50.81,
+            46.88,
+            46.36,
+            49
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-docker-logs-mongo",
+      "title": "Container logs (docker logs, mongo:8.0 --verbose)",
+      "link": "../a-sandbox/README.md#a-docker-logs-mongo",
+      "inputs": [
+        "docker-logs-mongo.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-docker-logs-mongo",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 60374,
+          "mean": 60374,
+          "sigma": 0,
+          "min": 60374,
+          "max": 60374,
+          "samples": [
+            60374,
+            60374,
+            60374,
+            60374,
+            60374
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 603,
+          "mean": 603,
+          "sigma": 0,
+          "min": 603,
+          "max": 603,
+          "samples": [
+            603,
+            603,
+            603,
+            603,
+            603
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 145,
+          "mean": 145,
+          "sigma": 0,
+          "min": 145,
+          "max": 145,
+          "samples": [
+            145,
+            145,
+            145,
+            145,
+            145
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 62.17,
+          "mean": 64.08,
+          "sigma": 4.97,
+          "min": 58.45,
+          "max": 69.83,
+          "samples": [
+            61.21,
+            58.45,
+            62.17,
+            68.76,
+            69.83
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 58.12,
+          "mean": 57.91,
+          "sigma": 4.02,
+          "min": 53.29,
+          "max": 62.17,
+          "samples": [
+            61.53,
+            62.17,
+            54.45,
+            58.12,
+            53.29
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-terraform-plan",
+      "title": "Plan output (terraform plan, 72 resources)",
+      "link": "../a-sandbox/README.md#a-terraform-plan",
+      "inputs": [
+        "terraform-plan.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-terraform-plan",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 34081,
+          "mean": 34081,
+          "sigma": 0,
+          "min": 34081,
+          "max": 34081,
+          "samples": [
+            34081,
+            34081,
+            34081,
+            34081,
+            34081
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 182,
+          "mean": 182,
+          "sigma": 0,
+          "min": 182,
+          "max": 182,
+          "samples": [
+            182,
+            182,
+            182,
+            182,
+            182
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 204,
+          "mean": 204,
+          "sigma": 0,
+          "min": 204,
+          "max": 204,
+          "samples": [
+            204,
+            204,
+            204,
+            204,
+            204
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 61.6,
+          "mean": 61.67,
+          "sigma": 3.95,
+          "min": 55.6,
+          "max": 65.95,
+          "samples": [
+            55.6,
+            64.27,
+            65.95,
+            60.93,
+            61.6
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 57.55,
+          "mean": 57.56,
+          "sigma": 1.68,
+          "min": 55.86,
+          "max": 60.09,
+          "samples": [
+            57.55,
+            60.09,
+            58.04,
+            55.86,
+            56.25
+          ]
+        }
+      }
+    },
+    {
+      "group": "a-sandbox",
+      "id": "a-git-log-stat-vite",
+      "title": "Commit history with file stats (git log --stat, 300 commits, vitejs/vite)",
+      "link": "../a-sandbox/README.md#a-git-log-stat-vite",
+      "inputs": [
+        "git-log-stat-vite.txt"
+      ],
+      "synthetic": false,
+      "v1_scenario": false,
+      "command": "node run.mjs a-git-log-stat-vite",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 164385,
+          "mean": 164385,
+          "sigma": 0,
+          "min": 164385,
+          "max": 164385,
+          "samples": [
+            164385,
+            164385,
+            164385,
+            164385,
+            164385
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 284,
+          "mean": 284,
+          "sigma": 0,
+          "min": 284,
+          "max": 284,
+          "samples": [
+            284,
+            284,
+            284,
+            284,
+            284
+          ]
+        },
+        "hook_bytes": {
+          "n": 5,
+          "median": 212,
+          "mean": 212,
+          "sigma": 0,
+          "min": 212,
+          "max": 212,
+          "samples": [
+            212,
+            212,
+            212,
+            212,
+            212
+          ]
+        },
+        "exec_ms": {
+          "n": 5,
+          "median": 66.39,
+          "mean": 69.35,
+          "sigma": 6.92,
+          "min": 62.72,
+          "max": 79.14,
+          "samples": [
+            73.9,
+            64.61,
+            66.39,
+            62.72,
+            79.14
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 89.78,
+          "mean": 89.82,
+          "sigma": 3,
+          "min": 86.73,
+          "max": 93.43,
+          "samples": [
+            92.16,
+            89.78,
+            86.73,
+            86.99,
+            93.43
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-read-vite-config",
+      "title": "Read of the 89 KB vite config source (denied, routed to ctx_execute)",
+      "link": "../f-hook-redirect/README.md#f-read-vite-config",
+      "inputs": [
+        "vite-config.ts"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-read-vite-config",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 91362,
+          "mean": 91362,
+          "sigma": 0,
+          "min": 91362,
+          "max": 91362,
+          "samples": [
+            91362,
+            91362,
+            91362,
+            91362,
+            91362
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 375,
+          "mean": 375,
+          "sigma": 0,
+          "min": 375,
+          "max": 375,
+          "samples": [
+            375,
+            375,
+            375,
+            375,
+            375
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 44.15,
+          "mean": 46.06,
+          "sigma": 6.38,
+          "min": 39.21,
+          "max": 55.41,
+          "samples": [
+            42.26,
+            44.15,
+            39.21,
+            49.29,
+            55.41
+          ]
+        }
+      }
+    },
+    {
+      "group": "f-hook-redirect",
+      "id": "f-webfetch-vite-docs",
+      "title": "WebFetch of the 265 KB Vite features guide (denied, routed to ctx_index + ctx_search)",
+      "link": "../f-hook-redirect/README.md#f-webfetch-vite-docs",
+      "inputs": [
+        "vite-docs-features.html"
+      ],
+      "synthetic": false,
+      "v1_scenario": null,
+      "command": "node run.mjs f-webfetch-vite-docs",
+      "ok": true,
+      "note": "",
+      "error": null,
+      "metrics": {
+        "raw_bytes": {
+          "n": 5,
+          "median": 271731,
+          "mean": 271731,
+          "sigma": 0,
+          "min": 271731,
+          "max": 271731,
+          "samples": [
+            271731,
+            271731,
+            271731,
+            271731,
+            271731
+          ]
+        },
+        "ctx_bytes": {
+          "n": 5,
+          "median": 439,
+          "mean": 439,
+          "sigma": 0,
+          "min": 439,
+          "max": 439,
+          "samples": [
+            439,
+            439,
+            439,
+            439,
+            439
+          ]
+        },
+        "decision": {
+          "n": 5,
+          "median": 1,
+          "mean": 1,
+          "sigma": 0,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "hook_ms": {
+          "n": 5,
+          "median": 41.24,
+          "mean": 40.53,
+          "sigma": 2.87,
+          "min": 35.63,
+          "max": 43.27,
+          "samples": [
+            41.34,
+            43.27,
+            41.24,
+            41.19,
+            35.63
+          ]
+        }
+      }
+    }
+  ]
+}

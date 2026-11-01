@@ -2,6 +2,7 @@
 // byte for byte (bench/fixtures/scenarios.json); 4 v2 scenarios (large JSON, npm log, big source, long git log) are new.
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { USECASES } from "./usecases.mjs";
 import { BENCH, bytes, read, postToolUse, runHook, seenAfterHook, pct, kb, med, rng3 } from "../suite/lib.mjs";
 
 const scen = JSON.parse(readFileSync(path.join(BENCH, "fixtures", "scenarios.json"), "utf8"));
@@ -39,7 +40,7 @@ const NEW = [
     console.log("top prefixes:", Object.entries(kinds).sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => k + " " + v).join(", "));` },
 ];
 
-const all = [...scen.part1.map((s) => ({ ...s, v1: true })), ...NEW.map((s) => ({ ...s, v1: false }))];
+const all = [...scen.part1.map((s) => ({ ...s, v1: true })), ...NEW.map((s) => ({ ...s, v1: false })), ...USECASES.map((s) => ({ ...s, v1: false }))];
 const idOf = (s) => "a-" + s.fixture.replace(/\.[a-z]+$/, "").replace(/[^a-z0-9]+/g, "-");
 
 export default {

@@ -1,0 +1,1045 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # local_file.config["api-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/api-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["api-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/api-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["api-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/api-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["auth-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/auth-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["auth-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/auth-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["auth-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/auth-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["billing-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/billing-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["billing-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/billing-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["billing-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/billing-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["notify-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/notify-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["notify-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/notify-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["notify-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/notify-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["report-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/report-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["report-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/report-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["report-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/report-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["search-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/search-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["search-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/search-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["search-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/search-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["web-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/web-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["web-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/web-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["web-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/web-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["worker-dev"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/worker-dev.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["worker-prod"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/worker-prod.json"
+      + id                   = (known after apply)
+    }
+
+  # local_file.config["worker-staging"] will be created
+  + resource "local_file" "config" {
+      + content              = (known after apply)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0777"
+      + file_permission      = "0777"
+      + filename             = "./out/worker-staging.json"
+      + id                   = (known after apply)
+    }
+
+  # random_password.token["api-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["api-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["api-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["auth-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["auth-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["auth-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["billing-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["billing-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["billing-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["notify-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["notify-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["notify-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["report-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["report-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["report-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["search-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["search-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["search-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["web-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["web-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["web-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["worker-dev"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["worker-prod"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_password.token["worker-staging"] will be created
+  + resource "random_password" "token" {
+      + bcrypt_hash = (sensitive value)
+      + id          = (known after apply)
+      + length      = 24
+      + lower       = true
+      + min_lower   = 0
+      + min_numeric = 0
+      + min_special = 0
+      + min_upper   = 0
+      + number      = true
+      + numeric     = true
+      + result      = (sensitive value)
+      + special     = true
+      + upper       = true
+    }
+
+  # random_pet.name["api-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "api"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["api-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "api"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["api-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "api"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["auth-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "auth"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["auth-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "auth"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["auth-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "auth"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["billing-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "billing"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["billing-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "billing"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["billing-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "billing"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["notify-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "notify"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["notify-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "notify"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["notify-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "notify"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["report-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "report"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["report-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "report"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["report-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "report"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["search-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "search"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["search-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "search"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["search-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "search"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["web-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "web"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["web-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "web"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["web-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "web"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["worker-dev"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "dev"
+          + "service" = "worker"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["worker-prod"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "prod"
+          + "service" = "worker"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+  # random_pet.name["worker-staging"] will be created
+  + resource "random_pet" "name" {
+      + id        = (known after apply)
+      + keepers   = {
+          + "env"     = "staging"
+          + "service" = "worker"
+        }
+      + length    = 2
+      + separator = "-"
+    }
+
+Plan: 72 to add, 0 to change, 0 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.

@@ -1,0 +1,175 @@
+Scope: all 294 workspace projects
+[WARN] The settings in packages/vite/src/node/server/__tests__/fixtures/pnpm/pnpm-workspace.yaml do not apply, because packages/vite/src/node/server/__tests__/fixtures/pnpm is a project of this workspace. pnpm reads settings only from the pnpm-workspace.yaml at the workspace root. Move the settings there, or add "!packages/vite/src/node/server/__tests__/fixtures/pnpm" to the root's "packages" to keep that project a separate workspace.
+? Verifying lockfile against supply-chain policies (1330 entries)...
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/user/Library/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Update available! 12.15.0 → 12.16.1.
+Changelog: https://pnpm.io/v/12.16.1
+To update, run: pnpm self-update
+Progress: resolved 1080, reused 0, downloaded 18, added 128
+Downloading @rolldown/binding-darwin-arm64@1.2.15: 0.00 B/7.53 MB
+Downloading @voidzero-dev/vitepress-theme@5.0.7: 0.00 B/7.72 MB
+Progress: resolved 1080, reused 0, downloaded 84, added 192
+Progress: resolved 1080, reused 0, downloaded 116, added 224
+Progress: resolved 1080, reused 0, downloaded 142, added 256
+Progress: resolved 1080, reused 0, downloaded 168, added 287
+Progress: resolved 1080, reused 0, downloaded 223, added 320
+Progress: resolved 1080, reused 0, downloaded 264, added 382
+Progress: resolved 1080, reused 0, downloaded 290, added 384
+Progress: resolved 1080, reused 0, downloaded 328, added 430
+Progress: resolved 1080, reused 0, downloaded 372, added 480
+Downloading @rolldown/binding-darwin-arm64@1.2.15: 2.62 MB/7.53 MB
+Downloading @voidzero-dev/vitepress-theme@5.0.7: 1.21 MB/7.72 MB
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 0.00 B/5.54 MB
+Progress: resolved 1080, reused 0, downloaded 477, added 576
+Progress: resolved 1080, reused 0, downloaded 502, added 608
+Progress: resolved 1080, reused 0, downloaded 519, added 622
+[WARN] Tarball download average speed 39 KiB/s (size 124 KiB) is below 50 KiB/s: https://registry.npmjs.org/@parcel/watcher-darwin-arm64/-/watcher-darwin-arm64-2.6.0.tgz (GET)
+[WARN] Tarball download average speed 39 KiB/s (size 100 KiB) is below 50 KiB/s: https://registry.npmjs.org/@vue/server-renderer/-/server-renderer-3.4.38.tgz (GET)
+Progress: resolved 1080, reused 0, downloaded 556, added 672
+[WARN] Tarball download average speed 35 KiB/s (size 109 KiB) is below 50 KiB/s: https://registry.npmjs.org/regenerate-unicode-properties/-/regenerate-unicode-properties-10.3.0.tgz (GET)
+Progress: resolved 1080, reused 0, downloaded 573, added 672
+[WARN] Tarball download average speed 38 KiB/s (size 99 KiB) is below 50 KiB/s: https://registry.npmjs.org/minimatch/-/minimatch-9.0.9.tgz (GET)
+[WARN] Tarball download average speed 44 KiB/s (size 57 KiB) is below 50 KiB/s: https://registry.npmjs.org/vscode-uri/-/vscode-uri-3.2.0.tgz (GET)
+Downloading @oxlint-tsgolint/darwin-arm64@7.0.2005: 0.00 B/7.52 MB
+Progress: resolved 1080, reused 0, downloaded 634, added 736
+Progress: resolved 1080, reused 0, downloaded 657, added 768
+Downloading @voidzero-dev/vitepress-theme@5.0.7: 1.70 MB/7.72 MB
+[WARN] Tarball download average speed 46 KiB/s (size 82 KiB) is below 50 KiB/s: https://registry.npmjs.org/@vue/reactivity/-/reactivity-3.5.44.tgz (GET)
+Progress: resolved 1080, reused 0, downloaded 707, added 800
+Downloading @typescript/typescript-darwin-arm64@7.0.2: 0.00 B/9.27 MB
+[WARN] Tarball download average speed 46 KiB/s (size 622 KiB) is below 50 KiB/s: https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.155.0.tgz (GET)
+Downloading @oxlint-tsgolint/darwin-arm64@7.0.2005: 1.76 MB/7.52 MB
+[WARN] Tarball download average speed 40 KiB/s (size 412 KiB) is below 50 KiB/s: https://registry.npmjs.org/jiti/-/jiti-1.21.7.tgz (GET)
+[WARN] Request took 13085ms: https://registry.npmjs.org/@tailwindcss%2Foxide
+[WARN] Tarball download average speed 44 KiB/s (size 945 KiB) is below 50 KiB/s: https://registry.npmjs.org/@rive-app/canvas-lite/-/canvas-lite-2.45.0.tgz (GET)
+[WARN] Request took 12032ms: https://registry.npmjs.org/@tailwindcss%2Foxide-darwin-x64
+[WARN] Tarball download average speed 43 KiB/s (size 135 KiB) is below 50 KiB/s: https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz (GET)
+Downloading @img/sharp-libvips-darwin-arm64@1.3.1: 0.00 B/8.25 MB
+[WARN] Tarball download average speed 38 KiB/s (size 41 KiB) is below 50 KiB/s: https://registry.npmjs.org/@volar/typescript/-/typescript-2.4.28.tgz (GET)
+Downloading @oxlint-tsgolint/darwin-arm64@7.0.2005: 2.11 MB/7.52 MB
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 835.58 kB/5.54 MB
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 851.96 kB/5.54 MB
+[WARN] Tarball download average speed 11 KiB/s (size 13 KiB) is below 50 KiB/s: https://registry.npmjs.org/cac/-/cac-7.1.0.tgz (GET)
+[WARN] Tarball download average speed 18 KiB/s (size 41 KiB) is below 50 KiB/s: https://registry.npmjs.org/postcss-selector-parser/-/postcss-selector-parser-6.0.10.tgz (GET)
+[WARN] Tarball download average speed 18 KiB/s (size 24 KiB) is below 50 KiB/s: https://registry.npmjs.org/globals/-/globals-15.15.0.tgz (GET)
+[WARN] Tarball download average speed 25 KiB/s (size 240 KiB) is below 50 KiB/s: https://registry.npmjs.org/@node-rs/bcrypt-darwin-arm64/-/bcrypt-darwin-arm64-2.0.0.tgz (GET)
+[WARN] Tarball download average speed 16 KiB/s (size 110 KiB) is below 50 KiB/s: https://registry.npmjs.org/entities/-/entities-7.0.1.tgz (GET)
+Progress: resolved 1080, reused 0, downloaded 838, added 928
+[WARN] Tarball download average speed 23 KiB/s (size 244 KiB) is below 50 KiB/s: https://registry.npmjs.org/@yuku-core/binding-darwin-arm64/-/binding-darwin-arm64-0.19.0.tgz (GET)
+Downloading @typescript/typescript-darwin-arm64@7.0.2: 3.55 MB/9.27 MB
+Downloading @rolldown/binding-darwin-arm64@1.2.15: 3.80 MB/7.53 MB
+[WARN] Tarball download average speed 8 KiB/s (size 40 KiB) is below 50 KiB/s: https://registry.npmjs.org/@tailwindcss/node/-/node-4.3.3.tgz (GET)
+Progress: resolved 1080, reused 0, downloaded 850, added 960
+Downloading @rolldown/binding-darwin-arm64@1.2.15: 3.83 MB/7.53 MB
+[WARN] Tarball download average speed 15 KiB/s (size 195 KiB) is below 50 KiB/s: https://registry.npmjs.org/systemjs/-/systemjs-6.15.1.tgz (GET)
+[WARN] Tarball download average speed 22 KiB/s (size 212 KiB) is below 50 KiB/s: https://registry.npmjs.org/@vueuse/core/-/core-14.4.0.tgz (GET)
+Downloading @oxlint-tsgolint/darwin-arm64@7.0.2005: 2.46 MB/7.52 MB
+[WARN] Tarball download average speed 23 KiB/s (size 180 KiB) is below 50 KiB/s: https://registry.npmjs.org/tailwindcss/-/tailwindcss-4.3.3.tgz (GET)
+[WARN] Tarball download average speed 36 KiB/s (size 1214 KiB) is below 50 KiB/s: https://registry.npmjs.org/workerd/-/workerd-1.20260730.1.tgz (GET)
+[WARN] Tarball download average speed 45 KiB/s (size 70 KiB) is below 50 KiB/s: https://registry.npmjs.org/@babel/helper-define-polyfill-provider/-/helper-define-polyfill-provider-0.6.8.tgz (GET)
+[WARN] Request took 10212ms: https://registry.npmjs.org/playwright-chromium
+Progress: resolved 1080, reused 0, downloaded 895, added 992
+Progress: resolved 1080, reused 0, downloaded 902, added 999
+[WARN] Tarball download average speed 38 KiB/s (size 693 KiB) is below 50 KiB/s: https://registry.npmjs.org/vitest/-/vitest-5.0.5.tgz (GET)
+[WARN] Tarball download average speed 38 KiB/s (size 1066 KiB) is below 50 KiB/s: https://registry.npmjs.org/@iconify-json/vscode-icons/-/vscode-icons-1.2.90.tgz (GET)
+Progress: resolved 1080, reused 0, downloaded 929, added 1024
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 0.00 B/32.08 MB
+[WARN] Tarball download average speed 46 KiB/s (size 1501 KiB) is below 50 KiB/s: https://registry.npmjs.org/@modelcontextprotocol/server/-/server-2.3.1.tgz (GET)
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 122.88 kB/32.08 MB
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 1.78 MB/5.54 MB
+[WARN] Tarball download average speed 37 KiB/s (size 792 KiB) is below 50 KiB/s: https://registry.npmjs.org/tailwindcss/-/tailwindcss-3.4.19.tgz (GET)
+[WARN] Request took 12095ms: https://registry.npmjs.org/rolldown
+[WARN] Tarball download average speed 49 KiB/s (size 658 KiB) is below 50 KiB/s: https://registry.npmjs.org/@vitejs/devtools-rolldown/-/devtools-rolldown-0.8.0.tgz (GET)
+[WARN] Request took 35877ms: https://registry.npmjs.org/@types%2Fnode
+[WARN] Request took 29557ms: https://registry.npmjs.org/electron-to-chromium
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 557.05 kB/32.08 MB
+Downloading @rolldown/binding-darwin-arm64@1.2.15: 4.80 MB/7.53 MB
+[WARN] Tarball download average speed 37 KiB/s (size 1856 KiB) is below 50 KiB/s: https://registry.npmjs.org/@iconify-json/simple-icons/-/simple-icons-1.2.100.tgz (GET)
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 655.36 kB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 802.81 kB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 950.27 kB/32.08 MB
+Downloading @rolldown/binding-darwin-arm64@1.2.15: 6.27 MB/7.53 MB
+[WARN] Request took 12986ms: https://registry.npmjs.org/tailwindcss
+Progress: resolved 1080, reused 0, downloaded 950, added 1056
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 3.65 MB/5.54 MB
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 4.07 MB/5.54 MB
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 4.40 MB/5.54 MB
+[WARN] Request took 33316ms: https://registry.npmjs.org/playwright-core
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 4.89 MB/5.54 MB
+[WARN] Request took 18601ms: https://registry.npmjs.org/typescript
+Downloading @oxlint/binding-darwin-arm64@1.89.0: 5.32 MB/5.54 MB
+[WARN] Request took 22196ms: https://registry.npmjs.org/playwright-chromium
+Downloading @voidzero-dev/vitepress-theme@5.0.7: 7.40 MB/7.72 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 4.77 MB/32.08 MB
+✓ Lockfile passes supply-chain policies (1330 entries in 1m 15.5s)
+Lockfile is up to date, resolution step is skipped
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 10.78 MB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 14.67 MB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 18.83 MB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 22.93 MB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 27.30 MB/32.08 MB
+Downloading @cloudflare/workerd-darwin-arm64@1.20260730.1: 29.99 MB/32.08 MB
+Packages: +1080
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1080, reused 0, downloaded 958, added 1080, done
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../node_modules/playwright-chromium install$ node install.js
+.../node_modules/workerd postinstall$ node install.js
+.../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+.../node_modules/simple-git-hooks postinstall$ node ./postinstall.js
+.../node_modules/@parcel/watcher install: Done
+.../node_modules/simple-git-hooks postinstall: [INFO] Successfully set the pre-commit with command: pnpm exec lint-staged --concurrent false
+.../node_modules/playwright-chromium install: Downloading Chrome for Testing 156.0.8078.4 (playwright chromium v1248) from https://cdn.playwright.dev/builds/cft/156.0.8078.4/mac-arm64/chrome-mac-arm64.zip
+.../node_modules/simple-git-hooks postinstall: Done
+.../node_modules/workerd postinstall: Done
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../node_modules/playwright-chromium install: |                                                                                |   0% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■                                                                        |  10% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■                                                                |  20% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 185.8 MiB
+.../node_modules/playwright-chromium install: |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 185.8 MiB
+.../node_modules/playwright-chromium install: Chrome for Testing 156.0.8078.4 (playwright chromium v1248) downloaded to /home/user/Library/Caches/ms-playwright/chromium-1248
+.../node_modules/playwright-chromium install: Done
+. postinstall$ simple-git-hooks
+. postinstall: Done
+
+devDependencies:
++ @e18e/eslint-plugin 0.8.1
++ @type-challenges/utils 0.1.1
++ @types/babel__core 7.20.5
++ @types/babel__preset-env 7.10.0
++ @types/convert-source-map 2.0.3
++ @types/etag 1.8.4
++ @types/less 3.0.8
++ @types/node 24.19.2
++ @types/picomatch 4.0.3
++ @types/stylus 0.48.43
++ @types/ws 8.18.2
++ @vitejs/release-scripts 1.10.0
++ eslint-plugin-n 18.5.0
++ eslint-plugin-regexp 3.3.1
++ execa 9.6.1
++ lint-staged 17.6.0
++ oxfmt 0.74.0
++ oxlint 1.89.0
++ oxlint-tsgolint 7.0.2005
++ picocolors 1.1.1
++ playwright-chromium 1.64.1
++ rolldown 1.2.15
++ rollup 4.64.9
++ simple-git-hooks 2.14.0
++ tsx 4.23.15
++ typescript 7.0.2
++ vite <- packages/vite
++ vitest 5.0.5
+
+Done in 2m 25.1s using pnpm v12.15.0
+exit 0

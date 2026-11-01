@@ -11,6 +11,8 @@ const CASES = [
   { id: "f-webfetch", title: "WebFetch of a docs page (denied, routed to ctx_index + ctx_search)", file: "sqlite-fts5-docs.html", kind: "webfetch", url: "https://www.sqlite.org/fts5.html" },
   { id: "f-bash-dump-post", title: "Bash dump of a 191 KB git log (PostToolUse replace)", file: "git-log-large.txt", kind: "post" },
   { id: "f-bash-curl-post", title: "Bash curl of a 219 KB API payload (allowed before, replaced after)", file: "github-api-issues-large.json", kind: "post", command: "curl -s https://api.github.com/repos/vercel/next.js/issues?per_page=30" },
+  { id: "f-read-vite-config", title: "Read of the 89 KB vite config source (denied, routed to ctx_execute)", file: "vite-config.ts", kind: "read" },
+  { id: "f-webfetch-vite-docs", title: "WebFetch of the 265 KB Vite features guide (denied, routed to ctx_index + ctx_search)", file: "vite-docs-features.html", kind: "webfetch", url: "https://vite.dev/guide/features.html" },
 ];
 
 export default {

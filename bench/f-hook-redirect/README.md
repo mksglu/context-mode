@@ -45,3 +45,17 @@ Bash curl of a 219 KB API payload (allowed before, replaced after)
 
 - Command: `node run.mjs f-bash-curl-post`
 - Input: `fixtures/data/github-api-issues-large.json`, 219175 B, sha256 bd2bdb943de007b7bb57d4e4a53a01ad801cf57606a3228682b39d05eb8a5e16
+
+## f-read-vite-config
+
+Read of the 89 KB vite config source (denied, routed to ctx_execute)
+
+- Command: `node run.mjs f-read-vite-config`
+- Input: `fixtures/data/vite-config.ts`, 91362 B, sha256 65a62e65875835fbdd66ae3b0b1de9638dc1c046f9688422922a239ca72dce84
+
+## f-webfetch-vite-docs
+
+WebFetch of the 265 KB Vite features guide (denied, routed to ctx_index + ctx_search)
+
+- Command: `node run.mjs f-webfetch-vite-docs`
+- Input: `fixtures/data/vite-docs-features.html`, 271731 B, sha256 1dca10c0a7b348c1b9ddb46733cfde706f46bee0554175716a415fe8609187c8
