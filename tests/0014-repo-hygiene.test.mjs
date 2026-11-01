@@ -1378,6 +1378,105 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const lic = readme.slice(readme.indexOf("\n## License\n"), readme.indexOf("\n## Community\n"));
     assert.ok(lic.includes("source-available") && lic.split("\n").filter((l) => l.startsWith("1. ") || l.startsWith("2. ") || l.startsWith("3. ")).length === 3, "License names the three ELv2 limits");
   });
+
+  const devRow = (id, quote) => {
+    const rows = readRepo("docs/architecture/DEVIATIONS.md").split("\n").filter((l) => l.startsWith(`| ${id} |`));
+    assert.equal(rows.length, 1, `DEVIATIONS has one ${id} row`);
+    assert.ok(rows[0].includes(quote), `the ${id} row quotes the owner`);
+  };
+  const fences = (text) => {
+    const out = [];
+    let cur = null;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("```")) { if (cur) { out.push(cur); cur = null; } else cur = []; } else if (cur) cur.push(line);
+    }
+    return out;
+  };
+
+  test("README use cases: the real-capture rows of the newest bench file, numbers equal to it (D-README-USECASES-2)", () => {
+    // Owner 2026-11-01: "orneklemeler cok az, sinirli"; "playwright i silelim ... daha populer github da daha cok yildiz almis en populer tool isimlerini yazalim".
+    const readme = readRepo("README.md");
+    const names = readdirSync(path.join(REPO, "bench/results")).filter((f) => f.endsWith("-darwin-arm64.json") && f.length === "2026-11-01-darwin-arm64.json".length).sort();
+    const newest = names[names.length - 1];
+    assert.ok(readme.includes(`bench/results/${newest}`), `README cites ${newest}`);
+    for (const old of names.slice(0, -1)) assert.ok(!readme.includes(old.slice(0, 10)), `README names the older bench date ${old.slice(0, 10)}`);
+    assert.ok(!readme.includes("next.8"), "README names 2.0.0-next.8");
+    const bench = JSON.parse(readRepo(`bench/results/${newest}`));
+    const version = bench.context_mode.version.split("+")[0];
+    assert.ok(readme.includes(version), `README names the bench version ${version}`);
+    const sec = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
+    assert.ok(sec.includes("| What you do | Tool | Raw | Reaches the context | Saved |"), "Use cases has the table header");
+    const rows = sec.split("\n").filter((l) => l.startsWith("| ") && l.includes("README.md#"));
+    assert.ok(rows.length >= 12, `the use-case table has ${rows.length} rows`);
+    for (const row of rows) {
+      const at = row.indexOf("README.md#") + "README.md#".length;
+      const id = row.slice(at, row.indexOf(")", at));
+      const r = bench.results.find((x) => x.id === id);
+      assert.ok(r && r.ok && r.synthetic === false, `${id} is a real-capture row of ${newest}`);
+      const raw = r.metrics.raw_bytes.median;
+      const ctx = r.metrics.ctx_bytes.median;
+      const cells = row.split("|").map((c) => c.trim());
+      assert.deepEqual(cells.slice(3, 6), [raw.toLocaleString("en-US") + " B", ctx.toLocaleString("en-US") + " B", (100 * (1 - ctx / raw)).toFixed(1) + "%"], `${id} numbers`);
+    }
+    for (const tool of ["Chrome DevTools MCP", "GitHub CLI", "Context7", "Vitest", "Biome", "pnpm", "Docker", "Terraform", "git", "Read", "WebFetch"]) {
+      assert.ok(sec.includes(tool), `Use cases names ${tool}`);
+    }
+    // Headline rule: median of the rows with 10 KB or more of raw output.
+    const big = bench.results.filter((r) => r.ok && r.metrics.raw_bytes && r.metrics.ctx_bytes && r.metrics.raw_bytes.median >= 10240);
+    const s = big.map((r) => 100 * (1 - r.metrics.ctx_bytes.median / r.metrics.raw_bytes.median)).sort((a, b) => a - b);
+    const med = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+    assert.ok(readme.includes(`${big.length} bench rows with 10 KB or more`) && readme.includes(`${med.toFixed(1)}%`), `README headline is ${med.toFixed(1)}% over ${big.length} rows`);
+    devRow("D-README-USECASES-2", "playwright i silelim");
+  });
+
+  test("README install: one collapsed block per agent, its own install command first, then update, check and remove from its page (D-README-INSTALL-2)", () => {
+    // Owner 2026-11-01: "install adimlarini collapse kullanarak yap ... README de kullanabilecegimiz tum stilleri kullan".
+    const readme = readRepo("README.md");
+    for (const id of AGENT_IDS) {
+      const start = readme.indexOf(`<details id="install-${id}">`);
+      assert.ok(start > 0, `README has a collapsed install block for ${id}`);
+      const block = readme.slice(start, readme.indexOf("</details>", start));
+      const page = readRepo(`docs/install/${id}.md`);
+      const pageFences = fences(page.slice(page.indexOf("\n## Install\n")));
+      assert.deepEqual(fences(block)[0], pageFences[0], `${id}: the block starts with the page's install fence`);
+      assert.ok(block.includes("Update: `" + pageFences[1][0] + "`"), `${id}: update command from the page`);
+      for (const need of [`Check: \`context-mode doctor --agents ${id}\``, "Remove: ", `context-mode setup --remove --agents ${id}`, `docs/install/${id}.md`]) {
+        assert.ok(block.includes(need), `${id}: block lacks ${need}`);
+      }
+    }
+    assert.ok(readme.includes("> [!IMPORTANT]") && readme.includes("> [!TIP]"), "README uses the IMPORTANT and TIP alerts");
+    assert.ok(readme.includes("\n**Contents:** "), "README has a short table of contents");
+    // No "v2" in prose: it becomes the default release.
+    // Skipped: fences and the <!-- --> note for agents in the page source (owner 2026-11-01: "markdown olarak sayfa kaynagina eklesen ai agents daha iyi okur").
+    let fence = false;
+    let note = false;
+    for (const line of readme.split("\n")) {
+      if (line.startsWith("```")) fence = !fence;
+      if (line === "<!--") note = true;
+      if (line === "-->") { note = false; continue; }
+      if (fence || note) continue;
+      const words = [];
+      let w = "";
+      for (const ch of line.toLowerCase() + " ") {
+        if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) w += ch;
+        else { if (w) words.push(w); w = ""; }
+      }
+      assert.ok(!words.includes("v2"), `README prose says v2: ${line.slice(0, 100)}`);
+    }
+    devRow("D-README-INSTALL-2", "install adimlarini collapse kullanarak yap");
+  });
+
+  test("README: one rendered stargazer-companies image, light and dark, drawn from the JSON, with its source line (D-README-STARRED-1)", () => {
+    // Owner 2026-11-01: "Starred by engineers at altindaki logolari labelleri bizim design system e gore yap".
+    const readme = readRepo("README.md");
+    const data = JSON.parse(readRepo("docs/assets/readme/data/stargazer-companies.json"));
+    assert.ok(readme.includes('srcset="docs/assets/readme/stargazers-dark.png"') && readme.includes('src="docs/assets/readme/stargazers-light.png"'), "README shows the stargazers image in both themes");
+    const html = readRepo("docs/assets/readme/src/stargazers.html");
+    assert.ok(html.includes("window.COMPANIES") && !html.includes(data.companies[0].name), "the page draws the names from the JSON, none typed in");
+    assert.ok(readRepo("docs/assets/readme/src/render.mjs").includes("stargazer-companies.json"), "render.mjs feeds the JSON to the page");
+    assert.ok(readme.split("\n").some((l) => l.includes("GitHub GraphQL API") && l.includes(data.read_at.slice(0, 10))), "README names the source and the date under the image");
+    devRow("D-README-STARRED-1", "Starred by engineers at");
+  });
 });
 
 describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
