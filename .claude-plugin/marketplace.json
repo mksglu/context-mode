@@ -1,11 +1,11 @@
 {
   "name": "context-mode",
   "owner": {
-    "name": "Mert Koseoğlu",
+    "name": "Mert Koseoglu",
     "email": "code.bm.ksglu@gmail.com"
   },
   "metadata": {
-    "description": "Context Mode plugins by Mert Koseoğlu",
+    "description": "Context Mode plugins by Mert Koseoglu",
     "version": "2.0.0-next.23"
   },
   "plugins": [
@@ -15,7 +15,7 @@
       "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
       "version": "2.0.0-next.23",
       "author": {
-        "name": "Mert Koseoğlu"
+        "name": "Mert Koseoglu"
       },
       "category": "development",
       "keywords": [
