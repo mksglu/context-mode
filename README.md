@@ -2,9 +2,9 @@
 
 **Keeping tool output out of a coding agent's context window: a local plugin for 10 agents, and the Gateway that works on the whole request.**
 
-[![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fcontext-mode%40main%2Fstats.json&query=%24.npm_downloads&label=npm%20downloads&color=blue)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
+[![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2Flast-year%2Fcontext-mode&query=%24.downloads&label=npm%20downloads%2C%20last%20365%20days&color=blue)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 
-> **When a session runs long.** Context Mode keeps tool output out of the context window. The conversation itself still grows with every turn, and at the window limit the agent compacts and forgets earlier steps. Context Mode Gateway works on that part. It sits between your agent and the model API, keeps older turns in an archive the agent can search (Recall) and carries facts across sessions and agents (Memory). On a long Claude Code session with a 200K window, it cut the mean cost per session from $4.86 to $3.04 (-37.6%), and the session ran to the end with zero compactions. [How the Gateway works](https://contextmode.ai/docs/how-saving-works)
+> **Context Mode Gateway** takes the same idea from tool output to the whole conversation. It is an optional hosted service that works next to this plugin: Recall keeps long sessions searchable, and Memory shares what your agents learn across sessions and tools. The plugin stays free, local and open source. [See how the Gateway works](https://contextmode.ai/docs/how-saving-works)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-dark.png">
@@ -42,7 +42,7 @@ A coding agent reads files, runs commands and fetches pages, and every result go
 One Playwright snapshot is 57.5 KB; one access log is 46.2 KB. The window fills, the agent compacts, and it forgets what it was doing.
 Context Mode runs the tool work in a local sandbox, keeps the full output in a per-project SQLite index, and returns what the agent asks for.
 On the 25 bench rows with 10 KB or more of raw output, it cut the bytes that reach the context by a median of 98.8%, measured with `ctx_bytes` against `raw_bytes`, 5 runs each.
-Context Mode Gateway works on the whole request and the whole account. On a pre-registered long session with a 200K window it cut cost from $4.86 to $3.04 (2026-10-04) (-37.6%), and the session ran to the end with 0 compactions.
+Context Mode Gateway, an optional hosted service, takes the same idea to the whole conversation and all your agents. On a pre-registered long session with a 200K window it cut cost from $4.86 to $3.04 (2026-10-04) (-37.6%).
 You can use both layers together. This paper gives the method, the numbers with their raw files, and the test setup behind each one.
 
 ## 1. The problem
@@ -97,9 +97,9 @@ Result: 315 B reach the context, a 99.5% cut, measured over 5 runs.
 Action: the `PreToolUse` hook denies the fetch and routes it to `ctx_index`, which keeps the page, and `ctx_search`, which returns the part asked for.
 Result: a 435 B reply instead of 215,354 B, a 99.8% cut. The hook took 54 ms.
 
-**Case 3. A long session (Gateway).** Problem: a long Claude Code session on a 200K window compacts, and the agent loses its place.
+**Case 3. A long session (Gateway).** Task: a long Claude Code session on a 200K window.
 Action: the same task through Context Mode Gateway with Recall, 3 pairs, with a rule fixed before the run.
-Result: cost fell from $4.86 to $3.04 (2026-10-04) (-37.6%). Direct compacted 3 times; the Gateway session had 0 compactions. 3 of 3 pairs passed.
+Result: cost fell from $4.86 to $3.04 (2026-10-04) (-37.6%). 3 of 3 pairs passed.
 
 ### 2.2 Longer sessions
 
@@ -270,38 +270,38 @@ Code from `ctx_execute` runs on your host as your user, with your environment (m
 
 ## 8. Context Mode Gateway
 
-The plugin keeps tool output out of the context window. In a long session the rest of the request still grows: the agent re-sends the whole history on every request, compacts at the window limit, and keeps what it learned inside one session and one agent.
-Context Mode Gateway works on that part. It runs between your agent and the model API, on every request and the whole account: Recall for sessions longer than the window, Memory shared by all your agents, Skills, Search over everything that passed through, and Protect.
+The plugin works on tool output, on your machine. Context Mode Gateway is a hosted service that works on every request, across all your agents: Recall, Memory, Skills, Search and Protect.
+Teams add it for long sessions, shared memory and cost reports. The two work together.
 
 <a href="docs/assets/readme/gateway/overview.webp"><img src="docs/assets/readme/gateway/overview-1200.webp" alt="Gateway Overview: money saved, AI spend, prompt-cache discount and cost per request over 30 days" width="100%"></a>
 
-**Overview.** A long session bills you late and in pieces. This screen shows what you paid and what the Gateway saved, per day.
+**Overview.** What you paid and what the Gateway saved, per day, in one view.
 
 <table>
   <tr>
     <td width="50%" valign="top">
       <a href="docs/assets/readme/gateway/analytics.webp"><img src="docs/assets/readme/gateway/analytics-1200.webp" alt="Gateway Analytics: saved money over time, split by source" width="100%"></a><br>
-      <b>Analytics.</b> You want to know where a saving comes from. This screen splits it into hidden tools, archived old results, kept-out large outputs and trimmed context.
+      <b>Analytics.</b> Where each saving comes from: hidden tools, archived old results, large outputs kept in the archive and trimmed context.
     </td>
     <td width="50%" valign="top">
       <a href="docs/assets/readme/gateway/spend.webp"><img src="docs/assets/readme/gateway/spend-1200.webp" alt="Gateway Spend: spend per day by model, cost per request and cache hit rate" width="100%"></a><br>
-      <b>Spend.</b> The bill grows by day and by model. This screen shows spend per day, cost per request and the cache hit rate.
+      <b>Spend.</b> Spend per day and per model, cost per request and the cache hit rate, to help you plan a budget.
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <a href="docs/assets/readme/gateway/memory.webp"><img src="docs/assets/readme/gateway/memory-top-1200.webp" alt="Gateway Memory: money saved by Recall and searches per day" width="100%"></a><br>
-      <b>Memory.</b> Facts and decisions carry across sessions and agents. This screen shows what Recall saved and how many searches found an answer.
+      <b>Memory.</b> Facts and decisions carry across sessions and agents. The screen shows what Recall saved and how many searches found an answer.
     </td>
     <td width="50%" valign="top">
       <a href="docs/assets/readme/gateway/skills.webp"><img src="docs/assets/readme/gateway/skills-1200.webp" alt="Gateway Skills: import from GitHub and the list of installed skills" width="100%"></a><br>
-      <b>Skills.</b> You add a skill once and all your clients use it when it helps. This screen imports skills from GitHub and lists the installed ones.
+      <b>Skills.</b> Add a skill once and all your clients use it when it helps. Import skills from GitHub and see the installed ones.
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
       <a href="docs/assets/readme/gateway/protect.webp"><img src="docs/assets/readme/gateway/protect-1200.webp" alt="Gateway Protect: a new command rule that blocks terraform destroy" width="50%"></a><br>
-      <b>Protect.</b> One wrong shell command can wipe a disk. This screen writes a rule that blocks such a command before it runs.
+      <b>Protect.</b> Rules that check each shell command before it runs. Here, a rule that stops <code>terraform destroy</code>.
     </td>
   </tr>
 </table>
@@ -313,7 +313,7 @@ Numbers in these screenshots come from the author's own account over 30 days (Oc
 | Feature | What it does | What you get | Details |
 |---|---|---|---|
 | Context Saving | Folds old tool output, runs data work as code (Thinking in Code), trims tool schemas, places cache marks | Tool schemas 102,784 B to 33,611 B per request (-67.3%); a tool output over 2,048 B becomes a pointer of about 285 B, with the full copy archived | Saves the most on sessions with many tool calls; A/B measured in Claude Code |
-| Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | 200K window, 2026-10-04: $4.86 to $3.04 (-37.6%), zero compactions against 3 on Claude Code alone | Cost measured in Claude Code on Claude Opus 5.5 |
+| Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | 200K window, 2026-10-04: mean cost per session $4.86 to $3.04 (-37.6%) | Cost measured in Claude Code on Claude Opus 5.5 |
 | Memory | Each fact keeps two times: when it was true and when the Gateway learned it | Claude Code and Codex on one account share one store, tested end to end | The memory block goes into the first request of a new session |
 | Skills | A skill catalog on the Gateway for your account; it loads the skill that matches your message | The matching skill loads on the message that needs it | Import skills from GitHub; a loaded skill joins the prompt in full |
 | Search | Searches the prompts, commands and tool output that passed through, in the console and as an agent tool | Find any past prompt, command or tool output, from the console or your agent | The console searches the first 4,000 characters of each tool result |
@@ -327,7 +327,7 @@ Numbers in these screenshots come from the author's own account over 30 days (Oc
 Gateway cost against Claude Code alone, Claude Opus 5.5, mean dollars per session at list price:
 
 - Six short tasks (2026-09-29): 24.5% cheaper pooled over 176 sessions (21% to 29% per task). [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json)
-- Long session, 200K window (2026-10-03/04): $4.86 to $3.04 (-37.6%), zero compactions against 3 on Claude Code alone. [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json)
+- Long Claude Code session, 200K window (2026-10-03/04): mean cost per session $4.86 to $3.04 (-37.6%). [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json)
 - We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks).
 
 Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi.

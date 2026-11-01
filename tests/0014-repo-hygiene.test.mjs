@@ -1218,17 +1218,52 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const bad of ["## Cite", "```bibtex", "CITATION.cff"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
   });
 
-  test("README: Gateway text comes first after the badges, reads problem-first, and no failed run is quoted", () => {
+  test("README: Gateway text comes first after the badges, and no failed run is quoted", () => {
     const readme = readRepo("README.md");
     const gw = readme.indexOf("Context Mode Gateway");
     assert.ok(gw > 0 && gw < readme.indexOf("## Abstract"), "the Gateway line must sit above the Abstract");
-    // Owner 2026-11-01 (D-README-GW-PROBLEM-1): the Gateway text reads problem-first; quota, price and sign-up lines read as an ad.
+    // Owner 2026-11-01 (D-README-GW-PROBLEM-1, D-README-GW-CALM-1): quota, price and sign-up lines read as an ad.
     for (const ad of ["1,000 requests", "card-free", "Start at", "Every plan has every feature", "contextmode.ai/pricing"]) assert.ok(!readme.includes(ad), `README has ${ad} (D-README-GW-PROBLEM-1)`);
     // Runs that failed their own pre-registered rule (gateway-paid.md §2) and claims with no raw source.
     for (const bad of ["65.5%", "54.9%", "$2.49", "$1.88", "80x", "315 KB becomes"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
     // The 1M-window run missed its own pre-registered accuracy rule, so the README leaves it out.
     for (const bad of ["$7.24", "-59.0%"]) assert.ok(!readme.includes(bad), `README quotes ${bad}`);
     for (const l of readme.split("\n").filter((x) => x.includes("43.8%"))) assert.ok(l.includes("15 of 20"), "-43.8% without its task-check loss");
+  });
+
+  test("README: the top Gateway blockquote and section 8 read calm: no fear word, no negation, no plan, price or sign-up line (D-README-GW-CALM-1)", () => {
+    // Owner 2026-11-01 on the problem-first text: "bu icime sinmedi OSS userleri kaciririz URKUTURUZ". The plugin is complete
+    // on its own; the Gateway is an optional hosted service next to it. Words are split by hand (no regex).
+    const readme = readRepo("README.md");
+    const lines = readme.split("\n");
+    const quote = lines.find((l) => l.startsWith("> ") && l.includes("Context Mode Gateway"));
+    assert.ok(quote, "README has no top Gateway blockquote");
+    assert.ok(lines.indexOf(quote) < lines.findIndex((l) => l.startsWith("## ")), "the Gateway blockquote sits above the first section");
+    assert.ok(quote.includes("free, local and open source"), "the blockquote says the plugin stays free, local and open source");
+    const start = readme.indexOf("## 8. Context Mode Gateway");
+    const end = readme.indexOf("\n## 9.", start);
+    assert.ok(start > 0 && end > start, "README has no section 8 Context Mode Gateway");
+    const words = (text) => {
+      const out = [];
+      let w = "";
+      for (const ch of text.toLowerCase() + " ") {
+        if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) w += ch;
+        else { if (w) out.push(w); w = ""; }
+      }
+      return out;
+    };
+    const BANNED_WORDS = ["forget", "forgets", "forgot", "lose", "loses", "lost", "flood", "floods", "break", "breaks", "limit", "limits", "pain",
+      "problem", "problems", "struggle", "risk", "risks", "not", "no", "never", "without", "cannot", "v2", "enterprise", "quota", "pricing"];
+    const BANNED_PHRASES = ["still grows", "compacts and", "n't", "1,000 requests", "card-free", "every feature", "start at", "sign up", "sign-up",
+      "free plan", "pro plan", "team plan", "per month", "/month", "/mo", "zero compactions", "0 compactions"];
+    for (const [name, text] of [["top blockquote", quote], ["section 8", readme.slice(start, end)]]) {
+      const ws = new Set(words(text));
+      for (const b of BANNED_WORDS) assert.ok(!ws.has(b), `${name} has the word "${b}" (D-README-GW-CALM-1)`);
+      for (const b of BANNED_PHRASES) assert.ok(!text.toLowerCase().includes(b), `${name} has "${b}" (D-README-GW-CALM-1)`);
+    }
+    const rows = readRepo("docs/architecture/DEVIATIONS.md").split("\n").filter((l) => l.startsWith("| D-README-GW-CALM-1 |"));
+    assert.equal(rows.length, 1, "DEVIATIONS has one D-README-GW-CALM-1 row");
+    assert.ok(rows[0].includes("bu icime sinmedi OSS userleri kaciririz URKUTURUZ"), "the row quotes the owner");
   });
 
   test("README: Gateway screenshots gallery names six existing images and the README holds no email address (D-README-GW-SHOTS-1)", () => {
@@ -1279,9 +1314,13 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.ok(y.split("\n").slice(0, 8).join("\n").includes("default branch"), "header: scheduled jobs run only on the default branch");
   });
 
-  test("README badges read the stats.json fields; no users or marketplace badge, no live count in the hero alt or figure text", () => {
+  test("README npm badge reads the npm downloads API with a label that says what it counts; no users or marketplace badge, no live count in the hero (D-README-GW-CALM-1)", () => {
     const readme = readRepo("README.md");
-    assert.ok(readme.includes("query=%24.npm_downloads"), "npm downloads badge reads $.npm_downloads");
+    // main holds the v1 stats.json (no npm_downloads field), so a badge on stats.json@main showed "no result".
+    // The npm API answers on every branch; last-year covers every download since the package began (2026-02-23) until 2027-02-23.
+    const badge = "https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2Flast-year%2Fcontext-mode&query=%24.downloads&label=npm%20downloads%2C%20last%20365%20days";
+    assert.ok(readme.includes(badge), "npm downloads badge reads api.npmjs.org last-year with the label 'npm downloads, last 365 days'");
+    assert.ok(!readme.includes("stats.json&query"), "no badge reads stats.json");
     for (const bad of ["query=%24.message", "query=%24.marketplace", "label=users", "747.4k", "683.2k", "64.1k", "33,053"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
     const hero = readRepo(SRC + "hero.html");
     for (const bad of ["Users", "GitHub stars", "33,053", "747.4k", "683.2k"]) assert.ok(!hero.includes(bad), `hero.html has ${bad}`);
