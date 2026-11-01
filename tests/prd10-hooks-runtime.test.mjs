@@ -10,6 +10,7 @@ import path, { join, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { handleHook } from "../src/core/hooks/dispatch.ts";
 import { ctxSearch } from "../src/core/tools/search.ts";
+import { ctxStats } from "../src/core/tools/stats.ts";
 import { chunkText } from "../src/core/index/chunk.ts";
 import { getAdapter, ADAPTERS, hasRecall, hasReplace } from "../src/adapters/table.ts";
 import { COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX, DECISION_OPTION_KEY, DECISION_SOURCE, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_OPEN_TAG, STATE_BUDGET, D5_LAST_HOOK_ERROR, MCP_HINT_EVERY, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, REPLACE_HANDLE_LINE, REQUIRE_SECURITY_ENV, TOOL_ORDER, prefixToolNames } from "../src/core/contracts/constants.ts";
@@ -410,6 +411,47 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(replaced.includes("needle target"));
     const src = await waitRows("SELECT label FROM sources WHERE session_id = ?", [p.session_id], 1);
     assert.equal(src.length, 1);
+  });
+
+  // D-STATS-RET-1: returned_bytes is what the model got. The row body stays the whole text.
+  function statsSession(text, sessionId) {
+    const line = text.split("\n").find((l) => l.startsWith("| session |"));
+    const [produced, returned, saved] = line.split("|").slice(2, 5).map((c) => Number(c.trim().split(" ")[0]));
+    return { produced, returned, saved };
+  }
+
+  test("D-STATS-RET-1: a replaced Bash output journals returned_bytes = the replace bytes, and ctx_stats shows the saving", async () => {
+    const text = bigText(160000);
+    const p = mainBashPost(text);
+    const out = parsed(await handleHook("claude-code", p, env));
+    const replaced = replacedText(out.updatedToolOutput);
+    const rows = await waitRows("SELECT bytes, sandbox_bytes, returned_bytes, length(body) AS blen FROM events WHERE session_id = ? AND kind = 'cmd'", [p.session_id], 1);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].bytes, Buffer.byteLength(text));
+    assert.equal(rows[0].sandbox_bytes, Buffer.byteLength(text));
+    assert.equal(rows[0].returned_bytes, Buffer.byteLength(replaced), "returned_bytes is the replace text the model got");
+    assert.equal(rows[0].blen, text.length, "the row body stays the whole text");
+    const reply = await ctxStats.handler({}, searchCtx(p.session_id));
+    const s = statsSession(reply.text, p.session_id);
+    assert.equal(s.produced, Buffer.byteLength(text));
+    assert.equal(s.returned, Buffer.byteLength(replaced));
+    assert.ok(s.saved > 0, "Saved > 0 for the replaced call: " + reply.text);
+  });
+
+  test("D-STATS-RET-1: an allowed small output journals returned_bytes = its bytes", async () => {
+    const text = "x".repeat(REPLACE_TRIGGER_BYTES - 10);
+    const p = mainBashPost(text);
+    assert.deepEqual(await handleHook("claude-code", p, env), { stdout: "", exitCode: 0 });
+    const rows = await waitRows("SELECT bytes, sandbox_bytes, returned_bytes FROM events WHERE session_id = ? AND kind = 'cmd'", [p.session_id], 1);
+    assert.deepEqual(rows.map((r) => ({ ...r })), [{ bytes: text.length, sandbox_bytes: text.length, returned_bytes: text.length }]);
+  });
+
+  test("D-STATS-RET-1: a large output allowed whole (row with no replace channel) journals returned_bytes = its bytes", async () => {
+    const text = bigText(40000);
+    const p = mainBashPost(text);
+    assert.deepEqual(await handleHook("codex", p, env), { stdout: "", exitCode: 0 });
+    const rows = await waitRows("SELECT bytes, returned_bytes FROM events WHERE session_id = ? AND kind = 'cmd'", [p.session_id], 1);
+    assert.deepEqual(rows.map((r) => ({ ...r })), [{ bytes: Buffer.byteLength(text), returned_bytes: Buffer.byteLength(text) }]);
   });
 
   test("D-M7-SV-1: a 4-16K Bash output is replaced by at most REPLACE_RETURN_BYTES of whole small chunks plus the more line", async () => {

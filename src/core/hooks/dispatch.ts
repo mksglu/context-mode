@@ -397,15 +397,31 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   if (result.persistedPath !== undefined) result.bytes = Buffer.byteLength(text);
   if (tool.canonicalName === DECISION_TOOL) askDetached(ev, project, tool, text); // ADR-0009 §8.2
   const kind = journalKind(tool, row, result.isError); // step 2
-  if (kind !== null) {
+  // D-STATS-RET-1: the row is written once, after the decision, so returned_bytes is what the model got:
+  // the replace text when the hook replaced the output, result.bytes when it allowed it whole. Same detached write.
+  const journal = (returned: number): void => {
+    if (kind === null) return;
     const key = kind === "cmd" ? canonicalKey(tool.canonicalName, str(tool.input.command))
       : kind === "toolerr" ? tool.canonicalName + ":" + stableJson(tool.input) : null; // step 3
     appendDetached(project, ev.sessionId, { // step 4; body is the whole text (D-M3-H2-6)
       session_id: ev.sessionId, worktree: project.worktree, agent: ev.agent, kind, tool: tool.canonicalName, key,
       path: pathOf(tool.input), ok: result.isError ? 0 : 1, exit_code: exitCodeOf(text), bytes: result.bytes,
-      body: text, turn: ev.turn ?? 0, sandbox_bytes: result.bytes, returned_bytes: result.bytes,
+      body: text, turn: ev.turn ?? 0, sandbox_bytes: result.bytes, returned_bytes: returned,
     });
+  };
+  let decision: Decision;
+  try {
+    decision = await postReplace(ev, row, project, env, tool, result, text);
+  } catch (err) {
+    journal(result.bytes); // the call still gets its row; the caller turns the throw into the failure output
+    throw err;
   }
+  journal(decision.kind === "replace" ? Buffer.byteLength(decision.output) : result.bytes);
+  return decision;
+}
+
+async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv,
+  tool: ToolCall, result: ToolResultInfo, text: string): Promise<Decision> {
   // step 5: replace, DECISIONS-r9 F1 split. Subagent case B/C (ADR-0016), and the main agent on a row
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
