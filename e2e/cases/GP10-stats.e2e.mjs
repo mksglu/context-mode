@@ -1,7 +1,7 @@
 // GP10 — Stats (TECH-SPEC §6.2 GP10 row, 14-tests.md §3 GP10 row, 14a-issue-cases.md GP10 rows,
 // DECISIONS-r9 V18/V19, DEVIATIONS D-M4-arch-4, D-M4-S3-1). covers: src/core/tools/stats.ts.
 // The byte math (reduction-pct-denominator #1025, reduction-pct-net-bytes #1042, binary-read-zero-savings
-// #1252) is unit-tested in tests/v2/tools/stats.test.mjs; this file checks it end to end through the bundle.
+// #1252) is unit-tested in tests/tools/stats.test.mjs; this file checks it end to end through the bundle.
 // usage-events-idempotent-per-turn (#1036) needs `cost` rows, which M5 writes; it is not an M4 row.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -151,5 +151,5 @@ test("[M5] GP10/usage-events-idempotent-per-turn: 3 step-finish events in one tu
     await c.request("notifications/usage", { sessionId: "s1", turn: 1, type: "step-finish" }).catch(() => {});
   }
   await c.close();
-  assert.ok(true, "full dedup assertion lives in tests/v2/store/cost-dedup.test.mjs; this case proves the bundle does not crash on repeated Usage events");
+  assert.ok(true, "full dedup assertion lives in tests/store/cost-dedup.test.mjs; this case proves the bundle does not crash on repeated Usage events");
 });

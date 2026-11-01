@@ -42,7 +42,7 @@
         "`npm ci` fails because the repo has no package-lock.json. I used `npm install`.",
         "The MCP server prints a zod warning (zod < 4.2.0, falls back to z.toJSONSchema()). The server ignored my first ctx_execute call's code and file env name, but the grep fallback still found the FATAL line.",
         "The first git clone took more than 10 minutes because 14 agents were cloning at once.",
-        "I did not run node --test tests/v2/ and did not commit, per the task."
+        "I did not run node --test tests/ and did not commit, per the task."
       ]
     },
     {

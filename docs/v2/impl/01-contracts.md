@@ -220,7 +220,7 @@ ADR-0017 `covers`: `src/core/contracts/errors.ts`.
 - A-C3: `formatError` throws a plain (non-`CtxError`) `Error` on a missing var, because that path is a programmer mistake caught by tests, not a user-facing error with its own line in `ERROR_TEXT`.
 - A-C5: No `ERROR_TEXT` template nests one `<name>` inside another or escapes a literal `<`/`>`, so `formatError` needs no nesting or escape rule; a `<` that hits a second `<` before a `>`, or that never meets a `>`, is copied through as plain text (§4.3 step 2). Reason: no template in the table needs nesting or escaping, so the simplest scan that is still exact is enough.
 - A-C1 note (intern M0 Q1): DECISIONS-r9 M6 replaces A-C1. `DECAY_X1000` is a literal 128-entry table (ages 0–127); age > 127 uses entry 127. The unit test recomputes the formula.
-- A-C6 (intern M0 Q2): no build-time template check. `tests/v2/contracts/contracts.test.mjs` formats every `ERROR_TEXT` key with all its `<name>` vars and asserts one line with `. Fix: `; A-C3 and A-C5 cover a bad template at run time.
+- A-C6 (intern M0 Q2): no build-time template check. `tests/contracts/contracts.test.mjs` formats every `ERROR_TEXT` key with all its `<name>` vars and asserts one line with `. Fix: `; A-C3 and A-C5 cover a bad template at run time.
 - A-C7 (intern M0 Q7): the `nativeTools` matcher regex is built only at build time by `build/manifests.ts` `buildMatcher` (impl/13 §3 step 5, `escapeRegExp` on `toolNamePrefix` only). `src/` never builds or runs it.
 - A-C8 (intern M0 Q8): `RATIO_SECTION_DECAY = 0.7` comes from ADR-0009 §4, `ratio = score · 0.7^k / bytes`; it is a design value, not a spike result.
 

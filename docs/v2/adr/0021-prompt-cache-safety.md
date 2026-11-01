@@ -19,10 +19,10 @@ Rules the code follows:
 
 ## Guard tests
 
-- `tests/v2/plugins/pi-cache.test.mjs`: prompts identical on turns 1 and 2, INSTRUCTIONS once.
-- `tests/v2/plugins/opencode-cache.test.mjs`: session B payload unchanged after a compaction in session A.
-- `e2e/live/cache/analyze.test.mjs`, `tests/v2/cache/codex-usage.test.mjs`: break and hit-ratio analysis.
-- `tests/v2/cache/prefix-determinism.test.mjs`: `initialize` and `tools/list` bytes across 5 starts per agent, no `list_changed`, pi and opencode system bytes across turns.
+- `tests/plugins/pi-cache.test.mjs`: prompts identical on turns 1 and 2, INSTRUCTIONS once.
+- `tests/plugins/opencode-cache.test.mjs`: session B payload unchanged after a compaction in session A.
+- `e2e/live/cache/analyze.test.mjs`, `tests/cache/codex-usage.test.mjs`: break and hit-ratio analysis.
+- `tests/cache/prefix-determinism.test.mjs`: `initialize` and `tools/list` bytes across 5 starts per agent, no `list_changed`, pi and opencode system bytes across turns.
 - `build/check-prompt-static.mjs` (gate `ci-checks`, `ci.yml`): no dynamic token in instructions or tool descriptions.
 - Live runs: `e2e/live/cache/run.mjs`, `e2e/live/cache/codex.mjs`.
 

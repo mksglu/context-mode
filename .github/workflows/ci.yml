@@ -80,14 +80,14 @@ jobs:
       - run: node e2e/cases/run.mjs --milestone "$GATE_MILESTONE"
         name: GP cases tagged <= gate milestone (D-M0-2, D-M2-arch-4)
         shell: bash
-      # D-C166-WIN-FIRE-1: the real Codex CLI on all 3 OS, so the codex fire tests (tests/v2/0020-fire-hook-config) run
+      # D-C166-WIN-FIRE-1: the real Codex CLI on all 3 OS, so the codex fire tests (tests/0020-fire-hook-config) run
       # on the Windows runner too. Fake local provider, temp HOME and CODEX_HOME, no login, no key.
       # A global agent CLI, not a dev install, so it does not go through scripts/ci-install.mjs.
       - run: npm i -g @openai/codex@0.166.0
         name: codex 0.166.0 for the codex fire tests (D-C166-WIN-FIRE-1)
       - run: codex --version
         name: codex version (info)
-      # D-OC2-FIRE-1: both OpenCode lines on all 3 OS for the opencode fire tests (tests/v2/0020-fire-plugin-ext). 1.19.5 is the
+      # D-OC2-FIRE-1: both OpenCode lines on all 3 OS for the opencode fire tests (tests/0020-fire-plugin-ext). 1.19.5 is the
       # global `opencode`; 2.2.5 (npm @opencode/cli) owns the same bin name, so it goes into its own prefix, found through
       # CM_OPENCODE2_DIR. Fake local provider, temp HOME, no login, no key.
       - run: npm i -g opencode-ai@1.19.5
@@ -107,7 +107,7 @@ jobs:
         name: OpenCode 2 native install, update, remove (D-OC2-NATIVE-CMD-1)
       - run: npm run typecheck
         name: typecheck, tsc --noEmit (D-TSC-GATE-1)
-      - run: node --test "tests/v2/**/*.test.mjs"
+      - run: node --test "tests/**/*.test.mjs"
         name: v2 unit tests (TECH-SPEC 6.2a, DEVIATIONS D-M1-13, same as gate layer v2-unit)
       # Keyless local live cases (ADR-0012: kind "local" runs no model). They failed on a dev machine while CI never ran
       # them. Same harness the owner runs by hand: node e2e/live/run.mjs --only <ids>. T-GS6 and T-F1 are wall-time

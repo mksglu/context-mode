@@ -366,7 +366,7 @@ None beyond the DB layer's own timeout constant (owned by `store`, not redefined
   - Q5 `repeatCount`: a count built in `candidates.ts` (1 or more), never read from the DB. `max(1, n)` is part of the formula, not a guard.
   - Q6 section order: A-intern-M4 Q1; the GP6 goldens assert it.
   - Q7 no rows: `ctx_resume` returns `RESUME_EMPTY_LINE` before it calls `renderState`. A compact delivery with no rows renders the wrapper with `session="" upto="0"`, no item line and an empty `more:` line. This is the defined "nothing yet" block; it names no search.
-  - Q8 `RESUME_CAP` and `STATE_BUDGET`: both 2048 (V21). `tests/v2/contracts` asserts both values and `resume.ts` throws on a block over `RESUME_CAP`. A change to one is a change to both.
+  - Q8 `RESUME_CAP` and `STATE_BUDGET`: both 2048 (V21). `tests/contracts` asserts both values and `resume.ts` throws on a block over `RESUME_CAP`. A change to one is a change to both.
   - Q9 tie-break: a journal row has one kind, so it feeds at most one section; `seq` is unique among candidates and the `seq` tie-break is total. Concatenation order does not change the result.
   - Q10 `ctx_stats` errors: the tool has no input fields. An MCP call always sends an object, so `unrecognized_keys` is the only issue that can occur; it maps to `STATS_UNKNOWN_FIELD_LINE`.
 

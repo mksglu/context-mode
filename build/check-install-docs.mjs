@@ -14,7 +14,7 @@
 // checkPages: README.md names Node 24.15.0, the two-command install and the uninstall command; each agent page names `context-mode setup` (no upgrade section: D-V1OUT-1).
 // D-V1OUT-1 (owner 2026-10-25): the word "v1" must not appear in README.md, CONTRIBUTING.md, docs/*.md, docs/install/**, skills/**,
 // src/prompt/**, e2e/golden/cli/** (CLI help goldens) or .github/ISSUE_TEMPLATE/** (checkNoV1, v1FreeFiles). docs/benchmarks/** and docs/v2/** are exempt. CLI help and output
-// are checked by tests/v2/repo/install-docs-v1out.test.mjs, which runs the CLI.
+// are checked by tests/repo/install-docs-v1out.test.mjs, which runs the CLI.
 // Simple rules (owner 2026-10-25: users never type paths, JSON or scripts), checkSimpleLines over docFiles: a fenced line
 // must not hold `node -e`, `npm root -g`, `$(...)` or a path under a home dir (~/, $HOME, %USERPROFILE%, $env:USERPROFILE,
 // {env:HOME}, /Users/, /home/, C:\Users); a line in a shell or unlabelled fence is at most 100 chars. checkSimplePages: a

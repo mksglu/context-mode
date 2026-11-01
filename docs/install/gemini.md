@@ -76,7 +76,7 @@ If you used the git route, run `gemini extensions uninstall context-mode`.
 
 - `gemini extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
 - `hooks/hooks.json` has no SessionStart (D-FU-GCH-1). The resume hint comes on the first BeforeAgent of a session (D-FU-GCH-2).
-- No logged-in Gemini session loaded the hooks in any run. A real `gemini -p` (0.66.0) against a local fake API, with the built extension linked into a temp HOME, ran the BeforeTool hook: `cat big.log` (208 KB) was blocked and the model saw the `ctx_execute` redirect (`tests/v2/e2e/gemini-fire.test.mjs`).
+- No logged-in Gemini session loaded the hooks in any run. A real `gemini -p` (0.66.0) against a local fake API, with the built extension linked into a temp HOME, ran the BeforeTool hook: `cat big.log` (208 KB) was blocked and the model saw the `ctx_execute` redirect (`tests/e2e/gemini-fire.test.mjs`).
 - Gemini installs the extension but runs none of its hooks when: `hooksConfig.enabled` is `false` in the system, workspace or user `settings.json`; the context-mode hook command is listed in `hooksConfig.disabled`; `admin.extensions.enabled` is `false`; or the extension is off for the workspace scope (`gemini extensions list` shows `Enabled (Workspace): false`). Setup and doctor read these and FAIL with a one-line fix. They never edit your settings. For the workspace scope run `gemini extensions enable context-mode --scope workspace` (D-NI-GEMINI-GATE-1).
 
 ## Report a problem
@@ -94,6 +94,6 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents gemini` | 0.65.0 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 0.65.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Gemini CLI session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a live, logged-in Gemini CLI session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
 
 Earlier git-route run, commit 05e97724, Gemini CLI 0.65.0, 2026-10-22: `gemini extensions install https://github.com/mksglu/context-mode --ref release --consent` Pass; `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` Pass: Connected; `tools/list` over stdio Pass: 9 tools. `gemini extensions update` and `uninstall` were not run.

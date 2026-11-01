@@ -390,7 +390,7 @@ Root cause of the two earlier "not replaced" tables:
 - The plugin under test returned `updatedToolOutput` as a plain string. A build of 3f4a4d0b (before D-M7-SV-1) reproduces the old result exactly: seen 19997 for N 4221, and the debug log says `PostToolUse hook returned updatedToolOutput that does not match Bash's output shape: reason=schema_invalid issues=invalid_type`. Claude Code then keeps the original output. The code on v2-design since 52b01705 sends the Bash shape and works live, so the "after r1 shape fix" table most likely ran a release-out built before that commit.
 - "stream-json showed SessionStart only" is not evidence that PostToolUse did not run. Without `--include-hook-events`, stream-json lists SessionStart hook events only; a session run that way here replaced (seen 187) and still showed SessionStart only.
 
-Regression guard: `tests/v2/hooks/replace-live-golden.test.mjs` runs the real captured payload (`e2e/fixtures/claude-code/2.1.303/PostToolUse-Bash-large.json`) through `src/entries/hook.ts` and checks the Bash shape and a result under 1/10 of the full output. It fails on 3f4a4d0b and passes on this branch.
+Regression guard: `tests/hooks/replace-live-golden.test.mjs` runs the real captured payload (`e2e/fixtures/claude-code/2.1.303/PostToolUse-Bash-large.json`) through `src/entries/hook.ts` and checks the Bash shape and a result under 1/10 of the full output. It fails on 3f4a4d0b and passes on this branch.
 
 ## Replace live proof (impl/replace-live)
 
@@ -406,7 +406,7 @@ The root cause in the section above is confirmed.
 
 Caveat found: the hook returns nothing when the session cwd is not inside a git repo (hook run by hand with a non-git cwd gives empty stdout; with a git cwd and `CLAUDE_PROJECT_DIR` set it gives the replace). In a non-git cwd the model saw the full output: 8892, 19997, 28002 chars, answers still correct. Not changed here (src/ is out of scope); it needs its own fix and DEVIATIONS row.
 
-Gate fix: `e2e/golden/GP3/fixture-replay-claude-code-PostToolUse-Bash-large.json` was missing, so gp-cases failed on the new fixture and the saving-score gate guard was false (M2 73.71). With the golden added, gp-cases passes (GP3 21 of 21), and `tests/v2/` passes 1079 of 1079.
+Gate fix: `e2e/golden/GP3/fixture-replay-claude-code-PostToolUse-Bash-large.json` was missing, so gp-cases failed on the new fixture and the saving-score gate guard was false (M2 73.71). With the golden added, gp-cases passes (GP3 21 of 21), and `tests/` passes 1079 of 1079.
 
 `node bench/saving-score.mjs` (lock ok, score files match `bench/saving-score.lock`): M1 94.21, M2 86.18, guards success true, small1k true (-0.32), tokens true, gate true. M2 is below the 90 target; it is inside the 2-run noise range noted above.
 
@@ -423,7 +423,7 @@ Independent check of D-M7-NG-1, 2026-10-21. Claude Code 2.1.303, claude-sonnet-5
 
 A first pass with a looser prompt let the model run `seq 1 N | tail -n 1` (4 bytes) in 6 of 8 runs. Those runs do not test the hook and are not counted. Before D-M7-NG-1 the non-git cell gave the full output (8892, 19997, 28002 chars, see above); now it gives the same replace as a git cwd.
 
-Rebase finding: after rebasing on v2-design 6f467b75, `tests/v2/ops/project-dir-ported.test.mjs` still asserted NO_GIT_DIR for a non-git cwd, and the saving-score gate guard failed (M2 78.22, gate false). The test now asserts the D-M7-NG-1 rule (DEVIATIONS row added). `node --test tests/v2/`: 1196 tests, 1194 pass, 0 fail, 2 skip.
+Rebase finding: after rebasing on v2-design 6f467b75, `tests/ops/project-dir-ported.test.mjs` still asserted NO_GIT_DIR for a non-git cwd, and the saving-score gate guard failed (M2 78.22, gate false). The test now asserts the D-M7-NG-1 rule (DEVIATIONS row added). `node --test tests/`: 1196 tests, 1194 pass, 0 fail, 2 skip.
 
 `node bench/saving-score.mjs` (lock ok): M1 94.21, M2 84.02, guards success true, small1k true (-0.32), tokens true, gate true. M2 is below the 90 target; it moves 78 to 86 between runs of the same code, which is the 2-run noise noted above.
 

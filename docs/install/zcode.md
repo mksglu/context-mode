@@ -58,7 +58,7 @@ ZCode 0.17.0 (built from zai-org/ZCode `3c5b2276`) reads `~/.zcode/cli/config.js
 
 ## Known limits
 
-- ZCode has no npm package. The live test `tests/v2/e2e/zcode-fire.test.mjs` runs the real CLI built from source (set `ZCODE_CLI_BUNDLE` to `zcode.cjs`) against a local fake provider; it skips when no binary is found. The ZCode desktop app is not covered.
+- ZCode has no npm package. The live test `tests/e2e/zcode-fire.test.mjs` runs the real CLI built from source (set `ZCODE_CLI_BUNDLE` to `zcode.cjs`) against a local fake provider; it skips when no binary is found. The ZCode desktop app is not covered.
 
 ## Report a problem
 
@@ -75,4 +75,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents zcode` | not installed | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | not installed | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-ZCode was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that ZCode loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.
+ZCode was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that ZCode loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.

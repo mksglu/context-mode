@@ -23,4 +23,4 @@ The npm name was the source only where the host takes an npm package (pi, openco
 - `npm ci` fails: the repo has no `package-lock.json`.
 - No host was run in a logged-in session that fires the hooks, so doctor `hook-seen` stays a WARN.
 
-Gate: `node scripts/gate.mjs --all --quick` exit 0. `node --test tests/v2/`: 1666 pass, 0 fail, 5 skip.
+Gate: `node scripts/gate.mjs --all --quick` exit 0. `node --test tests/`: 1666 pass, 0 fail, 5 skip.

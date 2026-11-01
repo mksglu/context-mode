@@ -70,4 +70,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents vscode` | not installed | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | not installed | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-VS Code (Copilot) was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that VS Code (Copilot) loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.
+VS Code (Copilot) was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that VS Code (Copilot) loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.

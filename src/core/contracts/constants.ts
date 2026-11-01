@@ -163,7 +163,7 @@ export const MCP_NAME_JOIN = "__"; // Claude-shape join between server and tool 
 export const GEMINI_MCP_PREFIX = "mcp_"; // generateValidName(): "mcp_" + server + "_" + tool (ADR-0016 Gemini row)
 export const GEMINI_NAME_EXTRA_CHARS = "_-.:"; // kept besides A-Z a-z 0-9; any other char becomes "_"
 
-// D-M7-RR-2: no caller since the hints are retired; kept because tests/v2/contracts pins it.
+// D-M7-RR-2: no caller since the hints are retired; kept because tests/contracts pins it.
 // MCP_HINT_EVERY: 10, or env CTX_MCP_HINT_EVERY when it is a positive safe integer (Q1, A-C4).
 // Read once at process start (impl/09 A20).
 const MCP_HINT_EVERY_DEFAULT = 10;
@@ -240,7 +240,7 @@ export function D5_LAST_HOOK_ERROR(ts: string, stage: string, label: string): st
 export function D5_PAST_HOOK_ERROR(ts: string, stage: string, label: string): string { return `; past hook error ${ts} at ${stage} (${label}), before this run, stack in ${HOOK_ERROR_LOG_FILE}`; }
 
 // impl/08 §6.1 step 5d, DECISIONS-r9 E4. D-M7-RR-2: step 5d (bounded -> no hint) is retired with the hints; the
-// set stays only because tests/v2/contracts pins it (not owned by this change).
+// set stays only because tests/contracts pins it (not owned by this change).
 // E3: CONTEXT_MODE_BASH_NUDGE_MIN_COMMAND_BYTES is not ported.
 export const BOUNDED_COMMANDS = Object.freeze(["pwd", "whoami", "uname", "id", "realpath", "ln"] as const);
 export const BOUNDED_GIT_SUBCOMMANDS = Object.freeze(["status"] as const); // `git status`

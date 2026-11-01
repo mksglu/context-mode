@@ -8,7 +8,7 @@ Scope: the built v2 CLI, installed the way a user installs it. Rules checked: AD
 - Temp `HOME`, `NO_COLOR=1`, no ANSI in any block except the pty block (colours stripped by hand there).
 - Fake agents: `~/.codex`, `~/.claude`, `~/.gemini` directories, and a stub `claude` that exits 0 (it does not implement `plugin list`; this matters for one FAIL below).
 - Node v26.8.1, npm 11.19.0, macOS. Version prints `0.0.0-dev` because this is a dev build.
-- Tests after the two fixes: `node --test tests/v2/cli/cli.test.mjs tests/v2/setup/engine.test.mjs`: 40 pass, 0 fail. Evidence: tests/v2/cli/cli.test.mjs.
+- Tests after the two fixes: `node --test tests/cli/cli.test.mjs tests/setup/engine.test.mjs`: 40 pass, 0 fail. Evidence: tests/cli/cli.test.mjs.
 
 ## The user journey: 2 commands
 
@@ -318,7 +318,7 @@ Usage: context-mode doctor [options]
 | 19 | `--help` starts in under 100 ms | PASS (median) | 30 runs: median 69 ms, min 49 ms, p95 187 ms. Bare `node -e 0` on the same host: median 46 ms, p95 90 ms. The CLI adds about 23 ms. The p95 is host noise; a loaded host can exceed 100 ms |
 | 20 | No network call at start | PASS | `src/entries/cli.ts` reads `package.json` only before routing |
 | 21 | Writes only allowlisted paths and `~/.context-mode/` | PASS | file list after `setup --yes --agents codex`: `.codex/config.toml` and `.context-mode/{backups,reports}` |
-| 22 | Manual step without typing paths (`setup --print <agent>`) | PASS | golden per agent in `tests/v2/cli/cli.test.mjs`; writes nothing (HOME snapshot equal); `--json` machine form. 2026-10-25, macOS arm64, clean temp HOME, npm-packed build: for all 10 agents, `context-mode setup --agents <id>` then `doctor` PASS, and the `--print --json` steps applied by hand then `doctor` PASS (claude 2.1.310, codex 0.164.0, copilot 1.0.103, gemini 0.65.0, opencode 1.19.4, qwen 0.26.1, pi from npm; kiro, vscode, zcode by config file only) |
+| 22 | Manual step without typing paths (`setup --print <agent>`) | PASS | golden per agent in `tests/cli/cli.test.mjs`; writes nothing (HOME snapshot equal); `--json` machine form. 2026-10-25, macOS arm64, clean temp HOME, npm-packed build: for all 10 agents, `context-mode setup --agents <id>` then `doctor` PASS, and the `--print --json` steps applied by hand then `doctor` PASS (claude 2.1.310, codex 0.164.0, copilot 1.0.103, gemini 0.65.0, opencode 1.19.4, qwen 0.26.1, pi from npm; kiro, vscode, zcode by config file only) |
 
 Result: 20 of 21 rules pass.
 

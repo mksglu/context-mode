@@ -1,8 +1,8 @@
 // GP4 — ctx_execute / ctx_batch (14-tests.md §4). M2 case.
 // Case source: TECH-SPEC §6.2 GP4 row. covers: src/core/tools/execute.ts, src/core/sandbox/.
 // Imports M0 harness files + release-out/server.mjs; fails until those land.
-// M2-M2-E1: ports the 14a GP4 rows from tests/v2/tools/execute.test.mjs,
-// tests/v2/tools/batch.test.mjs and tests/v2/sandbox/env.test.mjs into black-box cases that spawn
+// M2-M2-E1: ports the 14a GP4 rows from tests/tools/execute.test.mjs,
+// tests/tools/batch.test.mjs and tests/sandbox/env.test.mjs into black-box cases that spawn
 // release-out/server.mjs only (no src/ import, GS4). The windows-* cases skip on POSIX (D-M2-arch-1).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -163,8 +163,8 @@ test("[M2] GP4/batch-node-options-compound-cmd", async () => {
   golden("batch-node-options-compound-cmd", reply);
 });
 
-// ---- M2-M2-E1 rows (14a-issue-cases.md GP4; ports tests/v2/tools/execute.test.mjs,
-// tests/v2/tools/batch.test.mjs, tests/v2/sandbox/env.test.mjs) ----
+// ---- M2-M2-E1 rows (14a-issue-cases.md GP4; ports tests/tools/execute.test.mjs,
+// tests/tools/batch.test.mjs, tests/sandbox/env.test.mjs) ----
 
 test("[M2] GP4/exit1-stderr-is-error", async () => {
   if (IS_WIN) return;
@@ -226,7 +226,7 @@ const EMOJI = "\u{1F600}"; // 4 UTF-8 bytes, a surrogate pair in UTF-16
 
 test("[M2] GP4/code-point-safe-truncation-cut", async () => {
   // Black-box variant of the unit capBytes-at-every-offset case (that one imports src/core/sandbox
-  // /cap.ts directly and stays in tests/v2): here, output padded so an emoji sits exactly at a
+  // /cap.ts directly and stays in tests): here, output padded so an emoji sits exactly at a
   // byte offset near the cap, verified only by the invariant any cut must hold (no lone surrogate,
   // valid UTF-8), since OUTPUT_CAP is a src/ constant e2e/ may not import (GS4).
   const reply = await callExecute({ language: "javascript", code: `process.stdout.write("a".repeat(3) + "${EMOJI}".repeat(400000))` });

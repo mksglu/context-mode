@@ -98,7 +98,7 @@ const SELF = "build/check-removed.mjs";
 const ALLOWED_DIRS = [
   "src/core/", "src/prompt/", "src/entries/",
   "src/cli/", "src/setup/", // ADR-0019 D5-D7: npm CLI and setup engine (D-CR-0019-1)
-  "tests/v2/", "e2e/", "build/", "bench/", "tickets/", "metrics/",
+  "tests/_lib/", "tests/fixtures/", "tests/e2e/", "tests/ops/", "e2e/", "build/", "bench/", "tickets/", "metrics/",
   "docs/v2/", "docs/install/", "docs/benchmarks/",
   "scripts/release/", "scripts/v1-cases/", // v1 differential harness inputs (D-CR-SCRIPTS-1)
   ".github/", ".impl/",
@@ -131,8 +131,14 @@ const HELD_FOR_OWNER = [
   "tests/integration/seed-parity-coverage.test.ts",
 ];
 
+// ADR-0024: the unit tests sit flat in tests/ as *.test.mjs. A v1 file such as tests/hooks/x.test.ts is not one.
+// Literal compares only: starts with "tests/", ends with ".test.mjs", no second "/".
+function isFlatTest(p) {
+  return p.startsWith("tests/") && p.endsWith(".test.mjs") && p.indexOf("/", "tests/".length) === -1;
+}
+
 function allowed(p) {
-  return ALLOWED_FILES.includes(p) || ALLOWED_DIRS.some((d) => p.startsWith(d));
+  return ALLOWED_FILES.includes(p) || ALLOWED_DIRS.some((d) => p.startsWith(d)) || isFlatTest(p);
 }
 
 function matchesRemoved(p, e) {

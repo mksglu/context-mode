@@ -170,7 +170,7 @@ test("[M1] GP8/db-gone-hard-error: a context.db path vanished mid-session surfac
 // row: `runPool`'s generic `concurrency` parameter (batch.ts) is never called above 1 by any
 // registered MCP tool in M2 — `ctx_batch` always passes `ONE_AT_A_TIME` (1) — so the exact unit
 // fact "2 jobs, concurrency 8 -> capped false" has no black-box surface through a tool call; it
-// stays covered by the pre-existing unit test (tests/v2/tools/batch.test.mjs, not deleted). What
+// stays covered by the pre-existing unit test (tests/tools/batch.test.mjs, not deleted). What
 // IS black-box observable through `ctx_batch` is the behavior `capped` protects: when the stop
 // predicate never fires, every queued job still runs to completion (jobs.length results, in
 // order), regardless of the pool's width. This case proves that through 2 commands.

@@ -3,8 +3,8 @@
 Rule: a reply may be bounded only when the full content is stored first (indexed) and the reply tells the agent how to get the rest.
 A cut that drops content with no way back is forbidden.
 
-`tests/v2/repo/no-truncate.test.mjs` reads this file. Every `capBytes(` call in `src/` must have one `capBytes` row below
-(same file, same count) with verdict `lossless`. `capBytes` is only a final guard. `tests/v2/tools/no-lossy-cut.test.mjs`
+`tests/repo/no-truncate.test.mjs` reads this file. Every `capBytes(` call in `src/` must have one `capBytes` row below
+(same file, same count) with verdict `lossless`. `capBytes` is only a final guard. `tests/tools/no-lossy-cut.test.mjs`
 proves it cuts nothing real: the budget math keeps head, chunks and pointer under OUTPUT_CAP, and an echo of caller input
 (intent, query, label) longer than ECHO_MAX_BYTES is named by position, `...` or source handle instead of echoed.
 

@@ -51,7 +51,7 @@ function main() {
   const buildIdx = joined.search(/build/i);
   const lintIdx = joined.search(/lint/i);
   const gpIdx = joined.search(/e2e\/cases\/run\.mjs/);
-  const unitIdx = joined.search(/node --test "tests\/v2\/\*\*\/\*\.test\.mjs"|v2 unit tests/);
+  const unitIdx = joined.search(/node --test "tests\/\*\*\/\*\.test\.mjs"|v2 unit tests/);
   if ([buildIdx, lintIdx, gpIdx, unitIdx].some((i) => i === -1)) {
     return fail("ci.yml test job must run build, lint, e2e/cases/run.mjs, then the v2 unit tests (D-M7-CLN-5)");
   }

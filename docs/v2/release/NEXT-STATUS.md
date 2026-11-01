@@ -22,7 +22,7 @@ Changes since v2.0.0-next.20: OpenCode 2 native install is `opencode plugin add 
 ## Release numbers (next.21)
 
 - Tag v2.0.0-next.21 on fa9bffea. N = highest 2.0.0-next.N in the registry and origin tags (next.20) plus 1. v2-design was quiet for 47 minutes before the tag (head commit fa9bffea from 00:53 +03).
-- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/v2/**/*.test.mjs"` 2464 tests, 2428 pass, 0 fail, 36 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/**/*.test.mjs"` 2464 tests, 2428 pass, 0 fail, 36 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
 - CI on fa9bffea (run 41245667620): all 12 jobs green.
 - release.yml run 41249251428: one rerun. First attempt failed in ci / ci (windows-latest, node 26), test "H5: doctor hook-runs PASSES on all 10 hosts" ("claude-code: hook did not finish" after 12 s); it passed on the rerun with no change. This is a timing flake on a loaded Windows runner; root cause not proven, test and timeout not changed. After the rerun: ci x12, plan, build, publish-stage, smoke x3, publish-promote, publish-npm, github-release and dev-version all green.
 - Registry version published 2026-10-31T23:20:45Z (gitHead fa9bffea, SLSA v1 provenance). GitHub prerelease v2.0.0-next.21 (not draft) at 23:19:27Z. The registry document lagged the publish step by about 1 minute.
@@ -40,7 +40,7 @@ Changes since v2.0.0-next.18: the OpenCode 2 fix and the D5 timing fix. Reply fo
 ## Release numbers (next.20)
 
 - Tag v2.0.0-next.20 on efe519b1. N = highest 2.0.0-next.N in the origin tags (next.19, never published) plus 1; the registry highest was next.18. v2-design was quiet for 15 minutes before the tag (head commit efe519b1 from 22:32 +03).
-- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/v2/**/*.test.mjs"` exit 0, 2437 tests, 2401 pass, 0 fail, 36 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/**/*.test.mjs"` exit 0, 2437 tests, 2401 pass, 0 fail, 36 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
 - CI on efe519b1 (run 41234706070): all 12 jobs green.
 - release.yml run 41236521013: green on the first run, no rerun. ci x12, plan, build, publish-stage, smoke x3, publish-promote, publish-npm and github-release all green.
 - Registry version published 2026-10-31T20:20:37Z (gitHead efe519b1, SLSA v1 provenance, 2 signatures). GitHub prerelease v2.0.0-next.20 (not draft) at 20:18:47Z. The registry document lagged the publish step by about 2 minutes.
@@ -59,7 +59,7 @@ Changes since v2.0.0-next.17: the five findings of the Viet round on next.17. Re
 ## Release numbers (next.18)
 
 - Tag v2.0.0-next.18 on ea4179fd. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.17) plus 1. The head commit was 25 minutes old at tag time, and v2-design had no new commit after it.
-- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/v2/**/*.test.mjs"` exit 0, 2425 tests, 2391 pass, 0 fail, 34 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- Local on a fresh clone: `npm run typecheck` exit 0; `node --test "tests/**/*.test.mjs"` exit 0, 2425 tests, 2391 pass, 0 fail, 34 skip; `gate --all` exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
 - CI on ea4179fd (run 41198852297): all 12 jobs green on the first run.
 - release.yml run 41200613803: first attempt failed one job, ci (windows-latest, node 24.15.0), step "D3 hook overhead p95 <= 15 ms". Log: claude-code overheadMs 16 (batches 20, 16, 17, 19, 18), codex 13, budget 15. One rerun of the failed job, no code change, no budget change: green. Then plan, build, publish-stage, smoke x3, publish-promote, publish-npm and github-release all green. This is the same timing class as D-CI-PERF-8; it stays open in OPEN-ITEMS (Windows hook overhead sits at 13-17 ms against 15).
 - Registry version published 2026-10-31T12:56:03Z (gitHead ea4179fd, SLSA v1 provenance, 2 signatures). GitHub prerelease v2.0.0-next.18 (not draft) at 12:54:41Z. The registry document lagged the publish step by about 100 s.
@@ -76,7 +76,7 @@ Changes since v2.0.0-next.16: two Codex 0.166 fixes from the Windows tester repo
 ## Release numbers (next.17)
 
 - Tag v2.0.0-next.17 on d526f1e5. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.16) plus 1. v2-design was quiet from 15:49 (+03) for more than 45 minutes before the tag.
-- Local on a fresh clone: `node --test "tests/v2/**/*.test.mjs"` 113 s, 2396 tests, 2362 pass, 0 fail, 34 skip; `gate --all` 407 s, exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
+- Local on a fresh clone: `node --test "tests/**/*.test.mjs"` 113 s, 2396 tests, 2362 pass, 0 fail, 34 skip; `gate --all` 407 s, exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0. No budget or timeout was raised.
 - CI on d526f1e5 (run 41058292998): all 12 jobs green on the first run.
 - release.yml run 41064404552: all jobs green on the first run, no rerun (ci, plan, build, publish-stage, smoke x3, publish-promote, publish-npm, github-release).
 - Registry version published 2026-10-30T14:02:42Z (gitHead d526f1e5, SLSA v1 provenance, 2 signatures). The full package document lagged the dist-tags endpoint by about 3 minutes. GitHub prerelease v2.0.0-next.17 (not draft) at 13:59:52Z.
@@ -89,12 +89,12 @@ Changes since v2.0.0-next.15: search quality for every host, not only Pi.
 - D-HTML-READABLE-1: ctx_index turns HTML (text/html fetch, .html/.htm path) into readable markdown-like text at index time with htmlparser2. No regex. Code blocks stay whole.
 - D-CALL-SHAPE-1: every tool description leads with an exact example call; a bad call gets one line with the correct call. Same tool schema on all 10 hosts.
 - D-SEARCH-REPLY-1: a ctx_search relevance reply holds 5 hits (SEARCH_REPLY_HITS); the More: line pages the rest. No snippet is cut.
-- Parity e2e: fetch, index, search on a recorded react.dev page (tests/v2/e2e/fetch-index-search-parity.test.mjs).
+- Parity e2e: fetch, index, search on a recorded react.dev page (tests/e2e/fetch-index-search-parity.test.mjs).
 
 ## Release numbers (next.16)
 
 - Tag v2.0.0-next.16 on 144e3495. N = highest 2.0.0-next.N in the raw registry JSON and origin tags (next.15) plus 1. v2-design was quiet from 05:09 (+03) for more than 15 minutes before the tag.
-- Local on a fresh clone (seconds): `node --test tests/v2/` 101 s, 2383 tests, 2350 pass, 0 fail, 33 skip; `gate --all` 362 s, exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0 in under 1 s. No budget or timeout was raised.
+- Local on a fresh clone (seconds): `node --test tests/` 101 s, 2383 tests, 2350 pass, 0 fail, 33 skip; `gate --all` 362 s, exit 0 (live layer skipped: no live case covers the changed files); check-install-docs and check-secrets exit 0 in under 1 s. No budget or timeout was raised.
 - CI on 144e3495 (run 40990086878): all 12 jobs green on the first run.
 - release.yml run 40992512193 needed one rerun of the failed job only: ci / windows hosts (windows-latest), copilot-cli setup exited null while the copilot CLI was still extracting its package on first start (log: "Package extraction took 23502ms"). Same cause as the CI rerun on next.15. The rerun passed; build, publish-stage, smoke x3, publish-promote, publish-npm and github-release all succeeded. No code changed between attempts.
 - Registry version published 2026-10-30T03:06:30Z (gitHead 144e3495, SLSA v1 provenance, 2 signatures). The raw registry still showed next.15 for about 100 seconds after `npm notice ... may take a few minutes`. GitHub prerelease v2.0.0-next.16 (not draft) at 03:05:07Z.
@@ -173,7 +173,7 @@ Changes since v2.0.0-next.11:
 Changes since v2.0.0-next.9 (19 commits; DEVIATIONS rows added):
 
 - D-CKPT-LAT-1: the checkpoint no longer runs on the read path (ctx_stats, ctx_search). Windows latency fix.
-- D-NO-TRUNCATE-1: no TRUNCATE anywhere (no wal_checkpoint(TRUNCATE), no TRUNCATE SQL, no fs truncate). Guard: tests/v2/repo/no-truncate.test.mjs.
+- D-NO-TRUNCATE-1: no TRUNCATE anywhere (no wal_checkpoint(TRUNCATE), no TRUNCATE SQL, no fs truncate). Guard: tests/repo/no-truncate.test.mjs.
 - D-NO-LOSSY-CUT-1, D-NO-LOSSY-CUT-2: the doctor report is stored whole; long echoes are named by id. No content is thrown away with no way back.
 - D-DOC-D3-ROOT-1: doctor D3 root fix.
 - D-MO-3: Codex gets context7 too.

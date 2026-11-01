@@ -7,7 +7,7 @@
 //   (DEVIATIONS D-M5-arch-5, D-M5-B1-1); without it BUNDLE_SHA stays undefined (dev/test build).
 //        node build/build.mjs --generated-only
 //   --generated-only writes src/prompt/_generated.ts (git-ignored), keeps it and exits, so plain
-//   `node --test tests/v2/` resolves the src/ import (DEVIATIONS D-M2-arch-6).
+//   `node --test tests/` resolves the src/ import (DEVIATIONS D-M2-arch-6).
 //
 // Rows land with their entry (DEVIATIONS D-M0-8): server, hook (M0); run and its
 // search.mjs twin (M3, impl/04 §4, D-M2-4, D-M3-X1-2); pi (M5, D-M5-arch-1). opencode.ts

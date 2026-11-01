@@ -8,16 +8,16 @@ All live runs use a temp HOME, no login, no API key, and a fake local model prov
 
 | Host | Fires | Proof level | Gate that doctor checks | Proof file |
 |---|---|---|---|---|
-| claude-code | yes | live, claude 2.1.274, plugin installed with `claude plugin marketplace add` and `claude plugin install` | none new (D-CC-HOOKS-RUN-1) | tests/v2/e2e/claude-code-fire.test.mjs |
-| codex | yes | live, `codex exec` against a fake Responses provider | untrusted plugin hooks (D-NI-CODEX-TRUST-1, setup writes the trust key and hash) | tests/v2/e2e/codex-cat-redirect.test.mjs, tests/v2/setup/codex-trust-key.test.mjs |
-| gemini | yes | live, gemini 0.66.0, extension linked with `gemini extensions link` | D-NI-GEMINI-GATE-1 | tests/v2/e2e/gemini-fire.test.mjs, tests/v2/setup/gemini-gate.test.mjs |
-| qwen | yes | live, qwen 0.26.4, extension linked with `qwen extensions link` | `disableAllHooks` and one more setting (D-NI-QWEN-GATE-1) | tests/v2/e2e/qwen-fire.test.mjs |
-| copilot-cli | yes | live, copilot CLI, custom provider with COPILOT_OFFLINE | settings.json `disabledHooks` (D-HF-COPILOT-ENABLED-1); setup removes our key | tests/v2/e2e/copilot-cli-fire.test.mjs |
-| opencode | yes | live, opencode 1.19.5 (installed with `opencode plugin context-mode@next --global`) and 2.2.5 (installed with `opencode plugin add context-mode@next`) | plugin list entry that points to a missing file (D-HF-OPENCODE-GATE-1) | tests/v2/e2e/opencode-fire.test.mjs, tests/v2/setup/opencode-plugin-gate.test.mjs |
-| pi | yes | live, pi 1.4.0, installed with `pi install <package>` | packages[] extensions filter (D-NI-PI-GATE-1) | tests/v2/e2e/pi-fire.test.mjs, tests/v2/setup/pi-gate.test.mjs |
-| zcode | yes | live, zcode CLI 0.17.0 built from source (no npm package) | invalid key in config.json drops the whole file (D-NI-ZCODE-GATE-1) | tests/v2/e2e/zcode-fire.test.mjs, tests/v2/setup/zcode-gate.test.mjs |
-| vscode | not proven live | hook command only | `chat.useHooks`, `hookFilesLocations`, managed policy (D-NI-VSCODE-GATE-1) | tests/v2/e2e/vscode-fire.test.mjs, tests/v2/setup/vscode-gate.test.mjs |
-| kiro | not proven live (load only) | host loads all 6 entries | disabled entry (D-NI-KIRO-GATE-1) | tests/v2/e2e/kiro-fire.test.mjs, tests/v2/setup/kiro-gate.test.mjs |
+| claude-code | yes | live, claude 2.1.274, plugin installed with `claude plugin marketplace add` and `claude plugin install` | none new (D-CC-HOOKS-RUN-1) | tests/e2e/claude-code-fire.test.mjs |
+| codex | yes | live, `codex exec` against a fake Responses provider | untrusted plugin hooks (D-NI-CODEX-TRUST-1, setup writes the trust key and hash) | tests/e2e/codex-cat-redirect.test.mjs, tests/setup/codex-trust-key.test.mjs |
+| gemini | yes | live, gemini 0.66.0, extension linked with `gemini extensions link` | D-NI-GEMINI-GATE-1 | tests/e2e/gemini-fire.test.mjs, tests/setup/gemini-gate.test.mjs |
+| qwen | yes | live, qwen 0.26.4, extension linked with `qwen extensions link` | `disableAllHooks` and one more setting (D-NI-QWEN-GATE-1) | tests/e2e/qwen-fire.test.mjs |
+| copilot-cli | yes | live, copilot CLI, custom provider with COPILOT_OFFLINE | settings.json `disabledHooks` (D-HF-COPILOT-ENABLED-1); setup removes our key | tests/e2e/copilot-cli-fire.test.mjs |
+| opencode | yes | live, opencode 1.19.5 (installed with `opencode plugin context-mode@next --global`) and 2.2.5 (installed with `opencode plugin add context-mode@next`) | plugin list entry that points to a missing file (D-HF-OPENCODE-GATE-1) | tests/e2e/opencode-fire.test.mjs, tests/setup/opencode-plugin-gate.test.mjs |
+| pi | yes | live, pi 1.4.0, installed with `pi install <package>` | packages[] extensions filter (D-NI-PI-GATE-1) | tests/e2e/pi-fire.test.mjs, tests/setup/pi-gate.test.mjs |
+| zcode | yes | live, zcode CLI 0.17.0 built from source (no npm package) | invalid key in config.json drops the whole file (D-NI-ZCODE-GATE-1) | tests/e2e/zcode-fire.test.mjs, tests/setup/zcode-gate.test.mjs |
+| vscode | not proven live | hook command only | `chat.useHooks`, `hookFilesLocations`, managed policy (D-NI-VSCODE-GATE-1) | tests/e2e/vscode-fire.test.mjs, tests/setup/vscode-gate.test.mjs |
+| kiro | not proven live (load only) | host loads all 6 entries | disabled entry (D-NI-KIRO-GATE-1) | tests/e2e/kiro-fire.test.mjs, tests/setup/kiro-gate.test.mjs |
 
 ## Not proven
 

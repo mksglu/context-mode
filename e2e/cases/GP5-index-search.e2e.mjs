@@ -15,16 +15,16 @@ import { normalize } from "../harness/normalize.mjs";
 import { checkGolden } from "../harness/golden.mjs";
 import { dumpDb } from "../harness/db-dump.mjs";
 
-// 14a-issue-cases.md GP5 rows ported from tests/v2 unit files (M2-E2): auto-index-exec-output
-// (tests/v2/tools/execute.test.mjs), batch-execute-dedup-section / batch-index-byte-budget
-// (tests/v2/tools/batch.test.mjs), batch-ingestion-byte-caps / http-proxy-honored
-// (tests/v2/tools/index.test.mjs), chunk-byte-cap / chunk-size-cap / nested-fenced-code-intact /
-// rowless-tables / rowless-tables-survive (tests/v2/index/chunk.test.mjs), ctx-search-schema-
+// 14a-issue-cases.md GP5 rows ported from tests unit files (M2-E2): auto-index-exec-output
+// (tests/tools/execute.test.mjs), batch-execute-dedup-section / batch-index-byte-budget
+// (tests/tools/batch.test.mjs), batch-ingestion-byte-caps / http-proxy-honored
+// (tests/tools/index.test.mjs), chunk-byte-cap / chunk-size-cap / nested-fenced-code-intact /
+// rowless-tables / rowless-tables-survive (tests/index/chunk.test.mjs), ctx-search-schema-
 // declares-query / search-param-schema-match / negative-limit-rejected / dedupe-chunks-across-
-// queries / fts-highlight-bytecap / session-worktree-project-rank (tests/v2/tools/search.test.mjs),
-// globstar-zero-depth / nested-gitignore-negation (tests/v2/index/walk.test.mjs), non-ascii-auto-
-// memory-match (tests/v2/index/auto-memory.test.mjs), snippet-code-point-safe
-// (tests/v2/store/fts.test.mjs). Black-box only: calls release-out/server.mjs over MCP, no src/
+// queries / fts-highlight-bytecap / session-worktree-project-rank (tests/tools/search.test.mjs),
+// globstar-zero-depth / nested-gitignore-negation (tests/index/walk.test.mjs), non-ascii-auto-
+// memory-match (tests/index/auto-memory.test.mjs), snippet-code-point-safe
+// (tests/store/fts.test.mjs). Black-box only: calls release-out/server.mjs over MCP, no src/
 // import, per docs/v2/impl/14-tests.md §4/§5 and docs/v2/impl/05-tools-index.md.
 // Constants cited below (MAX_CHUNK_BYTES=4096, SNIPPET_MAX_BYTES=800, OUTPUT_CAP=16384,
 // RETENTION_SIZE_CAP_BYTES=524288000) are src/core/contracts/constants.ts values repeated as

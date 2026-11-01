@@ -74,7 +74,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 ## Known limits
 
 - The setup route adds the package folder from npm as a marketplace. The native route adds `mksglu/context-mode` from GitHub; use one of the two, not both.
-- Verified live on Claude Code 2.1.274 without a login: `claude -p` against a local fake Anthropic endpoint ran our hook and the model saw the `ctx_search(` redirect for a 200 KB file (`tests/v2/e2e/claude-code-fire.test.mjs`). A logged-in session was not run.
+- Verified live on Claude Code 2.1.274 without a login: `claude -p` against a local fake Anthropic endpoint ran our hook and the model saw the `ctx_search(` redirect for a 200 KB file (`tests/e2e/claude-code-fire.test.mjs`). A logged-in session was not run.
 - Hooks do not run when the plugin is disabled (`claude plugin enable context-mode@context-mode`; setup does this for you) or when `disableAllHooks` is `true` in a Claude Code settings file. Doctor fails with the fix for both; it never edits your settings.
 - `claude mcp add` by hand adds the MCP server only, with no hooks. Use `context-mode setup --print claude-code` instead.
 
@@ -93,4 +93,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents claude-code` | 2.1.309 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 2.1.309 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Claude Code session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a live, logged-in Claude Code session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).

@@ -1,6 +1,6 @@
 // src/setup/copilot-hooks.ts
 // D-HF-COPILOT-ENABLED-1. Copilot CLI 1.0.105 does not run a hook whose `disableKey` is in the user settings.json
-// `disabledHooks` list (live-proven, tests/v2/e2e/copilot-cli-fire.test.mjs). The host reports this itself: the
+// `disabledHooks` list (live-proven, tests/e2e/copilot-cli-fire.test.mjs). The host reports this itself: the
 // JSON-RPC method `hooks.discover` of `copilot --server --stdio` lists each hook with `enabled` and `disableKey`.
 // Setup and doctor ask the host; the key is never computed here (it is a host-side content hash).
 import { spawn } from "node:child_process";

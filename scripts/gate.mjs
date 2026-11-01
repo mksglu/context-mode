@@ -7,7 +7,7 @@
 //
 // Layers run in this order and stop at the first FAIL (impl/14 §8 step 3):
 //   1 v2-unit        node build/build.mjs --generated-only, then
-//                    node --test --test-reporter=tap tests/v2/                (>= M1, D-M1-13, D-M2-arch-6)
+//                    node --test --test-reporter=tap tests/                (>= M1, D-M1-13, D-M2-arch-6)
 //   1b ci-checks     node scripts/ci-gs4-lint.mjs,
 //                    node build/check-readme.mjs, build/check-install-docs.mjs, build/check-secrets.mjs,
 //                    build/check-prompt-static.mjs: the ci.yml steps no other layer runs (D-M4-GS4-1, D-C5-PREFIX-1)
@@ -78,7 +78,7 @@ function missing(files) {
 // TAP reporter so the counts come from fixed "# tests N" / "# pass N" / "# fail N" lines.
 // src/ imports src/prompt/_generated.ts, so the layer writes it first (DEVIATIONS D-M2-arch-6).
 function v2Unit() {
-  const gone = missing(["tests/v2", "build/build.mjs"]);
+  const gone = missing(["tests", "build/build.mjs"]);
   if (gone) return gone;
   const g = run(process.execPath, ["build/build.mjs", "--generated-only"]);
   if (g.status !== 0) {
@@ -91,7 +91,7 @@ function v2Unit() {
     dumpChild("v2-unit", t);
     return { status: "FAIL", detail: `tsc --noEmit exit ${t.status}` };
   }
-  const r = run(process.execPath, ["--test", "--test-reporter=tap", "tests/v2/"]);
+  const r = run(process.execPath, ["--test", "--test-reporter=tap", "tests/"]);
   const count = (key) => {
     const line = r.stdout.split("\n").find((l) => l.startsWith(`# ${key} `));
     return line === undefined ? undefined : Number(line.slice(key.length + 3));
@@ -108,10 +108,10 @@ function v2Unit() {
   const sum = parts.every((n) => n !== undefined) ? parts.reduce((a, b) => a + b, 0) : undefined;
   if (r.status !== 0 || tests === undefined || tests === 0 || sum !== tests || failN !== 0 || cancelled !== 0) {
     dumpChild("v2-unit", r);
-    return { status: "FAIL", detail: `node --test tests/v2/ exit ${r.status}: ${counts}, cancelled ${cancelled ?? "?"}` };
+    return { status: "FAIL", detail: `node --test tests/ exit ${r.status}: ${counts}, cancelled ${cancelled ?? "?"}` };
   }
   const named = r.stdout.split("\n").filter((l) => /^\s*ok \d+ - .*# (SKIP|TODO)/.test(l)).map((l) => l.replace(/^\s*ok \d+ - /, "").trim());
-  return { status: "PASS", detail: `node --test tests/v2/: ${counts}${named.length ? `; not run: ${named.join(" | ")}` : ""}` };
+  return { status: "PASS", detail: `node --test tests/: ${counts}${named.length ? `; not run: ${named.join(" | ")}` : ""}` };
 }
 
 // ---- layer 1b: ci.yml checks no other layer runs (DEVIATIONS D-M4-GS4-1) ----

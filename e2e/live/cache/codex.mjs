@@ -15,7 +15,7 @@ const MODEL = "gpt-6-astra";
 const EFFORT = "low";
 const BREAK_BYTES = 1024;
 
-// ---- pure analysis (unit-tested in tests/v2/cache/codex-usage.test.mjs) ----
+// ---- pure analysis (unit-tested in tests/cache/codex-usage.test.mjs) ----
 
 /** Parse `codex exec --json` stdout. Every line must be JSON. */
 export function parseExecJson(stdout) {

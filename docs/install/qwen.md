@@ -93,6 +93,6 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents qwen` | 0.26.0 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 0.26.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Live: Qwen Code 0.26.4 (`-o stream-json`, fake local OpenAI-compatible provider, no login) calls `run_shell_command` with `cat` of a 192 KB file; the model receives the `ctx_execute` redirect (210 bytes), and 4814 bytes of truncated output when `disableAllHooks` is true ([qwen-fire test](../../tests/v2/e2e/qwen-fire.test.mjs)).
+Live: Qwen Code 0.26.4 (`-o stream-json`, fake local OpenAI-compatible provider, no login) calls `run_shell_command` with `cat` of a 192 KB file; the model receives the `ctx_execute` redirect (210 bytes), and 4814 bytes of truncated output when `disableAllHooks` is true ([qwen-fire test](../../tests/e2e/qwen-fire.test.mjs)).
 
-Not run: a logged-in Qwen Code session. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a logged-in Qwen Code session. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).

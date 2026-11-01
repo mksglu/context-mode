@@ -94,7 +94,7 @@ Deletes stored data: one session, one indexed source, or everything stored for t
 
 ## Hook texts (deny reasons and hints)
 
-impl/08 §6.1, §6.2, Assumption B2. Built by `src/core/policy/decide.ts` from `src/core/contracts/constants.ts`; `tests/v2/policy/decide.test.mjs` checks that each block below equals what the code returns. Placeholders: `{prefix}` is the agent row's `toolNamePrefix`; `{command}`, `{url}`, `{path}`, `{size}`, `{intent}` come from the call (`{intent}` is the call's description, else `state what you need`). The ids use a hyphen, so the r3 tool-description check in `lint.mjs drafts` skips them (DEVIATIONS D-M3-E4-9).
+impl/08 §6.1, §6.2, Assumption B2. Built by `src/core/policy/decide.ts` from `src/core/contracts/constants.ts`; `tests/policy/decide.test.mjs` checks that each block below equals what the code returns. Placeholders: `{prefix}` is the agent row's `toolNamePrefix`; `{command}`, `{url}`, `{path}`, `{size}`, `{intent}` come from the call (`{intent}` is the call's description, else `state what you need`). The ids use a hyphen, so the r3 tool-description check in `lint.mjs drafts` skips them (DEVIATIONS D-M3-E4-9).
 
 <!-- id: deny-curl -->
 ```text

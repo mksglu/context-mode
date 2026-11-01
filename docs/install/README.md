@@ -182,4 +182,4 @@ The first run failed, and the failures were real defects. All four are fixed and
 | The npm package had no `.claude-plugin/marketplace.json`, and Claude Code needs an `owner` object in it | D-INST-3 |
 | Install-docs checker had no rule for CLI flags or page content | D-INST-4 |
 
-Open: Kiro, VS Code and ZCode were not installed, so their rows prove the config entry and handshake only. No logged-in agent session fired a hook. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [manifest tests](../../tests/v2/build/manifests.test.mjs).
+Open: Kiro, VS Code and ZCode were not installed, so their rows prove the config entry and handshake only. No logged-in agent session fired a hook. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [manifest tests](../../tests/build/manifests.test.mjs).
