@@ -142,6 +142,18 @@ describe("ADR-0012 / bench suite (bench/run.mjs)", () => {
     }
   });
 
+  // D-PATH-LABEL-1: a failed quality check is a miss, never a saving; the harness searches with the label ctx_index returned.
+  test("quality miss: a row with ok false is listed as a miss and shows no saving; the returned index label is read whole", async () => {
+    const { qualityMisses, savedCell, indexedLabel } = await import("../bench/suite/lib.mjs");
+    const rows = [{ id: "a", ok: true }, { id: "b", ok: false, note: "answer string missing for 3 query(ies)" }, { id: "c", ok: false, error: "boom" }];
+    assert.deepEqual(qualityMisses(rows).map((r) => r.id), ["b"]);
+    assert.equal(savedCell(rows[1], 1000, 100), "miss");
+    assert.equal(savedCell(rows[0], 1000, 100), "90%");
+    assert.equal(indexedLabel("Indexed 1 source(s), 95 chunk(s) from data\\sqlite-fts5-docs.html.\nRaw HTML kept as x"), "data\\sqlite-fts5-docs.html");
+    assert.equal(indexedLabel("Indexed 1 source(s), 95 chunk(s) from data/sqlite-fts5-docs.html."), "data/sqlite-fts5-docs.html");
+    assert.equal(indexedLabel("no label here"), null);
+  });
+
   test("a one-scenario run works and a bad --runs is refused", () => {
     const bad = spawnSync(process.execPath, [path.join(BENCH, "run.mjs"), "--runs", "0", "--no-write"], { encoding: "utf8" });
     assert.equal(bad.status, 2);

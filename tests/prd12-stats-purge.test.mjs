@@ -15,6 +15,7 @@ import { OUTPUT_CAP, STATS_COLUMNS, STATS_NO_DATA, STATS_SUMMARY, STATS_UNKNOWN_
 import { DatabaseSync } from "node:sqlite";
 import { ctxPurge } from "../src/core/tools/purge.ts";
 import { ctxIndex } from "../src/core/tools/index.ts";
+import { ctxSearch } from "../src/core/tools/search.ts";
 
 // Concurrent.
 describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency: CONC }, () => {
@@ -283,6 +284,17 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       assert.deepEqual([out.isError, out.text], [false, PURGE_SUMMARY(1 + goneChunks, "source")]);
       const after = await counts(ctx);
       assert.deepEqual(after, { events: before.events, sources: before.sources - 1, chunks: before.chunks - goneChunks });
+    }));
+
+    test("D-PATH-LABEL-1: purge/source takes the backslash form of a path label", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      mkdirSync(join(root, "nested"));
+      writeFileSync(join(root, "nested", "notes.md"), "# N\n\npurgezedtoken\n");
+      await ctxIndex.handler({ path: "nested/notes.md" }, ctx);
+      const out = await ctxPurge.handler({ source: "nested\\notes.md" }, ctx);
+      assert.equal(out.isError, false);
+      assert.notEqual(out.text, PURGE_SUMMARY(0, "source"), "the backslash form reached the row: " + out.text);
+      assert.deepEqual((await ctxSearch.handler({ queries: ["purgezedtoken"] }, ctx)).text.includes("nested/notes.md"), false);
     }));
 
     test("[M4] purge/source-unknown: an unknown source deletes zero rows", () => withRoot(async (root) => {

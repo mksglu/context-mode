@@ -14,7 +14,7 @@ import { capBytes } from "../sandbox/cap.ts";
 import { safeFetch } from "../sandbox/fetch.ts";
 import { unknownField } from "./search.ts";
 import { closeDb, openDb } from "../store/db.ts";
-import { sourceHandle } from "../store/fts.ts";
+import { pathLabel, sourceHandle } from "../store/fts.ts";
 import { indexText, storeText, type ChunkKind } from "../index/text.ts";
 import { hasMdStructure } from "../index/chunk.ts";
 import { htmlToReadable } from "../index/html-text.ts";
@@ -84,12 +84,12 @@ function pathItems(input: CtxIndexInput & { path: string }, project: ProjectCont
   if (statSync(abs).isDirectory()) {
     return walkDir(abs, project.containmentRoot).map((f) => ({
       sourceKind: "path",
-      label: join(base, f.relPath),
+      label: pathLabel(join(base, f.relPath)),
       kind: kindOfPath(f.relPath),
       read: () => readUtf8(f.absPath),
     }));
   }
-  return [{ sourceKind: "path", label: base === "" ? input.path : base, kind: kindOfPath(abs), read: () => readUtf8(abs) }];
+  return [{ sourceKind: "path", label: pathLabel(base === "" ? input.path : base), kind: kindOfPath(abs), read: () => readUtf8(abs) }];
 }
 
 async function itemsOf(input: CtxIndexInput, ctx: ToolContext): Promise<{ items: Item[]; from: string }> {
@@ -102,7 +102,7 @@ async function itemsOf(input: CtxIndexInput, ctx: ToolContext): Promise<{ items:
   }
   if (input.path !== undefined) {
     const items = pathItems({ ...input, path: input.path }, ctx.project);
-    return { items, from: items.length === 1 ? items[0].label : input.path };
+    return { items, from: items.length === 1 ? items[0].label : pathLabel(input.path) };
   }
   // url: safeFetch owns proxy env and the per-hop SSRF check; its CtxError is the reply (P1, one path).
   // 00 §5.2 step 3 / Q8: the handler runs under cancel and EXEC_TIMEOUT_MS, so a server that never

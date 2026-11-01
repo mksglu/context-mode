@@ -1568,6 +1568,59 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         } finally { rmSync(root, { recursive: true, force: true }); }
       });
 
+      // D-PATH-LABEL-1: a path source has one label form on every OS: forward slashes, relative to the project.
+      // The `source` argument of ctx_search takes either slash form; the label shown to the agent is the canonical one.
+      test("D-PATH-LABEL-1: a file label uses forward slashes; ctx_search source takes the forward or the backslash form", async () => {
+        const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-plabel-")));
+        try {
+          const ctx = ctxFor(root);
+          mkdirSync(join(root, "nested"));
+          writeFileSync(join(root, "nested", "notes.md"), "# N\n\nlabelzedtoken in nested notes\n");
+          writeFileSync(join(root, "other.md"), "# O\n\nlabelzedtoken in other file\n");
+          const ix = await ctxIndex.handler({ path: "nested/notes.md" }, ctx);
+          await ctxIndex.handler({ path: "other.md" }, ctx);
+          assert.ok(ix.text.includes("from nested/notes.md."), ix.text);
+          assert.equal(ix.text.includes("\\"), false, "no backslash in the reply: " + ix.text);
+          for (const source of ["nested/notes.md", "nested\\notes.md"]) {
+            const out = await ctxSearch.handler({ queries: ["labelzedtoken"], source }, ctx);
+            assert.ok(out.text.includes("nested/notes.md #0") && !out.text.includes("other file"), source + ": " + out.text);
+          }
+          const all = await ctxSearch.handler({ queries: ["labelzedtoken"] }, ctx);
+          assert.ok(all.text.includes("nested notes") && all.text.includes("other file"), all.text);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+      });
+
+      test("D-PATH-LABEL-1: a folder index labels each file with forward slashes", async () => {
+        const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-plabel2-")));
+        try {
+          const ctx = ctxFor(root);
+          mkdirSync(join(root, "docs", "deep"), { recursive: true });
+          writeFileSync(join(root, "docs", "deep", "a.md"), "# A\n\nfoldzedtoken deep file\n");
+          const ix = await ctxIndex.handler({ path: "docs" }, ctx);
+          assert.equal(ix.isError, false, ix.text);
+          const out = await ctxSearch.handler({ queries: ["foldzedtoken"], source: "docs\\deep\\a.md" }, ctx);
+          assert.ok(out.text.includes("docs/deep/a.md #0"), out.text);
+          assert.equal(out.text.includes("\\"), false, out.text);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+      });
+
+      // The same case with the real Windows separator: it runs on the windows-latest CI job (the path is built by node:path there).
+      test("D-PATH-LABEL-1: Windows only: an absolute and a backslash path index under the forward-slash label", { skip: process.platform !== "win32" }, async () => {
+        const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-plabel3-")));
+        try {
+          const ctx = ctxFor(root);
+          mkdirSync(join(root, "nested"));
+          writeFileSync(join(root, "nested", "notes.md"), "# N\n\nwinzedtoken in nested notes\n");
+          const a = await ctxIndex.handler({ path: join(root, "nested", "notes.md") }, ctx);
+          const b = await ctxIndex.handler({ path: "nested\\notes.md" }, ctx);
+          for (const ix of [a, b]) assert.ok(ix.text.includes("from nested/notes.md."), ix.text);
+          for (const source of ["nested/notes.md", "nested\\notes.md"]) {
+            const out = await ctxSearch.handler({ queries: ["winzedtoken"], source }, ctx);
+            assert.ok(out.text.includes("nested/notes.md #0"), source + ": " + out.text);
+          }
+        } finally { rmSync(root, { recursive: true, force: true }); }
+      });
+
       // #717 / #736: the ran code and commands are echoed so the user can audit them.
       test("[W1-core] #717: ctx_execute summary:true echoes the language and the code before stdout", async () => {
         const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-echo-")));

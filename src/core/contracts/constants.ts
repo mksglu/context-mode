@@ -106,7 +106,7 @@ export const MS_PER_DAY = 86400000; // DEVIATIONS D-M1-3: day-to-ms factor for t
 
 // Store (impl/02 §0; DEVIATIONS D-M1-3: impl/00 names NODE_MIN and INDEX_WRITE_CHUNK cover the rest)
 export const PROJECT_KEY_HEX_LEN = 16; // impl/00 A5: first 16 hex chars of sha256(git common dir realpath)
-export const SCHEMA_VERSION = 5; // ADR-0002 decision 2: PRAGMA user_version; 2 = cost dedup index (D-M5-arch-2); 3 = chunks title + porter (D-SEARCH-3); 4 = trigram table + vocab (D-SEARCH-4); 5 = line_units (r3-ledger)
+export const SCHEMA_VERSION = 6; // ADR-0002 decision 2: PRAGMA user_version; 2 = cost dedup index (D-M5-arch-2); 3 = chunks title + porter (D-SEARCH-3); 4 = trigram table + vocab (D-SEARCH-4); 5 = line_units (r3-ledger); 6 = path labels with forward slashes (D-PATH-LABEL-1)
 export const RETENTION_IDLE_DAYS = 30; // impl/02 A-S1: row-level, age since last access
 export const RETENTION_SIZE_CAP_BYTES = 524288000; // impl/02 A-S2 (Q7b): 500 MB per project
 export const PROJECT_DEAD_IDLE_DAYS = 14; // DECISIONS-r9 V22 (#1024): project-level sweep, dead owner

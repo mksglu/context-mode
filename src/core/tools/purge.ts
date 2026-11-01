@@ -12,9 +12,9 @@ import {
   SQLITE_BUSY_CODE,
   SQLITE_PRIMARY_CODE_MASK,
 } from "../contracts/constants.ts";
-import type { CtxPurgeInput, ToolContext, ToolReply } from "../contracts/types.ts";
+import type { CtxPurgeInput, DbHandle, ToolContext, ToolReply } from "../contracts/types.ts";
 import { closeDb, openDb, withWrite } from "../store/db.ts";
-import { deleteChunkRows } from "../store/fts.ts";
+import { deleteChunkRows, storedLabel } from "../store/fts.ts";
 import { unknownField } from "./search.ts";
 
 export type { CtxPurgeInput } from "../contracts/types.ts";
@@ -46,10 +46,12 @@ function changes(raw: DatabaseSync, sql: string, ...args: string[]): number {
 }
 
 // Steps 3-5: the rows deleted for one scope, summed across the tables it touches.
-function purgeScope(raw: DatabaseSync, scope: PurgeScope, input: CtxPurgeInput): number {
+function purgeScope(db: DbHandle, scope: PurgeScope, input: CtxPurgeInput): number {
+  const raw = db.raw;
   if (scope === "session") return changes(raw, "DELETE FROM events WHERE session_id = ?", input.session as string);
   if (scope === "source") {
-    const label = input.source as string;
+    // D-PATH-LABEL-1: a path label is named by either slash form.
+    const label = storedLabel(db, input.source as string);
     return deleteChunkRows(raw, { label }) + changes(raw, "DELETE FROM sources WHERE label = ?", label);
   }
   const chunks = deleteChunkRows(raw, "all");
@@ -71,7 +73,7 @@ async function handler(input: CtxPurgeInput, ctx: ToolContext): Promise<ToolRepl
     const db = await openDb(ctx.project);
     try {
       // Steps 2 and 6: one BEGIN IMMEDIATE; withWrite commits or rolls back.
-      const rows = withWrite(db, (h) => purgeScope(h.raw, scope, input));
+      const rows = withWrite(db, (h) => purgeScope(h, scope, input));
       return reply(PURGE_SUMMARY(rows, scope), false); // steps 7-8
     } finally {
       closeDb(db);

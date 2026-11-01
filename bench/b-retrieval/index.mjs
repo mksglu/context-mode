@@ -2,7 +2,7 @@
 // whether code blocks of the source come back whole, and for the HTML page whether the expected answer string is in the hits.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { BENCH, bytes, read, fences, queriesWithHits, pct, kb, rng3 } from "../suite/lib.mjs";
+import { BENCH, bytes, read, fences, queriesWithHits, pct, kb, rng3, indexedLabel, savedCell } from "../suite/lib.mjs";
 
 const scen = JSON.parse(readFileSync(path.join(BENCH, "fixtures", "scenarios.json"), "utf8"));
 const v1 = JSON.parse(readFileSync(path.join(BENCH, "fixtures", "v1-baseline.json"), "utf8"));
@@ -40,7 +40,9 @@ export default {
       const raw = s.html ? read(s.fixture) : text;
       const queries = s.qa.map((x) => x.q);
       const ix = await client.call("ctx_index", s.html ? { path: "data/" + s.fixture } : { content: text, source: s.source });
-      const se = await client.call("ctx_search", { queries, source: s.html ? "data/" + s.fixture : s.source });
+      // The search uses the label ctx_index returned (D-PATH-LABEL-1), not a label the harness spelled itself.
+      const label = s.html ? indexedLabel(ix.text) ?? "data/" + s.fixture : s.source;
+      const se = await client.call("ctx_search", { queries, source: label });
       if (ix.error || se.error || ix.isError || se.isError) return { error: ix.error ?? se.error ?? (ix.isError ? ix.text : se.text) };
       const blocks = fences(s.html ? raw : text);
       const whole = blocks.filter((b) => se.text.includes(b)).length;
@@ -69,7 +71,7 @@ export default {
     for (const r of rows) {
       const m = r.metrics;
       const ans = m.answers_expected ? `${m.answers_found.median}/${m.answers_expected.median}` : "n/a";
-      out.push(`| [${r.title}](${r.link}) | ${kb(m.raw_bytes.median)} | ${pct(m.raw_bytes.median, m.v1_bytes?.median)} | ${kb(m.ctx_bytes.median)} | ${pct(m.raw_bytes.median, m.ctx_bytes.median)} | ${m.queries_hit.median}/${m.queries.median} | ${m.blocks_whole.median}/${m.blocks_in_source.median} | ${ans} | ${rng3({ median: m.index_ms.median + m.search_ms.median, min: m.index_ms.min + m.search_ms.min, max: m.index_ms.max + m.search_ms.max })} |`);
+      out.push(`| [${r.title}](${r.link}) | ${kb(m.raw_bytes.median)} | ${pct(m.raw_bytes.median, m.v1_bytes?.median)} | ${kb(m.ctx_bytes.median)} | ${savedCell(r, m.raw_bytes.median, m.ctx_bytes.median)} | ${m.queries_hit.median}/${m.queries.median} | ${m.blocks_whole.median}/${m.blocks_in_source.median} | ${ans} | ${rng3({ median: m.index_ms.median + m.search_ms.median, min: m.index_ms.min + m.search_ms.min, max: m.index_ms.max + m.search_ms.max })} |`);
     }
     return out;
   },

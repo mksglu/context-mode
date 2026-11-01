@@ -388,7 +388,7 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
 
   test("SCHEMA_VERSION equals the constants.ts SCHEMA_VERSION", () => {
     assert.equal(SCHEMA_VERSION, C.SCHEMA_VERSION);
-    assert.equal(SCHEMA_VERSION, 5); // D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units
+    assert.equal(SCHEMA_VERSION, 6); // D-PATH-LABEL-1: v6 path labels use forward slashes; D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units
   });
 
   test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_id, turn) WHERE kind = 'cost'", () => {
@@ -411,7 +411,7 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
     }
   });
 
-  test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, 4, then 5) without losing rows", () => {
+  test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, 4, 5, then 6) without losing rows", () => {
     const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
     try {
       const db = freshDb(dir);
@@ -419,7 +419,7 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
       db.exec("PRAGMA user_version = 1");
       db.exec("INSERT INTO events(session_id, worktree, agent, kind, turn, created_at, accessed_at) VALUES ('s','w','claude-code','prompt',1,0,0)");
       applyMigrations(db, 1);
-      assert.equal(db.prepare("PRAGMA user_version").get().user_version, 5);
+      assert.equal(db.prepare("PRAGMA user_version").get().user_version, SCHEMA_VERSION);
       assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events").get().n, 1);
       assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'idx_events_cost_session_turn'").get());
       db.close();
@@ -547,7 +547,7 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
       ins.run(1, 0, "connection pooling");
       ins.run(1, 1, "Привет café");
       applyMigrations(v2, 2);
-      assert.equal(v2.prepare("PRAGMA user_version").get().user_version, 5);
+      assert.equal(v2.prepare("PRAGMA user_version").get().user_version, SCHEMA_VERSION);
       assert.equal(v2.prepare("SELECT COUNT(*) AS n FROM chunks").get().n, 2);
       assert.deepEqual(v2.prepare("SELECT ord, title FROM chunks WHERE chunks MATCH 'connecting'").all().map((r) => ({ ...r })), [{ ord: 0, title: "" }]);
       assert.equal(v2.prepare("SELECT COUNT(*) AS n FROM chunks WHERE chunks MATCH 'cafe'").get().n, 1);
@@ -570,12 +570,40 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
       ins.run(1, 0, "see T-CMP here", "");
       ins.run(1, 1, "other", "Guide > src/core/fts.ts");
       applyMigrations(db, 3);
-      assert.equal(db.prepare("PRAGMA user_version").get().user_version, 5);
+      assert.equal(db.prepare("PRAGMA user_version").get().user_version, SCHEMA_VERSION);
       assert.equal(db.prepare("SELECT COUNT(*) AS n FROM chunks").get().n, 2);
       const rid = (m) => db.prepare("SELECT rowid AS r FROM chunks_tri WHERE chunks_tri MATCH ?").all(m).map((r) => r.r);
       const want = (o) => db.prepare("SELECT rowid AS r FROM chunks WHERE ord = ?").get(o).r;
       assert.deepEqual(rid('"T-CMP"'), [want(0)]);
       assert.deepEqual(rid('"core/fts"'), [want(1)]);
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // D-PATH-LABEL-1: a version-5 DB with backslash path labels (written on Windows before the fix) keeps every row and
+  // reads them under the forward-slash label; content and url labels are not touched.
+  test("v6 (D-PATH-LABEL-1): a version-5 DB migrates path labels to forward slashes and loses no source or chunk", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
+    try {
+      const db = freshDb(dir);
+      applyMigrations(db, 0);
+      db.exec("PRAGMA user_version = 5");
+      const src = db.prepare("INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts) VALUES ('s','w','claude-code',?,?,1,1,1,'t',1)");
+      src.run("path", "data\\sqlite-fts5-docs.html");
+      src.run("path", "data\\sqlite-fts5-docs.html (raw)");
+      src.run("path", "plain.md");
+      src.run("content", "keep\\this");
+      src.run("url", "https://example.com/a");
+      const ins = db.prepare("INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VALUES (?, 's', 'w', 'claude-code', 0, 'migrated body', '')");
+      for (const id of [1, 2, 3, 4, 5]) ins.run(id);
+      applyMigrations(db, 5);
+      assert.equal(db.prepare("PRAGMA user_version").get().user_version, SCHEMA_VERSION);
+      assert.deepEqual(db.prepare("SELECT label FROM sources ORDER BY id").all().map((r) => r.label), [
+        "data/sqlite-fts5-docs.html", "data/sqlite-fts5-docs.html (raw)", "plain.md", "keep\\this", "https://example.com/a",
+      ]);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM chunks").get().n, 5);
       db.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -761,8 +789,8 @@ describe("ADR-0002: cost row dedup", { concurrency: CONC }, () => {
     };
   }
 
-  test("[M5] SCHEMA_VERSION is 5 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4) and line units (5, r3-ledger)", () => {
-    assert.equal(SCHEMA_VERSION, 5);
+  test("[M5] SCHEMA_VERSION is 6 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4) and line units (5, r3-ledger) and path labels (6, D-PATH-LABEL-1)", () => {
+    assert.equal(SCHEMA_VERSION, 6);
   });
 
   test("[M5] cost-dedup/usage-events-idempotent-per-turn: 3 step-finish events in one turn journal once", async (t) => {

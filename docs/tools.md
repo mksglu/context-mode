@@ -7,7 +7,7 @@ Each tool rejects an unknown input field with `UNKNOWN_FIELD`.
 |---|---|---|---|
 | `ctx_execute` | `language`, `code`, `file?`, `intent?`, `timeoutMs?`, `background?`, `summary?` | Runs code or a shell command in a sandbox; returns only what it prints, up to `OUTPUT_CAP` (16,384 B). Default and max timeout: `EXEC_TIMEOUT_MS` (600,000 ms) | `src/core/tools/execute.ts` |
 | `ctx_batch` | `commands[]`, `queries[]` | Runs the commands, indexes the output, and searches it in one call | `src/core/tools/batch.ts` |
-| `ctx_index` | `path?`, `content?`, `url?`, `source?` | Indexes a file, a folder, a text or a URL into the project database | `src/core/tools/index.ts` |
+| `ctx_index` | `path?`, `content?`, `url?`, `source?` | Indexes a file, a folder, a text or a URL into the project database. A path source is labelled relative to the project with forward slashes on every OS (`nested/notes.md`); `ctx_search` and `ctx_purge` take `source` in either slash form | `src/core/tools/index.ts` |
 | `ctx_search` | `queries[]`, `scope?` (`session`, `worktree`, `project`; default `worktree`), `source?`, `offset?`, `sort?` (`relevance`, `timeline`), `after?` | Searches the index; returns the matching parts only, `SEARCH_REPLY_HITS` (5) per reply; a `More:` line pages on with `offset` | `src/core/tools/search.ts` |
 | `ctx_resume` | `session?`, `seq?` | Returns the state block (at most `RESUME_CAP`, 2,048 B), or one full row by `seq` | `src/core/tools/resume.ts` |
 | `ctx_stats` | none | Shows how much output stayed out of context, per session, project and all time | `src/core/tools/stats.ts` |

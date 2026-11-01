@@ -638,19 +638,42 @@ export function parseSourceHandle(s: string): number | null {
   return n > 0 && sourceHandle(n) === s ? n : null;
 }
 
+// D-PATH-LABEL-1: the one label form of a path source on every OS: forward slashes. A backslash is a separator
+// only on Windows, but the label is a name the agent types back, so it has one spelling everywhere.
+export function pathLabel(p: string): string {
+  return p.includes("\\") ? p.split("\\").join("/") : p;
+}
+
+function labelStored(db: DbHandle, label: string): boolean {
+  return stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(label) !== undefined;
+}
+
+/**
+ * D-PATH-LABEL-1: the stored label a `source` argument names by its spelling: the argument itself when a row has
+ * it, else its forward-slash form (a backslash path from a Windows agent), else the argument as given.
+ * ctx_purge uses this alone; ctx_search adds the id and "#" suffix forms in resolveSourceLabel.
+ */
+export function storedLabel(db: DbHandle, source: string): string {
+  if (labelStored(db, source)) return source;
+  const canon = pathLabel(source);
+  return canon !== source && labelStored(db, canon) ? canon : source;
+}
+
 // D-CR3-HANDLE-1: the label a `source` argument names, in this order: a short id of a stored row, a full
-// label, a label without its "#<call id>" suffix (the newest such source). No match -> the argument as given.
+// label (either slash form, D-PATH-LABEL-1), a label without its "#<call id>" suffix (the newest such source).
+// No match -> the argument as given.
 export function resolveSourceLabel(db: DbHandle, source: string): string {
   const id = parseSourceHandle(source);
   if (id !== null) {
     const row = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id) as { label: string } | undefined;
     if (row !== undefined) return row.label;
   }
-  if (stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(source) !== undefined) return source;
-  const prefix = source + LABEL_SUFFIX_SEP;
+  const named = storedLabel(db, source);
+  if (labelStored(db, named)) return named;
+  const prefix = named + LABEL_SUFFIX_SEP;
   const rows = stmt(db.raw, "SELECT label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix) as Array<{ label: string }>;
   for (const r of rows) {
-    if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === source.length) return r.label;
+    if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === named.length) return r.label;
   }
   return source;
 }

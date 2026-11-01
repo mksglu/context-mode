@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { devVersionLabel } from "../scripts/release/dev-version.mjs";
-import { BENCH, REPO, DATA, sandbox, startServer, stats, sha256, tokens } from "./suite/lib.mjs";
+import { BENCH, REPO, DATA, sandbox, startServer, stats, sha256, tokens, qualityMisses } from "./suite/lib.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (name, d) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : d; };
@@ -67,7 +67,7 @@ for (const g of groups) {
     const link = `../${g.dir}/README.md#${s.id}`;
     results.push({ group: g.dir, id: s.id, title: s.title, link, inputs: s.inputs ?? [], synthetic: !!s.synthetic, v1_scenario: s.v1 ?? null, command: s.command, ok: err ? false : ok, note, error: err, metrics });
     if (err) errors++;
-    console.log(`${err ? "ERROR" : ok ? "ok   " : "WARN "} ${s.id}${err ? " " + err : note ? " (" + note + ")" : ""}`);
+    console.log(`${err ? "ERROR" : ok ? "ok   " : "MISS "} ${s.id}${err ? " " + err : note ? " (" + note + ")" : ""}`);
   }
 }
 
@@ -77,7 +77,7 @@ for (const r of results) for (const f of r.inputs) if (!manifest[f]) { const p =
 
 const runMs = Math.round(performance.now() - T0);
 const out = {
-  schema: 1, date, runs: RUNS, run_ms: runMs, token_method: "bytes / 4, an estimate (no tokenizer is vendored)",
+  schema: 1, quality_misses: qualityMisses(results).map((r) => r.id), date, runs: RUNS, run_ms: runMs, token_method: "bytes / 4, an estimate (no tokenizer is vendored)",
   context_mode: { version: devVersionLabel(pkg.version, commit), commit, dirty }, env, fixtures: manifest, results,
 };
 
@@ -110,5 +110,10 @@ if (WRITE) {
     writeFileSync(path.join(BENCH, g.dir, "README.md"), l.join("\n"));
   }
 }
-console.log(`done in ${runMs} ms, ${results.length} scenarios, ${errors} error(s)`);
+const misses = qualityMisses(results);
+if (misses.length) {
+  console.log(`\nQUALITY MISS in ${misses.length} scenario(s); these rows show no saving:`);
+  for (const r of misses) console.log(`  - ${r.id}${r.note ? ": " + r.note : ""}`);
+}
+console.log(`done in ${runMs} ms, ${results.length} scenarios, ${errors} error(s), ${misses.length} quality miss(es)`);
 process.exit(errors ? 1 : 0);

@@ -132,6 +132,13 @@ CREATE VIRTUAL TABLE line_units USING fts5(
 );
 `;
 
+// Version 6 (D-PATH-LABEL-1): a path source label has one spelling, forward slashes. Windows wrote "data\\x.html"
+// before; those rows are renamed in place (no row or chunk is touched), so every stored source stays findable.
+// content and url labels keep their text.
+export const DDL_V6: string = `
+UPDATE sources SET label = replace(label, char(92), '/') WHERE kind = 'path' AND instr(label, char(92)) > 0;
+`;
+
 // Ascending by version; step N brings the DB from N-1 to N.
 const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 1, sql: DDL },
@@ -139,6 +146,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 3, sql: DDL_V3 },
   { version: 4, sql: DDL_V4 },
   { version: 5, sql: DDL_V5 },
+  { version: 6, sql: DDL_V6 },
 ];
 
 export function applyMigrations(db: DatabaseSync, fromVersion: number): void {

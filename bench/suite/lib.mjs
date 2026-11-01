@@ -168,3 +168,16 @@ export function hostPayload(id, cwd, command, text) {
     default: throw new Error("unknown shape " + shape);
   }
 }
+
+// D-PATH-LABEL-1: a scenario whose own quality check failed (ok false, no error) is a quality miss: it is listed in the
+// summary and its table row shows "miss" where a saving would stand, so a failed row never reads as a saving.
+export const qualityMisses = (results) => results.filter((r) => !r.error && r.ok === false);
+export const savedCell = (row, raw, x) => (row.ok === false ? "miss" : pct(raw, x));
+// The source label ctx_index returned, from its reply line "Indexed N source(s), M chunk(s) from <label>." (no regex).
+export function indexedLabel(text) {
+  const line = String(text).split("\n")[0];
+  const at = line.indexOf(" from ");
+  if (at < 0) return null;
+  const rest = line.slice(at + 6);
+  return rest.endsWith(".") ? rest.slice(0, -1) : rest;
+}
