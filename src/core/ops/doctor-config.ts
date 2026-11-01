@@ -6,7 +6,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  AGENT_ARG, AGENT_HOME_DIR, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
@@ -19,7 +19,7 @@ import { hasReplace } from "../../adapters/table.ts";
 import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
 import { detectV1, type V1Scope } from "./detect-v1.ts";
 import { hostConfigValueAt, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
-import { resolvePluginRoot } from "./plugin-root.ts";
+import { marketplaceChoice, resolvePluginRoot } from "./plugin-root.ts";
 
 type D3Part = (typeof D3_PARTS)[number];
 const [PART_MCP, PART_HOOKS, PART_TIMEOUT] = D3_PARTS;
@@ -175,13 +175,13 @@ function nativeMcpWrong(dir: string, row: AdapterRow): boolean {
   }
 }
 
-function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv): boolean {
+function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): boolean {
   const native = row.id === "codex" ? codexNativeDir(env, home) : null;
   if (native !== null) return nativeMcpWrong(native, row);
   const file = mcpFile(row, home, env);
   try {
     if (file === null) {
-      resolvePluginRoot(row, env);
+      resolvePluginRoot(row, env, worktree);
       return false;
     }
     const cur = readHostConfig(row.id, file);
@@ -198,7 +198,7 @@ function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktr
   if (spec === null) return []; // in-process agent: hooks are code, not a file (impl/10 §1.5)
   let block: unknown;
   try {
-    const root = spec.root === "plugin" ? resolvePluginRoot(row, env) : spec.root === "home" ? home : worktree;
+    const root = spec.root === "plugin" ? resolvePluginRoot(row, env, worktree) : spec.root === "home" ? home : worktree;
     const native = row.id === "codex" ? codexNativeDir(env, home) : null;
     const file = native !== null ? join(native, CODEX_PLUGIN_HOOKS_FILE) // D-C166-NATIVE-CWD-1: the plugin's own hook file
       : row.id === "codex" ? join(codexDirOf(env, home), HOOKS_JSON_FILE) // D-N6-CODEX-HOME-2
@@ -237,7 +237,11 @@ function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktr
 export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktree: string): DoctorRow {
   const home = homeDirOf(env);
   if (home === null) return fail("D3", D3_DETAIL(D3_PARTS), DOCTOR_FIX_UPGRADE);
-  const parts: D3Part[] = [...(mcpWrong(row, home, env) ? [PART_MCP] : []), ...hookParts(row, home, env, worktree)];
+  if (row.installMode === "marketplace") { // D-DOC-D3-SCOPE-1: no install to judge is its own finding, not wrong entries
+    const choice = marketplaceChoice(env, worktree);
+    if ("installs" in choice) return fail("D3", D3_ROOT_DETAIL(choice.installs.map((r) => r.installPath)), D3_ROOT_FIX(choice.installs));
+  }
+  const parts: D3Part[] = [...(mcpWrong(row, home, env, worktree) ? [PART_MCP] : []), ...hookParts(row, home, env, worktree)];
   const read = row.id === "pi" ? mcpFile(row, home, env) : null;
   if (parts.length === 0) return read === null ? pass("D3") : { ...pass("D3"), detail: read };
   const detail = D3_DETAIL(parts);

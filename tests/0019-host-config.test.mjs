@@ -892,6 +892,87 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       assert.deepEqual(recordedInstallPaths("not json"), []);
       assert.deepEqual(recordedInstallPaths(JSON.stringify({ plugins: [] })), []);
     });
+
+    // ---- D-DOC-D3-SCOPE-1: tester report (candidate baaa3149, Claude Code Desktop, Windows) ------------------------
+    // A user-scope install stays recorded but disabled; the candidate is enabled through a project-scoped directory
+    // marketplace; both cached dirs exist; the MCP server runs from the marketplace source dir (neither cached dir).
+    // D3 said "wrong: MCP entry, hook entries". Claude Code 2.1.274 writes scope + projectPath per entry, counts an
+    // enabledPlugins value only when it is true (local > project > user), and gives a plugin MCP server CLAUDE_PLUGIN_ROOT.
+    async function twoInstalls(t, { projectPath, userOn = false, candOn = true } = {}) {
+      const { generateManifests } = await import("../build/manifests.ts");
+      const base = tmp(t);
+      const out = path.join(base, "out");
+      mkdirSync(out);
+      generateManifests(out);
+      const hooks = readFileSync(path.join(out, "hooks", "claude-code.json"), "utf8");
+      const home = path.join(base, "home");
+      const wt = path.join(base, "my project");
+      const src = path.join(base, "candidate", "release-out"); // directory marketplace source dir
+      const cache = path.join(home, ".claude", "plugins", "cache");
+      const user = path.join(cache, "context-mode", "context-mode", "1.0.168");
+      const cand = path.join(cache, "cand", "context-mode", "2.0.0-next.24");
+      for (const dir of [user, cand, src]) put(path.join(dir, "hooks", "claude-code.json"), hooks);
+      put(path.join(home, ".claude", "plugins", "installed_plugins.json"), JSON.stringify({ version: 2, plugins: {
+        "context-mode@context-mode": [{ scope: "user", installPath: user, version: "1.0.168" }],
+        "context-mode@cand": [{ scope: "project", projectPath: projectPath ?? wt, installPath: cand, version: "2.0.0-next.24" }],
+      } }, null, 2));
+      put(path.join(home, ".claude", "settings.json"), JSON.stringify({ enabledPlugins: { "context-mode@context-mode": userOn } }));
+      put(path.join(wt, ".claude", "settings.json"), JSON.stringify({ enabledPlugins: { "context-mode@cand": candOn } }));
+      return { home, wt, src, user, cand, env: { HOME: home, USERPROFILE: home } };
+    }
+
+    // Runs one call inside a child whose own script sits in `dir`, the way Claude Code runs server.mjs.
+    function runIn(dir, call) {
+      const script = path.join(dir, "server.mjs");
+      const href = (p) => JSON.stringify(new URL(p, import.meta.url).href);
+      writeFileSync(script, `import { resolvePluginRoot } from ${href("../src/core/ops/plugin-root.ts")};\nimport { checkHostConfig } from ${href("../src/core/ops/doctor-config.ts")};\nimport { getAdapter } from ${href("../src/adapters/table.ts")};\nconsole.log(JSON.stringify(${call}));\n`);
+      const r = spawnSync(process.execPath, [script], { encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout);
+    }
+
+    test("[D-DOC-D3-SCOPE-1] plugin-root/two live roots, user entry disabled, project entry enabled for this worktree: the project entry is the root", async (t) => {
+      const s = await twoInstalls(t);
+      assert.equal(resolvePluginRoot(CLAUDE, s.env, s.wt), s.cand);
+      assert.equal(resolvePluginRoot(CLAUDE, { ...s.env, CLAUDE_PROJECT_DIR: s.wt }), s.cand, "no worktree argument: CLAUDE_PROJECT_DIR is the project");
+    });
+
+    test("[D-DOC-D3-SCOPE-1] plugin-root/a project entry for another project does not apply: the enabled user entry is the root", async (t) => {
+      const s = await twoInstalls(t, { projectPath: path.join(path.sep, "elsewhere"), userOn: true });
+      assert.equal(resolvePluginRoot(CLAUDE, s.env, s.wt), s.user);
+    });
+
+    test("[D-DOC-D3-SCOPE-1] plugin-root/both enabled: the project entry for this worktree beats the user entry", async (t) => {
+      const s = await twoInstalls(t, { userOn: true });
+      assert.equal(resolvePluginRoot(CLAUDE, s.env, s.wt), s.cand);
+    });
+
+    test("[D-DOC-D3-SCOPE-1] plugin-root/running from a directory marketplace source dir: CLAUDE_PLUGIN_ROOT equal to the bundle dir is the root", async (t) => {
+      const s = await twoInstalls(t);
+      const env = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.src });
+      assert.equal(runIn(s.src, `resolvePluginRoot({ id: "claude-code", installMode: "marketplace" }, ${env}, ${JSON.stringify(s.wt)})`), s.src);
+      const other = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.user });
+      assert.equal(runIn(s.src, `resolvePluginRoot({ id: "claude-code", installMode: "marketplace" }, ${other}, ${JSON.stringify(s.wt)})`), s.cand, "CLAUDE_PLUGIN_ROOT of another dir is not this bundle");
+    });
+
+    test("[D-DOC-D3-SCOPE-1] doctor-config/D3 tester layout: PASS from the source dir and PASS from the CLI", async (t) => {
+      const s = await twoInstalls(t);
+      const env = JSON.stringify({ ...s.env, CLAUDE_PLUGIN_ROOT: s.src });
+      const d3 = runIn(s.src, `checkHostConfig(getAdapter("claude-code"), ${env}, ${JSON.stringify(s.wt)})`);
+      assert.equal(d3.status, "PASS", d3.detail);
+      const cli = checkHostConfig(getAdapter("claude-code"), s.env, s.wt);
+      assert.equal(cli.status, "PASS", cli.detail);
+    });
+
+    test("[D-DOC-D3-SCOPE-1] doctor-config/D3 root that cannot be told: own detail names both paths and the native fix", async (t) => {
+      const s = await twoInstalls(t, { candOn: false });
+      const d3 = checkHostConfig(getAdapter("claude-code"), s.env, s.wt);
+      assert.equal(d3.status, "FAIL");
+      assert.ok(!d3.detail.includes(C.D3_DETAIL([C.D3_PARTS[0]])), d3.detail);
+      assert.ok(d3.detail.includes(s.user) && d3.detail.includes(s.cand), d3.detail);
+      assert.ok(d3.fixCommand.includes("claude plugin uninstall context-mode@context-mode --scope user"), d3.fixCommand);
+      assert.ok(d3.fixCommand.includes("claude plugin uninstall context-mode@cand --scope project"), d3.fixCommand);
+    });
   });
 
   describe("ADR-0019 plugin current swap and rollback generation", { concurrency: CONC }, () => {

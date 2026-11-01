@@ -158,6 +158,16 @@ export const HOST_PLUGINS_DIR_NAME = "plugins"; // ~/.claude/plugins/installed_p
 export const INSTALLED_PLUGINS_FILE = "installed_plugins.json";
 export const PLUGIN_AGENT_SEPARATOR = ":"; // plugin agent type "<plugin>:<agent>"
 export const PLUGIN_KEY_SEPARATOR = "@"; // installed_plugins.json key "<plugin>@<marketplace>"
+// D-DOC-D3-SCOPE-1: Claude Code 2.1.274 writes scope + projectPath per installed_plugins.json entry and counts an
+// enabledPlugins value only when it is true; settings merge local > project > user. A local/project entry applies
+// only to its projectPath. Lower rank wins. A plugin MCP server gets CLAUDE_PLUGIN_ROOT = the dir the host runs.
+export const CLAUDE_PLUGIN_ROOT_ENV = "CLAUDE_PLUGIN_ROOT";
+export const CLAUDE_PROJECT_DIR_ENV = "CLAUDE_PROJECT_DIR";
+export const ENABLED_PLUGINS_KEY = "enabledPlugins";
+export const SETTINGS_LOCAL_FILE = "settings.local.json";
+export const DEFAULT_PLUGIN_SCOPE = "user"; // an entry without scope (record v1) is a user install
+export const PROJECT_PLUGIN_SCOPES: readonly string[] = Object.freeze(["local", "project"]);
+export const PLUGIN_SCOPE_RANK: Readonly<Record<string, number>> = Object.freeze({ local: 0, project: 1, user: 2, managed: 2 });
 export const FRONTMATTER_FENCE = "---";
 export const FRONTMATTER_TOOLS_KEY = "tools";
 export const FRONTMATTER_DISALLOWED_KEY = "disallowedTools";
@@ -500,6 +510,12 @@ export const DOCTOR_PASS_DETAIL = "ok"; // detail of a PASS row with nothing mor
 // doctor-config.ts: D3 host config, D4 old entries, D7 project (impl/07 §5).
 export const D3_PART_JOIN = ", ";
 export function D3_DETAIL(parts: readonly string[]): string { return `wrong: ${parts.join(D3_PART_JOIN)}`; }
+// D-DOC-D3-SCOPE-1: two or more live installs and none is the one Claude Code runs for this project.
+export function D3_ROOT_DETAIL(paths: readonly string[]): string { return `pick one install for this project: ${paths.join(D3_PART_JOIN)}`; }
+export const D3_ROOT_FIX_JOIN = " or ";
+export function D3_ROOT_FIX(installs: readonly { key: string; scope: string }[]): string {
+  return `remove the extra install: ${installs.map((i) => `claude plugin uninstall ${i.key} --scope ${i.scope}`).join(D3_ROOT_FIX_JOIN)}`;
+}
 // doctor-config.ts D3 hook entries (DEVIATIONS D-M5-D2-1..3): where each agent's own hook entries live and their
 // shape (impl/10 §1.5 table, build/manifests.ts HOOK_SHAPES). root: "plugin" = resolvePluginRoot, "home" = $HOME,
 // "project" = the repo worktree. null = in-process agent, no hook file.
