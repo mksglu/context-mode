@@ -23,7 +23,6 @@ const REMOVED_PATHS = [
   { kind: "file", path: "start.mjs" },
   { kind: "file", path: "bin/statusline.mjs" },
   { kind: "file", path: "bun.lock" },
-  { kind: "file", path: "stats.json" },
   { kind: "file", path: "BENCHMARK.md" },
   { kind: "file", path: "vitest.config.ts" },
   { kind: "file", path: ".npmignore" },
@@ -43,7 +42,6 @@ const REMOVED_PATHS = [
   { kind: "file", path: "docs/adr/0003-routing-deny-reasons.md" },
   { kind: "file", path: "docs/adr/0004-stats-strict-compression-formula.md" },
   { kind: "file", path: ".github/workflows/openclaw-e2e.yml" },
-  { kind: "file", path: ".github/workflows/update-stats.yml" },
   { kind: "file", path: ".github/workflows/tier2-e2e-smoke.yml" },
   { kind: "file", path: ".github/workflows/bundle.yml" },
   // TECH-SPEC §3.10 removed-agent files.
@@ -123,7 +121,7 @@ const ALLOWED_FILES = [
   // v2 user docs outside docs/architecture and docs/install (cleanup-plan §2).
   "docs/how-it-works.md", "docs/tools.md", "docs/algorithms.md", "docs/performance.md", "docs/UPSTREAM-CREDITS.md",
   // Root files.
-  "README.md", "CONTRIBUTING.md", "LICENSE", "package.json", "tsconfig.json", ".gitignore", ".gitattributes",
+  "README.md", "CONTRIBUTING.md", "LICENSE", "stats.json", "package.json", "tsconfig.json", ".gitignore", ".gitattributes",
 ];
 
 // v1 test files that cleanup-plan §3 leaves open for an owner decision (platform rollup forward

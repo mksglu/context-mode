@@ -31,7 +31,7 @@ jobs:
         id: install
         name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
       # Gate selection (DEVIATIONS D-M2-arch-4, D-M2-CI-4, D-M7-CLN-5, D-REPO-CLEAN-1): the milestone is the highest one
-      # the local gate passed before it was marked done. The old source, .impl/progress.json, left the repo; its last
+      # the local gate passed before it was marked done. The old source, https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/.impl/progress.json, left the repo; its last
       # value was M6. Raise it here to M7 when the M7 gate is the one to run.
       - name: gate milestone selection (D-M2-arch-4)
         shell: bash

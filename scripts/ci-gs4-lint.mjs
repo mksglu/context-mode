@@ -6,7 +6,7 @@
 //   1. No file under e2e/ imports src/ (static import, dynamic import, require, new URL).
 //      The KEEP-PASS exception (14-tests.md §7) never applies here: all 131 KEEP-PASS paths
 //      live under tests/, session/, adapters/, hooks/, never under e2e/.
-//   (The old check 2, the tickets/v2-test-ledger.md verdict table, left with the dev folders: D-REPO-CLEAN-1.)
+//   (The old check 2, the verdict table at https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/v2-test-ledger.md, left with the dev folders: D-REPO-CLEAN-1.)
 //
 // Usage: node scripts/ci-gs4-lint.mjs [--root <dir>]
 // Exit 0 = pass, 1 = fail. One PASS/FAIL line per check.

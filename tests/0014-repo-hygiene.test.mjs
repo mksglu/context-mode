@@ -207,6 +207,19 @@ describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
     assert.ok(SOURCE.includes('"ls-files", "-z"'), "tracked tree via git ls-files -z");
   });
 
+  test("badge data: stats.json and update-stats.yml pass the target tree; the workflow runs only on main (D-REPO-CLEAN-1)", () => {
+    const ok = run(fixture({ ...ALLOWED, "stats.json": "{}", ".github/workflows/update-stats.yml": "x" }));
+    assert.equal(ok.status, 0, ok.lines.join("\n"));
+    assert.deepEqual(ok.lines, ["check-removed: clean"]);
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") + path.sep;
+    const y = readFileSync(root + ".github/workflows/update-stats.yml", "utf8");
+    assert.ok(y.includes("if: github.ref == 'refs/heads/main'"), "update-stats.yml: job must run only on main");
+    assert.ok(y.includes("cron:"), "update-stats.yml: needs the schedule");
+    assert.ok(y.includes("stats.json"), "update-stats.yml: must write stats.json");
+    const j = JSON.parse(readFileSync(root + "stats.json", "utf8"));
+    for (const k of ["message", "npm", "marketplace"]) assert.equal(typeof j[k], "string", "stats.json: " + k);
+  });
+
   test("allow-list: bench/evidence/ passes, a stray root file still fails (D-FU-RF-BENCH-1)", () => {
     const ok = run(fixture({ ...ALLOWED, "bench/evidence/README.md": "x", "bench/evidence/data/a.json": "{}" }));
     assert.equal(ok.status, 0);
@@ -1066,4 +1079,68 @@ describe("ADR-0024 test layout: every test file is in the table", { concurrency:
     assert.deepEqual(hits, [], "merge conflict marker left in: " + hits.join(", "));
   });
 });
+});
+
+describe("ADR-0015 / ADR-0024 repo: no dev folders, no v2 dir names (D-REPO-CLEAN-1)", () => {
+  // The release tree holds no dev folders. Design citations to deleted files are permalinks pinned to a commit.
+  // Literal string checks only (no regex as mechanism).
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
+  const NAMES = ["tests/v2/", "docs/v2/", "tickets/", ".impl/"];
+  // These may name the old paths: history rows, frozen data, the changelog, and the guards themselves.
+  const EXEMPT = (f) => f === "docs/architecture/DEVIATIONS.md" || f === "docs/architecture/modules/DEVIATIONS.md" ||
+    f.startsWith("bench/fixtures/data/") || f.startsWith("CHANGELOG") ||
+    f === "tests/0014-repo-hygiene.test.mjs" || f === "build/check-removed.mjs";
+  const HEX = "0123456789abcdef";
+  // True when the text just before position i ends with "/blob/<40 hex>/" or "/tree/<40 hex>/".
+  function pinned(text, i) {
+    const sha = text.slice(Math.max(0, i - 41), i - 1);
+    if (text[i - 1] !== "/" || sha.length !== 40 || ![...sha].every((c) => HEX.includes(c))) return false;
+    const kind = text.slice(Math.max(0, i - 47), i - 41);
+    return kind === "/blob/" || kind === "/tree/";
+  }
+  function unpinned(text, name) {
+    const out = [];
+    for (let i = text.indexOf(name); i >= 0; i = text.indexOf(name, i + 1)) {
+      // the name must start a path: the char before is not a letter, digit, "_", "-" or "."
+      const p = i === 0 ? "" : text[i - 1];
+      if (p !== "" && (p === "_" || p === "-" || p === "." || (p >= "a" && p <= "z") || (p >= "A" && p <= "Z") || (p >= "0" && p <= "9"))) continue;
+      if (!pinned(text, i)) out.push(i);
+    }
+    return out;
+  }
+
+  test("no directory named v2 under tests/ or docs/", () => {
+    const hits = tracked.filter((f) => (f.startsWith("tests/") || f.startsWith("docs/")) && f.split("/").includes("v2"));
+    assert.deepEqual(hits, []);
+  });
+
+  test("tickets/, .impl/ and scripts/v1-cases/ hold no tracked file", () => {
+    const hits = tracked.filter((f) => f.startsWith("tickets/") || f.startsWith(".impl/") || f.startsWith("scripts/v1-cases/"));
+    assert.deepEqual(hits, []);
+  });
+
+  test("no tracked file names tests/v2/, docs/v2/, tickets/ or .impl/ outside a SHA-pinned permalink", () => {
+    const hits = [];
+    for (const f of tracked) {
+      if (EXEMPT(f)) continue;
+      let text;
+      try { text = readFileSync(path.join(ROOT, f), "utf8"); } catch { continue; }
+      if (text.includes("\0")) continue;
+      for (const n of NAMES) if (unpinned(text, n).length) hits.push(f + " names " + n);
+    }
+    assert.deepEqual(hits, []);
+  });
+
+  test("pinned(): a permalink passes, a bare path and a short sha fail", () => {
+    const sha = "274600e2ffab843e89c1dfa09b0d649e650c962f";
+    const ok = "https://github.com/mksglu/context-mode/blob/" + sha + "/tickets/x.md";
+    assert.equal(pinned(ok, ok.indexOf("tickets/")), true);
+    const tree = "https://github.com/mksglu/context-mode/tree/" + sha + "/docs/v2/review";
+    assert.equal(pinned(tree, tree.indexOf("docs/v2/")), true);
+    assert.equal(pinned("see tickets/x.md", 4), false);
+    const short = "https://github.com/mksglu/context-mode/blob/274600e2/tickets/x.md";
+    assert.equal(pinned(short, short.indexOf("tickets/")), false);
+    assert.deepEqual(unpinned("a tickets/x and my-tickets/y", "tickets/"), [2]);
+  });
 });
