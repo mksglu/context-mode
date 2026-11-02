@@ -1313,7 +1313,7 @@ describe("ADR-0008 privacy: network call sites in src (D-PRIVACY-NET-1)", { conc
   const ALLOWED = {
     "src/cli/commands.ts": ['spawnSync("gh"', "spawnSync(npm"], // gh issue create after a keypress (debug report); npm i -g in `context-mode upgrade`
     "src/core/contracts/constants.ts": ["fetch(", "GIT_LS_REMOTE", "GIT_CLONE_ARGS"], // the constants themselves (FETCH_CALL is a deny pattern)
-    "src/core/ops/doctor-env.ts": ["GIT_LS_REMOTE"], // doctor D1: git ls-remote <release repo> release
+    "src/core/ops/doctor-env.ts": ["fetch(", "GIT_LS_REMOTE"], // doctor D1: git ls-remote <release repo> release; after a git failure, GET registry.npmjs.org/-/package/context-mode/dist-tags (D-DOCTOR-D1-CAUSE-1)
     "src/core/ops/release-fetch.ts": ["GIT_CLONE_ARGS"], // ctx_upgrade: git clone --depth 1 of the release branch
     "src/core/sandbox/fetch.ts": ["node:http", "node:net", "node:tls", "node:dns"], // ctx_index / ctx_fetch of a URL the agent asks for
   };

@@ -436,9 +436,34 @@ export function DOCTOR_FAIL_LINE(host: string, check: string, cause: string, com
   return `FAIL ${host}: ${check} — ${cause}. Fix: ${command}`; // ADR-0010 per-host FAIL string, impl/07 §4 step 2
 }
 export const DOCTOR_FIX_UPGRADE = "run ctx_upgrade"; // D1, D3, D4, D8 stale schema
-export const D1_NO_NETWORK_DETAIL = "no network"; // UNKNOWN
 export const D1_DEV_BUILD_DETAIL = "dev build"; // UNKNOWN: BUNDLE_SHA unset (D-M5-arch-5)
 export const D1_UPDATE_DETAIL = "update available"; // FAIL (D-M5-arch-5)
+// D-DOCTOR-D1-CAUSE-1: every D1 detail starts with the installed version and the short bundle sha, then names the exact cause.
+export const D1_SHORT_SHA_LEN = 7;
+export const D1_PACKAGE_FILE = "package.json"; // <bundleDir>/package.json holds the installed version (OUT_PACKAGE_JSON)
+export function D1_PREFIX(version: string | undefined, sha: string): string {
+  return `${version ?? "bundle"} (${sha.slice(0, D1_SHORT_SHA_LEN)})`;
+}
+export const D1_GIT_PASS = "latest on the release branch"; // PASS through git ls-remote
+export function D1_NPM_PASS(tag: string): string { return `latest ${tag} on npm`; }
+export function D1_NPM_UPDATE(tag: string, latest: string): string { return `${D1_UPDATE_DETAIL}, ${tag} on npm is ${latest}`; }
+export const D1_LATEST_UNKNOWN = "latest unknown";
+export const D1_GIT_MISSING = "git not found on PATH";
+export function D1_GIT_EXIT(code: number, stderrLine: string): string { return stderrLine === "" ? `git exit ${code}` : `git exit ${code}: ${stderrLine}`; }
+export function D1_GIT_TIMEOUT(ms: number): string { return `git timed out after ${ms} ms`; }
+export const D1_GIT_CANCEL = "git stopped by cancel";
+export const D1_GIT_NO_START = "git did not start";
+export const D1_GIT_NO_SHA = "git answered no sha";
+export function D1_NPM_TIMEOUT(ms: number): string { return `npm registry timed out after ${ms} ms`; }
+export function D1_NPM_HTTP(status: number): string { return `npm registry answered HTTP ${status}`; }
+export function D1_NPM_ERROR(cause: string): string { return `npm registry: ${cause}`; }
+export function D1_NPM_NO_TAG(tag: string): string { return `npm registry answered no ${tag} version`; }
+export const D1_CAUSE_JOIN = "; ";
+export const D1_GIT_CHECK_FIX = `git ls-remote ${RELEASE_REPO_URL} ${RELEASE_BRANCH}`; // UNKNOWN: check by hand
+export const D1_NPM_CHECK_FIX = "npm view context-mode dist-tags"; // UNKNOWN with git missing: check by hand
+export const D1_REGISTRY_URL = "https://registry.npmjs.org/-/package/context-mode/dist-tags"; // {"latest":..,"next":..}
+export const D1_PRERELEASE_SEP = "-"; // 2.0.0-next.26: the text after "-" up to "." is the dist-tag
+export const D1_DEFAULT_TAG = "latest"; // a version with no prerelease part
 export const GIT_LS_REMOTE = "ls-remote"; // git ls-remote <RELEASE_REPO_URL> <RELEASE_BRANCH>
 export const D2_NODE_FIX = `install Node ${NODE_MIN} or later`;
 export function D2_NODE_DETAIL(version: string): string { return `Node ${version} is below ${NODE_MIN}`; }
@@ -541,7 +566,7 @@ export const NODE_VERSION_PREFIX = "v"; // process.version "v24.15.0" -> compare
 export const NODE_VERSION_SEP = "."; // major.minor.patch, compared as numbers
 export const LS_REMOTE_FIELD_SEP = "\t"; // git ls-remote line: "<sha>\t<ref>"
 export const GIT_SHA_HEX_LEN = 40; // a full commit sha
-export const DOCTOR_GIT_TIMEOUT_MS = 10000; // D1 git ls-remote; a timeout is "no network" (UNKNOWN)
+export const DOCTOR_GIT_TIMEOUT_MS = 10000; // D1 git ls-remote, and the npm registry read after a git failure; a timeout is UNKNOWN
 export const DOCTOR_PASS_DETAIL = "ok"; // detail of a PASS row with nothing more to say
 // doctor-config.ts: D3 host config, D4 old entries, D7 project (impl/07 §5).
 export const D3_PART_JOIN = ", ";

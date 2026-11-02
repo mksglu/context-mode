@@ -11,13 +11,14 @@ import { DatabaseSync } from "node:sqlite";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { createServer } from "node:http";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
 import { getAdapter, ADAPTERS } from "../src/adapters/table.ts";
 import { checkDb, checkIndex } from "../src/core/ops/doctor-db.ts";
 import { openDb, closeDb } from "../src/core/store/db.ts";
 import * as C from "../src/core/contracts/constants.ts";
 import { SCHEMA_VERSION, TOOL_ORDER } from "../src/core/contracts/constants.ts";
-import { checkMcp, checkMode, checkNode, checkProject, checkVersion } from "../src/core/ops/doctor-env.ts";
+import { bundleVersion, channelOf, checkMcp, checkMode, checkNode, checkProject, checkVersion } from "../src/core/ops/doctor-env.ts";
 import { checkHookRoundTrip, codexHookJournaled } from "../src/core/ops/doctor-hook.ts";
 import { DDL } from "../src/core/store/schema.ts";
 import { healD8 } from "../src/core/ops/db-heal.ts";
@@ -523,6 +524,11 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
 
   const SHA_A = "a".repeat(40);
   const SHA_B = "b".repeat(40);
+  const VER = "2.0.0-next.26";
+  const HEAD = `${VER} (aaaaaaa): `; // D-DOCTOR-D1-CAUSE-1: installed version and short bundle sha lead every detail
+  const GIT_FIX = "git ls-remote https://github.com/mksglu/context-mode.git release";
+  const NPM_FIX = "npm view context-mode dist-tags";
+  const DEAD_REGISTRY = "http://127.0.0.1:9/dist-tags"; // default: fetch blocks port 9 ("bad port"), no network use in tests
 
   function tmp(t) {
     const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "cm-doctor-env-")));
@@ -530,48 +536,131 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     return dir;
   }
 
-  // A fake `git` on PATH that prints one ls-remote line (POSIX only: a #!/bin/sh script).
-  function fakeGit(t, stdout, exit = 0) {
+  // A fake `git` on PATH running one sh body (POSIX only: a #!/bin/sh script). `name` is git.exe for the win32 cases.
+  function fakeGit(t, body, name = "git") {
     const bin = path.join(tmp(t), "bin");
     mkdirSync(bin);
-    const file = path.join(bin, "git");
-    writeFileSync(file, `#!/bin/sh\nprintf '${stdout}'\nexit ${exit}\n`);
+    const file = path.join(bin, name);
+    writeFileSync(file, `#!/bin/sh\n${body}\n`);
     chmodSync(file, 0o755);
     return { PATH: `${bin}:/bin:/usr/bin`, HOME: path.dirname(bin), USERPROFILE: path.dirname(bin) };
   }
+  const lsRemote = (sha) => `printf '${sha}\\trefs/heads/release\\n'`;
+  const noGit = (t) => ({ PATH: path.join(tmp(t), "empty"), HOME: tmp(t), USERPROFILE: tmp(t) });
+
+  // A local registry that answers the dist-tags body (or an HTTP status) on 127.0.0.1.
+  async function registry(t, status, body) {
+    const server = createServer((_req, res) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); });
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    t.after(() => server.close());
+    return `http://127.0.0.1:${server.address().port}/-/package/context-mode/dist-tags`;
+  }
 
   const posix = process.platform !== "win32";
-  const run = (env, bundleSha) => checkVersion({ bundleSha, env, cwd: env.HOME ?? tmpdir(), signal: new AbortController().signal });
+  const run = (env, bundleSha, o = {}) => checkVersion({
+    bundleSha, version: "version" in o ? o.version : VER, registryUrl: o.registryUrl ?? DEAD_REGISTRY, timeoutMs: o.timeoutMs ?? 10000,
+    env, cwd: env.HOME ?? tmpdir(), signal: new AbortController().signal,
+  });
 
   test("[M5] doctor-env/D1-dev-build-is-UNKNOWN-without-spawning-git", async () => {
     const row = await run({ PATH: "" }, undefined);
     assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "dev build" });
   });
 
-  test("[M5] doctor-env/D1-no-git-or-no-network-is-UNKNOWN-not-FAIL", async (t) => {
-    const row = await run({ PATH: path.join(tmp(t), "empty"), HOME: tmp(t), USERPROFILE: tmp(t) }, SHA_A);
-    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "no network" });
-  });
-
-  test("[M5] doctor-env/D1-git-exit-nonzero-is-UNKNOWN", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, "", 128), SHA_A);
-    assert.equal(row.status, "UNKNOWN");
-    assert.equal(row.detail, "no network");
-  });
-
-  test("[M5] doctor-env/D1-equal-sha-PASS", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, `${SHA_A}\\trefs/heads/release\\n`), SHA_A);
-    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: "ok" });
+  test("[M5] doctor-env/D1-equal-sha-PASS-names-version-and-sha", { skip: !posix }, async (t) => {
+    const row = await run(fakeGit(t, lsRemote(SHA_A)), SHA_A);
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest on the release branch` });
   });
 
   test("[M5] doctor-env/D1-different-sha-FAIL-update-available-fix-ctx_upgrade", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, `${SHA_B}\\trefs/heads/release\\n`), SHA_A);
-    assert.deepEqual(row, { id: "D1", label: "version", status: "FAIL", detail: "update available", fixCommand: "run ctx_upgrade" });
+    const row = await run(fakeGit(t, lsRemote(SHA_B)), SHA_A);
+    assert.deepEqual(row, { id: "D1", label: "version", status: "FAIL", detail: `${HEAD}update available`, fixCommand: "run ctx_upgrade" });
   });
 
-  test("[M5] doctor-env/D1-empty-ls-remote-output-is-UNKNOWN", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, ""), SHA_A);
+  // D-DOCTOR-D1-CAUSE-1 (Windows tester, 2.0.0-next.26, "| D1 version | UNKNOWN | no network | |" on a machine with
+  // network): D1 passed the bare name "git" to runProcess, and on win32 an argv[0] with no extension starts as
+  // [bash.exe, "git", ...], so bash read git as a script and exited 126. D1 now starts the git.exe found on PATH.
+  // Platform spoof only around the synchronous spawn, as in the D-VT-WINBASH-1 cases.
+  test("[M5] doctor-env/D1-win32-starts-git.exe-from-PATH-directly-not-through-bash", { skip: !posix }, async (t) => {
+    const env = fakeGit(t, lsRemote(SHA_A), "git.exe");
+    const gitRoot = path.join(env.HOME, "Git", "bin"); // a Git Bash beside it: the old path ran "bash.exe git ls-remote ..."
+    mkdirSync(gitRoot, { recursive: true });
+    symlinkSync("/bin/sh", path.join(gitRoot, "bash.exe"));
+    const real = Object.getOwnPropertyDescriptor(process, "platform");
+    const saved = process.env.PATH;
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    process.env.PATH = `${path.join(env.HOME, "Git", "cmd")}:${env.PATH}`;
+    let pending;
+    try {
+      pending = run({ ...env, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, SHA_A);
+    } finally {
+      Object.defineProperty(process, "platform", real);
+      process.env.PATH = saved;
+    }
+    const row = await pending;
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest on the release branch` });
+  });
+
+  test("[M5] doctor-env/D1-git-missing-and-registry-down-is-UNKNOWN-with-both-causes-and-npm-fix", async (t) => {
+    const server = createServer();
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    const port = server.address().port;
+    await new Promise((r) => server.close(r)); // a free local port: the connection is refused
+    const row = await run(noGit(t), SHA_A, { registryUrl: `http://127.0.0.1:${port}/dist-tags` });
     assert.equal(row.status, "UNKNOWN");
+    assert.ok(row.detail.startsWith(`${HEAD}latest unknown, git not found on PATH; npm registry: `), row.detail);
+    assert.ok(row.detail.includes("ECONNREFUSED"), row.detail);
+    assert.equal(row.fixCommand, NPM_FIX);
+  });
+
+  test("[M5] doctor-env/D1-git-exit-names-code-and-first-stderr-line", { skip: !posix }, async (t) => {
+    const env = fakeGit(t, "echo 'fatal: unable to access the repo' >&2; echo 'second line' >&2; exit 128");
+    const url = await registry(t, 503, {});
+    const row = await run(env, SHA_A, { registryUrl: url });
+    assert.deepEqual(row, {
+      id: "D1", label: "version", status: "UNKNOWN",
+      detail: `${HEAD}latest unknown, git exit 128: fatal: unable to access the repo; npm registry answered HTTP 503`, fixCommand: GIT_FIX,
+    });
+  });
+
+  test("[M5] doctor-env/D1-git-timeout-names-the-limit", { skip: !posix }, async (t) => {
+    const row = await run(fakeGit(t, "sleep 5"), SHA_A, { timeoutMs: 300, registryUrl: await registry(t, 200, { latest: "1.0.168" }) });
+    assert.deepEqual(row, {
+      id: "D1", label: "version", status: "UNKNOWN",
+      detail: `${HEAD}latest unknown, git timed out after 300 ms; npm registry answered no next version`, fixCommand: GIT_FIX,
+    });
+  });
+
+  test("[M5] doctor-env/D1-git-answer-without-sha-says-so", { skip: !posix }, async (t) => {
+    const row = await run(fakeGit(t, "exit 0"), SHA_A, { version: undefined });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "bundle (aaaaaaa): latest unknown, git answered no sha", fixCommand: GIT_FIX });
+  });
+
+  test("[M5] doctor-env/D1-git-missing-registry-same-version-is-PASS", async (t) => {
+    const url = await registry(t, 200, { latest: "1.0.168", next: VER });
+    const row = await run(noGit(t), SHA_A, { registryUrl: url });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on npm; git not found on PATH` });
+  });
+
+  test("[M5] doctor-env/D1-git-missing-registry-newer-is-FAIL-with-both-versions", async (t) => {
+    const url = await registry(t, 200, { latest: "1.0.168", next: "2.0.0-next.29" });
+    const row = await run(noGit(t), SHA_A, { registryUrl: url });
+    assert.deepEqual(row, {
+      id: "D1", label: "version", status: "FAIL",
+      detail: `${HEAD}update available, next on npm is 2.0.0-next.29; git not found on PATH`, fixCommand: "run ctx_upgrade",
+    });
+  });
+
+  test("[M5] doctor-env/D1-channel-and-installed-version-from-the-bundle", (t) => {
+    assert.equal(channelOf("2.0.0-next.26"), "next");
+    assert.equal(channelOf("2.0.0"), "latest");
+    assert.equal(channelOf("2.1.0-beta"), "beta");
+    const dir = tmp(t);
+    assert.equal(bundleVersion(dir), undefined);
+    writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "context-mode", version: VER }));
+    assert.equal(bundleVersion(dir), VER);
+    writeFileSync(path.join(dir, "package.json"), "{");
+    assert.equal(bundleVersion(dir), undefined);
   });
 
   test("[M5] doctor-env/D2-current-node-PASS-and-sqlite-loads", async () => {

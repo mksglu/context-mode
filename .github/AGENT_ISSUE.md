@@ -28,7 +28,7 @@ Run each command in the user's real HOME, where the problem happened, and keep i
 | hook errors | `tail -n 50 ~/.context-mode/hook-errors.log` (PowerShell: `Get-Content $HOME\.context-mode\hook-errors.log -Tail 50`) | What happened |
 | journal rows | the sqlite command below | What happened |
 
-Paste both doctor outputs whole. A terminal doctor and an agent doctor can differ (for example D5 hooks and D6 MCP), and the difference often names the cause.
+Paste both doctor outputs whole: every row, with every Detail and Fix cell word for word. The Detail cell names the exact cause (for example row D1 gives the installed version, the short bundle sha and why the latest version is unknown), and the Fix cell gives the command that checks it by hand. A terminal doctor and an agent doctor can differ (for example D5 hooks and D6 MCP), and the difference often names the cause.
 
 `hook-errors.log` holds one JSON line per hook failure: `ts` (UTC time), `agent`, `stage`, `label` (the error code), `message`, `stack`. Copy the lines whose `ts` falls in the minutes around the failure, and keep each line whole.
 
@@ -109,7 +109,7 @@ Save the body to a file, because multi-line Markdown breaks in shell quoting. Th
 
 ### ctx-report
 
-<the table from ctx_doctor in the agent, whole>
+<the table from ctx_doctor in the agent, whole: every Detail and Fix cell word for word>
 
 <the table from `context-mode doctor --agents <agent>`, whole>
 
