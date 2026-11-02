@@ -44,7 +44,7 @@ Returns a summary of up to 2 KB for this session: the last task and user request
 
 <!-- id: ctx_stats -->
 ```text
-Reports how many bytes context-mode kept out of the conversation in this session and in this project: a text report in a ```text block (totals with bars, then rows per tool, per agent and per journal kind), then a Markdown table with the raw byte counts. Show the text block to the user as it is, inside a code block. Use it when the user asks what context-mode saved.
+Reports the bytes context-mode kept out of the chat: a text report (bars, per tool, per agent) and a Markdown table. Show the text block to the user unchanged, in a code block. Use it when the user asks what it saved.
 ```
 
 <!-- id: ctx_doctor -->
