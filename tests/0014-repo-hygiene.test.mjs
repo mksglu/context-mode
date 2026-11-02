@@ -1191,6 +1191,46 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(readRepo(".github/AGENT_ISSUE.md").startsWith("# Filing a context-mode issue (for coding agents)"));
   });
 
+  test("AGENT_ISSUE.md is a repro brief: facts with commands, clean-state repro, next check, redaction, template with the bot's headings (D-AGENT-ISSUE-2)", async () => {
+    // Owner 2026-11-02: "repro stepleri onemli"; the brief answers "how would I reproduce and fix this if it came to me".
+    const { REQUIRED_HEADINGS } = await import("../.github/scripts/issue-intake.mjs");
+    const text = readRepo(".github/AGENT_ISSUE.md");
+    const mustHold = [
+      "## 1. Collect these facts", "## 2. Reproduce from a clean state", "## 3. Check the newest next release",
+      "## 4. Redact", "## 5. Fill in this template",
+      "node --version", "uname -sm", "context-mode doctor", "ctx_doctor", "hook-errors.log", "sqlite3 -readonly",
+      "events", "mktemp -d", "HOME=", "wc -c", "npm view context-mode dist-tags",
+      "claude plugin marketplace add", "codex plugin add", "gemini extensions install", "pi install", "opencode plugin add",
+      "Expected", "Actual", "Reproduced:", "gh issue create",
+    ];
+    for (const needle of mustHold) assert.ok(text.includes(needle), "AGENT_ISSUE.md must hold: " + needle);
+    // The fill-in template carries every heading the intake check requires, in the check's order.
+    const tpl = text.slice(text.indexOf("## 5. Fill in this template"));
+    let at = -1;
+    for (const h of REQUIRED_HEADINGS) {
+      const i = tpl.indexOf("### " + h + "\n", at + 1);
+      assert.ok(i > at, "template heading missing or out of order: ### " + h);
+      at = i;
+    }
+    for (const field of ["context-mode version:", "Install route:", "Agent and version:", "OS and arch:", "Node version:", "Reproduced:"]) {
+      assert.ok(tpl.includes(field), "template field missing: " + field);
+    }
+    // Positive wording (owner rule), no "v2" in prose, no banned product word: whole-word scan by character walk.
+    const words = [];
+    let w = "";
+    for (const ch of text.toLowerCase()) {
+      if ((ch >= "a" && ch <= "z") || ch === "'") w += ch;
+      else { if (w) words.push(w); w = ""; }
+    }
+    if (w) words.push(w);
+    for (const bad of ["not", "no", "never", "without", "cannot", "none", "nothing", "rtk"]) {
+      assert.ok(!words.includes(bad), "AGENT_ISSUE.md must use positive wording, found: " + bad);
+    }
+    assert.ok(!words.some((x) => x.endsWith("n't")), "AGENT_ISSUE.md holds an n't word");
+    assert.ok(!text.includes("v2"), 'AGENT_ISSUE.md must not say "v2"');
+    assert.ok(!text.includes('{"report"'), "ctx_doctor takes no arguments (ctxDoctorSchema is empty and strict)");
+  });
+
   test("readme-links: finds markdown targets and HTML src/srcset/href targets", async () => {
     const { readmeTargets, localPath, missingTargets } = await import("../build/readme-links.mjs");
     const text = '[a](docs/x.md#y) ![b](https://e.com/p.png)\n<img src="a/b.png" alt="b"> <source srcset="c.png" media="m"> <a href="#top">t</a>';
