@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// build/readme-agents.mjs — D-README-1: renders the README agent table (install) from the adapter
+// build/readme-agents.mjs — D-README-1, D-README-AGENT-LINES-1: renders one line per README install block from the adapter
 // table (src/adapters/table.ts) and the setup registry (src/setup/registry.ts).
 // Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
 // Columns (DEVIATIONS D-README-2): Hooks = the row's hookChannel kind in table.ts (every agent has one, ADR-0020);
 // MCP = "yes", or "plugin inside the agent" when the registry row has no MCP config and the agent runs in process (Pi);
 // Skills = the row's skillChannel; Install = every command of the first fence in the page's Install section, joined by
 // <br>, when it is the agent's own command (D-README-INSTALL-CELL-1), else "npm + context-mode setup".
-// Usage: node build/readme-agents.mjs [--write]. Without --write it prints the tables; --write puts them into
-// README.md between the markers. build/check-readme.mjs calls checkAgentTables() and fails on any problem.
+// The line ("Hooks: ... · MCP: ... · Skills: ... · Guide: ...") sits inside each <details id="install-<id>"> block; the
+// owner dropped the Supported agents table (2026-11-02). Usage: node build/readme-agents.mjs [--write]. Without --write it
+// prints the lines; --write puts them into README.md. build/check-readme.mjs calls checkAgentLines() and fails on any problem.
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,11 +21,7 @@ const TITLE_PREFIX = "# Install context-mode v2 on ";
 export const HOOK_WORDS = Object.freeze({ package: "package", "home-file": "hook file", "in-process": "the plugin's own event handlers" });
 const FALLBACK_INSTALL = "npm + `context-mode setup`";
 const SECTIONS = { install: { heading: "## Install", anchor: "install" } };
-
-export const MARKERS = Object.freeze(Object.fromEntries(Object.keys(SECTIONS).map((k) => [k, Object.freeze([
-  `<!-- agents:${k}:start (node build/readme-agents.mjs --write) -->`,
-  `<!-- agents:${k}:end -->`,
-])])));
+export const LINE_PREFIX = "Hooks: ";
 
 function pageOf(id) {
   const rel = `docs/install/${id}.md`;
@@ -66,51 +63,47 @@ export function agentRows() {
   }).sort((x, y) => x.name.localeCompare(y.name));
 }
 
-/** The two tables as markdown, without the markers. */
-export function renderAgentTables() {
-  const rows = agentRows();
-  const out = {};
-  for (const [key, { anchor }] of Object.entries(SECTIONS)) {
-    out[key] = ["| Agent | Hooks | MCP | Skills | Install | Guide |", "|---|---|---|---|---|---|",
-      ...rows.map((r) => `| ${r.name} | ${r.hooks} | ${r.mcp} | ${r.skills} | ${r.install} | [${r.page}](${r.page}#${anchor}) |`)].join("\n");
-  }
-  return out;
+/** The generated line for one agent: hooks, MCP, skills and the guide link (D-README-AGENT-LINES-1). */
+export function agentLine(r) {
+  const hooks = r.hooks.startsWith("yes, ") ? `yes (${r.hooks.slice(5)})` : r.hooks;
+  return `${LINE_PREFIX}${hooks} · MCP: ${r.mcp} · Skills: ${r.skills} · Guide: [${r.page}](${r.page}#install)`;
 }
 
-function block(key, table) {
-  const [start, end] = MARKERS[key];
-  return `${start}\n${table}\n${end}`;
+/** id -> generated line, one per adapter. */
+export function renderAgentLines() {
+  return Object.fromEntries(agentRows().map((r) => [r.id, agentLine(r)]));
 }
 
-/** Problems with the README copy of the tables; [] when both match the rendered tables. */
-export function checkAgentTables(text) {
-  const tables = renderAgentTables();
+/** The install block of one agent: from its <details id="install-<id>"> tag to the closing tag. */
+function blockOf(text, id) {
+  const start = text.indexOf(`id="install-${id}">`);
+  if (start < 0) return null;
+  const end = text.indexOf("</details>", start);
+  return end < 0 ? null : { start, end, body: text.slice(start, end) };
+}
+
+/** Problems with the README copy of the lines; [] when each install block holds its rendered line once. */
+export function checkAgentLines(text) {
   const problems = [];
-  for (const key of Object.keys(SECTIONS)) {
-    const [start, end] = MARKERS[key];
-    const starts = text.split(start).length - 1;
-    const ends = text.split(end).length - 1;
-    if (starts !== 1 || ends !== 1) {
-      problems.push(`${key}: README needs each marker once (start ${starts}, end ${ends}); run node build/readme-agents.mjs --write`);
-      continue;
-    }
-    if (!text.includes(block(key, tables[key]))) {
-      problems.push(`${key}: README table differs from build/readme-agents.mjs; run node build/readme-agents.mjs --write`);
-    }
+  for (const [id, line] of Object.entries(renderAgentLines())) {
+    const b = blockOf(text, id);
+    if (!b) { problems.push(`${id}: README has no install block id="install-${id}"`); continue; }
+    const own = b.body.split("\n").filter((l) => l.startsWith(LINE_PREFIX));
+    if (own.length !== 1 || own[0] !== line) problems.push(`${id}: install block line differs from build/readme-agents.mjs; run node build/readme-agents.mjs --write`);
   }
+  if (text.includes("| Agent | Hooks |")) problems.push("README still has the agent table; the lines in the install blocks replace it");
   return problems;
 }
 
-/** README text with both blocks replaced by the rendered tables. Throws when a marker is missing. */
-export function writeAgentTables(text) {
-  const tables = renderAgentTables();
+/** README text with each install block's line replaced (or added before </details>). Throws when a block is missing. */
+export function writeAgentLines(text) {
   let out = text;
-  for (const key of Object.keys(SECTIONS)) {
-    const [start, end] = MARKERS[key];
-    const i = out.indexOf(start);
-    const j = out.indexOf(end, i);
-    if (i < 0 || j < 0) throw new Error(`README.md has no ${key} markers`);
-    out = out.slice(0, i) + block(key, tables[key]) + out.slice(j + end.length);
+  for (const [id, line] of Object.entries(renderAgentLines())) {
+    const b = blockOf(out, id);
+    if (!b) throw new Error(`README.md has no install block for ${id}`);
+    const kept = b.body.split("\n").filter((l) => !l.startsWith(LINE_PREFIX));
+    const body = kept.join("\n") + (kept[kept.length - 1] === "" ? "" : "\n");
+    out = out.slice(0, b.start) + body.replace(/\n$/, "\n" + line + "\n") + out.slice(b.end);
   }
   return out;
 }
@@ -118,11 +111,10 @@ export function writeAgentTables(text) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes("--write")) {
     const text = readFileSync(README, "utf8");
-    const next = writeAgentTables(text);
+    const next = writeAgentLines(text);
     if (next !== text) writeFileSync(README, next);
     console.log(next === text ? "readme-agents: README.md already up to date" : "readme-agents: README.md updated");
   } else {
-    const t = renderAgentTables();
-    console.log(t.install);
+    console.log(Object.values(renderAgentLines()).join("\n"));
   }
 }

@@ -2,7 +2,7 @@
 
 **A free, local plugin that keeps tool output out of your coding agent's context window. 10 agents, zero telemetry, free forever.**
 
-[![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2Flast-year%2Fcontext-mode&query=%24.downloads&label=npm%20downloads%2C%20last%20365%20days&color=blue)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
+[![npm downloads](https://img.shields.io/npm/dy/context-mode?label=npm%20downloads)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 
 > **Context Mode Gateway** takes the same idea from tool output to the whole conversation. It is an optional hosted service that works next to this plugin: Gateway Recall keeps long sessions searchable, and Gateway Memory shares what your agents learn across sessions and tools. The plugin stays free and local, with its source open on GitHub. [See how the Gateway works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=quote)
 
@@ -11,7 +11,7 @@
   <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, for 10 coding agents, zero telemetry, your data stays on your machine. 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output).">
 </picture>
 
-**Contents:** [Why](#why) · [Install](#install) · [Supported agents](#supported-agents) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [Star history](#star-history) · [License](#license) · [Community](#community)
+**Contents:** [Why](#why) · [Install](#install) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [Adoption](#adoption-stars-and-npm-downloads) · [License](#license) · [Community](#community)
 
 ## Why
 
@@ -27,8 +27,7 @@ Context Mode runs that work in a local sandbox, keeps the full output in a SQLit
 
 ## Install
 
-> [!IMPORTANT]
-> You need Node 24.15.0 or later. On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` check D11 (shell) checks for it.
+You need Node 24.15.0 or later. On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` check D11 (shell) checks for it.
 
 Open your agent and copy its own install command. Each block also has the update, check and remove steps.
 `release` and `next` are the 2.0 channels; each command below already names the right one.
@@ -39,7 +38,8 @@ Open your agent and copy its own install command. Each block also has the update
 claude plugin marketplace add mksglu/context-mode#release
 claude plugin install context-mode@context-mode
 ```
-Update: `claude plugin update context-mode@context-mode`. Check: `context-mode doctor --agents claude-code`. Remove: `context-mode setup --remove --agents claude-code`. Guide: [docs/install/claude-code.md](docs/install/claude-code.md).
+Update: `claude plugin update context-mode@context-mode`. Check: `context-mode doctor --agents claude-code`. Remove: `context-mode setup --remove --agents claude-code`.
+Hooks: yes (package) · MCP: yes · Skills: yes · Guide: [docs/install/claude-code.md](docs/install/claude-code.md#install)
 </details>
 <details open id="install-codex"><summary><b>Codex</b></summary>
 
@@ -47,35 +47,40 @@ Update: `claude plugin update context-mode@context-mode`. Check: `context-mode d
 codex plugin marketplace add mksglu/context-mode@release
 codex plugin add context-mode@context-mode
 ```
-Update: `codex plugin marketplace upgrade context-mode`. Check: `context-mode doctor --agents codex`. Remove: `context-mode setup --remove --agents codex`. Guide: [docs/install/codex.md](docs/install/codex.md).
+Update: `codex plugin marketplace upgrade context-mode`. Check: `context-mode doctor --agents codex`. Remove: `context-mode setup --remove --agents codex`.
+Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/codex.md](docs/install/codex.md#install)
 </details>
 <details open id="install-gemini"><summary><b>Gemini CLI</b></summary>
 
 ```sh
 gemini extensions install https://github.com/mksglu/context-mode --ref release
 ```
-Update: `gemini extensions update context-mode`. Check: `context-mode doctor --agents gemini`. Remove: `context-mode setup --remove --agents gemini`, then `gemini extensions uninstall context-mode`. Guide: [docs/install/gemini.md](docs/install/gemini.md).
+Update: `gemini extensions update context-mode`. Check: `context-mode doctor --agents gemini`. Remove: `context-mode setup --remove --agents gemini`, then `gemini extensions uninstall context-mode`.
+Hooks: yes (package) · MCP: yes · Skills: yes · Guide: [docs/install/gemini.md](docs/install/gemini.md#install)
 </details>
 <details id="install-qwen"><summary><b>Qwen Code</b></summary>
 
 ```sh
 qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
 ```
-Update: `qwen extensions update context-mode`. Check: `context-mode doctor --agents qwen`. Remove: `context-mode setup --remove --agents qwen`, then `qwen extensions uninstall context-mode`. Guide: [docs/install/qwen.md](docs/install/qwen.md).
+Update: `qwen extensions update context-mode`. Check: `context-mode doctor --agents qwen`. Remove: `context-mode setup --remove --agents qwen`, then `qwen extensions uninstall context-mode`.
+Hooks: yes (package) · MCP: yes · Skills: yes · Guide: [docs/install/qwen.md](docs/install/qwen.md#install)
 </details>
 <details id="install-pi"><summary><b>Pi</b></summary>
 
 ```sh
 pi install npm:context-mode@next
 ```
-Update: `pi update --extensions`. Check: `context-mode doctor --agents pi`. Remove: `context-mode setup --remove --agents pi`. Guide: [docs/install/pi.md](docs/install/pi.md).
+Update: `pi update --extensions`. Check: `context-mode doctor --agents pi`. Remove: `context-mode setup --remove --agents pi`.
+Hooks: yes (the plugin's own event handlers) · MCP: plugin inside the agent · Skills: yes · Guide: [docs/install/pi.md](docs/install/pi.md#install)
 </details>
 <details id="install-opencode"><summary><b>OpenCode</b></summary>
 
 ```sh
 opencode plugin add context-mode@next
 ```
-Update: `opencode plugin update`. Check: `context-mode doctor --agents opencode`. Remove: `opencode plugin remove context-mode@next`, then `context-mode setup --remove --agents opencode`. Guide: [docs/install/opencode.md](docs/install/opencode.md).
+Update: `opencode plugin update`. Check: `context-mode doctor --agents opencode`. Remove: `opencode plugin remove context-mode@next`, then `context-mode setup --remove --agents opencode`.
+Hooks: yes (the plugin's own event handlers) · MCP: yes · Skills: yes · Guide: [docs/install/opencode.md](docs/install/opencode.md#install)
 </details>
 <details id="install-copilot-cli"><summary><b>Copilot CLI</b></summary>
 
@@ -83,7 +88,8 @@ Update: `opencode plugin update`. Check: `context-mode doctor --agents opencode`
 npm i -g context-mode@next
 context-mode setup --agents copilot-cli
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents copilot-cli`. Remove: `context-mode setup --remove --agents copilot-cli`. Guide: [docs/install/copilot-cli.md](docs/install/copilot-cli.md).
+Update: `context-mode upgrade`. Check: `context-mode doctor --agents copilot-cli`. Remove: `context-mode setup --remove --agents copilot-cli`.
+Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install)
 </details>
 <details id="install-kiro"><summary><b>Kiro</b></summary>
 
@@ -91,7 +97,8 @@ Update: `context-mode upgrade`. Check: `context-mode doctor --agents copilot-cli
 npm i -g context-mode@next
 context-mode setup --agents kiro
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents kiro`. Remove: `context-mode setup --remove --agents kiro`. Guide: [docs/install/kiro.md](docs/install/kiro.md).
+Update: `context-mode upgrade`. Check: `context-mode doctor --agents kiro`. Remove: `context-mode setup --remove --agents kiro`.
+Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/kiro.md](docs/install/kiro.md#install)
 </details>
 <details id="install-vscode"><summary><b>VS Code (Copilot)</b></summary>
 
@@ -99,7 +106,8 @@ Update: `context-mode upgrade`. Check: `context-mode doctor --agents kiro`. Remo
 npm i -g context-mode@next
 context-mode setup --agents vscode
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents vscode`. Remove: `context-mode setup --remove --agents vscode`. Guide: [docs/install/vscode.md](docs/install/vscode.md).
+Update: `context-mode upgrade`. Check: `context-mode doctor --agents vscode`. Remove: `context-mode setup --remove --agents vscode`.
+Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/vscode.md](docs/install/vscode.md#install)
 </details>
 <details id="install-zcode"><summary><b>ZCode</b></summary>
 
@@ -107,7 +115,8 @@ Update: `context-mode upgrade`. Check: `context-mode doctor --agents vscode`. Re
 npm i -g context-mode@next
 context-mode setup --agents zcode
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents zcode`. Remove: `context-mode setup --remove --agents zcode`. Guide: [docs/install/zcode.md](docs/install/zcode.md).
+Update: `context-mode upgrade`. Check: `context-mode doctor --agents zcode`. Remove: `context-mode setup --remove --agents zcode`.
+Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/zcode.md](docs/install/zcode.md#install)
 </details>
 
 The four GitHub-source commands name the `release` branch in each agent's own syntax.
@@ -130,28 +139,9 @@ context-mode setup
 `context-mode setup` is also the repair. It shows a plan, saves your earlier config, then applies the plan; if a step stops, it puts the saved config back.
 Uninstall: `context-mode setup --remove && npm rm -g context-mode`. Details: [docs/install/README.md](docs/install/README.md).
 
-> [!TIP]
-> Restart the agent, then run `context-mode doctor` (or `/ctx-doctor` in the agent). Each check prints PASS or a fix command.
+Restart the agent, then run `context-mode doctor` (or `/ctx-doctor` in the agent). Each check prints PASS or a fix command.
 
-## Supported agents
-
-Every agent gets hooks, the MCP server and the plugin skills (files in `skills/`). The Install column is the agent's own install command, or the npm route for the other four agents.
-
-<!-- agents:install:start (node build/readme-agents.mjs --write) -->
-| Agent | Hooks | MCP | Skills | Install | Guide |
-|---|---|---|---|---|---|
-| Claude Code | yes, package | yes | yes | `claude plugin marketplace add mksglu/context-mode#release`<br>`claude plugin install context-mode@context-mode` | [docs/install/claude-code.md](docs/install/claude-code.md#install) |
-| Codex | yes, hook file | yes | yes | `codex plugin marketplace add mksglu/context-mode@release`<br>`codex plugin add context-mode@context-mode` | [docs/install/codex.md](docs/install/codex.md#install) |
-| Copilot CLI | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install) |
-| Gemini CLI | yes, package | yes | yes | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | [docs/install/gemini.md](docs/install/gemini.md#install) |
-| Kiro | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/kiro.md](docs/install/kiro.md#install) |
-| OpenCode | yes, the plugin's own event handlers | yes | yes | `opencode plugin add context-mode@next` | [docs/install/opencode.md](docs/install/opencode.md#install) |
-| Pi | yes, the plugin's own event handlers | plugin inside the agent | yes | `pi install npm:context-mode@next` | [docs/install/pi.md](docs/install/pi.md#install) |
-| Qwen Code | yes, package | yes | yes | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | [docs/install/qwen.md](docs/install/qwen.md#install) |
-| VS Code (Copilot) | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/vscode.md](docs/install/vscode.md#install) |
-| ZCode | yes, hook file | yes | yes | npm + `context-mode setup` | [docs/install/zcode.md](docs/install/zcode.md#install) |
-<!-- agents:install:end -->
-
+Every agent gets hooks, the MCP server and the plugin skills (files in `skills/`); the last line of each block above says how.
 Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi).
 The real agent binary ran our hook for Claude Code, Codex, Gemini CLI, Qwen Code, Pi, OpenCode, Copilot CLI and ZCode, in a clean temp home, logged out, with a local test model (2.0.0-next.15, the release that the record below covers).
 VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
@@ -232,19 +222,13 @@ Median of 5 runs, bench of 2026-11-01. Rows per agent and per query: [bench/resu
   <img src="docs/assets/readme/fig-flow-light.png" alt="One tool call, step by step: the agent runs a tool, the PreToolUse hook denies a big Read and names the ctx_execute call, the MCP server runs it in the sandbox, SQLite FTS5 keeps the output, and after compaction a state block of at most 2,048 B comes back.">
 </picture>
 
-Context Mode has three parts: hooks, an MCP server with nine tools, and one SQLite database per project. All three run on your machine, and the data stays in `~/.context-mode`.
+1. Your agent calls a tool: it reads a file, runs a command or fetches a page.
+2. A hook sees the call first. It sends a big read or fetch to the sandbox and gives the agent the exact call to use.
+3. The sandbox runs the work on your machine and keeps the full output in a local SQLite index.
+4. The agent gets the part it asked for, and calls `ctx_search` when it wants more.
+5. After a compaction, the agent gets a short state block; each line points to the full record.
 
-**Hooks.** The hooks listen to four events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`. Gemini CLI, VS Code and OpenCode also send a compaction event; each host keeps its own event names. `PreToolUse` checks rules in a fixed order: the user's deny list, WebFetch, curl and HTTP or build commands, then Read and shell dumps. Context Mode denies a full-file `Read` of a file over 16,384 B, and the deny message names the exact `ctx_execute` call to use. A `Read` with a range still runs. A hook always exits 0: on any error it gives the host's "allow" reply and writes one log line, so your agent keeps working. Spawned hooks time out after 5,000 ms.
-
-**Sandbox execution.** `ctx_execute` writes the script to a temp folder and runs it as a local subprocess: shell, PowerShell, JavaScript, TypeScript, Python, or any runtime found on `PATH`. It spawns the runtime directly from an argument list, in the project folder. The default and maximum timeout is 600,000 ms; on timeout it kills the whole process group (`taskkill /F /T` on Windows). The child gets the parent environment minus the preload variables (`NODE_OPTIONS`, `BUN_OPTIONS`, `DENO_OPTIONS` and similar). The agent gets what the script prints, cut on a whole character.
-
-**Index and search.** Each output goes into SQLite FTS5 twice: a Porter-stemmed table for words, and a trigram table for paths, names and parts of words. `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(60 + rank) in each list. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers one of three scopes: this session, this worktree (the default) or the whole project. Chunks are at most 4,096 B. A Markdown chunk stays inside one heading section and carries its heading path as its title. A code block that fits in a chunk stays whole; a bigger one splits on blank lines, and each piece repeats the fence. A reply snippet is at most 800 B, or a whole code block up to 2,048 B.
-
-**Large output, run and replace.** When a host tool returns more than the cap, `PostToolUse` indexes the whole output and replaces it. The agent gets the best-matching whole chunks and one `ctx_search` line for the rest. Context Mode keeps the full text in the local index.
-
-**Session continuity.** The hooks log each prompt, edit, command, tool error, index, cost and decision. After a compaction the agent gets a state block of at most 2,048 B built from that log. Every line stays whole: a long line becomes a `ctx_resume(seq)` pointer that reads the full row. On the next prompt, a prompt match block of at most 2,048 B brings back the log rows that match it by BM25, always as whole rows. The same rows always give the same bytes.
-
-**Storage.** Context Mode uses Node's built-in `node:sqlite`, so the install is plain JavaScript. Each project gets one `context.db` under `~/.context-mode` on your machine. The database runs in WAL mode. On close it always runs a PASSIVE checkpoint. Context Mode builds a new database under a temp name, then moves it into place in one step, so the file on disk is always complete, even after a crash. Busy timeout: 5,000 ms.
+Timeouts, chunk sizes, ranking and storage: [Engineering details](docs/how-it-works.md#engineering-details).
 
 ## Tools
 
@@ -276,8 +260,7 @@ Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` 
 - The guard test D-PRIVACY-NET-1 in `tests/0008-enforcement.test.mjs` scans `src` for HTTP clients, sockets, DNS lookups, git network calls and `gh` or `npm` spawns. It fails when a new call site appears outside this list, so this section stays true.
 - Doctor and the debug report remove secrets by their structure before they print.
 
-> [!NOTE]
-> Here "sandbox" means the output stays in the sandbox, out of the context. Code from `ctx_execute` runs on your host as your user, with your environment (minus the preload variables), your files and your network; keep your agent's own permission prompts on.
+Here "sandbox" means the output stays in the sandbox, out of the context. Code from `ctx_execute` runs on your host as your user, with your environment (minus the preload variables), your files and your network; keep your agent's own permission prompts on.
 
 ## Context Mode Gateway
 
@@ -360,7 +343,7 @@ Setup is one command, `npx @context-mode/cli`. It signs you in and writes one co
 The Gateway routes to Anthropic and OpenAI. The Gateway sends your requests to its server on the way to the model. Its privacy page is at [contextmode.ai/privacy](https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 Keep your agent's own sandbox on next to Protect. More at [contextmode.ai](https://contextmode.ai/?utm_source=github&utm_medium=readme&utm_content=more).
 
-## Star history
+## Adoption: stars and npm downloads
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/star-history-dark.png">
@@ -376,7 +359,13 @@ Starred by engineers at these companies: each name is the company field of 2 or 
 
 GitHub stars over time, from the stargazers API (GraphQL, `starredAt`). A daily job redraws the chart; the date it was read is in the chart caption.
 
-- **npm downloads.** The badge at the top shows npm downloads of the package over the last 365 days, read from the npm API ([stats.json](stats.json) keeps a daily copy).
+npm downloads of the package by day, week, month and year, read from the npm API (`api.npmjs.org/downloads/range`) since the first publish on 2026-02-23. The total up to 2026-10-29 is 683K npm downloads ([stats.json](stats.json) keeps a daily copy). Pick a view; the same daily job redraws all four.
+
+<details open name="npm"><summary><b>Daily</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-daily-dark.png"><img src="docs/assets/readme/npm-daily-light.png" alt="Line chart of npm downloads per day for context-mode over the last 90 days. A daily job redraws it."></picture></details>
+<details name="npm"><summary><b>Weekly</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-weekly-dark.png"><img src="docs/assets/readme/npm-weekly-light.png" alt="Line chart of npm downloads per ISO week for context-mode since the first publish on 2026-02-23. A daily job redraws it."></picture></details>
+<details name="npm"><summary><b>Monthly</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-monthly-dark.png"><img src="docs/assets/readme/npm-monthly-light.png" alt="Bar chart of npm downloads per month for context-mode since the first publish on 2026-02-23. A daily job redraws it."></picture></details>
+<details name="npm"><summary><b>Yearly</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-yearly-dark.png"><img src="docs/assets/readme/npm-yearly-light.png" alt="Chart of total npm downloads per year for context-mode, with the running total since 2026-02-23. A daily job redraws it."></picture></details>
+
 - **Hacker News.** "MCP server that reduces Claude Code context consumption by 98%" reached the front page with 570+ points and 107 comments on 2026-02-28 ([thread](https://news.ycombinator.com/item?id=47193064)).
 - **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
 

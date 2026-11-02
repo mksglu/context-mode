@@ -9,13 +9,21 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
-import { HOOK_WORDS, MARKERS, agentRows, checkAgentTables, renderAgentTables } from "../build/readme-agents.mjs";
+import { HOOK_WORDS, LINE_PREFIX, agentRows, checkAgentLines, renderAgentLines, writeAgentLines } from "../build/readme-agents.mjs";
 import { installWithRetry, missingPackages } from "../scripts/ci-install.mjs";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 import { DOCTOR_CHECK_ORDER, REPORT_CAP, REPORT_SOURCE_LABEL } from "../src/core/contracts/constants.ts";
 
 // Sections are independent: own temp dirs or read-only reads of the repo; none changes process.env or the cwd, so they run concurrently.
+// One dated DEVIATIONS row per README change, and it quotes the owner.
+function datedRow(id, quote) {
+  const file = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "docs/architecture/modules/DEVIATIONS.md");
+  const rows = readFileSync(file, "utf8").split("\n").filter((l) => l.startsWith("| 2026-") && l.includes(`(${id})`));
+  assert.equal(rows.length, 1, `modules/DEVIATIONS.md has one ${id} row`);
+  assert.ok(rows[0].includes(quote), `the ${id} row quotes the owner`);
+}
+
 describe("ADR-0013 / ADR-0014 / ADR-0015 repo hygiene", { concurrency: CONC }, () => {
 describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
   // build/check-removed.mjs — GS5 repo-cleanup gate (impl/15 §2, TECH-SPEC §1 GS5 + §3.10,
@@ -936,7 +944,7 @@ describe("ADR-0015 repo: doc facts", () => {
   });
 });
 
-describe("ADR-0015 repo: README agent tables", () => {
+describe("ADR-0015 repo: README agent lines", () => {
   // README agent tables come from the adapter table (src/adapters/table.ts) and the setup registry
   // (src/setup/registry.ts). build/readme-agents.mjs renders them; build/check-readme.mjs fails when the README
   // copy differs (D-README-1).
@@ -979,16 +987,24 @@ describe("ADR-0015 repo: README agent tables", () => {
     assert.ok(README.includes("plugin inside the agent (OpenCode, Pi)"), "the README sentence names the plugin inside the agent");
   });
 
-  test("readme-agents: the table has the columns Agent | Hooks | MCP | Skills | Install | Guide and never says MCP only", () => {
-    const header = "| Agent | Hooks | MCP | Skills | Install | Guide |";
-    assert.ok(renderAgentTables().install.startsWith(header), renderAgentTables().install.split("\n")[0]);
-    assert.ok(README.includes(header));
-    for (const text of [README, renderAgentTables().install]) {
+  test("readme-agents: each install block ends with one generated line: hooks, MCP, skills and the guide link; the agent table is gone (D-README-AGENT-LINES-1)", () => {
+    // Owner 2026-11-02: "Supported agents bu table e gerek var mi burdaki bilgiler install adiminda da verebilirsin kisaca linkleri vs".
+    const lines = renderAgentLines();
+    assert.deepEqual(Object.keys(lines).sort(), ADAPTERS.map((a) => a.id).sort());
+    for (const r of agentRows()) {
+      const l = lines[r.id];
+      assert.ok(l.startsWith(LINE_PREFIX + "yes"), `${r.id}: ${l}`);
+      for (const need of [" · MCP: ", " · Skills: yes", `(${r.page}#install)`]) assert.ok(l.includes(need), `${r.id} line lacks ${need}`);
+    }
+    assert.deepEqual(checkAgentLines(README), []);
+    for (const bad of ["| Agent | Hooks |", "## Supported agents", "#supported-agents", "agents:install:start"]) assert.ok(!README.includes(bad), `README has ${bad}`);
+    for (const text of [README, Object.values(lines).join("\n")]) {
       assert.ok(!text.includes("MCP only"), "the words MCP only are gone");
       assert.ok(!text.includes("| full |"), "no full label");
     }
     assert.ok(!readFileSync(path.join(REPO, "docs", "install", "README.md"), "utf8").includes("MCP only"));
     assert.ok(!readFileSync(path.join(REPO, "src", "cli", "commands.ts"), "utf8").includes("MCP only"));
+    datedRow("D-README-AGENT-LINES-1", "Supported agents bu table e gerek var mi");
   });
 
   test("readme-agents: install cell is the page's native command, or npm + context-mode setup", () => {
@@ -1012,22 +1028,15 @@ describe("ADR-0015 repo: README agent tables", () => {
     assert.ok(rows[0].includes("tum agentlerin kendi native install commandleri"), "the row quotes the owner");
   });
 
-  test("readme-agents: the README holds the rendered tables between the markers", () => {
-    assert.deepEqual(checkAgentTables(README), []);
-    for (const [start, end] of Object.values(MARKERS)) {
-      assert.equal(README.split(start).length - 1, 1, `README has ${start} once`);
-      assert.equal(README.split(end).length - 1, 1, `README has ${end} once`);
-    }
-  });
-
-  test("readme-agents: a hand edit or a missing block fails the check", () => {
-    const tables = renderAgentTables();
-    const edited = README.replace("| Codex | yes", "| Codex | no");
+  test("readme-agents: a hand edit, a missing block or a table back in the README fails the check; --write is stable", () => {
+    const lines = renderAgentLines();
+    const edited = README.replace(lines.codex, lines.codex.replace("Hooks: yes", "Hooks: no"));
     assert.notEqual(edited, README, "fixture edit did not apply");
-    assert.ok(checkAgentTables(edited).some((p) => p.includes("install")), checkAgentTables(edited).join("\n"));
-    const missing = README.split(MARKERS.install[0]).join("");
-    assert.ok(checkAgentTables(missing).some((p) => p.includes("install")), checkAgentTables(missing).join("\n"));
-    assert.ok(tables.install.includes("(docs/install/codex.md#install)") && !("upgrade" in tables));
+    assert.ok(checkAgentLines(edited).some((p) => p.startsWith("codex:")), checkAgentLines(edited).join("\n"));
+    const missing = README.replace('id="install-codex">', 'id="install-x">');
+    assert.ok(checkAgentLines(missing).some((p) => p.startsWith("codex:")), checkAgentLines(missing).join("\n"));
+    assert.ok(checkAgentLines(README + "\n| Agent | Hooks | MCP |\n").some((p) => p.includes("table")));
+    assert.equal(writeAgentLines(README), README, "--write on a clean README changes nothing");
   });
 });
 
@@ -1286,8 +1295,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   test("README has its parts, and no citation file or block (D-README-NO-CITE-1, D-README-OSS-1)", () => {
     const readme = readRepo("README.md");
     // Owner 2026-11-01: "fazla akademik olmus, oss community nin kullandigi terimleri kullan". OSS section names, in this order.
-    const SECTIONS = ["## Why", "## Install", "## Supported agents", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
-      "## Security and privacy", "## Context Mode Gateway", "## Star history", "## License", "## Community"];
+    const SECTIONS = ["## Why", "## Install", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
+      "## Security and privacy", "## Context Mode Gateway", "## Adoption: stars and npm downloads", "## License", "## Community"];
     let at = -1;
     for (const part of SECTIONS) {
       const i = readme.indexOf("\n" + part + "\n");
@@ -1297,7 +1306,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const bad of ["## Abstract", "This paper", "**Figure ", "**Table ", "**Case ", "## 1.", "### 2.1", "Playwright"]) assert.ok(!readme.includes(bad), `README has ${bad} (D-README-OSS-1)`);
     assert.ok(!readme.includes('href="#"'), "README links a badge to #");
     assert.ok(!readme.includes("img.shields.io/badge/Microsoft"), "company badges are one rendered image now (D-README-OSS-1)");
-    assert.ok(readme.includes("<details>") && readme.includes("> [!TIP]") && readme.includes("> [!NOTE]"), "README uses details blocks and GitHub alerts");
+    assert.ok(readme.includes("<details>"), "README uses details blocks");
     for (const id of ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "opencode", "pi", "qwen", "vscode", "zcode"]) {
       assert.ok(readme.includes(`id="install-${id}">`), `README has an install block for ${id}`);
     }
@@ -1346,7 +1355,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     // D-README-PRIVACY-1: ELv2 is source-available, so the line says "source open on GitHub", not "open source".
     assert.ok(quote.includes("free and local, with its source open on GitHub"), "the blockquote says the plugin stays free and local, with its source open on GitHub");
     const start = readme.indexOf("\n## Context Mode Gateway\n");
-    const end = readme.indexOf("\n## Star history\n", start);
+    const end = readme.indexOf("\n## Adoption: stars and npm downloads\n", start);
     assert.ok(start > 0 && end > start, "README has no Context Mode Gateway section");
     const words = (text) => {
       const out = [];
@@ -1405,7 +1414,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const at = SHOTS.map((s) => readme.indexOf(dir + s));
     SHOTS.forEach((s, i) => {
       assert.ok(at[i] > 0, `README has no ${s} screen`);
-      const next = i + 1 < SHOTS.length ? at[i + 1] : readme.indexOf("\n## Star history\n");
+      const next = i + 1 < SHOTS.length ? at[i + 1] : readme.indexOf("\n## Adoption: stars and npm downloads\n");
       const block = readme.slice(at[i], next);
       assert.ok(block.includes("Docs: "), `${s} screen has no docs line`);
       assert.ok(block.includes("https://contextmode.ai/docs/") && block.includes("utm_content=" + s), `${s} docs line has no contextmode.ai/docs link tagged ${s}`);
@@ -1496,7 +1505,6 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
         assert.ok(block.includes(need), `${id}: block lacks ${need}`);
       }
     }
-    assert.ok(readme.includes("> [!IMPORTANT]") && readme.includes("> [!TIP]"), "README uses the IMPORTANT and TIP alerts");
     assert.ok(readme.includes("\n**Contents:** "), "README has a short table of contents");
     // No "v2" in prose: it becomes the default release.
     // Skipped: fences and the <!-- --> note for agents in the page source (owner 2026-11-01: "markdown olarak sayfa kaynagina eklesen ai agents daha iyi okur").
@@ -1570,7 +1578,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const hooks = bench.results.filter((r) => r.id.startsWith("g-hook-")).map((r) => r.metrics.overhead_ms.median);
     assert.ok(speed.includes(`${Math.min(...hooks).toFixed(1)} ms to ${Math.max(...hooks).toFixed(1)} ms`), "hook range from the bench rows");
     // Hook runs: one positive line that names each agent.
-    const agents = readme.slice(readme.indexOf("\n## Supported agents\n"), readme.indexOf("\n## Use cases\n"));
+    const agents = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("\n## Use cases\n"));
     assert.ok(!agents.includes("For 8 agents") && !agents.includes("earlier step"), "hook runs read as a list of agents");
     const live = agents.split("\n").find((l) => l.startsWith("The real agent binary ran our hook"));
     assert.ok(live, "README has the real-binary line");
@@ -1587,12 +1595,41 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       assert.ok(!rest.split(" ").some((w) => w.split(",").join("").split(".").join("") === "zero"), `README line has "zero": ${line.slice(0, 100)}`);
     }
     // Gateway: the intro names the same features as the table, in order.
-    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Star history\n"));
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
     const table = gw.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Feature |")).map((l) => l.split("|")[1].trim());
     assert.ok(table.length >= 10, `Gateway table has ${table.length} rows`);
     const intro = gw.split("\n").find((l) => l.startsWith("The plugin works on tool output"));
     assert.ok(intro.includes(`Its ${table.length} features, the full list: ${table.join(", ")}.`), "the intro lists the table features, in order, and says the list is full");
     devRow("D-README-REVIEW-1", "olumsuzluk eki olan olumsuz anlam tasiyan hicbir sey istemiyorum");
+  });
+
+  test("README holds no GitHub alert block: each note is a plain line (D-README-PLAIN-1)", () => {
+    // Owner 2026-11-02: "bu mor-yesil renklendirmeler AI-Sloppy gozukuyor ve bizim /brand design-system imimzde bu renkler bu stiller yok".
+    const readme = readRepo("README.md");
+    for (const line of readme.split("\n")) assert.ok(!line.startsWith("> [!"), `README has an alert block: ${line}`);
+    for (const kind of ["IMPORTANT", "TIP", "NOTE", "WARNING", "CAUTION"]) assert.ok(!readme.includes(`[!${kind}]`), `README has [!${kind}]`);
+    assert.ok(readme.includes("You need Node 24.15.0 or later."), "the Node line stays as a plain line");
+    datedRow("D-README-PLAIN-1", "bu mor-yesil renklendirmeler AI-Sloppy gozukuyor");
+  });
+
+  test("README How it works: the figure, 4 to 5 short numbered steps, and a link to Engineering details that hold every engineering fact (D-README-HOW-1)", () => {
+    // Owner 2026-11-02: "bu kismi 1 kisi bile ASLA okumaz bu kisim tamamen ai agentslere yonelik olmus cok ic ice giren metinler okummasi cok zor".
+    const readme = readRepo("README.md");
+    const sec = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
+    assert.ok(sec.includes('srcset="docs/assets/readme/fig-flow-dark.png"'), "the figure stays");
+    const steps = sec.split("\n").filter((l) => "12345".includes(l[0]) && l[1] === "." && l[2] === " ");
+    assert.ok(steps.length >= 4 && steps.length <= 5, `${steps.length} steps`);
+    for (const s of steps) assert.ok(s.length <= 160, `step is long: ${s}`);
+    assert.ok(sec.includes("[Engineering details](docs/how-it-works.md#engineering-details)"), "link to Engineering details");
+    for (const bold of ["**Hooks.**", "**Sandbox execution.**", "**Index and search.**", "**Storage.**"]) assert.ok(!sec.includes(bold), `README still has ${bold}`);
+    const doc = readRepo("docs/how-it-works.md");
+    const eng = doc.slice(doc.indexOf("\n## Engineering details\n"));
+    assert.ok(doc.includes("\n## Engineering details\n"), "docs/how-it-works.md has Engineering details");
+    for (const fact of ["16,384 B", "always exits 0", "5,000 ms", "600,000 ms", "taskkill /F /T", "NODE_OPTIONS", "Porter-stemmed", "1/(60 + rank)", "spelling fix",
+      "Chunks are at most 4,096 B", "800 B", "best-matching whole chunks", "ctx_resume(seq)", "prompt match block", "node:sqlite", "PASSIVE checkpoint", "even after a crash"]) {
+      assert.ok(eng.includes(fact), `Engineering details lack ${fact}`);
+    }
+    datedRow("D-README-HOW-1", "bu kismi 1 kisi bile ASLA okumaz");
   });
 
   test("README privacy: every data-stays or telemetry line before the Gateway names the plugin; the Gateway section links its privacy page (D-README-PRIVACY-2)", () => {
@@ -1604,7 +1641,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       const l = line.toLowerCase();
       if (l.includes("telemetry") || l.includes("your data") || l.includes("all data")) assert.ok(l.includes("plugin"), `privacy line lacks "plugin": ${line.slice(0, 100)}`);
     }
-    const gw = readme.slice(gwAt, readme.indexOf("\n## Star history\n"));
+    const gw = readme.slice(gwAt, readme.indexOf("\n## Adoption: stars and npm downloads\n"));
     assert.ok(gw.includes("The Gateway sends your requests to its server on the way to the model."), "Gateway section says where requests go");
     assert.ok(gw.includes("https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy"), "Gateway section links its privacy page");
     devRow("D-README-PRIVACY-2", "free, local, privacy, no telemetry");
@@ -1647,8 +1684,11 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     const readme = readRepo("README.md");
     // main holds the v1 stats.json (no npm_downloads field), so a badge on stats.json@main showed "no result".
     // The npm API answers on every branch; last-year covers every download since the package began (2026-02-23) until 2027-02-23.
-    const badge = "https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2Flast-year%2Fcontext-mode&query=%24.downloads&label=npm%20downloads%2C%20last%20365%20days";
-    assert.ok(readme.includes(badge), "npm downloads badge reads api.npmjs.org last-year with the label 'npm downloads, last 365 days'");
+    // Owner 2026-11-02: "bunu K ekle bu rakamlar okunmuyor". shields npm/dy reads the same npm last-year count and prints it in K ("683k/year").
+    const badge = "https://img.shields.io/npm/dy/context-mode?label=npm%20downloads";
+    assert.ok(readme.includes(badge), "npm downloads badge is shields npm/dy with the label 'npm downloads'");
+    assert.ok(!readme.includes("badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org"), "the full-digit badge is gone");
+    datedRow("D-README-BADGE-K-1", "bunu K ekle bu rakamlar okunmuyor");
     assert.ok(!readme.includes("stats.json&query"), "no badge reads stats.json");
     for (const bad of ["query=%24.message", "query=%24.marketplace", "label=users", "747.4k", "683.2k", "64.1k", "33,053"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
     const hero = readRepo(SRC + "hero.html");

@@ -126,6 +126,36 @@ names are prefixed with (`toolNamePrefix`), how a compaction-recovery block is d
 One mechanism, ten adapters: the rules in the sections above (deny, chunk, search, compact) are the same
 everywhere; only how a host is told about them changes.
 
+## Engineering details
+
+These facts moved here from the README (D-README-HOW-1). The numbers come from `src/core/contracts/constants.ts`.
+
+Context Mode has three parts: hooks, an MCP server with nine tools, and one SQLite database per project. All three run on your machine, and the data stays in `~/.context-mode`.
+
+### Hooks
+
+The hooks listen to four events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`. Gemini CLI, VS Code and OpenCode also send a compaction event; each host keeps its own event names. `PreToolUse` checks rules in a fixed order: the user's deny list, WebFetch, curl and HTTP or build commands, then Read and shell dumps. Context Mode denies a full-file `Read` of a file over 16,384 B, and the deny message names the exact `ctx_execute` call to use. A `Read` with a range still runs. A hook always exits 0: on any error it gives the host's "allow" reply and writes one log line, so your agent keeps working. Spawned hooks time out after 5,000 ms.
+
+### Sandbox execution
+
+`ctx_execute` writes the script to a temp folder and runs it as a local subprocess: shell, PowerShell, JavaScript, TypeScript, Python, or any runtime found on `PATH`. It spawns the runtime directly from an argument list, in the project folder. The default and maximum timeout is 600,000 ms; on timeout it kills the whole process group (`taskkill /F /T` on Windows). The child gets the parent environment minus the preload variables (`NODE_OPTIONS`, `BUN_OPTIONS`, `DENO_OPTIONS` and similar). The agent gets what the script prints, cut on a whole character.
+
+### Index and search
+
+Each output goes into SQLite FTS5 twice: a Porter-stemmed table for words, and a trigram table for paths, names and parts of words. `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(60 + rank) in each list. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers one of three scopes: this session, this worktree (the default) or the whole project. Chunks are at most 4,096 B. A Markdown chunk stays inside one heading section and carries its heading path as its title. A code block that fits in a chunk stays whole; a bigger one splits on blank lines, and each piece repeats the fence. A reply snippet is at most 800 B, or a whole code block up to 2,048 B.
+
+### Large output: run, then replace
+
+When a host tool returns more than the cap, `PostToolUse` indexes the whole output and replaces it. The agent gets the best-matching whole chunks and one `ctx_search` line for the rest. Context Mode keeps the full text in the local index. The cap is 4,096 B (`REPLACE_TRIGGER_BYTES`); each returned chunk is at most 96 B (`REPLACE_RETURN_BYTES`).
+
+### Session continuity
+
+The hooks log each prompt, edit, command, tool error, index, cost and decision. After a compaction the agent gets a state block of at most 2,048 B built from that log. Every line stays whole: a long line becomes a `ctx_resume(seq)` pointer that reads the full row. On the next prompt, a prompt match block of at most 2,048 B brings back the log rows that match it by BM25, always as whole rows. The same rows always give the same bytes.
+
+### Storage
+
+Context Mode uses Node's built-in `node:sqlite`, so the install is plain JavaScript. Each project gets one `context.db` under `~/.context-mode` on your machine. The database runs in WAL mode. On close it always runs a PASSIVE checkpoint. Context Mode builds a new database under a temp name, then moves it into place in one step, so the file on disk is always complete, even after a crash. Busy timeout: 5,000 ms.
+
 ## What is still open
 
 `docs/architecture/modules/DEVIATIONS.md` is the one place a gap between the design docs and the code at a given commit
