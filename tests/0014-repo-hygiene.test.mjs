@@ -1395,6 +1395,18 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(rows[0].includes("bu icime sinmedi OSS userleri kaciririz URKUTURUZ"), "the row quotes the owner");
   });
 
+  test("README links one engine guide per section and one short Videos line (D-README-LINKS-1)", () => {
+    const readme = readRepo("README.md");
+    const guides = readme.match(/https:\/\/contextmode\.ai\/docs\/engine\/[a-z-]+/g) ?? [];
+    assert.deepEqual(guides, ["install", "how-it-works", "security"].map((g) => `https://contextmode.ai/docs/engine/${g}`), "one guide link in each of Install, How it works, Security");
+    assert.ok(!readme.includes("Guides on contextmode.ai"), "the Community guide list is gone");
+    const video = readme.split("\n").filter((l) => l.startsWith("**Videos.**"));
+    assert.equal(video.length, 1);
+    assert.ok(video[0].includes("youtube.com/watch?v=QUHrntlfPo4") && video[0].includes("discord.gg/") && video[0].includes("10K views"), "Videos line: the video, Discord, the 10K rule");
+    assert.ok(!video[0].includes("<img") && !video[0].includes("!["), "the Videos line has no thumbnail or badge");
+    datedRow("D-README-LINKS-1", "Docs linklerini dump etme");
+  });
+
   test("README: Gateway screenshots gallery names six existing images and the README holds no email address (D-README-GW-SHOTS-1)", () => {
     const readme = readRepo("README.md");
     const dir = "docs/assets/readme/gateway/";

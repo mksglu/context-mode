@@ -50,7 +50,7 @@ Starred by engineers at these companies: each name is the company field of 2 or 
 
 The plugin needs Node 24.15.0 or later (the `engines` field in [package.json](package.json)). On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` checks that Git Bash is there.
 
-Open your agent and copy its own install command. Each block also has the update, check and remove steps. Step-by-step guide: [Install](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install), then [your first session](https://contextmode.ai/docs/engine/first-session?utm_source=github&utm_medium=readme&utm_content=install); per-agent notes: [Agents](https://contextmode.ai/docs/engine/agents?utm_source=github&utm_medium=readme&utm_content=install).
+Open your agent and copy its own install command. Each block also has the update, check and remove steps. Step-by-step guide: [Install](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install).
 The npm commands use `@next`, the current 2.0 release tag; a plain `npm i -g context-mode` installs 1.x. Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the `release` branch.
 The `context-mode` command (doctor, setup, remove) comes with the npm package: run `npm i -g context-mode@next` once, or use `/ctx-doctor` in the agent for the check.
 
@@ -165,7 +165,7 @@ CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the pa
 ## Try it
 
 Paste one of these prompts into your agent after the install. Each one ran once, live, in Claude Code 2.1.312, and its answer matched the source data ([evidence and rerun steps](bench/evidence/try-it-2026-11-02/README.md)). The headline numbers in [Benchmarks](#benchmarks) use the median of 5 runs. Other agents do the same job with the same tools: `ctx_execute`, `ctx_index` and `ctx_search`.
-More prompts and what each one shows: [First session](https://contextmode.ai/docs/engine/first-session?utm_source=github&utm_medium=readme&utm_content=try-it). Then run `/ctx-stats` in your agent to see how much output stayed out of the context. Every agent gets this command with the plugin skills ([skills/ctx-stats](skills/ctx-stats/SKILL.md)).
+Then run `/ctx-stats` in your agent to see how much output stayed out of the context. Every agent gets this command with the plugin skills ([skills/ctx-stats](skills/ctx-stats/SKILL.md)).
 ```text
 On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array.
 ```
@@ -272,7 +272,7 @@ Median of 5 runs, bench of 2026-11-01. Rows per agent and per query: [bench/resu
 4. The agent gets the part it asked for, and calls `ctx_search` when it wants more.
 5. After a compaction, the agent gets a short state block; each line points to the full record.
 
-Timeouts, chunk sizes, ranking and storage: [Engineering details](docs/how-it-works.md#engineering-details). Guides: [How it works](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how), [Sandbox](https://contextmode.ai/docs/engine/sandbox?utm_source=github&utm_medium=readme&utm_content=how), [Search](https://contextmode.ai/docs/engine/search?utm_source=github&utm_medium=readme&utm_content=how), [Long sessions](https://contextmode.ai/docs/engine/long-sessions?utm_source=github&utm_medium=readme&utm_content=how).
+Timeouts, chunk sizes, ranking and storage: [Engineering details](docs/how-it-works.md#engineering-details). Guide: [How it works](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how).
 
 ## Tools
 
@@ -288,13 +288,13 @@ Timeouts, chunk sizes, ranking and storage: [Engineering details](docs/how-it-wo
 | `ctx_upgrade` | Installs, upgrades or uninstalls; replaces old context-mode entries |
 | `ctx_purge` | Deletes indexed data by session, source or project |
 
-Full reference: [docs/tools.md](docs/tools.md) and [Tools](https://contextmode.ai/docs/engine/tools?utm_source=github&utm_medium=readme&utm_content=tools); install checks: [Doctor](https://contextmode.ai/docs/engine/doctor?utm_source=github&utm_medium=readme&utm_content=tools).
+Full reference: [docs/tools.md](docs/tools.md).
 
 Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` runs `ctx_doctor` (send its report with a defect report), and `/ctx-upgrade` runs `ctx_upgrade`, then `ctx_doctor`.
 
 ## Security and privacy
 
-- The plugin keeps all its data on your machine, in `~/.context-mode`: one `context.db` per project. `ctx_purge` deletes it by session, source or project. Guides: [Security](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=security), [Privacy](https://contextmode.ai/docs/engine/privacy?utm_source=github&utm_medium=readme&utm_content=security).
+- The plugin keeps all its data on your machine, in `~/.context-mode`: one `context.db` per project. `ctx_purge` deletes it by session, source or project. Guide: [Security](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=security).
 - The plugin has zero telemetry: usage data, events and crash reports stay on your machine. It uses the network at these call sites, each one started by you or your agent:
   - `ctx_index` of a URL the agent asks for: `src/core/sandbox/fetch.ts`. It blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect.
   - `context-mode doctor`: `git ls-remote` to the release repository, to check for a new version (`src/core/ops/doctor-env.ts`).
@@ -394,6 +394,6 @@ We chose ELv2 so the source stays open to all and the hosted service stays with 
 Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report.
 The maintainer writes every change; send ideas and defect reports on Discord.
 
-Guides on contextmode.ai: [Install](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=community), [How it works](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=community), [Security](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=community), [Benchmarks](https://contextmode.ai/docs/engine/benchmarks?utm_source=github&utm_medium=readme&utm_content=community), [For AI agents](https://contextmode.ai/docs/engine/for-agents?utm_source=github&utm_medium=readme&utm_content=community). In this repo: [docs/install/README.md](docs/install/README.md), [docs/algorithms.md](docs/algorithms.md), [bench/evidence/](bench/evidence/README.md).
+Docs: [docs/install/README.md](docs/install/README.md) (install, options, uninstall), [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](docs/algorithms.md) (search, ranking, size limits, deny rules), [docs/tools.md](docs/tools.md), [bench/evidence/](bench/evidence/README.md).
 
-**Videos.** [Claude Code is Expensive. This MCP Server Fixes It (Context Mode)](https://www.youtube.com/watch?v=QUHrntlfPo4) by Better Stack, 160K views. We support creators: make a video about Context Mode and share the link on [Discord](https://discord.gg/DCN9jUgN5v). Videos with 10K views or more get a place in this list.
+**Videos.** [Better Stack on Context Mode](https://www.youtube.com/watch?v=QUHrntlfPo4). Make your own video and share it on [Discord](https://discord.gg/DCN9jUgN5v); we add videos over 10K views here.
