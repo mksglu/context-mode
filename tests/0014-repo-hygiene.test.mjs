@@ -1295,7 +1295,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   test("README has its parts, and no citation file or block (D-README-NO-CITE-1, D-README-OSS-1)", () => {
     const readme = readRepo("README.md");
     // Owner 2026-11-01: "fazla akademik olmus, oss community nin kullandigi terimleri kullan". OSS section names, in this order.
-    const SECTIONS = ["## Why", "## Install", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
+    const SECTIONS = ["## Why", "## Install", "## Try it", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
       "## Security and privacy", "## Context Mode Gateway", "## Adoption: stars and npm downloads", "## License", "## Community"];
     let at = -1;
     for (const part of SECTIONS) {
@@ -1630,6 +1630,63 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       assert.ok(eng.includes(fact), `Engineering details lack ${fact}`);
     }
     datedRow("D-README-HOW-1", "bu kismi 1 kisi bile ASLA okumaz");
+  });
+
+  test("README Try it: the live prompts in fences, each with its measured line, the stats command and the evidence folder (D-README-TRYIT-1)", () => {
+    // Owner 2026-11-02: "direkt bu sekilde use-case ler verirsen iste o zaman insanlar bunu denemeye baslarlar".
+    const readme = readRepo("README.md");
+    const sec = readme.slice(readme.indexOf("\n## Try it\n"), readme.indexOf("\n## Use cases\n"));
+    const dir = "bench/evidence/try-it-2026-11-02/";
+    for (const id of ["03-docs-page", "04-api-json", "06-large-log", "07-web-page"]) {
+      const s = JSON.parse(readRepo(dir + id + ".json")).summary;
+      assert.equal(s.verdict, "pass", id);
+      assert.ok(sec.includes("```text\n" + s.prompt + "\n```"), `${id}: prompt in a fence`);
+      const after = sec.slice(sec.indexOf(s.prompt + "\n```") + s.prompt.length + 5).split("\n").find((l) => l.trim());
+      for (const need of [s.raw_bytes.toLocaleString("en-US") + " B", s.context_bytes.toLocaleString("en-US") + " B", s.date, s.version, s.model]) {
+        assert.ok(after.includes(need), `${id}: result line lacks ${need}: ${after}`);
+      }
+    }
+    assert.ok(sec.includes("`/ctx-stats`"), "Try it names the stats command");
+    assert.ok(sec.includes("(" + dir + "README.md)"), "Try it links the evidence");
+    const ev = readRepo(dir + "README.md");
+    for (const need of ["## Rerun", "claude plugin marketplace add mksglu/context-mode#release", "claude-haiku-5-5"]) assert.ok(ev.includes(need), `evidence README lacks ${need}`);
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    for (const q of ["Move this project from Jest to Vitest.", "Pick up where we stopped yesterday", "Which date library did we choose on Tuesday"]) {
+      assert.ok(gw.includes("```text\n" + q), `Gateway prompt in a fence: ${q}`);
+    }
+    datedRow("D-README-TRYIT-1", "insanlar bunu denemeye baslarlar");
+  });
+
+  test("README Gateway screens: the live video first, then a 2-column gallery of six screens, each with caption and docs (D-README-GW-GALLERY-1)", () => {
+    // Owner 2026-11-02: "gateway in ekran goruntulerini alt alta siraladigin icin cok scroll etmem gerekti, galeri tarzinda neden yapmadin".
+    const readme = readRepo("README.md");
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    const table = gw.slice(gw.indexOf("<table>"), gw.indexOf("</table>"));
+    assert.ok(gw.indexOf("gateway/live.webp") > 0 && gw.indexOf("gateway/live.webp") < gw.indexOf("<table>"), "the video sits above the grid");
+    const rows = table.split("<tr>").slice(1);
+    assert.equal(rows.length, 3, "three rows");
+    for (const r of rows) assert.equal(r.split("<td").length - 1, 2, "two cells per row");
+    for (const s of ["overview", "analytics", "spend", "memory", "skills", "protect"]) {
+      const cell = table.slice(table.indexOf(`href="docs/assets/readme/gateway/${s}.webp"`)).split("</td>")[0];
+      assert.ok(cell.includes("<img ") && cell.includes("Docs: ") && cell.includes("utm_content=" + s), `${s} cell`);
+    }
+    datedRow("D-README-GW-GALLERY-1", "galeri tarzinda neden yapmadin");
+  });
+
+  test("README Use cases add the output-filter rows, and Longer sessions is a story in whole sentences (D-README-STORY-1)", () => {
+    // Owner 2026-11-02: "Longer sessions bu kismi iyilestir ... surekli yarim kalmis cumleler ve rakamlar var".
+    const readme = readRepo("README.md");
+    const uc = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
+    for (const id of ["f-bash-dump-post", "d-real-git-log", "d-real-github-json", "f-read-large-file", "f-read-big-source"]) assert.ok(uc.includes("README.md#" + id + ")"), `Use cases lack ${id}`);
+    const ls = readme.slice(readme.indexOf("\n### Longer sessions\n") + 1, readme.indexOf("\n### Speed\n"));
+    const prose = ls.split("\n").slice(1).filter((l) => l.trim() && !l.startsWith("<") && !l.startsWith(" "));
+    assert.ok(prose.length >= 3, "story paragraphs");
+    for (const l of prose) {
+      assert.ok(!l.startsWith("- "), `bullet in Longer sessions: ${l}`);
+      assert.ok(l.endsWith(".") || l.endsWith(".)") || l.endsWith(")."), `line ends mid-sentence: ${l.slice(-60)}`);
+    }
+    for (const n of ["442,893 B", "2,019 B", "666,796 B", "3,380 B", "e-long-session", "d-synth-1m", "compaction"]) assert.ok(ls.includes(n), `Longer sessions lack ${n}`);
+    datedRow("D-README-STORY-1", "Longer sessions bu kismi iyilestir");
   });
 
   test("README privacy: every data-stays or telemetry line before the Gateway names the plugin; the Gateway section links its privacy page (D-README-PRIVACY-2)", () => {
