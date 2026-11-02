@@ -1,0 +1,42 @@
+[
+ {
+  "id": "01-repo-history",
+  "job": "repo history",
+  "prompt": "Look at the last 300 commits of https://github.com/vitejs/vite. Who are the top 5 committers, and which 5 files changed most often?"
+ },
+ {
+  "id": "02-issues",
+  "job": "issues",
+  "prompt": "Which 10 open issues in vercel/next.js have the most comments? Give me the issue number, title and comment count for each."
+ },
+ {
+  "id": "03-docs-page",
+  "job": "docs page",
+  "prompt": "On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array."
+ },
+ {
+  "id": "04-api-json",
+  "job": "API JSON",
+  "prompt": "Fetch https://jsonplaceholder.typicode.com/photos. Which photo has the longest title (give its id and title), and how many photos have a title that contains the word \"est\"?"
+ },
+ {
+  "id": "05-test-suite",
+  "job": "test suite run",
+  "prompt": "Clone https://github.com/expressjs/express, install it and run its test suite. How many tests passed, failed and were skipped?"
+ },
+ {
+  "id": "06-large-log",
+  "job": "large log",
+  "prompt": "Here is a Linux syslog sample: https://raw.githubusercontent.com/logpai/loghub/master/Linux/Linux_2k.log. How many authentication failures does it contain, and which 3 remote hosts caused the most?"
+ },
+ {
+  "id": "07-web-page",
+  "job": "web page",
+  "prompt": "What are the top 10 stories on the Hacker News front page right now? Give title, points and domain for each."
+ },
+ {
+  "id": "08-codebase-question",
+  "job": "codebase question",
+  "prompt": "Clone https://github.com/honojs/hono. Which 5 files in src/ have the most lines, and what does each one do?"
+ }
+]

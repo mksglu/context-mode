@@ -11,7 +11,7 @@
   <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, for 10 coding agents, zero telemetry, your data stays on your machine. 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output).">
 </picture>
 
-**Contents:** [Why](#why) · [Install](#install) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [Adoption](#adoption-stars-and-npm-downloads) · [License](#license) · [Community](#community)
+**Contents:** [Why](#why) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [Adoption](#adoption-stars-and-npm-downloads) · [License](#license) · [Community](#community)
 
 ## Why
 
@@ -147,6 +147,26 @@ The real agent binary ran our hook for Claude Code, Codex, Gemini CLI, Qwen Code
 VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
 CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: [docs/architecture/release/HOOKS-FIRE.md](docs/architecture/release/HOOKS-FIRE.md).
 
+## Try it
+
+Paste one of these prompts into your agent after the install. Each one ran live with Claude Code 2.1.312 and passed a check against the source data ([evidence and rerun steps](bench/evidence/try-it-2026-11-02/README.md)). Afterwards, run `/ctx-stats` in your agent to see how much output stayed out of the context; all 10 agents use this command.
+```text
+On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array.
+```
+The hook sends WebFetch to the sandbox, and the agent searches the page for the example and the rules. 601,984 B raw, 20,860 B reached the context, 96.5% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5).
+```text
+Fetch https://jsonplaceholder.typicode.com/photos. Which photo has the longest title (give its id and title), and how many photos have a title that contains the word "est"?
+```
+The agent runs code over 5,000 JSON records in the sandbox and gets back two answers. 1,039,898 B raw, 393 B reached the context, 99.96% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5).
+```text
+Here is a Linux syslog sample: https://raw.githubusercontent.com/logpai/loghub/master/Linux/Linux_2k.log. How many authentication failures does it contain, and which 3 remote hosts caused the most?
+```
+The agent counts failures in a 1,999-line syslog in the sandbox. 216,485 B raw, 566 B reached the context, 99.7% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5).
+```text
+What are the top 10 stories on the Hacker News front page right now? Give title, points and domain for each.
+```
+The hook sends WebFetch to the sandbox, and the agent reads ten stories from the page. 35,087 B raw, 1,501 B reached the context, 95.7% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5).
+
 ## Use cases
 
 Real tool output from public projects, run through Context Mode. Bench of 2026-11-01 on 2.0.0-next.23 (commit 16a4bcc5), median of 5 runs ([bench/results/2026-11-01-darwin-arm64.json](bench/results/2026-11-01-darwin-arm64.json)); each source is in [bench/fixtures/data/SOURCE.md](bench/fixtures/data/SOURCE.md).
@@ -167,6 +187,11 @@ Real tool output from public projects, run through Context Mode. Bench of 2026-1
 | [Read an 89 KB source file](bench/f-hook-redirect/README.md#f-read-vite-config) | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
 | [Fetch a 265 KB docs page](bench/f-hook-redirect/README.md#f-webfetch-vite-docs) | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
 | [Fetch a 214 KB API reply](bench/f-hook-redirect/README.md#f-bash-curl-post) | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
+| [Print a 187 KB git log in Bash](bench/f-hook-redirect/README.md#f-bash-dump-post) | Bash, output replaced after it runs | 191,120 B | 204 B | 99.9% |
+| [Print the same git log through a host tool](bench/d-externalize/README.md#d-real-git-log) | Host tool output over the cap, indexed whole | 191,120 B | 2,842 B | 98.5% |
+| [Print a 214 KB GitHub API reply through a host tool](bench/d-externalize/README.md#d-real-github-json) | Host tool output over the cap, indexed whole | 219,175 B | 4,060 B | 98.1% |
+| [Read a 45 KB log file](bench/f-hook-redirect/README.md#f-read-large-file) | Read, sent to `ctx_execute` by the hook | 46,216 B | 371 B | 99.2% |
+| [Read a 60 KB source file](bench/f-hook-redirect/README.md#f-read-big-source) | Read, sent to `ctx_execute` by the hook | 61,576 B | 374 B | 99.4% |
 | [Debug for a full session: 8 outputs, 3 searches](bench/g-overhead/README.md#g-session-total) | All hooks and tools | 281,261 B | 3,266 B | 98.8% |
 
 The agent gets the part it asks for. The full output stays in the local index, and `ctx_search` reads it back.
@@ -200,10 +225,12 @@ Reproduce: `cd bench && node run.mjs`. Method and every data file: [bench/README
   <img src="docs/assets/readme/fig-oss-light.png" alt="A session grows, the context stays small. The PreToolUse hook sends a tool call to ctx_execute or ctx_index; the full output goes into context.db and a small reply returns. At compaction a snapshot keeps the state, and ctx_resume and ctx_search read it back.">
 </picture>
 
-Each tool call: the hook sends large output to the sandbox or the index, the full copy goes into `context.db`, and the agent gets a small reply. At compaction, a snapshot of at most 2,048 B keeps the state, and `ctx_resume` and `ctx_search` read it back.
+Say you debug a slow test all afternoon. The agent reads files, runs the suite and fetches docs, and each result goes into the context window. When the window is full, the host compacts it, and from then on the agent sees a short summary plus your next message.
 
-- Long session, 40 outputs, then compaction: a 442,893 B transcript, a 2,019 B `ctx_resume` block ([bench/results/2026-11-01-darwin-arm64.json](bench/results/2026-11-01-darwin-arm64.json), row [e-long-session](bench/e-continuity/README.md#e-long-session)).
-- One large log: 666,796 B of output, 3,380 B reach the context (row [d-synth-1m](bench/d-externalize/README.md#d-synth-1m)).
+Context Mode keeps the full output of each large tool call in `context.db` on your machine and gives the agent a small reply. At compaction, a snapshot of at most 2,048 B keeps the session state. After the compaction, the agent calls `ctx_resume` to read that snapshot back and `ctx_search` to find any earlier output by keyword.
+
+In the bench, a scripted session of 40 tool outputs and one compaction made a 442,893 B transcript, and the `ctx_resume` block that brought the agent back was 2,019 B (row [e-long-session](bench/e-continuity/README.md#e-long-session) in [the bench file](bench/results/2026-11-01-darwin-arm64.json)).
+In the same bench, one large log of 666,796 B put 3,380 B into the context, and the full log stayed in the index for `ctx_search` (row [d-synth-1m](bench/d-externalize/README.md#d-synth-1m)).
 
 ### Speed
 
@@ -273,43 +300,27 @@ Teams add it for long sessions, shared memory and cost reports. The two work tog
 
 Docs: [How saving works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=live), [Recall](https://contextmode.ai/docs/recall?utm_source=github&utm_medium=readme&utm_content=live), [Session resume](https://contextmode.ai/docs/session-resume?utm_source=github&utm_medium=readme&utm_content=live)
 
-<a href="docs/assets/readme/gateway/overview.webp"><img src="docs/assets/readme/gateway/overview-1200.webp" alt="Gateway Overview: money saved, AI spend, prompt-cache discount and cost per request over 30 days" width="100%"></a>
-
-**Overview.** What you paid and what the Gateway saved, per day, in one view.
-
-Docs: [How saving works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=overview)
-
-<a href="docs/assets/readme/gateway/analytics.webp"><img src="docs/assets/readme/gateway/analytics-1200.webp" alt="Gateway Analytics: saved money over time, split by source" width="100%"></a>
-
-**Analytics.** Where each saving comes from: hidden tools, archived old results, large outputs kept in the archive and trimmed context.
-
-Docs: [How saving works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=analytics), [Active Context](https://contextmode.ai/docs/active-context?utm_source=github&utm_medium=readme&utm_content=analytics)
-
-<a href="docs/assets/readme/gateway/spend.webp"><img src="docs/assets/readme/gateway/spend-1200.webp" alt="Gateway Spend: spend per day by model, cost per request and cache hit rate" width="100%"></a>
-
-**Spend.** Spend per day and per model, cost per request and the cache hit rate, to help you plan a budget.
-
-Docs: [Prompt caching](https://contextmode.ai/docs/prompt-caching?utm_source=github&utm_medium=readme&utm_content=spend)
-
-<a href="docs/assets/readme/gateway/memory.webp"><img src="docs/assets/readme/gateway/memory-top-1200.webp" alt="Gateway Memory: money saved by Recall and searches per day" width="100%"></a>
-
-**Memory.** Facts and decisions carry across sessions and agents. The screen shows what Recall saved and how many searches found an answer.
-
-Docs: [Memory](https://contextmode.ai/docs/memory?utm_source=github&utm_medium=readme&utm_content=memory), [Recall](https://contextmode.ai/docs/recall?utm_source=github&utm_medium=readme&utm_content=memory)
-
-<a href="docs/assets/readme/gateway/skills.webp"><img src="docs/assets/readme/gateway/skills-1200.webp" alt="Gateway Skills: import from GitHub and the list of installed skills" width="100%"></a>
-
-**Skills.** Add a skill once and all your clients use it when it helps. Import skills from GitHub and see the installed ones.
-
-Docs: [Skills](https://contextmode.ai/docs/skills?utm_source=github&utm_medium=readme&utm_content=skills)
-
-<a href="docs/assets/readme/gateway/protect.webp"><img src="docs/assets/readme/gateway/protect-1200.webp" alt="Gateway Protect: a new command rule that blocks terraform destroy" width="100%"></a>
-
-**Protect.** Rules that check each shell command before it runs. Here, a rule that stops <code>terraform destroy</code>.
-
-Docs: [Protect](https://contextmode.ai/docs/protect?utm_source=github&utm_medium=readme&utm_content=protect)
+<table>
+<tr><td width="50%"><a href="docs/assets/readme/gateway/overview.webp"><img src="docs/assets/readme/gateway/overview-1200.webp" alt="Gateway Overview: money saved, AI spend, prompt-cache discount and cost per request over 30 days"></a><br><b>Overview.</b> What you paid and what the Gateway saved, per day, in one view.<br>Docs: <a href="https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=overview">How saving works</a></td><td width="50%"><a href="docs/assets/readme/gateway/analytics.webp"><img src="docs/assets/readme/gateway/analytics-1200.webp" alt="Gateway Analytics: saved money over time, split by source"></a><br><b>Analytics.</b> Where each saving comes from: hidden tools, archived old results, large outputs kept in the archive and trimmed context.<br>Docs: <a href="https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=analytics">How saving works</a>, <a href="https://contextmode.ai/docs/active-context?utm_source=github&utm_medium=readme&utm_content=analytics">Active Context</a></td></tr>
+<tr><td width="50%"><a href="docs/assets/readme/gateway/spend.webp"><img src="docs/assets/readme/gateway/spend-1200.webp" alt="Gateway Spend: spend per day by model, cost per request and cache hit rate"></a><br><b>Spend.</b> Spend per day and per model, cost per request and the cache hit rate, to help you plan a budget.<br>Docs: <a href="https://contextmode.ai/docs/prompt-caching?utm_source=github&utm_medium=readme&utm_content=spend">Prompt caching</a></td><td width="50%"><a href="docs/assets/readme/gateway/memory.webp"><img src="docs/assets/readme/gateway/memory-top-1200.webp" alt="Gateway Memory: money saved by Recall and searches per day"></a><br><b>Memory.</b> Facts and decisions carry across sessions and agents. The screen shows what Recall saved and how many searches found an answer.<br>Docs: <a href="https://contextmode.ai/docs/memory?utm_source=github&utm_medium=readme&utm_content=memory">Memory</a>, <a href="https://contextmode.ai/docs/recall?utm_source=github&utm_medium=readme&utm_content=memory">Recall</a></td></tr>
+<tr><td width="50%"><a href="docs/assets/readme/gateway/skills.webp"><img src="docs/assets/readme/gateway/skills-1200.webp" alt="Gateway Skills: import from GitHub and the list of installed skills"></a><br><b>Skills.</b> Add a skill once and all your clients use it when it helps. Import skills from GitHub and see the installed ones.<br>Docs: <a href="https://contextmode.ai/docs/skills?utm_source=github&utm_medium=readme&utm_content=skills">Skills</a></td><td width="50%"><a href="docs/assets/readme/gateway/protect.webp"><img src="docs/assets/readme/gateway/protect-1200.webp" alt="Gateway Protect: a new command rule that blocks terraform destroy"></a><br><b>Protect.</b> Rules that check each shell command before it runs. Here, a rule that stops <code>terraform destroy</code>.<br>Docs: <a href="https://contextmode.ai/docs/protect?utm_source=github&utm_medium=readme&utm_content=protect">Protect</a></td></tr>
+</table>
 
 Numbers in these screens come from the author's own account over 30 days (Oct 3 - Nov 1, 2026), so read them as one account's usage. Click an image for the full size.
+
+Three prompts to try with the Gateway on. The line under each one names the feature it shows.
+```text
+Move this project from Jest to Vitest. Convert every test file, fix the config, run the suite after each batch, and tell me what is left.
+```
+Memory keeps the plan and the file list across a long job.
+```text
+Pick up where we stopped yesterday on the Jest to Vitest move. What is done, what is left, and which test was failing?
+```
+Recall brings back yesterday's work in a fresh session.
+```text
+Which date library did we choose on Tuesday, and why did we reject the other two?
+```
+Search finds the answer in past sessions.
 
 <details>
 <summary>Gateway features, from contextmode.ai/docs</summary>
