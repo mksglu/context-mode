@@ -33,6 +33,16 @@ import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
 import { generateManifests } from "../build/manifests.ts";
 import { fakeCodexBin, trustedToml } from "./_lib/codex-fake.mjs";
 
+// D-WIN-RM-RETRY-1 (same rule as D-M3-F-9 and tests 0002, 0007, 0009): retry the temp cleanup, and on win32 only keep a
+// folder that a child process still holds (EPERM) in the runner temp dir. Every other error still fails the test.
+function rmTempDir(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch (err) {
+    if (process.platform !== "win32" || err.code !== "EPERM") throw err;
+  }
+}
+
 describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", { concurrency: CONC }, () => {
   // Spec: docs/architecture/modules/07-tools-ops.md §5 D3, D4, D5b; DEVIATIONS D-M5-arch-3, D-M5-D2-1..4.
 
@@ -754,8 +764,8 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
   // A fake release root: hook.mjs prints `out` (and echoes the --agent it got to stderr), fixtures/ next to it.
   function bundle(t, out, { fixture = FIXTURE, exit = 0 } = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), "cm-doctor-hook-"));
-    // D-WIN-RM-RETRY-1: Windows can hold a child's cwd after "close" (EPERM); up to 10 retries, 200 ms more each (about 11 s).
-    t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
+    // D-WIN-RM-RETRY-1: Windows can hold a child's cwd after "close" (EPERM); see rmTempDir.
+    t.after(() => rmTempDir(dir));
     writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
       `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s);process.stderr.write(process.argv.slice(2).join(" "));process.stdout.write(${JSON.stringify(out)});process.exitCode=${exit};});`);
     if (fixture !== null) {
@@ -1490,7 +1500,7 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
 
   function tmp(t) {
     const dir = mkdtempSync(path.join(tmpdir(), "cm-doctor-"));
-    t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })); // D-WIN-RM-RETRY-1
+    t.after(() => rmTempDir(dir)); // D-WIN-RM-RETRY-1
     return dir;
   }
 
