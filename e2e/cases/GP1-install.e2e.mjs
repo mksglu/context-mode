@@ -430,13 +430,19 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
     }
   });
 
-  test("[M6] GP1/install-docs-per-host: README Install table and the guide index list each host once", () => {
+  test("[M6] GP1/install-docs-per-host: README has one install block per host and links the contextmode.ai guide; the guide index lists each host once (D-GP1-README-SITE-1)", () => {
+    // Owner 2026-11-02 (D-README-LINKS-2): README guide links go to contextmode.ai, not to repo pages, and stay few.
     const readme = read("README.md");
     assert.ok(h2(readme).includes("Install"), "README keeps the exact '## Install' heading (npm deprecate link)");
+    assert.ok(!readme.includes("](docs/install/"), "README links a repo install page; the guide lives on contextmode.ai");
+    const site = "](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install)";
+    assert.equal(readme.split(site).length - 1, 1, "README links the contextmode.ai install guide once, with UTM");
     const index = read("docs/install/README.md");
     for (const host of HOSTS) {
-      const link = `(docs/install/${host}.md#install)`;
-      assert.equal(readme.split(link).length - 1, 1, `README links ${link} once`);
+      const block = `<details open id="install-${host}">`;
+      assert.equal(readme.split(block).length - 1, 1, `README has one install block for ${host}`);
+      const body = readme.slice(readme.indexOf(block), readme.indexOf("</details>", readme.indexOf(block)));
+      assert.ok(body.includes(`context-mode doctor --agents ${host}`), `${host}: install block names its check`);
       assert.equal(index.split(`(./${host}.md)`).length - 1, 1, `docs/install/README.md links ${host}.md once`);
     }
   });

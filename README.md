@@ -395,6 +395,6 @@ We chose ELv2 so the source stays open to all and the hosted service stays with 
 
 ## Community
 
-The maintainer writes every change. Send ideas, and defect reports with the full `/ctx-doctor` report, on Discord.
+Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report, and send ideas there too. The maintainer writes every change.
 
 **Videos.** [Better Stack on Context Mode](https://www.youtube.com/watch?v=QUHrntlfPo4). Make your own video and share it on [Discord](https://discord.gg/DCN9jUgN5v); we add videos over 10K views here.
