@@ -1,4 +1,4 @@
-# readme-stats (D-README-STATS-1). Keeps the README counts and the star chart current. No API key: GITHUB_TOKEN only.
+# readme-stats (D-README-STATS-1, D-README-NPM-1). Keeps the README counts, the star chart and the four npm downloads charts current. No API key: GITHUB_TOKEN only.
 # Scheduled jobs run only on the default branch (main), so this job goes live after the merge of v2-design to main.
 # Until then, run it by hand with workflow_dispatch on main, or run `node build/readme-stats.mjs` locally.
 name: readme-stats
@@ -21,15 +21,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node build/readme-stats.mjs
-      - name: install Playwright (outside the repo)
+      - name: read npm downloads per day since the first publish; write npm-data.js
+        run: node build/npm-downloads.mjs
+      - name: install Playwright and sharp (outside the repo; sharp writes palette PNGs like the other figures)
         run: |
           mkdir -p "$RUNNER_TEMP/pw"
-          npm install --prefix "$RUNNER_TEMP/pw" playwright
+          npm install --prefix "$RUNNER_TEMP/pw" playwright sharp
           npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
-      - name: render the star chart
+      - name: render the star chart and the npm downloads charts
         env:
           PLAYWRIGHT_DIR: ${{ runner.temp }}/pw/node_modules
-        run: node docs/assets/readme/src/render.mjs star-history
+        run: node docs/assets/readme/src/render.mjs star-history npm-downloads
       - name: commit only if a file changed
         run: |
           if git diff --quiet -- stats.json docs/assets/readme; then
@@ -38,6 +40,6 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add stats.json docs/assets/readme
-            git commit -m "docs(readme): update stats and star chart"
+            git commit -m "docs(readme): update stats, star chart and npm downloads charts"
             git push
           fi

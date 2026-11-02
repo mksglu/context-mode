@@ -2,11 +2,12 @@
 // Renders the README figures: <name>.html with ?theme=dark|light to ../<name>-<theme>.png.
 //   node render.mjs            all figures
 //   node render.mjs hero       one figure
+//   node render.mjs star-history npm-downloads   the figures with these names or pages (the daily job, D-README-NPM-1)
 // Needs Playwright. Set PLAYWRIGHT_DIR to a node_modules folder that holds it (default /tmp/web-sol/node_modules).
 // Fonts are in ./fonts (Geist, Geist Mono, IBM Plex Sans 600); no network needed. No regex.
 // A figure with `data` gets that JSON file from ../data as window.COMPANIES before its page script runs (D-README-STARRED-1).
 // When sharp is in PLAYWRIGHT_DIR too, each PNG is saved as a 256-colour palette PNG, about a third of the size (the 2 MB
-// README image budget in build/readme-links.mjs); the daily star-chart job installs Playwright only and keeps the full PNG.
+// README image budget in build/readme-links.mjs); the daily job installs Playwright and sharp, so its PNGs match.
 import { createRequire } from 'module';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
@@ -26,19 +27,24 @@ const FIGS = [
   { name: 'fig-oss', w: 1280, h: 720 },
   { name: 'star-history', w: 1280, h: 640, drawn: true }, // drawn from star-data.js: wait for window.__drawn (D-README-STAR-1)
   { name: 'stargazers', w: 1280, h: 440, data: 'stargazer-companies.json' }, // D-README-STARRED-1
+  // D-README-NPM-1: one page, four views, drawn from npm-data.js (build/npm-downloads.mjs); same frame as star-history.
+  { name: 'npm-daily', page: 'npm-downloads', view: 'daily', w: 1280, h: 640, drawn: true },
+  { name: 'npm-weekly', page: 'npm-downloads', view: 'weekly', w: 1280, h: 640, drawn: true },
+  { name: 'npm-monthly', page: 'npm-downloads', view: 'monthly', w: 1280, h: 640, drawn: true },
+  { name: 'npm-yearly', page: 'npm-downloads', view: 'yearly', w: 1280, h: 640, drawn: true },
 ];
 const MAX = 400 * 1024; // 2x PNGs; the README total stays under 2 MB (build/readme-links.mjs)
-const only = process.argv[2];
+const only = process.argv.slice(2);
 const browser = await chromium.launch();
 let bad = 0;
 for (const f of FIGS) {
-  if (only && only !== f.name) continue;
+  if (only.length && !only.includes(f.name) && !only.includes(f.page)) continue;
   for (const theme of ['dark', 'light']) {
     const page = await browser.newPage({ viewport: { width: f.w, height: f.h }, deviceScaleFactor: 2 });
     const errors = [];
     page.on('pageerror', (e) => errors.push('page error: ' + e.message));
     if (f.data) await page.addInitScript('window.COMPANIES = ' + readFileSync(join(dir, '..', 'data', f.data), 'utf8') + ';');
-    await page.goto(pathToFileURL(join(dir, f.name + '.html')).href + '?theme=' + theme);
+    await page.goto(pathToFileURL(join(dir, (f.page || f.name) + '.html')).href + '?theme=' + theme + (f.view ? '&view=' + f.view : ''));
     await page.evaluate(() => document.fonts.ready);
     if (f.drawn) await page.waitForFunction(() => window.__drawn !== undefined, null, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(150);

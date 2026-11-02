@@ -1702,4 +1702,64 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.ok(css.includes(".eyebrow{font-family:var(--mono);font-size:12px"));
     assert.ok(readRepo(SRC + "render.mjs").includes("deviceScaleFactor: 2"));
   });
+
+  // Owner 2026-11-02: "Star history gibi bir de npm indirme istiyorum ... haftalik gunluk ve aylik ve senelik npm indirmesini versin bana tab sekilde olsun" (D-README-NPM-1).
+  test("npm downloads data: 500-day API chunks, ISO weeks from Monday, complete weeks and months only, year totals plus the running total (D-README-NPM-1)", async () => {
+    const { rangeChunks, weekStart, aggregate, fmtK } = await import("../build/npm-downloads.mjs");
+    assert.deepEqual(rangeChunks("2026-02-23", "2026-03-01"), [["2026-02-23", "2026-03-01"]]);
+    const long = rangeChunks("2025-01-01", "2026-11-01");
+    assert.deepEqual(long, [["2025-01-01", "2026-05-15"], ["2026-05-16", "2026-11-01"]], "500 days per call, under the 18-month API limit, joined end to end");
+    assert.equal(weekStart("2026-03-01"), "2026-02-23", "Sunday belongs to the week that starts on Monday");
+    assert.equal(weekStart("2026-02-23"), "2026-02-23");
+    const days = [];
+    for (let t = Date.parse("2026-02-23"), i = 1; t <= Date.parse("2026-04-08"); t += 86_400_000, i++) days.push([new Date(t).toISOString().slice(0, 10), i]);
+    const a = aggregate(days.filter((d) => d[0] !== "2026-03-10"), "2026-04-09");
+    assert.equal(a.first, "2026-02-23");
+    assert.equal(a.last, "2026-04-08");
+    assert.equal(a.read_at, "2026-04-09");
+    assert.equal(a.daily.length, 45, "a gap day counts as 0, so the daily list stays contiguous");
+    assert.deepEqual(a.daily.find((d) => d[0] === "2026-03-10"), ["2026-03-10", 0]);
+    assert.deepEqual(a.weekly.map((w) => w[0]), ["2026-02-23", "2026-03-02", "2026-03-09", "2026-03-16", "2026-03-23", "2026-03-30"], "the week of 2026-04-06 is not over on 04-08");
+    assert.deepEqual(a.weekly[0], ["2026-02-23", 1 + 2 + 3 + 4 + 5 + 6 + 7]);
+    assert.deepEqual(a.monthly.map((m) => m[0]), ["2026-02", "2026-03"], "April is not over on 04-08");
+    const total = days.reduce((s, d) => s + d[1], 0) - 16;
+    assert.equal(a.total, total);
+    assert.deepEqual(a.yearly, [["2026", total]]);
+    assert.deepEqual(a.running.map((r) => r[0]), ["2026-02", "2026-03", "2026-04"]);
+    assert.equal(a.running[a.running.length - 1][1], total, "the running total ends at the total");
+    const many = [];
+    for (let t = Date.parse("2026-01-01"); t <= Date.parse("2026-12-31"); t += 86_400_000) many.push([new Date(t).toISOString().slice(0, 10), 1]);
+    assert.equal(aggregate(many, "2027-01-01").daily.length, 90, "daily keeps the last 90 days");
+    const tail = aggregate([["2026-10-28", 5], ["2026-10-29", 0], ["2026-10-30", 7], ["2026-10-31", 0], ["2026-11-01", 0]], "2026-11-02");
+    assert.equal(tail.last, "2026-10-30", "the API answers 0 for days it has not counted yet; the data ends on the last day with downloads");
+    assert.deepEqual(tail.daily, [["2026-10-28", 5], ["2026-10-29", 0], ["2026-10-30", 7]], "a 0 inside the range stays");
+    assert.deepEqual([fmtK(950), fmtK(1499), fmtK(683261), fmtK(33070), fmtK(1250000)], ["950", "1K", "683K", "33K", "1.3M"]);
+  });
+
+  test("npm downloads charts: one page draws four views, render.mjs renders them, the daily job fetches and renders them (D-README-NPM-1)", () => {
+    const html = readRepo(SRC + "npm-downloads.html");
+    for (const need of ["npm-data.js", "window.__drawn=", "daily", "weekly", "monthly", "yearly", "api.npmjs.org"]) assert.ok(html.includes(need), `npm-downloads.html lacks ${need}`);
+    const data = readRepo(SRC + "npm-data.js");
+    assert.ok(data.startsWith("// Written by build/npm-downloads.mjs. Run that script to update it.\nvar NPM="));
+    const npm = JSON.parse(data.slice(data.indexOf("var NPM=") + 8, data.lastIndexOf(";")));
+    for (const k of ["read_at", "first", "last", "total", "daily", "weekly", "monthly", "yearly", "running"]) assert.ok(k in npm, `npm-data.js lacks ${k}`);
+    assert.equal(npm.first, "2026-02-23", "first publish day of context-mode (npm view context-mode time.created)");
+    const r = readRepo(SRC + "render.mjs");
+    for (const v of ["daily", "weekly", "monthly", "yearly"]) assert.ok(r.includes("{ name: 'npm-" + v + "', page: 'npm-downloads', view: '" + v + "'"), `render.mjs lacks npm-${v}`);
+    const y = readRepo(".github/workflows/readme-stats.yml");
+    for (const need of ["node build/npm-downloads.mjs", "render.mjs star-history npm-downloads", "playwright sharp"]) assert.ok(y.includes(need), `readme-stats.yml lacks ${need}`);
+  });
+
+  test("npm downloads PNGs: 8 files at 2x carry the drawn chart, and every README figure together stays under the image budget (D-README-NPM-1)", async () => {
+    const { chartInkProblems, decodePng } = await import("../" + SRC + "render-guard.mjs");
+    const { README_IMAGES_MAX_BYTES, readmeImageBytes } = await import("../build/readme-links.mjs");
+    for (const v of ["daily", "weekly", "monthly", "yearly"]) for (const theme of ["dark", "light"]) {
+      const buf = readFileSync(path.join(REPO, "docs/assets/readme/npm-" + v + "-" + theme + ".png"));
+      const img = decodePng(buf);
+      assert.deepEqual([img.width, img.height], [2560, 1280], v + " " + theme + ": 1280x640 at 2x");
+      assert.deepEqual(chartInkProblems(buf, theme), [], v + " " + theme);
+      assert.ok(buf.length <= 100 * 1024, v + " " + theme + ": palette PNG, " + buf.length + " bytes");
+    }
+    assert.ok(readmeImageBytes(REPO) <= README_IMAGES_MAX_BYTES, "README figures " + readmeImageBytes(REPO) + " bytes");
+  });
 });
