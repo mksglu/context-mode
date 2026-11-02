@@ -28,7 +28,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pw"
           npm install --prefix "$RUNNER_TEMP/pw" playwright sharp
           npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
-      - name: render the star chart and the npm downloads charts
+      - name: render the star chart and the npm downloads grid (day, week, month, year in one image)
         env:
           PLAYWRIGHT_DIR: ${{ runner.temp }}/pw/node_modules
         run: node docs/assets/readme/src/render.mjs star-history npm-downloads
@@ -40,6 +40,6 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add stats.json docs/assets/readme
-            git commit -m "docs(readme): update stats, star chart and npm downloads charts"
+            git commit -m "docs(readme): update stats, star chart and npm downloads grid"
             git push
           fi

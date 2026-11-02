@@ -1295,8 +1295,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   test("README has its parts, and no citation file or block (D-README-NO-CITE-1, D-README-OSS-1)", () => {
     const readme = readRepo("README.md");
     // Owner 2026-11-01: "fazla akademik olmus, oss community nin kullandigi terimleri kullan". OSS section names, in this order.
-    const SECTIONS = ["## Why", "## Install", "## Try it", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
-      "## Security and privacy", "## Context Mode Gateway", "## Adoption: stars and npm downloads", "## License", "## Community"];
+    const SECTIONS = ["## Why", "## Adoption: stars and npm downloads", "## Install", "## Try it", "## Use cases", "## Benchmarks", "## How it works", "## Tools",
+      "## Security and privacy", "## Context Mode Gateway", "## License", "## Community"];
     let at = -1;
     for (const part of SECTIONS) {
       const i = readme.indexOf("\n" + part + "\n");
@@ -1355,7 +1355,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     // D-README-PRIVACY-1: ELv2 is source-available, so the line says "source open on GitHub", not "open source".
     assert.ok(quote.includes("free and local, with its source open on GitHub"), "the blockquote says the plugin stays free and local, with its source open on GitHub");
     const start = readme.indexOf("\n## Context Mode Gateway\n");
-    const end = readme.indexOf("\n## Adoption: stars and npm downloads\n", start);
+    const end = readme.indexOf("\n## License\n", start);
     assert.ok(start > 0 && end > start, "README has no Context Mode Gateway section");
     const words = (text) => {
       const out = [];
@@ -1414,7 +1414,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const at = SHOTS.map((s) => readme.indexOf(dir + s));
     SHOTS.forEach((s, i) => {
       assert.ok(at[i] > 0, `README has no ${s} screen`);
-      const next = i + 1 < SHOTS.length ? at[i + 1] : readme.indexOf("\n## Adoption: stars and npm downloads\n");
+      const next = i + 1 < SHOTS.length ? at[i + 1] : readme.indexOf("\n## License\n");
       const block = readme.slice(at[i], next);
       assert.ok(block.includes("Docs: "), `${s} screen has no docs line`);
       assert.ok(block.includes("https://contextmode.ai/docs/") && block.includes("utm_content=" + s), `${s} docs line has no contextmode.ai/docs link tagged ${s}`);
@@ -1603,7 +1603,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       assert.ok(!rest.split(" ").some((w) => w.split(",").join("").split(".").join("") === "zero"), `README line has "zero": ${line.slice(0, 100)}`);
     }
     // Gateway: the intro names the same features as the table, in order.
-    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
     const table = gw.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Feature |")).map((l) => l.split("|")[1].trim());
     assert.ok(table.length >= 10, `Gateway table has ${table.length} rows`);
     const intro = gw.split("\n").find((l) => l.startsWith("The plugin works on tool output"));
@@ -1658,7 +1658,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(sec.includes("(" + dir + "README.md)"), "Try it links the evidence");
     const ev = readRepo(dir + "README.md");
     for (const need of ["## Rerun", "claude plugin marketplace add mksglu/context-mode#release", "claude-haiku-5-5"]) assert.ok(ev.includes(need), `evidence README lacks ${need}`);
-    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
     for (const q of ["Move this project from Jest to Vitest.", "Pick up where we stopped yesterday", "Which date library did we choose on Tuesday"]) {
       assert.ok(gw.includes("```text\n" + q), `Gateway prompt in a fence: ${q}`);
     }
@@ -1668,7 +1668,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
   test("README Gateway screens: the live video first, then a 2-column gallery of six screens, each with caption and docs (D-README-GW-GALLERY-1)", () => {
     // Owner 2026-11-02: "gateway in ekran goruntulerini alt alta siraladigin icin cok scroll etmem gerekti, galeri tarzinda neden yapmadin".
     const readme = readRepo("README.md");
-    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
     const table = gw.slice(gw.indexOf("<table>"), gw.indexOf("</table>"));
     assert.ok(gw.indexOf("gateway/live.webp") > 0 && gw.indexOf("gateway/live.webp") < gw.indexOf("<table>"), "the video sits above the grid");
     const rows = table.split("<tr>").slice(1);
@@ -1706,7 +1706,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       const l = line.toLowerCase();
       if (l.includes("telemetry") || l.includes("your data") || l.includes("all data")) assert.ok(l.includes("plugin"), `privacy line lacks "plugin": ${line.slice(0, 100)}`);
     }
-    const gw = readme.slice(gwAt, readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    const gw = readme.slice(gwAt, readme.indexOf("\n## License\n"));
     assert.ok(gw.includes("The Gateway sends your requests to its server on the way to the model."), "Gateway section says where requests go");
     assert.ok(gw.includes("https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy"), "Gateway section links its privacy page");
     devRow("D-README-PRIVACY-2", "free, local, privacy, no telemetry");
@@ -1809,6 +1809,25 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
   });
 
   // Owner 2026-11-02: "Star history gibi bir de npm indirme istiyorum ... haftalik gunluk ve aylik ve senelik npm indirmesini versin bana tab sekilde olsun" (D-README-NPM-1).
+  test("README Adoption sits right after Why: star chart and npm grid side by side, both linked to the interactive stats page, no npm tabs in the README (D-README-ADOPT-1)", () => {
+    // Owner 2026-11-02: "Adaption cok altlarda kalmis" and "daily, weekly diye collapse yapmamiza gerek yok tab sistemi olsa daha iyi olur".
+    const readme = readRepo("README.md");
+    const at = readme.indexOf("\n## Adoption: stars and npm downloads\n");
+    assert.ok(at > readme.indexOf("\n## Why\n") && at < readme.indexOf("\n## Install\n"), "Adoption sits between Why and Install");
+    const sec = readme.slice(at, readme.indexOf("\n## Install\n"));
+    assert.ok(!readme.includes('<details name="npm"') && !readme.includes("<details open name=\"npm\""), "no npm details blocks");
+    const table = sec.slice(sec.indexOf("<table>"), sec.indexOf("</table>"));
+    assert.equal(table.split("<td").length - 1, 2, "one row, two cells");
+    const cells = table.split("<td").slice(1);
+    assert.ok(cells[0].includes("star-history-dark.png") && cells[0].includes("star-history-light.png"), "left cell: star chart");
+    assert.ok(cells[1].includes("npm-downloads-dark.png") && cells[1].includes("npm-downloads-light.png"), "right cell: npm grid");
+    const page = "https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption";
+    assert.ok(cells[0].includes('href="' + page + '#stars"') && cells[1].includes('href="' + page + '#daily"'), "both charts open the stats page on their tab");
+    assert.ok(sec.split("\n").some((l) => l.includes(page) && l.includes("interactive")), "one line points to the interactive page");
+    for (const need of ["stargazers-light.png", "**Hacker News.**", "**GitHub Trending.**"]) assert.ok(sec.includes(need), `Adoption lacks ${need}`);
+    datedRow("D-README-ADOPT-1", "Adaption cok altlarda kalmis");
+  });
+
   test("npm downloads data: 500-day API chunks, ISO weeks from Monday, complete weeks and months only, year totals plus the running total (D-README-NPM-1)", async () => {
     const { rangeChunks, weekStart, aggregate, fmtK } = await import("../build/npm-downloads.mjs");
     assert.deepEqual(rangeChunks("2026-02-23", "2026-03-01"), [["2026-02-23", "2026-03-01"]]);
@@ -1841,7 +1860,7 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.deepEqual([fmtK(950), fmtK(1499), fmtK(683261), fmtK(33070), fmtK(1250000)], ["950", "1K", "683K", "33K", "1.3M"]);
   });
 
-  test("npm downloads charts: one page draws four views, render.mjs renders them, the daily job fetches and renders them (D-README-NPM-1)", () => {
+  test("npm downloads charts: one page draws the four views as a 2x2 grid, render.mjs renders it, the daily job fetches and renders it (D-README-NPM-1, D-README-ADOPT-1)", () => {
     const html = readRepo(SRC + "npm-downloads.html");
     for (const need of ["npm-data.js", "window.__drawn=", "daily", "weekly", "monthly", "yearly", "api.npmjs.org"]) assert.ok(html.includes(need), `npm-downloads.html lacks ${need}`);
     const data = readRepo(SRC + "npm-data.js");
@@ -1850,20 +1869,25 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     for (const k of ["read_at", "first", "last", "total", "daily", "weekly", "monthly", "yearly", "running"]) assert.ok(k in npm, `npm-data.js lacks ${k}`);
     assert.equal(npm.first, "2026-02-23", "first publish day of context-mode (npm view context-mode time.created)");
     const r = readRepo(SRC + "render.mjs");
-    for (const v of ["daily", "weekly", "monthly", "yearly"]) assert.ok(r.includes("{ name: 'npm-" + v + "', page: 'npm-downloads', view: '" + v + "'"), `render.mjs lacks npm-${v}`);
+    assert.ok(r.includes("{ name: 'npm-downloads', view: 'grid'"), "render.mjs renders the grid view");
+    for (const v of ["daily", "weekly", "monthly", "yearly"]) assert.ok(!r.includes("name: 'npm-" + v + "'"), `render.mjs still renders npm-${v}`);
+    assert.ok(html.includes('VIEW==="grid"'), "npm-downloads.html draws the grid view");
     const y = readRepo(".github/workflows/readme-stats.yml");
     for (const need of ["node build/npm-downloads.mjs", "render.mjs star-history npm-downloads", "playwright sharp"]) assert.ok(y.includes(need), `readme-stats.yml lacks ${need}`);
   });
 
-  test("npm downloads PNGs: 8 files at 2x carry the drawn chart, and every README figure together stays under the image budget (D-README-NPM-1)", async () => {
+  test("npm downloads PNGs: one grid image per theme at 2x carries the drawn charts, the 8 single PNGs are gone, and every README figure stays under the image budget (D-README-NPM-1, D-README-ADOPT-1)", async () => {
     const { chartInkProblems, decodePng } = await import("../" + SRC + "render-guard.mjs");
     const { README_IMAGES_MAX_BYTES, readmeImageBytes } = await import("../build/readme-links.mjs");
     for (const v of ["daily", "weekly", "monthly", "yearly"]) for (const theme of ["dark", "light"]) {
-      const buf = readFileSync(path.join(REPO, "docs/assets/readme/npm-" + v + "-" + theme + ".png"));
+      assert.ok(!existsSync(path.join(REPO, "docs/assets/readme/npm-" + v + "-" + theme + ".png")), "single npm PNG left: " + v + " " + theme);
+    }
+    for (const theme of ["dark", "light"]) {
+      const buf = readFileSync(path.join(REPO, "docs/assets/readme/npm-downloads-" + theme + ".png"));
       const img = decodePng(buf);
-      assert.deepEqual([img.width, img.height], [2560, 1280], v + " " + theme + ": 1280x640 at 2x");
-      assert.deepEqual(chartInkProblems(buf, theme), [], v + " " + theme);
-      assert.ok(buf.length <= 100 * 1024, v + " " + theme + ": palette PNG, " + buf.length + " bytes");
+      assert.deepEqual([img.width, img.height], [2560, 1280], theme + ": 1280x640 at 2x");
+      assert.deepEqual(chartInkProblems(buf, theme), [], theme);
+      assert.ok(buf.length <= 120 * 1024, theme + ": palette PNG, " + buf.length + " bytes");
     }
     assert.ok(readmeImageBytes(REPO) <= README_IMAGES_MAX_BYTES, "README figures " + readmeImageBytes(REPO) + " bytes");
   });

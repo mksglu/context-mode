@@ -11,7 +11,7 @@
   <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, for 10 coding agents, zero telemetry, the plugin keeps your data on your machine. 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output).">
 </picture>
 
-**Contents:** [Why](#why) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [Adoption](#adoption-stars-and-npm-downloads) · [License](#license) · [Community](#community)
+**Contents:** [Why](#why) · [Adoption](#adoption-stars-and-npm-downloads) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [License](#license) · [Community](#community)
 
 ## Why
 
@@ -24,6 +24,25 @@ Context Mode runs that work in a local sandbox, keeps the full output in a SQLit
 - **Zero telemetry.** The plugin keeps all usage data on your machine. A CI test keeps its short list of network calls fixed: see [Security and privacy](#security-and-privacy).
 - **Works offline after install.** Sandbox runs, file indexing and search use local SQLite and your own runtimes.
 - **Small replies.** On the 36 bench rows with 10 KB or more of raw output, the plugin's median reply is 99.4% smaller than the raw output.
+
+## Adoption: stars and npm downloads
+
+<table><tr>
+<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#stars"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/star-history-dark.png"><img src="docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode since 2026-02-23. A daily job redraws it."></picture></a></td>
+<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-downloads-dark.png"><img src="docs/assets/readme/npm-downloads-light.png" alt="Four charts of npm downloads for context-mode in a 2x2 grid: per day, per ISO week, per month and per year, since the first publish on 2026-02-23. A daily job redraws them."></picture></a></td>
+</tr></table>
+
+Hover the bars on the [interactive chart](https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily) to read each day, week, month and year. Stars come from the GitHub GraphQL API (`starredAt`); npm downloads come from `api.npmjs.org/downloads/range`. The total up to 2026-10-29 is 683K npm downloads ([stats.json](stats.json) keeps a daily copy). A daily job redraws both charts.
+
+- **Hacker News.** "MCP server that reduces Claude Code context consumption by 98%" reached the front page with 570+ points and 107 comments on 2026-02-28 ([thread](https://news.ycombinator.com/item?id=47193064)).
+- **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/stargazers-dark.png">
+  <img src="docs/assets/readme/stargazers-light.png" alt="Companies that stargazers of mksglu/context-mode name in their GitHub profile, Microsoft, Tencent, Alibaba, ByteDance, Google and more.">
+</picture>
+
+Starred by engineers at these companies: each name is the company field of 2 or more stargazer profiles, read with the GitHub GraphQL API on 2026-11-01 ([data](docs/assets/readme/data/stargazer-companies.json)).
 
 ## Install
 
@@ -351,32 +370,6 @@ Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and P
 Setup is one command, `npx @context-mode/cli`. It signs you in and writes one config change per agent (the Gateway CLI needs Node 20.12 or later, from its npm `engines` field; the plugin needs Node 24.15.0).
 The Gateway routes to Anthropic and OpenAI. The Gateway sends your requests to its server on the way to the model. It keeps a searchable record of your sessions for Recall and Search, and masks secrets and e-mail addresses when it reads archived output back. Its privacy page is at [contextmode.ai/privacy](https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 Keep your agent's own sandbox on next to Protect. More at [contextmode.ai](https://contextmode.ai/?utm_source=github&utm_medium=readme&utm_content=more).
-
-## Adoption: stars and npm downloads
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/star-history-dark.png">
-  <img src="docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode since 2026-02-23. A daily job redraws it.">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/stargazers-dark.png">
-  <img src="docs/assets/readme/stargazers-light.png" alt="Companies that stargazers of mksglu/context-mode name in their GitHub profile, Microsoft, Tencent, Alibaba, ByteDance, Google and more.">
-</picture>
-
-Starred by engineers at these companies: each name is the company field of 2 or more stargazer profiles, read with the GitHub GraphQL API on 2026-11-01 ([data](docs/assets/readme/data/stargazer-companies.json)).
-
-GitHub stars over time, from the stargazers API (GraphQL, `starredAt`). A daily job redraws the chart; the date it was read is in the chart caption.
-
-npm downloads of the package by day, week, month and year, read from the npm API (`api.npmjs.org/downloads/range`) since the first publish on 2026-02-23. The total up to 2026-10-29 is 683K npm downloads ([stats.json](stats.json) keeps a daily copy). Pick a view; the same daily job redraws all four.
-
-<details open name="npm"><summary><b>Daily</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-daily-dark.png"><img src="docs/assets/readme/npm-daily-light.png" alt="Line chart of npm downloads per day for context-mode over the last 90 days. A daily job redraws it."></picture></details>
-<details name="npm"><summary><b>Weekly</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-weekly-dark.png"><img src="docs/assets/readme/npm-weekly-light.png" alt="Line chart of npm downloads per ISO week for context-mode since the first publish on 2026-02-23. A daily job redraws it."></picture></details>
-<details name="npm"><summary><b>Monthly</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-monthly-dark.png"><img src="docs/assets/readme/npm-monthly-light.png" alt="Bar chart of npm downloads per month for context-mode since the first publish on 2026-02-23. A daily job redraws it."></picture></details>
-<details name="npm"><summary><b>Yearly</b></summary><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-yearly-dark.png"><img src="docs/assets/readme/npm-yearly-light.png" alt="Chart of total npm downloads per year for context-mode, with the running total since 2026-02-23. A daily job redraws it."></picture></details>
-
-- **Hacker News.** "MCP server that reduces Claude Code context consumption by 98%" reached the front page with 570+ points and 107 comments on 2026-02-28 ([thread](https://news.ycombinator.com/item?id=47193064)).
-- **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
 
 ## License
 
