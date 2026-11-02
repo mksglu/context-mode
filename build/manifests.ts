@@ -15,6 +15,9 @@ const DEV_VERSION = "0.0.0-dev"; // impl/13 §3.1 step 2: non-release builds
 // D-PKG-META-1: the repo package.json is the one source of the shared release fields (description, keywords, license,
 // homepage, bugs, repository). The release version comes from build.mjs --version; engines from NODE_MIN.
 const DEV_PACKAGE_JSON = fileURLToPath(new URL("../package.json", import.meta.url));
+// D-NPM-NAMES-1: scripts/release/npm-names.json names the npm package; the bin stays SERVER_KEY in every config.
+const NPM_NAMES_JSON = fileURLToPath(new URL("../scripts/release/npm-names.json", import.meta.url));
+export const NPM_MAIN: string = (JSON.parse(readFileSync(NPM_NAMES_JSON, "utf8")) as { main: string }).main;
 interface DevMeta { description: string; keywords: string[]; license: string; homepage: string; bugs: JsonObject; repository: JsonObject }
 function devMeta(): DevMeta {
   const pkg = JSON.parse(readFileSync(DEV_PACKAGE_JSON, "utf8")) as Record<string, unknown>;
@@ -215,24 +218,24 @@ const REPOSITORY = { type: "git", url: "git+https://github.com/mksglu/context-mo
 const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"];
 const PI_KEYS: readonly string[] = ["extensions", "skills"];
 
-function npmPackageJson(version: string): JsonObject {
+export function npmPackageJson(version: string, name: string = NPM_MAIN): JsonObject {
   const meta = devMeta();
   return {
-    name: SERVER_KEY, version, type: "module", bin: { [SERVER_KEY]: CLI_BUNDLE }, engines: { node: NODE_ENGINE },
+    name, version, type: "module", bin: { [SERVER_KEY]: CLI_BUNDLE }, engines: { node: NODE_ENGINE },
     files: [...OUT_FILES], main: OPENCODE_MAIN, exports: OPENCODE_EXPORTS, pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] },
     description: meta.description, keywords: [...meta.keywords], license: meta.license, homepage: meta.homepage, bugs: meta.bugs, repository: meta.repository,
   };
 }
 
 // Throws unless `pkg` is the D1 shape above (any extra key, e.g. dependencies, scripts or private, is a hard stop).
-export function assertOutPackageJson(pkg: unknown): void {
+export function assertOutPackageJson(pkg: unknown, name: string = NPM_MAIN): void {
   if (pkg === null || typeof pkg !== "object" || Array.isArray(pkg)) throw new Error("package.json: not an object");
   const obj = pkg as Record<string, unknown>;
   for (const key of Object.keys(obj)) {
     if (!OUT_PACKAGE_KEYS.includes(key)) throw new Error("package.json: key " + key + " not allowed (ADR-0019 D1)");
   }
   for (const key of OUT_PACKAGE_KEYS) if (!(key in obj)) throw new Error("package.json: missing " + key);
-  if (obj.name !== SERVER_KEY) throw new Error("package.json: name must be " + SERVER_KEY);
+  if (obj.name !== name) throw new Error("package.json: name must be " + name);
   if (typeof obj.version !== "string") throw new Error("package.json: version must be a string");
   if (obj.type !== "module") throw new Error("package.json: type must be module");
   if (JSON.stringify(obj.bin) !== JSON.stringify({ [SERVER_KEY]: CLI_BUNDLE })) throw new Error("package.json: bin must be {" + SERVER_KEY + ": " + CLI_BUNDLE + "}");

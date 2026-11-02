@@ -252,6 +252,10 @@ jobs:
       - name: publish with provenance, dist-tag next (never latest)
         working-directory: release-out
         run: npm publish --provenance --access public --tag next
+      - name: publish the shim names of scripts/release/npm-names.json (D-NPM-NAMES-1; none by default)
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: node scripts/release/npm-names.mjs publish-shims --pkg release-out --version "$VERSION" --tag next
   # D-RN-ORDER-1: run 40496186557 (v2.0.0-next.4) made the GitHub prerelease, then the publish-npm job failed.
   # Runs after publish-npm: on its success, or when it was skipped because publish=false and no v2.* tag.
   # A failed, cancelled or skipped-but-asked publish-npm leaves no GitHub release.
@@ -433,7 +437,8 @@ jobs:
         env:
           VERSION: ${{ needs.main-plan.outputs.version }}
         run: |
-          if [ "$(npm view "context-mode@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+          NAME="$(node scripts/release/npm-names.mjs main)"
+          if [ "$(npm view "$NAME@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
             echo "published=true" >> "$GITHUB_OUTPUT"
           fi
       - name: tarball must equal SHA256SUMS
@@ -446,6 +451,11 @@ jobs:
           NPM_TAG: ${{ inputs.channel }}
         run: |
           npm publish --provenance --access public --tag "$NPM_TAG"
+      - name: publish the shim names of scripts/release/npm-names.json (D-NPM-NAMES-1; none by default)
+        env:
+          VERSION: ${{ needs.main-plan.outputs.version }}
+          NPM_TAG: ${{ inputs.channel }}
+        run: node scripts/release/npm-names.mjs publish-shims --pkg release-out --version "$VERSION" --tag "$NPM_TAG"
   main-commit:
     needs: [route, main-plan, main-npm]
     if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}

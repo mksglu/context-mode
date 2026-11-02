@@ -921,3 +921,129 @@ describe("ADR-0019 release: npm tarball check and publish job", () => {
   });
 });
 });
+
+// D-NPM-NAMES-1 (ADR-0019): scripts/release/npm-names.json is the one list of npm names the release publishes.
+// Default {main:"context-mode", shims:[]} gives the same publish as before; a scoped main name plus context-mode as a shim
+// publishes main first, then a shim that depends on main and runs it. The bin context-mode stays in every config.
+describe("[NPM-NAMES] D-NPM-NAMES-1 one config file for the npm names", { concurrency: CONC }, () => {
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const SCRIPT = path.join(REPO, "scripts", "release", "npm-names.mjs");
+  const yml = readFileSync(path.join(REPO, ".github", "workflows", "release.yml"), "utf8");
+  const jobOf = (name) => { const a = yml.indexOf(`\n  ${name}:`); const b = yml.slice(a + 1).search(/\n  [a-z][a-z0-9-]*:\n/); return yml.slice(a, a + 1 + b); };
+  const run = (args, cwd = REPO) => spawnSync(process.execPath, [SCRIPT, ...args], { cwd, encoding: "utf8" });
+  const tmp = (t) => { const d = mkdtempSync(path.join(tmpdir(), "cm-npm-names-")); t.after(() => rmSync(d, { recursive: true, force: true })); return d; };
+  const cfgFile = (t, cfg) => { const f = path.join(tmp(t), "npm-names.json"); writeFileSync(f, JSON.stringify(cfg)); return f; };
+  const SCOPED = { main: "@contextmode/plugin", shims: [{ name: "context-mode", bins: ["context-mode"] }] };
+  // The publish step as release.yml runs it today: working-directory release-out, one npm publish line.
+  const stepOf = (job, needle) => {
+    const lines = job.split("\n");
+    const j = lines.findIndex((l) => l.includes(needle) && !l.includes("npm-names.mjs"));
+    const i = lines[j].trim().startsWith("run:") ? j : j - 1; // "run: cmd" or "run: |" with cmd on the next line
+    const wd = lines.slice(Math.max(0, i - 6), i).find((l) => l.includes("working-directory:"));
+    const runLine = lines[j].trim().replace(/^run: /, "");
+    return `cd ${wd.split(":")[1].trim()} && ${runLine}\n`;
+  };
+
+  test("the checked-in config is the default: main context-mode, no shims", () => {
+    assert.deepEqual(JSON.parse(readFileSync(path.join(REPO, "scripts", "release", "npm-names.json"), "utf8")), { main: "context-mode", shims: [] });
+    const r = run(["main"]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "context-mode\n");
+  });
+
+  test("default plan is byte-identical to the publish step in release.yml (old path, tag next)", () => {
+    const r = run(["plan", "--tag", "next"]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "cd release-out && npm publish --provenance --access public --tag next\n");
+    assert.equal(r.stdout, stepOf(jobOf("publish-npm"), "npm publish"));
+  });
+
+  test("default plan is byte-identical to the publish step in release.yml (main path, tag = channel)", () => {
+    const r = run(["plan", "--tag", '"$NPM_TAG"']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, stepOf(jobOf("main-npm"), "npm publish"));
+  });
+
+  test("scoped main plus context-mode shim: main first, then the shim, same flags and tag", (t) => {
+    const r = run(["plan", "--tag", "next", "--config", cfgFile(t, SCOPED)]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, [
+      "cd release-out && npm publish --provenance --access public --tag next",
+      `cd ${path.join("release-out-shims", "context-mode")} && npm publish --provenance --access public --tag next`, ""].join("\n"));
+    const m = run(["main", "--config", cfgFile(t, SCOPED)]);
+    assert.equal(m.stdout, "@contextmode/plugin\n");
+  });
+
+  test("bad configs fail: extra key, bad name, a name twice, a shim with no bins", (t) => {
+    for (const bad of [{ main: "context-mode", shims: [], extra: 1 }, { main: "Context Mode", shims: [] },
+      { main: "context-mode", shims: [{ name: "context-mode", bins: ["context-mode"] }] }, { main: "@contextmode/plugin", shims: [{ name: "context-mode", bins: [] }] }]) {
+      const r = run(["main", "--config", cfgFile(t, bad)]);
+      assert.equal(r.status, 1, JSON.stringify(bad));
+      assert.match(r.stderr, /npm-names:/);
+    }
+  });
+
+  test("publish-shims with the default config does nothing; with a shim it writes the shim next to release-out", (t) => {
+    const d = tmp(t);
+    mkdirSync(path.join(d, "release-out"));
+    writeFileSync(path.join(d, "release-out", "package.json"), JSON.stringify({ name: "@contextmode/plugin", version: "2.0.0", license: "Elastic-2.0", engines: { node: ">=24.15.0" } }));
+    writeFileSync(path.join(d, "release-out", "LICENSE"), "Elastic License 2.0\n");
+    const none = run(["publish-shims", "--pkg", "release-out", "--version", "2.0.0", "--tag", "next"], d);
+    assert.equal(none.status, 0, none.stderr);
+    assert.ok(!existsSync(path.join(d, "release-out-shims")), "default writes no shim");
+    const r = run(["publish-shims", "--pkg", "release-out", "--version", "2.0.0", "--tag", "next", "--dry-run", "--config", cfgFile(t, SCOPED)], d);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(readdirSync(path.join(d, "release-out")).sort(), ["LICENSE", "package.json"], "release-out stays equal to its SHA256SUMS");
+    const pj = JSON.parse(readFileSync(path.join(d, "release-out-shims", "context-mode", "package.json"), "utf8"));
+    assert.equal(pj.name, "context-mode");
+    assert.deepEqual(pj.bin, { "context-mode": "cli.mjs" });
+    assert.deepEqual(pj.dependencies, { "@contextmode/plugin": "2.0.0" });
+    assert.equal(pj.license, "Elastic-2.0");
+    assert.deepEqual(pj.engines, { node: ">=24.15.0" });
+  });
+
+  test("a shim runs the main package: CLI args and exit code, OpenCode entry, pi extension", async (t) => {
+    const d = tmp(t);
+    const main = path.join(d, "node_modules", "@contextmode", "plugin");
+    mkdirSync(path.join(main, "opencode"), { recursive: true });
+    mkdirSync(path.join(main, "pi"), { recursive: true });
+    writeFileSync(path.join(main, "package.json"), JSON.stringify({ name: "@contextmode/plugin", version: "2.0.0", type: "module", main: "./opencode/plugin.js", exports: { ".": "./opencode/plugin.js", "./server": "./opencode/plugin.js" } }));
+    writeFileSync(path.join(main, "cli.mjs"), "console.log('main-cli ' + process.argv.slice(2).join(' ')); process.exit(3);\n");
+    writeFileSync(path.join(main, "opencode", "plugin.js"), "export const id = 'context-mode'; export default async function p() { return 'oc'; }\n");
+    writeFileSync(path.join(main, "pi", "index.js"), "export default function piExtension(api) { return 'pi:' + api; }\n");
+    const shim = path.join(d, "node_modules", "context-mode");
+    const w = run(["shim", "--name", "context-mode", "--main", "@contextmode/plugin", "--version", "2.0.0", "--out", shim]);
+    assert.equal(w.status, 0, w.stderr);
+    const cli = spawnSync(process.execPath, [path.join(shim, "cli.mjs"), "--version", "x"], { encoding: "utf8" });
+    assert.equal(cli.stdout, "main-cli --version x\n");
+    assert.equal(cli.status, 3);
+    const oc = await import(pathToFileURL(path.join(shim, "opencode", "plugin.js")).href);
+    assert.equal(oc.id, "context-mode");
+    assert.equal(await oc.default(), "oc");
+    const pi = await import(pathToFileURL(path.join(shim, "pi", "index.js")).href);
+    assert.equal(await pi.default("api"), "pi:api");
+  });
+
+  test("release.yml: both publish jobs read the config (exists check by main name, then the shims)", () => {
+    for (const name of ["publish-npm", "main-npm"]) {
+      const job = jobOf(name);
+      assert.ok(job.includes("node scripts/release/npm-names.mjs publish-shims --pkg release-out"), name + " publishes the shims");
+      assert.ok(job.indexOf("npm publish --provenance") < job.indexOf("npm-names.mjs publish-shims"), name + ": main before shims");
+    }
+    assert.ok(jobOf("publish-npm").includes('--tag next'), "old path: shims on next too");
+    assert.ok(jobOf("main-npm").includes('--tag "$NPM_TAG"'), "main path: shims on the channel tag");
+    assert.ok(!yml.includes('npm view "context-mode@'), "the exists check reads the main name from the config");
+    assert.ok(jobOf("main-npm").includes("node scripts/release/npm-names.mjs main"));
+  });
+
+  test("build/manifests.ts names release-out/package.json from the config; the bin stays context-mode", async () => {
+    const m = await import(pathToFileURL(path.join(REPO, "build", "manifests.ts")).href);
+    assert.equal(m.NPM_MAIN, "context-mode");
+    const scoped = m.npmPackageJson("2.0.0", "@contextmode/plugin");
+    assert.equal(scoped.name, "@contextmode/plugin");
+    assert.deepEqual(scoped.bin, { "context-mode": "cli.mjs" });
+    m.assertOutPackageJson(scoped, "@contextmode/plugin");
+    assert.throws(() => m.assertOutPackageJson(scoped), /name must be context-mode/);
+    assert.equal(m.npmPackageJson("2.0.0").name, "context-mode");
+  });
+});
