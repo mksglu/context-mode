@@ -6,7 +6,7 @@
 // MCP = "yes", or "ctx tools built into the plugin" (D-README-FIX-1) when the registry row has no MCP config and the agent runs in process (Pi);
 // Skills = the row's skillChannel; Install = every command of the first fence in the page's Install section, joined by
 // <br>, when it is the agent's own command (D-README-INSTALL-CELL-1), else "npm + context-mode setup".
-// The line ("Hooks: ... · MCP: ... · Skills: ... · Guide: ...") sits inside each <details id="install-<id>"> block; the
+// The line ("Hooks: ... · MCP: ... · Skills: ...") sits inside each <details id="install-<id>"> block; the
 // owner dropped the Supported agents table (2026-11-02). Usage: node build/readme-agents.mjs [--write]. Without --write it
 // prints the lines; --write puts them into README.md. build/check-readme.mjs calls checkAgentLines() and fails on any problem.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -63,10 +63,11 @@ export function agentRows() {
   }).sort((x, y) => x.name.localeCompare(y.name));
 }
 
-/** The generated line for one agent: hooks, MCP, skills and the guide link (D-README-AGENT-LINES-1). */
+/** The generated line for one agent: hooks, MCP and skills (D-README-AGENT-LINES-1). The guide link moved to the one
+ * Install guide link on contextmode.ai (D-README-LINKS-2). */
 export function agentLine(r) {
   const hooks = r.hooks.startsWith("yes, ") ? `yes (${r.hooks.slice(5)})` : r.hooks;
-  return `${LINE_PREFIX}${hooks} · MCP: ${r.mcp} · Skills: ${r.skills} · Guide: [${r.page}](${r.page}#install)`;
+  return `${LINE_PREFIX}${hooks} · MCP: ${r.mcp} · Skills: ${r.skills}`;
 }
 
 /** id -> generated line, one per adapter. */

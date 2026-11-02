@@ -63,3 +63,46 @@ export function readmeImageBytes(root) {
   for (const name of readdirSync(dir)) if (name.endsWith(".png")) total += statSync(path.join(dir, name)).size;
   return total;
 }
+
+// D-README-LINKS-2 (owner 2026-11-02: "bu kadar link olmasin"): the README carries at most README_MAX_LINKS links a reader
+// clicks to leave the page, and each docs link goes to the published guides on contextmode.ai, so none points to docs/*.md.
+export const README_MAX_LINKS = 30;
+
+/** Links a reader clicks, in order: markdown [text](target) and <a href="target">. Image links (a badge, a figure, a
+ * screenshot that opens its full size) and the images themselves stay out: the reader clicks those to see the image. */
+export function readmeLinks(text) {
+  const out = [];
+  let i = 0;
+  while ((i = text.indexOf("](", i)) !== -1) {
+    const end = text.indexOf(")", i + 2);
+    if (end === -1) break;
+    const open = text.lastIndexOf("[", i);
+    const image = text[i - 1] === ")" || (open > 0 && text[open - 1] === "!");
+    if (!image) out.push(text.slice(i + 2, end));
+    i = end;
+  }
+  const key = '<a href="';
+  let j = 0;
+  while ((j = text.indexOf(key, j)) !== -1) {
+    const start = j + key.length;
+    const end = text.indexOf('"', start);
+    if (end === -1) break;
+    const body = text.slice(text.indexOf(">", end) + 1).trimStart();
+    if (!body.startsWith("<img") && !body.startsWith("<picture")) out.push(text.slice(start, end));
+    j = end;
+  }
+  return out;
+}
+
+/** The links that leave the page: readmeLinks minus the #anchors of the page itself. */
+export function outboundLinks(text) {
+  return readmeLinks(text).filter((t) => !t.startsWith("#"));
+}
+
+/** Links to a repo docs page: any target under docs/ outside the README asset folder. */
+export function repoDocLinks(text) {
+  return readmeLinks(text).filter((t) => {
+    const p = localPath(t);
+    return p.startsWith("docs/") && !p.startsWith(README_ASSET_DIR + "/");
+  });
+}

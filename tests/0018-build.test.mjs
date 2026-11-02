@@ -871,7 +871,9 @@ describe("ADR-0019 build: npm package", () => {
     const rel = targetsOf(npmText).filter((t) => !t.startsWith("https://") && !t.startsWith("http://") && !t.startsWith("#"));
     assert.deepEqual(rel, [], "every target of the npm README is absolute");
     assert.ok(npmText.includes('srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.0.0/docs/assets/readme/hero-dark.png"'));
-    assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/v2.0.0/docs/install/README.md)"));
+    const BLOB = "https://github.com/mksglu/context-mode/blob/v2.0.0/";
+    const docPages = targetsOf(npmText).filter((t) => t.startsWith(BLOB + "docs/") && t.split("#")[0].split("?")[0].endsWith(".md"));
+    assert.deepEqual(docPages, [], "the npm README links no repo docs page (D-README-LINKS-2)");
     assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/v2.0.0/LICENSE)"));
   });
 

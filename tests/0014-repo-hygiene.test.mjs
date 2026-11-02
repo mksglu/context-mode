@@ -994,7 +994,8 @@ describe("ADR-0015 repo: README agent lines", () => {
     for (const r of agentRows()) {
       const l = lines[r.id];
       assert.ok(l.startsWith(LINE_PREFIX + "yes"), `${r.id}: ${l}`);
-      for (const need of [" · MCP: ", " · Skills: yes", `(${r.page}#install)`]) assert.ok(l.includes(need), `${r.id} line lacks ${need}`);
+      for (const need of [" · MCP: ", " · Skills: yes"]) assert.ok(l.includes(need), `${r.id} line lacks ${need}`);
+      assert.ok(!l.includes("Guide:") && !l.includes("]("), `${r.id} line holds a link (D-README-LINKS-2): ${l}`);
     }
     assert.deepEqual(checkAgentLines(README), []);
     for (const bad of ["| Agent | Hooks |", "## Supported agents", "#supported-agents", "agents:install:start"]) assert.ok(!README.includes(bad), `README has ${bad}`);
@@ -1395,16 +1396,35 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(rows[0].includes("bu icime sinmedi OSS userleri kaciririz URKUTURUZ"), "the row quotes the owner");
   });
 
-  test("README links one engine guide per section and one short Videos line (D-README-LINKS-1)", () => {
+  test("readme-links: readmeLinks skips images and image links; outboundLinks drops #anchors; repoDocLinks keeps docs pages only (D-README-LINKS-2)", async () => {
+    const { readmeLinks, outboundLinks, repoDocLinks } = await import("../build/readme-links.mjs");
+    const text = '[![b](x.svg)](https://a) [t](docs/x.md#y) <a href="y.mp4"><img src="z.webp"></a> <a href="w">w</a> [s](#a) [f](docs/assets/readme/data/c.json) ![i](q.png)';
+    assert.deepEqual(readmeLinks(text), ["docs/x.md#y", "#a", "docs/assets/readme/data/c.json", "w"]);
+    assert.deepEqual(outboundLinks(text), ["docs/x.md#y", "docs/assets/readme/data/c.json", "w"]);
+    assert.deepEqual(repoDocLinks(text), ["docs/x.md#y"]);
+  });
+
+  test("README links: guides come from contextmode.ai/docs/engine, one per topic; no repo docs page; at most README_MAX_LINKS links out (D-README-LINKS-1, D-README-LINKS-2)", async () => {
+    // Owner 2026-11-02: "readmeki docslarin linkleri github reposundan alinmis linkler ben contextmode.ai de yayinladiklarimizdan bahsetmistim"; "bu kadar link olmasin".
+    const { README_MAX_LINKS, outboundLinks, repoDocLinks } = await import("../build/readme-links.mjs");
     const readme = readRepo("README.md");
-    const guides = readme.match(/https:\/\/contextmode\.ai\/docs\/engine\/[a-z-]+/g) ?? [];
-    assert.deepEqual(guides, ["install", "how-it-works", "security"].map((g) => `https://contextmode.ai/docs/engine/${g}`), "one guide link in each of Install, How it works, Security");
+    const ENGINE = "https://contextmode.ai/docs/engine/";
+    const out = outboundLinks(readme);
+    const guides = out.filter((t) => t.startsWith(ENGINE)).map((t) => t.slice(ENGINE.length, t.indexOf("?")));
+    assert.deepEqual(guides, ["install", "install", "benchmarks", "how-it-works", "tools", "security"], "one guide each in Install (plus the switch anchor), Benchmarks, How it works, Tools, Security");
+    assert.ok(readme.includes(ENGINE + "install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github"), "one switch link to the site install page");
+    assert.deepEqual(repoDocLinks(readme), [], "README links a repo docs page");
+    assert.ok(out.length <= README_MAX_LINKS, `README has ${out.length} links out; the cap is ${README_MAX_LINKS}`);
+    assert.ok(!readme.includes("Guide: ["), "the per-agent guide links are gone");
+    const community = readme.slice(readme.indexOf("\n## Community\n"));
+    assert.ok(!community.split("\n").some((l) => l.startsWith("Docs: ")), "the Community docs line is gone");
     assert.ok(!readme.includes("Guides on contextmode.ai"), "the Community guide list is gone");
     const video = readme.split("\n").filter((l) => l.startsWith("**Videos.**"));
     assert.equal(video.length, 1);
     assert.ok(video[0].includes("youtube.com/watch?v=QUHrntlfPo4") && video[0].includes("discord.gg/") && video[0].includes("10K views"), "Videos line: the video, Discord, the 10K rule");
     assert.ok(!video[0].includes("<img") && !video[0].includes("!["), "the Videos line has no thumbnail or badge");
     datedRow("D-README-LINKS-1", "Docs linklerini dump etme");
+    datedRow("D-README-LINKS-2", "bu kadar link olmasin");
   });
 
   test("README: Gateway screenshots gallery names six existing images and the README holds no email address (D-README-GW-SHOTS-1)", () => {
@@ -1428,7 +1448,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const gw = readme.indexOf("\n## Context Mode Gateway\n");
     const firstImg = readme.indexOf("<img ", gw);
     assert.ok(readme.slice(firstImg, firstImg + 80).includes(dir + "live.webp"), "the live video is the first visual of the Gateway section");
-    assert.ok(readme.includes(`[Full video](${dir}live.mp4)`), "README links the full mp4");
+    assert.ok(readme.includes(`<a href="${dir}live.mp4"><img src="${dir}live.webp"`), "the live image opens the full mp4");
   });
 
   test("README: every Gateway screen has a docs line under its caption, and every contextmode.ai link carries the README UTM fields (D-README-FUNNEL-1)", async () => {
@@ -1445,6 +1465,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       const block = readme.slice(at[i], next);
       assert.ok(block.includes("Docs: "), `${s} screen has no docs line`);
       assert.ok(block.includes("https://contextmode.ai/docs/") && block.includes("utm_content=" + s), `${s} docs line has no contextmode.ai/docs link tagged ${s}`);
+      assert.equal(block.split("utm_content=" + s + '"').length + block.split("utm_content=" + s + ")").length - 2, 1, `${s}: one docs link under the screen (D-README-LINKS-2)`);
     });
     const site = readmeTargets(readme).filter((t) => t.startsWith("https://contextmode.ai") || t.startsWith("https://context-mode.com"));
     assert.ok(site.length >= SHOTS.length);
@@ -1494,18 +1515,22 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(readme.includes(version), `README names the bench version ${version}`);
     const sec = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
     assert.ok(sec.includes("| What you do | Tool | Raw | Reaches the context | Saved |"), "Use cases has the table header");
-    const rows = sec.split("\n").filter((l) => l.startsWith("| ") && l.includes("README.md#"));
+    // D-README-LINKS-2: rows carry no link; one source line under the table names the bench file, and each row matches a bench row by its numbers.
+    const head = "| What you do | Tool | Raw | Reaches the context | Saved |";
+    const table = sec.slice(sec.indexOf(head));
+    const rows = table.slice(0, table.indexOf("\n\n")).split("\n").slice(2);
     assert.ok(rows.length >= 12, `the use-case table has ${rows.length} rows`);
     for (const row of rows) {
-      const at = row.indexOf("README.md#") + "README.md#".length;
-      const id = row.slice(at, row.indexOf(")", at));
-      const r = bench.results.find((x) => x.id === id);
-      assert.ok(r && r.ok && r.synthetic === false, `${id} is a real-capture row of ${newest}`);
-      const raw = r.metrics.raw_bytes.median;
-      const ctx = r.metrics.ctx_bytes.median;
       const cells = row.split("|").map((c) => c.trim());
-      assert.deepEqual(cells.slice(3, 6), [raw.toLocaleString("en-US") + " B", ctx.toLocaleString("en-US") + " B", (100 * (1 - ctx / raw)).toFixed(1) + "%"], `${id} numbers`);
+      assert.ok(!row.includes("]("), `use-case row holds a link: ${row.slice(0, 80)}`);
+      const r = bench.results.find((x) => x.ok && x.synthetic === false && x.metrics.raw_bytes && x.metrics.ctx_bytes &&
+        x.metrics.raw_bytes.median.toLocaleString("en-US") + " B" === cells[3] && x.metrics.ctx_bytes.median.toLocaleString("en-US") + " B" === cells[4]);
+      assert.ok(r, `${cells[1]}: no real-capture row of ${newest} has these numbers`);
+      const raw = r.metrics.raw_bytes.median;
+      assert.equal(cells[5], (100 * (1 - r.metrics.ctx_bytes.median / raw)).toFixed(1) + "%", `${r.id} saved`);
     }
+    const src = table.slice(table.indexOf("\n\n") + 2).split("\n")[0];
+    assert.ok(src.startsWith("Source: ") && src.includes(`](bench/results/${newest})`), `one source line under the table: ${src}`);
     for (const tool of ["Chrome DevTools MCP", "GitHub CLI", "Context7", "Vitest", "Biome", "pnpm", "Docker", "Terraform", "git", "Read", "WebFetch"]) {
       assert.ok(sec.includes(tool), `Use cases names ${tool}`);
     }
@@ -1528,9 +1553,10 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       const pageFences = fences(page.slice(page.indexOf("\n## Install\n")));
       assert.deepEqual(fences(block)[0], pageFences[0], `${id}: the block starts with the page's install fence`);
       assert.ok(block.includes("Update: `" + pageFences[1][0] + "`"), `${id}: update command from the page`);
-      for (const need of [`Check: \`context-mode doctor --agents ${id}\``, "Remove: ", `context-mode setup --remove --agents ${id}`, `docs/install/${id}.md`]) {
+      for (const need of [`Check: \`context-mode doctor --agents ${id}\``, "Remove: ", `context-mode setup --remove --agents ${id}`]) {
         assert.ok(block.includes(need), `${id}: block lacks ${need}`);
       }
+      assert.ok(!block.includes("](docs/"), `${id}: block links a repo docs page (D-README-LINKS-2)`);
     }
     assert.ok(readme.includes("\n**Contents:** "), "README has a short table of contents");
     // No "v2" in prose: it becomes the default release.
@@ -1591,17 +1617,20 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(readme.includes(bench.context_mode.commit.slice(0, 8)), "README names the bench commit");
     // Use-case labels that name a size use KB = 1,024 B, rounded.
     const uc = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
-    for (const row of uc.split("\n").filter((l) => l.startsWith("| [") && l.includes(" KB "))) {
-      const label = row.slice(3, row.indexOf("]"));
-      const kb = Number(label.split(" ").find((w, i, a) => a[i + 1] === "KB"));
-      const id = row.slice(row.indexOf("README.md#") + 10, row.indexOf(")", row.indexOf("README.md#")));
-      const raw = bench.results.find((x) => x.id === id).metrics.raw_bytes.median;
-      assert.equal(kb, Math.round(raw / 1024), `${id}: label says ${kb} KB, raw is ${raw} B`);
+    const kbRows = uc.split("\n").filter((l) => l.startsWith("| ") && l.split("|")[1].includes(" KB "));
+    assert.ok(kbRows.length >= 4, "use-case labels name sizes");
+    for (const row of kbRows) {
+      const cells = row.split("|").map((c) => c.trim());
+      const kb = Number(cells[1].split(" ").find((w, i, a) => a[i + 1] === "KB"));
+      const raw = Number(cells[3].split(" ")[0].split(",").join(""));
+      assert.equal(kb, Math.round(raw / 1024), `${cells[1]}: label says ${kb} KB, raw is ${raw} B`);
     }
     // Speed: each row links its bench row; the section points to the bench results file.
     const speed = readme.slice(readme.indexOf("\n### Speed\n"), readme.indexOf("\n## How it works\n"));
-    assert.ok(speed.includes(`bench/results/${newest.replace(".json", ".md")}`) && !speed.includes("docs/performance.md"), "Speed links the bench results file");
-    for (const id of ["g-hook-kiro", "g-hook-claude-code", "g-search-latency", "g-index-per-mb"]) assert.ok(speed.includes(`bench/g-overhead/README.md#${id}`), `Speed links ${id}`);
+    // D-README-LINKS-2: Speed names its bench rows in code text, in one source line under the table, with no link.
+    assert.ok(speed.includes(`bench/results/${newest.replace(".json", ".md")}`) && !speed.includes("docs/performance.md"), "Speed names the bench results file");
+    assert.ok(!speed.includes("]("), "Speed holds no link");
+    for (const id of ["g-hook-kiro", "g-hook-claude-code", "g-search-latency", "g-index-per-mb"]) assert.ok(speed.includes("`" + id + "`"), `Speed names ${id}`);
     const hooks = bench.results.filter((r) => r.id.startsWith("g-hook-")).map((r) => r.metrics.overhead_ms.median);
     assert.ok(speed.includes(`${Math.min(...hooks).toFixed(1)} ms to ${Math.max(...hooks).toFixed(1)} ms`), "hook range from the bench rows");
     // Hook runs: one positive line that names each agent.
@@ -1656,7 +1685,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const steps = sec.split("\n").filter((l) => "12345".includes(l[0]) && l[1] === "." && l[2] === " ");
     assert.ok(steps.length >= 4 && steps.length <= 5, `${steps.length} steps`);
     for (const s of steps) assert.ok(s.length <= 160, `step is long: ${s}`);
-    assert.ok(sec.includes("[Engineering details](docs/how-it-works.md#engineering-details)"), "link to Engineering details");
+    assert.ok(sec.includes("](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how)"), "one link to the How it works guide on contextmode.ai (D-README-LINKS-2)");
+    assert.ok(!sec.includes("](docs/"), "How it works links a repo docs page");
     for (const bold of ["**Hooks.**", "**Sandbox execution.**", "**Index and search.**", "**Storage.**"]) assert.ok(!sec.includes(bold), `README still has ${bold}`);
     const doc = readRepo("docs/how-it-works.md");
     const eng = doc.slice(doc.indexOf("\n## Engineering details\n"));
@@ -1713,7 +1743,11 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     // Owner 2026-11-02: "Longer sessions bu kismi iyilestir ... surekli yarim kalmis cumleler ve rakamlar var".
     const readme = readRepo("README.md");
     const uc = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
-    for (const id of ["f-bash-dump-post", "d-real-git-log", "d-real-github-json", "f-read-large-file", "f-read-big-source"]) assert.ok(uc.includes("README.md#" + id + ")"), `Use cases lack ${id}`);
+    const bench = JSON.parse(readRepo("bench/results/2026-11-01-darwin-arm64.json"));
+    for (const id of ["f-bash-dump-post", "d-real-git-log", "d-real-github-json", "f-read-large-file", "f-read-big-source"]) {
+      const m = bench.results.find((x) => x.id === id).metrics;
+      assert.ok(uc.includes(`| ${m.raw_bytes.median.toLocaleString("en-US")} B | ${m.ctx_bytes.median.toLocaleString("en-US")} B |`), `Use cases lack ${id}`);
+    }
     const ls = readme.slice(readme.indexOf("\n### Longer sessions\n") + 1, readme.indexOf("\n### Speed\n"));
     const prose = ls.split("\n").slice(1).filter((l) => l.trim() && !l.startsWith("<") && !l.startsWith(" "));
     assert.ok(prose.length >= 3, "story paragraphs");
@@ -1788,6 +1822,32 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     for (const bad of ["query=%24.message", "query=%24.marketplace", "label=users", "747.4k", "683.2k", "64.1k", "33,053"]) assert.ok(!readme.includes(bad), `README has ${bad}`);
     const hero = readRepo(SRC + "hero.html");
     for (const bad of ["Users", "GitHub stars", "33,053", "747.4k", "683.2k"]) assert.ok(!hero.includes(bad), `hero.html has ${bad}`);
+  });
+
+  test("README hero: three measured outcomes from the bench file, each naming its row; agents and tools only in small text (D-README-HERO-2)", () => {
+    // Owner 2026-11-02: "image de su 99.4 rakami disindakilar business value katmiyor ... kocaman 10 yaziyor kime ne?".
+    const hero = readRepo(SRC + "hero.html");
+    const readme = readRepo("README.md");
+    const bench = JSON.parse(readRepo("bench/results/2026-11-01-darwin-arm64.json"));
+    const text = (html) => { let out = "", tag = false; for (const ch of html) { if (ch === "<") tag = true; else if (ch === ">") tag = false; else if (!tag) out += ch; } return out; };
+    const row = (id) => bench.results.find((x) => x.id === id).metrics;
+    const big = bench.results.filter((r) => r.ok && r.metrics.raw_bytes && r.metrics.ctx_bytes && r.metrics.raw_bytes.median >= 10240);
+    const s = big.map((r) => 100 * (1 - r.metrics.ctx_bytes.median / r.metrics.raw_bytes.median)).sort((a, b) => a - b);
+    const med = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+    const k = (b) => Math.round(b / 4 / 1000) + "K"; // tokens at 4 B per token, an estimate
+    const t = (b) => String(Math.round(b / 4));
+    const g = row("g-session-total"), e = row("e-long-session");
+    const tiles = hero.split('<div class="tile"').slice(1).map((x) => x.slice(0, x.indexOf("</div>\n")));
+    assert.equal(tiles.length, 3, "three tiles");
+    const nums = tiles.map((x) => text(x.slice(x.indexOf('<div class="n">'), x.indexOf("</div>", x.indexOf('<div class="n">')))).trim());
+    assert.deepEqual(nums, [med.toFixed(1) + "%", `${k(g.raw_bytes.median)} → ${t(g.ctx_bytes.median)}`, `${k(e.raw_bytes.median)} → ${t(e.resume_bytes.median)}`]);
+    for (const [i, need] of [[0, String(big.length)], [1, "g-session-total"], [1, g.raw_bytes.median.toLocaleString("en-US") + " B"], [1, g.ctx_bytes.median.toLocaleString("en-US") + " B"], [1, "4 B per token"],
+      [2, "e-long-session"], [2, e.raw_bytes.median.toLocaleString("en-US") + " B"], [2, e.resume_bytes.median.toLocaleString("en-US") + " B"], [2, "4 B per token"]]) assert.ok(text(tiles[i]).includes(need), `tile ${i + 1} lacks ${need}`);
+    for (const bad of ['<div class="k">Coding agents', '<div class="k">MCP tools', '<div class="n">10<', '<div class="n">9<']) assert.ok(!hero.includes(bad), `hero.html still has ${bad}`);
+    assert.ok(hero.includes('class="small"') && hero.includes("Claude Code") && hero.includes("9 MCP tools"), "agents and tools sit in small text");
+    const alt = readme.slice(readme.indexOf('src="docs/assets/readme/hero-light.png" alt="') + 46).split('"')[0];
+    for (const need of ["99.4%", "g-session-total", "e-long-session", "estimate"]) assert.ok(alt.includes(need), `hero alt lacks ${need}`);
+    datedRow("D-README-HERO-2", "kocaman 10 yaziyor kime ne");
   });
 
   test("render guard: the page must say it drew 2+ points and a non-empty path, else render.mjs exits 1 (D-README-STAR-1)", async () => {

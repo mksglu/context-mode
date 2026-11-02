@@ -261,6 +261,10 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
       assert.ok(!text.includes("node -e"), `${id}.md has node -e`);
     }
     for (const file of [["README.md"], ["docs", "install", "README.md"]]) assert.ok(read(...file).includes(SWITCH_HEADING), `${file.join("/")} lacks the switch pointer`);
+    // D-README-LINKS-2: the README pointer is one link to the published install guide, not four repo pages.
+    const readme = read("README.md");
+    assert.ok(readme.includes("](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github)"), "README switch pointer links the site install page");
+    assert.ok(!readme.includes("#already-installed-from-github)") || !readme.includes("](docs/install/"), "README links a repo install page");
   });
 
   test("install-native: checkReleaseRef fails a page without the switch step", () => {
