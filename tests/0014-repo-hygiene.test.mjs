@@ -1367,14 +1367,29 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       return out;
     };
     const BANNED_WORDS = ["forget", "forgets", "forgot", "lose", "loses", "lost", "flood", "floods", "break", "breaks", "limit", "limits", "pain",
-      "problem", "problems", "struggle", "risk", "risks", "not", "no", "never", "without", "cannot", "v2", "enterprise", "quota", "pricing"];
+      "problem", "problems", "struggle", "risk", "risks", "not", "no", "never", "without", "cannot", "v2", "enterprise", "quota", "pricing",
+      // D-README-GW-NAME-1: plan and sales words stay out; "hosted service", "separate" and "subscription" name the product.
+      "paid", "prices", "upgrade", "trial", "buy", "purchase", "hobby", "business", "basic"];
     const BANNED_PHRASES = ["still grows", "compacts and", "n't", "1,000 requests", "card-free", "every feature", "start at", "sign up", "sign-up",
-      "free plan", "pro plan", "team plan", "per month", "/month", "/mo", "zero compactions", "0 compactions"];
+      "free plan", "pro plan", "team plan", "per month", "/month", "/mo", "zero compactions", "0 compactions",
+      "credit card", "paid plan", "business plan", "hobby plan", "per seat", "per user"];
     for (const [name, text] of [["top blockquote", quote], ["section 8", readme.slice(start, end)]]) {
       const ws = new Set(words(text));
       for (const b of BANNED_WORDS) assert.ok(!ws.has(b), `${name} has the word "${b}" (D-README-GW-CALM-1)`);
       for (const b of BANNED_PHRASES) assert.ok(!text.toLowerCase().includes(b), `${name} has "${b}" (D-README-GW-CALM-1)`);
     }
+    // D-README-GW-NAME-1: the reader and an AI agent see two products: the free plugin and a separate hosted service.
+    const sec8 = readme.slice(start, end);
+    for (const [name, text] of [["top blockquote", quote], ["section 8", sec8]]) {
+      for (const need of ["hosted service", "separate", "own account and subscription"]) assert.ok(text.includes(need), `${name} lacks "${need}" (D-README-GW-NAME-1)`);
+    }
+    const ptable = sec8.slice(sec8.indexOf("| Product | Runs | Scope | Billing |"));
+    assert.ok(sec8.indexOf("| Product | Runs | Scope | Billing |") > 0, "section 8 has the two-row product table");
+    const prows = ptable.slice(0, ptable.indexOf("\n\n")).split("\n").slice(2);
+    assert.equal(prows.length, 2, "the product table has two rows");
+    assert.ok(prows[0].startsWith("| Context Mode plugin |") && prows[0].includes("| Free |"), "row 1: the free plugin");
+    assert.ok(prows[1].startsWith("| Context Mode Gateway |") && prows[1].includes("Subscription, separate from the plugin"), "row 2: the Gateway, its own subscription");
+    datedRow("D-README-GW-NAME-1", "paid diyerek urkutme kimseyi");
     const rows = readRepo("docs/architecture/DEVIATIONS.md").split("\n").filter((l) => l.startsWith("| D-README-GW-CALM-1 |"));
     assert.equal(rows.length, 1, "DEVIATIONS has one D-README-GW-CALM-1 row");
     assert.ok(rows[0].includes("bu icime sinmedi OSS userleri kaciririz URKUTURUZ"), "the row quotes the owner");
@@ -1604,7 +1619,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     }
     // Gateway: the intro names the same features as the table, in order.
     const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
-    const table = gw.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Feature |")).map((l) => l.split("|")[1].trim());
+    const ft = gw.slice(gw.indexOf("\n| Feature |") + 1);
+    const table = ft.slice(0, ft.indexOf("\n\n")).split("\n").slice(2).map((l) => l.split("|")[1].trim());
     assert.ok(table.length >= 10, `Gateway table has ${table.length} rows`);
     const intro = gw.split("\n").find((l) => l.startsWith("The plugin works on tool output"));
     assert.ok(intro.includes(`Its ${table.length} features, the full list: ${table.join(", ")}.`), "the intro lists the table features, in order, and says the list is full");
