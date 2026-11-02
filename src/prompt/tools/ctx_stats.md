@@ -1,2 +1,2 @@
 Example: `ctx_stats({})`. Required: none.
-Reports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.
+Reports how many bytes context-mode kept out of the conversation in this session and in this project: a text report in a ```text block (totals with bars, then rows per tool, per agent and per journal kind), then a Markdown table with the raw byte counts. Show the text block to the user as it is, inside a code block. Use it when the user asks what context-mode saved.

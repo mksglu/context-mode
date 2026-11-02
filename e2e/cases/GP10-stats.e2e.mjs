@@ -99,7 +99,9 @@ test("[M4] GP10/stats-wording-bytes-not-time (#1023): byte labels only, no time 
   await c.close();
   assert.ok(text(r).includes(STATS_HEADER));
   assert.ok(row(text(r), "session").slice(0, 3).every((cell) => / B$/.test(cell)));
-  assert.ok(!/\b(ms|seconds?|minutes?|hours?|faster|tokens?)\b/i.test(text(r)));
+  // D-STATS-REPORT-1: a token estimate (bytes / 4) is a size, not a time claim, so only time words stay banned.
+  assert.ok(!/\b(ms|seconds?|minutes?|hours?|faster)\b/i.test(text(r)));
+  assert.ok(text(r).includes("```text\n"), "the report block is present");
 });
 
 test("[M4] GP10/ctx-call-credited-to-caller-session (#1241): a ctx_execute in session S counts for S, not the server", async (t) => {

@@ -44,7 +44,7 @@ Returns a summary of up to 2 KB for this session: the last task and user request
 
 <!-- id: ctx_stats -->
 ```text
-Reports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.
+Reports how many bytes context-mode kept out of the conversation in this session and in this project: a text report in a ```text block (totals with bars, then rows per tool, per agent and per journal kind), then a Markdown table with the raw byte counts. Show the text block to the user as it is, inside a code block. Use it when the user asks what context-mode saved.
 ```
 
 <!-- id: ctx_doctor -->
@@ -61,10 +61,10 @@ Updates context-mode to the latest release for this agent and rewrites only cont
 ```text
 ---
 name: ctx-stats
-description: Show how much context context-mode saved, as a table.
+description: Show how much context context-mode saved, as a detailed report.
 disable-model-invocation: true
 ---
-Call the ctx_stats tool and show its table to the user unchanged. Add one sentence under the table that names the largest saving.
+Call the ctx_stats tool and show the text block of its reply to the user unchanged, inside a code block so the columns stay aligned. Add one sentence under it that names the largest saving.
 ```
 
 <!-- id: skill_ctx-doctor -->

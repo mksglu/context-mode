@@ -177,6 +177,115 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       assert.ok(Buffer.byteLength(out.text, "utf8") <= OUTPUT_CAP);
       assert.equal(out.sandboxBytes, 0);
     }));
+
+    // D-STATS-REPORT-1: the detailed report (v1 style) on the same journal rows. Fixed journal below; every
+    // expected number is worked out by hand from these rows, not from the code.
+    // rows: { s, agent, tool, kind, p (sandbox_bytes), r (returned_bytes) }
+    const FIXED = [
+      { tool: "ctx_execute", p: 40000, r: 1000 }, { tool: "ctx_execute", p: 10000, r: 500 },
+      { tool: "ctx_batch", p: 120000, r: 2000 }, { tool: "ctx_index", kind: "index", p: 222000, r: 300 },
+      { tool: "ctx_search", p: 0, r: 3000 }, { tool: "Bash", p: 160014, r: 421 },
+      { tool: "Edit", kind: "edit", p: 200, r: 200 }, { tool: "AskUserQuestion", kind: "decision", p: 0, r: 0 },
+      { tool: "Bash", kind: "toolerr", p: 5000, r: 5000 }, { tool: null, kind: "prompt", p: 0, r: 0 },
+      { tool: "ctx_stats", p: 0, r: 2500 }, // an earlier ctx_stats reply: reading the report is not work, never counted
+      { s: "s2", agent: "codex", tool: "ctx_execute", p: 9000, r: 500 },
+    ];
+    const T0 = 1793000000000; // 2026-10-26T07:33:20Z; row seq k is written at T0 + k minutes
+    async function addFixed(ctx, rows = FIXED) {
+      const db = await openDb(ctx.project);
+      try {
+        for (const x of rows) {
+          appendEvent(db, { session_id: x.s ?? "s1", worktree: ctx.project.worktree, agent: x.agent ?? "claude-code", kind: x.kind ?? "cmd",
+            tool: x.tool, key: null, path: null, ok: 1, exit_code: null, bytes: x.p, body: "x", turn: 1, sandbox_bytes: x.p, returned_bytes: x.r });
+        }
+      } finally { closeDb(db); }
+      const raw = new DatabaseSync(ctx.project.dbPath);
+      try {
+        raw.prepare("UPDATE events SET created_at = ? + seq * 60000").run(T0);
+        const ins = raw.prepare("INSERT INTO sources (session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts) VALUES ('s1', ?, 'claude-code', 'content', ?, ?, ?, 0, '', 0)");
+        ins.run(ctx.project.worktree, "notes", 3000, 4);
+        ins.run(ctx.project.worktree, "docs", 222000, 120);
+      } finally { raw.close(); }
+    }
+    // The fenced report block of the reply, DB file size masked (SQLite page use is not part of the contract).
+    function report(text) {
+      const m = /```text\n([\s\S]*?)\n```/.exec(text);
+      assert.ok(m, "the reply holds the report in a ```text block");
+      return m[1].replace(/(Database file +)\S+ \S+/, "$1<size>");
+    }
+    // Labels of a report table: the rows under the header line that starts with `  <title>`, up to a blank line.
+    function labels(rep, title) {
+      const lines = rep.split("\n");
+      const at = lines.findIndex((l) => l.startsWith("  " + title + " "));
+      assert.ok(at >= 0, title + " table is present");
+      const out = [];
+      for (const l of lines.slice(at + 1)) { if (l.trim() === "") break; out.push(l.slice(2, 23).trim()); }
+      return out;
+    }
+
+    test("[R6] stats/report-headline: session bars, saved bytes, % and the token estimate (bytes / 4)", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addFixed(ctx);
+      const out = await ctxStats.handler({}, ctx);
+      // project: 10 calls, 566214 produced, 12921 returned, 553293 saved -> 97.7; session s1: 557214 / 12421 / 544793 -> 97.8.
+      assert.equal(out.text.split("\n")[0], STATS_SUMMARY(97.7, 97.8));
+      const rep = report(out.text);
+      assert.ok(rep.includes("This session · 9 calls · 10m active"), rep);
+      assert.ok(rep.includes("  Without context-mode |" + "█".repeat(40) + "|   544.2 KB"), rep);
+      assert.ok(rep.includes("  With context-mode    |█" + "░".repeat(39) + "|    12.1 KB"), rep);
+      assert.ok(rep.includes("  532.0 KB saved (97.8%) · about 136,198 tokens kept out of the chat"), rep);
+      // The Markdown table stays for agents that read numbers; ctx_stats rows are not in it either.
+      assert.deepEqual(row(out.text, "project"), ["566214 B", "12921 B", "553293 B", "97.7"]);
+    }));
+
+    test("[R6] stats/report-sorting: tool rows sorted by saved bytes, host tools marked as hook rows, agents add up", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addFixed(ctx);
+      const rep = report((await ctxStats.handler({}, ctx)).text);
+      assert.deepEqual(labels(rep, "Tool"), ["ctx_index", "hook Bash", "ctx_batch", "ctx_execute", "hook Edit", "hook AskUserQuestion", "ctx_search"]);
+      assert.ok(rep.includes("  ctx_index                  1   216.8 KB      300 B   216.5 KB   99.9% ████████"), rep);
+      assert.ok(rep.includes("  hook Bash                  2   161.1 KB     5.3 KB   155.9 KB   96.7% ██████"), rep);
+      assert.deepEqual(labels(rep, "Agent"), ["claude-code", "codex"]);
+      assert.ok(rep.includes("  codex                      1     8.8 KB      500 B     8.3 KB   94.4%"), rep);
+      assert.deepEqual(labels(rep, "Scope"), ["session", "project", "all-time"]);
+    }));
+
+    test("[R6] stats/report-journal-and-store: categories with session/project counts, hints, index state, sessions", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addFixed(ctx);
+      const rep = report((await ctxStats.handler({}, ctx)).text);
+      assert.deepEqual(labels(rep, "Journal"), ["Tool runs", "Content indexed", "File edits", "Errors kept", "Your decisions", "Your prompts"]);
+      assert.ok(rep.includes("  Tool runs                    5        6  " + "█".repeat(20)), rep);
+      assert.ok(rep.includes("ctx_resume"), "hint names the tool that reads the journal back");
+      assert.ok(rep.includes("  Indexed sources      2 · 124 chunks · 219.7 KB of content"), rep);
+      assert.ok(rep.includes("  Database file        <size>"), rep);
+      assert.ok(rep.includes("  Sessions             2 · agents 2 · active days 1"), rep);
+    }));
+
+    test("[R6] stats/report-width-80: every line fits 80 columns, also with long names and GB-sized numbers", () => withRoot(async (root) => {
+      const ctx = ctxFor(root, "s1", "a-very-long-agent-name-that-goes-on");
+      await addFixed(ctx, [...FIXED, { agent: "a-very-long-agent-name-that-goes-on", tool: "mcp__some_server__a_very_long_tool_name", p: 5e12, r: 1e9 }]);
+      const out = await ctxStats.handler({}, ctx);
+      // The report block and the summary line; the Markdown table below holds raw byte counts for agents.
+      for (const line of [out.text.split("\n")[0], ...report(out.text).split("\n")]) assert.ok([...line].length <= 80, `${[...line].length} columns: ${line}`);
+      assert.ok(report(out.text).includes("4.5 TB"), "TB unit with one decimal");
+    }));
+
+    test("[R6] stats/report-deterministic: same journal, same bytes", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addFixed(ctx);
+      const a = await ctxStats.handler({}, ctx);
+      const b = await ctxStats.handler({}, ctx);
+      assert.equal(a.text, b.text);
+    }));
+
+    test("[R6] stats/report-empty: an empty journal gives a short, friendly report", () => withRoot(async (root) => {
+      const out = await ctxStats.handler({}, ctxFor(root));
+      const rep = report(out.text);
+      assert.ok(rep.includes("Ready. Your savings show up here after the first tool call."), rep);
+      assert.ok(rep.split("\n").length <= 6, rep);
+      assert.ok(!/\b(no data|0\.0%)/.test(rep), "no table of zeros");
+    }));
   });
 
   // Moved from tests/tools/purge.test.mjs

@@ -354,6 +354,42 @@ export function STATS_SUMMARY(allTimePct: number, sessionPct: number): string {
 }
 export const STATS_COLUMNS = Object.freeze(["Scope", "Produced", "Returned", "Saved", "Reduction %"] as const);
 export const STATS_NO_DATA = "no data — no tool calls recorded yet"; // step 4, PRD §12
+// D-STATS-REPORT-1: the detailed report, in a ```text block above the table. Plain text, at most
+// STATS_WIDTH columns per line, same journal -> same bytes. Positive labels only.
+export const STATS_WIDTH = 80;
+export const STATS_BYTES_PER_TOKEN = 4; // a rough estimate, labelled "about" in the report
+export const STATS_MAX_TOOL_ROWS = 12;
+// Report layout (columns) and units; stats.ts holds no number literal but 0 and 1 (M4 lint).
+export const STATS_LABEL_W = 21; // label column, two spaces of indent before it
+export const STATS_LABEL_MAX = 20; // longest label text; a longer one ends in "…"
+export const STATS_CALLS_W = 7;
+export const STATS_NUM_W = 11;
+export const STATS_PCT_W = 8;
+export const STATS_KIND_W = 9;
+export const STATS_HEAD_BAR = 40;
+export const STATS_ROW_BAR = 8;
+export const STATS_KIND_BAR = 20;
+export const STATS_KIB = 1024;
+export const STATS_MILLION = 1_000_000;
+export const STATS_MS_PER_MINUTE = 60_000;
+export const STATS_MINUTES_PER_HOUR = 60;
+export const STATS_HOURS_PER_DAY = 24;
+export const STATS_CLOCK_DIGITS = 2;
+export const STATS_REPORT_TITLE = "context-mode stats";
+export const STATS_EMPTY_LINES = Object.freeze([
+  "Ready. Your savings show up here after the first tool call.",
+  "Large outputs from ctx_execute, ctx_batch and ctx_index stay in the",
+  "sandbox, and only the short answer goes to the chat.",
+] as const);
+// Journal kinds in report order (schema.ts events.kind; `cost` rows are usage events, not shown).
+export const STATS_KIND_LABELS = Object.freeze([
+  ["cmd", "Tool runs"], ["index", "Content indexed"], ["edit", "File edits"],
+  ["toolerr", "Errors kept"], ["decision", "Your decisions"], ["prompt", "Your prompts"],
+] as const);
+export const STATS_JOURNAL_HINTS = Object.freeze([
+  "ctx_resume brings back your last task, files changed and open errors",
+  "after a compact or a restart; ctx_search finds indexed content by words.",
+] as const);
 
 // ctx_purge (impl/06 §6)
 export const PURGE_SCOPES = Object.freeze(["session", "source", "project"] as const);
