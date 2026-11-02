@@ -8,7 +8,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-dark.png">
-  <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, for 10 coding agents, zero telemetry, your data stays on your machine. 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output).">
+  <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, for 10 coding agents, zero telemetry, the plugin keeps your data on your machine. 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output).">
 </picture>
 
 **Contents:** [Why](#why) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [Adoption](#adoption-stars-and-npm-downloads) · [License](#license) · [Community](#community)
@@ -27,10 +27,11 @@ Context Mode runs that work in a local sandbox, keeps the full output in a SQLit
 
 ## Install
 
-You need Node 24.15.0 or later. On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` check D11 (shell) checks for it.
+The plugin needs Node 24.15.0 or later (the `engines` field in [package.json](package.json)). On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` checks that Git Bash is there.
 
 Open your agent and copy its own install command. Each block also has the update, check and remove steps.
-`release` and `next` are the 2.0 channels; each command below already names the right one.
+Every command installs 2.0. The npm commands use `@next`, the current 2.0 release tag; a plain `npm i -g context-mode` installs 1.x. Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the `release` branch.
+The `context-mode` command (doctor, setup, remove) comes with the npm package: run `npm i -g context-mode@next` once, or use `/ctx-doctor` in the agent for the check.
 
 <details open id="install-claude-code"><summary><b>Claude Code</b></summary>
 
@@ -47,6 +48,7 @@ Hooks: yes (package) · MCP: yes · Skills: yes · Guide: [docs/install/claude-c
 codex plugin marketplace add mksglu/context-mode@release
 codex plugin add context-mode@context-mode
 ```
+Then run `context-mode setup --agents codex` once: it marks the plugin hooks as trusted in the Codex `config.toml`, so Codex runs them.
 Update: `codex plugin marketplace upgrade context-mode`. Check: `context-mode doctor --agents codex`. Remove: `context-mode setup --remove --agents codex`.
 Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/codex.md](docs/install/codex.md#install)
 </details>
@@ -58,7 +60,7 @@ gemini extensions install https://github.com/mksglu/context-mode --ref release
 Update: `gemini extensions update context-mode`. Check: `context-mode doctor --agents gemini`. Remove: `context-mode setup --remove --agents gemini`, then `gemini extensions uninstall context-mode`.
 Hooks: yes (package) · MCP: yes · Skills: yes · Guide: [docs/install/gemini.md](docs/install/gemini.md#install)
 </details>
-<details id="install-qwen"><summary><b>Qwen Code</b></summary>
+<details open id="install-qwen"><summary><b>Qwen Code</b></summary>
 
 ```sh
 qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
@@ -66,15 +68,15 @@ qwen extensions install https://github.com/mksglu/context-mode:context-mode --re
 Update: `qwen extensions update context-mode`. Check: `context-mode doctor --agents qwen`. Remove: `context-mode setup --remove --agents qwen`, then `qwen extensions uninstall context-mode`.
 Hooks: yes (package) · MCP: yes · Skills: yes · Guide: [docs/install/qwen.md](docs/install/qwen.md#install)
 </details>
-<details id="install-pi"><summary><b>Pi</b></summary>
+<details open id="install-pi"><summary><b>Pi</b></summary>
 
 ```sh
 pi install npm:context-mode@next
 ```
 Update: `pi update --extensions`. Check: `context-mode doctor --agents pi`. Remove: `context-mode setup --remove --agents pi`.
-Hooks: yes (the plugin's own event handlers) · MCP: plugin inside the agent · Skills: yes · Guide: [docs/install/pi.md](docs/install/pi.md#install)
+Hooks: yes (the plugin's own event handlers) · MCP: ctx tools built into the plugin · Skills: yes · Guide: [docs/install/pi.md](docs/install/pi.md#install)
 </details>
-<details id="install-opencode"><summary><b>OpenCode</b></summary>
+<details open id="install-opencode"><summary><b>OpenCode</b></summary>
 
 ```sh
 opencode plugin add context-mode@next
@@ -82,7 +84,7 @@ opencode plugin add context-mode@next
 Update: `opencode plugin update`. Check: `context-mode doctor --agents opencode`. Remove: `opencode plugin remove context-mode@next`, then `context-mode setup --remove --agents opencode`.
 Hooks: yes (the plugin's own event handlers) · MCP: yes · Skills: yes · Guide: [docs/install/opencode.md](docs/install/opencode.md#install)
 </details>
-<details id="install-copilot-cli"><summary><b>Copilot CLI</b></summary>
+<details open id="install-copilot-cli"><summary><b>Copilot CLI</b></summary>
 
 ```sh
 npm i -g context-mode@next
@@ -91,7 +93,7 @@ context-mode setup --agents copilot-cli
 Update: `context-mode upgrade`. Check: `context-mode doctor --agents copilot-cli`. Remove: `context-mode setup --remove --agents copilot-cli`.
 Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/copilot-cli.md](docs/install/copilot-cli.md#install)
 </details>
-<details id="install-kiro"><summary><b>Kiro</b></summary>
+<details open id="install-kiro"><summary><b>Kiro</b></summary>
 
 ```sh
 npm i -g context-mode@next
@@ -100,7 +102,7 @@ context-mode setup --agents kiro
 Update: `context-mode upgrade`. Check: `context-mode doctor --agents kiro`. Remove: `context-mode setup --remove --agents kiro`.
 Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/kiro.md](docs/install/kiro.md#install)
 </details>
-<details id="install-vscode"><summary><b>VS Code (Copilot)</b></summary>
+<details open id="install-vscode"><summary><b>VS Code (Copilot)</b></summary>
 
 ```sh
 npm i -g context-mode@next
@@ -109,7 +111,7 @@ context-mode setup --agents vscode
 Update: `context-mode upgrade`. Check: `context-mode doctor --agents vscode`. Remove: `context-mode setup --remove --agents vscode`.
 Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/vscode.md](docs/install/vscode.md#install)
 </details>
-<details id="install-zcode"><summary><b>ZCode</b></summary>
+<details open id="install-zcode"><summary><b>ZCode</b></summary>
 
 ```sh
 npm i -g context-mode@next
@@ -119,14 +121,7 @@ Update: `context-mode upgrade`. Check: `context-mode doctor --agents zcode`. Rem
 Hooks: yes (hook file) · MCP: yes · Skills: yes · Guide: [docs/install/zcode.md](docs/install/zcode.md#install)
 </details>
 
-The four GitHub-source commands name the `release` branch in each agent's own syntax.
 Already installed from GitHub on `main`? Each agent page has the steps to switch to the `release` ref: see "Already installed from GitHub?" in [Claude Code](docs/install/claude-code.md#already-installed-from-github), [Codex](docs/install/codex.md#already-installed-from-github), [Gemini CLI](docs/install/gemini.md#already-installed-from-github) and [Qwen Code](docs/install/qwen.md#already-installed-from-github).
-<!--
-After v2 is on main: `claude plugin marketplace add mksglu/context-mode`, `codex plugin marketplace add mksglu/context-mode`, `gemini extensions install https://github.com/mksglu/context-mode`, `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
-`next` is the v2 prerelease tag on npm.
-Switch day: remove the `release` and `next` lines and the "Already installed from GitHub?" line; drop `#release`, `@release`, `--ref release` and `@next` from the commands.
-Agent note, native install then update per agent: claude-code: `claude plugin marketplace add mksglu/context-mode#release`, then `claude plugin install context-mode@context-mode`; update `claude plugin update context-mode@context-mode`. codex: `codex plugin marketplace add mksglu/context-mode@release`, then `codex plugin add context-mode@context-mode`; update `codex plugin marketplace upgrade context-mode`. gemini: `gemini extensions install https://github.com/mksglu/context-mode --ref release`; update `gemini extensions update context-mode`. qwen: `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release`; update `qwen extensions update context-mode`. pi: `pi install npm:context-mode@next`; update `pi update --extensions`. opencode: `opencode plugin add context-mode@next`; update `opencode plugin update`.
--->
 
 The npm route works for every agent:
 
@@ -135,21 +130,21 @@ npm i -g context-mode@next
 context-mode setup
 ```
 
-`next` is the 2.0 tag on npm, so add `@next`.
-`context-mode setup` is also the repair. It shows a plan, saves your earlier config, then applies the plan; if a step stops, it puts the saved config back.
+`context-mode setup` is also the repair. It shows a plan, saves your earlier config, then applies the plan; when a step ends early, it restores the saved config.
 Uninstall: `context-mode setup --remove && npm rm -g context-mode`. Details: [docs/install/README.md](docs/install/README.md).
 
 Restart the agent, then run `context-mode doctor` (or `/ctx-doctor` in the agent). Each check prints PASS or a fix command.
 
 Every agent gets hooks, the MCP server and the plugin skills (files in `skills/`); the last line of each block above says how.
 Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi).
-The real agent binary ran our hook for Claude Code, Codex, Gemini CLI, Qwen Code, Pi, OpenCode, Copilot CLI and ZCode, in a clean temp home, logged out, with a local test model (2.0.0-next.15, the release that the record below covers).
-VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
+We ran the real binary of each agent with the plugin hook: Claude Code, Codex, Gemini CLI, Qwen Code, Pi, OpenCode, Copilot CLI and ZCode. Each run used a clean temp home and a local test model, on 2.0.0-next.15.
+For VS Code and Kiro, the check covers the hook setup: VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
 CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: [docs/architecture/release/HOOKS-FIRE.md](docs/architecture/release/HOOKS-FIRE.md).
 
 ## Try it
 
-Paste one of these prompts into your agent after the install. Each one ran live with Claude Code 2.1.312 and passed a check against the source data ([evidence and rerun steps](bench/evidence/try-it-2026-11-02/README.md)). Afterwards, run `/ctx-stats` in your agent to see how much output stayed out of the context; all 10 agents use this command.
+Paste one of these prompts into your agent after the install. Each one ran once, live, in Claude Code 2.1.312, and its answer matched the source data ([evidence and rerun steps](bench/evidence/try-it-2026-11-02/README.md)). The headline numbers in [Benchmarks](#benchmarks) use the median of 5 runs. Other agents do the same job with the same tools: `ctx_execute`, `ctx_index` and `ctx_search`.
+Then run `/ctx-stats` in your agent to see how much output stayed out of the context. Every agent gets this command with the plugin skills ([skills/ctx-stats](skills/ctx-stats/SKILL.md)).
 ```text
 On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array.
 ```
@@ -157,7 +152,7 @@ The hook sends WebFetch to the sandbox, and the agent searches the page for the 
 ```text
 Fetch https://jsonplaceholder.typicode.com/photos. Which photo has the longest title (give its id and title), and how many photos have a title that contains the word "est"?
 ```
-The agent runs code over 5,000 JSON records in the sandbox and gets back two answers. 1,039,898 B raw, 393 B reached the context, 99.96% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5).
+The agent runs code over 5,000 JSON records in the sandbox and gets back two answers. 1,039,898 B raw, 393 B reached the context, 99.96% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5). The answer is two short facts, so this is the best case of the four.
 ```text
 Here is a Linux syslog sample: https://raw.githubusercontent.com/logpai/loghub/master/Linux/Linux_2k.log. How many authentication failures does it contain, and which 3 remote hosts caused the most?
 ```
@@ -165,7 +160,7 @@ The agent counts failures in a 1,999-line syslog in the sandbox. 216,485 B raw, 
 ```text
 What are the top 10 stories on the Hacker News front page right now? Give title, points and domain for each.
 ```
-The hook sends WebFetch to the sandbox, and the agent reads ten stories from the page. 35,087 B raw, 1,501 B reached the context, 95.7% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5).
+The hook sends WebFetch to the sandbox, and the agent reads ten stories from the page. 35,087 B raw, 1,501 B reached the context, 95.7% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5). The front page changes, so the raw size changes with each run.
 
 ## Use cases
 
@@ -195,16 +190,17 @@ Real tool output from public projects, run through Context Mode. Bench of 2026-1
 | [Debug for a full session: 8 outputs, 3 searches](bench/g-overhead/README.md#g-session-total) | All hooks and tools | 281,261 B | 3,266 B | 98.8% |
 
 The agent gets the part it asks for. The full output stays in the local index, and `ctx_search` reads it back.
+The Context7 row has 6,917 B of raw output, under the 10 KB line of the headline rule, so the headline leaves it out.
 
 ## Benchmarks
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/fig-saving-dark.png">
-  <img src="docs/assets/readme/fig-saving-light.png" alt="Bar chart: median output bytes saved per category for rows of 10 KB or more. Sandbox 99.5%, Batch 93.1%, Externalize 98.3%, Hook redirect 99.8%, Session total 98.8%.">
+  <img src="docs/assets/readme/fig-saving-light.png" alt="Bar chart: median output bytes saved per category for rows of 10 KB or more. Sandbox 99.5%, Batch 93.1%, Externalize 98.3%, Hook redirect 99.8%, Session total 98.8%. The table below adds Retrieval, 77.2%.">
 </picture>
 
 Rule for every headline number in this README: rows with 10 KB or more of raw output, median of 5 runs per row, measured with `ctx_bytes` against `raw_bytes`; a category is the median of its rows; 1 KB = 1,024 B.
-All 36 such rows, the six categories below: the plugin keeps a median of 99.4% of output bytes out of the context. Bench on 2.0.0-next.23, commit 16a4bcc5 with local edits (`dirty: true` in the file), macOS arm64, 2026-11-01.
+All 36 such rows, the six categories below: the plugin keeps a median of 99.4% of output bytes out of the context. Bench on 2.0.0-next.23 (commit 16a4bcc5 and the local edits that the file records), macOS arm64, 2026-11-01.
 
 | Category | What runs | Rows | Median saved |
 |---|---|---:|---:|
@@ -215,7 +211,7 @@ All 36 such rows, the six categories below: the plugin keeps a median of 99.4% o
 | f. Hook redirect | A big Read, curl or WebFetch sent to the sandbox | 7 | 99.8% |
 | g. Session total | One full scripted session | 1 | 98.8% |
 
-Search replies (category b) return the matching text, so they keep less out. The full file lists every row, small ones too: [bench/results/2026-11-01-darwin-arm64.md](bench/results/2026-11-01-darwin-arm64.md).
+Search replies (category b) carry the matching text, so they save 77.2%. Category e (long sessions) is in [Longer sessions](#longer-sessions). The full file lists every row, small ones too: [bench/results/2026-11-01-darwin-arm64.md](bench/results/2026-11-01-darwin-arm64.md).
 Reproduce: `cd bench && node run.mjs`. Method and every data file: [bench/README.md](bench/README.md), [bench/evidence/](bench/evidence/README.md).
 
 ### Longer sessions
@@ -293,6 +289,8 @@ Here "sandbox" means the output stays in the sandbox, out of the context. Code f
 
 The plugin works on tool output, on your machine, and it is complete on its own. Context Mode Gateway is an optional hosted service that works on every request, across all your agents. Its 11 features, the full list: Context Saving, Recall, Memory, Skills, Search, Session resume, Active Context, Instructions, Protect, Prompt caching, Live and Analytics.
 Teams add it for long sessions, shared memory and cost reports. The two work together.
+Gateway Recall, Search and Session resume run on the Gateway server, across sessions and agents. The plugin's `ctx_search` and `ctx_resume` read the local `context.db` of one project.
+With the Gateway on, your requests pass through its server; the plugin keeps its own data on your machine.
 
 <a href="docs/assets/readme/gateway/live.mp4"><img src="docs/assets/readme/gateway/live.webp" width="100%" alt="Gateway Live screen during a session: money saved, bytes kept out per request, history kept and sent, and a feed of each request with its cost and saving"></a>
 
@@ -329,16 +327,16 @@ Source: [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works?utm_s
 
 | Feature | What it does | What you get | Details |
 |---|---|---|---|
-| Context Saving | Folds old tool output, runs data work as code (Thinking in Code), trims tool schemas, places cache marks | Gateway, Claude Code, Opus 5.5: tool schemas 102,784 B to 33,611 B per request (-67.3% of bytes); a tool output over 2,048 B becomes a pointer of about 285 B, with the full copy archived | Saves the most on sessions with many tool calls; A/B measured in Claude Code |
-| Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | Gateway, Claude Code, Opus 5.5, 200K window, 2026-10-04: mean cost per session $4.86 to $3.04 (-37.6% in dollars) | Cost measured in Claude Code on Claude Opus 5.5 |
+| Context Saving | Folds old tool output, runs data work as code (Thinking in Code), trims tool schemas, places cache marks | A tool output over 2,048 B becomes a short pointer, with the full copy archived | Saves the most on sessions with many tool calls ([How saving works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=table)) |
+| Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | Gateway, Claude Code, Opus 5.5, 200K window, 2026-10-04: mean cost per session $4.8627 to $3.0353 (-37.6% in dollars, [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json?utm_source=github&utm_medium=readme&utm_content=table)) | Cost measured in Claude Code on Claude Opus 5.5 |
 | Memory | Each fact keeps two times: when it was true and when the Gateway learned it | Claude Code and Codex on one account share one store, tested end to end | The memory block goes into the first request of a new session |
 | Skills | A skill catalog on the Gateway for your account; it loads the skill that matches your message | The matching skill loads on the message that needs it | Import skills from GitHub; a loaded skill joins the prompt in full |
-| Search | Searches the prompts, commands and tool output that passed through, in the console and as an agent tool | Find any past prompt, command or tool output, from the console or your agent | The console searches the first 4,000 characters of each tool result |
-| Session resume | One command rebuilds a conversation as a native Claude Code or Codex session | Continue a conversation in Claude Code or Codex | Restores the text, tool names and a summary; the command is valid for 15 minutes |
-| Active Context | Sets how much a thread carries before its oldest parts move to the archive: 200K, 500K or 1M tokens | Pick the window size per thread | An image older than the kept part becomes a short text note |
-| Instructions | One text of at most 4,096 characters that tells every agent how to answer you | Read from the provider cache after the first request | Sets how the agent writes to you |
+| Search | Searches the prompts, commands and tool output that passed through, in the console and as an agent tool | Find any past prompt, command or tool output, from the console or your agent | The console searches the first 4,000 characters of each tool result ([Search](https://contextmode.ai/docs/search?utm_source=github&utm_medium=readme&utm_content=table)) |
+| Session resume | One command rebuilds a conversation as a native Claude Code or Codex session | Continue a conversation in Claude Code or Codex | Restores the text, tool names and a summary; the command is valid for 15 minutes ([Session resume](https://contextmode.ai/docs/session-resume?utm_source=github&utm_medium=readme&utm_content=table)) |
+| Active Context | Sets how much a thread carries before its oldest parts move to the archive: 200K, 500K or 1M tokens | Pick the window size per thread | An image older than the kept part becomes a short text note ([Active Context](https://contextmode.ai/docs/active-context?utm_source=github&utm_medium=readme&utm_content=table)) |
+| Instructions | One text of at most 4,096 characters that tells every agent how to answer you | Read from the provider cache after the first request | Sets how the agent writes to you ([Instructions](https://contextmode.ai/docs/instructions?utm_source=github&utm_medium=readme&utm_content=table)) |
 | Protect | A tool-call firewall: checks shell commands, file reads and writes, web fetches and tool-server calls by what they do | Each call checked before it runs | Reads the call itself, so keep your agent's sandbox on for script files and paths built at run time; opt-in |
-| Prompt caching | Keeps requests cache-friendly: cache marks on the fixed part of the prompt and a cache for fetched pages | Inside the measured costs above | Uses up to 4 cache marks, the provider's maximum |
+| Prompt caching | Keeps requests cache-friendly: cache marks on the fixed part of the prompt and a cache for fetched pages | Inside the measured costs above | Uses up to 4 cache marks, the provider's maximum ([Prompt caching](https://contextmode.ai/docs/prompt-caching?utm_source=github&utm_medium=readme&utm_content=table)) |
 | Live and Analytics | Shows each request and what the Gateway saved, as it happens and over time | See each request and its saving, live and over time | Covers every request that passes through the Gateway |
 
 </details>
@@ -346,12 +344,12 @@ Source: [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works?utm_s
 Gateway cost against Claude Code alone, Claude Opus 5.5, mean dollars per session at list price:
 
 - Six short tasks (2026-09-29): 24.5% fewer dollars pooled over 176 sessions (21% to 29% per task). [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json?utm_source=github&utm_medium=readme&utm_content=bench)
-- Long Claude Code session, 200K window (2026-10-03/04): mean cost per session $4.86 to $3.04 (-37.6% in dollars). [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json?utm_source=github&utm_medium=readme&utm_content=bench)
+- Long Claude Code session, 200K window (2026-10-03/04): mean cost per session $4.8627 to $3.0353 (-37.6% in dollars, mean of 3 pairs). [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json?utm_source=github&utm_medium=readme&utm_content=bench)
 - We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks?utm_source=github&utm_medium=readme&utm_content=bench).
 
 Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi.
-Setup is one command, `npx @context-mode/cli`. It signs you in and writes one config change per agent (it needs Node 20.12 or later).
-The Gateway routes to Anthropic and OpenAI. The Gateway sends your requests to its server on the way to the model. Its privacy page is at [contextmode.ai/privacy](https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
+Setup is one command, `npx @context-mode/cli`. It signs you in and writes one config change per agent (the Gateway CLI needs Node 20.12 or later, from its npm `engines` field; the plugin needs Node 24.15.0).
+The Gateway routes to Anthropic and OpenAI. The Gateway sends your requests to its server on the way to the model. It keeps a searchable record of your sessions for Recall and Search, and masks secrets and e-mail addresses when it reads archived output back. Its privacy page is at [contextmode.ai/privacy](https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 Keep your agent's own sandbox on next to Protect. More at [contextmode.ai](https://contextmode.ai/?utm_source=github&utm_medium=readme&utm_content=more).
 
 ## Adoption: stars and npm downloads

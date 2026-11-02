@@ -186,9 +186,11 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     for (const file of [["README.md"], ["docs", "install", "README.md"]]) {
       const text = read(...file);
       for (const [id, [install, update]] of Object.entries(NATIVE)) {
-        for (const cmd of [...install, ...update]) assert.ok(text.includes(`\`${cmd}\``), `${file.join("/")} lacks ${cmd} (${id})`);
+        // D-README-FIX-1: README.md shows the install commands as fence lines, so it checks the plain command.
+        for (const cmd of [...install, ...update]) assert.ok(text.includes(file.length === 1 ? cmd : `\`${cmd}\``), `${file.join("/")} lacks ${cmd} (${id})`);
       }
-      assert.ok(text.includes("`next` is the v2 prerelease tag"), `${file.join("/")} lacks the next line`);
+      const nextLine = file.length === 1 ? "`@next`, the current 2.0 release tag" : "`next` is the v2 prerelease tag";
+      assert.ok(text.includes(nextLine), `${file.join("/")} lacks the next line`);
       assert.ok(text.includes("context-mode doctor"), `${file.join("/")} lacks doctor`);
       assert.ok(!text.includes("node -e"), `${file.join("/")} has node -e`);
     }
@@ -220,9 +222,9 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
       for (const c of cmds) assert.ok(afters[0].includes(c), `${id}.md after line lacks ${c}`);
       assert.ok(!install.includes("Testing v2 (next):"), `${id}.md still has a separate Testing line; the top block is the test command`);
     }
-    for (const file of [["README.md"], ["docs", "install", "README.md"]]) {
-      assert.ok(read(...file).split("\n").some((l) => l.startsWith("After v2 is on main: ")), `${file.join("/")} lacks the After line`);
-    }
+    // D-README-FIX-1: the README carries no maintainer comment; the After line lives in docs/install/README.md.
+    assert.ok(read("docs", "install", "README.md").split("\n").some((l) => l.startsWith("After v2 is on main: ")), "docs/install/README.md lacks the After line");
+    assert.ok(!read("README.md").includes("After v2"), "README.md holds the maintainer After line");
   });
 
   test("install-native: no doc names a GitHub-source command without the release ref, except the After line", () => {

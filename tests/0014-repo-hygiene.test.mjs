@@ -977,7 +977,7 @@ describe("ADR-0015 repo: README agent lines", () => {
     for (const id of ["pi", "opencode"]) {
       assert.ok(rows[id].hooks.includes("the plugin's own event handlers"), `${id} hooks cell: ${rows[id].hooks}`);
     }
-    assert.equal(rows.pi.mcp, "plugin inside the agent");
+    assert.equal(rows.pi.mcp, "ctx tools built into the plugin");
     assert.ok(!/in[- ]process/i.test(Object.values(HOOK_WORDS).join(" ")), "HOOK_WORDS has no in-process wording");
     for (const rel of ["README.md", "docs/install/README.md", "docs/how-it-works.md", "docs/install/pi.md", "docs/install/opencode.md"]) {
       const text = readFileSync(path.join(REPO, rel), "utf8");
@@ -1580,14 +1580,22 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     // Hook runs: one positive line that names each agent.
     const agents = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("\n## Use cases\n"));
     assert.ok(!agents.includes("For 8 agents") && !agents.includes("earlier step"), "hook runs read as a list of agents");
-    const live = agents.split("\n").find((l) => l.startsWith("The real agent binary ran our hook"));
+    const live = agents.split("\n").find((l) => l.startsWith("We ran the real binary of each agent with the plugin hook"));
     assert.ok(live, "README has the real-binary line");
     for (const n of ["Claude Code", "Codex", "Gemini CLI", "Qwen Code", "Pi", "OpenCode", "Copilot CLI", "ZCode"]) assert.ok(live.includes(n), `real-binary line names ${n}`);
-    // Install: the channel line sits before the blocks; the first three blocks are open.
+    assert.ok(!live.includes("logged out") && !live.includes(" our "), "the real-binary line reads plain");
+    // Install (D-README-FIX-1): all 10 blocks open; the tag, CLI and GitHub-source lines sit before the blocks.
     const firstBlock = readme.indexOf("<details open id=\"install-claude-code\">");
     assert.ok(firstBlock > 0, "the Claude Code block is open");
-    assert.ok(readme.slice(readme.indexOf("\n## Install\n"), firstBlock).includes("`release` and `next` are the 2.0 channels"), "channel line before the blocks");
-    for (const id of ["codex", "gemini"]) assert.ok(readme.includes(`<details open id="install-${id}">`), `${id} block is open`);
+    const head = readme.slice(readme.indexOf("\n## Install\n"), firstBlock);
+    for (const need of ["`@next`, the current 2.0 release tag", "Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub", "`npm i -g context-mode@next`", "[package.json](package.json)"]) {
+      assert.ok(head.includes(need), `Install intro lacks ${need}`);
+    }
+    for (const a of ADAPTERS) assert.ok(readme.includes(`<details open id="install-${a.id}">`), `${a.id} block is open`);
+    const codex = readme.slice(readme.indexOf("<details open id=\"install-codex\">"), readme.indexOf("<details open id=\"install-gemini\">"));
+    assert.ok(codex.includes("`context-mode setup --agents codex`"), "the Codex block names the hook trust step");
+    for (const bad of ["check D11", "After v2", "Switch day", "Agent note", "<!--", "so add `@next`"]) assert.ok(!readme.includes(bad), `README has "${bad}"`);
+    datedRow("D-README-FIX-1", "tum agentlerin kendi native install commandleri");
     for (const bad of ["old build", "old release", "rolls back", "recall block", "FAIL"]) assert.ok(!readme.includes(bad), `README has "${bad}"`);
     // "zero" stays only in the owner's own "zero telemetry".
     for (const line of readme.split("\n")) {
@@ -1608,7 +1616,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const readme = readRepo("README.md");
     for (const line of readme.split("\n")) assert.ok(!line.startsWith("> [!"), `README has an alert block: ${line}`);
     for (const kind of ["IMPORTANT", "TIP", "NOTE", "WARNING", "CAUTION"]) assert.ok(!readme.includes(`[!${kind}]`), `README has [!${kind}]`);
-    assert.ok(readme.includes("You need Node 24.15.0 or later."), "the Node line stays as a plain line");
+    assert.ok(readme.includes("The plugin needs Node 24.15.0 or later"), "the Node line stays as a plain line");
     datedRow("D-README-PLAIN-1", "bu mor-yesil renklendirmeler AI-Sloppy gozukuyor");
   });
 

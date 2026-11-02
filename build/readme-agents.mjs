@@ -3,7 +3,7 @@
 // table (src/adapters/table.ts) and the setup registry (src/setup/registry.ts).
 // Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
 // Columns (DEVIATIONS D-README-2): Hooks = the row's hookChannel kind in table.ts (every agent has one, ADR-0020);
-// MCP = "yes", or "plugin inside the agent" when the registry row has no MCP config and the agent runs in process (Pi);
+// MCP = "yes", or "ctx tools built into the plugin" (D-README-FIX-1) when the registry row has no MCP config and the agent runs in process (Pi);
 // Skills = the row's skillChannel; Install = every command of the first fence in the page's Install section, joined by
 // <br>, when it is the agent's own command (D-README-INSTALL-CELL-1), else "npm + context-mode setup".
 // The line ("Hooks: ... · MCP: ... · Skills: ... · Guide: ...") sits inside each <details id="install-<id>"> block; the
@@ -57,7 +57,7 @@ export function agentRows() {
     const { rel, name, lines } = pageOf(a.id);
     if (!(a.hookChannel.kind in HOOK_WORDS)) throw new Error(`${a.id}: unknown hook channel ${a.hookChannel.kind}`);
     const hooks = `yes, ${HOOK_WORDS[a.hookChannel.kind]}`;
-    const mcp = a.installMode === "in-process" && !reg.config ? "plugin inside the agent" : "yes";
+    const mcp = a.installMode === "in-process" && !reg.config ? "ctx tools built into the plugin" : "yes";
     const bin = reg.nativePlugin?.bin ?? reg.cli?.bin ?? (a.installMode === "in-process" ? a.id : "");
     return { id: a.id, name, hooks, mcp, skills: a.skillChannel ? "yes" : "no", install: installCell(lines, bin), page: rel };
   }).sort((x, y) => x.name.localeCompare(y.name));
