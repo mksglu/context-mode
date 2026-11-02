@@ -754,7 +754,8 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
   // A fake release root: hook.mjs prints `out` (and echoes the --agent it got to stderr), fixtures/ next to it.
   function bundle(t, out, { fixture = FIXTURE, exit = 0 } = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), "cm-doctor-hook-"));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    // D-WIN-RM-RETRY-1: Windows can hold the hook child's cwd a moment after "close" (EPERM); retry like 0002/0007.
+    t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 3 }));
     writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
       `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s);process.stderr.write(process.argv.slice(2).join(" "));process.stdout.write(${JSON.stringify(out)});process.exitCode=${exit};});`);
     if (fixture !== null) {
@@ -1489,7 +1490,7 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
 
   function tmp(t) {
     const dir = mkdtempSync(path.join(tmpdir(), "cm-doctor-"));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 3 })); // D-WIN-RM-RETRY-1
     return dir;
   }
 
