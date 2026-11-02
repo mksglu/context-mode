@@ -1447,7 +1447,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const readme = readRepo("README.md");
     const head = readme.slice(0, readme.indexOf("\n## Context Mode Gateway\n"));
     const why = head.slice(head.indexOf("\n## Why\n"), head.indexOf("\n## Install\n"));
-    for (const need of ["Free forever", "Runs on your machine", "~/.context-mode", "Zero telemetry", "offline"]) assert.ok(why.includes(need), `Why lacks ${need}`);
+    for (const need of ["The plugin is free forever", "Runs on your machine", "~/.context-mode", "Zero telemetry", "offline"]) assert.ok(why.includes(need), `Why lacks ${need}`);
     const sec = head.slice(head.indexOf("\n## Security and privacy\n"));
     for (const need of ["zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "tests/0008-enforcement.test.mjs"]) assert.ok(sec.includes(need), `Security and privacy lacks ${need}`);
     assert.ok(head.split("\n")[2].includes("free") && head.split("\n")[2].includes("local"), "the tagline says free and local");
@@ -1765,9 +1765,11 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     const readme = readRepo("README.md");
     // main holds the v1 stats.json (no npm_downloads field), so a badge on stats.json@main showed "no result".
     // The npm API answers on every branch; last-year covers every download since the package began (2026-02-23) until 2027-02-23.
-    // Owner 2026-11-02: "bunu K ekle bu rakamlar okunmuyor". shields npm/dy reads the same npm last-year count and prints it in K ("683k/year").
-    const badge = "https://img.shields.io/npm/dy/context-mode?label=npm%20downloads";
-    assert.ok(readme.includes(badge), "npm downloads badge is shields npm/dy with the label 'npm downloads'");
+    // Owner 2026-11-02: "bunu K ekle bu rakamlar okunmuyor". shields prints the count in K.
+    // D-README-COUNT-1: npm/dt (all time) so the badge and the 683K total in the README name the same count; npm/dy (last year) differs.
+    const badge = "https://img.shields.io/npm/dt/context-mode?label=npm%20downloads";
+    assert.ok(readme.includes(badge), "npm downloads badge is shields npm/dt with the label 'npm downloads'");
+    assert.ok(!readme.includes("img.shields.io/npm/dy/"), "the last-year badge is gone (D-README-COUNT-1)");
     assert.ok(!readme.includes("badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org"), "the full-digit badge is gone");
     datedRow("D-README-BADGE-K-1", "bunu K ekle bu rakamlar okunmuyor");
     assert.ok(!readme.includes("stats.json&query"), "no badge reads stats.json");
@@ -1836,12 +1838,35 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.equal(table.split("<td").length - 1, 2, "one row, two cells");
     const cells = table.split("<td").slice(1);
     assert.ok(cells[0].includes("star-history-dark.png") && cells[0].includes("star-history-light.png"), "left cell: star chart");
-    assert.ok(cells[1].includes("npm-downloads-dark.png") && cells[1].includes("npm-downloads-light.png"), "right cell: npm grid");
+    assert.ok(cells[1].includes("npm-downloads-dark.png") && cells[1].includes("npm-downloads-light.png"), "right cell: npm downloads per day");
+    assert.ok(cells[1].includes("npm downloads per day") && !cells[1].includes("2x2"), "right cell alt names the one daily chart (D-README-COUNT-1)");
     const page = "https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption";
     assert.ok(cells[0].includes('href="' + page + '#stars"') && cells[1].includes('href="' + page + '#daily"'), "both charts open the stats page on their tab");
     assert.ok(sec.split("\n").some((l) => l.includes(page) && l.includes("interactive")), "one line points to the interactive page");
     for (const need of ["stargazers-light.png", "**Hacker News.**", "**GitHub Trending.**"]) assert.ok(sec.includes(need), `Adoption lacks ${need}`);
     datedRow("D-README-ADOPT-1", "Adaption cok altlarda kalmis");
+  });
+
+  test("README top: four badges, a one-line count from stats.json under them, the plugin named as the free part (D-README-COUNT-1)", () => {
+    // Owner 2026-11-02: "Adaption cok altlarda kalmis"; "FREE'den ayri bir urun oldugunu bilmeleri gerek".
+    const readme = readRepo("README.md");
+    const lines = readme.split("\n");
+    const badges = lines.find((l) => l.startsWith("[![npm downloads]"));
+    assert.equal(badges.split("[![").length - 1, 4, "badge row: npm downloads, stars, Discord, license");
+    for (const bad of ["Hacker%20News", "GitHub-Trending"]) assert.ok(!badges.includes(bad), `badge row has ${bad}; the Adoption bullets hold it`);
+    const stats = JSON.parse(readRepo("stats.json"));
+    const k = (n) => Math.round(n / 1000) + "K";
+    const count = lines.find((l) => l.startsWith("**" + k(stats.stars) + " GitHub stars"));
+    assert.ok(count && lines.indexOf(count) < lines.findIndex((l) => l.startsWith("## ")), "a count line from stats.json sits above the first section");
+    for (const need of [k(stats.npm_downloads) + " npm downloads", stats.read_at, "(stats.json)", "#adoption-stars-and-npm-downloads"]) assert.ok(count.includes(need), `count line lacks ${need}`);
+    assert.ok(lines[2].includes("The plugin is free forever"), "the tagline names the plugin as the free part");
+    const why = readme.slice(readme.indexOf("\n## Why\n"), readme.indexOf("\n## Adoption"));
+    assert.ok(why.includes("The Context Mode plugin runs that work"), "Why names the plugin");
+    const install = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("<details open id=\"install-claude-code\">"));
+    assert.ok(!install.includes("Every command installs"), "Install intro opens with the commands, the tag line follows");
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
+    assert.ok(gw.split("\n").some((l) => l.includes("npx @context-mode/cli") && l.includes("own subscription")), "the Gateway setup line names its subscription");
+    datedRow("D-README-COUNT-1", "Adaption cok altlarda kalmis");
   });
 
   test("npm downloads data: 500-day API chunks, ISO weeks from Monday, complete weeks and months only, year totals plus the running total (D-README-NPM-1)", async () => {
@@ -1885,7 +1910,8 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     for (const k of ["read_at", "first", "last", "total", "daily", "weekly", "monthly", "yearly", "running"]) assert.ok(k in npm, `npm-data.js lacks ${k}`);
     assert.equal(npm.first, "2026-02-23", "first publish day of context-mode (npm view context-mode time.created)");
     const r = readRepo(SRC + "render.mjs");
-    assert.ok(r.includes("{ name: 'npm-downloads', view: 'grid'"), "render.mjs renders the grid view");
+    // D-README-COUNT-1: the README cell is half the page wide, so it shows one chart (per day); weeks, months and years live on the stats page.
+    assert.ok(r.includes("{ name: 'npm-downloads', view: 'daily'"), "render.mjs renders the daily view for the README");
     for (const v of ["daily", "weekly", "monthly", "yearly"]) assert.ok(!r.includes("name: 'npm-" + v + "'"), `render.mjs still renders npm-${v}`);
     assert.ok(html.includes('VIEW==="grid"'), "npm-downloads.html draws the grid view");
     const y = readRepo(".github/workflows/readme-stats.yml");

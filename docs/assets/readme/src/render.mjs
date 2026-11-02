@@ -27,9 +27,9 @@ const FIGS = [
   { name: 'fig-oss', w: 1280, h: 720 },
   { name: 'star-history', w: 1280, h: 640, drawn: true }, // drawn from star-data.js: wait for window.__drawn (D-README-STAR-1)
   { name: 'stargazers', w: 1280, h: 440, data: 'stargazer-companies.json' }, // D-README-STARRED-1
-  // D-README-NPM-1, D-README-ADOPT-1: one image, the four views (daily, weekly, monthly, yearly) as a 2x2 grid, drawn from
+  // D-README-NPM-1, D-README-COUNT-1: one image, npm downloads per day (the README cell is half the page wide), drawn from
   // npm-data.js (build/npm-downloads.mjs); same frame as star-history. npm-downloads.html?view=daily draws one view full size.
-  { name: 'npm-downloads', view: 'grid', w: 1280, h: 640, drawn: true },
+  { name: 'npm-downloads', view: 'daily', w: 1280, h: 640, drawn: true },
 ];
 const MAX = 400 * 1024; // 2x PNGs; the README total stays under 2 MB (build/readme-links.mjs)
 const only = process.argv.slice(2);

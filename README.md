@@ -1,8 +1,10 @@
 # Context Mode
 
-**A free, local plugin that keeps tool output out of your coding agent's context window. 10 agents, zero telemetry, free forever.**
+**A free, local plugin for 10 coding agents. It keeps tool output out of your agent's context window and keeps all usage data on your machine. The plugin is free forever.**
 
-[![npm downloads](https://img.shields.io/npm/dy/context-mode?label=npm%20downloads)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Hacker News 570+ points](https://img.shields.io/badge/Hacker%20News-570%2B%20points-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=47193064) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-black?logo=github)](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
+[![npm downloads](https://img.shields.io/npm/dt/context-mode?label=npm%20downloads)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
+
+**33K GitHub stars · 683K npm downloads** (read 2026-11-01, [stats.json](stats.json)) · on the Hacker News front page and GitHub Trending: [charts and sources](#adoption-stars-and-npm-downloads)
 
 > The Context Mode plugin is free and local, with its source open on GitHub. **Context Mode Gateway** is a separate hosted service with its own account and subscription. It takes the same idea from tool output to the whole conversation: Gateway Recall keeps long sessions searchable, and Gateway Memory shares what your agents learn across sessions and tools. [See how the Gateway works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=quote)
 
@@ -16,12 +18,12 @@
 ## Why
 
 A coding agent reads files, runs commands and fetches pages, and every result goes into its context window.
-Context Mode runs that work in a local sandbox, keeps the full output in a SQLite index on your machine, and gives the agent the part it asks for.
+The Context Mode plugin runs that work in a local sandbox, keeps the full output in a SQLite index on your machine, and gives the agent the part it asks for.
 
-- **Free forever.** Use it at home and at work, free of charge, under a source-available license.
+- **The plugin is free forever.** Use it at home and at work, free of charge, under a source-available license.
 - **Runs on your machine.** The hooks, the sandbox and search run as local processes next to your agent.
 - **The plugin keeps your data on your machine.** Every index lives in `~/.context-mode`: one `context.db` per project.
-- **Zero telemetry.** The plugin keeps all usage data on your machine. A CI test keeps its short list of network calls fixed: see [Security and privacy](#security-and-privacy).
+- **Zero telemetry.** The plugin keeps all usage data on your machine. [Security and privacy](#security-and-privacy) lists each network call it makes.
 - **Works offline after install.** Sandbox runs, file indexing and search use local SQLite and your own runtimes.
 - **Small replies.** On the 36 bench rows with 10 KB or more of raw output, the plugin's median reply is 99.4% smaller than the raw output.
 
@@ -29,10 +31,10 @@ Context Mode runs that work in a local sandbox, keeps the full output in a SQLit
 
 <table><tr>
 <td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#stars"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/star-history-dark.png"><img src="docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode since 2026-02-23. A daily job redraws it."></picture></a></td>
-<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-downloads-dark.png"><img src="docs/assets/readme/npm-downloads-light.png" alt="Four charts of npm downloads for context-mode in a 2x2 grid: per day, per ISO week, per month and per year, since the first publish on 2026-02-23. A daily job redraws them."></picture></a></td>
+<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/npm-downloads-dark.png"><img src="docs/assets/readme/npm-downloads-light.png" alt="Area chart of npm downloads per day for context-mode, the last 90 days. A daily job redraws it."></picture></a></td>
 </tr></table>
 
-Hover the bars on the [interactive chart](https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily) to read each day, week, month and year. Stars come from the GitHub GraphQL API (`starredAt`); npm downloads come from `api.npmjs.org/downloads/range`. The total up to 2026-10-29 is 683K npm downloads ([stats.json](stats.json) keeps a daily copy). A daily job redraws both charts.
+Open the [interactive chart](https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily) and point at a bar to read its value. Tabs there show days, weeks, months and years. Stars come from the GitHub GraphQL API (`starredAt`); npm downloads come from `api.npmjs.org/downloads/range`. The total up to 2026-10-29 is 683K npm downloads ([stats.json](stats.json) keeps a daily copy). A daily job redraws both charts.
 
 - **Hacker News.** "MCP server that reduces Claude Code context consumption by 98%" reached the front page with 570+ points and 107 comments on 2026-02-28 ([thread](https://news.ycombinator.com/item?id=47193064)).
 - **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
@@ -49,7 +51,7 @@ Starred by engineers at these companies: each name is the company field of 2 or 
 The plugin needs Node 24.15.0 or later (the `engines` field in [package.json](package.json)). On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` checks that Git Bash is there.
 
 Open your agent and copy its own install command. Each block also has the update, check and remove steps.
-Every command installs 2.0. The npm commands use `@next`, the current 2.0 release tag; a plain `npm i -g context-mode` installs 1.x. Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the `release` branch.
+The npm commands use `@next`, the current 2.0 release tag; a plain `npm i -g context-mode` installs 1.x. Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the `release` branch.
 The `context-mode` command (doctor, setup, remove) comes with the npm package: run `npm i -g context-mode@next` once, or use `/ctx-doctor` in the agent for the check.
 
 <details open id="install-claude-code"><summary><b>Claude Code</b></summary>
@@ -372,7 +374,7 @@ Gateway cost against Claude Code alone, Claude Opus 5.5, mean dollars per sessio
 - We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks?utm_source=github&utm_medium=readme&utm_content=bench).
 
 Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi.
-Setup is one command, `npx @context-mode/cli`. It signs you in and writes one config change per agent (the Gateway CLI needs Node 20.12 or later, from its npm `engines` field; the plugin needs Node 24.15.0).
+Setup is one command, `npx @context-mode/cli`. It signs you in to your Gateway account, which has its own subscription, and writes one config change per agent (the Gateway CLI needs Node 20.12 or later, from its npm `engines` field; the plugin needs Node 24.15.0).
 The Gateway routes to Anthropic and OpenAI. The Gateway sends your requests to its server on the way to the model. It keeps a searchable record of your sessions for Recall and Search, and masks secrets and e-mail addresses when it reads archived output back. Its privacy page is at [contextmode.ai/privacy](https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 Keep your agent's own sandbox on next to Protect. More at [contextmode.ai](https://contextmode.ai/?utm_source=github&utm_medium=readme&utm_content=more).
 
