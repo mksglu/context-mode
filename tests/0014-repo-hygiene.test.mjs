@@ -1177,6 +1177,8 @@ describe("ADR-0015 / ADR-0024 repo: no dev folders, no v2 dir names (D-REPO-CLEA
   // These may name the old paths: history rows, frozen data, the changelog, and the guards themselves.
   const EXEMPT = (f) => f === "docs/architecture/DEVIATIONS.md" || f === "docs/architecture/modules/DEVIATIONS.md" ||
     f.startsWith("bench/fixtures/data/") || f.startsWith("CHANGELOG") ||
+    // generated case pages and their stored replies quote those fixture bytes word for word (D-BENCH-PAGES-1)
+    /^bench\/[a-g]-[a-z-]+\/README\.md$/.test(f) || /^bench\/results\/[^/]+-replies\.json$/.test(f) ||
     f === "tests/0014-repo-hygiene.test.mjs" || f === "build/check-removed.mjs";
   const HEX = "0123456789abcdef";
   // True when the text just before position i ends with "/blob/<40 hex>/" or "/tree/<40 hex>/".

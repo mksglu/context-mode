@@ -1,11 +1,15 @@
 // Group D: large output externalization. An output over the cap stays whole in FTS5; the reply is a head plus a pointer.
 // Proof nothing is lost: a query finds the first, a middle and the last line.
+import { execFileSync } from "node:child_process";
 import { bytes, read, rng, pct, kb, rng3 } from "../suite/lib.mjs";
 
 // Deterministic synthetic output (seed 20261031): `lines` log lines with unique markers on the first, middle and last line.
 const synth = (lines) => `const s=${20261031};let a=s>>>0;const r=()=>{a=(a+0x6d2b79f5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296};
 const N=${lines};const out=[];for(let i=0;i<N;i++){let m="req "+Math.floor(r()*1e9).toString(16)+" latency="+Math.floor(r()*900)+"ms upstream=api-"+Math.floor(r()*40)+" status="+(r()<0.05?500:200);
 if(i===0)m="FIRSTMARK-7c1e "+m;if(i===Math.floor(N/2))m="MIDMARK-52ab "+m;if(i===N-1)m="LASTMARK-9f3a "+m;out.push(m)}console.log(out.join("\\n"))`;
+
+// The first lines of the synthetic output, for the case page (the same seeded script, run once here).
+const sampleOf = (code) => execFileSync(process.execPath, ["-e", code], { encoding: "utf8", maxBuffer: 1 << 26 }).split("\n").slice(0, 8).join("\n");
 
 const CASES = [
   { id: "d-synth-120k", title: "Synthetic log, about 120 KB (seeded)", synthetic: true, lines: 1500, marks: ["FIRSTMARK-7c1e", "MIDMARK-52ab", "LASTMARK-9f3a"] },
@@ -43,7 +47,7 @@ export default {
         searchBytes += bytes(s.text ?? ""); searchMs += s.ms ?? 0;
         if ((s.text ?? "").includes(m.split(" ")[0]) || (s.text ?? "").includes(m)) found++;
       }
-      return { metrics: { raw_bytes: fullBytes, ctx_bytes: bytes(r.text), exec_ms: r.ms, markers: marks.length, markers_found: found, search_bytes_per_query: Math.round(searchBytes / marks.length), search_ms_per_query: searchMs / marks.length }, ok: found === marks.length };
+      return { metrics: { raw_bytes: fullBytes, ctx_bytes: bytes(r.text), exec_ms: r.ms, markers: marks.length, markers_found: found, search_bytes_per_query: Math.round(searchBytes / marks.length), search_ms_per_query: searchMs / marks.length }, reply: r.text, ...(c.synthetic ? { sample: sampleOf(code) } : {}), ok: found === marks.length };
     },
   })),
   table(rows) {

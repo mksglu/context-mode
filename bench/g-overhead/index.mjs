@@ -30,10 +30,10 @@ export default {
       async run({ client }) {
         for (const f of SESSION) { const r = await client.call("ctx_index", { content: read(f), source: f }); if (r.error || r.isError) return { error: r.error ?? r.text }; }
         const qs = ["failed tests", "TS2339", "build warnings", "status 500", "revert", "label bug", "sessions", "button", "error", "cache", "timeout", "import", "commit", "page", "request", "login", "price", "user", "route", "export"];
-        const ms = [], by = [];
-        for (const q of qs) { const r = await client.call("ctx_search", { queries: [q] }); if (r.error || r.isError) return { error: r.error ?? r.text }; ms.push(r.ms); by.push(bytes(r.text)); }
+        const ms = [], by = []; let last = "";
+        for (const q of qs) { const r = await client.call("ctx_search", { queries: [q] }); if (r.error || r.isError) return { error: r.error ?? r.text }; ms.push(r.ms); by.push(bytes(r.text)); last = r.text; }
         const s = stats(ms);
-        return { metrics: { search_ms_median: s.median, search_ms_max: s.max, reply_bytes_median: stats(by).median }, ok: true };
+        return { metrics: { search_ms_median: s.median, search_ms_max: s.max, reply_bytes_median: stats(by).median }, reply: last, ok: true };
       },
     },
     {
@@ -57,9 +57,9 @@ export default {
           const s = seenAfterHook(t, h); if (s.error) return { error: s.error };
           seen += bytes(s.seen); hookMs += h.ms;
         }
-        let follow = 0;
-        for (const q of ["failed tests", "TS2339 property", "status 500"]) { const r = await client.call("ctx_search", { queries: [q], scope: "session" }, session); if (r.error || r.isError) return { error: r.error ?? r.text }; follow += bytes(r.text); }
-        return { metrics: { raw_bytes: raw, ctx_bytes: seen + follow, hook_left_bytes: seen, follow_up_bytes: follow, hook_ms_total: hookMs }, ok: true };
+        let follow = 0; const replies = [];
+        for (const q of ["failed tests", "TS2339 property", "status 500"]) { const r = await client.call("ctx_search", { queries: [q], scope: "session" }, session); if (r.error || r.isError) return { error: r.error ?? r.text }; follow += bytes(r.text); replies.push(r.text); }
+        return { metrics: { raw_bytes: raw, ctx_bytes: seen + follow, hook_left_bytes: seen, follow_up_bytes: follow, hook_ms_total: hookMs }, reply: replies.join("\n"), ok: true };
       },
     },
   ],

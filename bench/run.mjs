@@ -5,14 +5,17 @@
 //   node run.mjs --runs 5                    n runs per scenario (the median, min, max and sigma are over these)
 //   node run.mjs --bundle <dir>              built bundle dir (default ../release-out; built if missing)
 //   node run.mjs --no-write                  print the tables, write nothing
+//   node run.mjs --pages                     rebuild the group READMEs from the newest results file and its -replies.json
+//   node run.mjs --save-replies <id...>      run cases once, store their reply text in the newest -replies.json, then rebuild pages
 // Writes results/<date>-<os>-<arch>.json (raw samples) and results/<date>-<os>-<arch>.md (tables), and one README.md per
 // group folder (inputs with sha256, commands). Exit 1 only when a scenario errors; numbers never fail a run.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { devVersionLabel } from "../scripts/release/dev-version.mjs";
 import { BENCH, REPO, DATA, sandbox, startServer, stats, sha256, tokens, qualityMisses } from "./suite/lib.mjs";
+import { groupPage } from "./suite/pages.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (name, d) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : d; };
@@ -22,14 +25,27 @@ const WRITE = !argv.includes("--no-write");
 const skip = new Set(["--runs", "--bundle"].flatMap((f) => (argv.includes(f) ? [argv[argv.indexOf(f) + 1]] : [])));
 const filters = argv.filter((a) => !a.startsWith("--") && !skip.has(a));
 if (!Number.isInteger(RUNS) || RUNS < 1) { console.error("--runs needs a positive integer"); process.exit(2); }
-
-if (!existsSync(path.join(BUNDLE, "server.mjs"))) {
-  execFileSync(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", BUNDLE], { cwd: REPO, stdio: "inherit" });
-}
+const PAGES = argv.includes("--pages"), SAVE_REPLIES = argv.includes("--save-replies");
 const GROUPS = ["a-sandbox", "b-retrieval", "c-batch", "d-externalize", "e-continuity", "f-hook-redirect", "g-overhead"];
 const groups = [];
 for (const g of GROUPS) groups.push({ dir: g, ...(await import(`./${g}/index.mjs`)).default });
 
+// Group pages are built from stored data only: the newest results file, its -replies.json twin and the input files.
+const RESULTS = path.join(BENCH, "results");
+const newestResults = () => readdirSync(RESULTS).filter((f) => /^\d{4}-\d{2}-\d{2}-[a-z0-9]+-[a-z0-9]+\.json$/.test(f)).sort().at(-1);
+const repliesPath = (f) => path.join(RESULTS, f.replace(/\.json$/, "-replies.json"));
+function writePages(file) {
+  const r = JSON.parse(readFileSync(path.join(RESULTS, file), "utf8"));
+  const rp = existsSync(repliesPath(file)) ? JSON.parse(readFileSync(repliesPath(file), "utf8")) : { date: r.date, replies: {} };
+  const ctx = { results: r.results, manifest: r.fixtures, runs: r.runs, resultsFile: file, replies: rp.replies, repliesDate: rp.date };
+  for (const g of groups) writeFileSync(path.join(BENCH, g.dir, "README.md"), groupPage(g, ctx));
+  console.log(`pages: ${groups.length} group READMEs from results/${file}`);
+}
+if (PAGES) { writePages(newestResults()); process.exit(0); }
+
+if (!existsSync(path.join(BUNDLE, "server.mjs"))) {
+  execFileSync(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", BUNDLE], { cwd: REPO, stdio: "inherit" });
+}
 const git = (...a) => { try { return execFileSync("git", a, { cwd: REPO, encoding: "utf8" }).trim(); } catch { return null; } };
 const commit = git("rev-parse", "HEAD");
 const OWN = /^(\?\? |.. )(release-out\/?|bench\/results\/.*|bench\/[a-z-]+\/README\.md)$/; // files this run writes or builds do not make the tree dirty
@@ -45,6 +61,7 @@ const T0 = performance.now();
 const matches = (g, s) => filters.length === 0 || filters.some((f) => g.dir === f || s.id === f || s.id.startsWith(f));
 
 const results = [];
+const replies = {};
 let errors = 0;
 for (const g of groups) {
   for (const s of g.scenarios) {
@@ -60,6 +77,7 @@ for (const g of groups) {
         if (r.error) { err = r.error; break; }
         for (const [k, v] of Object.entries(r.metrics)) if (v !== null && v !== undefined) (samples[k] ??= []).push(typeof v === "boolean" ? Number(v) : v);
         ok = ok && r.ok !== false; if (r.note) note = r.note;
+        if (r.reply !== undefined) replies[s.id] = { reply: r.reply, ...(r.sample !== undefined ? { sample: r.sample } : {}) };
       } catch (e) { err = String(e.message ?? e); }
       finally { try { await client?.close(); } catch { /* gone */ } sb.dispose(); }
     }
@@ -93,22 +111,18 @@ for (const g of groups) {
 }
 console.log("\n" + md.join("\n"));
 
-if (WRITE) {
+if (SAVE_REPLIES) {
+  // Keep the committed numbers; add only the reply text of the cases just run (one run each is enough: bytes repeat).
+  const file = newestResults(), p = repliesPath(file);
+  const old = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : { date, replies: {} };
+  writeFileSync(p, JSON.stringify({ date: old.date ?? date, replies: { ...old.replies, ...replies } }, null, 2) + "\n");
+  writePages(file);
+} else if (WRITE) {
   mkdirSync(path.join(BENCH, "results"), { recursive: true });
   writeFileSync(path.join(BENCH, "results", `${tag}.json`), JSON.stringify(out, null, 2) + "\n");
   writeFileSync(path.join(BENCH, "results", `${tag}.md`), md.join("\n") + "\n");
-  for (const g of groups) {
-    const rs = g.scenarios.filter((s) => filters.length === 0 || matches(g, s));
-    if (filters.length) continue; // group READMEs are written only by a full run
-    const l = [`# ${g.title}`, "", g.blurb, "", `Run this group: \`cd bench && node run.mjs ${g.dir}\`. Latest tables: [results/${tag}.md](../results/${tag}.md).`, ""];
-    for (const s of rs) {
-      l.push(`## ${s.id}`, "", s.title, "", `- Command: \`${s.command}\``);
-      if ((s.inputs ?? []).length) for (const f of s.inputs) l.push(`- Input: \`fixtures/data/${f}\`${manifest[f] ? `, ${manifest[f].bytes} B, sha256 ${manifest[f].sha256}` : ""}`);
-      else l.push(s.synthetic ? "- Input: synthetic, generated in the scenario with a fixed seed (20261031)" : "- Input: none (small payloads built in the scenario)");
-      l.push("");
-    }
-    writeFileSync(path.join(BENCH, g.dir, "README.md"), l.join("\n"));
-  }
+  writeFileSync(repliesPath(`${tag}.json`), JSON.stringify({ date, replies }, null, 2) + "\n");
+  if (filters.length === 0) writePages(`${tag}.json`); // group READMEs are written only by a full run
 }
 const misses = qualityMisses(results);
 if (misses.length) {

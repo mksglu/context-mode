@@ -154,6 +154,45 @@ describe("ADR-0012 / bench suite (bench/run.mjs)", () => {
     assert.equal(indexedLabel("no label here"), null);
   });
 
+  // D-BENCH-PAGES-1: each case section on a group page speaks plainly and its numbers equal the committed results file.
+  test("group pages: each case has plain lines, numbers equal to the results JSON, a fenced sample and the rerun command", async () => {
+    const { beforeAfter, keptOut, docsLink, whatYouDo } = await import("../bench/suite/pages.mjs");
+    const file = files.at(-1);
+    const r = JSON.parse(readFileSync(path.join(BENCH, "results", file), "utf8"));
+    const rp = JSON.parse(readFileSync(path.join(BENCH, "results", file.replace(/\.json$/, "-replies.json")), "utf8"));
+    const fmt = (n) => Math.round(n).toLocaleString("en-US");
+    for (const g of GROUPS) {
+      const readme = readFileSync(path.join(BENCH, g, "README.md"), "utf8");
+      const top = readme.split("\n## " + r.results.find((x) => x.group === g).id + "\n")[0];
+      const intro = top.split("\n").filter((l) => l.trim() && !l.startsWith("#") && !l.startsWith("Run this group"));
+      assert.equal(intro.length, 3, g + ": a 3-line intro");
+      assert.doesNotMatch(top, /\bv2\b|Engine/, g + ": intro has no v2 or Engine");
+      const rows = r.results.filter((x) => x.group === g);
+      for (const [i, row] of rows.entries()) {
+        // cut at the next case anchor: samples may hold "## " lines inside their fences
+        const sec = readme.split("\n## " + row.id + "\n")[1]?.split(rows[i + 1] ? "\n## " + rows[i + 1].id + "\n" : "\0")[0];
+        assert.ok(sec, row.id + ": section with its anchor");
+        assert.ok(whatYouDo(row.id), row.id + ": a plain one-line job");
+        assert.ok(sec.includes("**What you do:** " + whatYouDo(row.id)), row.id + ": What you do");
+        assert.match(sec, /\*\*Without Context Mode:\*\*/, row.id);
+        assert.match(sec, /\*\*With Context Mode:\*\*/, row.id);
+        assert.ok(sec.includes("```sh\ncd bench && node run.mjs " + row.id + "\n```"), row.id + ": rerun command");
+        assert.ok(sec.includes("](" + docsLink(row.id) + ")"), row.id + ": docs link with UTM");
+        assert.match(sec, /<sub>Proof: /, row.id + ": proof line");
+        for (const f of row.inputs) assert.ok(sec.includes(r.fixtures[f].sha256), row.id + ": sha256 of " + f);
+        const ba = beforeAfter(row);
+        if (!ba) continue;
+        assert.ok(sec.includes(`${fmt(ba.before)} B, about ${fmt(ba.before / 4)} tokens`), row.id + ": before bytes and tokens");
+        assert.ok(sec.includes(`The agent gets ${fmt(ba.after)} B, about ${fmt(ba.after / 4)} tokens.`), row.id + ": after bytes");
+        if (ba.after < ba.before) assert.ok(sec.includes(`keeps ${keptOut(ba.before, ba.after)}% of it out`), row.id + ": % kept out");
+        assert.ok((sec.match(/^`{3,}text$/gm) ?? []).length >= 2, row.id + ": a fenced sample and a fenced reply");
+        assert.ok(rp.replies[row.id]?.reply, row.id + ": stored reply text");
+        const first = rp.replies[row.id].reply.split("\n")[0].slice(0, 60);
+        assert.ok(sec.includes(first), row.id + ": the stored reply is on the page");
+      }
+    }
+  });
+
   test("a one-scenario run works and a bad --runs is refused", () => {
     const bad = spawnSync(process.execPath, [path.join(BENCH, "run.mjs"), "--runs", "0", "--no-write"], { encoding: "utf8" });
     assert.equal(bad.status, 2);

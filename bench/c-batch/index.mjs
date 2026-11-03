@@ -1,4 +1,5 @@
 // Group C: ctx_batch (several commands + queries in one call) against separate raw Bash calls.
+import { execSync } from "node:child_process";
 import { bytes, read, pct, kb, rng3 } from "../suite/lib.mjs";
 
 const CASES = [
@@ -9,6 +10,8 @@ const CASES = [
   { id: "c-small", title: "Small outputs (3 tiny commands, 2 queries): batch has fixed overhead", cmds: ["node --version", "git rev-parse --is-inside-work-tree", "echo ready"],
     queries: ["node version", "ready"], expect: ["v"] },
 ];
+
+const execOut = (cmd) => { try { return execSync(cmd, { encoding: "utf8" }); } catch { return ""; } };
 
 export default {
   id: "c-batch",
@@ -28,7 +31,7 @@ export default {
       }
       const found = c.expect.every((e) => r.text.includes(e));
       const sections = r.text.split(/^## /m).length - 1;
-      return { metrics: { raw_bytes: native, ctx_bytes: bytes(r.text), batch_ms: r.ms, commands: commands.length, query_sections: sections }, ok: found, note: found ? "" : "expected string missing" };
+      return { metrics: { raw_bytes: native, ctx_bytes: bytes(r.text), batch_ms: r.ms, commands: commands.length, query_sections: sections }, reply: r.text, ...(c.cmds ? { sample: commands.map((cmd) => execOut(cmd)).join("") } : {}), ok: found, note: found ? "" : "expected string missing" };
     },
   })),
   table(rows) {

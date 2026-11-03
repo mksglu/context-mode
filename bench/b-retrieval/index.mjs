@@ -63,7 +63,7 @@ export default {
         ok = metrics.queries_hit === queries.length && found === expect.length && !markup;
         if (found < expect.length) note = `answer string missing for ${expect.length - found} query(ies)`;
       }
-      return { metrics, ok, note };
+      return { metrics, ok, note, reply: se.text };
     },
   })),
   table(rows) {

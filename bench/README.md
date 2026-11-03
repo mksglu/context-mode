@@ -23,7 +23,7 @@ starts the built MCP server over stdio and runs the built hooks as separate proc
 
 Output: `results/<date>-<os>-<arch>.json` (raw samples, median, min, max, sigma, n, node, os, cpu, context-mode version and git
 commit, dirty flag, sha256 of every input) and `results/<date>-<os>-<arch>.md` (one table per group, each with a footnote line).
-Each table row links to its scenario in the group README, which lists the command and the input hashes.
+Each table row links to its case in the group README: what the case does, a sample of the raw output, the reply the agent got, the rerun command and the input hashes. `node run.mjs --pages` rebuilds those pages from the newest results file and its `-replies.json`.
 
 Method notes.
 - Tokens are bytes / 4. That is an estimate. No tokenizer is vendored.

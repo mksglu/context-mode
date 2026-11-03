@@ -58,7 +58,7 @@ export default {
       const h = runHook(bundle, sb, "claude-code", hp);
       const seen = seenAfterHook(raw, h);
       if (seen.error) return { error: seen.error };
-      return { metrics: { raw_bytes: bytes(raw), ctx_bytes: bytes(r.text), hook_bytes: bytes(seen.seen), exec_ms: r.ms, hook_ms: h.ms, v1_bytes: v1Row(s.name)?.v1_context_bytes ?? null }, ok: true, note: seen.replaced ? "" : "hook allowed (below its threshold)" };
+      return { metrics: { raw_bytes: bytes(raw), ctx_bytes: bytes(r.text), hook_bytes: bytes(seen.seen), exec_ms: r.ms, hook_ms: h.ms, v1_bytes: v1Row(s.name)?.v1_context_bytes ?? null }, reply: r.text, ok: true, note: seen.replaced ? "" : "hook allowed (below its threshold)" };
     },
   })),
   table(rows) {

@@ -23,7 +23,7 @@ export default {
     id: c.id, title: c.title, inputs: [c.file], command: `node run.mjs ${c.id}`,
     async run({ bundle, sb }) {
       const raw = read(c.file);
-      let h, ctxBytes, decision, note = "";
+      let h, ctxBytes, decision, reply, note = "";
       if (c.kind === "read") { h = runHook(bundle, sb, "claude-code", pre(sb, "Read", { file_path: sb.project + "/data/" + c.file })); }
       else if (c.kind === "webfetch") { h = runHook(bundle, sb, "claude-code", pre(sb, "WebFetch", { url: c.url, prompt: "summarize" })); }
       else { h = runHook(bundle, sb, "claude-code", postToolUse(sb, raw, { command: c.command ?? "cat data/" + c.file })); }
@@ -31,15 +31,15 @@ export default {
       if (c.kind === "post") {
         const s = seenAfterHook(raw, h);
         if (s.error) return { error: s.error };
-        ctxBytes = bytes(s.seen); decision = s.replaced ? 1 : 0;
+        ctxBytes = bytes(s.seen); reply = s.seen; decision = s.replaced ? 1 : 0;
         const pre2 = runHook(bundle, sb, "claude-code", pre(sb, "Bash", { command: c.command ?? "cat data/" + c.file }));
         note = "PreToolUse " + (pre2.stdout.trim() === "" ? "allowed" : "answered");
       } else {
         const denied = h.stdout.includes('"deny"');
-        ctxBytes = denied ? bytes(h.stdout) : bytes(raw); decision = denied ? 1 : 0;
+        ctxBytes = denied ? bytes(h.stdout) : bytes(raw); reply = denied ? h.stdout : raw; decision = denied ? 1 : 0;
       }
       const expectDecision = c.id === "f-read-small-file" ? 0 : 1;
-      return { metrics: { raw_bytes: bytes(raw), ctx_bytes: ctxBytes, decision, hook_ms: h.ms }, ok: decision === expectDecision, note };
+      return { metrics: { raw_bytes: bytes(raw), ctx_bytes: ctxBytes, decision, hook_ms: h.ms }, reply, ok: decision === expectDecision, note };
     },
   })),
   table(rows) {

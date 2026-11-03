@@ -45,7 +45,7 @@ export default {
       const up = runHook(bundle, sb, "claude-code", { hook_event_name: "UserPromptSubmit", prompt: c.question, session_id: session, cwd: sb.project });
       if (resume.error || resume.isError || ss.status !== 0 || up.status !== 0) return { error: resume.error ?? resume.text ?? "hook exit " + ss.status + "/" + up.status };
       const found = up.stdout.includes(c.expect) ? 1 : 0;
-      return { metrics: { raw_bytes: raw, hook_bytes_total: hookBytes, resume_bytes: bytes(resume.text), compact_block_bytes: bytes(ss.stdout), recall_bytes: bytes(up.stdout), recall_found: found, resume_ms: resume.ms, events: texts.length }, ok: found === 1, note: found ? "" : "recall block does not hold the expected line" };
+      return { metrics: { raw_bytes: raw, hook_bytes_total: hookBytes, resume_bytes: bytes(resume.text), compact_block_bytes: bytes(ss.stdout), recall_bytes: bytes(up.stdout), recall_found: found, resume_ms: resume.ms, events: texts.length }, reply: resume.text, ...(c.synthetic ? { sample: texts[0] } : {}), ok: found === 1, note: found ? "" : "recall block does not hold the expected line" };
     },
   })),
   table(rows) {
