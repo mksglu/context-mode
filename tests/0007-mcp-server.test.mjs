@@ -163,7 +163,7 @@ describe("ADR-0007 call shape on every host", () => {
   let oldHome;
 
   before(() => {
-    root = realpathSync(mkdtempSync(join(tmpdir(), "cm-call-shape-")));
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), "cm-call-shape-"))); // D-WIN-TMP-LONG-1: Windows tmpdir is RUNNER~1, the server prints runneradmin
     repo = join(root, "repo");
     mkdirSync(repo);
     execFileSync("git", ["init", "-q", repo]);
