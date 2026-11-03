@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Context Mode plugins by Mert Koseoglu",
-    "version": "2.0.0-next.29"
+    "version": "2.0.0-next.35"
   },
   "plugins": [
     {
       "name": "context-mode",
       "source": "./",
       "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
-      "version": "2.0.0-next.29",
+      "version": "2.0.0-next.35",
       "author": {
         "name": "Mert Koseoglu"
       },
