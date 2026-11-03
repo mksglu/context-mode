@@ -913,7 +913,7 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
   test("[M5] doctor-hook/D5-no-fixture-file-is-UNKNOWN", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, native, { fixture: null })));
     assert.equal(r.status, "UNKNOWN");
-    assert.ok(r.detail.startsWith("the hook fixture file ") && r.detail.includes(C.HOOK_FIXTURE_FILE), r.detail); // D-DOCTOR-ISSUE-1
+    assert.ok(r.detail.startsWith("hook fixture ") && r.detail.includes(C.HOOK_FIXTURE_FILE) && r.detail.endsWith(" is absent: the round trip needs it"), r.detail); // D-DOCTOR-ISSUE-1, D-DOCTOR-FIX-1 shorter row
   });
 
   test("[M5] doctor-hook/D5-codex-hooks-file-and-no-journal-row-is-UNKNOWN-not-trusted (R6)", async (t) => {
@@ -2123,20 +2123,29 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     const { doctorReply } = await import("../src/core/tools/doctor.ts");
     const reply = await doctorReply(ctx, hostOf(h, { CODEX_HOME: path.join(h, "codex-home") }));
     const lines = reply.text.split("\n");
-    // 1. Environment line above the table.
+    // 1. Environment: two lines above the table (D-DOCTOR-FIX-1: each fits 80 columns).
     assert.ok(lines[0].startsWith("Environment: context-mode "), lines[0]);
-    for (const part of [`${process.platform}-${process.arch}`, process.version, "claude-code 9.9.9", "/bin/sh"]) assert.ok(lines[0].includes(part), part);
-    assert.equal(lines[1], C.REPORT_HEADER);
-    // 3 + 5. D3 names setup; every FAIL or UNKNOWN row carries the docs link with UTM.
+    assert.ok(lines[1].startsWith("Environment: "), lines[1]);
+    for (const part of [`${process.platform}-${process.arch}`, process.version, "claude-code 9.9.9", "/bin/sh"]) assert.ok((lines[0] + lines[1]).includes(part), part);
+    assert.equal(lines[2], C.REPORT_HEADER);
+    // 3 + 5. D3 names setup; D-DOCTOR-FIX-1: the docs link with UTM shows once, under the table, and in no row.
     assert.ok(reply.text.includes("Fix: context-mode setup --agents claude-code"));
-    for (const l of lines.filter((x) => x.includes("| FAIL |") || x.includes("| UNKNOWN |"))) assert.ok(l.includes("https://contextmode.ai/docs/engine/doctor?utm_source=ctx_doctor"), l);
+    assert.ok(!lines.some((l) => l.startsWith("| ") && l.includes("contextmode.ai")), "rows hold no docs link");
+    const docs = lines.filter((l) => l.startsWith("Docs: "));
+    assert.equal(docs.length, 1, reply.text);
+    assert.ok(docs[0].startsWith("Docs: https://contextmode.ai/docs/engine/doctor?utm_source=ctx_doctor&utm_medium=doctor&utm_content=D"), docs[0]);
+    // D-DOCTOR-FIX-1: every line outside the table fits 80 columns; the two URL lines are one link each.
+    for (const l of lines.filter((x) => !x.startsWith("| ") && !x.startsWith("Docs: ") && !x.startsWith("Or open: "))) assert.ok([...l].length <= 80, l);
     // 6. Report path (home as ~), gh line and the prefilled form URL.
     const rep = lines.find((l) => l.startsWith("Report file: ~/.context-mode/reports/doctor-"));
     assert.ok(rep, reply.text);
     const file = path.join(h, rep.slice("Report file: ~/".length));
     assert.ok(existsSync(file), file);
-    const gh = lines.find((l) => l.startsWith("File it: gh issue create --repo mksglu/context-mode "));
-    assert.ok(gh && gh.includes("--body-file ~/.context-mode/reports/doctor-"), gh);
+    // D-DOCTOR-FIX-1: the gh command wraps with a trailing backslash, so a terminal runs the three lines as one.
+    const gi = lines.findIndex((l) => l.startsWith(`File it: gh issue create --repo ${C.ISSUE_REPO_SLUG} --label bug \\`));
+    assert.ok(gi > 0, reply.text);
+    assert.ok(lines[gi + 1].startsWith("  --title \"ctx_doctor claude-code: ") && lines[gi + 1].endsWith(" \\"), lines[gi + 1]);
+    assert.ok(lines[gi + 2].startsWith("  --body-file ~/.context-mode/reports/doctor-"), lines[gi + 2]);
     const url = lines.find((l) => l.startsWith("Or open: https://github.com/mksglu/context-mode/issues/new?template=agent-report.yml&"));
     assert.ok(url && url.length < 8000, url);
     // 10. The report holds every form field, in the form's order, and the debug data, with home as ~ and secrets masked.
@@ -2156,6 +2165,8 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     // The report is a valid issue body for the intake check.
     const intake = await import("../.github/scripts/issue-intake.mjs");
     assert.deepEqual(intake.check(body).findings, []);
+    // D-DOCTOR-FIX-1: the whole reply pasted into an issue reads clean too (two env lines, docs line, wrapped gh lines).
+    assert.deepEqual(intake.reportKeys(lines).bad, []);
   });
 
   test("[M5] doctor-issue/agent-report.yml has one required field per report heading; config.yml points to Discord and the docs", () => {

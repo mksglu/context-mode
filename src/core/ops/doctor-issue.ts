@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import {
-  BUNDLE_SHA, CONFIG_TOML_FILE, DOCTOR_CONFIG_LINES, DOCTOR_ENV_NAMES, DOCTOR_ENV_PREFIX, DOCTOR_GH_LINE,
+  BUNDLE_SHA, CONFIG_TOML_FILE, DOCTOR_CONFIG_LINES, DOCTOR_ENV_NAMES, DOCTOR_ENV_PREFIX, DOCTOR_GH_LINE, DOCTOR_GH_NEXT,
   DOCTOR_GIT_VERSION_TIMEOUT_MS, DOCTOR_HOOK_LOG_LINES, DOCTOR_JOURNAL_ROWS, DOCTOR_LOG_TAIL_BYTES, DOCTOR_MASK,
   DOCTOR_PATH_TOOLS, DOCTOR_REPORT_FILE_PREFIX, DOCTOR_REPORT_LINE, DOCTOR_REPORTS_DIR, DOCTOR_SECRET_WORDS, DOCTOR_URL_LINE,
   EXE_SUFFIX, ISSUE_FORM_HEADINGS, ISSUE_FORM_URL, ISSUE_REPO_SLUG, ISSUE_URL_MAX, NATIVE_INSTALL, SETTINGS_FILE,
@@ -51,7 +51,9 @@ export function environmentLine(ctx: ToolContext, adapter: AdapterRow, env: Node
   const agent = client === undefined ? adapter.id
     : client.name === adapter.id ? `${adapter.id} ${client.version}` : `${adapter.id} ${client.version} (client ${client.name})`;
   const shell = env.SHELL ?? env.ComSpec ?? "sh";
-  return `${DOCTOR_ENV_PREFIX}context-mode ${version ?? "source checkout"} (${sha}), agent ${agent}, ${process.platform}-${process.arch}, Node ${process.version}, shell ${shell}`;
+  // D-DOCTOR-FIX-1: two lines, so each fits 80 columns: what runs, then where it runs.
+  return `${DOCTOR_ENV_PREFIX}context-mode ${version ?? "source checkout"} (${sha}), agent ${agent}\n` +
+    `${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}, Node ${process.version}, shell ${shell}`;
 }
 
 function gitVersion(env: NodeJS.ProcessEnv): string {
@@ -213,8 +215,9 @@ export async function writeIssueReport(i: IssueInput): Promise<string[]> {
   const shown = tilde(file);
   const title = issueTitle(i.adapter.id, i.rows);
   // gh refuses --template together with --body-file; the body file already holds the form's sections.
-  const gh = `gh issue create --repo ${ISSUE_REPO_SLUG} --title ${JSON.stringify(title)} --label bug --body-file ${shown}`;
-  return [DOCTOR_REPORT_LINE + shown, DOCTOR_GH_LINE + gh, DOCTOR_URL_LINE + formUrl(title, summaryOf(i.adapter.id, i.rows))];
+  // D-DOCTOR-FIX-1: the command wraps with a trailing backslash, so each line fits 80 columns and a shell runs it as one.
+  const gh = [`gh issue create --repo ${ISSUE_REPO_SLUG} --label bug \\`, `${DOCTOR_GH_NEXT}title ${JSON.stringify(title)} \\`, `${DOCTOR_GH_NEXT}body-file ${shown}`];
+  return [DOCTOR_REPORT_LINE + shown, DOCTOR_GH_LINE + gh[0], gh[1]!, gh[2]!, DOCTOR_URL_LINE + formUrl(title, summaryOf(i.adapter.id, i.rows))];
 }
 
 /** The prefilled agent-report.yml URL: title and summary only, under ISSUE_URL_MAX. */

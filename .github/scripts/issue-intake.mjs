@@ -17,7 +17,7 @@ export const ENV_KEYS = ["env.NODE_ENV"];
 export const ALLOWED_KEYS = new Set([...CHECK_KEYS, ...ENV_KEYS]);
 const TRUNCATED_PREFIX = "(report truncated at ";
 const COMMAND_PREFIX = "Run in a terminal: ";
-const NOTE_PREFIXES = ["Environment: ", "Report file: ", "File it: ", "Or open: "]; // = DOCTOR_NOTE_PREFIXES
+const NOTE_PREFIXES = ["Environment: ", "Docs: ", "Report file: ", "File it: ", "--", "Or open: "]; // = DOCTOR_NOTE_PREFIXES (D-DOCTOR-FIX-1)
 const ROW_PREFIX = "| ";
 const ENV_PREFIX = "env.";
 const FENCE = "```";

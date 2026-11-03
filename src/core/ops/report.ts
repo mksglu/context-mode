@@ -2,8 +2,6 @@
 // redact-secrets-in-debug-report (#1144) and redact-secrets-in-doctor-output (#1141); DEVIATIONS D-M5-O3-1..3.
 // Pure function: renders the ctx_doctor table plus typed env lines, ; buildReportHead shortens the reply, never the stored report.
 import {
-  DOCTOR_DOCS_LABEL,
-  DOCTOR_DOCS_LINK,
   DOCTOR_FAIL_LINE,
   REPORT_CAP,
   REPORT_COMMAND_PREFIX,
@@ -43,12 +41,12 @@ function envLine(key: string, value: string): string {
   return REPORT_ENV_PREFIX + typedKey + ": " + typedValue;
 }
 
-// D-DOCTOR-ISSUE-1: a FAIL or UNKNOWN row ends its Fix cell with the docs link (UTM utm_source=ctx_doctor).
+// ADR-0010: a FAIL row's Fix cell is the per-host FAIL string. D-DOCTOR-FIX-1: the docs link shows once, under
+// the table (doctorReply), so no row repeats it.
 function fixCell(agent: AgentId, row: DoctorRow): string {
   if (row.status === "PASS") return "";
-  const docs = DOCTOR_DOCS_LABEL + DOCTOR_DOCS_LINK(row.id);
-  if (row.status === "FAIL") return DOCTOR_FAIL_LINE(agent, row.id, row.detail, row.fixCommand ?? "") + ". " + docs;
-  return row.fixCommand === undefined ? docs : "Fix: " + row.fixCommand + ". " + docs;
+  if (row.status === "FAIL") return DOCTOR_FAIL_LINE(agent, row.id, row.detail, row.fixCommand ?? "");
+  return row.fixCommand === undefined ? "" : "Fix: " + row.fixCommand;
 }
 
 function rowLine(agent: AgentId, row: DoctorRow): string {

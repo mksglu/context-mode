@@ -511,7 +511,7 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
 
     test("[M5] D-INST-7: the temp-file finding text says it is report only and nothing needs doing", () => {
       assert.match(C.V1_REASON.tmpFile, /context-mode-\*/);
-      assert.match(C.V1_REASON.tmpFile, /report only, no action needed/);
+      assert.match(C.V1_REASON.tmpFile, /report only, safe to keep/); // D-DOCTOR-FIX-1: positive wording, shorter row
     });
 
     test("SEARCH_REPLY_HITS is 5 and not above SEARCH_PAGE_SIZE (D-SEARCH-REPLY-1)", async () => {

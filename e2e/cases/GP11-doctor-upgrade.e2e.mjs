@@ -255,10 +255,12 @@ describe("GP11 doctor and upgrade", () => {
     // the header lines and the Check column, in order.
     // ADR-0019 D7 (D-DOCTOR-CMD-1): after the rows comes one "Run in a terminal:" line, then env lines.
     // D-DOCTOR-ISSUE-1: line 1 is the environment line; on a FAIL three report-file lines follow the env lines.
+    // D-DOCTOR-FIX-1: the environment is two lines, the docs link one line, the gh command three wrapped lines.
     const all = text(reply).split("\n");
-    assert.match(all[0] ?? "", /^Environment: context-mode .+, agent claude-code.*, Node v\d+/);
-    const NOTES = ["Report file: ", "File it: ", "Or open: "];
-    const lines = all.slice(1).filter((l) => !NOTES.some((p) => l.startsWith(p)));
+    assert.match(all[0] ?? "", /^Environment: context-mode .+, agent claude-code/);
+    assert.match(all[1] ?? "", /^Environment: .+, Node v[\d.]+, shell /);
+    const NOTES = ["Environment: ", "Docs: ", "Report file: ", "File it: ", "  --", "Or open: "];
+    const lines = all.filter((l) => !NOTES.some((p) => l.startsWith(p)));
     const body = lines.slice(2);
     const rows = body.filter((l) => l.startsWith("| "));
     const rest = body.filter((l) => !l.startsWith("| "));

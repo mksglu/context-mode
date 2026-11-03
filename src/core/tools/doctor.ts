@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
-  D5_LAST_HOOK_ERROR, D5_PAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
+  D5_LAST_HOOK_ERROR, D5_PAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_DOCS_LABEL, DOCTOR_DOCS_LINK, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
   PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
@@ -167,7 +167,10 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
       notes = [`Report file: ${lineOf(err)}`]; // ADR-0010: doctor always answers
     }
   }
-  const whole = [envLine, table, ...notes].join("\n");
+  // D-DOCTOR-FIX-1: one docs link (UTM) under the table, for the first row that needs a look.
+  const look = rows.find((r) => r.status === "FAIL") ?? rows.find((r) => r.status !== "PASS");
+  const docs = look === undefined ? [] : [DOCTOR_DOCS_LABEL + DOCTOR_DOCS_LINK(look.id)];
+  const whole = [envLine, table, ...docs, ...notes].join("\n");
   const bytes = Buffer.byteLength(whole, "utf8");
   if (bytes <= REPORT_CAP) return { text: whole, isError: false, sandboxBytes: bytes }; // step 4
   // D-NO-LOSSY-CUT-1: over the cap, the whole report is stored first; the reply holds the FAIL rows and the pointer.
@@ -177,7 +180,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   } finally {
     closeDb(db);
   }
-  const text = [envLine, buildReportHead(input), ...notes].join("\n");
+  const text = [envLine, buildReportHead(input), ...docs, ...notes].join("\n");
   return { text, isError: false, sandboxBytes: bytes };
 }
 

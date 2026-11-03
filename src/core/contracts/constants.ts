@@ -457,7 +457,7 @@ export function DOCTOR_FAIL_LINE(host: string, check: string, cause: string, com
   return `FAIL ${host}: ${check} — ${cause}. Fix: ${command}`; // ADR-0010 per-host FAIL string, impl/07 §4 step 2
 }
 export const DOCTOR_FIX_UPGRADE = "run ctx_upgrade"; // D1, D3, D4, D8 stale schema
-export const D1_DEV_BUILD_DETAIL = "dev build: the release build stamps the commit sha, and this bundle came from a source checkout"; // UNKNOWN: BUNDLE_SHA unset (D-M5-arch-5, D-DOCTOR-ISSUE-1 names the cause)
+export const D1_DEV_BUILD_DETAIL = "dev build: source checkout; release builds stamp the sha"; // D-DOCTOR-FIX-1 shorter row; // UNKNOWN: BUNDLE_SHA unset (D-M5-arch-5, D-DOCTOR-ISSUE-1 names the cause)
 export const D1_UPDATE_DETAIL = "update available"; // FAIL (D-M5-arch-5)
 // D-DOCTOR-D1-CAUSE-1: every D1 detail starts with the installed version and the short bundle sha, then names the exact cause.
 export const D1_SHORT_SHA_LEN = 7;
@@ -759,7 +759,7 @@ export const V1_REASON = Object.freeze({
   dataDir: "old context-mode data dir <agent home>/context-mode/",
   dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
   dataRoot: "old context-mode content under ~/.context-mode/",
-  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, no action needed",
+  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, safe to keep",
 } as const);
 // ADR-0011 "reported with a fix, not removed" rows, Gemini data "only after a prompt" (a tool cannot prompt), and
 // tmp context-mode-* (a live v1 server may own them), and the Kiro steering doc (A37: manual review): report only
@@ -836,7 +836,7 @@ export function DOCTOR_DOCS_LINK(check: string): string {
 }
 export const DOCTOR_DOCS_LABEL = "Docs: ";
 export function D3_NO_SETUP_FIX(agent: string): string { return `context-mode setup --agents ${agent}`; } // MCP entry and hooks both absent
-export function D5_FIXTURE_FILE_ABSENT(file: string): string { return `the hook fixture file ${file} is absent, so the round trip has no payload to send`; }
+export function D5_FIXTURE_FILE_ABSENT(file: string): string { return `hook fixture ${file} is absent: the round trip needs it`; }
 export function D5_FIXTURE_PARSE(file: string, cause: string): string { return `the hook fixture file ${file} failed to parse: ${cause}`; }
 export function D5_FIXTURE_AGENT_ABSENT(file: string, keys: readonly string[]): string { return `the hook fixture file ${file} records payloads for ${keys.join(", ") || "zero agents"} only`; }
 export const DOCTOR_REPORTS_DIR = "reports"; // ~/.context-mode/reports/doctor-<utc>.md
@@ -844,7 +844,11 @@ export const DOCTOR_REPORT_FILE_PREFIX = "doctor-";
 export const DOCTOR_REPORT_LINE = "Report file: ";
 export const DOCTOR_GH_LINE = "File it: ";
 export const DOCTOR_URL_LINE = "Or open: ";
-export const DOCTOR_NOTE_PREFIXES: readonly string[] = Object.freeze([DOCTOR_ENV_PREFIX, DOCTOR_REPORT_LINE, DOCTOR_GH_LINE, DOCTOR_URL_LINE]);
+// D-DOCTOR-FIX-1: the gh command wraps; each next line starts with this and the line before ends with " \".
+export const DOCTOR_GH_NEXT = "  --";
+export const DOCTOR_NOTE_PREFIXES: readonly string[] = Object.freeze([
+  DOCTOR_ENV_PREFIX, DOCTOR_DOCS_LABEL, DOCTOR_REPORT_LINE, DOCTOR_GH_LINE, DOCTOR_GH_NEXT.trim(), DOCTOR_URL_LINE,
+]);
 export const ISSUE_REPO_SLUG = "mksglu/context-mode";
 export const ISSUE_FORM_FILE = "agent-report.yml"; // .github/ISSUE_TEMPLATE/agent-report.yml
 export const ISSUE_URL_MAX = 8000; // the prefilled form URL holds the title and the summary fields only
