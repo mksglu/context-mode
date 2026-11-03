@@ -3,10 +3,14 @@
 //   node build/readme-stats.mjs            reads stars (GitHub GraphQL, needs GITHUB_TOKEN) and npm downloads (public API),
 //                                          writes stats.json and docs/assets/readme/src/star-data.js
 //   node build/readme-stats.mjs --dry-run  reads the same, prints the result, writes nothing
+//   node build/readme-stats.mjs --history  reads GitHub traffic (gh CLI), stars and npm counts; merges them by day into
+//                                          docs/assets/readme/data/adoption-history.json (D-README-HISTORY-1). Once a day
+//                                          unless --force; --backfill-v1 adds the v1 stats.json series from origin/main.
 // stats.json fields are named by what they count: npm_downloads (all-time npm downloads of the package), stars, read_at.
 // star-data.js feeds docs/assets/readme/src/star-history.html; render.mjs turns it into the two PNGs.
 // No regex: dates are cut and compared as ISO strings.
-import { writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,6 +46,164 @@ export function statsJson({ npmDownloads, stars, readAt }) {
   if (!Number.isInteger(stars) || stars < 0) throw new Error(`stars is not a count: ${String(stars)}`);
   if (!isDay(readAt)) throw new Error(`read_at is not a YYYY-MM-DD day: ${String(readAt)}`);
   return { npm_downloads: npmDownloads, stars, read_at: readAt };
+}
+
+// ---- Adoption history (D-README-HISTORY-1) ----
+// GitHub keeps traffic for 14 days only, and Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, so npm
+// never sees them: their only count is the clone traffic. The file keeps every day it ever read (merge by day, the
+// newer read wins its own day, old days stay; nothing is cut).
+export const HISTORY_FILE = "docs/assets/readme/data/adoption-history.json";
+export const HISTORY_SERIES = ["github_clones", "github_views", "github_referrers", "stars", "npm_totals", "npm_versions_last_week", "v1_marketplace"];
+const SERIES_TEXT = {
+  github_clones: "[day, clones, unique cloners] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/clones (keeps 14 days). Counts git clones and fetches of the repo: Claude Code, Codex, Gemini CLI and Qwen Code plugin installs and updates, CI machines and people.",
+  github_views: "[day, views, unique visitors] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/views (keeps 14 days).",
+  github_referrers: "[read day, [[referrer, views, unique visitors], ...]]: the top 10 referrers for the 14 days before the read day. GitHub REST /repos/mksglu/context-mode/traffic/popular/referrers.",
+  stars: "[read day, GitHub stars total]. GitHub REST /repos/mksglu/context-mode stargazers_count.",
+  npm_totals: "[read day, all-time, last week, last month] npm downloads of context-mode. api.npmjs.org/downloads/point/{2000-01-01:<day>,last-week,last-month}/context-mode. Counts installs, updates and CI runs of Pi, OpenCode, Copilot CLI, Kiro, VS Code and ZCode setups.",
+  npm_versions_last_week: "[read day, 1.x downloads, -next downloads, other downloads, versions] for the last 7 days npm counted. api.npmjs.org/versions/context-mode/last-week.",
+  v1_marketplace: "[day, unique cloners in the 14 days before, commit sha]: the 'marketplace' field of the v1 stats.json on main (written by .github/workflows/update-stats.yml from traffic/clones uniques), the last readable commit of each UTC day. Rounded as v1 wrote it (63.3k+ is 63300).",
+};
+
+/** A v1 stats.json count ("63.3k+", "1.2M+", "211") as an integer; null when it is not a count. */
+export function v1Count(text) {
+  if (typeof text !== "string") return null;
+  let s = text.endsWith("+") ? text.slice(0, -1) : text;
+  let mult = 1;
+  if (s.endsWith("k")) { mult = 1_000; s = s.slice(0, -1); } else if (s.endsWith("M")) { mult = 1_000_000; s = s.slice(0, -1); }
+  if (s === "" || s.split(".").length > 2 || [...s].some((c) => c !== "." && (c < "0" || c > "9"))) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n * mult) : null;
+}
+
+/** git log rows ({ sha, at }) of v1 stats.json -> [[UTC day, marketplace count, sha]]: the last readable commit of each day. */
+export function v1Series(log, read) {
+  const best = new Map();
+  for (const { sha, at } of log) {
+    const t = Date.parse(at);
+    if (Number.isNaN(t)) continue;
+    let v = null;
+    try { v = v1Count(JSON.parse(read(sha)).marketplace); } catch { v = null; }
+    if (v === null) continue;
+    const day = new Date(t).toISOString().slice(0, ISO_DAY);
+    const b = best.get(day);
+    if (!b || t > b.t) best.set(day, { t, v, sha });
+  }
+  return [...best].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, b]) => [d, b.v, b.sha]);
+}
+
+/** A traffic answer (clones or views) -> [[day, count, uniques]], oldest first; the read day is partial and waits. */
+export function trafficDays(body, key, readDay) {
+  const list = body && body[key];
+  if (!Array.isArray(list)) throw new Error(`traffic answer has no ${key} list`);
+  return list.map((r) => [String(r.timestamp).slice(0, ISO_DAY), r.count, r.uniques])
+    .filter((r) => r[0] < readDay).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+
+/** api.npmjs.org/versions/<pkg>/last-week -> { v1, next, other, versions }. */
+export function versionSplit(j) {
+  if (!j || !j.downloads || typeof j.downloads !== "object") throw new Error("npm versions answer has no downloads map");
+  const out = { v1: 0, next: 0, other: 0, versions: 0 };
+  for (const [v, n] of Object.entries(j.downloads)) {
+    out.versions++;
+    if (v.includes("-next")) out.next += n; else if (v.startsWith("1.")) out.v1 += n; else out.other += n;
+  }
+  return out;
+}
+
+/** Merge a fresh read into the history: union by day per series, the fresh row wins its day, every old day stays. */
+export function mergeHistory(old, fresh) {
+  const out = { read_at: fresh.read_at, series: { ...SERIES_TEXT } };
+  for (const k of HISTORY_SERIES) {
+    const m = new Map();
+    for (const r of (old && old[k]) || []) m.set(r[0], r);
+    for (const r of fresh[k] || []) m.set(r[0], r);
+    out[k] = [...m.values()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  }
+  return out;
+}
+
+/** One read a day: due when the file has no read day or an older one. */
+export function historyDue(h, today) {
+  return !h || typeof h.read_at !== "string" || h.read_at < today;
+}
+
+/** The history as JSON with one row per line, so each daily commit shows only the new rows. */
+function historyText(h) {
+  const parts = [`  "read_at": ${JSON.stringify(h.read_at)}`, `  "series": ${JSON.stringify(h.series, null, 2).split("\n").join("\n  ")}`];
+  for (const k of HISTORY_SERIES) parts.push(`  ${JSON.stringify(k)}: [${h[k].length ? "\n" + h[k].map((r) => "    " + JSON.stringify(r)).join(",\n") + "\n  " : ""}]`);
+  return "{\n" + parts.join(",\n") + "\n}\n";
+}
+
+/** v1 stats.json at every commit on `ref`, read in one git cat-file --batch call. */
+function readV1Log(ref) {
+  const git = (args, input) => execFileSync("git", args, { cwd: REPO_ROOT, input, maxBuffer: 64 * 1024 * 1024 });
+  const log = git(["log", ref, "--format=%H %cI", "--", "stats.json"]).toString().split("\n").filter(Boolean)
+    .map((l) => ({ sha: l.split(" ")[0], at: l.split(" ")[1] }));
+  const buf = git(["cat-file", "--batch"], log.map((r) => r.sha + ":stats.json").join("\n") + "\n");
+  const files = new Map();
+  let i = 0;
+  for (const { sha } of log) {
+    const nl = buf.indexOf(10, i);
+    const head = buf.subarray(i, nl).toString().split(" ");
+    i = nl + 1;
+    if (head[1] !== "blob") continue;
+    const size = Number(head[2]);
+    files.set(sha, buf.subarray(i, i + size).toString());
+    i += size + 1;
+  }
+  return { log, read: (sha) => files.get(sha) };
+}
+
+async function readHistory(slug, today, calls) {
+  // GitHub reads go through the gh CLI: GH_TOKEN in CI (TRAFFIC_TOKEN, push access for traffic), the local gh login otherwise.
+  const gh = (p) => { calls.n++; return JSON.parse(execFileSync("gh", ["api", p], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 })); };
+  const npm = async (p) => {
+    calls.n++;
+    const r = await fetch("https://api.npmjs.org/" + p);
+    if (!r.ok) throw new Error(`npm API ${p} answered ${r.status}`);
+    return r.json();
+  };
+  const [all, week, month, versions] = await Promise.all([npm(`downloads/point/2000-01-01:${today}/${PACKAGE}`),
+    npm(`downloads/point/last-week/${PACKAGE}`), npm(`downloads/point/last-month/${PACKAGE}`), npm(`versions/${PACKAGE}/last-week`)]);
+  const split = versionSplit(versions);
+  const refs = gh(`repos/${slug}/traffic/popular/referrers`);
+  if (!Array.isArray(refs)) throw new Error("traffic referrers answer is not a list");
+  const stars = gh(`repos/${slug}`).stargazers_count;
+  if (!Number.isInteger(stars)) throw new Error("repo answer has no stargazers_count");
+  return {
+    read_at: today,
+    github_clones: trafficDays(gh(`repos/${slug}/traffic/clones`), "clones", today),
+    github_views: trafficDays(gh(`repos/${slug}/traffic/views`), "views", today),
+    github_referrers: [[today, refs.slice(0, 10).map((r) => [r.referrer, r.count, r.uniques])]],
+    stars: [[today, stars]],
+    npm_totals: [[today, all.downloads, week.downloads, month.downloads]],
+    npm_versions_last_week: [[today, split.v1, split.next, split.other, split.versions]],
+  };
+}
+
+/** --history [--force] [--backfill-v1]: read today's counts and merge them into HISTORY_FILE; writes no README file. */
+async function historyMain() {
+  const t0 = performance.now();
+  const file = path.join(REPO_ROOT, HISTORY_FILE);
+  const today = new Date().toISOString().slice(0, ISO_DAY);
+  const old = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
+  const backfill = process.argv.includes("--backfill-v1");
+  if (!backfill && !process.argv.includes("--force") && !historyDue(old, today)) {
+    console.log(`history: already read on ${today}; nothing to do`);
+    return;
+  }
+  const calls = { n: 0 };
+  const fresh = await readHistory(process.env.GITHUB_REPOSITORY || "mksglu/context-mode", today, calls);
+  if (backfill) {
+    const { log, read } = readV1Log(process.env.V1_REF || "origin/main");
+    fresh.v1_marketplace = v1Series(log, read);
+    console.log(`history: v1 backfill, ${log.length} commits, ${fresh.v1_marketplace.length} days`);
+  }
+  const merged = mergeHistory(old, fresh);
+  const text = historyText(merged);
+  writeFileSync(file, text);
+  const rows = HISTORY_SERIES.map((k) => `${k} ${merged[k].length}`).join(", ");
+  console.log(`history: ${HISTORY_FILE} ${text.length} bytes; ${rows}; ${calls.n} API calls; ${Math.round(performance.now() - t0)} ms`);
 }
 
 async function readNpmDownloads(today) {
@@ -93,5 +255,5 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((e) => { console.error(`readme-stats failed: ${e.message}`); process.exit(1); });
+  (process.argv.includes("--history") ? historyMain() : main()).catch((e) => { console.error(`readme-stats failed: ${e.message}`); process.exit(1); });
 }

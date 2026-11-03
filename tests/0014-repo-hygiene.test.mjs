@@ -1798,12 +1798,60 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.throws(() => statsJson({ npmDownloads: 1, stars: 1, readAt: "yesterday" }), /read_at/);
   });
 
-  test("readme-stats.yml: daily plus manual, GITHUB_TOKEN only, main only, commits only on change, says it is live after the merge", () => {
+  test("adoption history: v1 counts, traffic days, npm version split, merge by day keeps every old day (D-README-HISTORY-1)", async () => {
+    // Owner 2026-11-03: "claude code kurulumunda hic npm e gerek yoksa biz claude code kurulumunlarinin stats ini nasil alacagiz?"
+    // GitHub keeps traffic for 14 days only, so each day the job does not save is gone; the file keeps every day it ever read.
+    const H = await import("../build/readme-stats.mjs");
+    assert.equal(H.HISTORY_FILE, "docs/assets/readme/data/adoption-history.json");
+    assert.deepEqual(["63.3k+", "766.8k+", "211", "1.2M+", "2.4k", "", "{\"message\":\"Resource", undefined].map(H.v1Count), [63300, 766800, 211, 1200000, 2400, null, null, null]);
+    const body = { count: 10, uniques: 6, clones: [{ timestamp: "2026-11-02T00:00:00Z", count: 4, uniques: 3 }, { timestamp: "2026-11-01T00:00:00Z", count: 5, uniques: 2 },
+      { timestamp: "2026-11-03T00:00:00Z", count: 1, uniques: 1 }] };
+    assert.deepEqual(H.trafficDays(body, "clones", "2026-11-03"), [["2026-11-01", 5, 2], ["2026-11-02", 4, 3]], "oldest first; the read day is partial and waits for the next read");
+    assert.throws(() => H.trafficDays({}, "views", "2026-11-03"), /views/);
+    assert.deepEqual(H.versionSplit({ package: "context-mode", downloads: { "1.0.169": 30, "1.0.168": 5, "2.0.0-next.33": 4, "0.9.1": 1 } }), { v1: 35, next: 4, other: 1, versions: 4 });
+    assert.throws(() => H.versionSplit({}), /downloads/);
+    const old = { read_at: "2026-11-01", github_clones: [["2026-10-01", 7, 6], ["2026-10-31", 1, 1]], v1_marketplace: [["2026-02-25", 211, "abc"]] };
+    const fresh = { read_at: "2026-11-03", github_clones: [["2026-10-31", 9, 4], ["2026-11-02", 4, 3]], stars: [["2026-11-03", 33100]] };
+    const m = H.mergeHistory(old, fresh);
+    assert.deepEqual(m.github_clones, [["2026-10-01", 7, 6], ["2026-10-31", 9, 4], ["2026-11-02", 4, 3]], "union by day; the newer read wins its day; old days stay");
+    assert.deepEqual(m.v1_marketplace, old.v1_marketplace, "a series missing from the new read stays whole");
+    assert.deepEqual(m.stars, [["2026-11-03", 33100]]);
+    assert.equal(m.read_at, "2026-11-03");
+    for (const k of H.HISTORY_SERIES) assert.ok(typeof m.series[k] === "string" && Array.isArray(m[k]), `${k}: described and present`);
+    assert.equal(H.historyDue({ read_at: "2026-11-03" }, "2026-11-03"), false, "one read a day");
+    assert.equal(H.historyDue({ read_at: "2026-11-02" }, "2026-11-03"), true);
+    assert.equal(H.historyDue({}, "2026-11-03"), true);
+    // The v1 backfill: the 'marketplace' field of stats.json on main, one value per UTC day (the day's last commit), sha as the source.
+    const log = [{ sha: "c3", at: "2026-02-26T09:00:00+03:00" }, { sha: "c2", at: "2026-02-25T13:33:48+03:00" }, { sha: "c1", at: "2026-02-25T10:34:31+00:00" }];
+    const files = { c1: "{\"marketplace\":\"{\\\"message\\\":\\\"Resource\"}", c2: "{\"marketplace\":\"211\"}", c3: "{\"marketplace\":\"1.1k+\"}" };
+    assert.deepEqual(H.v1Series(log, (s) => files[s]), [["2026-02-25", 211, "c2"], ["2026-02-26", 1100, "c3"]], "last readable commit of each UTC day");
+  });
+
+  test("adoption history file: every series sorted by day, one row a day, 14 traffic days and the v1 backfill with commit shas (D-README-HISTORY-1)", async () => {
+    const H = await import("../build/readme-stats.mjs");
+    const h = JSON.parse(readRepo(H.HISTORY_FILE));
+    for (const k of H.HISTORY_SERIES) {
+      const days = h[k].map((r) => r[0]);
+      assert.deepEqual(days, [...new Set(days)].sort(), `${k}: sorted, one row a day`);
+    }
+    assert.ok(h.github_clones.length >= 13 && h.github_views.length >= 13, "the 14-day traffic window, less the partial read day");
+    assert.ok(h.v1_marketplace.length >= 100, "the v1 backfill");
+    for (const r of h.v1_marketplace) assert.ok(Number.isInteger(r[1]) && r[2].length === 40, `v1 row ${r[0]} names its commit`);
+  });
+
+  test("readme-stats.yml: capture job daily, on each v2-design push and by hand; README job main only; commits only on change (D-README-STATS-1, D-README-HISTORY-1)", () => {
     const y = readRepo(".github/workflows/readme-stats.yml");
     for (const need of ["schedule:", "cron:", "workflow_dispatch:", "contents: write", "secrets.GITHUB_TOKEN", "if: github.ref == 'refs/heads/main'",
-      "build/readme-stats.mjs", "render.mjs star-history", "git diff --quiet", "PLAYWRIGHT_DIR"]) assert.ok(y.includes(need), `readme-stats.yml lacks ${need}`);
-    for (const bad of ["TRAFFIC_TOKEN", "secrets.", "curl "]) if (bad !== "secrets.") assert.ok(!y.includes(bad), `readme-stats.yml has ${bad}`);
-    assert.equal(y.split("secrets.").length - 1, 1, "only secrets.GITHUB_TOKEN");
+      "build/readme-stats.mjs", "render.mjs star-history", "git diff --quiet", "PLAYWRIGHT_DIR",
+      "push:", "branches: [v2-design]", "paths-ignore:", "concurrency:", "node build/readme-stats.mjs --history"]) assert.ok(y.includes(need), `readme-stats.yml lacks ${need}`);
+    assert.ok(!y.includes("curl "), "readme-stats.yml has curl");
+    const secrets = y.split("secrets.").slice(1).map((s) => s.split(" ")[0]);
+    assert.deepEqual(secrets, ["TRAFFIC_TOKEN", "GITHUB_TOKEN"], "TRAFFIC_TOKEN reads traffic; GITHUB_TOKEN reads stars for the README job");
+    const capture = y.slice(y.indexOf("\n  capture:"), y.indexOf("\n  readme-stats:"));
+    assert.ok(capture.includes("GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}"), "gh api reads traffic with TRAFFIC_TOKEN");
+    assert.ok(capture.includes("git add \"$F\"") && !capture.includes("README") && !capture.includes("git add ."), "capture commits the history file only");
+    const ignore = y.slice(y.indexOf("paths-ignore:"), y.indexOf("workflow_dispatch:"));
+    assert.ok(ignore.includes("docs/assets/readme/data/adoption-history.json"), "its own output starts no run");
     assert.ok(y.split("\n").slice(0, 8).join("\n").includes("default branch"), "header: scheduled jobs run only on the default branch");
   });
 
