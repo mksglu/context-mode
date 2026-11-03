@@ -16,10 +16,11 @@ import type {
 } from "../contracts/types.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers } from "../ops/doctor-config.ts";
 import { checkDb, checkIndex } from "../ops/doctor-db.ts";
+import type { DbCheck } from "../ops/doctor-db.ts";
 import { bundleVersion, checkMcp, checkMode, checkNode, checkProject, checkShell, checkVersion } from "../ops/doctor-env.ts";
 import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
 import { lastHookError } from "../hooks/fallback.ts";
-import { healD8 } from "../ops/db-heal.ts";
+import { healD8, healOrphan } from "../ops/db-heal.ts";
 import { buildReport, buildReportHead } from "../ops/report.ts";
 import { environmentLine, writeIssueReport } from "../ops/doctor-issue.ts";
 import { claudeDirOf, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
@@ -106,6 +107,7 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
   const env = host.env;
   const project = ctx.project;
   let integrityFailed = false;
+  let orphan: DbCheck["orphan"] = [];
   const checks: Record<DoctorCheckId, () => DoctorRow | Promise<DoctorRow>> = {
     D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal }),
     D2: () => checkNode({ nodeVersion: process.version, bunVersion: process.versions.bun }),
@@ -118,6 +120,7 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
     D8: async () => {
       const r = await checkDb(project);
       integrityFailed = r.integrityFailed;
+      orphan = r.orphan;
       return r.row;
     },
     D9: () => checkIndex(project),
@@ -126,9 +129,15 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
   };
   const rows: DoctorRow[] = [];
   for (const id of DOCTOR_CHECK_ORDER) rows.push(await guard(id, checks[id]));
+  const at = DOCTOR_CHECK_ORDER.indexOf("D8");
+  // D-ORPHAN-WAL-1: a missing context.db with its WAL left: move the WAL files aside, start a new index.
+  if (orphan.length > 0) {
+    const files = orphan;
+    rows[at] = await guard("D8", () => healOrphan(project, files, rows[at] as DoctorRow));
+    return rows;
+  }
   if (!integrityFailed) return rows;
   // Step 7: the sole write. healD8 returns the updated D8 row (PASS lossless, or FAIL recreate).
-  const at = DOCTOR_CHECK_ORDER.indexOf("D8");
   rows[at] = await guard("D8", () => {
     const configDir = resolveConfigDir(env);
     return healD8({ project, configDir, serverId: ownServerId(configDir, project.projectKey), row: rows[at] as DoctorRow });

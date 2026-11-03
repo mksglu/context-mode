@@ -516,6 +516,21 @@ export const D8_HEALED_LOSSLESS_DETAIL = "healed (lossless)";
 export function D8_HEALED_RECREATE_DETAIL(ts: string): string { return `healed by recreate — old data kept at context.db.${ts}.bak`; }
 export const INTEGRITY_OK = "ok"; // PRAGMA integrity_check single-row pass value
 export const HEAL_BACKUP_SUFFIX = ".bak"; // <file>.<ts>.bak
+// D-ORPHAN-WAL-1: context.db missing, its -wal/-shm left. D8 names each file and its size; the heal moves them whole
+// into <projectDir>/orphan-<UTC stamp>/ and starts a new context.db. Nothing is deleted or cut (D-NO-TRUNCATE-1).
+export interface OrphanFile { path: string; bytes: number; }
+const orphanList = (files: readonly OrphanFile[]): string => files.map((f) => `${f.path} (${f.bytes} bytes)`).join(", ");
+export const ORPHAN_DIR_PREFIX = "orphan-"; // <projectDir>/orphan-20261103T120102Z/
+export function D8_ORPHAN_DETAIL(files: readonly OrphanFile[]): string { return `context.db is gone, its WAL files are still here: ${orphanList(files)}`; }
+export const D8_ORPHAN_FIX = "run ctx_doctor once; it keeps these files in a dated folder and starts a new index";
+export function D8_ORPHAN_HEALED_DETAIL(dir: string, moved: readonly OrphanFile[], dbPath: string): string {
+  return `moved the WAL files of the missing context.db, whole and unchanged, to ${dir}: ${orphanList(moved)}; new index at ${dbPath}; the old WAL is kept there, to restore it put the original context.db back next to it`;
+}
+export const D8_ORPHAN_HEALED_FIX = "run ctx_doctor again; D8 then reads PASS";
+export function D8_ORPHAN_MOVE_FAILED(detail: string, cause: string): string { return `${detail}; moving them aside failed: ${cause}`; }
+// D-ORPHAN-WAL-1: ctx_doctor keeps its report when its own journal row cannot be written; this one line says so.
+export const DOCTOR_TOOL_NAME = "ctx_doctor"; // the one tool whose reply survives a failed journal write
+export function JOURNAL_SKIPPED_LINE(cause: string): string { return `Journal row for this call skipped: ${cause}`; }
 export function D9_INDEX_DETAIL(sources: number, chunks: number): string { return `${sources} sources, ${chunks} chunks indexed`; }
 
 // Plugin root and git-checkout upgrade (impl/07 §1, §6; ADR-0010, ADR-0011).

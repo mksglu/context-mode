@@ -110,7 +110,7 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
     const EXPECTED = {
       NODE_TOO_OLD: "Node 22.1.0 is below 24.15.0. Fix: install Node 24.15.0 or later.",
       NO_SQLITE: "node:sqlite failed to load. Fix: run ctx_doctor.",
-      DB_GONE: "context.db path vanished. Fix: run ctx_doctor.",
+      DB_GONE: "context.db is gone and its WAL file is still in place. Fix: run ctx_doctor once; it keeps the WAL file in a dated folder and starts a new index.",
       NO_PROJECT: "Project source spawn-cwd is missing. Fix: run ctx_doctor.",
       UNKNOWN_FIELD: 'Unknown field "query". Fix: use "queries".',
       TIMEOUT: "Timed out after 600000 ms. Fix: pass background: true.",

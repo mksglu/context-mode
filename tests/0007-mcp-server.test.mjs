@@ -5,7 +5,7 @@ import { describe, test, before, after } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { spawnSync, execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, realpathSync, readdirSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
@@ -14,6 +14,7 @@ import vm from "node:vm";
 import { z } from "zod/v4";
 import { TOOLS, checkCall } from "../src/core/tools/registry.ts";
 import * as C from "../src/core/contracts/constants.ts";
+import { ERROR_TEXT } from "../src/core/contracts/errors.ts";
 import { DESCRIPTION_CAP, SURFACE_CAP } from "../src/core/contracts/constants.ts";
 import { ctxResume } from "../src/core/tools/resume.ts";
 import { ctxStats } from "../src/core/tools/stats.ts";
@@ -345,6 +346,66 @@ describe("ADR-0007 call shape on every host", () => {
     const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: "application.log" } });
     assert.notEqual(r.isError, true, r.content[0].text);
     await client.close();
+  });
+
+  // D-ORPHAN-WAL-1 (tester, published next.34): "With the main DB deliberately removed and WAL left, doctor just repeats
+  // 'run ctx_doctor'." A server is killed with rows still in its WAL, then only context.db goes away.
+  async function orphanProject(name) {
+    const work = join(root, name);
+    mkdirSync(work);
+    execFileSync("git", ["init", "-q", work]);
+    const projects = join(root, ".context-mode", "projects");
+    const had = existsSync(projects) ? readdirSync(projects) : [];
+    const seed = spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root }, ["--agent", "opencode"], { cwd: work });
+    await seed.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "orphan", version: "0" } });
+    const r = await seed.request("tools/call", { name: "ctx_index", arguments: { content: "REAL_WAL_CANARY value=614972", source: "canary" } });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    seed.kill();
+    await new Promise((res) => setTimeout(res, 200));
+    const key = readdirSync(projects).filter((d) => !had.includes(d));
+    assert.equal(key.length, 1, key.join(","));
+    const projectDir = join(projects, key[0]);
+    const db = join(projectDir, "context.db");
+    assert.ok(existsSync(db + "-wal"), "WAL kept after SIGKILL");
+    rmSync(db);
+    const client = spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root }, ["--agent", "opencode"], { cwd: work });
+    await client.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "orphan", version: "0" } });
+    const call = async (name, args) => (await client.request("tools/call", { name, arguments: args })).valueOf();
+    return { projectDir, db, client, call, text: (r) => r.content.map((c) => c.text).join("\n") };
+  }
+
+  test("[D-ORPHAN-WAL-1] orphan WAL: a tool names the next step, ctx_doctor reports and moves the files aside, the second doctor PASSes", { timeout: 60000 }, async (t) => {
+    const o = await orphanProject("orphan-heal");
+    t.after(() => o.client.kill());
+    const search = await o.call("ctx_search", { queries: ["REAL_WAL_CANARY"], scope: "project" });
+    assert.equal(search.isError, true);
+    assert.equal(o.text(search), ERROR_TEXT.DB_GONE);
+    const d1 = await o.call("ctx_doctor", {});
+    assert.notEqual(d1.isError, true, o.text(d1));
+    const kept = readdirSync(o.projectDir).filter((n) => n.startsWith(C.ORPHAN_DIR_PREFIX));
+    assert.equal(kept.length, 1, readdirSync(o.projectDir).join(","));
+    assert.ok(o.text(d1).includes("D8"), o.text(d1));
+    assert.ok(o.text(d1).includes(join(o.projectDir, kept[0], "context.db-wal")), o.text(d1));
+    const d2 = await o.call("ctx_doctor", {});
+    assert.notEqual(d2.isError, true, o.text(d2));
+    assert.ok(o.text(d2).includes("| D8 context.db | PASS |"), o.text(d2));
+    const again = await o.call("ctx_search", { queries: ["anything"], scope: "project" });
+    assert.notEqual(again.isError, true, o.text(again));
+    await o.client.close();
+  });
+
+  test("[D-ORPHAN-WAL-1] ctx_doctor keeps its report when the reply cannot be journaled, and says so in one line", { skip: process.platform === "win32" || process.getuid?.() === 0, timeout: 60000 }, async (t) => {
+    const o = await orphanProject("orphan-locked");
+    t.after(() => { chmodSync(o.projectDir, 0o755); o.client.kill(); });
+    chmodSync(o.projectDir, 0o555); // the heal cannot move the files, so the journal open still meets DB_GONE
+    const d1 = await o.call("ctx_doctor", {});
+    const text = o.text(d1);
+    assert.notEqual(d1.isError, true, text);
+    assert.ok(text.includes("D8 context.db"), text);
+    assert.ok(text.includes(C.JOURNAL_SKIPPED_LINE(ERROR_TEXT.DB_GONE)), text);
+    assert.equal(text.split(ERROR_TEXT.DB_GONE).length - 1, 1, "the error shows once, in the journal line");
+    chmodSync(o.projectDir, 0o755);
+    await o.client.close();
   });
 
   const MCP_AGENTS = AGENT_IDS.filter((a) => a !== "pi" && a !== "opencode");

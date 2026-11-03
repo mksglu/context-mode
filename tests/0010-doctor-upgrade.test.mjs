@@ -44,6 +44,24 @@ function rmTempDir(dir) {
   }
 }
 
+// D-ORPHAN-WAL-1 (tester, next.34): "With the main DB deliberately removed and WAL left, doctor just repeats 'run ctx_doctor'."
+// A real context.db with one canary row still in its WAL; then only context.db goes away, -wal and -shm stay byte for byte.
+async function seedOrphanWal(p) {
+  const db = await openDb(p);
+  db.raw.exec("PRAGMA wal_autocheckpoint = 0");
+  db.raw.exec("CREATE TABLE canary(v TEXT)");
+  db.raw.prepare("INSERT INTO canary VALUES (?)").run("REAL_WAL_CANARY value=614972");
+  const main = readFileSync(p.dbPath);
+  const wal = readFileSync(p.dbPath + "-wal");
+  const shm = readFileSync(p.dbPath + "-shm");
+  db.raw.close();
+  for (const s of ["", "-wal", "-shm"]) rmSync(p.dbPath + s, { force: true });
+  writeFileSync(p.dbPath + "-wal", wal);
+  writeFileSync(p.dbPath + "-shm", shm);
+  return { main, wal, shm };
+}
+const sha256 = (b) => createHash("sha256").update(b).digest("hex");
+
 describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", { concurrency: CONC }, () => {
   // Spec: docs/architecture/modules/07-tools-ops.md §5 D3, D4, D5b; DEVIATIONS D-M5-arch-3, D-M5-D2-1..4.
 
@@ -492,6 +510,20 @@ describe("ADR-0010 doctor D8, D9: database and index checks", { concurrency: CON
     const r = await checkDb(p);
     assert.equal(r.row.status, "PASS");
     assert.equal(existsSync(p.dbPath), false, "doctor must not create context.db");
+  });
+
+  test("[D-ORPHAN-WAL-1] D8 FAILs when context.db is missing and its -wal and -shm are left, naming both paths and byte sizes", async (t) => {
+    const p = project(t);
+    const { wal, shm } = await seedOrphanWal(p);
+    const r = await checkDb(p);
+    assert.equal(r.row.status, "FAIL");
+    assert.equal(r.row.detail, C.D8_ORPHAN_DETAIL([{ path: p.dbPath + "-wal", bytes: wal.length }, { path: p.dbPath + "-shm", bytes: shm.length }]));
+    assert.ok(r.row.detail.includes(p.dbPath + "-wal (" + wal.length + " bytes)"), r.row.detail);
+    assert.ok(r.row.detail.includes(p.dbPath + "-shm (" + shm.length + " bytes)"), r.row.detail);
+    assert.equal(r.row.fixCommand, C.D8_ORPHAN_FIX);
+    assert.deepEqual(r.orphan, [{ path: p.dbPath + "-wal", bytes: wal.length }, { path: p.dbPath + "-shm", bytes: shm.length }]);
+    assert.equal(existsSync(p.dbPath), false, "the check alone writes nothing");
+    assert.equal(sha256(readFileSync(p.dbPath + "-wal")), sha256(wal));
   });
 
   test("[M5] doctor-db/D8-read-only-does-not-migrate-stale-db", async (t) => {
@@ -1714,6 +1746,33 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
     const corrupt = (await doctor(home)).rows.find((r) => r.id === "D8");
     assert.ok(!corrupt.detail.includes("stale schema"), corrupt.detail);
     assert.match(corrupt.detail, /healed/);
+  });
+
+  test("[D-ORPHAN-WAL-1] ctx_doctor moves an orphan -wal/-shm whole into orphan-<UTC>/, starts a new context.db, the next run PASSes", async (t) => {
+    const home = tmp(t);
+    const p = ctxFor(home).project;
+    mkdirSync(p.projectDir, { recursive: true });
+    const { main, wal, shm } = await seedOrphanWal(p);
+    const first = (await doctor(home)).rows.find((r) => r.id === "D8");
+    assert.equal(first.status, "FAIL", first.detail);
+    const kept = readdirSync(p.projectDir).filter((n) => n.startsWith(C.ORPHAN_DIR_PREFIX));
+    assert.equal(kept.length, 1, readdirSync(p.projectDir).join(","));
+    assert.ok(kept[0].endsWith("Z"), kept[0]);
+    const dir = path.join(p.projectDir, kept[0]);
+    assert.equal(sha256(readFileSync(path.join(dir, "context.db-wal"))), sha256(wal), "WAL bytes kept unchanged");
+    assert.equal(sha256(readFileSync(path.join(dir, "context.db-shm"))), sha256(shm), "SHM bytes kept unchanged");
+    for (const need of [path.join(dir, "context.db-wal"), path.join(dir, "context.db-shm"), String(wal.length) + " bytes", p.dbPath, "put the original context.db"]) {
+      assert.ok(first.detail.includes(need), need + " missing in: " + first.detail);
+    }
+    assert.equal(first.fixCommand, C.D8_ORPHAN_HEALED_FIX);
+    assert.equal(existsSync(p.dbPath), true, "a new context.db");
+    const second = (await doctor(home)).rows.find((r) => r.id === "D8");
+    assert.equal(second.status, "PASS", second.detail);
+    assert.equal(readdirSync(p.projectDir).filter((n) => n.startsWith(C.ORPHAN_DIR_PREFIX)).length, 1, "second run moves nothing");
+    // The restore line works: the original context.db next to the kept WAL reads the canary.
+    writeFileSync(path.join(dir, "context.db"), main);
+    const back = new DatabaseSync(path.join(dir, "context.db"));
+    try { assert.equal(back.prepare("SELECT v FROM canary").get().v, "REAL_WAL_CANARY value=614972"); } finally { back.close(); }
   });
 
   // Finding 3 part 2 (D-D5-PAST-1): an old line in hook-errors.log is history, not a current failure. The log stays whole.

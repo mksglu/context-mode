@@ -10,7 +10,7 @@ export type ErrorCode =
 export const ERROR_TEXT: Readonly<Record<ErrorCode, string>> = Object.freeze({
   NODE_TOO_OLD: "Node <v> is below 24.15.0. Fix: install Node 24.15.0 or later.",
   NO_SQLITE: "node:sqlite failed to load. Fix: run ctx_doctor.",
-  DB_GONE: "context.db path vanished. Fix: run ctx_doctor.",
+  DB_GONE: "context.db is gone and its WAL file is still in place. Fix: run ctx_doctor once; it keeps the WAL file in a dated folder and starts a new index.", // D-ORPHAN-WAL-1
   NO_PROJECT: "Project source <kind> is missing. Fix: run ctx_doctor.",
   UNKNOWN_FIELD: 'Unknown field "<f>". Fix: use "queries".',
   TIMEOUT: "Timed out after <ms> ms. Fix: pass background: true.",

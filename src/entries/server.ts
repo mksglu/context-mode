@@ -10,7 +10,7 @@ import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server
 import { AGENT_IDS, type AgentId } from "../core/contracts/agents.ts";
 import {
   HOST_SESSION_ENV, INTERNAL_ERROR_LINE, NODE_MIN, OWNER_STOP_EXT, OWNERS_DIR_NAME, PROJECTS_DIR_NAME, RUN_SESSION_PREFIX, SERVER_KEY, TOOLS_TTL_MS,
-  UPGRADE_STOP_DELAY_MS,
+  UPGRADE_STOP_DELAY_MS, DOCTOR_TOOL_NAME, JOURNAL_SKIPPED_LINE,
 } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { DbHandle, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
@@ -257,7 +257,9 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
           try {
             await journal(resolved, ctx, tool.name, reply);
           } catch (err) {
-            reply = errorReply(err);
+            // D-ORPHAN-WAL-1, ADR-0010 "doctor always answers": a doctor reply that cannot be journaled stays the
+            // reply, with one line that says the row was skipped. Every other tool returns the failure.
+            reply = tool.name === DOCTOR_TOOL_NAME ? { ...reply, text: reply.text + "\n" + JOURNAL_SKIPPED_LINE(errorReply(err).text) } : errorReply(err);
           }
         }
       }

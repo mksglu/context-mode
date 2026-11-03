@@ -2,10 +2,15 @@
 // Runs only after D8's integrity_check sub-check failed. Sole live owner -> healLossless; else, or if
 // healLossless throws -> rename context.db, -wal, -shm aside as <file>.<ts>.bak and recreate via openDb.
 // All file steps are synchronous: no other code of this process runs between the copy and the swap.
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import {
   D8_HEALED_LOSSLESS_DETAIL,
   D8_HEALED_RECREATE_DETAIL,
+  D8_ORPHAN_HEALED_DETAIL,
+  D8_ORPHAN_HEALED_FIX,
+  D8_ORPHAN_MOVE_FAILED,
+  ORPHAN_DIR_PREFIX,
   DB_SHM_SUFFIX,
   DB_SIBLING_SUFFIXES,
   DB_TIMEOUT_MS,
@@ -19,6 +24,7 @@ import {
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import { renameWithRetry } from "./atomic-file.ts";
+import type { OrphanFile } from "../contracts/constants.ts";
 import type { DoctorRow, ProjectContext } from "../contracts/types.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { listLiveOwners } from "../store/owners.ts";
@@ -96,4 +102,47 @@ export async function healD8(input: HealD8Input): Promise<DoctorRow> {
   const ts = renameAside(project.dbPath);
   closeDb(await openDb(project));
   return { ...row, status: "FAIL", detail: D8_HEALED_RECREATE_DETAIL(ts) };
+}
+
+// "2026-11-03T12:01:02.345Z" -> "20261103T120102Z": no ":" (Windows file names), sorts by time.
+function utcStamp(now: Date): string {
+  return now.toISOString().slice(0, 19).replaceAll("-", "").replaceAll(":", "") + "Z";
+}
+
+/** A new folder <projectDir>/orphan-<UTC stamp>/ (a "-<n>" suffix when that second is taken). */
+function makeOrphanDir(projectDir: string): string {
+  const base = join(projectDir, ORPHAN_DIR_PREFIX + utcStamp(new Date()));
+  for (let n = 1; ; n += 1) {
+    const dir = n === 1 ? base : base + "-" + String(n);
+    try {
+      mkdirSync(dir);
+      return dir;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    }
+  }
+}
+
+/**
+ * D-ORPHAN-WAL-1, ADR-0010 D8 (the one doctor write): context.db is missing and its -wal/-shm are left. Each file
+ * moves whole and unchanged (rename, same folder tree) into a new orphan-<UTC>/ folder; then openDb starts a new
+ * context.db. Nothing is deleted or cut (D-NO-TRUNCATE-1). A failed move keeps the row's own text plus the cause.
+ */
+export async function healOrphan(project: ProjectContext, files: readonly OrphanFile[], row: DoctorRow): Promise<DoctorRow> {
+  const moved: OrphanFile[] = [];
+  let dir = "";
+  try {
+    dir = makeOrphanDir(dirname(project.dbPath));
+    for (const f of files) {
+      const to = join(dir, basename(f.path));
+      renameWithRetry(f.path, to);
+      moved.push({ path: to, bytes: f.bytes });
+    }
+    closeDb(await openDb(project));
+  } catch (err) {
+    const cause = err instanceof CtxError ? err.toLine() : err instanceof Error ? err.message : String(err);
+    const at = moved.length > 0 ? D8_ORPHAN_HEALED_DETAIL(dir, moved, project.dbPath) : row.detail;
+    return { ...row, detail: D8_ORPHAN_MOVE_FAILED(at, cause) };
+  }
+  return { ...row, status: "FAIL", detail: D8_ORPHAN_HEALED_DETAIL(dir, moved, project.dbPath), fixCommand: D8_ORPHAN_HEALED_FIX };
 }
