@@ -48,6 +48,12 @@ The package must be listed, and its `packages[]` entry in `settings.json` must n
 ## Remove
 
 ```sh
+pi remove npm:context-mode@next
+```
+
+`pi remove` uninstalls the package and drops it from `settings.json`. If you also ran setup, undo it first:
+
+```sh
 context-mode setup --remove --agents pi
 ```
 

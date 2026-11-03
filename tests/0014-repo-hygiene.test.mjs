@@ -1064,11 +1064,30 @@ describe("ADR-0015 repo: README agent lines", () => {
     }
     const codex = blocks.codex.split("```sh\n")[1].split("\n```")[0].split("\n");
     assert.equal(codex[codex.length - 1], "context-mode setup --agents codex", "Codex: the trust step is the last line of the install fence");
-    assert.ok(codex[codex.length - 2].startsWith("# "), "Codex: a short comment names the trust step");
+    assert.ok(codex[codex.length - 3].startsWith("# "), "Codex: a short comment names the trust step (D-README-DWELL-2: the npm line sits before the setup line)");
     for (const line of README.split("\n")) assert.ok(!(line.startsWith("<details") && / open[ >]/.test(line)), `a README details block starts open: ${line.slice(0, 80)}`);
     const opened = README.replace('<details id="install-pi">', '<details open id="install-pi">');
     assert.notEqual(opened, README, "fixture edit did not apply");
     assert.ok(checkAgentLines(opened).some((p) => p.includes("starts open")), checkAgentLines(opened).join("\n"));
+  });
+
+  test("readme-agents: a picker line links every block in order; an agent's own install removes with its own command; Codex gets the context-mode command before its trust step (D-README-DWELL-2)", () => {
+    // Owner 2026-11-03: "hedefin, bir user i bu sayfada 10 dakikadan fazla tutabilmek olsun"; main rule: each agent's own native command.
+    const head = README.slice(README.indexOf("\n## Install\n"), README.indexOf('<details id="install-'));
+    const pick = head.split("\n").find((l) => l.startsWith("Pick your agent: "));
+    assert.ok(pick, "Install has a picker line");
+    const anchors = pick.split("](#").slice(1).map((s) => s.slice(0, s.indexOf(")")));
+    const order = README.split('<details id="').slice(1).map((s) => s.slice(0, s.indexOf('"'))).filter((s) => s.startsWith("install-"));
+    assert.equal(order.length, ADAPTERS.length);
+    assert.deepEqual(anchors, order, "the picker names each block once, in order");
+    for (const r of agentRows()) {
+      if (!r.cmds.own) continue;
+      const bin = r.cmds.install[0].split(" ")[0];
+      for (const l of r.cmds.remove) assert.ok(l.startsWith(bin + " "), `${r.id}: remove uses ${bin}: ${l}`);
+    }
+    assert.ok(renderAgentBlocks().pi.includes("\n# remove\npi remove npm:context-mode@next\n"), "Pi removes with pi remove");
+    const codex = renderAgentBlocks().codex.split("```sh\n")[1].split("\n```")[0].split("\n");
+    assert.deepEqual(codex.slice(-2), ["npm i -g context-mode@next", "context-mode setup --agents codex"], "Codex installs the context-mode command, then trusts the hooks");
   });
 });
 
@@ -1637,6 +1656,27 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       assert.ok(!words.includes("v2"), `README prose says v2: ${line.slice(0, 100)}`);
     }
     devRow("D-README-INSTALL-2", "install adimlarini collapse kullanarak yap");
+  });
+
+  test("README dwell, round 2: install proof folds into one closed block; network calls are a table with file links; the Gateway says when to add it and gives its setup command first (D-README-DWELL-2)", () => {
+    // Owner 2026-11-03: "hedefin, bir user i bu sayfada 10 dakikadan fazla tutabilmek olsun"; "inline code etiketleri ile alttaki paragraflar ne kadar kullanissiz".
+    const readme = readRepo("README.md");
+    const inst = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("\n## Try it\n"));
+    const proofAt = inst.indexOf("<details><summary><b>How we tested the install</b></summary>");
+    assert.ok(proofAt > inst.lastIndexOf('<details id="install-'), "a closed proof block after the agent blocks");
+    const proof = inst.slice(proofAt, inst.indexOf("</details>", proofAt));
+    for (const need of ["We ran the real binary", "Hooks reach each agent in one of three ways", "HOOKS-FIRE.md", "ADR-0023"]) assert.ok(proof.includes(need), `proof block lacks ${need}`);
+    const sec = readme.slice(readme.indexOf("\n## Security and privacy\n"), readme.indexOf("\n## Context Mode Gateway\n"));
+    assert.ok(sec.includes("\n| Call | When | File |\n"), "network calls are a table");
+    for (const f of ["src/core/sandbox/fetch.ts", "src/core/ops/doctor-env.ts", "src/core/ops/release-fetch.ts", "src/cli/commands.ts"]) assert.ok(sec.includes(`](${f})`), `Security links ${f}`);
+    for (const line of sec.split("\n")) if (!line.startsWith("|")) assert.ok(line.split("`").length - 1 < 6, `Security line holds 3 or more inline-code spans: ${line.slice(0, 100)}`);
+    const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
+    assert.ok(gw.includes("\nAdd the Gateway when you want "), "the Gateway section says when to add it");
+    const setup = gw.indexOf("```sh\nnpx @context-mode/cli\n```");
+    assert.ok(setup > 0 && setup < gw.indexOf("<table>"), "the Gateway setup fence sits before the screens");
+    // The reviewer's pricing link stays out: D-README-GW-PROBLEM-1 and D-README-GW-CALM-1 keep price lines out of the README.
+    assert.ok(gw.includes("Gateway only"), "the cost lines say Gateway only");
+    datedRow("D-README-DWELL-2", "10 dakikadan fazla");
   });
 
   test("README: one rendered stargazer-companies image, light and dark, drawn from the JSON, with its source line (D-README-STARRED-1)", () => {

@@ -5,7 +5,7 @@
 // "tum agentlerin kendi native install commandleri ne ise onlari kullanalim").
 // Block = summary (agent name from the "# Install context-mode v2 on <name>" heading), then
 //   1. a sh fence: the first fence under "## Install" (the agent's own install). Codex adds its one-time hook trust step
-//      (the page's "context-mode setup --agents codex" fence) as the last line, after a # comment.
+//      (the page's "npm i -g context-mode@next" + "context-mode setup --agents codex" fence) as the last lines, after a # comment.
 //   2. a sh fence with "# update", "# check" and "# remove" comment lines:
 //      update = the page's Update fence;
 //      check  = the page's Verify fence. For an agent that installs with its own plugin command, the context-mode CLI
@@ -70,8 +70,11 @@ export function agentCommands(id, lines, bin) {
   const own = !first[0]?.startsWith("npm ") && (first[first.length - 1] ?? "").startsWith(`${bin} `);
   const cmds = { install: [...first], update, check: verify, remove: removeFence, own };
   if (!own) return cmds;
-  const trust = install.find((f) => f.lines.length === 1 && f.lines[0] === `context-mode setup --agents ${id}`);
-  if (id === "codex" && trust) cmds.install.push(TRUST_COMMENT, trust.lines[0]);
+  // The trust step: the page's fence that installs the context-mode command from npm, then runs setup (D-README-DWELL-2).
+  const setupLine = `context-mode setup --agents ${id}`;
+  const trust = install.find((f) => f.lines.length === 2 && f.lines[0].startsWith("npm i -g ") && f.lines[1] === setupLine)
+    ?? install.find((f) => f.lines.length === 1 && f.lines[0] === setupLine);
+  if (id === "codex" && trust) cmds.install.push(TRUST_COMMENT, ...trust.lines);
   const agentChecks = verify.filter((l) => !l.startsWith("context-mode "));
   if (agentChecks.length) cmds.check = agentChecks;
   // The switch fence: the agent's own uninstall lines, then the install lines again.
@@ -99,7 +102,7 @@ export function agentRows() {
     const mcp = a.installMode === "in-process" && !reg.config ? "ctx tools built into the plugin" : "yes";
     const bin = reg.nativePlugin?.bin ?? reg.cli?.bin ?? (a.installMode === "in-process" ? a.id : "");
     const cmds = agentCommands(a.id, lines, bin);
-    const install = cmds.own ? cmds.install.filter((c) => !c.startsWith("#") && !c.startsWith("context-mode ")).map((c) => `\`${c}\``).join("<br>") : FALLBACK_INSTALL;
+    const install = cmds.own ? cmds.install.filter((c) => !c.startsWith("#") && !c.startsWith("context-mode ") && !c.startsWith("npm ")).map((c) => `\`${c}\``).join("<br>") : FALLBACK_INSTALL;
     return { id: a.id, name, hooks, mcp, skills: a.skillChannel ? "yes" : "no", install, cmds, page: rel };
   }).sort((x, y) => x.name.localeCompare(y.name));
 }

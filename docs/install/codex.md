@@ -21,6 +21,13 @@ After v2 is on main: `codex plugin marketplace add mksglu/context-mode`, then `c
 
 The plugin brings the MCP server, the hooks and the skills. Codex runs a hook only when it is trusted. After `codex plugin add`, Codex 0.156.1 lists the plugin hooks `untrusted` (`hooks/list`). Run `context-mode setup --agents codex` once: it asks Codex (`codex app-server`, `hooks/list`) for the hooks of `context-mode@context-mode` and writes one `[hooks.state]` trust table per hook in `config.toml`, with the key and hash Codex reports. It trusts only our own plugin hooks, never user hooks or other plugins. Checked live on Codex 0.156.1 in a clean CODEX_HOME: 4 of 4 hooks `trusted`, and a `cat` of a 192 KB log in `codex exec` is blocked by the PreToolUse hook. Restart Codex after the install.
 
+The trust step needs the `context-mode` command, so install it from npm first:
+
+```sh
+npm i -g context-mode@next
+context-mode setup --agents codex
+```
+
 `context-mode doctor` fails `hook-registered` while Codex lists the plugin hooks `untrusted`, and prints the fix: `context-mode setup`. If Codex gives no answer, doctor shows a `hook-trust` warning.
 
 Route with no plugin (npm + setup): `context-mode setup --agents codex` writes `~/.codex/hooks.json` and one `[hooks.state]` trust table per hook in `config.toml` (D-TRUST-KEYDIR-2). The same probe shows `trusted` for all 4 hooks.

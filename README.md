@@ -48,10 +48,12 @@ Starred by engineers at these companies: each name is the company field of 2 or 
 
 ## Install
 
-Pick your agent below, open its block and copy its own install command. Each block also holds the update, check and remove steps, and the [Install guide](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install) walks through them.
+Pick your agent: [Claude Code](#install-claude-code) · [Codex](#install-codex) · [Gemini CLI](#install-gemini) · [Qwen Code](#install-qwen) · [Pi](#install-pi) · [OpenCode](#install-opencode) · [Copilot CLI](#install-copilot-cli) · [Kiro](#install-kiro) · [VS Code](#install-vscode) · [ZCode](#install-zcode)
+
+Open its block and copy its own install command. Each block also holds the update, check and remove steps, and the [Install guide](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install) walks through them.
 
 The plugin needs Node 24.15.0 or later, from the engines field in [package.json](package.json). On Windows, add Git for Windows: the shell tools run in Git Bash, and doctor checks for it.
-The npm commands use `@next`, the current 2.0 release tag. A plain npm install of context-mode gives the 1.x line.
+The npm commands use `@next`, the current 2.0 release tag; the plain package name gives the 1.x line.
 Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the release branch.
 
 <details id="install-claude-code"><summary><b>Claude Code</b></summary>
@@ -79,6 +81,7 @@ Hooks ✓ (package) · MCP ✓ · Skills ✓
 codex plugin marketplace add mksglu/context-mode@release
 codex plugin add context-mode@context-mode
 # one-time step: trust the plugin hooks
+npm i -g context-mode@next
 context-mode setup --agents codex
 ```
 
@@ -143,7 +146,7 @@ pi update --extensions
 # check
 pi list
 # remove
-context-mode setup --remove --agents pi
+pi remove npm:context-mode@next
 ```
 
 Hooks ✓ (the plugin's own event handlers) · MCP ✓ (ctx tools built into the plugin) · Skills ✓
@@ -264,12 +267,16 @@ npm rm -g context-mode
 
 Restart the agent, then run `/ctx-doctor` in it. Each check prints PASS or a fix command, and the [Doctor guide](https://contextmode.ai/docs/engine/doctor?utm_source=github&utm_medium=readme&utm_content=install-doctor) explains each check.
 
+<details><summary><b>How we tested the install</b></summary>
+
 Every agent gets hooks, the MCP server and the plugin skills; the last line of each block above says how.
 Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi). The [Agents guide](https://contextmode.ai/docs/engine/agents?utm_source=github&utm_medium=readme&utm_content=install-agents) shows what each agent runs.
 We ran the real binary of each agent with the plugin hook: Claude Code, Codex, Gemini CLI, Qwen Code, Pi, OpenCode, Copilot CLI and ZCode. Each run used a clean temp home and a local test model, on 2.0.0-next.15.
 For VS Code and Kiro, the check covers the hook setup: VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
 CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: [HOOKS-FIRE.md](docs/architecture/release/HOOKS-FIRE.md).
 Each agent uses its own install command, and [ADR-0023](docs/architecture/adr/ADR-0023-native-install.md) says why.
+
+</details>
 
 Your first task with the plugin, step by step: [First session](https://contextmode.ai/docs/engine/first-session?utm_source=github&utm_medium=readme&utm_content=install-next). Or paste a prompt from [Try it](#try-it) right now.
 
@@ -420,23 +427,27 @@ Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` 
 
 ## Security and privacy
 
-- The plugin keeps all its data on your machine, in `~/.context-mode`: one `context.db` per project. `ctx_purge` deletes it by session, source or project. Read the [Security guide](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=security).
-- The plugin has zero telemetry: usage data, events and crash reports stay on your machine. It uses the network at these call sites, each one started by you or your agent:
-  - `ctx_index` of a URL the agent asks for: [`src/core/sandbox/fetch.ts`](src/core/sandbox/fetch.ts). It blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect.
-  - `context-mode doctor`: one read of the npm dist-tags of `context-mode`, with `git ls-remote` of the release tags as the fallback when npm is down, to check for a new version (`src/core/ops/doctor-env.ts`).
-  - `ctx_upgrade`: `git clone --depth 1` of the release branch (`src/core/ops/release-fetch.ts`). `context-mode upgrade`: `npm i -g context-mode@next` (`src/cli/commands.ts`).
-  - The debug report: `gh issue create`, after you press a key (`src/cli/commands.ts`).
-  - Install and update: your agent's own install command, npm or git.
-- The guard test D-PRIVACY-NET-1 in [`tests/0008-enforcement.test.mjs`](tests/0008-enforcement.test.mjs) scans `src` for HTTP clients, sockets, DNS lookups, git network calls and `gh` or `npm` spawns. It fails when a new call site appears outside this list, so this section stays true.
+- The plugin keeps all its data on your machine, one database per project in `~/.context-mode`, and `ctx_purge` deletes it by session, source or project. Read the [Security guide](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=security).
+- The plugin has zero telemetry: usage data, events and crash reports stay on your machine. It uses the network for five calls, each one started by you or your agent:
+
+| Call | When | File |
+|---|---|---|
+| Fetch of a URL, for `ctx_index` | Your agent asks for a page. The fetch blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect. | [fetch.ts](src/core/sandbox/fetch.ts) |
+| One read of the npm dist-tags, with `git ls-remote` of the release tags as the fallback | You run `context-mode doctor`, to check for a new version | [doctor-env.ts](src/core/ops/doctor-env.ts) |
+| `git clone --depth 1` of the release branch | You run `ctx_upgrade` | [release-fetch.ts](src/core/ops/release-fetch.ts) |
+| `npm i -g context-mode@next`, or `gh issue create` | You run `context-mode upgrade`, or you press a key to send the debug report | [commands.ts](src/cli/commands.ts) |
+| Your agent's own install command, npm or git | You install or update | Your agent |
+
+- The guard test D-PRIVACY-NET-1 in [tests/0008-enforcement.test.mjs](tests/0008-enforcement.test.mjs) scans the source for HTTP clients, sockets, DNS lookups, git network calls and gh or npm spawns. It flags each new call site, so this table stays true.
 - Doctor and the debug report remove secrets by their structure before they print.
 
-Here "sandbox" means the output stays in the sandbox, out of the context. Code from `ctx_execute` runs on your host as your user, with your environment (minus the preload variables), your files and your network; keep your agent's own permission prompts on.
+Code from `ctx_execute` runs on your host as your user, with your files, your network and your environment except the preload variables, so keep your agent's own permission prompts on. Here "sandbox" means the output stays in the sandbox and out of the context.
 What the plugin stores, where, and how to delete it: [Privacy](https://contextmode.ai/docs/engine/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 
 ## Context Mode Gateway
 
 The plugin works on tool output, on your machine, and it is complete on its own. Context Mode Gateway is a separate hosted service with its own account and subscription. It works on every request, across all your agents. Its 11 features, the full list: Context Saving, Recall, Memory, Skills, Search, Session resume, Active Context, Instructions, Protect, Prompt caching, Live and Analytics.
-Teams add it for long sessions, shared memory and cost reports. The two work together: [Gateway guide](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=readme&utm_content=gateway).
+Add the Gateway when you want savings on every request, memory across sessions and agents, or cost reports for a team. For one project on one machine, the plugin covers the job. The two work together: [Gateway guide](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=readme&utm_content=gateway).
 Gateway Recall, Search and Session resume run on the Gateway server, across sessions and agents. The plugin's `ctx_search` and `ctx_resume` read the local `context.db` of one project.
 With the Gateway on, your requests pass through its server; the plugin keeps its own data on your machine.
 
@@ -444,6 +455,15 @@ With the Gateway on, your requests pass through its server; the plugin keeps its
 |---|---|---|---|
 | Context Mode plugin | On your machine | One project, local `context.db` | Free |
 | Context Mode Gateway | Hosted service | All sessions and agents | Subscription, separate from the plugin |
+
+Set up the Gateway with one command:
+
+```sh
+npx @context-mode/cli
+```
+
+`npx @context-mode/cli` signs you in to your Gateway account, which has its own subscription, and writes one config change per agent.
+Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi. The Gateway CLI needs Node 20.12 or later, from its npm engines field.
 
 <a href="docs/assets/readme/gateway/live.mp4"><img src="docs/assets/readme/gateway/live.webp" width="100%" alt="Gateway Live screen during a session: money saved, bytes kept out per request, history kept and sent, and a feed of each request with its cost and saving"></a>
 
@@ -494,14 +514,12 @@ Source: [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works?utm_s
 
 </details>
 
-Gateway cost against Claude Code alone, Claude Opus 5.5, mean dollars per session at list price:
+Gateway only: its cost against Claude Code alone, Claude Opus 5.5, mean dollars per session at list price. The plugin numbers are in [Benchmarks](#benchmarks).
 
 - Six short tasks (2026-09-29): 24.5% fewer dollars pooled over 176 sessions (21% to 29% per task). [v3-opus55-short.json](https://contextmode.ai/benchmarks/data/v3-opus55-short.json?utm_source=github&utm_medium=readme&utm_content=bench)
 - Long Claude Code session, 200K window (2026-10-03/04): mean cost per session $4.8627 to $3.0353 (-37.6% in dollars, mean of 3 pairs). [ab.json](https://contextmode.ai/benchmarks/recall/200k-r2/ab.json?utm_source=github&utm_medium=readme&utm_content=bench)
 - We fixed the rules before each run: [contextmode.ai/docs/benchmarks](https://contextmode.ai/docs/benchmarks?utm_source=github&utm_medium=readme&utm_content=bench).
 
-Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi.
-Setup is one command, `npx @context-mode/cli`. It signs you in to your Gateway account, which has its own subscription, and writes one config change per agent (the Gateway CLI needs Node 20.12 or later, from its npm `engines` field; the plugin needs Node 24.15.0).
 The Gateway routes to Anthropic and OpenAI. The Gateway sends your requests to its server on the way to the model. It keeps a searchable record of your sessions for Recall and Search, and masks secrets and e-mail addresses when it reads archived output back. Its privacy page is at [contextmode.ai/privacy](https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 Keep your agent's own sandbox on next to Protect.
 
