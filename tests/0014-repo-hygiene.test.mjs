@@ -2048,6 +2048,33 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(gw.includes("https://contextmode.ai/privacy?utm_source=github&utm_medium=readme&utm_content=privacy"), "Gateway section links its privacy page");
     devRow("D-README-PRIVACY-2", "free, local, privacy, no telemetry");
   });
+
+  test("README prose names the product contextmode; context-mode stays in commands, code, URLs, link targets and HTML tags (D-README-NAME-1)", () => {
+    // Owner 2026-11-03: "context-mode degil ismimiz artik contextmode buna gore guncelleyelim"; "context-mode u sadece readme de fixle simdilik".
+    // The npm package, the repo, the command and the data folder keep the name context-mode, so those places still work.
+    const readme = readRepo("README.md");
+    const drop = (s, open, close) => {
+      let out = "", at = 0;
+      for (let i = s.indexOf(open); i >= 0; i = s.indexOf(open, at)) {
+        const end = s.indexOf(close, i + open.length);
+        if (end < 0) break;
+        out += s.slice(at, i) + " ";
+        at = end + close.length;
+      }
+      return out + s.slice(at);
+    };
+    const prose = (line) => ["https://", "http://"].reduce((s, p) => drop(s, p, " "), drop(drop(drop(line, "`", "`"), "<", ">"), "](", ")") + " ");
+    const bad = [];
+    let fence = false;
+    readme.split("\n").forEach((line, i) => {
+      if (line.trimStart().startsWith("```")) fence = !fence;
+      else if (!fence && prose(line).includes("context-mode")) bad.push(`${i + 1}: ${line.slice(0, 120)}`);
+    });
+    assert.deepEqual(bad, [], "README prose writes the product name as contextmode");
+    const install = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("<details id=\"install-"));
+    assert.ok(install.includes("contextmode installs as the npm package and command `context-mode`."), "Install says which name npm and the shell use");
+    devRow("D-README-NAME-1", "ismimiz artik contextmode");
+  });
 });
 
 describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {

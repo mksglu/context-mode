@@ -54,6 +54,7 @@ Pick your agent: [Claude Code](#install-claude-code) · [Codex](#install-codex) 
 Open its block and copy its own install command. Each block also holds the update, check and remove steps, and the [Install guide](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install) walks through them.
 
 The plugin needs Node 24.15.0 or later, from the engines field in [package.json](package.json). On Windows, add Git for Windows: the shell tools run in Git Bash, and doctor checks for it.
+contextmode installs as the npm package and command `context-mode`.
 The npm commands use `@next`, the current 2.0 release tag; the plain package name gives the 1.x line.
 Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the release branch.
 
@@ -529,7 +530,7 @@ Every number with its reason: [How it works](docs/how-it-works.md). The rules th
 | `ctx_resume` | Returns the plugin's local state block (at most 2,048 B), or one full row by `seq` |
 | `ctx_stats` | Shows how much output stayed out of context |
 | `ctx_doctor` | Checks the install; each check prints PASS or a fix command |
-| `ctx_upgrade` | Installs, upgrades or uninstalls; replaces old context-mode entries |
+| `ctx_upgrade` | Installs, upgrades or uninstalls; replaces old contextmode entries |
 | `ctx_purge` | Deletes indexed data by session, source or project |
 
 Three more real calls, from the same live run of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](bench/evidence/terminal-calls-2026-11-03/calls.json)).
