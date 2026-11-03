@@ -2305,7 +2305,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         const r = await ctxBatch.handler({ commands: ["yes line | head -n 5000"], queries: ["q".repeat(9000), "w".repeat(9000)] }, ctx);
         assert.ok(B(r.text) <= C.OUTPUT_CAP);
         assert.ok(r.text.includes("## query 1") && r.text.includes("## query 2"));
-        assert.ok(r.text.endsWith("})") && r.text.includes('source:"ctx_batch:1"'));
+        assert.ok(r.text.endsWith("})") && r.text.includes('source:"ctx_batch:1:1"'));
       });
 
       test("[NLC] index: a huge label is stored whole and named by its handle in the reply", async (t) => {

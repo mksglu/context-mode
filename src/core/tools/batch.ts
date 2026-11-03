@@ -16,7 +16,7 @@ import { buildChildEnv } from "../sandbox/env.ts";
 import { findRuntime, noRuntimeError } from "../sandbox/runtimes.ts";
 import { runProcess } from "../sandbox/spawn.ts";
 import { closeDb, openDb } from "../store/db.ts";
-import { ftsInsert, ftsQuery } from "../store/fts.ts";
+import { ftsInsert, ftsQuery, nextLabelSerial } from "../store/fts.ts";
 import { unknownField } from "./search.ts";
 
 export type { BatchInput } from "../contracts/types.ts";
@@ -28,7 +28,8 @@ export const ctxBatchSchema = z.object({
 }, { error: unknownField }).strict(); // 00 §5.2 step 1: the SDK validates first, so the text lives on the schema
 
 const TOOL = "ctx_batch";
-const LABEL_PREFIX = TOOL + ":"; // §3.3 step 5: label = "ctx_batch:" + turn
+const LABEL_PREFIX = TOOL + ":"; // §3.3 step 5: label = "ctx_batch:" + turn + ":" + n (D-BATCH-OWN-SOURCE-1)
+const LABEL_SEP = ":";
 const SHELL = "shell";
 const SHELL_INLINE_FLAG = "-c";
 const MARKER = "$ "; // §3.3 step 4: one "$ <command>" line heads each block
@@ -106,7 +107,7 @@ async function runCommand(cmd: string, shell: string | null, ctx: ToolContext, d
 
 /** Why indexing stopped before the end: the Q8 deadline (or a cancel), or the ingest byte budget. */
 type IndexStop = "deadline" | "budget" | null;
-interface Indexed { bodies: Map<string, string>; raw: Map<string, string>; indexed: number; total: number; stop: IndexStop; }
+interface Indexed { bodies: Map<string, string>; raw: Map<string, string>; ids: number[]; indexed: number; total: number; stop: IndexStop; }
 
 function chunkKey(sourceId: number, ord: number): string {
   return sourceId + ":" + ord;
@@ -135,6 +136,7 @@ function indexCombined(db: DbHandle, ctx: ToolContext, label: string, ran: CmdOu
   const display = shown(chunks, ran.map((r) => r.head));
   const bodies = new Map<string, string>();
   const raw = new Map<string, string>(); // the indexed text with its `$ <command>` marker, for output no query showed
+  const ids: number[] = []; // D-BATCH-OWN-SOURCE-1: the source rows this call wrote
   let total = 0;
   for (const c of chunks) total += c.bytes;
   let indexed = 0;
@@ -157,6 +159,7 @@ function indexCombined(db: DbHandle, ctx: ToolContext, label: string, ran: CmdOu
       chunkCount: group.length,
       createdAt: Date.now(),
     }, group);
+    ids.push(id);
     for (const c of group) { bodies.set(chunkKey(id, c.ord), display[c.ord]); raw.set(chunkKey(id, c.ord), c.text); }
     indexed += groupBytes;
     group = [];
@@ -166,15 +169,15 @@ function indexCombined(db: DbHandle, ctx: ToolContext, label: string, ran: CmdOu
   for (const c of chunks) {
     if (queued + c.bytes > budgetBytes) {
       const stop: IndexStop = flush() ? "budget" : "deadline"; // flush first: it adds to `indexed`
-      return { bodies, raw, indexed, total, stop };
+      return { bodies, raw, ids, indexed, total, stop };
     }
-    if (group.length > 0 && groupBytes + c.bytes > INDEX_WRITE_CHUNK && !flush()) return { bodies, raw, indexed, total, stop: "deadline" };
+    if (group.length > 0 && groupBytes + c.bytes > INDEX_WRITE_CHUNK && !flush()) return { bodies, raw, ids, indexed, total, stop: "deadline" };
     group.push(c);
     groupBytes += c.bytes;
     queued += c.bytes;
   }
   const stop: IndexStop = flush() ? null : "deadline";
-  return { bodies, raw, indexed, total, stop };
+  return { bodies, raw, ids, indexed, total, stop };
 }
 
 // ---- steps 6-8: answer each query inside its share ----
@@ -185,13 +188,14 @@ function bytes(s: string): number {
 
 // Each query is one LIMIT SEARCH_PAGE_SIZE lookup, a fixed cost, so the queries run after a timeout
 // too and show what ran (D-M2-T11-1); only a cancel stops them.
-function answer(db: DbHandle, ctx: ToolContext, label: string, queries: string[], share: number, own: Map<string, string>): { lines: string[]; seen: Set<string> } {
+function answer(db: DbHandle, ctx: ToolContext, ownIds: number[], queries: string[], share: number, own: Map<string, string>): { lines: string[]; seen: Set<string> } {
   const seen = new Set<string>(); // step 7: a (sourceId, ord) already shown is not shown again
   const lines: string[] = [];
   for (const [qi, q] of queries.entries()) {
     if (ctx.signal.aborted) break;
-    // Step 6, A15: this call's own label first; the whole session scope only when that is empty.
-    let hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0, label);
+    // Step 6, A15: this call's own sources first (by id: D-BATCH-OWN-SOURCE-1); the whole session scope
+    // only when that is empty.
+    let hits = ownIds.length === 0 ? [] : ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0, undefined, ownIds);
     if (hits.length === 0) hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0);
     const head = "## " + (bytes(q) > ECHO_MAX_BYTES ? "query " + (qi + 1) : q); // D-NO-LOSSY-CUT-2: a long query is named by position
     let used = bytes(head) + 1;
@@ -237,10 +241,13 @@ export async function runBatch(input: unknown, ctx: ToolContext, boundMs: number
   const ran = pool.results;
   const last = ran[ran.length - 1];
   const sandboxBytes = ran.reduce((n, r) => n + r.bytes, 0);
-  const label = LABEL_PREFIX + ctx.turn;
 
   try {
     const db = await openDb(ctx.project);
+    // D-BATCH-OWN-SOURCE-1: one label per call, so `source` in ctx_search names this call's output only.
+    // Labels of older versions ("ctx_batch:<turn>") stay in the store and stay readable by `source`.
+    const turnPrefix = LABEL_PREFIX + ctx.turn + LABEL_SEP;
+    const label = turnPrefix + nextLabelSerial(db, ctx.sessionId, turnPrefix);
     let sections: string[];
     let idx: Indexed;
     // D-BATCH-FRAMING-1: no counts line (the caller holds its commands and queries); the exit code only when it is news.
@@ -261,7 +268,7 @@ export async function runBatch(input: unknown, ctx: ToolContext, boundMs: number
       // The footer budget is reserved always, so printing it later never pushes the reply past OUTPUT_CAP.
       const fixed = (exitLine === null ? 0 : bytes(exitLine) + 1) + (notice === null ? 0 : bytes(notice) + 1) + bytes(footer);
       const share = Math.floor((OUTPUT_CAP - fixed) / queries.length);
-      const answered = answer(db, ctx, label, queries, share, idx.bodies);
+      const answered = answer(db, ctx, idx.ids, queries, share, idx.bodies);
       sections = answered.lines;
       // Output no query showed: a little is printed with its marker (cheaper than the pointer, and nothing
       // is left out); more than that, or an ingest cut, gets the pointer.

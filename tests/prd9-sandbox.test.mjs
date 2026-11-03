@@ -115,6 +115,21 @@ describe("PRD-v2 section 9: ctx_execute", { concurrency: CONC }, () => {
     };
   }
 
+  test("ctx_execute (D-BATCH-OWN-SOURCE-1): two calls with the same label in one turn answer from their own output", async () => {
+    // Same code first line -> same "ctx_execute:" label; the intent selection reads by source id, so no mix.
+    const root = mkdtempSync(join(tmpdir(), "cm-exown-"));
+    try {
+      const ctx = ctxFor(root);
+      const a = await ctxExecute.handler({ language: "shell", code: "# snap\nprintf 'N1_SNAPSHOT phase=A\\n'", intent: "N1_SNAPSHOT" }, ctx);
+      assert.ok(a.text.includes("phase=A"), a.text);
+      const b = await ctxExecute.handler({ language: "shell", code: "# snap\nprintf 'N1_SNAPSHOT phase=B\\n'", intent: "N1_SNAPSHOT" }, ctx);
+      assert.ok(b.text.includes("phase=B"), b.text);
+      assert.ok(!b.text.includes("phase=A"), b.text);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("ctx_execute runs language:shell and returns stdout (D-EXEC-BARE-1: no head line on exit 0 with the whole output)", async () => {
     const root = mkdtempSync(join(tmpdir(), "cm-ex-"));
     try {
@@ -395,6 +410,45 @@ describe("PRD-v2 section 9: ctx_batch", { concurrency: CONC }, () => {
     };
   }
 
+  test("ctx_batch (D-BATCH-OWN-SOURCE-1): a second call in the same turn answers from its own source, not the earlier call's", async () => {
+    // Tester finding 1 (next.34): two sequential calls, one session, one turn; the second reply held phase=A too.
+    const root = mkdtempSync(join(tmpdir(), "cm-bown-"));
+    try {
+      const ctx = ctxFor(root);
+      const a = await ctxBatch.handler({ commands: ["printf 'N1_SNAPSHOT phase=A queries=51 elapsed_ms=150\\n'"], queries: ["N1_SNAPSHOT"] }, ctx);
+      assert.ok(a.text.includes("phase=A"), a.text);
+      const b = await ctxBatch.handler({ commands: ["printf 'N1_SNAPSHOT phase=B queries=4 elapsed_ms=26\\n'"], queries: ["N1_SNAPSHOT"] }, ctx);
+      assert.ok(b.text.includes("phase=B"), b.text);
+      assert.ok(!b.text.includes("phase=A"), b.text);
+      // Widen only when the own source has no hit: a query only the first call can answer still finds it.
+      const c = await ctxBatch.handler({ commands: ["echo other-zzz"], queries: ["elapsed_ms=150"] }, ctx);
+      assert.ok(c.text.includes("phase=A"), c.text);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("ctx_batch (D-BATCH-OWN-SOURCE-1): each call's label is unique and readable by ctx_search source", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-blab-"));
+    try {
+      const ctx = ctxFor(root);
+      const big = "b".repeat(200);
+      const a = await ctxBatch.handler({ commands: ["echo one-aaa", "echo two-" + big], queries: ["one-aaa"] }, ctx);
+      const b = await ctxBatch.handler({ commands: ["echo one-aaa", "echo three-" + big], queries: ["one-aaa"] }, ctx);
+      const la = a.text.match(/source:"([^"]+)"/)[1];
+      const lb = b.text.match(/source:"([^"]+)"/)[1];
+      assert.notEqual(la, lb);
+      assert.ok(la.startsWith("ctx_batch:1"), la);
+      const { ctxSearch } = await import("../src/core/tools/search.ts");
+      const sb = await ctxSearch.handler({ queries: ["three"], source: lb }, ctx);
+      assert.ok(sb.text.includes("three-"), sb.text);
+      const sa = await ctxSearch.handler({ queries: ["three"], source: la }, ctx);
+      assert.ok(!sa.text.includes("three-"), sa.text);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("ctx_batch is not readOnly (it runs commands)", () => {
     assert.equal(ctxBatch.name, "ctx_batch");
     assert.equal(ctxBatch.readOnly, false);
@@ -492,7 +546,7 @@ describe("PRD-v2 section 9: ctx_batch", { concurrency: CONC }, () => {
       const out = await ctxBatch.handler({ commands: ["for i in $(seq 1 3000); do echo \"row $i needle\"; echo; done"], queries: ["needle", "row"] }, ctxFor(root));
       assert.ok(Buffer.byteLength(out.text) <= 16384);
       assert.ok(out.text.startsWith("## needle\n")); // D-BATCH-FRAMING-1: no counts line, exit 0 is not printed
-      assert.ok(out.text.trimEnd().endsWith('source:"ctx_batch:1"})'));
+      assert.ok(out.text.trimEnd().endsWith('source:"ctx_batch:1:1"})'));
       assert.ok(out.sandboxBytes > 16384);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -529,7 +583,7 @@ describe("PRD-v2 section 9: ctx_batch", { concurrency: CONC }, () => {
     const root = mkdtempSync(join(tmpdir(), "cm-bf4-"));
     try {
       const out = await ctxBatch.handler({ commands: ["echo one-aaa", "echo two-" + "b".repeat(200)], queries: ["one-aaa"] }, ctxFor(root));
-      assert.equal(out.text, '## one-aaa\none-aaa\nmore: ctx_search({queries:[...], source:"ctx_batch:1"})');
+      assert.equal(out.text, '## one-aaa\none-aaa\nmore: ctx_search({queries:[...], source:"ctx_batch:1:1"})');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

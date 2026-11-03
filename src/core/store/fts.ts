@@ -49,6 +49,7 @@ const PORTER_MATCH = `
     AND (:scope <> 'session' OR chunks.session_id = :session_id)
     AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
     AND (:source IS NULL OR s.label = :source)
+    AND (:ids IS NULL OR s.id IN (SELECT value FROM json_each(:ids)))
     ${NOT_RAW}`;
 const PORTER_ORDER = `
 ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
@@ -80,6 +81,7 @@ WHERE chunks_tri MATCH :match
   AND (:scope <> 'session' OR c.session_id = :session_id)
   AND (:scope <> 'worktree' OR c.worktree = :worktree)
   AND (:source IS NULL OR s.label = :source)
+  AND (:ids IS NULL OR s.id IN (SELECT value FROM json_each(:ids)))
   ${NOT_RAW}
 ORDER BY bm25(chunks_tri, 1.0, ${TITLE_WEIGHT}) ASC, c.source_id DESC, c.ord ASC`;
 
@@ -344,6 +346,17 @@ function typoTerms(db: DbHandle, words: string[]): string[] | null {
   return changed ? out.map((t) => `"${t.replaceAll('"', '""')}"*`) : null;
 }
 
+// D-BATCH-OWN-SOURCE-1: the next free serial n for labels "<prefix><n>" in this session (1 when none).
+// MAX, not COUNT: a purged label in the middle never makes a later call reuse a label that still exists.
+const LABEL_SERIAL = `
+SELECT COALESCE(MAX(CAST(substr(label, length(:prefix) + 1) AS INTEGER)), 0) + 1 AS n
+FROM sources WHERE session_id = :session_id AND substr(label, 1, length(:prefix)) = :prefix`;
+
+export function nextLabelSerial(db: DbHandle, sessionId: string, prefix: string): number {
+  const row = stmt(db.raw, LABEL_SERIAL).get({ session_id: sessionId, prefix }) as { n: number };
+  return Number(row.n);
+}
+
 // impl/02 §9.2 + impl/05 steps 5, 7, 8 (D-M1-T8-2, D-M1-T8-4). Zero hits -> [], never throws for
 // text input.
 export function ftsQuery(
@@ -355,10 +368,13 @@ export function ftsQuery(
   limit: number,
   offset: number,
   source?: string,
+  sourceIds?: readonly number[],
 ): Hit[] {
   const terms = searchTerms(q);
   if (terms.length === 0) return [];
-  const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
+  // D-BATCH-OWN-SOURCE-1: `sourceIds` limits the search to these source rows (a call's own output).
+  const ids = sourceIds === undefined ? null : JSON.stringify(sourceIds);
+  const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null, ids };
   // D-SEARCH-2: AND first, then OR. The OR form matches; chunks that also match the AND form (every term)
   // rank before partial matches inside each session/worktree tier.
   const rrf: Record<string, number> = scope === "project" ? { k: RRF_K } : {};
