@@ -152,6 +152,7 @@ describe("ADR-0012 / bench suite (bench/run.mjs)", () => {
     assert.equal(indexedLabel("Indexed 1 source(s), 95 chunk(s) from data\\sqlite-fts5-docs.html.\nRaw HTML kept as x"), "data\\sqlite-fts5-docs.html");
     assert.equal(indexedLabel("Indexed 1 source(s), 95 chunk(s) from data/sqlite-fts5-docs.html."), "data/sqlite-fts5-docs.html");
     assert.equal(indexedLabel("no label here"), null);
+    assert.equal(indexedLabel("Indexed 1 source(s), 95 chunk(s) from s3. Label: data/sqlite-fts5-docs.html\nRaw HTML kept as x"), "s3"); // D-LABEL-HANDLE-1
   });
 
   // D-BENCH-PAGES-1: each case section on a group page speaks plainly and its numbers equal the committed results file.

@@ -14,7 +14,7 @@ import { capBytes } from "../sandbox/cap.ts";
 import { safeFetch } from "../sandbox/fetch.ts";
 import { unknownField } from "./search.ts";
 import { closeDb, openDb } from "../store/db.ts";
-import { pathLabel, sourceHandle } from "../store/fts.ts";
+import { indexedLabelLine, pathLabel, shownLabel, sourceHandle } from "../store/fts.ts";
 import { indexText, storeText, type ChunkKind } from "../index/text.ts";
 import { hasMdStructure } from "../index/chunk.ts";
 import { htmlToReadable } from "../index/html-text.ts";
@@ -162,9 +162,14 @@ async function handler(input: CtxIndexInput, ctx: ToolContext): Promise<ToolRepl
       closeDb(db);
     }
     // Step 6; step 5 is the server's one journal row, fed by `journal` (D-M2-2).
-    // D-NO-LOSSY-CUT-2: a long label is stored whole; the reply names it by its handle (ctx_search source accepts it).
-    const shown = Buffer.byteLength(from, "utf8") > ECHO_MAX_BYTES ? sourceHandle(lastId) : from;
-    const line = ["Indexed " + sources + " source(s), " + chunks + " chunk(s) from " + shown + ".", ...notes].join("\n");
+    // D-LABEL-HANDLE-1: one source -> the reply names its own handle first, then its label, so a label that has
+    // the handle form ("s1") still gets a handle of its own. D-LABEL-HANDLE-2: a long label is stored whole and
+    // shown as its byte size and a short head (indexedLabelLine). Many sources (a folder) -> the folder label.
+    const head = "Indexed " + sources + " source(s), " + chunks + " chunk(s) from ";
+    const first = sources === 1 && lastId > 0
+      ? head + sourceHandle(lastId) + ". " + indexedLabelLine(from, lastId)
+      : head + shownLabel(from, null) + ".";
+    const line = [first, ...notes].join("\n");
     return {
       text: capBytes(line, OUTPUT_CAP).text,
       isError: false,

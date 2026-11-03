@@ -14,7 +14,7 @@ import {
 } from "../contracts/constants.ts";
 import type { CtxPurgeInput, DbHandle, ToolContext, ToolReply } from "../contracts/types.ts";
 import { closeDb, openDb, withWrite } from "../store/db.ts";
-import { deleteChunkRows, storedLabel } from "../store/fts.ts";
+import { deleteChunkRows, pickSource } from "../store/fts.ts";
 import { unknownField } from "./search.ts";
 
 export type { CtxPurgeInput } from "../contracts/types.ts";
@@ -50,8 +50,9 @@ function purgeScope(db: DbHandle, scope: PurgeScope, input: CtxPurgeInput): numb
   const raw = db.raw;
   if (scope === "session") return changes(raw, "DELETE FROM events WHERE session_id = ?", input.session as string);
   if (scope === "source") {
-    // D-PATH-LABEL-1: a path label is named by either slash form.
-    const label = storedLabel(db, input.source as string);
+    // D-PATH-LABEL-1: a path label is named by either slash form. D-LABEL-HANDLE-1/2: a stored label wins, then
+    // a source's handle (so a long label is purged by its short handle); no "#" suffix match for a delete.
+    const label = pickSource(db, input.source as string, false).label;
     return deleteChunkRows(raw, { label }) + changes(raw, "DELETE FROM sources WHERE label = ?", label);
   }
   const chunks = deleteChunkRows(raw, "all");

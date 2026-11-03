@@ -645,7 +645,7 @@ test("[M4] GP5/decision-user-label-renamed", async () => {
   const out = await twoSessions(async ({ a }) => {
     const indexed = await a("ctx_index", { content: "my decision notes", source: "decision" });
     assert.equal(indexed.isError, false);
-    assert.ok((indexed.content?.[0]?.text ?? "").endsWith("from decision (user)."));
+    assert.ok((indexed.content?.[0]?.text ?? "").endsWith(". Label: decision (user)")); // D-LABEL-HANDLE-1
     const reserved = await a("ctx_search", { queries: ["notes"], source: "decision" });
     const user = await a("ctx_search", { queries: ["notes"], source: "decision (user)" });
     const listed = await a("ctx_search", { queries: [], source: "decision" });

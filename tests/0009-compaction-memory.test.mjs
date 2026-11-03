@@ -1126,7 +1126,7 @@ describe("ADR-0009 section 8: decision tag, timeline and cross-session ranking i
     const ctx = ctxAt(root, "s1");
     const out = await ctxIndex.handler({ content: "my own decision notes", source: C.DECISION_SOURCE }, ctx);
     assert.equal(out.isError, false, out.text);
-    assert.ok(out.text.endsWith("from " + C.DECISION_USER_LABEL + "."), out.text);
+    assert.ok(out.text.endsWith("from s1. Label: " + C.DECISION_USER_LABEL), out.text); // D-LABEL-HANDLE-1
     assert.equal(out.journal.key, C.DECISION_USER_LABEL);
     assert.deepEqual(await sourceLabels(ctx), [C.DECISION_USER_LABEL]);
     // Any other label is stored as given.

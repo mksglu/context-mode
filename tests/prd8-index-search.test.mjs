@@ -32,6 +32,7 @@ import { ctxIndex } from "../src/core/tools/index.ts";
 import { ctxExecute } from "../src/core/tools/execute.ts";
 import { ctxBatch } from "../src/core/tools/batch.ts";
 import { ctxStats } from "../src/core/tools/stats.ts";
+import { ctxPurge } from "../src/core/tools/purge.ts";
 import { buildReport, buildReportHead } from "../src/core/ops/report.ts";
 import http, { createServer } from "node:http";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1579,7 +1580,8 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
           writeFileSync(join(root, "other.md"), "# O\n\nlabelzedtoken in other file\n");
           const ix = await ctxIndex.handler({ path: "nested/notes.md" }, ctx);
           await ctxIndex.handler({ path: "other.md" }, ctx);
-          assert.ok(ix.text.includes("from nested/notes.md."), ix.text);
+          // D-LABEL-HANDLE-1: the reply names the source's own handle, then its label.
+          assert.ok(ix.text.includes("from s1. Label: nested/notes.md"), ix.text);
           assert.equal(ix.text.includes("\\"), false, "no backslash in the reply: " + ix.text);
           for (const source of ["nested/notes.md", "nested\\notes.md"]) {
             const out = await ctxSearch.handler({ queries: ["labelzedtoken"], source }, ctx);
@@ -1992,6 +1994,93 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         }
       });
 
+      // D-LABEL-HANDLE-1 (tester, next.34: "A source named s1 is accepted, but searching s1 returns source ID 1
+      // instead."): a source value that is a stored label names that label; the index reply names the handle.
+      test("D-LABEL-HANDLE-1: a label that has the handle form wins over the handle; the reply names both", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-lh-"));
+        try {
+          const c = ctxFor(root);
+          const first = await ctxIndex.handler({ source: "original-note", content: "ORIGINALTOKEN original source id one" }, c);
+          const second = await ctxIndex.handler({ source: "s1", content: "COLLISIONTOKEN expected literal source s1" }, c);
+          const h1 = first.text.split(" from ")[1].split(".")[0];
+          const h2 = second.text.split(" from ")[1].split(".")[0];
+          assert.equal(h1, "s1", first.text);
+          assert.equal(h2, "s2", second.text);
+          assert.ok(second.text.includes("Label: s1"), second.text);
+          const byLabel = await ctxSearch.handler({ queries: ["COLLISIONTOKEN"], source: "s1" }, c);
+          assert.ok(byLabel.text.includes("COLLISIONTOKEN expected literal source s1"), byLabel.text);
+          assert.equal(byLabel.text.includes("ORIGINALTOKEN"), false, byLabel.text);
+          const note = byLabel.text.split("\n").filter((l) => l.includes("handle s1") && l.includes("original-note"));
+          assert.equal(note.length, 1, "one line names the other source: " + byLabel.text);
+          assert.ok(note[0].includes("s2"), note[0]);
+          const byHandle = await ctxSearch.handler({ queries: ["COLLISIONTOKEN"], source: "s2" }, c);
+          assert.ok(byHandle.text.includes("COLLISIONTOKEN expected literal source s1"), byHandle.text);
+          const other = await ctxSearch.handler({ queries: ["ORIGINALTOKEN"], source: "original-note" }, c);
+          assert.ok(other.text.includes("ORIGINALTOKEN original source id one"), other.text);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      // D-LABEL-HANDLE-2 (tester, next.34: "A 17 KB source label fills the search reply, leaving no content or usable
+      // next page."): a long label is shown as its handle plus a short preview with its byte size; content comes
+      // first, the More: cursor is a whole call that moves forward, and the label stays whole and readable.
+      test("D-LABEL-HANDLE-2: a 17 KB label never crowds out content; cursor whole and moving; label readable whole", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-ll-"));
+        try {
+          const c = ctxFor(root);
+          const long = "label-" + "x".repeat(17000);
+          const ix = await ctxIndex.handler({ source: long, content: "LONGTOKEN retained content" }, c);
+          assert.ok(Buffer.byteLength(ix.text) < 512, ix.text.length + " B");
+          const handle = ix.text.split(" from ")[1].split(".")[0];
+          assert.ok(ix.text.includes("label (17,006 B): label-x") && ix.text.includes("…"), ix.text);
+          const wide = "x".repeat(100);
+          for (const source of [handle, long, undefined]) {
+            const out = await ctxSearch.handler(source === undefined ? { queries: ["LONGTOKEN"] } : { queries: ["LONGTOKEN"], source }, c);
+            assert.ok(out.text.includes("LONGTOKEN retained content"), out.text.slice(0, 300));
+            assert.ok(Buffer.byteLength(out.text) < 1024 && !out.text.includes(wide), Buffer.byteLength(out.text) + " B");
+            assert.ok(out.text.includes(handle) && out.text.includes("label (17,006 B)"), out.text);
+          }
+          const beyond = await ctxSearch.handler({ queries: ["LONGTOKEN"], source: handle, offset: 1 }, c);
+          assert.ok(beyond.text.startsWith("No more hits past offset 1"), beyond.text);
+          // The cursor: a whole call, offsets move forward, the long label is named by its handle.
+          const big = Array.from({ length: 1200 }, (_, i) => "PAGETOKEN line " + i + " " + "filler words here ".repeat(6)).join("\n");
+          const ix2 = await ctxIndex.handler({ source: "big-" + "y".repeat(17000), content: big }, c);
+          const h2 = ix2.text.split(" from ")[1].split(".")[0];
+          let offset = 0;
+          for (let n = 0; n < 3; n++) {
+            const out = await ctxSearch.handler({ queries: ["PAGETOKEN"], source: h2, offset }, c);
+            assert.ok(out.text.includes("PAGETOKEN line"), out.text.slice(0, 300));
+            const more = out.text.split("\n").find((l) => l.startsWith("More: "));
+            assert.ok(more !== undefined && more.endsWith("})") && more.includes('source:"' + h2 + '"'), String(more));
+            const next = Number(more.slice(more.indexOf("offset:") + 7, -2));
+            assert.ok(next > offset, offset + " -> " + next);
+            offset = next;
+          }
+          // The whole label: empty queries on the handle list the source card, paged by label byte offset.
+          let got = "";
+          let at = 0;
+          for (let n = 0; n < 5 && at >= 0; n++) {
+            const card = await ctxSearch.handler({ queries: [], source: handle, ...(at > 0 ? { offset: at } : {}) }, c);
+            assert.ok(Buffer.byteLength(card.text) <= C.OUTPUT_CAP, "card within cap");
+            const lines = card.text.split("\n");
+            assert.ok(lines[0].startsWith("Source " + handle + ": label 17,006 B"), lines[0]);
+            const i = lines.indexOf("Label:");
+            const more = lines.find((l) => l.startsWith("More: "));
+            got += lines.slice(i + 1, more === undefined ? lines.length : lines.indexOf(more)).join("\n");
+            at = more === undefined ? -1 : Number(more.slice(more.indexOf("offset:") + 7, -2));
+          }
+          assert.equal(got, long, "label read back whole");
+          for (const out of [await ctxStats.handler({}, c)]) assert.equal(out.text.includes(wide), false, "ctx_stats: no long label echo");
+          const purged = await ctxPurge.handler({ source: handle }, c);
+          assert.ok(Buffer.byteLength(purged.text) < 512 && !purged.text.includes(wide), purged.text.slice(0, 300));
+          assert.ok(purged.text.includes("deleted") && !purged.text.includes("deleted 0 rows"), purged.text);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+
       // D-M2-JSON-3: a source holding a JSON array of objects answers with whole rows ranked by BM25 over the row
       // text (keys and values), not with 48-byte line snippets.
       test("D-M2-JSON-3: ctx_search over a JSON source returns the matching whole row first, five rows a page", async () => {
@@ -2314,7 +2403,8 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         const r = await ctxIndex.handler({ content: "hello world", source: label }, ctx);
         assert.ok(B(r.text) <= C.OUTPUT_CAP);
         assert.ok(r.text.endsWith("."));
-        assert.ok(!r.text.includes("LLLL"));
+        // D-LABEL-HANDLE-2: a short head of the label is shown with its size, never the label itself.
+        assert.ok(!r.text.includes("L".repeat(64)) && r.text.includes("label (20,000 B)"), r.text);
         const s = await ctxSearch.handler({ queries: ["hello"], source: label }, ctx);
         assert.ok(s.text.includes("hello"));
       });

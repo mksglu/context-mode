@@ -179,5 +179,10 @@ export function indexedLabel(text) {
   const at = line.indexOf(" from ");
   if (at < 0) return null;
   const rest = line.slice(at + 6);
+  // D-LABEL-HANDLE-1: one source -> "from s2. Label: <label>" (or ". Its label (...)"); the handle names it.
+  for (const tail of [". Label: ", ". Its label ("]) {
+    const cut = rest.indexOf(tail);
+    if (cut >= 0) return rest.slice(0, cut);
+  }
   return rest.endsWith(".") ? rest.slice(0, -1) : rest;
 }

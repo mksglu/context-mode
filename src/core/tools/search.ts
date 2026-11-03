@@ -3,12 +3,12 @@
 // ctx_search: relevance (ContentStore, BM25 / RRF for scope "project", session first) or timeline
 // (ContentStore + SessionDB + auto-memory, oldest first, epoch-ms `after` cursor).
 import { z } from "zod/v4";
-import { DECISION_SOURCE, OUTPUT_CAP, SEARCH_PAGE_SIZE, SEARCH_REPLY_HITS, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
+import { DECISION_SOURCE, LABEL_PAGE_BYTES, OUTPUT_CAP, SEARCH_PAGE_SIZE, SEARCH_REPLY_HITS, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
 import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
-import { ftsListSource, ftsQuery, ftsQueryTimeline, rankTexts, resolveSourceLabel } from "../store/fts.ts";
+import { collisionLine, ftsListSource, ftsQuery, ftsQueryTimeline, groupDigits, isLongLabel, labelPage, pickSource, rankTexts, shownLabel, sourceCardRow, sourceHandle, type SourcePick } from "../store/fts.ts";
 import { readAutoMemory } from "../index/auto-memory.ts";
 import { fitRow, jsonRows, namedKeys } from "../index/shape.ts";
 
@@ -57,8 +57,37 @@ function sourceCount(db: DbHandle, scope: SearchScope, ctx: ToolContext, source:
   return Number(row.n);
 }
 
-function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: string | undefined): ToolReply {
-  return reply('No hits in scope "' + scope + '" across ' + sourceCount(db, scope, ctx, source) + " source(s).", false);
+function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: string | undefined, offset = 0): ToolReply {
+  const n = sourceCount(db, scope, ctx, source);
+  // D-LABEL-HANDLE-2: past the last hit the reply says so (the hits are behind, not missing).
+  if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
+  return reply('No hits in scope "' + scope + '" across ' + n + " source(s).", false);
+}
+
+// D-LABEL-HANDLE-1/2: how one call names its source to the user: `arg` is the value a paging line repeats (the
+// handle of a long label, else what the user typed); `note` is the collision line, when the value was a label
+// here and another source's handle.
+interface Named { arg: string | undefined; note: string | null }
+
+function named(given: string | undefined, pick: SourcePick | null): Named {
+  if (given === undefined || pick === null) return { arg: given, note: null };
+  const arg = pick.id !== null && isLongLabel(given) ? sourceHandle(pick.id) : given;
+  return { arg, note: collisionLine(given, pick) };
+}
+
+// D-LABEL-HANDLE-2: empty `queries` on one stored source -> its card: handle, label size, chunks, bytes, then the
+// stored label whole, LABEL_PAGE_BYTES a page; `offset` is the label byte offset of the page.
+function sourceCard(db: DbHandle, id: number, input: CtxSearchInput, scope: SearchScope, arg: string): ToolReply | null {
+  const row = sourceCardRow(db, id);
+  if (row === null) return null;
+  const pg = labelPage(row.label, input.offset ?? 0, LABEL_PAGE_BYTES);
+  const lines = [
+    "Source " + sourceHandle(id) + ": label " + groupDigits(pg.total) + " B, " + row.chunks + " chunk(s), " + groupDigits(row.bytes) + " B of " + row.kind + ".",
+    "Label:",
+    pg.text,
+  ];
+  if (pg.next !== null) lines.push("More: " + callText([], scope, arg, "offset:" + pg.next));
+  return reply(lines.join("\n"), false);
 }
 
 // The call a paging line repeats: same queries, scope and source, plus the cursor.
@@ -105,7 +134,7 @@ WHERE label = :source
   AND (:scope <> 'worktree' OR worktree = :worktree)
 ORDER BY id DESC LIMIT 1`;
 
-function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext): ToolReply | null {
+function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named): ToolReply | null {
   if (input.source === undefined || input.source === DECISION_SOURCE || input.queries.length === 0) return null;
   const src = db.raw.prepare(JSON_SOURCE).get({ source: input.source, scope, session_id: ctx.sessionId, worktree: ctx.project.worktree }) as { id: number; bytes_total: number } | undefined;
   if (src === undefined || Number(src.bytes_total) > JSON_SOURCE_MAX_BYTES) return null;
@@ -116,6 +145,7 @@ function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, 
   const texts = objs.map((o) => JSON.stringify(o));
   const offset = input.offset ?? 0;
   const out: string[] = [objs.length + " objects {" + keys.join(",") + "}"];
+  const name = shownLabel(input.source, Number(src.id));
   let shown = 0;
   let more = false;
   for (const q of input.queries) {
@@ -126,15 +156,16 @@ function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, 
     for (const i of order.slice(offset, offset + JSON_ROWS_PAGE)) {
       const row = fitRow(objs[i], [], named, SNIPPET_MAX_BYTES);
       if (row === null) continue;
-      out.push(input.source + " [" + i + "]: " + row);
+      out.push(name + " [" + i + "]: " + row);
       shown++;
     }
     if (order.length > offset + JSON_ROWS_PAGE) {
-      out.push("More: " + callText([q], scope, input.source, "offset:" + (offset + JSON_ROWS_PAGE)));
+      out.push("More: " + callText([q], scope, nm.arg, "offset:" + (offset + JSON_ROWS_PAGE)));
       more = true;
     }
   }
-  return shown === 0 && !more ? null : reply(out.join("\n"), false);
+  if (shown === 0 && !more) return null;
+  return reply((nm.note === null ? out : [nm.note, ...out]).join("\n"), false);
 }
 
 // D-SEARCH-SMALL-1: the hit bytes of one reply, per source, stay within this share of that source's bytes. A reply
@@ -168,7 +199,7 @@ function replyHits(hits: Hit[], size: number): number {
 // query (and every later one) gets a `More:` line starting at the first hit not shown (D-M2-6).
 // D-SEARCH-SMALL-1: a hit already shown for an earlier query of the call is named in one `Same as above:` line,
 // so a query never gets an empty block; a hit that was only left out of an earlier query still shows here.
-function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx: ToolContext): ToolReply {
+function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named): ToolReply {
   const input: CtxSearchInput = { ...given, queries: decisionQueries(given) };
   const offset = input.offset ?? 0;
   const size = pageSize(input);
@@ -177,10 +208,11 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const take: number[] = fetched.map((h) => replyHits(h, size));
   const pages: Hit[][] = fetched.map((h, i) => h.slice(0, take[i]));
   // Step 9: every query had zero hits.
-  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source);
+  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, offset);
 
+  // D-LABEL-HANDLE-2: the cursor names a long label by its handle, so the line is short and whole.
   const moreLine = (q: string, pos: number): string =>
-    "More: " + callText([q], scope, input.source, "offset:" + pos);
+    "More: " + callText([q], scope, nm.arg, "offset:" + pos);
   // Room for one paging line per query at its largest cursor (offset + page size).
   let reserve = 0;
   for (const q of input.queries) reserve += bytes(moreLine(q, offset + size)) + 1;
@@ -188,10 +220,10 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const total = input.source === DECISION_SOURCE ? new Map<number, number>() : sourceBytes(db, [...new Set(pages.flat().map((h) => h.sourceId))]);
   const spent = new Map<number, number>(); // hit bytes shown so far, per source
 
-  const lines: string[] = [];
+  const lines: string[] = nm.note === null ? [] : [nm.note];
   const more: Array<{ q: string; pos: number }> = []; // grouped by cursor when the reply is built
   const shown = new Set<string>(); // "sourceId:ord" of every hit line already in the reply
-  let used = 0;
+  let used = nm.note === null ? 0 : bytes(nm.note) + 1;
   let stopped = false;
   input.queries.forEach((q, qi) => {
     const hits = pages[qi];
@@ -209,10 +241,12 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       const hit = hits[i];
       const key = hit.sourceId + ":" + hit.ord;
       if (shown.has(key)) {
-        again.set(hit.label, [...(again.get(hit.label) ?? []), hit.ord]);
+        const name = shownLabel(hit.label, hit.sourceId);
+        again.set(name, [...(again.get(name) ?? []), hit.ord]);
         continue;
       }
-      const line = hit.label + " #" + hit.ord + ": " + hit.snippet;
+      // D-LABEL-HANDLE-2: a long label is its handle and a short preview, so the snippet keeps the room.
+      const line = shownLabel(hit.label, hit.sourceId) + " #" + hit.ord + ": " + hit.snippet;
       if (used + bytes(line) + 1 + reserve > OUTPUT_CAP) {
         cut = offset + i;
         stopped = true;
@@ -241,7 +275,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const moreLines: string[] = [];
   const byPos = new Map<number, string[]>();
   for (const m of more) byPos.set(m.pos, [...(byPos.get(m.pos) ?? []), m.q]);
-  for (const [pos, qs] of byPos) moreLines.push("More: " + callText(qs, scope, input.source, "offset:" + pos));
+  for (const [pos, qs] of byPos) moreLines.push("More: " + callText(qs, scope, nm.arg, "offset:" + pos));
   return reply(lines.concat(moreLines).join("\n"), false);
 }
 
@@ -250,23 +284,23 @@ function timelineLine(r: TimelineRow): string {
   const nl = r.text.indexOf("\n");
   const first = nl < 0 ? r.text : r.text.slice(0, nl);
   const seq = r.seq === null ? "" : " #" + r.seq;
-  return "[" + new Date(r.ts).toISOString() + "] " + r.label + seq + " " + first;
+  return "[" + new Date(r.ts).toISOString() + "] " + shownLabel(r.label, r.sourceId) + seq + " " + first;
 }
 
 // ADR-0009 §8.1 rules 1-8, D-M2-3, D-M2-T3-1. Lines are added a whole timestamp group at a time;
 // a group that does not fit ends the page there, so the `after` cursor never skips a row (M18).
-function timeline(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext): ToolReply {
+function timeline(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named): ToolReply {
   // D-M2-T9-1: memory files belong to the worktree, not to a session.
   const memory = scope === "session" ? [] : readAutoMemory(ctx.project);
   const page = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, memory);
   if (page.rows.length === 0) return zeroHits(db, scope, ctx, input.source);
 
   const moreLine = (ts: number): string =>
-    "more: " + callText(input.queries, scope, input.source, 'sort:"timeline", after:' + ts);
+    "more: " + callText(input.queries, scope, nm.arg, 'sort:"timeline", after:' + ts);
   const reserve = bytes(moreLine(page.rows[page.rows.length - 1].ts)) + 1;
 
-  const lines: string[] = [];
-  let used = 0;
+  const lines: string[] = nm.note === null ? [] : [nm.note];
+  let used = nm.note === null ? 0 : bytes(nm.note) + 1;
   let lastTs: number | null = null;
   let more = page.more;
   let i = 0;
@@ -304,10 +338,17 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
   const scope: SearchScope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
   try {
-    // D-CR3-HANDLE-1: a short id, a full label or a label without its "#" suffix all name one source.
-    if (input.source !== undefined && input.source !== DECISION_SOURCE) input = { ...input, source: resolveSourceLabel(db, input.source) };
-    if (sort === "timeline") return timeline(db, input, scope, ctx);
-    return jsonRowsReply(db, input, scope, ctx) ?? relevance(db, input, scope, ctx);
+    // D-LABEL-HANDLE-1: a stored label wins, then a short id, then a label without its "#" suffix (pickSource).
+    const given = input.source;
+    const pick = given !== undefined && given !== DECISION_SOURCE ? pickSource(db, given) : null;
+    if (pick !== null) input = { ...input, source: pick.label };
+    const nm = named(given, pick);
+    if (sort === "timeline") return timeline(db, input, scope, ctx, nm);
+    if (pick !== null && pick.id !== null && input.queries.length === 0) {
+      const card = sourceCard(db, pick.id, input, scope, nm.arg as string);
+      if (card !== null) return card;
+    }
+    return jsonRowsReply(db, input, scope, ctx, nm) ?? relevance(db, input, scope, ctx, nm);
   } finally {
     closeDb(db);
   }

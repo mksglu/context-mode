@@ -6,7 +6,7 @@
 // M2: ftsInsert returns the new id (D-M2-1); ftsQueryTimeline (ADR-0009 §8.1, DECISIONS-r9 M14-M18,
 // D-M2-3, D-M2-T3-1); rankTexts, the in-memory BM25 form selectChunksInMemory calls (impl/05 §5 step 2).
 import { CtxError } from "../contracts/errors.ts";
-import { DECISION_SOURCE, INDEX_WRITE_CHUNK, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
+import { DECISION_SOURCE, ECHO_MAX_BYTES, INDEX_WRITE_CHUNK, LABEL_PREVIEW_BYTES, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow, UnitCandidate } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
@@ -675,23 +675,128 @@ export function storedLabel(db: DbHandle, source: string): string {
   return canon !== source && labelStored(db, canon) ? canon : source;
 }
 
-// D-CR3-HANDLE-1: the label a `source` argument names, in this order: a short id of a stored row, a full
-// label (either slash form, D-PATH-LABEL-1), a label without its "#<call id>" suffix (the newest such source).
-// No match -> the argument as given.
-export function resolveSourceLabel(db: DbHandle, source: string): string {
-  const id = parseSourceHandle(source);
-  if (id !== null) {
-    const row = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id) as { label: string } | undefined;
-    if (row !== undefined) return row.label;
-  }
+/** D-LABEL-HANDLE-1: what a `source` argument named: the label, the newest row id with it, and the other source
+ * whose handle has the same spelling (the value is a label here and a handle there), if any. */
+export interface SourcePick {
+  label: string;
+  id: number | null;
+  via: "label" | "handle" | "suffix" | "none";
+  other: { id: number; label: string } | null;
+}
+
+function newestId(db: DbHandle, label: string): number | null {
+  const row = stmt(db.raw, "SELECT id FROM sources WHERE label = ? ORDER BY id DESC LIMIT 1").get(label) as { id: number } | undefined;
+  return row === undefined ? null : Number(row.id);
+}
+
+function labelOfId(db: DbHandle, id: number): string | null {
+  const row = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id) as { label: string } | undefined;
+  return row === undefined ? null : row.label;
+}
+
+// D-LABEL-HANDLE-1 (replaces the order of D-CR3-HANDLE-1): the source a `source` argument names, in this order:
+// a stored label (either slash form, D-PATH-LABEL-1) - what the user typed wins -, then the short id of a stored
+// row, then (with `suffix`) a label without its "#<call id>" suffix (the newest such source). No match -> the
+// argument as given, id null. ctx_purge passes suffix false: a delete names one label exactly.
+export function pickSource(db: DbHandle, source: string, suffix = true): SourcePick {
   const named = storedLabel(db, source);
-  if (labelStored(db, named)) return named;
-  const prefix = named + LABEL_SUFFIX_SEP;
-  const rows = stmt(db.raw, "SELECT label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix) as Array<{ label: string }>;
-  for (const r of rows) {
-    if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === named.length) return r.label;
+  const id = parseSourceHandle(source);
+  const own = newestId(db, named);
+  if (own !== null) {
+    const otherLabel = id === null || id === own ? null : labelOfId(db, id);
+    return { label: named, id: own, via: "label", other: otherLabel === null || otherLabel === named ? null : { id: id as number, label: otherLabel } };
   }
-  return source;
+  if (id !== null) {
+    const label = labelOfId(db, id);
+    if (label !== null) return { label, id, via: "handle", other: null };
+  }
+  if (suffix) {
+    const prefix = named + LABEL_SUFFIX_SEP;
+    const rows = stmt(db.raw, "SELECT id, label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix) as Array<{ id: number; label: string }>;
+    for (const r of rows) {
+      if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === named.length) return { label: r.label, id: Number(r.id), via: "suffix", other: null };
+    }
+  }
+  return { label: source, id: null, via: "none", other: null };
+}
+
+/** D-LABEL-HANDLE-1: the one line a reply adds when a value is a label here and another source's handle. */
+export function collisionLine(value: string, pick: SourcePick): string | null {
+  if (pick.other === null || pick.id === null) return null;
+  return "Source " + JSON.stringify(value) + ": used the label " + shownLabel(pick.label, null) + " (" + sourceHandle(pick.id) + "); handle " +
+    sourceHandle(pick.other.id) + " is " + shownLabel(pick.other.label, null) + (isLongLabel(pick.other.label) ? ", search it by its full label." : ", search it with source:" + JSON.stringify(pick.other.label) + ".");
+}
+
+/** D-LABEL-HANDLE-2: the byte page [start, end) of a label, both ends on a whole code point. */
+export function labelPage(label: string, offset: number, max: number): { text: string; next: number | null; total: number } {
+  const buf = Buffer.from(label, "utf8");
+  let start = Math.min(offset, buf.length);
+  while (start < buf.length && (buf[start] & 0xc0) === 0x80) start++;
+  let end = Math.min(start + max, buf.length);
+  while (end < buf.length && end > start && (buf[end] & 0xc0) === 0x80) end--;
+  return { text: buf.subarray(start, end).toString("utf8"), next: end < buf.length ? end : null, total: buf.length };
+}
+
+/** The label pickSource names (ctx_search order, "#" suffix form included). */
+export function resolveSourceLabel(db: DbHandle, source: string): string {
+  return pickSource(db, source).label;
+}
+
+// D-LABEL-HANDLE-2: 17006 -> "17,006". Digit groups by hand (no Intl, no regex).
+export function groupDigits(n: number): string {
+  const s = String(Math.trunc(n));
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 === 0) out += ",";
+    out += s[i];
+  }
+  return out;
+}
+
+// The head of a string within `max` UTF-8 bytes, ending on a whole code point.
+export function headBytes(s: string, max: number): string {
+  let out = "";
+  let used = 0;
+  for (const ch of s) {
+    const n = Buffer.byteLength(ch, "utf8");
+    if (used + n > max) break;
+    out += ch;
+    used += n;
+  }
+  return out;
+}
+
+export function isLongLabel(label: string): boolean {
+  return Buffer.byteLength(label, "utf8") > ECHO_MAX_BYTES;
+}
+
+/** D-LABEL-HANDLE-2: "label (17,006 B): label-xxxx…" - the size and head of a long label; the row keeps it whole. */
+export function labelPreview(label: string): string {
+  return "label (" + groupDigits(Buffer.byteLength(label, "utf8")) + " B): " + headBytes(label, LABEL_PREVIEW_BYTES) + "\u2026";
+}
+
+/** D-LABEL-HANDLE-2: how a reply names a source: its label, or for a long label its handle and a preview. */
+export function shownLabel(label: string, id: number | null): string {
+  if (!isLongLabel(label)) return label;
+  return (id === null ? "" : sourceHandle(id) + " ") + "[" + labelPreview(label) + "]";
+}
+
+/** D-LABEL-HANDLE-1/2: the second part of a ctx_index reply for one source: its label, or a long label's preview. */
+export function indexedLabelLine(label: string, id: number): string {
+  if (!isLongLabel(label)) return "Label: " + label;
+  return "Its label (" + groupDigits(Buffer.byteLength(label, "utf8")) + " B): " + headBytes(label, LABEL_PREVIEW_BYTES) +
+    "\u2026; ctx_search({queries:[], source:" + JSON.stringify(sourceHandle(id)) + "}) reads it whole.";
+}
+
+/** D-LABEL-HANDLE-2: the `source` value a reply hands back (a cursor): the label, or the handle of a long one. */
+export function sourceArg(label: string, id: number | null): string {
+  return id !== null && isLongLabel(label) ? sourceHandle(id) : label;
+}
+
+/** D-LABEL-HANDLE-2: one stored source row by id, for the source card. */
+export function sourceCardRow(db: DbHandle, id: number): { label: string; bytes: number; chunks: number; kind: string } | null {
+  const row = stmt(db.raw, "SELECT label, bytes_total, chunk_count, kind FROM sources WHERE id = ?").get(id) as { label: string; bytes_total: number; chunk_count: number; kind: string } | undefined;
+  return row === undefined ? null : { label: row.label, bytes: Number(row.bytes_total), chunks: Number(row.chunk_count), kind: row.kind };
 }
 
 /** D-CR3-RESUME-1: this session's stored sources, newest first (id, label, bytes). */
