@@ -18,7 +18,7 @@ import { checkDb, checkIndex } from "../src/core/ops/doctor-db.ts";
 import { openDb, closeDb } from "../src/core/store/db.ts";
 import * as C from "../src/core/contracts/constants.ts";
 import { SCHEMA_VERSION, TOOL_ORDER } from "../src/core/contracts/constants.ts";
-import { bundleVersion, channelOf, checkMcp, checkMode, checkNode, checkProject, checkVersion } from "../src/core/ops/doctor-env.ts";
+import { bundleVersion, channelOf, checkMcp, checkMode, checkNode, checkProject, checkVersion, compareVersions, parseVersion } from "../src/core/ops/doctor-env.ts";
 import { checkHookRoundTrip, codexHookJournaled } from "../src/core/ops/doctor-hook.ts";
 import { DDL } from "../src/core/store/schema.ts";
 import { healD8 } from "../src/core/ops/db-heal.ts";
@@ -536,7 +536,7 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
   const SHA_B = "b".repeat(40);
   const VER = "2.0.0-next.26";
   const HEAD = `${VER} (aaaaaaa): `; // D-DOCTOR-D1-CAUSE-1: installed version and short bundle sha lead every detail
-  const GIT_FIX = "git ls-remote https://github.com/mksglu/context-mode.git release";
+  const GIT_FIX = 'git ls-remote --tags --refs https://github.com/mksglu/context-mode.git "v*"';
   const NPM_FIX = "npm view context-mode dist-tags";
   const DEAD_REGISTRY = "http://127.0.0.1:9/dist-tags"; // default: fetch blocks port 9 ("bad port"), no network use in tests
 
@@ -555,7 +555,6 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     chmodSync(file, 0o755);
     return { PATH: `${bin}:/bin:/usr/bin`, HOME: path.dirname(bin), USERPROFILE: path.dirname(bin) };
   }
-  const lsRemote = (sha) => `printf '${sha}\\trefs/heads/release\\n'`;
   const noGit = (t) => ({ PATH: path.join(tmp(t), "empty"), HOME: tmp(t), USERPROFILE: tmp(t) });
 
   // A local registry that answers the dist-tags body (or an HTTP status) on 127.0.0.1.
@@ -577,22 +576,98 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: C.D1_DEV_BUILD_DETAIL });
   });
 
-  test("[M5] doctor-env/D1-equal-sha-PASS-names-version-and-sha", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, lsRemote(SHA_A)), SHA_A);
-    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest on the release branch` });
+  // D-DOCTOR-D1-TAGS-1 (packed run of 2.0.0-next.32: "| D1 version | FAIL | 2.0.0-next.32 (feb8de1): update available |"
+  // although next.32 was the newest). D1 compared the bundle sha (the source commit, tag v2.0.0-next.32 -> feb8de11) with the
+  // head of the release branch (the CI-built commit a730707b "release v2.0.0-next.32"): they never match. D1 now compares
+  // versions in the bundle's channel: the npm dist-tag first (the user can only install what npm has), git tags after.
+  // A fake git: `ls-remote --tags` prints one refs/tags line per name; any other call prints the release head `head`.
+  // Every call appends its argv to $HOME/git-argv.
+  const tagsGit = (tags, head = SHA_B) => `echo "$*" >> "$HOME/git-argv"; case "$*" in *--tags*) printf '${tags.map((v) => `${SHA_A}\\trefs/tags/${v}\\n`).join("")}';; *) printf '${head}\\trefs/heads/release\\n';; esac`;
+  const AHEAD = "2.0.0-next.25";
+
+  test("[M5] doctor-env/D1-release-head-sha-differs-from-bundle-sha-is-not-FAIL", { skip: !posix }, async (t) => {
+    const env = fakeGit(t, tagsGit(["v2.0.0-next.25", `v${VER}`]));
+    const row = await run(env, SHA_A, { registryUrl: await registry(t, 503, {}) });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on GitHub tags; npm registry answered HTTP 503` });
+    assert.equal(readFileSync(path.join(env.HOME, "git-argv"), "utf8"), "ls-remote --tags --refs https://github.com/mksglu/context-mode.git v*\n");
   });
 
-  test("[M5] doctor-env/D1-different-sha-FAIL-update-available-fix-ctx_upgrade", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, lsRemote(SHA_B)), SHA_A);
-    assert.deepEqual(row, { id: "D1", label: "version", status: "FAIL", detail: `${HEAD}update available`, fixCommand: "run ctx_upgrade" });
+  test("[M5] doctor-env/D1-npm-same-version-is-PASS-and-git-is-not-started", { skip: !posix }, async (t) => {
+    const env = fakeGit(t, tagsGit(["v2.0.0-next.27"]));
+    const row = await run(env, SHA_A, { registryUrl: await registry(t, 200, { latest: "1.0.169", next: VER }) });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on npm` });
+    assert.equal(existsSync(path.join(env.HOME, "git-argv")), false);
+  });
+
+  test("[M5] doctor-env/D1-npm-newer-is-FAIL-with-both-versions", { skip: !posix }, async (t) => {
+    const row = await run(fakeGit(t, tagsGit([`v${VER}`])), SHA_A, { registryUrl: await registry(t, 200, { latest: "1.0.169", next: "2.0.0-next.29" }) });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "FAIL", detail: `${HEAD}update available, next on npm is 2.0.0-next.29`, fixCommand: "run ctx_upgrade" });
+  });
+
+  test("[M5] doctor-env/D1-npm-down-git-tags-higher-next-is-FAIL-numeric-compare", { skip: !posix }, async (t) => {
+    const ver = "2.0.0-next.9";
+    const env = fakeGit(t, tagsGit(["v2.0.0-next.10", "v2.0.0-next.9", "v2.0.0-next.2"]));
+    const row = await run(env, SHA_A, { version: ver, registryUrl: await registry(t, 503, {}) });
+    assert.deepEqual(row, {
+      id: "D1", label: "version", status: "FAIL",
+      detail: `${ver} (aaaaaaa): update available, next on GitHub tags is 2.0.0-next.10; npm registry answered HTTP 503`, fixCommand: "run ctx_upgrade",
+    });
+  });
+
+  test("[M5] doctor-env/D1-npm-down-git-tags-equal-is-PASS", { skip: !posix }, async (t) => {
+    const row = await run(fakeGit(t, tagsGit(["v2.0.0-next.1", `v${VER}`])), SHA_A, { registryUrl: await registry(t, 404, {}) });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on GitHub tags; npm registry answered HTTP 404` });
+  });
+
+  test("[M5] doctor-env/D1-tags-of-the-other-channel-are-ignored", { skip: !posix }, async (t) => {
+    const tags = ["v1.0.169", "v1.0.170-beta.1", "v2.0.0", "v3.0.0-beta.4", `v${VER}`, "vnot-a-version", "v2.0.0-next.x"];
+    const url = await registry(t, 503, {});
+    const next = await run(fakeGit(t, tagsGit(tags)), SHA_A, { registryUrl: url });
+    assert.deepEqual(next, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on GitHub tags; npm registry answered HTTP 503` });
+    const latest = await run(fakeGit(t, tagsGit(["v1.0.169", "v1.0.168", "v2.0.0-next.40"])), SHA_A, { version: "2.0.0", registryUrl: url });
+    assert.deepEqual(latest, {
+      id: "D1", label: "version", status: "PASS", detail: "2.0.0 (aaaaaaa): ahead of latest on GitHub tags (1.0.169); npm registry answered HTTP 503",
+    });
+  });
+
+  test("[M5] doctor-env/D1-tag-without-npm-publish-npm-decides-PASS", { skip: !posix }, async (t) => {
+    const ver = "2.0.0-next.30"; // next.31 was tagged but never published: the user cannot install it
+    const env = fakeGit(t, tagsGit(["v2.0.0-next.31", "v2.0.0-next.30"]));
+    const row = await run(env, SHA_A, { version: ver, registryUrl: await registry(t, 200, { latest: "1.0.169", next: ver }) });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${ver} (aaaaaaa): latest next on npm` });
+  });
+
+  test("[M5] doctor-env/D1-dev-build-ahead-of-npm-and-tags-is-PASS-naming-both", { skip: !posix }, async (t) => {
+    const env = fakeGit(t, tagsGit([`v${AHEAD}`]));
+    const npm = await run(env, SHA_A, { registryUrl: await registry(t, 200, { next: AHEAD }) });
+    assert.deepEqual(npm, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}ahead of next on npm (${AHEAD})` });
+    const tags = await run(env, SHA_A, { registryUrl: await registry(t, 503, {}) });
+    assert.deepEqual(tags, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}ahead of next on GitHub tags (${AHEAD}); npm registry answered HTTP 503` });
+  });
+
+  test("[M5] doctor-env/D1-compareVersions-semver-order", () => {
+    assert.equal(compareVersions("2.0.0-next.10", "2.0.0-next.9"), 1);
+    assert.equal(compareVersions("2.0.0-next.32", "2.0.0-next.32"), 0);
+    assert.equal(compareVersions("2.0.0-next.32", "2.0.0"), -1);
+    assert.equal(compareVersions("1.0.169", "1.0.17"), 1);
+    assert.equal(compareVersions("1.10.0", "1.9.9"), 1);
+    assert.equal(compareVersions("2.0.0-beta.1", "2.0.0-next.1"), -1);
+    assert.equal(compareVersions("2.0.0-next.x", "2.0.0-next.1"), null);
+    assert.equal(parseVersion("2.0.0-next.1.1"), null);
+    assert.equal(parseVersion("2.0"), null);
+    assert.equal(parseVersion("v2.0.0"), null);
+    assert.deepEqual(parseVersion("2.0.0-next.32"), { core: [2, 0, 0], pre: ["next", 32] });
+    assert.deepEqual(parseVersion("1.0.169"), { core: [1, 0, 169], pre: [] });
   });
 
   // D-DOCTOR-D1-CAUSE-1 (Windows tester, 2.0.0-next.26, "| D1 version | UNKNOWN | no network | |" on a machine with
   // network): D1 passed the bare name "git" to runProcess, and on win32 an argv[0] with no extension starts as
   // [bash.exe, "git", ...], so bash read git as a script and exited 126. D1 now starts the git.exe found on PATH.
-  // Platform spoof only around the synchronous spawn, as in the D-VT-WINBASH-1 cases.
+  // Platform spoof only around the synchronous part of checkVersion, as in the D-VT-WINBASH-1 cases: D1 looks up git.exe
+  // before its first await (D-DOCTOR-D1-TAGS-1 reads npm first), and starts that full path, which has an extension.
   test("[M5] doctor-env/D1-win32-starts-git.exe-from-PATH-directly-not-through-bash", { skip: !posix }, async (t) => {
-    const env = fakeGit(t, lsRemote(SHA_A), "git.exe");
+    const env = fakeGit(t, tagsGit([`v${VER}`]), "git.exe");
+    const url = await registry(t, 503, {});
     const gitRoot = path.join(env.HOME, "Git", "bin"); // a Git Bash beside it: the old path ran "bash.exe git ls-remote ..."
     mkdirSync(gitRoot, { recursive: true });
     symlinkSync("/bin/sh", path.join(gitRoot, "bash.exe"));
@@ -602,13 +677,13 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     process.env.PATH = `${path.join(env.HOME, "Git", "cmd")}:${env.PATH}`;
     let pending;
     try {
-      pending = run({ ...env, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, SHA_A);
+      pending = run({ ...env, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, SHA_A, { registryUrl: url });
     } finally {
       Object.defineProperty(process, "platform", real);
       process.env.PATH = saved;
     }
     const row = await pending;
-    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest on the release branch` });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on GitHub tags; npm registry answered HTTP 503` });
   });
 
   test("[M5] doctor-env/D1-git-missing-and-registry-down-is-UNKNOWN-with-both-causes-and-npm-fix", async (t) => {
@@ -618,8 +693,9 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     await new Promise((r) => server.close(r)); // a free local port: the connection is refused
     const row = await run(noGit(t), SHA_A, { registryUrl: `http://127.0.0.1:${port}/dist-tags` });
     assert.equal(row.status, "UNKNOWN");
-    assert.ok(row.detail.startsWith(`${HEAD}latest unknown, git not found on PATH; npm registry: `), row.detail);
+    assert.ok(row.detail.startsWith(`${HEAD}latest unknown, npm registry: `), row.detail);
     assert.ok(row.detail.includes("ECONNREFUSED"), row.detail);
+    assert.ok(row.detail.endsWith("; git not found on PATH"), row.detail);
     assert.equal(row.fixCommand, NPM_FIX);
   });
 
@@ -629,7 +705,7 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     const row = await run(env, SHA_A, { registryUrl: url });
     assert.deepEqual(row, {
       id: "D1", label: "version", status: "UNKNOWN",
-      detail: `${HEAD}latest unknown, git exit 128: fatal: unable to access the repo; npm registry answered HTTP 503`, fixCommand: GIT_FIX,
+      detail: `${HEAD}latest unknown, npm registry answered HTTP 503; git exit 128: fatal: unable to access the repo`, fixCommand: GIT_FIX,
     });
   });
 
@@ -637,19 +713,26 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     const row = await run(fakeGit(t, "sleep 5"), SHA_A, { timeoutMs: 300, registryUrl: await registry(t, 200, { latest: "1.0.168" }) });
     assert.deepEqual(row, {
       id: "D1", label: "version", status: "UNKNOWN",
-      detail: `${HEAD}latest unknown, git timed out after 300 ms; npm registry answered no next version`, fixCommand: GIT_FIX,
+      detail: `${HEAD}latest unknown, npm registry answered no next version; git timed out after 300 ms`, fixCommand: GIT_FIX,
     });
   });
 
-  test("[M5] doctor-env/D1-git-answer-without-sha-says-so", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, "exit 0"), SHA_A, { version: undefined });
-    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "bundle (aaaaaaa): latest unknown, git answered no sha", fixCommand: GIT_FIX });
+  test("[M5] doctor-env/D1-git-answer-without-channel-tag-says-so", { skip: !posix }, async (t) => {
+    const row = await run(fakeGit(t, tagsGit(["v1.0.169"])), SHA_A, { registryUrl: await registry(t, 503, {}) });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: `${HEAD}latest unknown, npm registry answered HTTP 503; git answered no next tag`, fixCommand: GIT_FIX });
+  });
+
+  test("[M5] doctor-env/D1-no-installed-version-is-UNKNOWN-without-network", { skip: !posix }, async (t) => {
+    const env = fakeGit(t, tagsGit([`v${VER}`]));
+    const row = await run(env, SHA_A, { version: undefined });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "bundle (aaaaaaa): latest unknown, no version in package.json", fixCommand: NPM_FIX });
+    assert.equal(existsSync(path.join(env.HOME, "git-argv")), false);
   });
 
   test("[M5] doctor-env/D1-git-missing-registry-same-version-is-PASS", async (t) => {
     const url = await registry(t, 200, { latest: "1.0.168", next: VER });
     const row = await run(noGit(t), SHA_A, { registryUrl: url });
-    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on npm; git not found on PATH` });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on npm` });
   });
 
   test("[M5] doctor-env/D1-git-missing-registry-newer-is-FAIL-with-both-versions", async (t) => {
@@ -657,7 +740,7 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     const row = await run(noGit(t), SHA_A, { registryUrl: url });
     assert.deepEqual(row, {
       id: "D1", label: "version", status: "FAIL",
-      detail: `${HEAD}update available, next on npm is 2.0.0-next.29; git not found on PATH`, fixCommand: "run ctx_upgrade",
+      detail: `${HEAD}update available, next on npm is 2.0.0-next.29`, fixCommand: "run ctx_upgrade",
     });
   });
 

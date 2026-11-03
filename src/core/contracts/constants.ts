@@ -430,7 +430,7 @@ export const DECISION_OPTION_KEY = "option"; // rule 2: journal key of an option
 export const DECISION_LABEL_JOIN = " | "; // rule 1: multi-select labels
 
 // ctx_doctor D1 / ctx_upgrade release source (impl/07 §5 D1, ADR-0011; DEVIATIONS D-M5-arch-5)
-export const RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git"; // git ls-remote <repo> release
+export const RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git"; // D1: git ls-remote --tags; ctx_upgrade: git clone of release
 export const RELEASE_BRANCH = "release"; // CI build output only (PRD §6)
 export const BUNDLE_SHA_DEFINE = "__CTX_BUNDLE_SHA__"; // the one esbuild `define` key the release build sets to the commit sha
 declare const __CTX_BUNDLE_SHA__: string | undefined;
@@ -465,27 +465,34 @@ export const D1_PACKAGE_FILE = "package.json"; // <bundleDir>/package.json holds
 export function D1_PREFIX(version: string | undefined, sha: string): string {
   return `${version ?? "bundle"} (${sha.slice(0, D1_SHORT_SHA_LEN)})`;
 }
-export const D1_GIT_PASS = "latest on the release branch"; // PASS through git ls-remote
-export function D1_NPM_PASS(tag: string): string { return `latest ${tag} on npm`; }
-export function D1_NPM_UPDATE(tag: string, latest: string): string { return `${D1_UPDATE_DETAIL}, ${tag} on npm is ${latest}`; }
+// D-DOCTOR-D1-TAGS-1: D1 compares versions in the bundle's channel; `source` names where the latest version came from.
+export const D1_SOURCE_NPM = "npm"; // the dist-tag of the channel: decides first
+export const D1_SOURCE_TAGS = "GitHub tags"; // the highest v* tag of the channel: only when npm does not answer
+export function D1_LATEST_PASS(tag: string, source: string): string { return `latest ${tag} on ${source}`; }
+export function D1_LATEST_UPDATE(tag: string, source: string, latest: string): string { return `${D1_UPDATE_DETAIL}, ${tag} on ${source} is ${latest}`; }
+export function D1_LATEST_AHEAD(tag: string, source: string, latest: string): string { return `ahead of ${tag} on ${source} (${latest})`; } // a dev build newer than any release: PASS
+export const D1_NO_VERSION = "no version in package.json"; // UNKNOWN without a network call: no channel to ask about
 export const D1_LATEST_UNKNOWN = "latest unknown";
 export const D1_GIT_MISSING = "git not found on PATH";
 export function D1_GIT_EXIT(code: number, stderrLine: string): string { return stderrLine === "" ? `git exit ${code}` : `git exit ${code}: ${stderrLine}`; }
 export function D1_GIT_TIMEOUT(ms: number): string { return `git timed out after ${ms} ms`; }
 export const D1_GIT_CANCEL = "git stopped by cancel";
 export const D1_GIT_NO_START = "git did not start";
-export const D1_GIT_NO_SHA = "git answered no sha";
+export function D1_GIT_NO_TAG(tag: string): string { return `git answered no ${tag} tag`; }
 export function D1_NPM_TIMEOUT(ms: number): string { return `npm registry timed out after ${ms} ms`; }
 export function D1_NPM_HTTP(status: number): string { return `npm registry answered HTTP ${status}`; }
 export function D1_NPM_ERROR(cause: string): string { return `npm registry: ${cause}`; }
 export function D1_NPM_NO_TAG(tag: string): string { return `npm registry answered no ${tag} version`; }
 export const D1_CAUSE_JOIN = "; ";
-export const D1_GIT_CHECK_FIX = `git ls-remote ${RELEASE_REPO_URL} ${RELEASE_BRANCH}`; // UNKNOWN: check by hand
+export const GIT_LS_REMOTE_TAG_ARGS: readonly string[] = Object.freeze(["--tags", "--refs"]); // tag refs only, no peeled ^{} lines
+export const RELEASE_TAG_PATTERN = "v*"; // release tags: v1.0.169, v2.0.0-next.32
+export const RELEASE_TAG_REF_PREFIX = "refs/tags/v"; // ls-remote ref of a release tag; the rest is the version
+export const D1_GIT_CHECK_FIX = `git ls-remote --tags --refs ${RELEASE_REPO_URL} "${RELEASE_TAG_PATTERN}"`; // UNKNOWN: check by hand
 export const D1_NPM_CHECK_FIX = "npm view context-mode dist-tags"; // UNKNOWN with git missing: check by hand
 export const D1_REGISTRY_URL = "https://registry.npmjs.org/-/package/context-mode/dist-tags"; // {"latest":..,"next":..}
 export const D1_PRERELEASE_SEP = "-"; // 2.0.0-next.26: the text after "-" up to "." is the dist-tag
 export const D1_DEFAULT_TAG = "latest"; // a version with no prerelease part
-export const GIT_LS_REMOTE = "ls-remote"; // git ls-remote <RELEASE_REPO_URL> <RELEASE_BRANCH>
+export const GIT_LS_REMOTE = "ls-remote"; // git ls-remote --tags --refs <RELEASE_REPO_URL> v*
 export const D2_NODE_FIX = `install Node ${NODE_MIN} or later`;
 export function D2_NODE_DETAIL(version: string): string { return `Node ${version} is below ${NODE_MIN}`; }
 export const D2_SQLITE_DETAIL = "node:sqlite failed to load";
@@ -586,8 +593,8 @@ export const SQLITE_MODULE = "node:sqlite"; // D2: await import(SQLITE_MODULE)
 export const NODE_VERSION_PREFIX = "v"; // process.version "v24.15.0" -> compare "24.15.0" with NODE_MIN
 export const NODE_VERSION_SEP = "."; // major.minor.patch, compared as numbers
 export const LS_REMOTE_FIELD_SEP = "\t"; // git ls-remote line: "<sha>\t<ref>"
-export const GIT_SHA_HEX_LEN = 40; // a full commit sha
-export const DOCTOR_GIT_TIMEOUT_MS = 10000; // D1 git ls-remote, and the npm registry read after a git failure; a timeout is UNKNOWN
+export const GIT_SHA_HEX_LEN = 40; // a full commit sha (the first field of a D1 ls-remote tag line)
+export const DOCTOR_GIT_TIMEOUT_MS = 10000; // D1: the npm registry read, and git ls-remote --tags after an npm failure (each); a timeout is UNKNOWN
 export const DOCTOR_PASS_DETAIL = "ok"; // detail of a PASS row with nothing more to say
 // doctor-config.ts: D3 host config, D4 old entries, D7 project (impl/07 §5).
 export const D3_PART_JOIN = ", ";

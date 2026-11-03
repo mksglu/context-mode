@@ -1,15 +1,18 @@
 // src/core/ops/doctor-env.ts — ctx_doctor environment rows: D1 version, D2 Node and node:sqlite, D6 MCP,
 // D7 project and worktree, D10 enforcement mode.
-// Spec: impl/07 §5 D1 D2 D6 D7 D10, ADR-0010; DEVIATIONS D-M5-arch-3, D-M5-arch-5, D-M5-C2-1, D-M5-U1-6, D-M5-D1-1.
+// Spec: impl/07 §5 D1 D2 D6 D7 D10, ADR-0010; DEVIATIONS D-M5-arch-3, D-M5-arch-5, D-M5-C2-1, D-M5-U1-6, D-M5-D1-1,
+// D-DOCTOR-D1-TAGS-1.
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import {
-  D1_CAUSE_JOIN, D1_DEFAULT_TAG, D1_DEV_BUILD_DETAIL, D1_GIT_CANCEL, D1_GIT_CHECK_FIX, D1_GIT_EXIT, D1_GIT_MISSING, D1_GIT_NO_SHA,
-  D1_GIT_NO_START, D1_GIT_PASS, D1_GIT_TIMEOUT, D1_LATEST_UNKNOWN, D1_NPM_CHECK_FIX, D1_NPM_ERROR, D1_NPM_HTTP, D1_NPM_NO_TAG,
-  D1_NPM_PASS, D1_NPM_TIMEOUT, D1_NPM_UPDATE, D1_PACKAGE_FILE, D1_PREFIX, D1_PRERELEASE_SEP, D1_UPDATE_DETAIL, D10_DETAIL, D11_PASS_DETAIL, D11_POSIX_DETAIL, D11_POSIX_FIX, D11_WIN_DETAIL, D11_WIN_FIX, D2_BUN_DETAIL, D2_NODE_DETAIL, D2_NODE_FIX,
+  D1_CAUSE_JOIN, D1_DEFAULT_TAG, D1_DEV_BUILD_DETAIL, D1_GIT_CANCEL, D1_GIT_CHECK_FIX, D1_GIT_EXIT, D1_GIT_MISSING, D1_GIT_NO_START,
+  D1_GIT_NO_TAG, D1_GIT_TIMEOUT, D1_LATEST_AHEAD, D1_LATEST_PASS, D1_LATEST_UNKNOWN, D1_LATEST_UPDATE, D1_NO_VERSION, D1_NPM_CHECK_FIX,
+  D1_NPM_ERROR, D1_NPM_HTTP, D1_NPM_NO_TAG, D1_NPM_TIMEOUT, D1_PACKAGE_FILE, D1_PREFIX, D1_PRERELEASE_SEP, D1_SOURCE_NPM, D1_SOURCE_TAGS,
+  D10_DETAIL, D11_PASS_DETAIL, D11_POSIX_DETAIL, D11_POSIX_FIX, D11_WIN_DETAIL, D11_WIN_FIX, D2_BUN_DETAIL, D2_NODE_DETAIL, D2_NODE_FIX,
   D2_SQLITE_DETAIL, D2_SQLITE_FIX, D4_REASON_JOIN, D6_UNKNOWN_DETAIL, D7_DETAIL, D7_FIX, DOCTOR_FIX_UPGRADE,
-  DOCTOR_GIT_TIMEOUT_MS, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, GIT_BIN, GIT_LS_REMOTE, GIT_NO_PROMPT_ENV, GIT_SHA_HEX_LEN,
-  LS_REMOTE_FIELD_SEP, NODE_MIN, NODE_VERSION_PREFIX, NODE_VERSION_SEP, RELEASE_BRANCH, RELEASE_REPO_URL, SQLITE_MODULE,
+  DOCTOR_GIT_TIMEOUT_MS, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, GIT_BIN, GIT_LS_REMOTE, GIT_LS_REMOTE_TAG_ARGS, GIT_NO_PROMPT_ENV, GIT_SHA_HEX_LEN,
+  LS_REMOTE_FIELD_SEP, NODE_MIN, NODE_VERSION_PREFIX, NODE_VERSION_SEP, RELEASE_REPO_URL, RELEASE_TAG_PATTERN, RELEASE_TAG_REF_PREFIX,
+  SQLITE_MODULE,
 } from "../contracts/constants.ts";
 import type { AdapterRow, DoctorCheckId, DoctorRow, ProjectContext, ToolContext } from "../contracts/types.ts";
 import { findRuntime } from "../sandbox/runtimes.ts";
@@ -28,8 +31,8 @@ function fail(id: DoctorCheckId, detail: string, fixCommand: string): DoctorRow 
 export interface VersionInput {
   bundleSha: string | undefined; // BUNDLE_SHA; undefined in dev/test builds (D-M5-arch-5)
   version: string | undefined;   // the installed version from <bundleDir>/package.json (bundleVersion)
-  registryUrl: string;           // D1_REGISTRY_URL; read only when git fails
-  timeoutMs: number;             // DOCTOR_GIT_TIMEOUT_MS; one limit for git and for the registry read
+  registryUrl: string;           // D1_REGISTRY_URL; read first (D-DOCTOR-D1-TAGS-1)
+  timeoutMs: number;             // DOCTOR_GIT_TIMEOUT_MS; one limit for the registry read and for git (each)
   env: Record<string, string>;   // live env: PATH finds git, HOME for its config
   cwd: string;
   signal: AbortSignal;
@@ -80,7 +83,7 @@ function fetchCause(err: unknown, timeoutMs: number): string {
   return D1_NPM_ERROR(code !== "" && !msg.includes(code) ? `${code} ${msg}` : msg);
 }
 
-// After a git failure: the latest version of the channel from the npm registry, same timeout (D-PRIVACY-NET-1 lists it).
+// The latest version of the channel from the npm registry dist-tags (D-PRIVACY-NET-1 lists it).
 async function npmLatest(url: string, tag: string, signal: AbortSignal, timeoutMs: number): Promise<Latest> {
   try {
     const res = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) });
@@ -93,39 +96,103 @@ async function npmLatest(url: string, tag: string, signal: AbortSignal, timeoutM
   }
 }
 
-// D1 (D-DOCTOR-D1-CAUSE-1): the bundle's commit sha vs the latest commit on RELEASE_BRANCH, through the git binary found on
-// PATH (git.exe on Windows, started directly). When git is missing or fails, the latest version of the bundle's channel on
-// npm decides. Every detail starts with "<version> (<short sha>)" and names the exact cause. A dev build, or no answer from
-// either source, is UNKNOWN with the command that checks it by hand, never FAIL (ADR-0010 D1). Never throws.
+export interface ParsedVersion {
+  core: [number, number, number]; // major.minor.patch
+  pre: [] | [string] | [string, number]; // "" | "-next" | "-next.32"
+}
+
+function digits(s: string): boolean {
+  if (s === "") return false;
+  for (const ch of s) if (ch < "0" || ch > "9") return false;
+  return true;
+}
+
+/** D-DOCTOR-D1-TAGS-1: "2.0.0-next.32" -> {core:[2,0,0], pre:["next",32]}; "1.0.169" -> pre []; any other shape is null. */
+export function parseVersion(v: string): ParsedVersion | null {
+  const at = v.indexOf(D1_PRERELEASE_SEP);
+  const core = (at < 0 ? v : v.slice(0, at)).split(NODE_VERSION_SEP);
+  if (core.length !== 3 || !core.every(digits)) return null;
+  const nums: [number, number, number] = [Number(core[0]), Number(core[1]), Number(core[2])];
+  if (at < 0) return { core: nums, pre: [] };
+  const pre = v.slice(at + 1).split(NODE_VERSION_SEP);
+  if (pre[0] === "" || digits(pre[0]) || pre.length > 2) return null;
+  if (pre.length === 1) return { core: nums, pre: [pre[0]] };
+  return digits(pre[1]) ? { core: nums, pre: [pre[0], Number(pre[1])] } : null;
+}
+
+function sign(n: number): -1 | 0 | 1 {
+  return n < 0 ? -1 : n > 0 ? 1 : 0;
+}
+
+/** Numeric version order: major.minor.patch, then a release above its prereleases, then the prerelease name and number.
+ *  null when either side does not parse. */
+export function compareVersions(a: string, b: string): -1 | 0 | 1 | null {
+  const x = parseVersion(a);
+  const y = parseVersion(b);
+  if (x === null || y === null) return null;
+  for (let k = 0; k < 3; k++) if (x.core[k] !== y.core[k]) return sign(x.core[k] - y.core[k]);
+  if (x.pre.length === 0 || y.pre.length === 0) return sign(y.pre.length - x.pre.length);
+  if (x.pre[0] !== y.pre[0]) return x.pre[0] < y.pre[0] ? -1 : 1;
+  return sign((x.pre[1] ?? -1) - (y.pre[1] ?? -1));
+}
+
+// The highest release tag of the channel in `git ls-remote --tags --refs` output ("<sha>\t refs/tags/v<version>" lines).
+function highestTag(stdout: string, tag: string): string | undefined {
+  let best: string | undefined;
+  for (const line of stdout.split("\n")) {
+    const [sha, ref] = line.trim().split(LS_REMOTE_FIELD_SEP);
+    if (sha === undefined || sha.length !== GIT_SHA_HEX_LEN || ref === undefined || !ref.startsWith(RELEASE_TAG_REF_PREFIX)) continue;
+    const v = ref.slice(RELEASE_TAG_REF_PREFIX.length);
+    if (parseVersion(v) === null || channelOf(v) !== tag) continue;
+    if (best === undefined || compareVersions(v, best) === 1) best = v;
+  }
+  return best;
+}
+
+// The installed version vs the latest of its channel from one source. Unparseable versions fall back to equal-or-not.
+function versionRow(head: string, installed: string, tag: string, source: string, latest: string, tail: string): DoctorRow {
+  const cmp = compareVersions(installed, latest) ?? (installed === latest ? 0 : -1);
+  if (cmp === 0) return pass("D1", head + D1_LATEST_PASS(tag, source) + tail);
+  if (cmp > 0) return pass("D1", head + D1_LATEST_AHEAD(tag, source, latest) + tail);
+  return fail("D1", head + D1_LATEST_UPDATE(tag, source, latest) + tail, DOCTOR_FIX_UPGRADE);
+}
+
+// D1 (D-DOCTOR-D1-TAGS-1, D-DOCTOR-D1-CAUSE-1): the installed version vs the latest version of its channel (channelOf:
+// "2.0.0-next.32" is next, "1.0.169" is latest), compared as numbers, never as commit shas: the bundle sha is the source
+// commit and the release branch head is a CI-built commit, so the two never match. Order of sources:
+//   1. npm dist-tag of the channel decides first: the user can only install what npm has (a tag can exist before or
+//      without an npm publish, as v2.0.0-next.31 did).
+//   2. Only when npm does not answer: the highest v* tag of the channel from `git ls-remote --tags --refs`, through the
+//      git binary found on PATH (git.exe on Windows, started directly).
+// Equal is PASS, lower is FAIL with both versions and ctx_upgrade, higher (a build ahead of the releases) is PASS naming
+// both. Every detail starts with "<version> (<short sha>): " and names the exact cause of a source that failed. A dev
+// build, no version, or no answer from either source is UNKNOWN with the command that checks it by hand, never FAIL
+// (ADR-0010 D1). Never throws.
 export async function checkVersion(i: VersionInput): Promise<DoctorRow> {
   if (i.bundleSha === undefined) return unknown("D1", D1_DEV_BUILD_DETAIL);
   const head = D1_PREFIX(i.version, i.bundleSha) + ": ";
-  const git = findRuntime(GIT_BIN, i.env);
+  if (i.version === undefined) return unknown("D1", head + D1_LATEST_UNKNOWN + ", " + D1_NO_VERSION, D1_NPM_CHECK_FIX);
+  const tag = channelOf(i.version);
+  const git = findRuntime(GIT_BIN, i.env); // found before the first await: a sync PATH lookup, read only if npm fails
+  const npm = await npmLatest(i.registryUrl, tag, i.signal, i.timeoutMs);
+  if (npm.ok) return versionRow(head, i.version, tag, D1_SOURCE_NPM, npm.version, "");
   let cause = D1_GIT_MISSING;
   if (git !== null) {
-    const r = await runProcess([git, GIT_LS_REMOTE, RELEASE_REPO_URL, RELEASE_BRANCH], {
+    const r = await runProcess([git, GIT_LS_REMOTE, ...GIT_LS_REMOTE_TAG_ARGS, RELEASE_REPO_URL, RELEASE_TAG_PATTERN], {
       cwd: i.cwd,
       env: { ...i.env, ...GIT_NO_PROMPT_ENV },
       signal: i.signal,
       timeoutMs: i.timeoutMs,
     });
     if (r.exitCode === 0 && r.killed === null) {
-      const latest = r.stdout.toString("utf8").split(LS_REMOTE_FIELD_SEP)[0];
-      if (latest.length === GIT_SHA_HEX_LEN) {
-        return latest === i.bundleSha ? pass("D1", head + D1_GIT_PASS) : fail("D1", head + D1_UPDATE_DETAIL, DOCTOR_FIX_UPGRADE);
-      }
-      cause = D1_GIT_NO_SHA;
+      const latest = highestTag(r.stdout.toString("utf8"), tag);
+      if (latest !== undefined) return versionRow(head, i.version, tag, D1_SOURCE_TAGS, latest, D1_CAUSE_JOIN + npm.cause);
+      cause = D1_GIT_NO_TAG(tag);
     } else {
       cause = gitCause(r, i.timeoutMs);
     }
   }
-  const handFix = git === null ? D1_NPM_CHECK_FIX : D1_GIT_CHECK_FIX;
-  if (i.version === undefined) return unknown("D1", head + D1_LATEST_UNKNOWN + ", " + cause, handFix);
-  const tag = channelOf(i.version);
-  const npm = await npmLatest(i.registryUrl, tag, i.signal, i.timeoutMs);
-  if (!npm.ok) return unknown("D1", head + D1_LATEST_UNKNOWN + ", " + cause + D1_CAUSE_JOIN + npm.cause, handFix);
-  if (npm.version === i.version) return pass("D1", head + D1_NPM_PASS(tag) + D1_CAUSE_JOIN + cause);
-  return fail("D1", head + D1_NPM_UPDATE(tag, npm.version) + D1_CAUSE_JOIN + cause, DOCTOR_FIX_UPGRADE);
+  return unknown("D1", head + D1_LATEST_UNKNOWN + ", " + npm.cause + D1_CAUSE_JOIN + cause, git === null ? D1_NPM_CHECK_FIX : D1_GIT_CHECK_FIX);
 }
 
 export interface NodeInput {
