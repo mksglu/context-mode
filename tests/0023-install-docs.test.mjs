@@ -25,6 +25,13 @@ describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () =>
     assert.ok(!out.includes("a.md:8"), "text outside a fence is not checked");
   });
 
+  test("install-docs: a text fence that opens with a terminal call line is a transcript and passes; a plain text fence still fails (D-TIC-README-3)", () => {
+    const shown = ["```text", '⏺ context-mode - ctx_resume (MCP)()', '  ⎿  <context_mode_state session="s" upto="2">', "```"].join("\n");
+    assert.deepEqual(checkLines("t.md", shown), []);
+    const plain = ["```text", "node <path>/server.mjs", "```"].join("\n");
+    assert.ok(checkLines("t.md", plain).join("\n").includes("t.md:2 placeholder"));
+  });
+
   test("install-docs: more user paths and placeholders fail", () => {
     const bad = ["```sh", "ls /home/you/.context-mode-app", '"Users\\\\you\\\\x"', "node <...>/server.mjs", "npx context-mode", "```"].join("\n");
     const out = checkLines("c.md", bad).join("\n");

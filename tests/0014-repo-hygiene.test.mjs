@@ -1404,9 +1404,9 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(!out.includes('"docs'), "OUT_FILES names a docs path");
   });
 
-  test("README line cap is 650 (D-TIC-README-1, was 600 by D-README-DWELL-1, 400 before) and its DEVIATIONS row quotes the owner", async () => {
+  test("README line cap is 700 (D-TIC-README-3, was 650 by D-TIC-README-1, 600 by D-README-DWELL-1, 400 before) and its DEVIATIONS row quotes the owner", async () => {
     const { README_MAX_LINES } = await import("../src/core/contracts/constants.ts");
-    assert.equal(README_MAX_LINES, 650);
+    assert.equal(README_MAX_LINES, 700);
     const rows = readRepo("docs/architecture/modules/DEVIATIONS.md").split("\n").filter((l) => l.includes("(D-README-THESIS-1)")); // the row id; later rows may name it in their text
     assert.equal(rows.length, 1);
     assert.ok(rows[0].includes("akademik bir tez"));
@@ -1711,6 +1711,39 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       assert.equal(row.includes("[Thinking in Code](#thinking-in-code)"), row.includes("](bench/a-sandbox/README.md#"), `mark only the sandbox script rows: ${row.slice(0, 70)}`);
     }
     devRow("D-TIC-README-2", "terminalde nasil gozukecek");
+  });
+
+  test("README How it works and Tools show each other tool as its real terminal call, from the stored MCP frames (D-TIC-README-3)", () => {
+    // Owner 2026-11-03: "Bu MCP olarak terminal bazli gosterme konusunu cok cok sevdim. How it works kisminda diger tool lari da gosterebilirsin."
+    const readme = readRepo("README.md");
+    const B = (n) => `${n.toLocaleString("en-US")} B`;
+    const dir = "bench/evidence/terminal-calls-2026-11-03";
+    const ev = JSON.parse(readRoot(`${dir}/calls.json`));
+    const evReadme = readRoot(`${dir}/README.md`);
+    for (const need of [ev.date, ev.version]) assert.ok(evReadme.includes(need), `evidence README names ${need}`);
+    const how = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
+    const step = (n, title) => how.slice(how.indexOf(`\n${n}. **${title}** `), how.indexOf(`\n${n + 1}. **`));
+    const tools = readme.slice(readme.indexOf("\n## Tools\n"), readme.indexOf("\n## Security and privacy\n"));
+    const where = {
+      ctx_index: step(6, "Indexing."), ctx_search: step(7, "Search."), ctx_resume: step(9, "Journal and compaction."),
+      ctx_stats: tools, ctx_doctor: tools, ctx_purge: tools,
+    };
+    for (const [tool, part] of Object.entries(where)) {
+      const c = ev.calls.find((x) => x.tool === tool);
+      assert.ok(c, `evidence holds a ${tool} call`);
+      const form = terminalForm(tool, c.input, c.result, { lines: c.shown_lines });
+      assert.ok(textFences(part).includes(form), `${tool} shows its stored call, line for line`);
+      assert.ok(form.split("\n").length <= 9, `${tool} block is short`);
+      assert.ok(part.includes(B(Buffer.byteLength(c.result))), `${tool}: returned bytes ${B(Buffer.byteLength(c.result))}`);
+      if (c.file) {
+        assert.equal(c.produced_bytes, statSync(path.join(ROOT, c.file)).size, `${tool} produced bytes equal the file size`);
+        assert.ok(part.includes(B(c.produced_bytes)), `${tool}: produced bytes ${B(c.produced_bytes)}`);
+      }
+      assert.ok(part.includes(`](${dir}/calls.json)`) || part.includes("in the same run"), `${tool} links its evidence or names the same run`);
+    }
+    assert.ok(where.ctx_index.includes(`](${dir}/calls.json)`) && tools.includes(`](${dir}/calls.json)`), "step 6 and Tools link calls.json");
+    for (const bad of [/\bv2\b/, /\bEngine\b/]) assert.ok(!bad.test(tools), `Tools section avoids ${bad}`);
+    devRow("D-TIC-README-3", "terminal bazli gosterme");
   });
 
   test("README install: one collapsed block per agent, its own install command first, then update, check and remove from its page (D-README-INSTALL-2)", () => {

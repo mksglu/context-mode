@@ -62,14 +62,18 @@ export function checkLines(name, text) {
   let fence = null;
   let config = false;
   let lang = "";
+  let transcript = false;
   text.split("\n").forEach((line, i) => {
     const m = /^\s*(`{3,})\s*([\w+-]*)/.exec(line);
     if (m) {
-      if (fence === null) { fence = m[1]; lang = m[2]; config = CONFIG_LANG.test(m[2]); }
-      else if (line.trim().startsWith(fence)) { fence = null; config = false; lang = ""; }
+      if (fence === null) { fence = m[1]; lang = m[2]; config = CONFIG_LANG.test(m[2]); transcript = false; }
+      else if (line.trim().startsWith(fence)) { fence = null; config = false; lang = ""; transcript = false; }
       return;
     }
     if (fence === null) return;
+    // D-TIC-README-3: a text fence that opens with the terminal's "⏺" call line shows a tool call and its reply; the reader copies nothing from it.
+    if (lang === "text" && transcript) return;
+    if (lang === "text" && line.trimStart().startsWith("⏺ ")) { transcript = true; return; }
     const at = `${name}:${i + 1}`;
     if (/<[A-Za-z.][^<>\n]*>/.test(line) || /\.\.\.>/.test(line)) bad.push(`${at} placeholder: ${line.trim()}`);
     if (/npx\s+(-y\s+)?context-mode/.test(line)) bad.push(`${at} npx context-mode: ${line.trim()}`);

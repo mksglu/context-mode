@@ -480,9 +480,38 @@ One tool call, in time order, from the install to a hook error.
         … +95 lines (ctrl+o to expand)
    ```
 6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](src/core/store/fts.ts)).
+
+   `ctx_index` on a copy of this repo's `docs/how-it-works.md`, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](bench/evidence/terminal-calls-2026-11-03/calls.json)). The file is 11,569 B; the agent gets 64 B.
+
+   ```text
+   ⏺ context-mode - ctx_index (MCP)(path: "how-it-works.md")
+     ⎿  Indexed 1 source(s), 17 chunk(s) from s1. Label: how-it-works.md
+   ```
 7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](src/core/tools/search.ts)).
+
+   `ctx_search` on that index, in the same run. The agent gets 1,757 B: the best snippets, each with its source and heading.
+
+   ```text
+   ⏺ context-mode - ctx_search (MCP)(queries: ["compaction state block"])
+     ⎿  Query "compaction state block":
+        how-it-works.md #14: ### Session continuity
+        
+        The hooks log each prompt, edit, command, tool error, i…e same rows always give the same bytes.
+        … +16 lines (ctrl+o to expand)
+   ```
 8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](src/core/hooks/dispatch.ts)).
 9. **Journal and compaction.** The hooks log each prompt, edit, command, tool error and decision in a journal. After a compaction the agent gets a state block of at most `STATE_BUDGET` (2,048 B), and each long line becomes a `ctx_resume(seq)` pointer to the full row; one `ctx_resume` reply is at most `RESUME_CAP` (2,048 B). On the next prompt, a prompt-match block brings back the journal rows that match it by BM25 ([ADR-0009](docs/architecture/adr/0009-compaction-and-memory.md)).
+
+   `ctx_resume` with empty parameters returns the state block, in the same run: 209 B.
+
+   ```text
+   ⏺ context-mode - ctx_resume (MCP)()
+     ⎿  <context_mode_state session="mcp:85e67fa2-28ef-45eb-9d5b-a967129b74c0" upto="2">
+        indexed how-it-works.md
+        source s1: how-it-works.md (11536 B)
+        more: ctx_search(queries:[], scope:"session")
+        </context_mode_state>
+   ```
 10. **The database.** Each project has one `context.db` under `~/.context-mode`, in Node's built-in `node:sqlite`. The database runs in WAL mode and runs a PASSIVE checkpoint on close. A new database gets built under a temp name and moves into place in one atomic step, and the busy timeout is `DB_TIMEOUT_MS` (5,000 ms) ([db.ts](src/core/store/db.ts)).
 11. **A hook error.** A hook always ends with exit 0. On any error it gives the host's allow reply and writes one log line to `~/.context-mode/hook-errors.log`, so your agent keeps working. A spawned hook has `HOOK_TIMEOUT_MS` (5,000 ms) ([fallback.ts](src/core/hooks/fallback.ts)).
 
@@ -501,6 +530,36 @@ Every number with its reason: [How it works](docs/how-it-works.md). The rules th
 | `ctx_doctor` | Checks the install; each check prints PASS or a fix command |
 | `ctx_upgrade` | Installs, upgrades or uninstalls; replaces old context-mode entries |
 | `ctx_purge` | Deletes indexed data by session, source or project |
+
+Three more real calls, from the same live run of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](bench/evidence/terminal-calls-2026-11-03/calls.json)).
+
+`ctx_stats`: the agent gets 3,097 B, the first line is the summary.
+
+```text
+⏺ context-mode - ctx_stats (MCP)()
+  ⎿  ctx_stats: 82.5% kept out all-time, 82.5% this session.
+     … +59 lines (ctrl+o to expand)
+```
+
+`ctx_doctor` after `context-mode setup --agents claude-code`: 862 B, one row per check.
+
+```text
+⏺ context-mode - ctx_doctor (MCP)()
+  ⎿  Environment: context-mode 2.0.0-next.36 (8facf27), agent claude-code 0 (client r20-live)
+     Environment: darwin-arm64, Node v26.8.1, shell /bin/zsh
+     | Check | Status | Detail | Fix |
+     |---|---|---|---|
+     | D1 version | PASS | 2.0.0-next.36 (8facf27): ahead of next on npm (2.0.0-next.34) |  |
+     | D2 node | PASS | ok |  |
+     … +11 lines (ctrl+o to expand)
+```
+
+`ctx_purge` deletes one source: 66 B.
+
+```text
+⏺ context-mode - ctx_purge (MCP)(source: "how-it-works.md")
+  ⎿  ctx_purge: deleted 18 rows (scope: source). This cannot be undone.
+```
 
 Full reference: [Tools](https://contextmode.ai/docs/engine/tools?utm_source=github&utm_medium=readme&utm_content=tools).
 
