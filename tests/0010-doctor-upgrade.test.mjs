@@ -8,7 +8,8 @@ import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
+import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
@@ -1169,11 +1170,21 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const REPO = path.resolve(import.meta.dirname, "..");
     let out;
     let fixtures;
-    before(() => {
+    let buildTicks = 0;
+    before(async () => {
       out = mkdtempSync(path.join(tmpdir(), "cm-d5-fixture-build-"));
-      const b = spawnSync(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", out], { encoding: "utf8" });
-      assert.equal(b.status, 0, b.stderr);
+      const tick = setInterval(() => buildTicks++, 5);
+      // Async on purpose (D-D5-SYNC-BUILD-1): a spawnSync here stops the timers of the D5 round trips running beside it.
+      await promisify(execFile)(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", out], { encoding: "utf8" });
+      clearInterval(tick);
       fixtures = JSON.parse(readFileSync(path.join(out, C.HOOK_FIXTURE_DIR, C.HOOK_FIXTURE_FILE), "utf8"));
+    });
+
+    // D-D5-SYNC-BUILD-1 (release runs of next.33 and next.34, macos-latest node 26): this block runs beside the D5 round
+    // trips (CONC). A build that stops the event loop for more than HOOK_TIMEOUT_MS lets each round trip's 5 s timer fire
+    // before its "close" event, so a fast hook reads as killed: "timeout" and D5 FAILs with the shape detail. The loop must turn.
+    test("the fixture build lets the event loop run, so the D5 round trips beside it keep their timers (D-D5-SYNC-BUILD-1)", () => {
+      assert.ok(buildTicks > 0, "the event loop stood still for the whole build");
     });
     after(() => rmSync(out, { recursive: true, force: true }));
 
