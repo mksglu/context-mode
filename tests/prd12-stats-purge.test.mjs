@@ -244,7 +244,7 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       await addFixed(ctx);
       const rep = report((await ctxStats.handler({}, ctx)).text);
       // D-STATS-FIX-1 (1): ctx_search nets against the index it reads (I1-15), so it shares the ctx_index row;
-      // the two rows with 0 B kept out fold into "other". Tool rows are not clamped, so they add up to the project row.
+      // the two rows with 0 B kept out fold into "other". No row here is below 0 B, so they add up to the project row.
       assert.deepEqual(labels(rep, "Tool"), ["ctx_index + search", "hook Bash", "ctx_batch", "ctx_execute", "other (2 tools)"]);
       assert.ok(rep.includes("By tool (this project)\n  " + "Tool".padEnd(21) + "Calls".padStart(7) + ["Made", "Sent", "Kept out"].map((h) => h.padStart(11)).join("") + "%".padStart(8) + "\n"), rep);
       assert.ok(rep.includes("  ctx_index + search         2   216.8 KB     3.2 KB   213.6 KB   98.5% ████████"), rep);
@@ -284,6 +284,34 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       for (const line of [out.text.split("\n")[0], ...report(out.text).split("\n")]) assert.ok([...line].length <= 80, `${[...line].length} columns: ${line}`);
       assert.ok(report(out.text).includes("4.5 TB"), "TB unit with one decimal");
       assert.ok(report(out.text).includes(" times a 200K window"), "a saving past one window reads as times");
+    }));
+
+    // D-STATS-ZERO-1, tester on 2.0.0-next.34: a ctx_search with no hits made 0 B and sent 47 B; the tool row read
+    // "-47 B-4700.0%" while the scope rows read 0 B and 0.0%. A row never keeps out less than 0 B; 0 B made is 0.0%.
+    for (const sent of [47, 902]) {
+      test(`[R13] stats/zero-made: 0 B made, ${sent} B sent -> every row 0 B kept out and 0.0%, as the scope rows`, () => withRoot(async (root) => {
+        const ctx = ctxFor(root);
+        await addFixed(ctx, [{ tool: "ctx_search", p: 0, r: sent }]);
+        const out = await ctxStats.handler({}, ctx);
+        const rep = report(out.text);
+        const cells = (name) => "  " + name.padEnd(21) + "1".padStart(7) + ["0 B", sent + " B", "0 B"].map((v) => v.padStart(11)).join("") + "0.0%".padStart(8);
+        assert.ok(rep.includes("\n" + cells("ctx_search") + "\n"), rep);
+        assert.ok(rep.includes("\n" + cells("session") + "\n"), rep);
+        assert.ok(rep.includes(`  0 B became ${sent} B: 0 B kept out (0.0%)\n`), rep);
+        assert.ok(!/(^| )-\d/m.test(rep), "no negative value anywhere in the report: " + rep);
+        assert.deepEqual(row(out.text, "project"), ["0 B", sent + " B", "0 B", "0"]);
+      }));
+    }
+
+    test("[R13] stats/columns-never-touch: a value wider than its column still has a space before it", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addFixed(ctx, [{ tool: "ctx_execute", p: 4e15, r: 2e15 }, { tool: "ctx_search", p: 0, r: 47 }]);
+      const rep = report((await ctxStats.handler({}, ctx)).text);
+      const line = rep.split("\n").find((l) => l.startsWith("  ctx_execute "));
+      assert.ok(line, rep);
+      // 4e15 B is near the largest safe integer. label | calls | made (n unit) | sent (n unit) | kept out (n unit) | % : each field is set apart by spaces.
+      const f = line.slice(23).trim().split(" ").filter((x) => x !== "");
+      assert.deepEqual(f.slice(0, 8), ["1", "3638.0", "TB", "1819.0", "TB", "1819.0", "TB", "50.0%"], line);
     }));
 
     test("[R6] stats/report-deterministic: same journal, same bytes", () => withRoot(async (root) => {

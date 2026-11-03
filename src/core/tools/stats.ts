@@ -236,6 +236,12 @@ function bytes(n: number): string {
   return v.toFixed(1) + " " + UNITS[u];
 }
 
+// D-STATS-ZERO-1: one space always sets a field apart from the one before it, also when the value is
+// wider than its column; a value that fits takes exactly `width` columns, as before.
+function right(v: string, width: number): string {
+  return " " + v.padStart(width - 1);
+}
+
 function pct(t: Totals): string {
   return ((t.saved * PERCENT_SCALE) / Math.max(1, t.produced)).toFixed(1) + "%";
 }
@@ -268,10 +274,10 @@ function plural(n: number, word: string): string {
 // D-STATS-FIX-1 (7): one verb pair, "made" and "sent", and "kept out" for the result.
 function table(title: string, rows: Named[]): string[] {
   const max = Math.max(0, ...rows.map((r) => r.saved));
-  const head = "  " + title.padEnd(LABEL_W) + "Calls".padStart(STATS_CALLS_W) + "Made".padStart(NUM_W) + "Sent".padStart(NUM_W) +
-    "Kept out".padStart(NUM_W) + "%".padStart(PCT_W);
-  return [head, ...rows.map((r) => ("  " + label(r.name) + count(r.calls).padStart(STATS_CALLS_W) + bytes(r.produced).padStart(NUM_W) +
-    bytes(r.returned).padStart(NUM_W) + bytes(r.saved).padStart(NUM_W) + pct(r).padStart(PCT_W) + " " + bar(r.saved, max, STATS_ROW_BAR)).trimEnd())];
+  const head = "  " + title.padEnd(LABEL_W) + right("Calls", STATS_CALLS_W) + right("Made", NUM_W) + right("Sent", NUM_W) +
+    right("Kept out", NUM_W) + right("%", PCT_W);
+  return [head, ...rows.map((r) => ("  " + label(r.name) + right(count(r.calls), STATS_CALLS_W) + right(bytes(r.produced), NUM_W) +
+    right(bytes(r.returned), NUM_W) + right(bytes(r.saved), NUM_W) + right(pct(r), PCT_W) + " " + bar(r.saved, max, STATS_ROW_BAR)).trimEnd())];
 }
 
 function bySaved(a: Named, b: Named): number {
@@ -284,19 +290,20 @@ function toolName(tool: string): string {
 }
 
 // D-STATS-FIX-1 (1): a ctx_search reply nets against the index it reads (PRD §12, I1-15), so the two share
-// one row; each row is its true made - sent (no clamp), so the rows add up to the project row.
+// one row. D-STATS-ZERO-1: a row keeps out max(0, made - sent), like the saving units of the scope rows, so a
+// search with no hits reads 0 B and 0.0%, never a negative.
 function joinIndex(tools: Named[]): Named[] {
   const idx = tools.filter((t) => STATS_INDEX_TOOLS.includes(t.name));
   if (idx.length <= 1) return tools;
   const t = sum(idx);
-  const one = { name: STATS_INDEX_TOOLS.join(" + ").replace(" + ctx_", " + "), ...t, saved: t.produced - t.returned };
+  const one = { name: STATS_INDEX_TOOLS.join(" + ").replace(" + ctx_", " + "), ...t, saved: Math.max(0, t.produced - t.returned) };
   return [...tools.filter((x) => !idx.includes(x)), one];
 }
 
 // D-STATS-VALUE-1 (6): two or more rows with 0 B kept out fold into one "other" row; past STATS_MAX_TOOL_ROWS
 // the rows with the smallest saving join it.
 function toolRows(tools: Named[]): Named[] {
-  const named = joinIndex(tools.map((t) => ({ ...t, saved: t.produced - t.returned })))
+  const named = joinIndex(tools.map((t) => ({ ...t, saved: Math.max(0, t.produced - t.returned) })))
     .map((t) => ({ ...t, name: toolName(t.name) })).sort(bySaved);
   const zero = named.filter((t) => t.saved <= 0);
   const fold = zero.length > 1 ? zero : [];
@@ -378,7 +385,7 @@ function lastDays(week: Day[], allCalls: number): string[] {
     head,
     ...card,
     ...week.flatMap((d, i) => (saved[i]! > 0 ? ["  " + mmdd(d.day) + " " +
-      stack(STATS_WAYS.map(([w]) => d.ways[w]), max, STATS_DAY_BAR).padEnd(STATS_DAY_BAR) + bytes(saved[i]!).padStart(NUM_W)] : [])),
+      stack(STATS_WAYS.map(([w]) => d.ways[w]), max, STATS_DAY_BAR).padEnd(STATS_DAY_BAR) + right(bytes(saved[i]!), NUM_W)] : [])),
     "  " + STATS_WAYS.map(([, ch, name]) => `${ch} ${name}`).join("  "),
     "",
   ];
@@ -411,8 +418,8 @@ function report(f: Facts, sessionId: string, agent: string): string {
     ...head,
     `${scopeName} · ${plural(focus.calls, "call")}${extra}`,
     `  ${bytes(focus.produced)} became ${bytes(focus.returned)}: ${bytes(focus.saved)} kept out (${pct(focus)})`,
-    "  " + "Without context-mode".padEnd(LABEL_W) + "|" + bar(focus.produced, top, STATS_HEAD_BAR, "█", "░") + "|" + bytes(focus.produced).padStart(NUM_W),
-    "  " + "With context-mode".padEnd(LABEL_W) + "|" + bar(focus.returned, top, STATS_HEAD_BAR, "█", "░") + "|" + bytes(focus.returned).padStart(NUM_W),
+    "  " + "Without context-mode".padEnd(LABEL_W) + "|" + bar(focus.produced, top, STATS_HEAD_BAR, "█", "░") + "|" + right(bytes(focus.produced), NUM_W),
+    "  " + "With context-mode".padEnd(LABEL_W) + "|" + bar(focus.returned, top, STATS_HEAD_BAR, "█", "░") + "|" + right(bytes(focus.returned), NUM_W),
     ...(focus.saved > 0 ? [windowLine(focus.saved), STATS_TOKEN_NOTE] : []),
     ...hookLine(f.redirected, f.replaced),
     "",
@@ -426,7 +433,7 @@ function report(f: Facts, sessionId: string, agent: string): string {
     "",
     ...(f.top.length > 0
       ? ["Largest single outputs (made → sent to the chat)",
-        ...f.top.map((t) => "  " + label(toolName(t.name)) + bytes(t.produced).padStart(NUM_W) + " → " + bytes(t.returned).padStart(NUM_W)), ""]
+        ...f.top.map((t) => "  " + label(toolName(t.name)) + right(bytes(t.produced), NUM_W) + " → " + right(bytes(t.returned), NUM_W)), ""]
       : []),
   ];
 
@@ -436,10 +443,10 @@ function report(f: Facts, sessionId: string, agent: string): string {
   lines.push("By agent (this project)", ...table("Agent", [...agents].map(([name, t]) => ({ name, ...t })).sort(bySaved)), "");
 
   const maxKind = Math.max(0, ...[...f.kinds.values()].map((k) => k.project));
-  lines.push("Kept in the session journal", "  " + "Journal".padEnd(LABEL_W) + "Session".padStart(STATS_KIND_W) + "Project".padStart(STATS_KIND_W));
+  lines.push("Kept in the session journal", "  " + "Journal".padEnd(LABEL_W) + right("Session", STATS_KIND_W) + right("Project", STATS_KIND_W));
   for (const [kind, name] of STATS_KIND_LABELS) {
     const k = f.kinds.get(kind) ?? { session: 0, project: 0 };
-    lines.push(("  " + label(name) + int(k.session).padStart(STATS_KIND_W) + int(k.project).padStart(STATS_KIND_W) + "  " + bar(k.project, maxKind, STATS_KIND_BAR)).trimEnd());
+    lines.push(("  " + label(name) + right(int(k.session), STATS_KIND_W) + right(int(k.project), STATS_KIND_W) + "  " + bar(k.project, maxKind, STATS_KIND_BAR)).trimEnd());
   }
   lines.push("", ...STATS_JOURNAL_HINTS.map((h) => "  " + h), "");
 
