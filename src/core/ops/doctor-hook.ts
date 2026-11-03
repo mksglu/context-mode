@@ -78,26 +78,44 @@ function loadFixture(bundleDir: string, agent: AgentId): FixtureEntry | { cause:
   return { event: e.event, payload: e.payload };
 }
 
-/** The fixture payload with `cwd` set to the project worktree: a recorded /tmp/project is no repository and would log a hook error each run. */
-function payloadFor(payload: unknown, worktree: string | undefined): unknown {
-  return worktree !== undefined && isObject(payload) ? { ...payload, cwd: worktree } : payload;
+// D-D5-ALL-AGENTS-1: the payload key that carries the project dir. OpenCode's plugin sends `directory` (adapters/opencode.ts decode).
+const CWD_KEY: Readonly<Record<AgentId, string>> = {
+  "claude-code": "cwd", codex: "cwd", gemini: "cwd", qwen: "cwd", "copilot-cli": "cwd", vscode: "cwd", kiro: "cwd", zcode: "cwd", pi: "cwd", opencode: "directory",
+};
+
+/** The fixture payload with the agent's cwd key set to the project worktree: a recorded /tmp/project is no repository and would log a hook error each run. */
+export function payloadFor(agent: AgentId, payload: unknown, worktree: string | undefined): unknown {
+  return worktree !== undefined && isObject(payload) ? { ...payload, [CWD_KEY[agent]]: worktree } : payload;
 }
 
+// D-D5-ALL-AGENTS-1: the answer shape of each adapter's encode. "claude": hookSpecificOutput.hookEventName is the event
+// (encodeClaudeShape). "gemini": {decision, reason} or {hookSpecificOutput}. "copilot": a flat object (permissionDecision,
+// additionalContext, modifiedResult). "text": plain stdout, exit 2 on deny (kiro, pi, opencode).
+type Shape = "claude" | "gemini" | "copilot" | "text";
+const SHAPE: Readonly<Record<AgentId, Shape>> = {
+  "claude-code": "claude", codex: "claude", qwen: "claude", vscode: "claude", zcode: "claude",
+  gemini: "gemini", "copilot-cli": "copilot", kiro: "text", pi: "text", opencode: "text",
+};
+const COPILOT_KEYS = ["permissionDecision", "additionalContext", "modifiedResult"];
+
 /**
- * Native shape (D-M5-D3-1): exit 0 or 2, not killed, and stdout is either empty (allow) or one JSON object
- * whose `hookSpecificOutput.hookEventName` is the fixture's event. Both recorded agents (claude-code, codex)
- * answer in the Claude hook shape (adapters `encodeClaudeShape`).
+ * Native shape (D-M5-D3-1): exit 0 or 2, not killed, and stdout is empty (allow) or the agent's own answer shape (SHAPE).
  */
-function isNativeShape(stdout: string, exitCode: number | null, killed: string | null, event: string): boolean {
+function isNativeShape(agent: AgentId, stdout: string, exitCode: number | null, killed: string | null, event: string): boolean {
   if (killed !== null || (exitCode !== 0 && exitCode !== 2)) return false;
-  if (stdout.length === 0) return true;
+  if (stdout.length === 0 || SHAPE[agent] === "text") return true;
   let out: unknown;
   try {
     out = JSON.parse(stdout);
   } catch {
     return false;
   }
-  return isObject(out) && isObject(out.hookSpecificOutput) && out.hookSpecificOutput.hookEventName === event;
+  if (!isObject(out)) return false;
+  switch (SHAPE[agent]) {
+    case "claude": return isObject(out.hookSpecificOutput) && out.hookSpecificOutput.hookEventName === event;
+    case "gemini": return typeof out.decision === "string" || isObject(out.hookSpecificOutput);
+    default: return COPILOT_KEYS.some((k) => Object.hasOwn(out, k));
+  }
 }
 
 /** R6: true when at least one journal row of any Codex session exists in this project's context.db. */
@@ -168,10 +186,10 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
       env: i.env,
       signal: i.signal,
       timeoutMs,
-      stdin: JSON.stringify(payloadFor(fixture.payload, i.worktree)),
+      stdin: JSON.stringify(payloadFor(i.agent, fixture.payload, i.worktree)),
     });
     hookWalls.push(now() - start);
-    if (!isNativeShape(r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+    if (!isNativeShape(i.agent, r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
     bareWalls.push(await bareMs());
     ms = Math.max(0, Math.round(Math.min(...hookWalls) - Math.min(...bareWalls)));
     if (n >= minPairs && ms <= HOOK_P95_MS) break;

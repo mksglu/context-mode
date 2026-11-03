@@ -74,13 +74,16 @@ function gitCause(r: RunResult, timeoutMs: number): string {
 
 type Latest = { ok: true; version: string } | { ok: false; cause: string };
 
-function fetchCause(err: unknown, timeoutMs: number): string {
+/** D1 npm cause text (exported for the exact-string test, D-D1-CAUSE-SPACE-1). */
+export function fetchCause(err: unknown, timeoutMs: number): string {
   const name = err instanceof Error ? err.name : "";
   if (name === "TimeoutError") return D1_NPM_TIMEOUT(timeoutMs);
   const cause = err instanceof Error && err.cause instanceof Error ? err.cause : err;
   const code = typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "string" ? cause.code : "";
   const msg = cause instanceof Error ? cause.message : String(cause);
-  return D1_NPM_ERROR(code !== "" && !msg.includes(code) ? `${code} ${msg}` : msg);
+  // D-D1-CAUSE-SPACE-1: Node's refused fetch has code ECONNREFUSED and an empty message; join only the parts that exist.
+  const parts = code !== "" && !msg.includes(code) ? [code, msg] : [msg];
+  return D1_NPM_ERROR(parts.filter((part) => part !== "").join(" "));
 }
 
 // The latest version of the channel from the npm registry dist-tags (D-PRIVACY-NET-1 lists it).

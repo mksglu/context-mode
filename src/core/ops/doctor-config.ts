@@ -238,7 +238,7 @@ function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktr
   return [...(hooksBad ? [PART_HOOKS] : []), ...(timeoutBad ? [PART_TIMEOUT] : [])];
 }
 
-/** D3 — host config. FAIL names which of the 3 parts is wrong; fix "run ctx_upgrade". Pi also names the
+/** D3 — host config. FAIL names which of the 3 parts is wrong; fix setup for the MCP entry, else "run ctx_upgrade". Pi also names the
  *  settings file it read (PI_CODING_AGENT_DIR, else ~/.pi/agent), never a legacy path (#1168 #1266, D-M7-G2-1). */
 export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktree: string): DoctorRow {
   const home = homeDirOf(env);
@@ -251,8 +251,9 @@ export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktre
   const read = row.id === "pi" ? mcpFile(row, home, env) : null;
   if (parts.length === 0) return read === null ? pass("D3") : { ...pass("D3"), detail: read };
   const detail = D3_DETAIL(parts);
-  // D-DOCTOR-ISSUE-1: MCP entry and hook entries both wrong or absent is an agent with no setup; setup writes both.
-  const fix = parts.includes(PART_MCP) && parts.includes(PART_HOOKS) ? D3_NO_SETUP_FIX(row.id) : DOCTOR_FIX_UPGRADE;
+  // D-D3-SETUP-FIX-1: a wrong or absent MCP entry is fixed by setup (it writes the entry and the hooks), the same command
+  // as the closing "Run in a terminal" line. Hook entries or timeout alone keep ctx_upgrade.
+  const fix = parts.includes(PART_MCP) ? D3_NO_SETUP_FIX(row.id) : DOCTOR_FIX_UPGRADE;
   return fail("D3", read === null ? detail : detail + D4_REASON_JOIN + read, fix);
 }
 

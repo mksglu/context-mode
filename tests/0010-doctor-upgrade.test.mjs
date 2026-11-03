@@ -18,8 +18,8 @@ import { checkDb, checkIndex } from "../src/core/ops/doctor-db.ts";
 import { openDb, closeDb } from "../src/core/store/db.ts";
 import * as C from "../src/core/contracts/constants.ts";
 import { SCHEMA_VERSION, TOOL_ORDER } from "../src/core/contracts/constants.ts";
-import { bundleVersion, channelOf, checkMcp, checkMode, checkNode, checkProject, checkVersion, compareVersions, parseVersion } from "../src/core/ops/doctor-env.ts";
-import { checkHookRoundTrip, codexHookJournaled } from "../src/core/ops/doctor-hook.ts";
+import { bundleVersion, channelOf, fetchCause, checkMcp, checkMode, checkNode, checkProject, checkVersion, compareVersions, parseVersion } from "../src/core/ops/doctor-env.ts";
+import { checkHookRoundTrip, codexHookJournaled, payloadFor } from "../src/core/ops/doctor-hook.ts";
 import { DDL } from "../src/core/store/schema.ts";
 import { healD8 } from "../src/core/ops/db-heal.ts";
 import { writeOwnerPid } from "../src/core/store/owners.ts";
@@ -270,7 +270,7 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     assert.equal(d3.status, "FAIL");
     assert.ok(d3.detail.startsWith("wrong: MCP entry"), d3.detail);
     assert.ok(d3.detail.includes(path.join(custom, "settings.json")), d3.detail);
-    assert.equal(d3.fixCommand, "run ctx_upgrade");
+    assert.equal(d3.fixCommand, "context-mode setup --agents pi"); // D-D3-SETUP-FIX-1: setup writes the missing MCP entry
   });
 
   test("[D-N6-CODEX-DIRECT-1] doctor-config/D3 names the MCP entry when the codex entry lacks omit_tools_from deferred", (t) => {
@@ -388,6 +388,22 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
         assert.equal(d3.status, "PASS", d3.detail);
       });
     }
+  }
+});
+
+describe("ADR-0010 doctor D3 fix: setup fixes a wrong or missing MCP entry (D-D3-SETUP-FIX-1)", { concurrency: CONC }, () => {
+  // Tester, next.34 (Windows, OpenCode, empty profile): "FAIL opencode: D3 — wrong: MCP entry. Fix: run ctx_upgrade" while the
+  // closing line says "Run in a terminal: context-mode setup --agents opencode". One rule: an MCP part in D3 -> the setup command.
+  for (const row of ADAPTERS) {
+    test(`[M5] doctor-config/D3-${row.id}-empty-home-fix-is-the-setup-command`, (t) => {
+      const home = mkdtempSync(path.join(tmpdir(), "cm-d3-fix-"));
+      t.after(() => rmTempDir(home));
+      const env = { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), XDG_CONFIG_HOME: path.join(home, ".config") };
+      const d3 = checkHostConfig(row, env, home);
+      assert.equal(d3.status, "FAIL", row.id);
+      if (d3.detail.includes("MCP entry")) assert.equal(d3.fixCommand, `context-mode setup --agents ${row.id}`, row.id + ": " + d3.detail);
+      else assert.ok(d3.fixCommand === "run ctx_upgrade" || d3.fixCommand.startsWith("context-mode setup"), row.id + ": " + d3.fixCommand);
+    });
   }
 });
 
@@ -696,7 +712,17 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     assert.ok(row.detail.startsWith(`${HEAD}latest unknown, npm registry: `), row.detail);
     assert.ok(row.detail.includes("ECONNREFUSED"), row.detail);
     assert.ok(row.detail.endsWith("; git not found on PATH"), row.detail);
+    assert.ok(!row.detail.includes("  ") && !row.detail.includes(" ;"), row.detail); // D-D1-CAUSE-SPACE-1
     assert.equal(row.fixCommand, NPM_FIX);
+  });
+
+  // D-D1-CAUSE-SPACE-1 (tester, next.34 Windows: "npm registry: ECONNREFUSED  |"): a refused fetch on Windows has an
+  // AggregateError cause with code ECONNREFUSED and an empty message; the cause text has no stray space.
+  test("[M5] doctor-env/D1-npm-cause-text-is-exact (D-D1-CAUSE-SPACE-1)", () => {
+    const refused = (message) => Object.assign(new Error("fetch failed"), { cause: Object.assign(new AggregateError([], message), { code: "ECONNREFUSED" }) });
+    assert.equal(fetchCause(refused(""), 5000), "npm registry: ECONNREFUSED");
+    assert.equal(fetchCause(refused("connect ECONNREFUSED 127.0.0.1:9"), 5000), "npm registry: connect ECONNREFUSED 127.0.0.1:9");
+    assert.equal(fetchCause(Object.assign(new Error("fetch failed"), { cause: Object.assign(new Error("getaddrinfo"), { code: "ENOTFOUND" }) }), 5000), "npm registry: ENOTFOUND getaddrinfo");
   });
 
   test("[M5] doctor-env/D1-git-exit-names-code-and-first-stderr-line", { skip: !posix }, async (t) => {
@@ -1006,6 +1032,39 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.ok(r.detail.startsWith(C.D5_NO_FIXTURE_DETAIL("gemini") + ": "), r.detail); // D-DOCTOR-ISSUE-1: names the agents the file records
   });
 
+  // D-D5-ALL-AGENTS-1 (owner: every agent has 100% hooks): each agent's recorded payload gives PASS or FAIL, never UNKNOWN.
+  const SHIPPED = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "..", "e2e", "fixtures", "hook-roundtrip.json"), "utf8"));
+  for (const { id } of ADAPTERS) {
+    test(`[M5] doctor-hook/D5-${id}-has-a-recorded-payload-and-PASSes (D-D5-ALL-AGENTS-1)`, async (t) => {
+      assert.ok(Object.hasOwn(SHIPPED, id), id + " has no recorded payload in e2e/fixtures/hook-roundtrip.json");
+      const decoded = getAdapter(id).decode(SHIPPED[id].payload);
+      assert.equal(decoded.event, SHIPPED[id].event, id);
+      assert.equal(decoded.tool?.canonicalName, "Bash", id);
+      const r = await checkHookRoundTrip(input(bundle(t, "", { fixture: SHIPPED }), { agent: id, codexConfigDir: path.join(tmpdir(), "cm-no-codex-home") }));
+      assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail: C.DOCTOR_PASS_DETAIL }, id);
+    });
+  }
+
+  test("[M5] doctor-hook/D5-payload-cwd-goes-in-the-agent's-own-key (D-D5-ALL-AGENTS-1)", () => {
+    assert.deepEqual(payloadFor("opencode", { type: "execute.before", directory: "/tmp/project" }, "/w"), { type: "execute.before", directory: "/w" });
+    assert.deepEqual(payloadFor("pi", { type: "tool_call", cwd: "/tmp/project" }, "/w"), { type: "tool_call", cwd: "/w" });
+    assert.deepEqual(payloadFor("copilot-cli", { toolName: "bash" }, undefined), { toolName: "bash" });
+  });
+
+  test("[M5] doctor-hook/D5-non-claude-shapes: gemini JSON decision, kiro stderr deny, opencode text deny are native", async (t) => {
+    const deny = { gemini: JSON.stringify({ decision: "deny", reason: "x" }), "copilot-cli": JSON.stringify({ permissionDecision: "deny", permissionDecisionReason: "x" }) };
+    for (const [id, out] of Object.entries(deny)) {
+      const r = await checkHookRoundTrip(input(bundle(t, out, { fixture: SHIPPED }), { agent: id }));
+      assert.equal(r.status, "PASS", id + " " + r.detail);
+    }
+    for (const id of ["kiro", "opencode", "pi"]) {
+      const r = await checkHookRoundTrip(input(bundle(t, "use ctx_execute", { fixture: SHIPPED, exit: 2 }), { agent: id }));
+      assert.equal(r.status, "PASS", id + " " + r.detail);
+    }
+    const bad = await checkHookRoundTrip(input(bundle(t, "not json", { fixture: SHIPPED }), { agent: "gemini" }));
+    assert.equal(bad.status, "FAIL");
+  });
+
   test("[M5] doctor-hook/D5-no-fixture-file-is-UNKNOWN", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, native, { fixture: null })));
     assert.equal(r.status, "UNKNOWN");
@@ -1126,9 +1185,10 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     }
 
     test("every shipped fixture has the key set of the recorded native PreToolUse payload", () => {
-      assert.deepEqual(Object.keys(fixtures).sort(), ["claude-code", "codex"]);
-      for (const [host, entry] of Object.entries(fixtures)) {
-        assert.equal(entry.event, "PreToolUse", host);
+      // D-D5-ALL-AGENTS-1: every agent has hooks, so every agent has a recorded payload; claude-code and codex have host recordings.
+      assert.deepEqual(Object.keys(fixtures).sort(), ADAPTERS.map((r) => r.id).sort());
+      for (const host of ["claude-code", "codex"]) {
+        const entry = fixtures[host];
         assert.equal(entry.payload.hook_event_name, "PreToolUse", host);
         assert.deepEqual(Object.keys(entry.payload).sort(), Object.keys(recordedPreToolUse(host)).sort(), host);
         assert.equal(entry.payload.tool_name, recordedPreToolUse(host).tool_name, host);
@@ -1142,7 +1202,7 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
           spawnSync("git", ["init", "-q", home]);
           const env = { PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, ".codex"), CLAUDE_PROJECT_DIR: home };
           const r = spawnSync(process.execPath, [path.join(out, C.HOOK_ENTRY_FILE), C.AGENT_ARG, host], {
-            input: JSON.stringify({ ...entry.payload, cwd: home }), encoding: "utf8", env, cwd: home,
+            input: JSON.stringify(payloadFor(host, entry.payload, home)), encoding: "utf8", env, cwd: home,
           });
           assert.equal(r.status, 0, host + " " + r.stderr);
           assert.ok(!r.stderr.includes("decode failed"), host + " " + r.stderr);
