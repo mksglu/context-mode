@@ -283,7 +283,7 @@ Your first task with the plugin, step by step: [First session](https://contextmo
 ## Try it
 
 Paste one of these prompts into your agent after the install. Each one ran once, live, in Claude Code 2.1.312, and its answer matched the source data ([evidence and rerun steps](bench/evidence/try-it-2026-11-02/README.md)). The headline numbers in [Benchmarks](#benchmarks) use the median of 5 runs. Other agents do the same job with the same tools: `ctx_execute`, `ctx_index` and `ctx_search`.
-Then run `/ctx-stats` in your agent to see how much output stayed out of the context. Every agent gets this command with the plugin skills (`skills/ctx-stats`).
+After a prompt, run the stats skill and read the report yourself ([See the saving](#see-the-saving)).
 ```text
 On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array.
 ```
@@ -300,6 +300,37 @@ The agent counts failures in a 1,999-line syslog in the sandbox. 216,485 B raw, 
 What are the top 10 stories on the Hacker News front page right now? Give title, points and domain for each.
 ```
 The hook sends WebFetch to the sandbox, and the agent reads ten stories from the page. 35,087 B raw, 1,501 B reached the context, 95.7% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5). The front page changes, so the raw size changes with each run.
+
+### See the saving
+
+Run the stats skill right after a prompt. Each agent uses its own command; the skill calls `ctx_stats` and shows its report unchanged.
+
+| Agent | Command |
+|---|---|
+| Claude Code | `/ctx-stats` |
+| Codex | `$ctx-stats` |
+| Copilot CLI | `/ctx-stats` |
+| Gemini CLI | `Call ctx_stats and show me the report.` |
+| Kiro | `Call ctx_stats and show me the report.` |
+| OpenCode | `Call ctx_stats and show me the report.` |
+| Pi | `/skill:ctx-stats` |
+| Qwen Code | `Call ctx_stats and show me the report.` |
+| VS Code (Copilot) | `/ctx-stats` |
+| ZCode | `Call ctx_stats and show me the report.` |
+
+The first lines of a real report, after the JSON prompt above ran as one `ctx_execute` call:
+
+```text
+context-mode stats
+────────────────────────────────────────────────────────────────────────────────
+
+This session · 1 call · <1m active
+  1015.5 KB became 3.7 KB: 1011.8 KB kept out (99.6%)
+  Without context-mode |████████████████████████████████████████|  1015.5 KB
+  With context-mode    |█░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|     3.7 KB
+  about 259K tokens kept out, 1.3 times a 200K window
+```
+Captured 2026-11-03 with 2.0.0-next.35: `release-out/server.mjs` over MCP in a temp HOME.
 
 Next, the same numbers for 20 real tools, in [Use cases](#use-cases).
 
@@ -398,14 +429,21 @@ Next, what happens inside one tool call, in [How it works](#how-it-works).
   <img src="docs/assets/readme/fig-flow-light.png" alt="One tool call, step by step: the agent runs a tool, the PreToolUse hook denies a big Read and names the ctx_execute call, the MCP server runs it in the sandbox, SQLite FTS5 keeps the output, and after compaction a state block of at most 2,048 B comes back.">
 </picture>
 
-1. Your agent calls a tool: it reads a file, runs a command or fetches a page.
-2. A hook sees the call first. It sends a big read or fetch to the sandbox and gives the agent the exact call to use.
-3. The sandbox runs the work on your machine and keeps the full output in a local SQLite index.
-4. The agent gets the part it asked for, and calls `ctx_search` when it wants more.
-5. After a compaction, the agent gets a short state block; each line points to the full record.
+One tool call, in time order, from the install to a hook error.
 
-Timeouts, chunk sizes, ranking and storage: [How it works](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how).
-The rules the hook follows, and the reasons for each: [ADR-0008](docs/architecture/adr/0008-enforcement-rewrite-and-cap.md). Next, the [Tools](#tools) the agent calls.
+1. **Install.** Each agent's own install command adds the MCP server, the hooks and the skills `ctx-doctor`, `ctx-stats` and `ctx-upgrade` to that agent's config folder, for example `~/.codex/skills/<name>/SKILL.md`. `context-mode setup` writes or repairs any part the native command leaves out ([ADR-0023](docs/architecture/adr/ADR-0023-native-install.md)).
+2. **Session start.** The `SessionStart` hook opens the project database. When the session ran before, the agent gets one line that tells it to call `ctx_resume` ([dispatch.ts](src/core/hooks/dispatch.ts)).
+3. **PreToolUse checks.** Before a tool runs, the `PreToolUse` hook checks the call in a fixed order: the user's deny list, WebFetch, curl and wget, inline HTTP and build commands, then a full-file Read over `OUTPUT_CAP` (16,384 B) and one-file shell dumps such as `cat` or `tail`. A Read with a line range runs as usual ([decide.ts](src/core/policy/decide.ts)).
+4. **The exact call.** When a check matches, the hook stops the call and its reply names the exact `ctx_*` call to use, for example `ctx_execute` with `{"language":"shell","code":"<the command>","intent":"<what you need>"}`. For WebFetch the reply names `ctx_index`, then `ctx_search` ([read-deny.ts](src/core/policy/read-deny.ts)).
+5. **The sandbox.** `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](src/core/tools/execute.ts)).
+6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](src/core/store/fts.ts)).
+7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](src/core/tools/search.ts)).
+8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](src/core/hooks/dispatch.ts)).
+9. **Journal and compaction.** The hooks log each prompt, edit, command, tool error and decision in a journal. After a compaction the agent gets a state block of at most `STATE_BUDGET` (2,048 B), and each long line becomes a `ctx_resume(seq)` pointer to the full row; one `ctx_resume` reply is at most `RESUME_CAP` (2,048 B). On the next prompt, a prompt-match block brings back the journal rows that match it by BM25 ([ADR-0009](docs/architecture/adr/0009-compaction-and-memory.md)).
+10. **The database.** Each project has one `context.db` under `~/.context-mode`, in Node's built-in `node:sqlite`. The database runs in WAL mode and runs a PASSIVE checkpoint on close. A new database gets built under a temp name and moves into place in one atomic step, and the busy timeout is `DB_TIMEOUT_MS` (5,000 ms) ([db.ts](src/core/store/db.ts)).
+11. **A hook error.** A hook always ends with exit 0. On any error it gives the host's allow reply and writes one log line to `~/.context-mode/hook-errors.log`, so your agent keeps working. A spawned hook has `HOOK_TIMEOUT_MS` (5,000 ms) ([fallback.ts](src/core/hooks/fallback.ts)).
+
+Every number with its reason: [How it works](docs/how-it-works.md). The rules the hook follows: [ADR-0008](docs/architecture/adr/0008-enforcement-rewrite-and-cap.md). Next, the [Tools](#tools) the agent calls.
 
 ## Tools
 

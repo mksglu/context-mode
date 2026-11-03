@@ -1471,7 +1471,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(guides.length >= 8, `README links ${guides.length} guides`);
     assert.ok(readme.includes(ENGINE + "install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github"), "one switch link to the site install page");
     // Repo docs links: architecture records only (ADRs, the hook-run record); install guides live on contextmode.ai.
-    for (const t of repoDocLinks(readme)) assert.ok(t.startsWith("docs/architecture/"), `README links a repo docs page outside docs/architecture: ${t}`);
+    // D-README-HOW-2: How it works ends with one link to docs/how-it-works.md, the long form of its steps.
+    for (const t of repoDocLinks(readme)) assert.ok(t.startsWith("docs/architecture/") || t === "docs/how-it-works.md", `README links a repo docs page outside docs/architecture: ${t}`);
     assert.ok(repoDocLinks(readme).some((t) => t.startsWith("docs/architecture/adr/")), "README links an ADR");
     for (const need of ["](bench/README.md", "](CONTRIBUTING.md)"]) assert.ok(readme.includes(need), `README lacks ${need}`);
     assert.ok(out.length <= README_MAX_LINKS, `README has ${out.length} links out; the cap is ${README_MAX_LINKS}`);
@@ -1778,16 +1779,37 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     datedRow("D-README-PLAIN-1", "bu mor-yesil renklendirmeler AI-Sloppy gozukuyor");
   });
 
-  test("README How it works: the figure, 4 to 5 short numbered steps, and a link to Engineering details that hold every engineering fact (D-README-HOW-1)", () => {
-    // Owner 2026-11-02: "bu kismi 1 kisi bile ASLA okumaz bu kisim tamamen ai agentslere yonelik olmus cok ic ice giren metinler okummasi cok zor".
+  test("README How it works: the figure, then one tool call in time order, each step with its limits by name and one source link (D-README-HOW-2)", async () => {
+    // Owner 2026-11-03: "How it works u README'ye acikca algoritmasi ve kronolojik hikayesi ile yazmayi istiyorum."
+    const C = await import("../src/core/contracts/constants.ts");
     const readme = readRepo("README.md");
     const sec = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
     assert.ok(sec.includes('srcset="docs/assets/readme/fig-flow-dark.png"'), "the figure stays");
-    const steps = sec.split("\n").filter((l) => "12345".includes(l[0]) && l[1] === "." && l[2] === " ");
-    assert.ok(steps.length >= 4 && steps.length <= 5, `${steps.length} steps`);
-    for (const s of steps) assert.ok(s.length <= 160, `step is long: ${s}`);
-    assert.ok(sec.includes("](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how)"), "one link to the How it works guide on contextmode.ai (D-README-LINKS-2)");
-    assert.ok(!sec.split("](docs/").slice(1).some((s) => !s.startsWith("architecture/adr/")), "How it works links a repo docs page other than an ADR (D-README-DWELL-1)");
+    assert.ok(sec.indexOf("<picture>") < sec.indexOf("\n1. "), "the figure is on top");
+    const steps = [];
+    for (let n = 1; sec.includes("\n" + n + ". "); n++) {
+      const from = sec.indexOf("\n" + n + ". ") + 1;
+      const next = sec.indexOf("\n" + (n + 1) + ". ", from);
+      steps.push(sec.slice(from, next === -1 ? sec.indexOf("\n\n", from) === -1 ? sec.length : sec.indexOf("\n\n", from) : next));
+    }
+    assert.ok(steps.length >= 9 && steps.length <= 12, `${steps.length} steps`);
+    for (const s of steps) {
+      const sentences = s.split(". ").length;
+      assert.ok(sentences >= 2 && sentences <= 6, `step has ${sentences} sentences: ${s.slice(0, 80)}`);
+      assert.ok(s.includes("](src/") || s.includes("](docs/architecture/adr/") || s.includes("](docs/v2/adr/"), `step has no source or ADR link: ${s.slice(0, 80)}`);
+    }
+    const order = ["install", "SessionStart", "PreToolUse", "sandbox", "index", "PostToolUse", "compaction", "context.db", "exit 0"];
+    let at = -1;
+    for (const w of order) { const i = sec.indexOf(w, at + 1); assert.ok(i > at, `How it works lacks ${w} after the step before it`); at = i; }
+    for (const w of ["deny list", "WebFetch", "curl", "Porter", "trigram", "BM25", "Reciprocal Rank Fusion", "spelling", "ctx_resume", "WAL", "PASSIVE checkpoint", "atomic", "one log line"]) {
+      assert.ok(sec.includes(w), `How it works lacks ${w}`);
+    }
+    for (const name of ["OUTPUT_CAP", "EXEC_TIMEOUT_MS", "HOOK_TIMEOUT_MS", "MAX_CHUNK_BYTES", "SNIPPET_MAX_BYTES", "RRF_K", "REPLACE_TRIGGER_BYTES", "STATE_BUDGET", "RESUME_CAP", "DB_TIMEOUT_MS"]) {
+      assert.ok(sec.includes("`" + name + "`"), `How it works lacks ${name} by name`);
+      assert.ok(sec.includes(C[name].toLocaleString("en-US")), `How it works lacks the value of ${name}`);
+    }
+    assert.equal(sec.split("](docs/how-it-works.md").length - 1, 1, "How it works links docs/how-it-works.md once");
+    assert.ok(sec.lastIndexOf("](docs/how-it-works.md") > sec.indexOf("\n" + steps.length + ". "), "the docs link is at the end");
     for (const bold of ["**Hooks.**", "**Sandbox execution.**", "**Index and search.**", "**Storage.**"]) assert.ok(!sec.includes(bold), `README still has ${bold}`);
     const doc = readRepo("docs/how-it-works.md");
     const eng = doc.slice(doc.indexOf("\n## Engineering details\n"));
@@ -1796,7 +1818,28 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       "Chunks are at most 4,096 B", "800 B", "best-matching whole chunks", "ctx_resume(seq)", "prompt match block", "node:sqlite", "PASSIVE checkpoint", "even after a crash"]) {
       assert.ok(eng.includes(fact), `Engineering details lack ${fact}`);
     }
-    datedRow("D-README-HOW-1", "bu kismi 1 kisi bile ASLA okumaz");
+    datedRow("D-README-HOW-2", "kronolojik hikayesi");
+  });
+
+  test("README Try it: a stats step after the prompts, each agent's own command and a real report sample with date and version (D-README-STATS-RUN-1)", () => {
+    // Owner 2026-11-03: "stats Skill ini cagirsin hemen ardindan ve sonucunu kendi gozleri ile gorsun."
+    const readme = readRepo("README.md");
+    const sec = readme.slice(readme.indexOf("\n## Try it\n"), readme.indexOf("\n## Use cases\n"));
+    const head = sec.indexOf("\n### See the saving\n");
+    assert.ok(head > 0, "Try it has the stats step");
+    assert.equal(sec.slice(0, head).split("```text\n").length - 1, 4, "the stats step comes after the four prompts");
+    const step = sec.slice(head);
+    for (const row of agentRows()) {
+      const line = step.split("\n").find((l) => l.startsWith("| " + row.name + " |"));
+      assert.ok(line !== undefined, `stats step lacks a row for ${row.name}`);
+    }
+    assert.ok(step.includes("`/ctx-stats`"), "the slash command");
+    const sample = step.slice(step.indexOf("```text\n") + 8, step.indexOf("\n```", step.indexOf("```text\n") + 8));
+    assert.ok(step.includes("```text\n") && sample.length > 0, "a report sample in a fence");
+    assert.ok(sample.includes("context-mode"), `the sample is the ctx_stats report: ${sample.slice(0, 80)}`);
+    const under = step.slice(step.indexOf("\n```", step.indexOf("```text\n") + 8) + 4);
+    assert.ok(under.includes("2026-") && under.includes("2.0.0-next."), "the sample names its date and version");
+    datedRow("D-README-STATS-RUN-1", "kendi gozleri ile gorsun");
   });
 
   test("README Try it: the live prompts in fences, each with its measured line, the stats command and the evidence folder (D-README-TRYIT-1)", () => {

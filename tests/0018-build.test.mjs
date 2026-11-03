@@ -874,7 +874,8 @@ describe("ADR-0019 build: npm package", () => {
     const BLOB = "https://github.com/mksglu/context-mode/blob/v2.0.0/";
     // D-README-DWELL-1 (owner 2026-11-03: "GitHub reposuna ekledigimiz bench dizini ya da diger dizinlerdeki referanslari ekleyelim"):
     // architecture records (ADRs, HOOKS-FIRE) may be linked; guides stay on contextmode.ai.
-    const docPages = targetsOf(npmText).filter((t) => t.startsWith(BLOB + "docs/") && !t.startsWith(BLOB + "docs/architecture/") && t.split("#")[0].split("?")[0].endsWith(".md"));
+    // D-README-HOW-2 (owner 2026-11-03: "kronolojik hikayesi"): How it works ends with one link to docs/how-it-works.md.
+    const docPages = targetsOf(npmText).filter((t) => t.startsWith(BLOB + "docs/") && !t.startsWith(BLOB + "docs/architecture/") && t !== BLOB + "docs/how-it-works.md" && t.split("#")[0].split("?")[0].endsWith(".md"));
     assert.deepEqual(docPages, [], "the npm README links no repo guide page (D-README-LINKS-2)");
     assert.ok(npmText.includes("](https://github.com/mksglu/context-mode/blob/v2.0.0/LICENSE)"));
   });
