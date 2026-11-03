@@ -217,6 +217,14 @@ describe("ADR-0007 call shape on every host", () => {
     assert.ok(TOOLS.reduce((n, t) => n + t.description.length, 0) <= SURFACE_CAP);
   });
 
+  // Owner 2026-11-03 (D-TIC-PROMPT-1): "her yerde Thinking in Code felsefesini ... gormek istiyorum". The model reads the
+  // ctx_execute description on every turn, so it says the principle in one plain line.
+  test("ctx_execute description tells the agent to write code that prints only the answer (Thinking in Code)", () => {
+    const exec = TOOLS.find((t) => t.name === "ctx_execute");
+    assert.ok(exec.description.includes("Write code that prints only the answer, not the raw data."), exec.description);
+    assert.ok(exec.description.length <= DESCRIPTION_CAP);
+  });
+
   const BAD = [
     ["ctx_search", {}],
     ["ctx_search", { queries: "auth" }],

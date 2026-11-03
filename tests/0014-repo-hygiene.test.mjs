@@ -895,6 +895,24 @@ describe("ADR-0015 repo: doc facts", () => {
     assert.ok(md.includes(`(${first}–${last},`), `tools.md must say ${first}–${last}`);
   });
 
+  test("docs/tools.md opens ctx_execute and ctx_batch with Thinking in Code and the bench bytes of a real run (D-TIC-DOCS-1)", () => {
+    // Owner 2026-11-03: "Tum web'de, readme'de docslarda her yerde Thinking in Code felsefesini ... gormek istiyorum".
+    const md = read("docs/tools.md");
+    const res = json("bench/results/2026-11-01-darwin-arm64.json").results;
+    const row = (id) => res.find((r) => r.id === id);
+    const B = (n) => `${n.toLocaleString("en-US")} B`;
+    const exec = md.slice(md.indexOf("## ctx_execute"), md.indexOf("## ctx_batch"));
+    const batch = md.slice(md.indexOf("## ctx_batch"));
+    assert.ok(md.indexOf("## ctx_execute") > 0 && md.indexOf("## ctx_batch") > md.indexOf("## ctx_execute"));
+    for (const [part, id] of [[exec, "a-git-log-stat-vite"], [batch, "c-install-log"]]) {
+      assert.ok(part.split("\n").slice(0, 4).join("\n").includes("Thinking in Code"), `${id} section opens with the principle`);
+      const m = row(id).metrics;
+      assert.ok(part.includes(B(m.raw_bytes.median)) && part.includes(B(m.ctx_bytes.median)), `${id} bytes from the results JSON`);
+      assert.ok(part.includes(`../bench/results/2026-11-01-darwin-arm64.json`) && part.includes("```"), `${id} links its row and shows the call`);
+    }
+    assert.ok(exec.includes("https://contextmode.ai/docs/"), "the Gateway line links its own page");
+  });
+
   test("docs/tools.md says where a doctor report over REPORT_CAP is stored (D-NO-LOSSY-CUT-1)", () => {
     const md = read("docs/tools.md");
     assert.ok(md.includes(REPORT_SOURCE_LABEL));

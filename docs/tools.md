@@ -15,4 +15,32 @@ Each tool rejects an unknown input field with `UNKNOWN_FIELD`.
 | `ctx_upgrade` | `mode?` (`upgrade`, `uninstall`), `confirmDelete?` | Installs, upgrades or uninstalls; replaces old context-mode entries | `src/core/tools/upgrade.ts` |
 | `ctx_purge` | `session?`, `source?`, `project?` | Deletes indexed data by session, source or project | `src/core/tools/purge.ts` |
 
+## ctx_execute
+
+Thinking in Code: the agent writes a short script instead of reading the data.
+The script runs in the sandbox on your machine, and only what it prints goes into the context.
+
+A real bench run ([a-git-log-stat-vite](../bench/a-sandbox/README.md#a-git-log-stat-vite)): 300 commits of `git log --stat` are 164,385 B. The bench script ([source](../bench/a-sandbox/usecases.mjs)) prints 268 B ([results row](../bench/results/2026-11-01-darwin-arm64.json)).
+
+The agent calls `ctx_execute({ language: "javascript", file: "git-log-stat-vite.txt", code })` with this `code`, a short form of the bench script that prints 27 B (`commits: 300 | authors: 76`):
+
+```js
+const L = require("fs").readFileSync(process.env.CTX_FILE, "utf8").split("\n");
+const authors = new Set(L.filter((l) => l.startsWith("Author: ")).map((l) => l.slice(8)));
+console.log("commits:", L.filter((l) => l.startsWith("commit ")).length, "| authors:", authors.size);
+```
+
+The hosted Gateway has its own Thinking in Code tools, apart from this plugin: [Gateway](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=docs&utm_content=tools-tic).
+
+## ctx_batch
+
+Thinking in Code for many commands at once: the agent names the commands and the questions in one call.
+The output stays in the local index, and only the parts that answer the questions come back.
+
+A real bench run ([c-install-log](../bench/c-batch/README.md#c-install-log)): an install log and a long git log are 228,881 B. One call returns 12,797 B ([results row](../bench/results/2026-11-01-darwin-arm64.json)).
+
+```js
+ctx_batch({ commands: ["cat npm-install-log.txt", "cat git-log-large.txt"], queries: ["cache miss", "feat commit"] })
+```
+
 See [how-it-works.md](how-it-works.md) and [algorithms.md](algorithms.md) for how the tools work.
