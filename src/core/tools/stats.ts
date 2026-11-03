@@ -467,7 +467,16 @@ async function handler(_input: CtxStatsInput, ctx: ToolContext): Promise<ToolRep
   const db = await openDb(ctx.project, { readOnly: true }); // step 1
   let facts: Facts;
   try {
-    facts = readFacts(db.raw, ctx.sessionId);
+    // D-STATS-SNAPSHOT-1: every SELECT of one reply reads one WAL snapshot. BEGIN DEFERRED takes no lock
+    // until the first read, and on a reader it never takes a write lock; COMMIT or ROLLBACK ends it.
+    db.raw.exec("BEGIN DEFERRED");
+    try {
+      facts = readFacts(db.raw, ctx.sessionId);
+      db.raw.exec("COMMIT");
+    } catch (err) {
+      if (db.raw.isTransaction) db.raw.exec("ROLLBACK");
+      throw err;
+    }
   } finally {
     closeDb(db);
   }

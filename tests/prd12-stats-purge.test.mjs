@@ -5,7 +5,7 @@
 import { test, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ctxStats } from "../src/core/tools/stats.ts";
@@ -402,6 +402,44 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       assert.ok(!/ 0 B$/m.test(rep.split("Last 7 days")[1].split("By scope")[0]), "no empty days");
       for (const line of rep.split("\n")) assert.ok([...line].length <= 80, line);
       assert.equal((await ctxStats.handler({}, ctx)).text, (await ctxStats.handler({}, ctx)).text, "same journal, same bytes");
+    }));
+
+    // D-STATS-SNAPSHOT-1 (tester, next.34): one reply mixed two snapshots, "project (all-time) 15 calls" and
+    // "ctx_index 16 calls". A second handle commits a row after the first SELECT of the reply has run.
+    test("[R16] stats/one-snapshot: a write between the reads of one reply does not split its totals", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addRows(ctx, [["s1", "claude-code", 1000, 100], ["s1", "claude-code", 2000, 200], ["s2", "codex", 500, 50]]);
+      const writer = await openDb(ctx.project);
+      const dbFile = realpathSync(ctx.project.dbPath);
+      const proto = DatabaseSync.prototype;
+      const prepare = proto.prepare;
+      let wrote = 0;
+      proto.prepare = function (sql, ...rest) {
+        if (wrote === 0 && this.location() !== null && realpathSync(this.location()) === dbFile && String(sql).includes("GROUP BY tool") && !String(sql).includes("day")) {
+          wrote++;
+          appendEvent(writer, { session_id: "s3", worktree: ctx.project.worktree, agent: "opencode", kind: "cmd", tool: "ctx_index",
+            key: null, path: null, ok: 1, exit_code: null, bytes: 70, body: "x", turn: 1, sandbox_bytes: 70, returned_bytes: 7 });
+        }
+        return prepare.call(this, sql, ...rest);
+      };
+      let rep;
+      try { rep = report((await ctxStats.handler({}, ctx)).text); } finally { proto.prepare = prepare; closeDb(writer); }
+      assert.equal(wrote, 1, "the write ran between the reads");
+      const callsOf = (title, text = rep) => {
+        const lines = text.split("\n");
+        const at = lines.findIndex((l) => l.startsWith("  " + title + " "));
+        const out = [];
+        for (const l of lines.slice(at + 1)) { if (l.trim() === "") break; out.push([l.slice(2, 23).trim(), Number(l.slice(23, 30).trim().replaceAll(",", ""))]); }
+        return out;
+      };
+      const project = callsOf("Scope").find(([n]) => n === "project (all-time)")[1];
+      const tools = callsOf("Tool").reduce((a, [, n]) => a + n, 0);
+      assert.equal(tools, project, rep);
+      assert.equal(project, 3, "the reply reads the snapshot of its first SELECT");
+      assert.ok(rep.includes("By agent (this project)"), rep);
+      assert.ok(!rep.includes("opencode   "), "the late row is not in the agent table either");
+      const after = report((await ctxStats.handler({}, ctx)).text);
+      assert.equal(callsOf("Scope", after).find(([n]) => n === "project (all-time)")[1], 4, "the next reply reads the new row");
     }));
 
     test("[R6] stats/report-empty: an empty journal gives a short, friendly report", () => withRoot(async (root) => {
