@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { ctxStats } from "../src/core/tools/stats.ts";
 import { appendEvent } from "../src/core/journal/append.ts";
 import { openDb, closeDb } from "../src/core/store/db.ts";
-import { OUTPUT_CAP, STATS_COLUMNS, STATS_NO_DATA, STATS_SUMMARY, STATS_UNKNOWN_FIELD_LINE, PURGE_NO_SCOPE_LINE, PURGE_MANY_SCOPES_LINE, PURGE_BUSY_LINE, PURGE_SUMMARY } from "../src/core/contracts/constants.ts";
+import { OUTPUT_CAP, ISSUE_REPO_SLUG, STATS_COLUMNS, STATS_NO_DATA, STATS_SUMMARY, STATS_UNKNOWN_FIELD_LINE, PURGE_NO_SCOPE_LINE, PURGE_MANY_SCOPES_LINE, PURGE_BUSY_LINE, PURGE_SUMMARY } from "../src/core/contracts/constants.ts";
 import { DatabaseSync } from "node:sqlite";
 import { ctxPurge } from "../src/core/tools/purge.ts";
 import { ctxIndex } from "../src/core/tools/index.ts";
@@ -230,10 +230,11 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       // project: 10 calls, 566214 produced, 12921 returned, 553293 saved -> 97.7; session s1: 557214 / 12421 / 544793 -> 97.8.
       assert.equal(out.text.split("\n")[0], STATS_SUMMARY(97.7, 97.8));
       const rep = report(out.text);
-      assert.ok(rep.includes("This session · 9 calls · 10m active"), rep);
+      // D-STATS-FIX-1 (7): one line right under the scope line says it all, with one verb ("kept out").
+      assert.ok(rep.includes("This session · 9 calls · 10m active\n  544.2 KB became 12.1 KB: 532.0 KB kept out (97.8%)\n"), rep);
       assert.ok(rep.includes("  Without context-mode |" + "█".repeat(40) + "|   544.2 KB"), rep);
       assert.ok(rep.includes("  With context-mode    |█" + "░".repeat(39) + "|    12.1 KB"), rep);
-      assert.ok(rep.includes("\n  532.0 KB saved (97.8%)\n"), rep);
+      assert.ok(!rep.includes(" saved"), "one verb for the result: kept out");
       // The Markdown table stays for agents that read numbers; ctx_stats rows are not in it either.
       assert.deepEqual(row(out.text, "project"), ["566214 B", "12921 B", "553293 B", "97.7"]);
     }));
@@ -242,23 +243,35 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       const ctx = ctxFor(root);
       await addFixed(ctx);
       const rep = report((await ctxStats.handler({}, ctx)).text);
-      // D-STATS-VALUE-1 (6): the three rows with 0 B saved fold into one "other" row.
-      assert.deepEqual(labels(rep, "Tool"), ["ctx_index", "hook Bash", "ctx_batch", "ctx_execute", "other (3 tools)"]);
-      assert.ok(rep.includes("  ctx_index                  1   216.8 KB      300 B   216.5 KB   99.9% ████████"), rep);
+      // D-STATS-FIX-1 (1): ctx_search nets against the index it reads (I1-15), so it shares the ctx_index row;
+      // the two rows with 0 B kept out fold into "other". Tool rows are not clamped, so they add up to the project row.
+      assert.deepEqual(labels(rep, "Tool"), ["ctx_index + search", "hook Bash", "ctx_batch", "ctx_execute", "other (2 tools)"]);
+      assert.ok(rep.includes("By tool (this project)\n  " + "Tool".padEnd(21) + "Calls".padStart(7) + ["Made", "Sent", "Kept out"].map((h) => h.padStart(11)).join("") + "%".padStart(8) + "\n"), rep);
+      assert.ok(rep.includes("  ctx_index + search         2   216.8 KB     3.2 KB   213.6 KB   98.5% ████████"), rep);
       assert.ok(rep.includes("  hook Bash                  2   161.1 KB     5.3 KB   155.9 KB   96.7% ██████"), rep);
+      assert.ok(rep.includes("  other (2 tools)            2      200 B      200 B        0 B    0.0%\n"), rep);
+      // 218,700 + 159,593 + 118,000 + 57,000 + 0 = 553,293 B, the project row (540.3 KB), each row rounded once.
+      const kept = rep.split("\n").filter((l) => labels(rep, "Tool").some((n) => l.startsWith("  " + n + " ")))
+        .map((l) => Number(l.slice(2 + 21 + 7 + 22, 2 + 21 + 7 + 33).trim().split(" ")[0]));
+      assert.ok(Math.abs(kept.reduce((a, b) => a + b, 0) - 540.3) <= 0.05 * kept.length, String(kept));
+      assert.ok(rep.includes("By agent (this project)\n  Agent "), rep);
       assert.deepEqual(labels(rep, "Agent"), ["claude-code", "codex"]);
       assert.ok(rep.includes("  codex                      1     8.8 KB      500 B     8.3 KB   94.4%"), rep);
-      assert.deepEqual(labels(rep, "Scope"), ["session", "project", "all-time"]);
+      // D-STATS-FIX-1 (5): one DB per project holds all of it, so project and all-time are one row.
+      assert.deepEqual(labels(rep, "Scope"), ["session", "project (all-time)"]);
     }));
 
     test("[R6] stats/report-journal-and-store: categories with session/project counts, hints, index state, sessions", () => withRoot(async (root) => {
       const ctx = ctxFor(root);
       await addFixed(ctx);
       const rep = report((await ctxStats.handler({}, ctx)).text);
-      assert.deepEqual(labels(rep, "Journal"), ["Tool runs", "Content indexed", "File edits", "Errors kept", "Your decisions", "Your prompts"]);
-      assert.ok(rep.includes("  Tool runs                    5        6  " + "█".repeat(20)), rep);
-      assert.ok(rep.includes("ctx_resume"), "hint names the tool that reads the journal back");
-      assert.ok(rep.includes("  Indexed sources      2 · 124 chunks · 219.7 KB of content"), rep);
+      // D-STATS-FIX-1 (8, 10): the first five rows add up to the session's 9 calls; positive names.
+      assert.deepEqual(labels(rep, "Journal"), ["Content indexed", "File edits", "Issues kept", "Your decisions", "Other tool calls", "Your prompts"]);
+      assert.ok(rep.includes("  " + "Other tool calls".padEnd(21) + "5".padStart(9) + "6".padStart(9) + "  " + "█".repeat(20)), rep);
+      assert.ok(rep.includes("ctx_resume") && rep.includes("open issues"), "hint names the tool that reads the journal back");
+      // D-STATS-FIX-1 (6): the source count shows once.
+      assert.ok(rep.includes("  Index and search     2 sources · 124 chunks · 219.7 KB · 1 ctx_search call"), rep);
+      assert.ok(!rep.includes("Indexed sources"), rep);
       assert.ok(rep.includes("  Database file        <size>"), rep);
       assert.ok(rep.includes("  Sessions             2 · agents 2 · active days 1"), rep);
     }));
@@ -305,17 +318,25 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       await addFixed(ctx);
       const rep = report((await ctxStats.handler({}, ctx)).text);
       // session s1 saved 544,793 B -> 136,198 tokens -> 68.1% of 200,000.
-      assert.ok(rep.includes("\n  about 136K tokens kept out, 68% of a 200K window\n"), rep);
+      // D-STATS-FIX-1 (3): the ratio and the window size show their source.
+      assert.ok(rep.includes("\n  about 136K tokens kept out, 68% of a 200K window\n  (at 4 bytes per token; a Claude context window is 200K tokens)\n"), rep);
+      // All rows sit in the last 7 days, so the week cards would repeat the project row: only the day chart shows.
+      assert.ok(rep.includes("\nLast 7 days of use · 2026-10-20 to 2026-10-26\n  10-26 " + "█".repeat(15)), rep);
+      assert.ok(!rep.includes("Tokens kept out "), rep);
     }));
 
     test("[R8] stats/hook-work: redirects (run.mjs sources) and replaces (host rows returned < produced) are counted", () => withRoot(async (root) => {
       const a = ctxFor(root);
       await addFixed(a);
-      assert.ok(report((await ctxStats.handler({}, a)).text).includes("\n  Hooks sent 1 large output to the sandbox · 0 redirected, 1 replaced\n"));
+      // D-STATS-FIX-1 (4): one count, labelled with its scope; a way with nothing to count is left out.
+      const ra = report((await ctxStats.handler({}, a)).text);
+      assert.ok(ra.includes("\n  Project hooks: 1 large output cut down\n"), ra);
+      assert.ok(!/ 0 (redirected|sent|cut)/.test(ra), ra);
       const b = ctxFor(root, "s1", "claude-code");
       b.project = { ...b.project, projectKey: "6".repeat(16), projectDir: join(root, "projects", "6".repeat(16)), dbPath: join(root, "projects", "6".repeat(16), "context.db") };
       await addWeek(b);
-      assert.ok(report((await ctxStats.handler({}, b)).text).includes("\n  Hooks sent 3 large outputs to the sandbox · 1 redirected, 2 replaced\n"));
+      const rb = report((await ctxStats.handler({}, b)).text);
+      assert.ok(rb.includes("\n  Project hooks: 3 large outputs kept out · 1 sent to the sandbox, 2 cut down\n"), rb);
     }));
 
     test("[R8] stats/top-outputs + index-and-search + footer: largest single outputs, sources vs searches, last line", () => withRoot(async (root) => {
@@ -325,8 +346,9 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       const top = (name, p, r) => "  " + name.padEnd(21) + p.padStart(11) + " → " + r.padStart(11);
       assert.ok(rep.includes("Largest single outputs (made → sent to the chat)\n" +
         [top("ctx_index", "216.8 KB", "300 B"), top("hook Bash", "156.3 KB", "421 B"), top("ctx_batch", "117.2 KB", "2.0 KB")].join("\n") + "\n\n"), rep);
-      assert.ok(rep.includes("\n  Index and search     3 sources indexed · 1 ctx_search call\n"), rep);
-      assert.equal(rep.split("\n").at(-1), "contextmode.ai · github.com/mksglu/context-mode");
+      assert.ok(rep.includes("\n  Index and search     3 sources · 144 chunks · 297.9 KB · 1 ctx_search call\n"), rep);
+      // D-STATS-FIX-1 (11): the funnel link carries UTM; the repo slug comes from ISSUE_REPO_SLUG.
+      assert.deepEqual(rep.split("\n").slice(-2), ["https://contextmode.ai/?utm_source=ctx_stats&utm_medium=stats&utm_content=footer", "github.com/" + ISSUE_REPO_SLUG]);
     }));
 
     test("[R8] stats/last-7-days: four cards with spark lines, then one stacked bar per UTC day by way of saving", () => withRoot(async (root) => {
@@ -336,19 +358,20 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       // Window 10-20..10-26 (the day of the latest row; 10-17 is out). Saved per day by way, worked by hand:
       // 10-20 sandbox 29,000; 10-23 index 49,800 + replace 89,500; 10-24 redirect 80,000 - 16,384 (OUTPUT_CAP) = 63,616;
       // 10-26 sandbox 175,000 + index 218,700 + replace 159,593 = 553,293. Sum 785,209 B, 14 calls (13 rows + 1 run).
-      assert.ok(rep.includes([
-        "Last 7 days · 10-20 to 10-26",
-        "  Saved bytes        Tokens kept out    Calls counted      Saved per call",
-        "  766.8 KB           about 196K         14                 54.8 KB",
-        "  ▂▁▁▃▂▁█            ▂▁▁▃▂▁█            ▂▁▁▂▂▁█            ▄▁▁█▇▁▇",
-      ].join("\n")), rep);
+      // D-STATS-FIX-1 (6, 9): the year shows, the window ends on the last call (no clock); a 10-17 row is older,
+      // so the cards add news; one chart, days with data only, no spark lines.
       const day = (d, bar, v) => "  " + d + " " + bar.padEnd(48) + v.padStart(11);
-      assert.ok(rep.includes(["Saved over time",
-        day("10-20", "█".repeat(3), "28.3 KB"), day("10-21", "", "0 B"), day("10-22", "", "0 B"),
-        day("10-23", "▓".repeat(4) + "░".repeat(8), "136.0 KB"), day("10-24", "▒".repeat(6), "62.1 KB"), day("10-25", "", "0 B"),
+      assert.ok(rep.includes([
+        "Last 7 days of use · 2026-10-20 to 2026-10-26",
+        "  Kept out           Tokens kept out    Calls              Kept out per call",
+        "  766.8 KB           about 196K         14                 54.8 KB",
+        "",
+        day("10-20", "█".repeat(3), "28.3 KB"),
+        day("10-23", "▓".repeat(4) + "░".repeat(8), "136.0 KB"), day("10-24", "▒".repeat(6), "62.1 KB"),
         day("10-26", "█".repeat(15) + "▓".repeat(19) + "░".repeat(14), "540.3 KB"),
-        "  █ sandbox run  ▓ index + search  ▒ hook redirect  ░ output replaced",
+        "  █ sandbox run  ▓ index + search  ▒ hook sent to sandbox  ░ hook cut down",
       ].join("\n")), rep);
+      assert.ok(!/ 0 B$/m.test(rep.split("Last 7 days")[1].split("By scope")[0]), "no empty days");
       for (const line of rep.split("\n")) assert.ok([...line].length <= 80, line);
       assert.equal((await ctxStats.handler({}, ctx)).text, (await ctxStats.handler({}, ctx)).text, "same journal, same bytes");
     }));

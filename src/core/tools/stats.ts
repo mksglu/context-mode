@@ -1,12 +1,14 @@
 // impl/06 §5, PRD §12, TECH-SPEC GP10 + §6.2a D3; DECISIONS-r4 I1-14, I1-15, I1-19; DECISIONS-r9 V18, V19;
 // DEVIATIONS D-M4-arch-3 (handler shape (input, ctx)), D-M4-arch-4 (sums sandbox_bytes/returned_bytes),
 // D-M4-S3-1 (call rows, scopes, labels), D-STATS-REPORT-1 (detailed text report, ctx_stats rows not counted),
-// D-STATS-VALUE-1 (context window, hook work, largest outputs, index and search, last 7 days, footer).
+// D-STATS-VALUE-1 (context window, hook work, largest outputs, index and search, last 7 days, footer),
+// D-STATS-FIX-1 (one verb, rows that add up, scoped headings, no repeated blocks, UTM footer).
 // ctx_stats: on demand, one read-only open of this project's own context.db; it opens no other DB, so no
 // sibling DB is ever opened or touched (#1213, #1236).
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod/v4";
 import {
+  ISSUE_REPO_SLUG,
   MS_PER_DAY,
   OUTPUT_CAP,
   PERCENT_SCALE,
@@ -40,10 +42,10 @@ import {
   STATS_CARD_W,
   STATS_DAY_BAR,
   STATS_DAYS,
-  STATS_FOOTER,
+  STATS_FOOTER_URL,
   STATS_INDEX_TOOLS,
-  STATS_SPARK,
   STATS_THOUSAND,
+  STATS_TOKEN_NOTE,
   STATS_TOP_OUTPUTS,
   STATS_WAYS,
   STATS_WHOLE_FROM,
@@ -226,6 +228,7 @@ function count(n: number): string {
 }
 
 function bytes(n: number): string {
+  if (n < 0) return "-" + bytes(-n);
   if (n < STATS_KIB) return int(n) + " B";
   let v = n / STATS_KIB;
   let u = 0;
@@ -262,10 +265,11 @@ function plural(n: number, word: string): string {
 }
 
 // One table of byte totals: label, calls, produced, returned, saved, %, a bar scaled to the largest saving.
+// D-STATS-FIX-1 (7): one verb pair, "made" and "sent", and "kept out" for the result.
 function table(title: string, rows: Named[]): string[] {
   const max = Math.max(0, ...rows.map((r) => r.saved));
-  const head = "  " + title.padEnd(LABEL_W) + "Calls".padStart(STATS_CALLS_W) + "Produced".padStart(NUM_W) + "Returned".padStart(NUM_W) +
-    "Saved".padStart(NUM_W) + "%".padStart(PCT_W);
+  const head = "  " + title.padEnd(LABEL_W) + "Calls".padStart(STATS_CALLS_W) + "Made".padStart(NUM_W) + "Sent".padStart(NUM_W) +
+    "Kept out".padStart(NUM_W) + "%".padStart(PCT_W);
   return [head, ...rows.map((r) => ("  " + label(r.name) + count(r.calls).padStart(STATS_CALLS_W) + bytes(r.produced).padStart(NUM_W) +
     bytes(r.returned).padStart(NUM_W) + bytes(r.saved).padStart(NUM_W) + pct(r).padStart(PCT_W) + " " + bar(r.saved, max, STATS_ROW_BAR)).trimEnd())];
 }
@@ -279,10 +283,21 @@ function toolName(tool: string): string {
   return tool.startsWith("ctx_") ? tool : "hook " + tool;
 }
 
-// D-STATS-VALUE-1 (6): two or more rows with 0 B saved fold into one "other" row; past STATS_MAX_TOOL_ROWS
+// D-STATS-FIX-1 (1): a ctx_search reply nets against the index it reads (PRD §12, I1-15), so the two share
+// one row; each row is its true made - sent (no clamp), so the rows add up to the project row.
+function joinIndex(tools: Named[]): Named[] {
+  const idx = tools.filter((t) => STATS_INDEX_TOOLS.includes(t.name));
+  if (idx.length <= 1) return tools;
+  const t = sum(idx);
+  const one = { name: STATS_INDEX_TOOLS.join(" + ").replace(" + ctx_", " + "), ...t, saved: t.produced - t.returned };
+  return [...tools.filter((x) => !idx.includes(x)), one];
+}
+
+// D-STATS-VALUE-1 (6): two or more rows with 0 B kept out fold into one "other" row; past STATS_MAX_TOOL_ROWS
 // the rows with the smallest saving join it.
 function toolRows(tools: Named[]): Named[] {
-  const named = tools.map((t) => ({ ...t, name: toolName(t.name) })).sort(bySaved);
+  const named = joinIndex(tools.map((t) => ({ ...t, saved: t.produced - t.returned })))
+    .map((t) => ({ ...t, name: toolName(t.name) })).sort(bySaved);
   const zero = named.filter((t) => t.saved <= 0);
   const fold = zero.length > 1 ? zero : [];
   const keep = named.filter((t) => !fold.includes(t));
@@ -296,7 +311,6 @@ function toolRows(tools: Named[]): Named[] {
 // ---- D-STATS-VALUE-1: the business-value lines. ----
 
 const TOKEN_UNITS = ["K", "M", "B", "T"] as const;
-const SPARK = [...STATS_SPARK];
 
 // One decimal below STATS_WHOLE_FROM, a whole number at or past it.
 function whole(v: number): string {
@@ -322,16 +336,12 @@ function windowLine(saved: number): string {
   return p * STATS_WHOLE_FROM < 1 ? head : `${head}, ${whole(p)}% of ${win}`;
 }
 
-function spark(values: number[]): string {
-  const top = SPARK.length - 1;
-  const max = Math.max(0, ...values);
-  return values.map((v) => SPARK[v <= 0 || max <= 0 ? 0 : Math.min(top, Math.max(1, Math.round((v / max) * top)))]).join("");
+function ymd(day: number): string {
+  return new Date(day * MS_PER_DAY).toISOString().slice(0, "yyyy-mm-dd".length);
 }
 
 function mmdd(day: number): string {
-  const d = new Date(day * MS_PER_DAY);
-  const two = (n: number): string => String(n).padStart(STATS_CLOCK_DIGITS, "0");
-  return two(d.getUTCMonth() + 1) + "-" + two(d.getUTCDate());
+  return ymd(day).slice("yyyy-".length);
 }
 
 // One stacked bar: ways in STATS_WAYS order, cut at rounded running sums so the parts add up to the whole.
@@ -352,25 +362,35 @@ function cards(cells: string[]): string {
   return ("  " + cells.map((c) => c.padEnd(STATS_CARD_W)).join("")).trimEnd();
 }
 
-// The Gateway Analytics shape from local data: four cards with a spark line each, then saved per day by way.
-function lastDays(week: Day[]): string[] {
+// The Gateway Analytics shape from local data. D-STATS-FIX-1 (6, 9): the cards show only when older calls
+// exist (else they repeat the project row); the chart lists days with data; the header has the year.
+function lastDays(week: Day[], allCalls: number): string[] {
   const saved = week.map((d) => STATS_WAYS.reduce((t, [w]) => t + d.ways[w], 0));
   const all = saved.reduce((a, b) => a + b, 0);
   const calls = week.reduce((a, d) => a + d.calls, 0);
-  const per = week.map((d, i) => (d.calls > 0 ? saved[i]! / d.calls : 0));
   const max = Math.max(0, ...saved);
+  const head = `Last ${STATS_DAYS} days of use · ${ymd(week[0]!.day)} to ${ymd(week[week.length - 1]!.day)}`;
+  const card = calls < allCalls
+    ? [cards(["Kept out", "Tokens kept out", "Calls", "Kept out per call"]),
+      cards([bytes(all), "about " + tokens(all / STATS_BYTES_PER_TOKEN), count(calls), bytes(calls > 0 ? all / calls : 0)]), ""]
+    : [];
   return [
-    `Last ${STATS_DAYS} days · ${mmdd(week[0]!.day)} to ${mmdd(week[week.length - 1]!.day)}`,
-    cards(["Saved bytes", "Tokens kept out", "Calls counted", "Saved per call"]),
-    cards([bytes(all), "about " + tokens(all / STATS_BYTES_PER_TOKEN), count(calls), bytes(calls > 0 ? all / calls : 0)]),
-    cards([spark(saved), spark(saved), spark(week.map((d) => d.calls)), spark(per)]),
-    "",
-    "Saved over time",
-    ...week.map((d, i) => "  " + mmdd(d.day) + " " +
-      stack(STATS_WAYS.map(([w]) => d.ways[w]), max, STATS_DAY_BAR).padEnd(STATS_DAY_BAR) + bytes(saved[i]!).padStart(NUM_W)),
+    head,
+    ...card,
+    ...week.flatMap((d, i) => (saved[i]! > 0 ? ["  " + mmdd(d.day) + " " +
+      stack(STATS_WAYS.map(([w]) => d.ways[w]), max, STATS_DAY_BAR).padEnd(STATS_DAY_BAR) + bytes(saved[i]!).padStart(NUM_W)] : [])),
     "  " + STATS_WAYS.map(([, ch, name]) => `${ch} ${name}`).join("  "),
     "",
   ];
+}
+
+// D-STATS-FIX-1 (4): one count with its scope; a way with nothing to count is left out.
+function hookLine(redirected: number, replaced: number): string[] {
+  const all = redirected + replaced;
+  if (all === 0) return [];
+  const parts = [...(redirected > 0 ? [`${int(redirected)} sent to the sandbox`] : []), ...(replaced > 0 ? [`${int(replaced)} cut down`] : [])];
+  const what = plural(all, "large output");
+  return [parts.length === 1 ? `  Project hooks: ${what} ${parts[0]!.replace(/^[\d,]+ /, "")}` : `  Project hooks: ${what} kept out · ${parts.join(", ")}`];
 }
 
 function fit(line: string): string {
@@ -390,18 +410,18 @@ function report(f: Facts, sessionId: string, agent: string): string {
   const lines = [
     ...head,
     `${scopeName} · ${plural(focus.calls, "call")}${extra}`,
+    `  ${bytes(focus.produced)} became ${bytes(focus.returned)}: ${bytes(focus.saved)} kept out (${pct(focus)})`,
     "  " + "Without context-mode".padEnd(LABEL_W) + "|" + bar(focus.produced, top, STATS_HEAD_BAR, "█", "░") + "|" + bytes(focus.produced).padStart(NUM_W),
     "  " + "With context-mode".padEnd(LABEL_W) + "|" + bar(focus.returned, top, STATS_HEAD_BAR, "█", "░") + "|" + bytes(focus.returned).padStart(NUM_W),
-    `  ${bytes(focus.saved)} saved (${pct(focus)})`,
-    ...(focus.saved > 0 ? [windowLine(focus.saved)] : []),
-    ...(f.redirected + f.replaced > 0
-      ? [`  Hooks sent ${plural(f.redirected + f.replaced, "large output")} to the sandbox · ${int(f.redirected)} redirected, ${int(f.replaced)} replaced`]
-      : []),
+    ...(focus.saved > 0 ? [windowLine(focus.saved), STATS_TOKEN_NOTE] : []),
+    ...hookLine(f.redirected, f.replaced),
     "",
-    ...lastDays(f.week),
-    ...table("Scope", [{ name: "session", ...session }, { name: "project", ...project }, { name: "all-time", ...project }]),
+    ...lastDays(f.week, project.calls + f.redirected),
+    // D-STATS-FIX-1 (5): one DB per project holds every session of it, so project and all-time are one row.
+    "By scope",
+    ...table("Scope", [{ name: "session", ...session }, { name: "project (all-time)", ...project }]),
     "",
-    "Where the savings came from (this project)",
+    "By tool (this project)",
     ...table("Tool", toolRows(f.tools)),
     "",
     ...(f.top.length > 0
@@ -413,7 +433,7 @@ function report(f: Facts, sessionId: string, agent: string): string {
   const agents = new Map<string, Totals>();
   for (const g of f.groups) agents.set(g.agent, sum([agents.get(g.agent) ?? EMPTY, g]));
   if (!agents.has(agent)) agents.set(agent, EMPTY);
-  lines.push(...table("Agent", [...agents].map(([name, t]) => ({ name, ...t })).sort(bySaved)), "");
+  lines.push("By agent (this project)", ...table("Agent", [...agents].map(([name, t]) => ({ name, ...t })).sort(bySaved)), "");
 
   const maxKind = Math.max(0, ...[...f.kinds.values()].map((k) => k.project));
   lines.push("Kept in the session journal", "  " + "Journal".padEnd(LABEL_W) + "Session".padStart(STATS_KIND_W) + "Project".padStart(STATS_KIND_W));
@@ -423,14 +443,15 @@ function report(f: Facts, sessionId: string, agent: string): string {
   }
   lines.push("", ...STATS_JOURNAL_HINTS.map((h) => "  " + h), "");
 
+  // D-STATS-FIX-1 (6): the source count shows once.
   lines.push(
-    "  " + "Indexed sources".padEnd(LABEL_W) + `${int(f.sources.count)} · ${plural(f.sources.chunks, "chunk")} · ${bytes(f.sources.bytes)} of content`,
-    "  " + "Index and search".padEnd(LABEL_W) +
-      `${plural(f.sources.count, "source")} indexed · ${plural(f.tools.find((t) => t.name === "ctx_search")?.calls ?? 0, "ctx_search call")}`,
+    "  " + "Index and search".padEnd(LABEL_W) + `${plural(f.sources.count, "source")} · ${plural(f.sources.chunks, "chunk")} · ` +
+      `${bytes(f.sources.bytes)} · ${plural(f.tools.find((t) => t.name === "ctx_search")?.calls ?? 0, "ctx_search call")}`,
     "  " + "Database file".padEnd(LABEL_W) + bytes(f.dbBytes),
     "  " + "Sessions".padEnd(LABEL_W) + `${int(f.sessions)} · agents ${int(f.agents)} · active days ${int(f.days)}`,
     "",
-    STATS_FOOTER,
+    STATS_FOOTER_URL,
+    "github.com/" + ISSUE_REPO_SLUG,
   );
   return lines.map(fit).join("\n");
 }

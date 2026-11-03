@@ -383,11 +383,12 @@ export const STATS_EMPTY_LINES = Object.freeze([
 ] as const);
 // Journal kinds in report order (schema.ts events.kind; `cost` rows are usage events, not shown).
 export const STATS_KIND_LABELS = Object.freeze([
-  ["cmd", "Tool runs"], ["index", "Content indexed"], ["edit", "File edits"],
-  ["toolerr", "Errors kept"], ["decision", "Your decisions"], ["prompt", "Your prompts"],
+  // D-STATS-FIX-1 (8): the first five rows are call kinds, so they add up to the calls of the scope line.
+  ["index", "Content indexed"], ["edit", "File edits"], ["toolerr", "Issues kept"],
+  ["decision", "Your decisions"], ["cmd", "Other tool calls"], ["prompt", "Your prompts"],
 ] as const);
 export const STATS_JOURNAL_HINTS = Object.freeze([
-  "ctx_resume brings back your last task, files changed and open errors",
+  "ctx_resume brings back your last task, files changed and open issues",
   "after a compact or a restart; ctx_search finds indexed content by words.",
 ] as const);
 
@@ -399,15 +400,17 @@ export const STATS_WHOLE_FROM = 10; // at or past this, a whole number (token st
 export const STATS_DAYS = 7; // UTC days in "Last 7 days", ending on the day of the latest row
 export const STATS_TOP_OUTPUTS = 3;
 export const STATS_CARD_W = 19; // one card column: 4 cards = 76 columns with the indent
-export const STATS_DAY_BAR = 48; // the largest day of "Saved over time"
-export const STATS_SPARK = "▁▂▃▄▅▆▇█";
+export const STATS_DAY_BAR = 48; // the largest day of the "Last 7 days of use" chart
+// D-STATS-FIX-1 (3): the two assumptions of the token line, named on the line below it.
+export const STATS_TOKEN_NOTE = "  (at 4 bytes per token; a Claude context window is 200K tokens)";
 // The plugin's own ways of saving, in bar order: [key, bar character, legend name].
 export const STATS_WAYS = Object.freeze([
   ["sandbox", "█", "sandbox run"], ["index", "▓", "index + search"],
-  ["redirect", "▒", "hook redirect"], ["replace", "░", "output replaced"],
+  ["redirect", "▒", "hook sent to sandbox"], ["replace", "░", "hook cut down"],
 ] as const);
 export const STATS_INDEX_TOOLS: readonly string[] = Object.freeze(["ctx_index", "ctx_search"]);
-export const STATS_FOOTER = "contextmode.ai · github.com/mksglu/context-mode";
+// D-STATS-FIX-1 (11): the funnel link carries UTM; the repo line reads ISSUE_REPO_SLUG (one place for the org move).
+export const STATS_FOOTER_URL = "https://contextmode.ai/?utm_source=ctx_stats&utm_medium=stats&utm_content=footer";
 
 // ctx_purge (impl/06 §6)
 export const PURGE_SCOPES = Object.freeze(["session", "source", "project"] as const);
