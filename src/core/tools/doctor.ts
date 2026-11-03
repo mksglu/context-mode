@@ -21,6 +21,7 @@ import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
 import { lastHookError } from "../hooks/fallback.ts";
 import { healD8 } from "../ops/db-heal.ts";
 import { buildReport, buildReportHead } from "../ops/report.ts";
+import { environmentLine, writeIssueReport } from "../ops/doctor-issue.ts";
 import { claudeDirOf, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { indexText } from "../index/text.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
@@ -145,14 +146,28 @@ function reportEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolReply> {
+/**
+ * D-DOCTOR-ISSUE-1: the reply. Line 1 is the environment line, then the table; when a row FAILs, the full issue
+ * report goes to ~/.context-mode/reports/ and three lines under the table name it, the gh command and the form URL.
+ */
+export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<ToolReply> {
   const adapter = getAdapter(ctx.project.agent); // step 1
-  const host: DoctorHost = { env: process.env, bundleDir: dirname(process.argv[1] as string), piCwd: undefined };
   const rows = await runDoctorChecks(ctx, adapter, host); // step 2
+  const failed = rows.some((r) => r.status === "FAIL");
   // ADR-0019 D7: name the CLI command; setup when a row failed (it repairs and verifies), else doctor.
-  const command = `context-mode ${rows.some((r) => r.status === "FAIL") ? "setup" : "doctor"} --agents ${adapter.id}`;
-  const input = { agent: adapter.id, rows, env: reportEnv(process.env), command };
-  const whole = buildReport(input); // step 3
+  const command = `context-mode ${failed ? "setup" : "doctor"} --agents ${adapter.id}`;
+  const input = { agent: adapter.id, rows, env: reportEnv(host.env), command };
+  const envLine = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir));
+  const table = buildReport(input); // step 3
+  let notes: string[] = [];
+  if (failed) {
+    try {
+      notes = await writeIssueReport({ ctx, adapter, env: host.env, bundleDir: host.bundleDir, rows, envLine, table });
+    } catch (err) {
+      notes = [`Report file: ${lineOf(err)}`]; // ADR-0010: doctor always answers
+    }
+  }
+  const whole = [envLine, table, ...notes].join("\n");
   const bytes = Buffer.byteLength(whole, "utf8");
   if (bytes <= REPORT_CAP) return { text: whole, isError: false, sandboxBytes: bytes }; // step 4
   // D-NO-LOSSY-CUT-1: over the cap, the whole report is stored first; the reply holds the FAIL rows and the pointer.
@@ -162,8 +177,12 @@ async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolRe
   } finally {
     closeDb(db);
   }
-  const text = buildReportHead(input);
+  const text = [envLine, buildReportHead(input), ...notes].join("\n");
   return { text, isError: false, sandboxBytes: bytes };
+}
+
+async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolReply> {
+  return doctorReply(ctx, { env: process.env, bundleDir: dirname(process.argv[1] as string), piCwd: undefined });
 }
 
 export const ctxDoctor = Object.freeze({

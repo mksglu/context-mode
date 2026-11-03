@@ -254,7 +254,11 @@ describe("GP11 doctor and upgrade", () => {
     // D-M5-R1-2: D5 timing and D4 host state vary per run, so the golden holds the table shape only:
     // the header lines and the Check column, in order.
     // ADR-0019 D7 (D-DOCTOR-CMD-1): after the rows comes one "Run in a terminal:" line, then env lines.
-    const lines = text(reply).split("\n");
+    // D-DOCTOR-ISSUE-1: line 1 is the environment line; on a FAIL three report-file lines follow the env lines.
+    const all = text(reply).split("\n");
+    assert.match(all[0] ?? "", /^Environment: context-mode .+, agent claude-code.*, Node v\d+/);
+    const NOTES = ["Report file: ", "File it: ", "Or open: "];
+    const lines = all.slice(1).filter((l) => !NOTES.some((p) => l.startsWith(p)));
     const body = lines.slice(2);
     const rows = body.filter((l) => l.startsWith("| "));
     const rest = body.filter((l) => !l.startsWith("| "));

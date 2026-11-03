@@ -9,7 +9,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_SLOW_DETAIL,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
@@ -58,19 +58,22 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** The agent's recorded payload, or null: no fixture file, unreadable JSON, or no key for this agent. */
-function loadFixture(bundleDir: string, agent: AgentId): FixtureEntry | null {
+/** The agent's recorded payload, or the exact reason there is none (D-DOCTOR-ISSUE-1: every UNKNOWN names its cause). */
+function loadFixture(bundleDir: string, agent: AgentId): FixtureEntry | { cause: string } {
   const file = path.join(bundleDir, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE);
-  if (!existsSync(file)) return null;
+  if (!existsSync(file)) return { cause: D5_FIXTURE_FILE_ABSENT(file) };
   let all: unknown;
   try {
     all = JSON.parse(hostText(readFileSync(file, "utf8")));
-  } catch {
-    return null;
+  } catch (err) {
+    return { cause: D5_FIXTURE_PARSE(file, err instanceof Error ? err.message : String(err)) };
   }
-  if (!isObject(all) || !Object.hasOwn(all, agent)) return null;
+  if (!isObject(all)) return { cause: D5_FIXTURE_PARSE(file, "top level is not an object") };
+  if (!Object.hasOwn(all, agent)) return { cause: D5_NO_FIXTURE_DETAIL(agent) + ": " + D5_FIXTURE_AGENT_ABSENT(file, Object.keys(all)) };
   const e = all[agent];
-  if (!isObject(e) || typeof e.event !== "string" || !Object.hasOwn(e, "payload")) return null;
+  if (!isObject(e) || typeof e.event !== "string" || !Object.hasOwn(e, "payload")) {
+    return { cause: D5_NO_FIXTURE_DETAIL(agent) + ": the entry lacks an event name or a payload" };
+  }
   return { event: e.event, payload: e.payload };
 }
 
@@ -143,7 +146,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     return row("UNKNOWN", D5_CODEX_UNTRUSTED_DETAIL);
   }
   const fixture = loadFixture(i.bundleDir, i.agent);
-  if (fixture === null) return row("UNKNOWN", D5_NO_FIXTURE_DETAIL(i.agent));
+  if ("cause" in fixture) return row("UNKNOWN", fixture.cause);
   const now = i.now ?? (() => performance.now());
   const fixed = i.samples === undefined ? null : Math.max(1, i.samples);
   const maxPairs = fixed ?? D5_MAX_PAIRS;

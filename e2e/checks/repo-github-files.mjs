@@ -67,7 +67,19 @@ export function check() {
     need(/^blank_issues_enabled: false\s*$/m.test(src), "config.yml blank_issues_enabled: false");
     need(src.includes("/security/advisories"), "config.yml security advisories link");
     need(src.includes("README.md#install"), "config.yml README#install link");
-    need((src.match(/^\s+- name:/gm) || []).length === 2, "config.yml exactly two contact_links");
+    // D-DOCTOR-ISSUE-1: security, doctor docs (UTM), Discord, install guide.
+    need((src.match(/^\s+- name:/gm) || []).length === 4, "config.yml exactly four contact_links");
+    need(src.includes("https://discord.gg/DCN9jUgN5v"), "config.yml Discord link");
+    need(src.includes("https://contextmode.ai/docs/engine/doctor?utm_source=github"), "config.yml doctor docs link with UTM");
+  }
+
+  // agent-report.yml (D-DOCTOR-ISSUE-1): the form ctx_doctor's report file fills.
+  const arP = path.join(TPL, "agent-report.yml");
+  if (!existsSync(arP)) errors.push("agent-report.yml missing");
+  else {
+    const src = read(arP);
+    need(/^labels: \[\s*"?bug"?\s*\]\s*$/m.test(src), "agent-report.yml labels: [bug]");
+    need(src.includes("AGENT_ISSUE.md") && src.includes("~/.context-mode/reports/doctor-"), "agent-report.yml names AGENT_ISSUE.md and the report file");
   }
 
   // feature.yml (§6.3)

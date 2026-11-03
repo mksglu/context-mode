@@ -574,7 +574,7 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
 
   test("[M5] doctor-env/D1-dev-build-is-UNKNOWN-without-spawning-git", async () => {
     const row = await run({ PATH: "" }, undefined);
-    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "dev build" });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: C.D1_DEV_BUILD_DETAIL });
   });
 
   test("[M5] doctor-env/D1-equal-sha-PASS-names-version-and-sha", { skip: !posix }, async (t) => {
@@ -906,13 +906,14 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
 
   test("[M5] doctor-hook/D5-agent-without-fixture-key-is-UNKNOWN (D-M5-arch-4)", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, native), { agent: "gemini" }));
-    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "UNKNOWN", detail: C.D5_NO_FIXTURE_DETAIL("gemini") });
+    assert.equal(r.status, "UNKNOWN");
+    assert.ok(r.detail.startsWith(C.D5_NO_FIXTURE_DETAIL("gemini") + ": "), r.detail); // D-DOCTOR-ISSUE-1: names the agents the file records
   });
 
   test("[M5] doctor-hook/D5-no-fixture-file-is-UNKNOWN", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, native, { fixture: null })));
     assert.equal(r.status, "UNKNOWN");
-    assert.equal(r.detail, C.D5_NO_FIXTURE_DETAIL("claude-code"));
+    assert.ok(r.detail.startsWith("the hook fixture file ") && r.detail.includes(C.HOOK_FIXTURE_FILE), r.detail); // D-DOCTOR-ISSUE-1
   });
 
   test("[M5] doctor-hook/D5-codex-hooks-file-and-no-journal-row-is-UNKNOWN-not-trusted (R6)", async (t) => {
@@ -1698,7 +1699,9 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
 
   test("[M5] doctor/handler-never-isError and no baked paths in the report", async (t) => {
     const home = tmp(t);
-    const reply = await ctxDoctor.handler({}, ctxFor(home));
+    // D-DOCTOR-ISSUE-1: a FAIL writes a report file under HOME, so the test passes a temp HOME, never process.env.
+    const { doctorReply } = await import("../src/core/tools/doctor.ts");
+    const reply = await doctorReply(ctxFor(home), { env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "" }, bundleDir: path.join(home, "no-bundle"), piCwd: undefined });
     assert.equal(reply.isError, false);
     assert.ok(reply.text.includes("D10"));
     assert.equal(reply.sandboxBytes, Buffer.byteLength(reply.text, "utf8"));
@@ -1708,7 +1711,8 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
 
   test("[M7] doctor/cli-command: the ctx_doctor report prints the exact context-mode command to run (ADR-0019 D7)", async (t) => {
     const home = tmp(t);
-    const reply = await ctxDoctor.handler({}, ctxFor(home, "codex"));
+    const { doctorReply } = await import("../src/core/tools/doctor.ts");
+    const reply = await doctorReply(ctxFor(home, "codex"), { env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "" }, bundleDir: path.join(home, "no-bundle"), piCwd: undefined });
     assert.match(reply.text, /^Run in a terminal: context-mode (doctor|setup) --agents codex$/m);
     if (reply.text.includes("| FAIL |")) assert.match(reply.text, /context-mode setup --agents codex/);
     assert.ok(Buffer.byteLength(reply.text, "utf8") <= 4096, "report stays within REPORT_CAP");
@@ -2060,5 +2064,111 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       if (d3Parts(d3).includes("MCP entry")) bad.push(`${id} D3 ${d3.detail}`);
     }
     assert.deepEqual(bad, []);
+  });
+});
+
+describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrency: CONC }, () => {
+  // Owner 2026-11-03: "bu doctor ciktisini direkt agentler nasil otomatik issue acabilecekler hicbir hook ya da link ya da yonerge yok?"
+  // and "User in AI Agent'i, issue yu oyle bir doldurmali ki o issueye oyle veriler vermeliyiz ki sen aninda onu fixleyebilmelisin".
+  const KEY6 = "6".repeat(16);
+  function home(t) {
+    const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-doctor-issue-")));
+    t.after(() => rmTempDir(dir));
+    return dir;
+  }
+  function ctxOf(h, agent = "claude-code") {
+    const projectDir = path.join(h, ".context-mode", "projects", KEY6);
+    return {
+      project: { projectKey: KEY6, projectDir, dbPath: path.join(projectDir, "context.db"), worktree: h, containmentRoot: h, agent, source: getAdapter(agent).projectSource },
+      sessionId: "s1", turn: 1, signal: new AbortController().signal, protocolVersion: "2025-06-18", clientInfo: { name: agent, version: "9.9.9" },
+    };
+  }
+  const hostOf = (h, extra = {}) => ({ env: { HOME: h, USERPROFILE: h, PATH: process.env.PATH ?? "", SHELL: "/bin/sh", ...extra }, bundleDir: path.join(h, "no-bundle"), piCwd: undefined });
+
+  test("[M5] doctor-issue/D4-old-temp-file-alone-is-PASS-with-the-finding-and-an-empty-Fix", (t) => {
+    const h = home(t);
+    const tmpDir = home(t);
+    writeFileSync(path.join(tmpDir, C.V1_TMP_PREFIX + "x"), "x");
+    const d4 = checkV1Leftovers("claude-code", h, { tmp: tmpDir });
+    assert.deepEqual(d4, { id: "D4", label: C.DOCTOR_LABEL.D4, status: "PASS", detail: C.V1_REASON.tmpFile });
+  });
+
+  test("[M5] doctor-issue/D3-agent-with-no-setup-names-the-setup-command", (t) => {
+    const h = home(t);
+    const d3 = checkHostConfig(getAdapter("codex"), { HOME: h, USERPROFILE: h }, h);
+    assert.equal(d3.status, "FAIL");
+    assert.equal(d3.detail, "wrong: MCP entry, hook entries");
+    assert.equal(d3.fixCommand, "context-mode setup --agents codex");
+  });
+
+  test("[M5] doctor-issue/every-UNKNOWN-row-names-its-cause", async (t) => {
+    const h = home(t);
+    const { rows } = { rows: await runDoctorChecks(ctxOf(h), getAdapter("claude-code"), hostOf(h)) };
+    for (const r of rows.filter((x) => x.status === "UNKNOWN")) assert.ok(r.detail.length > 20 && r.detail.includes(" "), `${r.id}: ${r.detail}`);
+    assert.ok(rows.find((r) => r.id === "D1").detail.startsWith("dev build: "));
+  });
+
+  test("[M5] doctor-issue/FAIL-writes-the-report-file-and-prints-gh-and-the-form-URL", async (t) => {
+    const h = home(t);
+    const ctx = ctxOf(h);
+    // Seed what a maintainer asks for first: a hook error, journal rows, an agent config with a secret.
+    mkdirSync(path.join(h, ".context-mode"), { recursive: true });
+    writeFileSync(path.join(h, ".context-mode", "hook-errors.log"), JSON.stringify({ ts: "2026-11-03T01:02:03.000Z", agent: "claude-code", stage: "project", label: "SEEDLABEL", message: "m", stack: `at ${h}/x.js` }) + "\n");
+    const db = await openDb(ctx.project);
+    db.raw.prepare("INSERT INTO events(session_id, worktree, agent, kind, tool, ok, exit_code, bytes, body, turn, created_at, accessed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run("s1", h, "claude-code", "cmd", "Bash", 0, 2, 1234, "SECRETBODY", 1, Date.now(), Date.now());
+    closeDb(db);
+    mkdirSync(path.join(h, ".claude"), { recursive: true });
+    writeFileSync(path.join(h, ".claude", "settings.json"), JSON.stringify({ enabledPlugins: { "context-mode@context-mode": true }, env: { GITHUB_TOKEN: "ghp_seedsecret" } }, null, 2));
+    const { doctorReply } = await import("../src/core/tools/doctor.ts");
+    const reply = await doctorReply(ctx, hostOf(h, { CODEX_HOME: path.join(h, "codex-home") }));
+    const lines = reply.text.split("\n");
+    // 1. Environment line above the table.
+    assert.ok(lines[0].startsWith("Environment: context-mode "), lines[0]);
+    for (const part of [`${process.platform}-${process.arch}`, process.version, "claude-code 9.9.9", "/bin/sh"]) assert.ok(lines[0].includes(part), part);
+    assert.equal(lines[1], C.REPORT_HEADER);
+    // 3 + 5. D3 names setup; every FAIL or UNKNOWN row carries the docs link with UTM.
+    assert.ok(reply.text.includes("Fix: context-mode setup --agents claude-code"));
+    for (const l of lines.filter((x) => x.includes("| FAIL |") || x.includes("| UNKNOWN |"))) assert.ok(l.includes("https://contextmode.ai/docs/engine/doctor?utm_source=ctx_doctor"), l);
+    // 6. Report path (home as ~), gh line and the prefilled form URL.
+    const rep = lines.find((l) => l.startsWith("Report file: ~/.context-mode/reports/doctor-"));
+    assert.ok(rep, reply.text);
+    const file = path.join(h, rep.slice("Report file: ~/".length));
+    assert.ok(existsSync(file), file);
+    const gh = lines.find((l) => l.startsWith("File it: gh issue create --repo mksglu/context-mode "));
+    assert.ok(gh && gh.includes("--body-file ~/.context-mode/reports/doctor-"), gh);
+    const url = lines.find((l) => l.startsWith("Or open: https://github.com/mksglu/context-mode/issues/new?template=agent-report.yml&"));
+    assert.ok(url && url.length < 8000, url);
+    // 10. The report holds every form field, in the form's order, and the debug data, with home as ~ and secrets masked.
+    const body = readFileSync(file, "utf8");
+    let at = -1;
+    for (const head of C.ISSUE_FORM_HEADINGS) {
+      const i = body.indexOf("### " + head + "\n", at + 1);
+      assert.ok(i > at, "heading missing or out of order: " + head);
+      at = i;
+    }
+    for (const need of ["SEEDLABEL", "2026-11-03T01:02:03.000Z", "| kind | tool | bytes | ok | exit_code | created_at |", "| cmd | Bash | 1234 | 0 | 2 |",
+      "~/.claude/settings.json", "context-mode@context-mode", "CODEX_HOME=~/codex-home", "CLAUDE_CONFIG_DIR", "PATH holds node:", "git version",
+      "Install route:", "claude plugin marketplace add mksglu/context-mode#release", "Prompt or command:", "Expected:", "Actual:", "mktemp -d", "Reproduced:", C.REPORT_HEADER]) {
+      assert.ok(body.includes(need), "report must hold: " + need);
+    }
+    for (const leak of ["SECRETBODY", "ghp_seedsecret", h]) assert.ok(!body.includes(leak), "report leaks: " + leak);
+    // The report is a valid issue body for the intake check.
+    const intake = await import("../.github/scripts/issue-intake.mjs");
+    assert.deepEqual(intake.check(body).findings, []);
+  });
+
+  test("[M5] doctor-issue/agent-report.yml has one required field per report heading; config.yml points to Discord and the docs", () => {
+    const form = readFileSync(path.join(import.meta.dirname, "..", ".github", "ISSUE_TEMPLATE", "agent-report.yml"), "utf8");
+    const blocks = form.split("\n  - type: ");
+    for (const head of C.ISSUE_FORM_HEADINGS) {
+      const block = blocks.find((b) => b.includes(`label: ${head}\n`));
+      assert.ok(block, "form field missing: " + head);
+      assert.ok(block.includes("required: true"), "form field optional: " + head);
+    }
+    const cfg = readFileSync(path.join(import.meta.dirname, "..", ".github", "ISSUE_TEMPLATE", "config.yml"), "utf8");
+    assert.ok(cfg.includes("https://discord.gg/DCN9jUgN5v") && cfg.includes("https://contextmode.ai/docs/engine/doctor?utm_source=github"));
+    const brief = readFileSync(path.join(import.meta.dirname, "..", ".github", "AGENT_ISSUE.md"), "utf8");
+    assert.ok(brief.includes("agent-report.yml") && brief.includes("~/.context-mode/reports/doctor-"));
   });
 });

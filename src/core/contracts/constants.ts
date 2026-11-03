@@ -454,7 +454,7 @@ export function DOCTOR_FAIL_LINE(host: string, check: string, cause: string, com
   return `FAIL ${host}: ${check} — ${cause}. Fix: ${command}`; // ADR-0010 per-host FAIL string, impl/07 §4 step 2
 }
 export const DOCTOR_FIX_UPGRADE = "run ctx_upgrade"; // D1, D3, D4, D8 stale schema
-export const D1_DEV_BUILD_DETAIL = "dev build"; // UNKNOWN: BUNDLE_SHA unset (D-M5-arch-5)
+export const D1_DEV_BUILD_DETAIL = "dev build: the release build stamps the commit sha, and this bundle came from a source checkout"; // UNKNOWN: BUNDLE_SHA unset (D-M5-arch-5, D-DOCTOR-ISSUE-1 names the cause)
 export const D1_UPDATE_DETAIL = "update available"; // FAIL (D-M5-arch-5)
 // D-DOCTOR-D1-CAUSE-1: every D1 detail starts with the installed version and the short bundle sha, then names the exact cause.
 export const D1_SHORT_SHA_LEN = 7;
@@ -822,3 +822,57 @@ export const REPORT_ENV_PREFIX = "env."; // one `env.<KEY>: <value>` line per en
 export const REPORT_ENV_ENUMS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   NODE_ENV: Object.freeze(["development", "production", "test"]),
 });
+
+// D-DOCTOR-ISSUE-1 (owner 2026-11-03): the environment line above the ctx_doctor table, the docs link on each FAIL or
+// UNKNOWN row, and the agent issue path (report file, gh line, prefilled form URL) when a row FAILs.
+export const DOCTOR_ENV_PREFIX = "Environment: "; // one keyless line above the table
+export const DOCTOR_DOCS_URL = "https://contextmode.ai/docs/engine/doctor"; // HTTP 200 on 2026-11-03; live anchors: checks, repair, help
+export const DOCTOR_DOCS_ANCHOR = "checks";
+export function DOCTOR_DOCS_LINK(check: string): string {
+  return `${DOCTOR_DOCS_URL}?utm_source=ctx_doctor&utm_medium=doctor&utm_content=${check}#${DOCTOR_DOCS_ANCHOR}`;
+}
+export const DOCTOR_DOCS_LABEL = "Docs: ";
+export function D3_NO_SETUP_FIX(agent: string): string { return `context-mode setup --agents ${agent}`; } // MCP entry and hooks both absent
+export function D5_FIXTURE_FILE_ABSENT(file: string): string { return `the hook fixture file ${file} is absent, so the round trip has no payload to send`; }
+export function D5_FIXTURE_PARSE(file: string, cause: string): string { return `the hook fixture file ${file} failed to parse: ${cause}`; }
+export function D5_FIXTURE_AGENT_ABSENT(file: string, keys: readonly string[]): string { return `the hook fixture file ${file} records payloads for ${keys.join(", ") || "zero agents"} only`; }
+export const DOCTOR_REPORTS_DIR = "reports"; // ~/.context-mode/reports/doctor-<utc>.md
+export const DOCTOR_REPORT_FILE_PREFIX = "doctor-";
+export const DOCTOR_REPORT_LINE = "Report file: ";
+export const DOCTOR_GH_LINE = "File it: ";
+export const DOCTOR_URL_LINE = "Or open: ";
+export const DOCTOR_NOTE_PREFIXES: readonly string[] = Object.freeze([DOCTOR_ENV_PREFIX, DOCTOR_REPORT_LINE, DOCTOR_GH_LINE, DOCTOR_URL_LINE]);
+export const ISSUE_REPO_SLUG = "mksglu/context-mode";
+export const ISSUE_FORM_FILE = "agent-report.yml"; // .github/ISSUE_TEMPLATE/agent-report.yml
+export const ISSUE_URL_MAX = 8000; // the prefilled form URL holds the title and the summary fields only
+// The report file is the issue body: one "### <label>" section per form field, in the form's order.
+export const ISSUE_FORM_HEADINGS: readonly string[] = Object.freeze([
+  "Summary", "ctx-report", "What happened", "Hook errors", "Journal rows", "Agent config", "Expected", "Steps", "Environment",
+]);
+export const DOCTOR_HOOK_LOG_LINES = 50;
+export const DOCTOR_JOURNAL_ROWS = 30;
+export const DOCTOR_CONFIG_LINES = 40; // config lines that name context-mode or hook.mjs, per file
+export const DOCTOR_ENV_NAMES: readonly string[] = Object.freeze([
+  "CODEX_HOME", "CLAUDE_CONFIG_DIR", "CLAUDE_PLUGIN_ROOT", "COPILOT_HOME", "KIRO_HOME", "OPENCODE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_CONFIG_HOME", "SHELL",
+]);
+export const DOCTOR_PATH_TOOLS: readonly string[] = Object.freeze(["node", "git", "sh"]);
+export const DOCTOR_SECRET_WORDS: readonly string[] = Object.freeze(["token", "secret", "password", "apikey", "api_key", "authorization", "bearer"]);
+export const DOCTOR_MASK = "<masked>";
+// D-DOCTOR-ISSUE-1: each agent's own native install command (docs/install/<agent>.md, first code block), so the
+// report names the route the user took and the repro script reinstalls the same way (owner rule: native install first).
+export const NATIVE_INSTALL: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  "claude-code": ["claude plugin marketplace add mksglu/context-mode#release", "claude plugin install context-mode@context-mode"],
+  codex: ["codex plugin marketplace add mksglu/context-mode@release", "codex plugin add context-mode@context-mode"],
+  gemini: ["gemini extensions install https://github.com/mksglu/context-mode --ref release"],
+  qwen: ["qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release"],
+  opencode: ["opencode plugin add context-mode@next"],
+  pi: ["pi install npm:context-mode@next"],
+  "copilot-cli": ["npm i -g context-mode@next", "context-mode setup --agents copilot-cli"],
+  vscode: ["npm i -g context-mode@next", "context-mode setup --agents vscode"],
+  kiro: ["npm i -g context-mode@next", "context-mode setup --agents kiro"],
+  zcode: ["npm i -g context-mode@next", "context-mode setup --agents zcode"],
+});
+export const ISSUE_FORM_URL = `https://github.com/${ISSUE_REPO_SLUG}/issues/new?template=${ISSUE_FORM_FILE}`; // + &title=&summary=
+export const DOCTOR_GIT_VERSION_TIMEOUT_MS = 5000; // git --version for the report file only
+export const DOCTOR_LOG_TAIL_BYTES = 262144; // hook-errors.log tail read for the last DOCTOR_HOOK_LOG_LINES lines
+

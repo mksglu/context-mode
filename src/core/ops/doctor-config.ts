@@ -6,7 +6,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
@@ -193,18 +193,24 @@ function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktre
 }
 
 /** Parts of the hook block that differ from the row: entries/matcher, or timeout (D-M5-D2-2). */
+/** The host file that holds our hook entries (impl/10 §1.5); throws when the plugin root is unknown. */
+function hookFile(row: AdapterRow, spec: NonNullable<(typeof HOOK_HOST_FILE)[AgentId]>, home: string, env: NodeJS.ProcessEnv, worktree: string): string {
+  const root = spec.root === "plugin" ? resolvePluginRoot(row, env, worktree) : spec.root === "home" ? home : worktree;
+  const native = row.id === "codex" ? codexNativeDir(env, home) : null;
+  const file = native !== null ? join(native, CODEX_PLUGIN_HOOKS_FILE) // D-C166-NATIVE-CWD-1: the plugin's own hook file
+      : row.id === "codex" ? join(codexDirOf(env, home), HOOKS_JSON_FILE) // D-N6-CODEX-HOME-2
+      : row.id === "copilot-cli" ? join(copilotDirOf(env, home), ...spec.file.slice(1)) // D-WIN-COPILOT-HOME-1: file = [".copilot", ...]
+      : row.id === "kiro" ? join(kiroDirOf(env, home), ...spec.file.slice(1)) // D-WIN-KIRO-HOME-1: file = [".kiro", ...]
+      : join(root, ...spec.file);
+  return file;
+}
+
 function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): D3Part[] {
   const spec = HOOK_HOST_FILE[row.id];
   if (spec === null) return []; // in-process agent: hooks are code, not a file (impl/10 §1.5)
   let block: unknown;
   try {
-    const root = spec.root === "plugin" ? resolvePluginRoot(row, env, worktree) : spec.root === "home" ? home : worktree;
-    const native = row.id === "codex" ? codexNativeDir(env, home) : null;
-    const file = native !== null ? join(native, CODEX_PLUGIN_HOOKS_FILE) // D-C166-NATIVE-CWD-1: the plugin's own hook file
-      : row.id === "codex" ? join(codexDirOf(env, home), HOOKS_JSON_FILE) // D-N6-CODEX-HOME-2
-      : row.id === "copilot-cli" ? join(copilotDirOf(env, home), ...spec.file.slice(1)) // D-WIN-COPILOT-HOME-1: file = [".copilot", ...]
-      : row.id === "kiro" ? join(kiroDirOf(env, home), ...spec.file.slice(1)) // D-WIN-KIRO-HOME-1: file = [".kiro", ...]
-      : join(root, ...spec.file);
+    const file = hookFile(row, spec, home, env, worktree);
     block = hostConfigValueAt(readParsed(row.id, file).value, spec.key);
     if (row.id === "codex") {
       const config = readParsed(row.id, join(codexDirOf(env, home), CONFIG_TOML_FILE)).value;
@@ -245,14 +251,19 @@ export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktre
   const read = row.id === "pi" ? mcpFile(row, home, env) : null;
   if (parts.length === 0) return read === null ? pass("D3") : { ...pass("D3"), detail: read };
   const detail = D3_DETAIL(parts);
-  return fail("D3", read === null ? detail : detail + D4_REASON_JOIN + read, DOCTOR_FIX_UPGRADE);
+  // D-DOCTOR-ISSUE-1: MCP entry and hook entries both wrong or absent is an agent with no setup; setup writes both.
+  const fix = parts.includes(PART_MCP) && parts.includes(PART_HOOKS) ? D3_NO_SETUP_FIX(row.id) : DOCTOR_FIX_UPGRADE;
+  return fail("D3", read === null ? detail : detail + D4_REASON_JOIN + read, fix);
 }
 
 /** D4 — old entries: every finding's reason in one row, joined "; ". */
 export function checkV1Leftovers(agent: AgentId, home: string, scope: V1Scope = {}): DoctorRow {
   const findings = detectV1(agent, home, scope);
   if (findings.length === 0) return pass("D4");
-  return fail("D4", findings.map((f) => f.reason).join(D4_REASON_JOIN), DOCTOR_FIX_UPGRADE);
+  const detail = findings.map((f) => f.reason).join(D4_REASON_JOIN);
+  // D-DOCTOR-ISSUE-1: a report-only finding (old temp file) asks for no step, so the row is PASS with the finding as detail.
+  if (findings.every((f) => f.reason === V1_REASON.tmpFile)) return { ...pass("D4"), detail };
+  return fail("D4", detail, DOCTOR_FIX_UPGRADE);
 }
 
 // A file we cannot read or parse turns nothing on (same rule as detect-v1, D-M5-O2-5). VS Code settings are JSONC.
@@ -274,4 +285,31 @@ export function checkDoubleFire(agent: AgentId, worktree: string): DoctorRow {
   const vscode = parsedOrNull(agent, join(worktree, VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE), true);
   const useClaudeHooks = isObject(vscode) && vscode[VSCODE_CLAUDE_HOOKS_SETTING] === true;
   return hooksOn && useClaudeHooks ? fail("D5b", D5B_DETAIL, D5B_FIX) : pass("D5b");
+}
+
+/** D-DOCTOR-ISSUE-1: the host files that hold this agent's context-mode entries, for the issue report file. */
+export function configPaths(row: AdapterRow, env: NodeJS.ProcessEnv, worktree: string): { label: string; path: string }[] {
+  const home = homeDirOf(env);
+  if (home === null) return [];
+  const out: { label: string; path: string }[] = [];
+  const mcp = mcpFile(row, home, env);
+  if (mcp !== null) out.push({ label: "MCP entry", path: mcp });
+  const native = row.id === "codex" ? codexNativeDir(env, home) : null;
+  if (native !== null) out.push({ label: "Codex plugin MCP", path: join(native, CODEX_PLUGIN_MCP_FILE) });
+  const spec = HOOK_HOST_FILE[row.id];
+  if (spec !== null) {
+    try {
+      out.push({ label: "hook entries", path: hookFile(row, spec, home, env, worktree) });
+    } catch (err) {
+      out.push({ label: "hook entries", path: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  if (spec !== null && spec.root === "plugin" || row.installMode === "marketplace" || row.installMode === "plugin") {
+    try {
+      out.push({ label: "plugin root", path: resolvePluginRoot(row, env, worktree) });
+    } catch (err) {
+      out.push({ label: "plugin root", path: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return out.filter((e, i) => out.findIndex((o) => o.path === e.path) === i);
 }

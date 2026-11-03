@@ -17,6 +17,7 @@ export const ENV_KEYS = ["env.NODE_ENV"];
 export const ALLOWED_KEYS = new Set([...CHECK_KEYS, ...ENV_KEYS]);
 const TRUNCATED_PREFIX = "(report truncated at ";
 const COMMAND_PREFIX = "Run in a terminal: ";
+const NOTE_PREFIXES = ["Environment: ", "Report file: ", "File it: ", "Or open: "]; // = DOCTOR_NOTE_PREFIXES
 const ROW_PREFIX = "| ";
 const ENV_PREFIX = "env.";
 const FENCE = "```";
@@ -47,6 +48,8 @@ function splitHeadings(body) {
 // A line that is none of these returns undefined: it was not written by ctx_doctor.
 export function lineKey(line) {
   if (line === REPORT_HEADER || line === REPORT_HEADER_RULE || line.startsWith(TRUNCATED_PREFIX) || line.startsWith(COMMAND_PREFIX)) return null;
+  // D-DOCTOR-ISSUE-1: the environment line above the table and the report-file lines under it carry no key.
+  if (NOTE_PREFIXES.some((p) => line.startsWith(p))) return null;
   if (line.startsWith(ROW_PREFIX)) {
     const cell = line.slice(ROW_PREFIX.length);
     const end = cell.indexOf(" ");

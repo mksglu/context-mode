@@ -11,6 +11,7 @@ import * as clack from "@clack/prompts";
 import { ADAPTERS } from "../adapters/table.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
 import { homeDirOf } from "../core/project/config-dir.ts";
+import { formUrl } from "../core/ops/doctor-issue.ts";
 import { buildRegistry, detectAgents, printPlan, printText, runDoctor, runRemove, runSetup, STATE_DIR } from "../setup/index.ts";
 import type { AgentResult, SetupContext, SetupResult } from "../setup/index.ts";
 import { HELP, parseFlags, UsageError, type Command, type Flags } from "./args.ts";
@@ -154,9 +155,10 @@ function ghReady(env: SetupContext["env"]): boolean {
   return r.status === 0;
 }
 
-function issueUrl(title: string, body: string): string {
-  const b = body.length > URL_BODY_MAX ? body.slice(0, URL_BODY_MAX) + "\n(cut; attach the report file)" : body;
-  return `https://github.com/${ISSUE_REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(b)}`;
+// D-DOCTOR-ISSUE-1: the same agent-report.yml form as ctx_doctor; the URL holds the title and summary only, the
+// report file stays whole (gh issue create --body-file).
+function issueUrl(title: string, summary: string): string {
+  return formUrl(title, summary.length > URL_BODY_MAX ? summary.slice(0, URL_BODY_MAX) : summary);
 }
 
 /** D6: write the redacted report; on a TTY show it and ask once; never send without a keypress. */
@@ -169,7 +171,7 @@ async function report(ui: Ui, command: string, res: SetupResult, write: boolean)
     file = path.join(dir, `${command}-${new Date().toISOString().replace(/[:.]/g, "-")}.md`);
     writeFileSync(file, text);
   }
-  const gh = `gh issue create --repo ${ISSUE_REPO} --title ${JSON.stringify(title)} --body-file ${JSON.stringify(file || "<report>")}`;
+  const gh = `gh issue create --repo ${ISSUE_REPO} --title ${JSON.stringify(title)} --label bug --body-file ${JSON.stringify(file || "<report>")}`;
   const p = ui.clack;
   if (!p) {
     if (ui.f.debug) err(text);
@@ -181,11 +183,11 @@ async function report(ui: Ui, command: string, res: SetupResult, write: boolean)
   const yes = await p.confirm({ message: `Open an issue on github.com/${ISSUE_REPO} with this report?`, initialValue: false });
   if (p.isCancel(yes) || !yes) { p.log.info(`Not sent.${file ? ` Report: ${file}` : ""}`); return; }
   if (file && ghReady(ui.ctx.env)) {
-    const r = spawnSync("gh", ["issue", "create", "--repo", ISSUE_REPO, "--title", title, "--body-file", file], { env: ui.ctx.env, encoding: "utf8", timeout: 60_000, windowsHide: true });
+    const r = spawnSync("gh", ["issue", "create", "--repo", ISSUE_REPO, "--title", title, "--label", "bug", "--body-file", file], { env: ui.ctx.env, encoding: "utf8", timeout: 60_000, windowsHide: true });
     if (r.status === 0) { p.log.success(`Issue opened: ${`${r.stdout}`.trim()}`); return; }
     p.log.warn(`gh issue create failed: ${`${r.stderr}`.trim()}`);
   }
-  p.log.info(`Open this URL to file the issue:\n${issueUrl(title, text)}`);
+  p.log.info(`Open this URL to file the issue (paste the report file into the form):\n${issueUrl(title, title)}`);
 }
 
 // ---------- apply with live checklist and Ctrl-C rollback ----------

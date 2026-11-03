@@ -4,6 +4,8 @@ Your user asked you to report a context-mode problem. Work as if the issue came 
 
 One person maintains context-mode for 10 agents on 3 operating systems. A fix starts from the doctor report and a repro that runs in a fresh directory.
 
+Fast path: when a `ctx_doctor` row FAILs, ctx_doctor writes the whole issue body to `~/.context-mode/reports/doctor-<utc>.md` and prints a ready `gh issue create --repo mksglu/context-mode ... --body-file <that file>` line and a link to the form `.github/ISSUE_TEMPLATE/agent-report.yml`. The file already holds every section of the form: the doctor table, versions, install route, config entries, hook errors, journal rows and env paths. Run each Fix first. When a FAIL stays, fill the `<...>` lines in Steps and Expected, show the file to the user, and send it after the user agrees. Sections 1 to 5 below say what each part means.
+
 Security problems go to https://github.com/mksglu/context-mode/security/advisories/new as a private advisory.
 
 ## 0. Before you start
