@@ -509,6 +509,20 @@ exit 0`);
     assert.ok(text.includes("answer=y"), text);
   });
 
+  // D-SETUP-SLOW-1: a first run of an agent CLI can unpack its own package before `mcp add` answers (copilot on a fresh
+  // Windows runner took over 10 s, so spawnSync gave status null and setup rolled back). Install steps get a longer limit.
+  test("setup: an agent CLI whose install step takes 11 s still installs (D-SETUP-SLOW-1)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const state = path.join(s.root, "qwen.state");
+    fakeBin(s.root, "qwen", `case "$1 $2" in
+  "extensions list") if [ -f "${state}" ]; then echo "context-mode (2.0.0)"; fi ;;
+  "extensions link") read a; sleep 11; touch "${state}" ;;
+esac
+exit 0`);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["qwen"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+  });
+
   // D-INST-2: Gemini 0.65.0 prints `extensions list` to stderr. The list check read stdout only, so a linked extension
   // looked missing and setup rolled Gemini back.
   test("setup: the list check reads the agent's stderr too (D-INST-2)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {

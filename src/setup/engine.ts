@@ -38,6 +38,7 @@ const HOOK_SAMPLES = 9;
 const HOOK_ROUNDS = 5; // noise only adds time: a real overhead over budget fails every round
 const P95 = 0.95;
 const VERIFY_TIMEOUT_MS = 10_000;
+const INSTALL_TIMEOUT_MS = 120_000; // D-SETUP-SLOW-1: a first run of an agent CLI can unpack its own package before `mcp add` answers
 const MANIFEST = "manifest.json";
 const MANIFEST_DONE = "manifest.removed.json";
 const FILES = "files";
@@ -122,8 +123,8 @@ export function installExitOk(status: number | null, listed: boolean, platform: 
 }
 
 /** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe (spawnForm). */
-function runBin(bin: string, args: string[], env: SetupContext["env"], input?: string): ReturnType<typeof spawnSync> {
-  return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS }) as ReturnType<typeof spawnSync>;
+function runBin(bin: string, args: string[], env: SetupContext["env"], input?: string, timeout = VERIFY_TIMEOUT_MS): ReturnType<typeof spawnSync> {
+  return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout }) as ReturnType<typeof spawnSync>;
 }
 
 /** CC-WIN-3: host file text as plain LF without a BOM (PowerShell 5 writes both); apply gives the layout back. */
@@ -982,12 +983,12 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       atomicWrite(e.file, e.plain || raw === undefined ? e.after : withLayout(e.after, hostLayout(raw)));
     }
     for (const args of plan.cli) {
-      const r = runBin(row.cli!.bin, args, ctx.env, row.cli!.input ?? "");
+      const r = runBin(row.cli!.bin, args, ctx.env, row.cli!.input ?? "", INSTALL_TIMEOUT_MS);
       if (!installExitOk(r.status, r.status === WIN_EXIT_CRASH && listCheck(row, ctx.env)?.ok === true)) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
     }
     if (plan.cli.length) for (const args of row.cli!.remove) run.record({ agent: row.id, undo: { bin: row.cli!.bin, args } });
     for (const args of plan.refresh) { // a refresh is not an install: recorded, never undone
-      const r = runBin(row.cli!.bin, args, ctx.env);
+      const r = runBin(row.cli!.bin, args, ctx.env, undefined, INSTALL_TIMEOUT_MS);
       if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
       run.record({ agent: row.id, ran: { bin: row.cli!.bin, args } });
     }
