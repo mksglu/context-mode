@@ -438,11 +438,13 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
     const site = "](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install)";
     assert.equal(readme.split(site).length - 1, 1, "README links the contextmode.ai install guide once, with UTM");
     const index = read("docs/install/README.md");
+    // D-README-DWELL-1: every block starts closed; inside, # update, # check and # remove lines in a fence.
+    for (const line of readme.split("\n")) assert.ok(!(line.startsWith("<details") && / open[ >]/.test(line)), `README details block starts open: ${line.slice(0, 80)}`);
     for (const host of HOSTS) {
-      const block = `<details open id="install-${host}">`;
-      assert.equal(readme.split(block).length - 1, 1, `README has one install block for ${host}`);
+      const block = `<details id="install-${host}">`;
+      assert.equal(readme.split(block).length - 1, 1, `README has one closed install block for ${host}`);
       const body = readme.slice(readme.indexOf(block), readme.indexOf("</details>", readme.indexOf(block)));
-      assert.ok(body.includes(`context-mode doctor --agents ${host}`), `${host}: install block names its check`);
+      for (const need of ["\n# update\n", "\n# check\n", "\n# remove\n"]) assert.ok(body.includes(need), `${host}: install block lacks ${need.trim()}`);
       assert.equal(index.split(`(./${host}.md)`).length - 1, 1, `docs/install/README.md links ${host}.md once`);
     }
   });

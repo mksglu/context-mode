@@ -1,14 +1,21 @@
 #!/usr/bin/env node
-// build/readme-agents.mjs — D-README-1, D-README-AGENT-LINES-1: renders one line per README install block from the adapter
-// table (src/adapters/table.ts) and the setup registry (src/setup/registry.ts).
-// Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
-// Columns (DEVIATIONS D-README-2): Hooks = the row's hookChannel kind in table.ts (every agent has one, ADR-0020);
-// MCP = "yes", or "ctx tools built into the plugin" (D-README-FIX-1) when the registry row has no MCP config and the agent runs in process (Pi);
-// Skills = the row's skillChannel; Install = every command of the first fence in the page's Install section, joined by
-// <br>, when it is the agent's own command (D-README-INSTALL-CELL-1), else "npm + context-mode setup".
-// The line ("Hooks: ... · MCP: ... · Skills: ...") sits inside each <details id="install-<id>"> block; the
-// owner dropped the Supported agents table (2026-11-02). Usage: node build/readme-agents.mjs [--write]. Without --write it
-// prints the lines; --write puts them into README.md. build/check-readme.mjs calls checkAgentLines() and fails on any problem.
+// build/readme-agents.mjs — D-README-1, D-README-AGENT-LINES-1, D-README-DWELL-1: renders each README install block
+// (<details id="install-<id>">, closed) from docs/install/<id>.md, the adapter table (src/adapters/table.ts) and the
+// setup registry (src/setup/registry.ts). Every command is copied from the page, never typed here (owner main rule:
+// "tum agentlerin kendi native install commandleri ne ise onlari kullanalim").
+// Block = summary (agent name from the "# Install context-mode v2 on <name>" heading), then
+//   1. a sh fence: the first fence under "## Install" (the agent's own install). Codex adds its one-time hook trust step
+//      (the page's "context-mode setup --agents codex" fence) as the last line, after a # comment.
+//   2. a sh fence with "# update", "# check" and "# remove" comment lines:
+//      update = the page's Update fence;
+//      check  = the page's Verify fence. For an agent that installs with its own plugin command, the context-mode CLI
+//               is absent from PATH right after that install (live temp-HOME runs, 2026-11-03), so the block keeps the
+//               agent's own Verify lines (claude plugin list, codex mcp list, ...) and drops the context-mode doctor line;
+//      remove = the agent's own uninstall lines from the page (the "Already installed" switch fence, before the
+//               reinstall), else the first fence under "## Remove".
+//   3. one line "Hooks ✓ (<channel>) · MCP ✓ · Skills ✓" from table.ts and the registry.
+// Usage: node build/readme-agents.mjs [--write]. Without --write it prints the blocks; --write puts them into README.md.
+// build/check-readme.mjs calls checkAgentLines() and fails on any problem.
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,30 +27,62 @@ const README = path.join(REPO_ROOT, "README.md");
 const TITLE_PREFIX = "# Install context-mode v2 on ";
 export const HOOK_WORDS = Object.freeze({ package: "package", "home-file": "hook file", "in-process": "the plugin's own event handlers" });
 const FALLBACK_INSTALL = "npm + `context-mode setup`";
-const SECTIONS = { install: { heading: "## Install", anchor: "install" } };
-export const LINE_PREFIX = "Hooks: ";
+export const LINE_PREFIX = "Hooks ✓";
+const TRUST_COMMENT = "# one-time step: trust the plugin hooks";
+
+/** Fences of one "## <heading>" section: [{ before, lines }], before = the last prose line above the fence. */
+function sectionFences(lines, heading) {
+  const at = lines.indexOf(heading);
+  if (at < 0) return [];
+  const out = [];
+  let fence = null;
+  let before = "";
+  for (let i = at + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (!fence && l.startsWith("## ")) break;
+    if (l.startsWith("```")) {
+      if (fence) { out.push({ before, lines: fence }); fence = null; } else fence = [];
+      continue;
+    }
+    if (fence) { if (l.trim() !== "") fence.push(l.trimEnd()); } else if (l.trim() !== "") before = l;
+  }
+  return out;
+}
 
 function pageOf(id) {
   const rel = `docs/install/${id}.md`;
   const lines = readFileSync(path.join(REPO_ROOT, rel), "utf8").split("\n");
   const title = lines[0] ?? "";
   if (!title.startsWith(TITLE_PREFIX)) throw new Error(`${rel}: first line must start with "${TITLE_PREFIX}"`);
-  for (const { heading } of Object.values(SECTIONS)) {
+  for (const heading of ["## Install", "## Verify", "## Remove"]) {
     if (!lines.includes(heading)) throw new Error(`${rel}: no "${heading}" heading`);
   }
   return { rel, name: title.slice(TITLE_PREFIX.length).trim(), lines };
 }
 
-/** The Install cell: every line of the first fence under "## Install" when it is the agent's own command, joined by <br>
- * (D-README-INSTALL-CELL-1: a reader who copies the cell runs the whole install), else the npm route. */
-function installCell(lines, bin) {
-  const at = lines.indexOf(SECTIONS.install.heading);
-  const open = lines.findIndex((l, i) => i > at && l.startsWith("```"));
-  const close = lines.findIndex((l, i) => i > open && l.startsWith("```"));
-  const cmds = lines.slice(open + 1, close).filter((l) => l.trim() !== "");
-  const last = cmds[cmds.length - 1] ?? "";
-  if (cmds[0]?.startsWith("npm ") || !last.startsWith(`${bin} `)) return FALLBACK_INSTALL;
-  return cmds.map((c) => `\`${c.trim()}\``).join("<br>");
+/** The commands of one agent, each list copied from its install page. */
+export function agentCommands(id, lines, bin) {
+  const install = sectionFences(lines, "## Install");
+  const verify = sectionFences(lines, "## Verify")[0]?.lines ?? [];
+  const removeFence = sectionFences(lines, "## Remove")[0]?.lines ?? [];
+  const first = install[0]?.lines ?? [];
+  const update = install.find((f) => f.before.startsWith("Update"))?.lines ?? [];
+  const own = !first[0]?.startsWith("npm ") && (first[first.length - 1] ?? "").startsWith(`${bin} `);
+  const cmds = { install: [...first], update, check: verify, remove: removeFence, own };
+  if (!own) return cmds;
+  const trust = install.find((f) => f.lines.length === 1 && f.lines[0] === `context-mode setup --agents ${id}`);
+  if (id === "codex" && trust) cmds.install.push(TRUST_COMMENT, trust.lines[0]);
+  const agentChecks = verify.filter((l) => !l.startsWith("context-mode "));
+  if (agentChecks.length) cmds.check = agentChecks;
+  // The switch fence: the agent's own uninstall lines, then the install lines again.
+  const sw = install.find((f) => f.lines.length > first.length && first.every((c) => f.lines.includes(c)));
+  if (sw) {
+    const off = sw.lines.filter((l) => !first.includes(l));
+    if (off.length) cmds.remove = off;
+  } else if (removeFence[0] && !removeFence[0].startsWith("context-mode ")) {
+    cmds.remove = [removeFence[0]];
+  }
+  return cmds;
 }
 
 /** One row per adapter, sorted by agent name. */
@@ -59,15 +98,18 @@ export function agentRows() {
     const hooks = `yes, ${HOOK_WORDS[a.hookChannel.kind]}`;
     const mcp = a.installMode === "in-process" && !reg.config ? "ctx tools built into the plugin" : "yes";
     const bin = reg.nativePlugin?.bin ?? reg.cli?.bin ?? (a.installMode === "in-process" ? a.id : "");
-    return { id: a.id, name, hooks, mcp, skills: a.skillChannel ? "yes" : "no", install: installCell(lines, bin), page: rel };
+    const cmds = agentCommands(a.id, lines, bin);
+    const install = cmds.own ? cmds.install.filter((c) => !c.startsWith("#") && !c.startsWith("context-mode ")).map((c) => `\`${c}\``).join("<br>") : FALLBACK_INSTALL;
+    return { id: a.id, name, hooks, mcp, skills: a.skillChannel ? "yes" : "no", install, cmds, page: rel };
   }).sort((x, y) => x.name.localeCompare(y.name));
 }
 
-/** The generated line for one agent: hooks, MCP and skills (D-README-AGENT-LINES-1). The guide link moved to the one
- * Install guide link on contextmode.ai (D-README-LINKS-2). */
+/** The generated Hooks / MCP / Skills line for one agent. */
 export function agentLine(r) {
-  const hooks = r.hooks.startsWith("yes, ") ? `yes (${r.hooks.slice(5)})` : r.hooks;
-  return `${LINE_PREFIX}${hooks} · MCP: ${r.mcp} · Skills: ${r.skills}`;
+  const hooks = r.hooks.startsWith("yes, ") ? `${LINE_PREFIX} (${r.hooks.slice(5)})` : `Hooks: ${r.hooks}`;
+  const mcp = r.mcp === "yes" ? "MCP ✓" : r.mcp.startsWith("no") ? `MCP: ${r.mcp}` : `MCP ✓ (${r.mcp})`;
+  const skills = r.skills === "yes" ? "Skills ✓" : "Skills: no";
+  return `${hooks} · ${mcp} · ${skills}`;
 }
 
 /** id -> generated line, one per adapter. */
@@ -75,36 +117,62 @@ export function renderAgentLines() {
   return Object.fromEntries(agentRows().map((r) => [r.id, agentLine(r)]));
 }
 
-/** The install block of one agent: from its <details id="install-<id>"> tag to the closing tag. */
-function blockOf(text, id) {
-  const start = text.indexOf(`id="install-${id}">`);
-  if (start < 0) return null;
-  const end = text.indexOf("</details>", start);
-  return end < 0 ? null : { start, end, body: text.slice(start, end) };
+const fence = (lines) => ["```sh", ...lines, "```"];
+
+/** The whole closed install block of one agent. */
+export function agentBlock(r) {
+  const c = r.cmds;
+  return [
+    `<details id="install-${r.id}"><summary><b>${r.name}</b></summary>`,
+    "",
+    ...fence(c.install),
+    "",
+    ...fence(["# update", ...c.update, "# check", ...c.check, "# remove", ...c.remove]),
+    "",
+    agentLine(r),
+    "",
+    "</details>",
+  ].join("\n");
 }
 
-/** Problems with the README copy of the lines; [] when each install block holds its rendered line once. */
+/** id -> whole block, one per adapter. */
+export function renderAgentBlocks() {
+  return Object.fromEntries(agentRows().map((r) => [r.id, agentBlock(r)]));
+}
+
+/** The install block of one agent: from its <details ... id="install-<id>"> tag through </details>. */
+function blockOf(text, id) {
+  const tag = text.indexOf(`id="install-${id}">`);
+  if (tag < 0) return null;
+  const start = text.lastIndexOf("<details", tag);
+  const close = text.indexOf("</details>", tag);
+  if (start < 0 || close < 0) return null;
+  const end = close + "</details>".length;
+  return { start, end, body: text.slice(start, end) };
+}
+
+/** Problems with the README copy of the blocks; [] when each install block equals its rendered block. */
 export function checkAgentLines(text) {
   const problems = [];
-  for (const [id, line] of Object.entries(renderAgentLines())) {
+  for (const [id, block] of Object.entries(renderAgentBlocks())) {
     const b = blockOf(text, id);
     if (!b) { problems.push(`${id}: README has no install block id="install-${id}"`); continue; }
-    const own = b.body.split("\n").filter((l) => l.startsWith(LINE_PREFIX));
-    if (own.length !== 1 || own[0] !== line) problems.push(`${id}: install block line differs from build/readme-agents.mjs; run node build/readme-agents.mjs --write`);
+    if (b.body !== block) problems.push(`${id}: install block differs from build/readme-agents.mjs; run node build/readme-agents.mjs --write`);
   }
-  if (text.includes("| Agent | Hooks |")) problems.push("README still has the agent table; the lines in the install blocks replace it");
+  if (text.includes("| Agent | Hooks |")) problems.push("README still has the agent table; the install blocks replace it");
+  for (const line of text.split("\n")) {
+    if (line.startsWith("<details") && line.includes(" open")) problems.push(`a details block starts open (D-README-DWELL-1): ${line.slice(0, 80)}`);
+  }
   return problems;
 }
 
-/** README text with each install block's line replaced (or added before </details>). Throws when a block is missing. */
+/** README text with each install block replaced by its rendered block. Throws when a block is missing. */
 export function writeAgentLines(text) {
   let out = text;
-  for (const [id, line] of Object.entries(renderAgentLines())) {
+  for (const [id, block] of Object.entries(renderAgentBlocks())) {
     const b = blockOf(out, id);
     if (!b) throw new Error(`README.md has no install block for ${id}`);
-    const kept = b.body.split("\n").filter((l) => !l.startsWith(LINE_PREFIX));
-    const body = kept.join("\n") + (kept[kept.length - 1] === "" ? "" : "\n");
-    out = out.slice(0, b.start) + body.replace(/\n$/, "\n" + line + "\n") + out.slice(b.end);
+    out = out.slice(0, b.start) + block + out.slice(b.end);
   }
   return out;
 }
@@ -116,6 +184,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (next !== text) writeFileSync(README, next);
     console.log(next === text ? "readme-agents: README.md already up to date" : "readme-agents: README.md updated");
   } else {
-    console.log(Object.values(renderAgentLines()).join("\n"));
+    console.log(Object.values(renderAgentBlocks()).join("\n\n"));
   }
 }

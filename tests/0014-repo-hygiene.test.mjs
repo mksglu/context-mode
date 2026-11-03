@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
-import { HOOK_WORDS, LINE_PREFIX, agentRows, checkAgentLines, renderAgentLines, writeAgentLines } from "../build/readme-agents.mjs";
+import { HOOK_WORDS, LINE_PREFIX, agentRows, checkAgentLines, renderAgentBlocks, renderAgentLines, writeAgentLines } from "../build/readme-agents.mjs";
 import { installWithRetry, missingPackages } from "../scripts/ci-install.mjs";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
@@ -987,14 +987,15 @@ describe("ADR-0015 repo: README agent lines", () => {
     assert.ok(README.includes("plugin inside the agent (OpenCode, Pi)"), "the README sentence names the plugin inside the agent");
   });
 
-  test("readme-agents: each install block ends with one generated line: hooks, MCP, skills and the guide link; the agent table is gone (D-README-AGENT-LINES-1)", () => {
+  test("readme-agents: each install block ends with one generated line: Hooks ✓ · MCP ✓ · Skills ✓ with the host detail in plain words; the agent table is gone (D-README-AGENT-LINES-1, D-README-DWELL-1)", () => {
     // Owner 2026-11-02: "Supported agents bu table e gerek var mi burdaki bilgiler install adiminda da verebilirsin kisaca linkleri vs".
     const lines = renderAgentLines();
     assert.deepEqual(Object.keys(lines).sort(), ADAPTERS.map((a) => a.id).sort());
     for (const r of agentRows()) {
       const l = lines[r.id];
-      assert.ok(l.startsWith(LINE_PREFIX + "yes"), `${r.id}: ${l}`);
-      for (const need of [" · MCP: ", " · Skills: yes"]) assert.ok(l.includes(need), `${r.id} line lacks ${need}`);
+      assert.ok(l.startsWith(LINE_PREFIX + " ("), `${r.id}: ${l}`);
+      for (const need of [" · MCP ✓", " · Skills ✓"]) assert.ok(l.includes(need), `${r.id} line lacks ${need}`);
+      assert.ok(!l.includes("`"), `${r.id} line holds inline code: ${l}`);
       assert.ok(!l.includes("Guide:") && !l.includes("]("), `${r.id} line holds a link (D-README-LINKS-2): ${l}`);
     }
     assert.deepEqual(checkAgentLines(README), []);
@@ -1031,13 +1032,43 @@ describe("ADR-0015 repo: README agent lines", () => {
 
   test("readme-agents: a hand edit, a missing block or a table back in the README fails the check; --write is stable", () => {
     const lines = renderAgentLines();
-    const edited = README.replace(lines.codex, lines.codex.replace("Hooks: yes", "Hooks: no"));
+    const edited = README.replace(lines.codex, lines.codex.replace("Hooks ✓", "Hooks: no"));
     assert.notEqual(edited, README, "fixture edit did not apply");
     assert.ok(checkAgentLines(edited).some((p) => p.startsWith("codex:")), checkAgentLines(edited).join("\n"));
     const missing = README.replace('id="install-codex">', 'id="install-x">');
     assert.ok(checkAgentLines(missing).some((p) => p.startsWith("codex:")), checkAgentLines(missing).join("\n"));
     assert.ok(checkAgentLines(README + "\n| Agent | Hooks | MCP |\n").some((p) => p.includes("table")));
     assert.equal(writeAgentLines(README), README, "--write on a clean README changes nothing");
+  });
+
+  test("readme-agents: every install block starts closed: the agent's own install fence, then one fence of # update, # check, # remove, each line copied from its page (D-README-DWELL-1)", () => {
+    // Owner 2026-11-03: "Tamami baslangicta acik gelmesin. Ana command i verdikten sonra yuklemek icin bakar misin inline code etiketleri ile alttaki paragraflar ne kadar kullanissiz".
+    const blocks = renderAgentBlocks();
+    for (const r of agentRows()) {
+      const b = blocks[r.id];
+      assert.ok(b.startsWith(`<details id="install-${r.id}"><summary>`), `${r.id} block starts closed: ${b.split("\n")[0]}`);
+      assert.ok(README.includes(b), `${r.id}: README holds the rendered block`);
+      const f = b.split("```sh\n").slice(1).map((s) => s.slice(0, s.indexOf("\n```")).split("\n"));
+      assert.equal(f.length, 2, `${r.id}: two sh fences`);
+      const second = f[1];
+      const [u, c, rm] = ["# update", "# check", "# remove"].map((x) => second.indexOf(x));
+      assert.ok(u === 0 && c > u + 1 && rm > c + 1 && rm < second.length - 1, `${r.id}: update, check and remove, each with a command: ${second.join(" / ")}`);
+      const page = readFileSync(path.join(REPO, "docs", "install", `${r.id}.md`), "utf8");
+      for (const cmd of [...f[0], ...second]) if (!cmd.startsWith("# ")) assert.ok(page.split("\n").includes(cmd), `${r.id}: "${cmd}" is not a line of its page`);
+      if (!f[0][0].startsWith("npm ")) {
+        // Live temp-HOME runs 2026-11-03: after the agent's own install, the context-mode command is absent from PATH.
+        const checks = second.slice(c + 1, rm);
+        assert.ok(checks.every((l) => !l.startsWith("context-mode ")), `${r.id}: the check uses the agent's own command: ${checks.join(" / ")}`);
+      }
+      assert.ok(!b.includes("Update: `") && !b.includes("Check: `"), `${r.id}: the inline-code paragraph is gone`);
+    }
+    const codex = blocks.codex.split("```sh\n")[1].split("\n```")[0].split("\n");
+    assert.equal(codex[codex.length - 1], "context-mode setup --agents codex", "Codex: the trust step is the last line of the install fence");
+    assert.ok(codex[codex.length - 2].startsWith("# "), "Codex: a short comment names the trust step");
+    for (const line of README.split("\n")) assert.ok(!(line.startsWith("<details") && / open[ >]/.test(line)), `a README details block starts open: ${line.slice(0, 80)}`);
+    const opened = README.replace('<details id="install-pi">', '<details open id="install-pi">');
+    assert.notEqual(opened, README, "fixture edit did not apply");
+    assert.ok(checkAgentLines(opened).some((p) => p.includes("starts open")), checkAgentLines(opened).join("\n"));
   });
 });
 
@@ -1285,9 +1316,9 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(!out.includes('"docs'), "OUT_FILES names a docs path");
   });
 
-  test("README line cap is 400 and its DEVIATIONS row quotes the owner", async () => {
+  test("README line cap is 600 (D-README-DWELL-1, was 400) and its DEVIATIONS row quotes the owner", async () => {
     const { README_MAX_LINES } = await import("../src/core/contracts/constants.ts");
-    assert.equal(README_MAX_LINES, 400);
+    assert.equal(README_MAX_LINES, 600);
     const rows = readRepo("docs/architecture/modules/DEVIATIONS.md").split("\n").filter((l) => l.includes("(D-README-THESIS-1)")); // the row id; later rows may name it in their text
     assert.equal(rows.length, 1);
     assert.ok(rows[0].includes("akademik bir tez"));
@@ -1410,11 +1441,24 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const readme = readRepo("README.md");
     const ENGINE = "https://contextmode.ai/docs/engine/";
     const out = outboundLinks(readme);
+    // D-README-DWELL-1 (owner 2026-11-03: "Readme linkleri, oruntulu olsun, organik olsun"): guides from the live sitemap,
+    // each one at most once (install also has its switch anchor), woven into the section that names the topic.
+    const LIVE = ["install", "agents", "first-session", "how-it-works", "tools", "sandbox", "search", "long-sessions", "security", "privacy", "benchmarks", "doctor", "gateway", "for-agents"];
     const guides = out.filter((t) => t.startsWith(ENGINE)).map((t) => t.slice(ENGINE.length, t.indexOf("?")));
-    assert.deepEqual(guides, ["install", "install", "benchmarks", "how-it-works", "tools", "security"], "one guide each in Install (plus the switch anchor), Benchmarks, How it works, Tools, Security");
+    for (const g of guides) assert.ok(LIVE.includes(g), `${g}: a guide outside the live sitemap`);
+    for (const g of new Set(guides)) assert.ok(guides.filter((x) => x === g).length <= (g === "install" ? 2 : 1), `${g}: linked more than once`);
+    assert.ok(guides.length >= 8, `README links ${guides.length} guides`);
     assert.ok(readme.includes(ENGINE + "install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github"), "one switch link to the site install page");
-    assert.deepEqual(repoDocLinks(readme), [], "README links a repo docs page");
+    // Repo docs links: architecture records only (ADRs, the hook-run record); install guides live on contextmode.ai.
+    for (const t of repoDocLinks(readme)) assert.ok(t.startsWith("docs/architecture/"), `README links a repo docs page outside docs/architecture: ${t}`);
+    assert.ok(repoDocLinks(readme).some((t) => t.startsWith("docs/architecture/adr/")), "README links an ADR");
+    for (const need of ["](bench/README.md", "](CONTRIBUTING.md)"]) assert.ok(readme.includes(need), `README lacks ${need}`);
     assert.ok(out.length <= README_MAX_LINKS, `README has ${out.length} links out; the cap is ${README_MAX_LINKS}`);
+    // No link lists: a line holds at most 2 links out, except the use-case table rows and the Gateway screen table.
+    for (const line of readme.split("\n")) {
+      if (line.startsWith("| ") || line.startsWith("<tr>") || line.startsWith("[![")) continue;
+      assert.ok(outboundLinks(line).length <= 2, `a line lists ${outboundLinks(line).length} links: ${line.slice(0, 100)}`);
+    }
     assert.ok(!readme.includes("Guide: ["), "the per-agent guide links are gone");
     const community = readme.slice(readme.indexOf("\n## Community\n"));
     assert.ok(!community.split("\n").some((l) => l.startsWith("Docs: ")), "the Community docs line is gone");
@@ -1425,6 +1469,9 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(!video[0].includes("<img") && !video[0].includes("!["), "the Videos line has no thumbnail or badge");
     datedRow("D-README-LINKS-1", "Docs linklerini dump etme");
     datedRow("D-README-LINKS-2", "bu kadar link olmasin");
+    datedRow("D-README-DWELL-1", "Readme linkleri, oruntulu olsun, organik olsun");
+    // D-README-DWELL-1: every contextmode.ai link carries the README UTM source (funnel rule).
+    for (const t of out.filter((x) => x.startsWith("https://contextmode.ai"))) assert.ok(t.includes("utm_source=github"), `${t}: lacks utm_source`);
   });
 
   test("README: Gateway screenshots gallery names six existing images and the README holds no email address (D-README-GW-SHOTS-1)", () => {
@@ -1515,17 +1562,22 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(readme.includes(version), `README names the bench version ${version}`);
     const sec = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n"));
     assert.ok(sec.includes("| What you do | Tool | Raw | Reaches the context | Saved |"), "Use cases has the table header");
-    // D-README-LINKS-2: rows carry no link; one source line under the table names the bench file, and each row matches a bench row by its numbers.
+    // D-README-DWELL-1 (owner 2026-11-03: "use case lerde linkler vardi kaldirmissin uzuldum"): each row links its bench case,
+    // bench/<category>/README.md#<row id>, and each row matches a bench row by its numbers and its id.
     const head = "| What you do | Tool | Raw | Reaches the context | Saved |";
     const table = sec.slice(sec.indexOf(head));
     const rows = table.slice(0, table.indexOf("\n\n")).split("\n").slice(2);
     assert.ok(rows.length >= 12, `the use-case table has ${rows.length} rows`);
     for (const row of rows) {
       const cells = row.split("|").map((c) => c.trim());
-      assert.ok(!row.includes("]("), `use-case row holds a link: ${row.slice(0, 80)}`);
+      assert.ok(cells[1].startsWith("[") && cells[1].includes("](bench/") && cells[1].endsWith(")"), `use-case row links its bench case: ${row.slice(0, 80)}`);
+      const target = cells[1].slice(cells[1].indexOf("](") + 2, -1);
+      const [file, anchor] = target.split("#");
+      assert.ok(readRepo(file).split("\n").includes(`## ${anchor}`), `${target}: the bench case heading exists`);
       const r = bench.results.find((x) => x.ok && x.synthetic === false && x.metrics.raw_bytes && x.metrics.ctx_bytes &&
         x.metrics.raw_bytes.median.toLocaleString("en-US") + " B" === cells[3] && x.metrics.ctx_bytes.median.toLocaleString("en-US") + " B" === cells[4]);
       assert.ok(r, `${cells[1]}: no real-capture row of ${newest} has these numbers`);
+      assert.equal(anchor, r.id, `${cells[1]}: links the bench row it quotes`);
       const raw = r.metrics.raw_bytes.median;
       assert.equal(cells[5], (100 * (1 - r.metrics.ctx_bytes.median / raw)).toFixed(1) + "%", `${r.id} saved`);
     }
@@ -1551,12 +1603,20 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
       const block = readme.slice(start, readme.indexOf("</details>", start));
       const page = readRepo(`docs/install/${id}.md`);
       const pageFences = fences(page.slice(page.indexOf("\n## Install\n")));
-      assert.deepEqual(fences(block)[0], pageFences[0], `${id}: the block starts with the page's install fence`);
-      assert.ok(block.includes("Update: `" + pageFences[1][0] + "`"), `${id}: update command from the page`);
-      for (const need of [`Check: \`context-mode doctor --agents ${id}\``, "Remove: ", `context-mode setup --remove --agents ${id}`]) {
-        assert.ok(block.includes(need), `${id}: block lacks ${need}`);
-      }
+      const pf = pageFences[0].filter((l) => l.trim() !== "");
+      assert.deepEqual(fences(block)[0].slice(0, pf.length), pf, `${id}: the block starts with the page's install fence`);
+      const second = fences(block)[1];
+      assert.ok(second[0] === "# update" && second[1] === pageFences[1][0], `${id}: update command from the page`);
+      for (const need of ["# check", "# remove"]) assert.ok(second.includes(need), `${id}: block lacks ${need}`);
       assert.ok(!block.includes("](docs/"), `${id}: block links a repo docs page (D-README-LINKS-2)`);
+    }
+    // D-README-DWELL-1 (owner 2026-11-03: "inline code etiketleri ile alttaki paragraflar ne kadar kullanissiz"):
+    // outside a fence, an Install line holds at most one inline-code span.
+    const inst = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("\n## Try it\n"));
+    let inFence = false;
+    for (const line of inst.split("\n")) {
+      if (line.startsWith("```")) { inFence = !inFence; continue; }
+      if (!inFence) assert.ok(line.split("`").length - 1 < 4, `Install line holds 2 or more inline-code spans: ${line.slice(0, 100)}`);
     }
     assert.ok(readme.includes("\n**Contents:** "), "README has a short table of contents");
     // No "v2" in prose: it becomes the default release.
@@ -1629,7 +1689,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const speed = readme.slice(readme.indexOf("\n### Speed\n"), readme.indexOf("\n## How it works\n"));
     // D-README-LINKS-2: Speed names its bench rows in code text, in one source line under the table, with no link.
     assert.ok(speed.includes(`bench/results/${newest.replace(".json", ".md")}`) && !speed.includes("docs/performance.md"), "Speed names the bench results file");
-    assert.ok(!speed.includes("]("), "Speed holds no link");
+    // D-README-DWELL-1 (owner 2026-11-03: "bench dizini ... referanslari ekleyelim"): Speed links only bench files and page anchors.
+    for (const s of speed.split("](").slice(1)) assert.ok(s.startsWith("bench/") || s.startsWith("#"), `Speed links outside bench: ${s.slice(0, 60)}`);
     for (const id of ["g-hook-kiro", "g-hook-claude-code", "g-search-latency", "g-index-per-mb"]) assert.ok(speed.includes("`" + id + "`"), `Speed names ${id}`);
     const hooks = bench.results.filter((r) => r.id.startsWith("g-hook-")).map((r) => r.metrics.overhead_ms.median);
     assert.ok(speed.includes(`${Math.min(...hooks).toFixed(1)} ms to ${Math.max(...hooks).toFixed(1)} ms`), "hook range from the bench rows");
@@ -1640,16 +1701,14 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(live, "README has the real-binary line");
     for (const n of ["Claude Code", "Codex", "Gemini CLI", "Qwen Code", "Pi", "OpenCode", "Copilot CLI", "ZCode"]) assert.ok(live.includes(n), `real-binary line names ${n}`);
     assert.ok(!live.includes("logged out") && !live.includes(" our "), "the real-binary line reads plain");
-    // Install (D-README-FIX-1): all 10 blocks open; the tag, CLI and GitHub-source lines sit before the blocks.
-    const firstBlock = readme.indexOf("<details open id=\"install-claude-code\">");
-    assert.ok(firstBlock > 0, "the Claude Code block is open");
+    // Install (D-README-DWELL-1, replaces the open blocks of D-README-FIX-1): all 10 blocks closed; one short "pick your agent" line sits before them.
+    const firstBlock = readme.indexOf("<details id=\"install-");
+    assert.ok(firstBlock > 0, "the first install block is closed");
     const head = readme.slice(readme.indexOf("\n## Install\n"), firstBlock);
-    for (const need of ["`@next`, the current 2.0 release tag", "Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub", "`npm i -g context-mode@next`", "[package.json](package.json)"]) {
-      assert.ok(head.includes(need), `Install intro lacks ${need}`);
-    }
-    for (const a of ADAPTERS) assert.ok(readme.includes(`<details open id="install-${a.id}">`), `${a.id} block is open`);
-    const codex = readme.slice(readme.indexOf("<details open id=\"install-codex\">"), readme.indexOf("<details open id=\"install-gemini\">"));
-    assert.ok(codex.includes("`context-mode setup --agents codex`"), "the Codex block names the hook trust step");
+    for (const need of ["Pick your agent", "[package.json](package.json)"]) assert.ok(head.includes(need), `Install intro lacks ${need}`);
+    for (const a of ADAPTERS) assert.ok(readme.includes(`<details id="install-${a.id}">`), `${a.id} block is closed`);
+    const codex = readme.slice(readme.indexOf("<details id=\"install-codex\">"), readme.indexOf("</details>", readme.indexOf("<details id=\"install-codex\">")));
+    assert.ok(codex.includes("\ncontext-mode setup --agents codex\n```"), "the Codex block ends its install fence with the hook trust step");
     for (const bad of ["check D11", "After v2", "Switch day", "Agent note", "<!--", "so add `@next`"]) assert.ok(!readme.includes(bad), `README has "${bad}"`);
     datedRow("D-README-FIX-1", "tum agentlerin kendi native install commandleri");
     for (const bad of ["old build", "old release", "rolls back", "recall block", "FAIL"]) assert.ok(!readme.includes(bad), `README has "${bad}"`);
@@ -1686,7 +1745,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(steps.length >= 4 && steps.length <= 5, `${steps.length} steps`);
     for (const s of steps) assert.ok(s.length <= 160, `step is long: ${s}`);
     assert.ok(sec.includes("](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how)"), "one link to the How it works guide on contextmode.ai (D-README-LINKS-2)");
-    assert.ok(!sec.includes("](docs/"), "How it works links a repo docs page");
+    assert.ok(!sec.split("](docs/").slice(1).some((s) => !s.startsWith("architecture/adr/")), "How it works links a repo docs page other than an ADR (D-README-DWELL-1)");
     for (const bold of ["**Hooks.**", "**Sandbox execution.**", "**Index and search.**", "**Storage.**"]) assert.ok(!sec.includes(bold), `README still has ${bold}`);
     const doc = readRepo("docs/how-it-works.md");
     const eng = doc.slice(doc.indexOf("\n## Engineering details\n"));
@@ -1985,7 +2044,7 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.ok(lines[2].includes("The plugin is free forever"), "the tagline names the plugin as the free part");
     const why = readme.slice(readme.indexOf("\n## Why\n"), readme.indexOf("\n## Adoption"));
     assert.ok(why.includes("The Context Mode plugin runs that work"), "Why names the plugin");
-    const install = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("<details open id=\"install-claude-code\">"));
+    const install = readme.slice(readme.indexOf("\n## Install\n"), readme.indexOf("<details id=\"install-"));
     assert.ok(!install.includes("Every command installs"), "Install intro opens with the commands, the tag line follows");
     const gw = readme.slice(readme.indexOf("\n## Context Mode Gateway\n"), readme.indexOf("\n## License\n"));
     assert.ok(gw.split("\n").some((l) => l.includes("npx @context-mode/cli") && l.includes("own subscription")), "the Gateway setup line names its subscription");

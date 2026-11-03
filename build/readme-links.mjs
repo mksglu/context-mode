@@ -66,7 +66,9 @@ export function readmeImageBytes(root) {
 
 // D-README-LINKS-2 (owner 2026-11-02: "bu kadar link olmasin"): the README carries at most README_MAX_LINKS links a reader
 // clicks to leave the page, and each docs link goes to the published guides on contextmode.ai, so none points to docs/*.md.
-export const README_MAX_LINKS = 30;
+// D-README-DWELL-1 (owner 2026-11-03: "use case lerde linkler vardi ... o linklere tiklayip daha da derine gidebilirdi"):
+// 30 -> 80. The 20 use-case rows link their bench case again, and each section ends with one next step.
+export const README_MAX_LINKS = 80;
 
 /** Links a reader clicks, in order: markdown [text](target) and <a href="target">. Image links (a badge, a figure, a
  * screenshot that opens its full size) and the images themselves stay out: the reader clicks those to see the image. */

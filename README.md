@@ -48,101 +48,205 @@ Starred by engineers at these companies: each name is the company field of 2 or 
 
 ## Install
 
-The plugin needs Node 24.15.0 or later (the `engines` field in [package.json](package.json)). On Windows you also need Git for Windows: the shell tools run in Git Bash, and `context-mode doctor` checks that Git Bash is there.
+Pick your agent below, open its block and copy its own install command. Each block also holds the update, check and remove steps, and the [Install guide](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install) walks through them.
 
-Open your agent and copy its own install command. Each block also has the update, check and remove steps. Step-by-step guide: [Install](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install).
-The npm commands use `@next`, the current 2.0 release tag; a plain `npm i -g context-mode` installs 1.x. Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the `release` branch.
-The `context-mode` command (doctor, setup, remove) comes with the npm package: run `npm i -g context-mode@next` once, or use `/ctx-doctor` in the agent for the check.
+The plugin needs Node 24.15.0 or later, from the engines field in [package.json](package.json). On Windows, add Git for Windows: the shell tools run in Git Bash, and doctor checks for it.
+The npm commands use `@next`, the current 2.0 release tag. A plain npm install of context-mode gives the 1.x line.
+Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the release branch.
 
-<details open id="install-claude-code"><summary><b>Claude Code</b></summary>
+<details id="install-claude-code"><summary><b>Claude Code</b></summary>
 
 ```sh
 claude plugin marketplace add mksglu/context-mode#release
 claude plugin install context-mode@context-mode
 ```
-Update: `claude plugin update context-mode@context-mode`. Check: `context-mode doctor --agents claude-code`. Remove: `context-mode setup --remove --agents claude-code`.
-Hooks: yes (package) · MCP: yes · Skills: yes
+
+```sh
+# update
+claude plugin update context-mode@context-mode
+# check
+claude plugin list
+# remove
+claude plugin marketplace remove context-mode
+```
+
+Hooks ✓ (package) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-codex"><summary><b>Codex</b></summary>
+<details id="install-codex"><summary><b>Codex</b></summary>
 
 ```sh
 codex plugin marketplace add mksglu/context-mode@release
 codex plugin add context-mode@context-mode
+# one-time step: trust the plugin hooks
+context-mode setup --agents codex
 ```
-Then run `context-mode setup --agents codex` once: it marks the plugin hooks as trusted in the Codex `config.toml`, so Codex runs them.
-Update: `codex plugin marketplace upgrade context-mode`. Check: `context-mode doctor --agents codex`. Remove: `context-mode setup --remove --agents codex`.
-Hooks: yes (hook file) · MCP: yes · Skills: yes
+
+```sh
+# update
+codex plugin marketplace upgrade context-mode
+# check
+codex mcp list
+# remove
+codex plugin remove context-mode@context-mode
+codex plugin marketplace remove context-mode
+```
+
+Hooks ✓ (hook file) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-gemini"><summary><b>Gemini CLI</b></summary>
+<details id="install-gemini"><summary><b>Gemini CLI</b></summary>
 
 ```sh
 gemini extensions install https://github.com/mksglu/context-mode --ref release
 ```
-Update: `gemini extensions update context-mode`. Check: `context-mode doctor --agents gemini`. Remove: `context-mode setup --remove --agents gemini`, then `gemini extensions uninstall context-mode`.
-Hooks: yes (package) · MCP: yes · Skills: yes
+
+```sh
+# update
+gemini extensions update context-mode
+# check
+GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list
+# remove
+gemini extensions uninstall context-mode
+```
+
+Hooks ✓ (package) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-qwen"><summary><b>Qwen Code</b></summary>
+<details id="install-qwen"><summary><b>Qwen Code</b></summary>
 
 ```sh
 qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
 ```
-Update: `qwen extensions update context-mode`. Check: `context-mode doctor --agents qwen`. Remove: `context-mode setup --remove --agents qwen`, then `qwen extensions uninstall context-mode`.
-Hooks: yes (package) · MCP: yes · Skills: yes
+
+```sh
+# update
+qwen extensions update context-mode
+# check
+qwen extensions list
+# remove
+qwen extensions uninstall context-mode
+```
+
+Hooks ✓ (package) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-pi"><summary><b>Pi</b></summary>
+<details id="install-pi"><summary><b>Pi</b></summary>
 
 ```sh
 pi install npm:context-mode@next
 ```
-Update: `pi update --extensions`. Check: `context-mode doctor --agents pi`. Remove: `context-mode setup --remove --agents pi`.
-Hooks: yes (the plugin's own event handlers) · MCP: ctx tools built into the plugin · Skills: yes
+
+```sh
+# update
+pi update --extensions
+# check
+pi list
+# remove
+context-mode setup --remove --agents pi
+```
+
+Hooks ✓ (the plugin's own event handlers) · MCP ✓ (ctx tools built into the plugin) · Skills ✓
+
 </details>
-<details open id="install-opencode"><summary><b>OpenCode</b></summary>
+<details id="install-opencode"><summary><b>OpenCode</b></summary>
 
 ```sh
 opencode plugin add context-mode@next
 ```
-Update: `opencode plugin update`. Check: `context-mode doctor --agents opencode`. Remove: `opencode plugin remove context-mode@next`, then `context-mode setup --remove --agents opencode`.
-Hooks: yes (the plugin's own event handlers) · MCP: yes · Skills: yes
+
+```sh
+# update
+opencode plugin update
+# check
+opencode mcp list --pure          # OpenCode 1.19
+opencode mcp list --standalone    # OpenCode 2
+# remove
+opencode plugin remove context-mode@next
+```
+
+Hooks ✓ (the plugin's own event handlers) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-copilot-cli"><summary><b>Copilot CLI</b></summary>
+<details id="install-copilot-cli"><summary><b>Copilot CLI</b></summary>
 
 ```sh
 npm i -g context-mode@next
 context-mode setup --agents copilot-cli
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents copilot-cli`. Remove: `context-mode setup --remove --agents copilot-cli`.
-Hooks: yes (hook file) · MCP: yes · Skills: yes
+
+```sh
+# update
+context-mode upgrade
+# check
+context-mode doctor --agents copilot-cli
+copilot mcp list
+# remove
+context-mode setup --remove --agents copilot-cli
+```
+
+Hooks ✓ (hook file) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-kiro"><summary><b>Kiro</b></summary>
+<details id="install-kiro"><summary><b>Kiro</b></summary>
 
 ```sh
 npm i -g context-mode@next
 context-mode setup --agents kiro
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents kiro`. Remove: `context-mode setup --remove --agents kiro`.
-Hooks: yes (hook file) · MCP: yes · Skills: yes
+
+```sh
+# update
+context-mode upgrade
+# check
+context-mode doctor --agents kiro
+# remove
+context-mode setup --remove --agents kiro
+```
+
+Hooks ✓ (hook file) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-vscode"><summary><b>VS Code (Copilot)</b></summary>
+<details id="install-vscode"><summary><b>VS Code (Copilot)</b></summary>
 
 ```sh
 npm i -g context-mode@next
 context-mode setup --agents vscode
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents vscode`. Remove: `context-mode setup --remove --agents vscode`.
-Hooks: yes (hook file) · MCP: yes · Skills: yes
+
+```sh
+# update
+context-mode upgrade
+# check
+context-mode doctor --agents vscode
+# remove
+context-mode setup --remove --agents vscode
+```
+
+Hooks ✓ (hook file) · MCP ✓ · Skills ✓
+
 </details>
-<details open id="install-zcode"><summary><b>ZCode</b></summary>
+<details id="install-zcode"><summary><b>ZCode</b></summary>
 
 ```sh
 npm i -g context-mode@next
 context-mode setup --agents zcode
 ```
-Update: `context-mode upgrade`. Check: `context-mode doctor --agents zcode`. Remove: `context-mode setup --remove --agents zcode`.
-Hooks: yes (hook file) · MCP: yes · Skills: yes
+
+```sh
+# update
+context-mode upgrade
+# check
+context-mode doctor --agents zcode
+# remove
+context-mode setup --remove --agents zcode
+```
+
+Hooks ✓ (hook file) · MCP ✓ · Skills ✓
+
 </details>
 
-Already installed from GitHub on `main`? Switch Claude Code, Codex, Gemini CLI or Qwen Code to the `release` ref with the steps in [Already installed from GitHub?](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github).
+Moving Claude Code, Codex, Gemini CLI or Qwen Code from the main branch to the release ref? Follow [Already installed from GitHub?](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github).
 
 The npm route works for every agent:
 
@@ -151,16 +255,23 @@ npm i -g context-mode@next
 context-mode setup
 ```
 
-`context-mode setup` is also the repair. It shows a plan, saves your earlier config, then applies the plan; when a step ends early, it restores the saved config.
-Uninstall: `context-mode setup --remove && npm rm -g context-mode`.
+Setup is also the repair. It shows a plan, saves your earlier config, then applies the plan; when a step ends early, it restores the saved config. To uninstall:
 
-Restart the agent, then run `context-mode doctor` (or `/ctx-doctor` in the agent). Each check prints PASS or a fix command.
+```sh
+context-mode setup --remove
+npm rm -g context-mode
+```
 
-Every agent gets hooks, the MCP server and the plugin skills (files in `skills/`); the last line of each block above says how.
-Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi).
+Restart the agent, then run `/ctx-doctor` in it. Each check prints PASS or a fix command, and the [Doctor guide](https://contextmode.ai/docs/engine/doctor?utm_source=github&utm_medium=readme&utm_content=install-doctor) explains each check.
+
+Every agent gets hooks, the MCP server and the plugin skills; the last line of each block above says how.
+Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi). The [Agents guide](https://contextmode.ai/docs/engine/agents?utm_source=github&utm_medium=readme&utm_content=install-agents) shows what each agent runs.
 We ran the real binary of each agent with the plugin hook: Claude Code, Codex, Gemini CLI, Qwen Code, Pi, OpenCode, Copilot CLI and ZCode. Each run used a clean temp home and a local test model, on 2.0.0-next.15.
 For VS Code and Kiro, the check covers the hook setup: VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
-CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: `docs/architecture/release/HOOKS-FIRE.md`.
+CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: [HOOKS-FIRE.md](docs/architecture/release/HOOKS-FIRE.md).
+Each agent uses its own install command, and [ADR-0023](docs/architecture/adr/ADR-0023-native-install.md) says why.
+
+Your first task with the plugin, step by step: [First session](https://contextmode.ai/docs/engine/first-session?utm_source=github&utm_medium=readme&utm_content=install-next). Or paste a prompt from [Try it](#try-it) right now.
 
 ## Try it
 
@@ -183,37 +294,43 @@ What are the top 10 stories on the Hacker News front page right now? Give title,
 ```
 The hook sends WebFetch to the sandbox, and the agent reads ten stories from the page. 35,087 B raw, 1,501 B reached the context, 95.7% saved (2026-11-02, 2.0.0-next.26, claude-haiku-5-5). The front page changes, so the raw size changes with each run.
 
+Next, the same numbers for 20 real tools, in [Use cases](#use-cases).
+
 ## Use cases
 
 Real tool output from public projects, run through Context Mode. Bench of 2026-11-01 on 2.0.0-next.23 (commit 16a4bcc5), median of 5 runs.
 
 | What you do | Tool | Raw | Reaches the context | Saved |
 |---|---|---:|---:|---:|
-| Read a browser page | Chrome DevTools MCP `take_snapshot` | 136,514 B | 463 B | 99.7% |
-| List 40 issues | GitHub CLI `gh issue list --json` | 182,943 B | 850 B | 99.5% |
-| List 25 pull requests with checks | GitHub CLI `gh pr list --json` | 195,471 B | 776 B | 99.6% |
-| Look up library docs | Context7 `query-docs` | 6,917 B | 473 B | 93.2% |
-| Run 1,106 tests | Vitest `vitest run --reporter=verbose` | 62,909 B | 429 B | 99.3% |
-| Lint a source folder | Biome `biome lint --reporter=json` | 288,523 B | 577 B | 99.8% |
-| Install a workspace | pnpm `pnpm install --frozen-lockfile` | 14,988 B | 199 B | 98.7% |
-| Install packages | npm `npm install --loglevel http` | 37,761 B | 435 B | 98.8% |
-| Read container logs | Docker `docker logs` | 60,374 B | 587 B | 99.0% |
-| Plan 72 resources | Terraform `terraform plan` | 34,081 B | 166 B | 99.5% |
-| Read 300 commits with file stats | git `git log --stat` | 164,385 B | 268 B | 99.8% |
-| Read an 89 KB source file | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
-| Fetch a 265 KB docs page | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
-| Fetch a 214 KB API reply | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
-| Print a 187 KB git log in Bash | Bash, output replaced after it runs | 191,120 B | 204 B | 99.9% |
-| Print the same git log through a host tool | Host tool output over the cap, indexed whole | 191,120 B | 2,842 B | 98.5% |
-| Print a 214 KB GitHub API reply through a host tool | Host tool output over the cap, indexed whole | 219,175 B | 4,060 B | 98.1% |
-| Read a 45 KB log file | Read, sent to `ctx_execute` by the hook | 46,216 B | 371 B | 99.2% |
-| Read a 60 KB source file | Read, sent to `ctx_execute` by the hook | 61,576 B | 374 B | 99.4% |
-| Debug for a full session: 8 outputs, 3 searches | All hooks and tools | 281,261 B | 3,266 B | 98.8% |
+| [Read a browser page](bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot` | 136,514 B | 463 B | 99.7% |
+| [List 40 issues](bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json` | 182,943 B | 850 B | 99.5% |
+| [List 25 pull requests with checks](bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json` | 195,471 B | 776 B | 99.6% |
+| [Look up library docs](bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs` | 6,917 B | 473 B | 93.2% |
+| [Run 1,106 tests](bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose` | 62,909 B | 429 B | 99.3% |
+| [Lint a source folder](bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json` | 288,523 B | 577 B | 99.8% |
+| [Install a workspace](bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile` | 14,988 B | 199 B | 98.7% |
+| [Install packages](bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http` | 37,761 B | 435 B | 98.8% |
+| [Read container logs](bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs` | 60,374 B | 587 B | 99.0% |
+| [Plan 72 resources](bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan` | 34,081 B | 166 B | 99.5% |
+| [Read 300 commits with file stats](bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat` | 164,385 B | 268 B | 99.8% |
+| [Read an 89 KB source file](bench/f-hook-redirect/README.md#f-read-vite-config) | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
+| [Fetch a 265 KB docs page](bench/f-hook-redirect/README.md#f-webfetch-vite-docs) | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
+| [Fetch a 214 KB API reply](bench/f-hook-redirect/README.md#f-bash-curl-post) | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
+| [Print a 187 KB git log in Bash](bench/f-hook-redirect/README.md#f-bash-dump-post) | Bash, output replaced after it runs | 191,120 B | 204 B | 99.9% |
+| [Print the same git log through a host tool](bench/d-externalize/README.md#d-real-git-log) | Host tool output over the cap, indexed whole | 191,120 B | 2,842 B | 98.5% |
+| [Print a 214 KB GitHub API reply through a host tool](bench/d-externalize/README.md#d-real-github-json) | Host tool output over the cap, indexed whole | 219,175 B | 4,060 B | 98.1% |
+| [Read a 45 KB log file](bench/f-hook-redirect/README.md#f-read-large-file) | Read, sent to `ctx_execute` by the hook | 46,216 B | 371 B | 99.2% |
+| [Read a 60 KB source file](bench/f-hook-redirect/README.md#f-read-big-source) | Read, sent to `ctx_execute` by the hook | 61,576 B | 374 B | 99.4% |
+| [Debug for a full session: 8 outputs, 3 searches](bench/g-overhead/README.md#g-session-total) | All hooks and tools | 281,261 B | 3,266 B | 98.8% |
 
-Source: [bench/results/2026-11-01-darwin-arm64.json](bench/results/2026-11-01-darwin-arm64.json), one row per line; each input is named in `bench/fixtures/data/SOURCE.md`.
+Source: [bench/results/2026-11-01-darwin-arm64.json](bench/results/2026-11-01-darwin-arm64.json), one row per line; [SOURCE.md](bench/fixtures/data/SOURCE.md) names where each input comes from.
+Click a task to open its case: the command, the input file with its sha256, and the run command, so you can run the same row on your machine.
 
 The agent gets the part it asks for. The full output stays in the local index, and `ctx_search` reads it back.
+Rows with a command run in the [sandbox](https://contextmode.ai/docs/engine/sandbox?utm_source=github&utm_medium=readme&utm_content=usecases); the agent then finds the rest with [search](https://contextmode.ai/docs/engine/search?utm_source=github&utm_medium=readme&utm_content=usecases).
 The Context7 row has 6,917 B of raw output, under the 10 KB line of the headline rule, so the headline leaves it out.
+
+Next, how the bench counts these bytes, in [Benchmarks](#benchmarks).
 
 ## Benchmarks
 
@@ -234,8 +351,9 @@ All 36 such rows, the six categories below: the plugin keeps a median of 99.4% o
 | f. Hook redirect | A big Read, curl or WebFetch sent to the sandbox | 7 | 99.8% |
 | g. Session total | One full scripted session | 1 | 98.8% |
 
-Search replies (category b) carry the matching text, so they save 77.2%. Category e (long sessions) is in [Longer sessions](#longer-sessions). The full file lists every row, small ones too: `bench/results/2026-11-01-darwin-arm64.md`.
-Reproduce: `cd bench && node run.mjs`. Method, data files and rerun steps: [Benchmarks](https://contextmode.ai/docs/engine/benchmarks?utm_source=github&utm_medium=readme&utm_content=benchmarks).
+Search replies (category b) carry the matching text, so they save 77.2%. Category e (long sessions) is in [Longer sessions](#longer-sessions). The full file lists every row, small ones too: [2026-11-01-darwin-arm64.md](bench/results/2026-11-01-darwin-arm64.md).
+Reproduce with `cd bench && node run.mjs`. It needs plain Node and runs offline; [bench/README.md](bench/README.md) lists each scenario and its options.
+Method, data files and rerun steps: [Benchmarks guide](https://contextmode.ai/docs/engine/benchmarks?utm_source=github&utm_medium=readme&utm_content=benchmarks).
 
 ### Longer sessions
 
@@ -248,8 +366,9 @@ Say you debug a slow test all afternoon. The agent reads files, runs the suite a
 
 Context Mode keeps the full output of each large tool call in `context.db` on your machine and gives the agent a small reply. At compaction, a snapshot of at most 2,048 B keeps the session state. After the compaction, the agent calls `ctx_resume` to read that snapshot back and `ctx_search` to find any earlier output by keyword.
 
-In the bench, a scripted session of 40 tool outputs and one compaction made a 442,893 B transcript, and the `ctx_resume` block that brought the agent back was 2,019 B (row `e-long-session` in the bench file).
-In the same bench, one large log of 666,796 B put 3,380 B into the context, and the full log stayed in the index for `ctx_search` (row `d-synth-1m`).
+In the bench, a scripted session of 40 tool outputs and one compaction made a 442,893 B transcript, and the `ctx_resume` block that brought the agent back was 2,019 B (row `e-long-session` in the bench file; [open the case](bench/e-continuity/README.md#e-long-session)).
+In the same bench, one large log of 666,796 B put 3,380 B into the context, and the full log stayed in the index for `ctx_search` (row `d-synth-1m`; [open the case](bench/d-externalize/README.md#d-synth-1m)).
+How the snapshot picks what to keep: the [Long sessions guide](https://contextmode.ai/docs/engine/long-sessions?utm_source=github&utm_medium=readme&utm_content=longer-sessions) and [ADR-0009](docs/architecture/adr/0009-compaction-and-memory.md).
 
 ### Speed
 
@@ -261,7 +380,9 @@ Median of 5 runs, bench of 2026-11-01.
 | `ctx_search`, 20 queries over 8 indexed files | 1.62 ms median, 6.70 ms max |
 | `ctx_index`, 3 real files, 625,649 B | 150 ms per MB |
 
-Source: rows `g-hook-kiro` to `g-hook-claude-code`, `g-search-latency` and `g-index-per-mb` of `bench/results/2026-11-01-darwin-arm64.md`, with every agent and query.
+Source: rows `g-hook-kiro` to `g-hook-claude-code`, `g-search-latency` and `g-index-per-mb` of [the bench file](bench/results/2026-11-01-darwin-arm64.md), with every agent and query. The [overhead cases](bench/g-overhead/README.md) show how each one runs.
+
+Next, what happens inside one tool call, in [How it works](#how-it-works).
 
 ## How it works
 
@@ -277,6 +398,7 @@ Source: rows `g-hook-kiro` to `g-hook-claude-code`, `g-search-latency` and `g-in
 5. After a compaction, the agent gets a short state block; each line points to the full record.
 
 Timeouts, chunk sizes, ranking and storage: [How it works](https://contextmode.ai/docs/engine/how-it-works?utm_source=github&utm_medium=readme&utm_content=how).
+The rules the hook follows, and the reasons for each: [ADR-0008](docs/architecture/adr/0008-enforcement-rewrite-and-cap.md). Next, the [Tools](#tools) the agent calls.
 
 ## Tools
 
@@ -300,20 +422,21 @@ Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` 
 
 - The plugin keeps all its data on your machine, in `~/.context-mode`: one `context.db` per project. `ctx_purge` deletes it by session, source or project. Read the [Security guide](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=security).
 - The plugin has zero telemetry: usage data, events and crash reports stay on your machine. It uses the network at these call sites, each one started by you or your agent:
-  - `ctx_index` of a URL the agent asks for: `src/core/sandbox/fetch.ts`. It blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect.
+  - `ctx_index` of a URL the agent asks for: [`src/core/sandbox/fetch.ts`](src/core/sandbox/fetch.ts). It blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect.
   - `context-mode doctor`: one read of the npm dist-tags of `context-mode`, with `git ls-remote` of the release tags as the fallback when npm is down, to check for a new version (`src/core/ops/doctor-env.ts`).
   - `ctx_upgrade`: `git clone --depth 1` of the release branch (`src/core/ops/release-fetch.ts`). `context-mode upgrade`: `npm i -g context-mode@next` (`src/cli/commands.ts`).
   - The debug report: `gh issue create`, after you press a key (`src/cli/commands.ts`).
   - Install and update: your agent's own install command, npm or git.
-- The guard test D-PRIVACY-NET-1 in `tests/0008-enforcement.test.mjs` scans `src` for HTTP clients, sockets, DNS lookups, git network calls and `gh` or `npm` spawns. It fails when a new call site appears outside this list, so this section stays true.
+- The guard test D-PRIVACY-NET-1 in [`tests/0008-enforcement.test.mjs`](tests/0008-enforcement.test.mjs) scans `src` for HTTP clients, sockets, DNS lookups, git network calls and `gh` or `npm` spawns. It fails when a new call site appears outside this list, so this section stays true.
 - Doctor and the debug report remove secrets by their structure before they print.
 
 Here "sandbox" means the output stays in the sandbox, out of the context. Code from `ctx_execute` runs on your host as your user, with your environment (minus the preload variables), your files and your network; keep your agent's own permission prompts on.
+What the plugin stores, where, and how to delete it: [Privacy](https://contextmode.ai/docs/engine/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
 
 ## Context Mode Gateway
 
 The plugin works on tool output, on your machine, and it is complete on its own. Context Mode Gateway is a separate hosted service with its own account and subscription. It works on every request, across all your agents. Its 11 features, the full list: Context Saving, Recall, Memory, Skills, Search, Session resume, Active Context, Instructions, Protect, Prompt caching, Live and Analytics.
-Teams add it for long sessions, shared memory and cost reports. The two work together.
+Teams add it for long sessions, shared memory and cost reports. The two work together: [Gateway guide](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=readme&utm_content=gateway).
 Gateway Recall, Search and Session resume run on the Gateway server, across sessions and agents. The plugin's `ctx_search` and `ctx_resume` read the local `context.db` of one project.
 With the Gateway on, your requests pass through its server; the plugin keeps its own data on your machine.
 
@@ -395,6 +518,6 @@ We chose ELv2 so the source stays open to all and the hosted service stays with 
 
 ## Community
 
-Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report, and send ideas there too. The maintainer writes every change.
+Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report, and send ideas there too. The maintainer writes every change; [CONTRIBUTING.md](CONTRIBUTING.md) shows how an agent files an issue.
 
 **Videos.** [Better Stack on Context Mode](https://www.youtube.com/watch?v=QUHrntlfPo4). Make your own video and share it on [Discord](https://discord.gg/DCN9jUgN5v); we add videos over 10K views here.
