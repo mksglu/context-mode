@@ -1615,7 +1615,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
           writeFileSync(join(root, "nested", "notes.md"), "# N\n\nwinzedtoken in nested notes\n");
           const a = await ctxIndex.handler({ path: join(root, "nested", "notes.md") }, ctx);
           const b = await ctxIndex.handler({ path: "nested\\notes.md" }, ctx);
-          for (const ix of [a, b]) assert.ok(ix.text.includes("from nested/notes.md."), ix.text);
+          for (const ix of [a, b]) assert.ok(ix.text.includes("Label: nested/notes.md"), ix.text); // D-LABEL-HANDLE-1: the reply gives the handle, then the label
           for (const source of ["nested/notes.md", "nested\\notes.md"]) {
             const out = await ctxSearch.handler({ queries: ["winzedtoken"], source }, ctx);
             assert.ok(out.text.includes("nested/notes.md #0"), source + ": " + out.text);
