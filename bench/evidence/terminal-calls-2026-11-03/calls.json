@@ -5,7 +5,7 @@
     "name": "context-mode",
     "version": "dev"
   },
-  "how": "node release-out/server.mjs over stdio MCP (initialize, then one tools/call per tool in order), HOME and the project folder in a new temp folder that holds a copy of docs/how-it-works.md; script: bench/evidence/terminal-calls-2026-11-03/calls-live.mjs",
+  "how": "node release-out/server.mjs over stdio MCP (initialize, then one tools/call per tool in order), HOME and the project folder in a new temp folder that holds a copy of docs/how-it-works.md and a short AGENTS.md (memory file); script: bench/evidence/terminal-calls-2026-11-03/calls-live.mjs",
   "calls": [
     {
       "tool": "ctx_index",
@@ -26,10 +26,10 @@
           "compaction state block"
         ]
       },
-      "returned_bytes": 1757,
-      "shown_lines": 4,
+      "returned_bytes": 1268,
+      "shown_lines": 5,
       "isError": false,
-      "result": "Query \"compaction state block\":\nhow-it-works.md #14: ### Session continuity\n\nThe hooks log each prompt, edit, command, tool error, index, cost and decision. After a compaction the agent gets a state block of at most 2,048 B built from that log. Every line stays whole: a long line becomes a `ctx_resume(seq)` pointer that reads the full row. On the next prompt, a prompt match block of at most 2,048 B brings back the log rows that match it by BM25, always as whole rows. The same rows always give the same bytes.\nhow-it-works.md #6: ## Surviving a context compaction\n\nWhen the agent's host compacts the conversation, most of what hooks added earlier is summarized away. To\ngive the agent its place back, context-mode rebuilds a small block (`STATE_BUDGET`, 2,048 bytes) from the\nsession's journal: the highest-scoring rows (errors first, then prompts, edits, index writes, with older\nrows worth less) are picked until the budget is used up. No row's text is ever cut partway — a row that\nwill not fit whole becomes a one-line pointer into `ctx_search` instead (`docs/algorithms.md` §3).\nhow-it-works.md #8: ## Adapters: one mechanism per host\n\nEvery coding agent host (Claude Code, Codex, Gemini, Qwen, Copilot CLI, VS Code, Kiro, ZCode, Pi,\nOpenCode) wires hooks and the MCP server in a different way. The adapter table names, per host: how\ncontext-mode installs (`installMode`), how it finds the project root (`projectSource`), what its MCP tool\nnames are prefixed with (`toolNamePrefix`), how a compaction-recovery block is delivered\n(`compactDelivery`), and how deny messages reach the host (`denyChannel`) (`docs/architecture/modules/10-adapters.md`\n§lines 51-61):\nMore: ctx_search({queries:[\"compaction state block\"], scope:\"worktree\", offset:3})"
+      "result": "Query \"compaction state block\":\nhow-it-works.md #14: ### Session continuity\n\nThe hooks log each prompt, edit, command, tool error, index, cost and decision. After a compaction the agent gets a state block of at most 2,048 B built from that log. Every line stays whole: a long line becomes a `ctx_resume(seq)` pointer that reads the full row. On the next prompt, a prompt match block of at most 2,048 B brings back the log rows that match it by BM25, always as whole rows. The same rows always give the same bytes.\nmemory AGENTS.md #0: # Agent rules\n\nBefore a compaction, save the state block with ctx_resume.\nhow-it-works.md #6: ## Surviving a context compaction\n\nWhen the agent's host compacts the conversation, most of what hooks added earlier is summarized away. To\ngive the agent its place back, context-mode rebuilds a small block (`STATE_BUDGET`, 2,048 bytes) from the\nsession's journal: the highest-scoring rows (errors first, then prompts, edits, index writes, with older\nrows worth less) are picked until the budget is used up. No row's text is ever cut partway — a row that\nwill not fit whole becomes a one-line pointer into `ctx_search` instead (`docs/algorithms.md` §3).\nMore: ctx_search({queries:[\"compaction state block\"], scope:\"worktree\", offset:2})"
     },
     {
       "tool": "ctx_resume",

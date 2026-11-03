@@ -9,7 +9,7 @@ import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolConte
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { collisionLine, ftsListSource, ftsQuery, ftsQueryTimeline, groupDigits, isLongLabel, labelPage, pickSource, rankTexts, shownLabel, sourceCardRow, sourceHandle, type SourcePick } from "../store/fts.ts";
-import { readAutoMemory } from "../index/auto-memory.ts";
+import { memoryChunks, memoryHits, readAutoMemory, type MemoryChunk } from "../index/auto-memory.ts";
 import { fitRow, jsonRows, namedKeys } from "../index/shape.ts";
 
 // DECISIONS-r9 V23, M23: six keys, strict (unknown key -> the SDK's isError); offset/after are
@@ -195,6 +195,28 @@ function replyHits(hits: Hit[], size: number): number {
   return n;
 }
 
+// D-UNIFIED-MEMORY-1: memory hits (sourceId < 0) join the content hits of the first page. A hit that holds every
+// query word comes before one that does not; inside one class content and memory alternate, content first. Both lists
+// keep their own order and nothing is cut: the paging cursor counts content hits only (contentIn).
+const MEMORY_HITS = 2;
+function mergeMemory(content: Hit[], memory: Hit[]): Hit[] {
+  const out: Hit[] = [];
+  let c = 0;
+  let m = 0;
+  let lastMem = true;
+  while (c < content.length || m < memory.length) {
+    const rank = (h: Hit | undefined): number => (h === undefined ? -1 : h.full === true ? 1 : 0);
+    const rc = rank(content[c]);
+    const rm = rank(memory[m]);
+    const mem = rc < 0 || rm > rc || (rm === rc && !lastMem);
+    if (mem) { out.push(memory[m++]); lastMem = true; } else { out.push(content[c++]); lastMem = false; }
+  }
+  return out;
+}
+
+// Content hits among the first n hits: the paging cursor counts content hits only.
+const contentIn = (hits: Hit[], n: number): number => hits.slice(0, n).filter((h) => h.sourceId > 0).length;
+
 // impl/05 §6 steps 5-10. Hits are kept whole: when the next hit line would not fit OUTPUT_CAP, that
 // query (and every later one) gets a `More:` line starting at the first hit not shown (D-M2-6).
 // D-SEARCH-SMALL-1: a hit already shown for an earlier query of the call is named in one `Same as above:` line,
@@ -204,7 +226,11 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const offset = input.offset ?? 0;
   const size = pageSize(input);
   // One hit past the page: a `More:` line is printed only when a hit is left behind it (D-SEARCH-SMALL-1).
-  const fetched: Hit[][] = input.queries.map((q) => page(db, q, input, scope, ctx, offset, 1));
+  const mem: MemoryChunk[] = offset === 0 && scope !== "session" && input.source === undefined ? memoryChunks(readAutoMemory(ctx.project)) : [];
+  const fetched: Hit[][] = input.queries.map((q) => {
+    const content = page(db, q, input, scope, ctx, offset, 1);
+    return mem.length === 0 ? content : mergeMemory(content, memoryHits(mem, q, MEMORY_HITS));
+  });
   const take: number[] = fetched.map((h) => replyHits(h, size));
   const pages: Hit[][] = fetched.map((h, i) => h.slice(0, take[i]));
   // Step 9: every query had zero hits.
@@ -248,13 +274,13 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       // D-LABEL-HANDLE-2: a long label is its handle and a short preview, so the snippet keeps the room.
       const line = shownLabel(hit.label, hit.sourceId) + " #" + hit.ord + ": " + hit.snippet;
       if (used + bytes(line) + 1 + reserve > OUTPUT_CAP) {
-        cut = offset + i;
+        cut = offset + contentIn(hits, i);
         stopped = true;
         break;
       }
       const room = total.get(hit.sourceId);
       if (room !== undefined && mine.has(hit.sourceId) && (spent.get(hit.sourceId) ?? 0) + bytes(line) + 1 > room * SMALL_SOURCE_SHARE * (qi + 1) / input.queries.length) {
-        cut = offset + i;
+        cut = offset + contentIn(hits, i);
         break;
       }
       lines.push(line);
@@ -269,7 +295,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       used += bytes(line) + 1;
     }
     if (cut >= 0) more.push({ q, pos: cut });
-    else if (fetched[qi].length > take[qi]) more.push({ q, pos: offset + take[qi] });
+    else if (contentIn(fetched[qi], fetched[qi].length) > contentIn(fetched[qi], take[qi])) more.push({ q, pos: offset + contentIn(fetched[qi], take[qi]) });
   });
   // D-SEARCH-LEAN-1: queries that stop at one cursor share one `More:` line (the call pages them all from there).
   const moreLines: string[] = [];

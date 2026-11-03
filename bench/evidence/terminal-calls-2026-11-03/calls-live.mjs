@@ -11,6 +11,7 @@ const work = path.join(home, "work");
 mkdirSync(work);
 const file = "docs/how-it-works.md";
 copyFileSync(path.join(repo, file), path.join(work, "how-it-works.md"));
+writeFileSync(path.join(work, "AGENTS.md"), "# Agent rules\n\nBefore a compaction, save the state block with ctx_resume.\n");
 const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("CLAUDE"))), HOME: home, CLAUDE_PROJECT_DIR: work };
 // Install first, the way a user does, so ctx_doctor checks a real install.
 await new Promise((res) => spawn(process.execPath, [path.join(repo, "release-out/cli.mjs"), "setup", "--agents", "claude-code", "--yes"], { cwd: work, env, stdio: "ignore" }).on("exit", res));
@@ -33,7 +34,7 @@ const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabiliti
 child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
 const plan = [
   { tool: "ctx_index", input: { path: "how-it-works.md" }, file, shown_lines: 1 },
-  { tool: "ctx_search", input: { queries: ["compaction state block"] }, shown_lines: 4 },
+  { tool: "ctx_search", input: { queries: ["compaction state block"] }, shown_lines: 5 },
   { tool: "ctx_resume", input: {}, shown_lines: 5 },
   { tool: "ctx_stats", input: {}, shown_lines: 1 },
   { tool: "ctx_doctor", input: {}, shown_lines: 6 },
@@ -50,7 +51,7 @@ writeFileSync(out, JSON.stringify({
   date: new Date().toISOString().slice(0, 10),
   version: JSON.parse(readFileSync(path.join(repo, "package.json"), "utf8")).version,
   server: init.result.serverInfo,
-  how: "node release-out/server.mjs over stdio MCP (initialize, then one tools/call per tool in order), HOME and the project folder in a new temp folder that holds a copy of docs/how-it-works.md; script: bench/evidence/terminal-calls-2026-11-03/calls-live.mjs",
+  how: "node release-out/server.mjs over stdio MCP (initialize, then one tools/call per tool in order), HOME and the project folder in a new temp folder that holds a copy of docs/how-it-works.md and a short AGENTS.md (memory file); script: bench/evidence/terminal-calls-2026-11-03/calls-live.mjs",
   calls,
 }, null, 2) + "\n");
 for (const c of calls) console.log("==", c.tool, c.returned_bytes, c.isError, "\n" + c.result.slice(0, 700));

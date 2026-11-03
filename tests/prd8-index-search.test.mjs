@@ -125,6 +125,85 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
           rmSync(root, { recursive: true, force: true });
         }
       });
+
+      // D-UNIFIED-MEMORY-1 (owner: "ctx_search'e memory ozelligimizi de ekle"): one reader for every agent's project
+      // memory files inside the worktree; a relevance query ranks their chunks together with indexed content.
+      const memCtx = (root, agent) => ({
+        project: { projectKey: "3".repeat(16), projectDir: join(root, ".p"), dbPath: join(root, ".p", "context.db"), worktree: root, containmentRoot: root, agent, source: "arg:--agent+cwd" },
+        sessionId: "s1", turn: 1, signal: new AbortController().signal,
+      });
+
+      test("[UM] a query that matches only a memory file returns it for claude-code, codex and gemini", async () => {
+        const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-um-")));
+        try {
+          writeFileSync(join(root, "CLAUDE.md"), "# Rules\n\nkestrelword: run the linter before a commit\n");
+          writeFileSync(join(root, "AGENTS.md"), "# Agents\n\nzebrafjord: the tests live in tests/\n");
+          writeFileSync(join(root, "GEMINI.md"), "# Gemini\n\nquillmoth: use pnpm here\n");
+          for (const agent of ["claude-code", "codex", "gemini"]) {
+            for (const [word, file] of [["kestrelword", "CLAUDE.md"], ["zebrafjord", "AGENTS.md"], ["quillmoth", "GEMINI.md"]]) {
+              const out = await ctxSearch.handler({ queries: [word] }, memCtx(root, agent));
+              assert.equal(out.isError, false, out.text);
+              const at = out.text.split("\n").findIndex((l) => l.startsWith("memory " + file + " #"));
+              assert.ok(at >= 0, agent + " " + word + "\n" + out.text);
+              // The snippet is a block: the matched word sits in the hit's lines after its label line.
+              assert.ok(out.text.split("\n").slice(at).join("\n").includes(word), out.text);
+            }
+          }
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("[UM] a memory file whose realpath leaves the worktree never shows", async () => {
+        const base = realpathSync(mkdtempSync(join(tmpdir(), "cm-um-out-")));
+        const root = join(base, "wt");
+        const outside = join(base, "outside");
+        mkdirSync(root);
+        mkdirSync(join(outside, "steering"), { recursive: true });
+        writeFileSync(join(outside, "AGENTS.md"), "outsideword secret\n");
+        writeFileSync(join(outside, "steering", "rules.md"), "outsideword steering\n");
+        symlinkSync(join(outside, "AGENTS.md"), join(root, "AGENTS.md"));
+        mkdirSync(join(root, ".kiro"));
+        symlinkSync(join(outside, "steering"), join(root, ".kiro", "steering"));
+        mkdirSync(join(root, ".github"));
+        symlinkSync(join(outside, "AGENTS.md"), join(root, ".github", "copilot-instructions.md"));
+        try {
+          for (const agent of ["claude-code", "codex", "kiro", "copilot-cli"]) {
+            const out = await ctxSearch.handler({ queries: ["outsideword"] }, memCtx(root, agent));
+            assert.equal(out.isError, false, out.text);
+            assert.ok(!out.text.includes("outsideword"), out.text);
+            assert.ok(out.text.startsWith("No hits"), out.text);
+            assert.deepEqual(readAutoMemory({ agent, worktree: root, containmentRoot: root }), []);
+          }
+        } finally {
+          rmSync(base, { recursive: true, force: true });
+        }
+      });
+
+      test("[UM] content and memory hits rank together in one relevance reply", async () => {
+        const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-um-rank-")));
+        try {
+          writeFileSync(join(root, "AGENTS.md"), "# Release\n\nharborlight lantern: tag a release from main only\n");
+          const ctx = memCtx(root, "codex");
+          assert.equal((await ctxIndex.handler({ content: "# Notes\n\nharborlight is the deploy job name\n", source: "notes" }, ctx)).isError, false);
+          const order = async (q) => {
+            const out = await ctxSearch.handler({ queries: [q] }, ctx);
+            const lines = out.text.split("\n");
+            assert.equal(lines.filter((l) => l.startsWith("Query ")).length, 1, out.text);
+            const mem = lines.findIndex((l) => l.startsWith("memory AGENTS.md #"));
+            const content = lines.findIndex((l) => l.startsWith("notes #"));
+            assert.ok(mem > 0 && content > 0, out.text);
+            return { mem, content };
+          };
+          // The chunk that holds every query word ranks first, whichever side it comes from.
+          const a = await order("harborlight lantern");
+          assert.ok(a.mem < a.content, "memory holds both words");
+          const b = await order("harborlight deploy");
+          assert.ok(b.content < b.mem, "content holds both words");
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
     });
 
     // Moved from tests/index/chunk-md-sections.test.mjs

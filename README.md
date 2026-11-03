@@ -489,7 +489,7 @@ One tool call, in time order, from the install to a hook error.
    ```
 7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](src/core/tools/search.ts)).
 
-   `ctx_search` on that index, in the same run. The agent gets 1,757 B: the best snippets, each with its source and heading.
+   `ctx_search` on that index, in the same run, in a project that also holds an `AGENTS.md`. One search reads the index and every agent's memory files. The agent gets 1,268 B: one content hit and one memory hit, each with its source and heading. For memory shared across machines, agents and sessions, see [Context Mode Gateway Memory](https://contextmode.ai/docs/memory?utm_source=github&utm_medium=readme&utm_content=search-memory).
 
    ```text
    ⏺ context-mode - ctx_search (MCP)(queries: ["compaction state block"])
@@ -497,7 +497,8 @@ One tool call, in time order, from the install to a hook error.
         how-it-works.md #14: ### Session continuity
         
         The hooks log each prompt, edit, command, tool error, i…e same rows always give the same bytes.
-        … +16 lines (ctrl+o to expand)
+        memory AGENTS.md #0: # Agent rules
+        … +10 lines (ctrl+o to expand)
    ```
 8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](src/core/hooks/dispatch.ts)).
 9. **Journal and compaction.** The hooks log each prompt, edit, command, tool error and decision in a journal. After a compaction the agent gets a state block of at most `STATE_BUDGET` (2,048 B), and each long line becomes a `ctx_resume(seq)` pointer to the full row; one `ctx_resume` reply is at most `RESUME_CAP` (2,048 B). On the next prompt, a prompt-match block brings back the journal rows that match it by BM25 ([ADR-0009](docs/architecture/adr/0009-compaction-and-memory.md)).
