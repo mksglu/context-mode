@@ -22,12 +22,32 @@ The script runs in the sandbox on your machine, and only what it prints goes int
 
 A real bench run ([a-git-log-stat-vite](../bench/a-sandbox/README.md#a-git-log-stat-vite)): 300 commits of `git log --stat` are 164,385 B. The bench script ([source](../bench/a-sandbox/usecases.mjs)) prints 268 B ([results row](../bench/results/2026-11-01-darwin-arm64.json)).
 
-The agent calls `ctx_execute({ language: "javascript", file: "git-log-stat-vite.txt", code })` with this `code`, a short form of the bench script that prints 27 B (`commits: 300 | authors: 76`):
+A real call from the Try-it run (Claude Code 2.1.312, Context Mode 2.0.0-next.26, [04-api-json.json](../bench/evidence/try-it-2026-11-02/04-api-json.json)), as the terminal shows it. The data is 1,039,898 B; the agent gets 254 B:
 
-```js
-const L = require("fs").readFileSync(process.env.CTX_FILE, "utf8").split("\n");
-const authors = new Set(L.filter((l) => l.startsWith("Author: ")).map((l) => l.slice(8)));
-console.log("commits:", L.filter((l) => l.startsWith("commit ")).length, "| authors:", authors.size);
+```text
+⏺ context-mode - ctx_execute (MCP)(language: "javascript", c…jsonplaceholder.typicode.com/photos\");
+  if (!res.ok) throw new Error(\"HTTP \" + res.status);
+  const photos = await res.json();
+  let longest = null;
+  for (const p of photos) {
+    if (!longest || p.title.length > longest.title.length) longest = p;
+  }
+  const withEst = photos.filter(p => p.title.includes(\"est\")).length;
+  const ties = photos.filter(p => p.title.length === longest.title.length).map(p => p.id);
+  console.log(JSON.stringify({ total: photos.length, longest…nd count of titles containing \"est\"")
+  ⎿  exit 0 · 239 B
+     {
+       "total": 5000,
+       "longest": {
+         "id": 653,
+         "title": "temporibus commodi et fugit doloremque re…rit exercitationem necessitatibus aut",
+         "length": 86
+       },
+       "longestTieIds": [
+         653
+       ],
+       "titlesContainingEst": 892
+     }
 ```
 
 The hosted Gateway has its own Thinking in Code tools, apart from this plugin: [Gateway](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=docs&utm_content=tools-tic).
@@ -39,8 +59,17 @@ The output stays in the local index, and only the parts that answer the question
 
 A real bench run ([c-install-log](../bench/c-batch/README.md#c-install-log)): an install log and a long git log are 228,881 B. One call returns 12,797 B ([results row](../bench/results/2026-11-01-darwin-arm64.json)).
 
-```js
-ctx_batch({ commands: ["cat npm-install-log.txt", "cat git-log-large.txt"], queries: ["cache miss", "feat commit"] })
+A live call with the same two files and two of those queries (Context Mode 2.0.0-next.36, 2026-11-03, [2026-11-03-ctx-batch.json](../bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)), in the form the Claude Code terminal shows it. The commands print 228,881 B; the agent gets 8,667 B:
+
+```text
+⏺ context-mode - ctx_batch (MCP)(commands: ["cat npm-install… queries: ["cache miss","feat commit"])
+  ⎿  ## cache miss
+     js.org/@esbuild%2fwin32-x64 282ms (cache miss)
+     npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2flinux-s390x 79ms (cache miss)
+     npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fopenbsd-x64 101ms (cache miss)
+     npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fwin32-arm64 99ms (cache miss)
+     npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fdarwin-arm64 99ms (cache miss)
+     … +95 lines (ctrl+o to expand)
 ```
 
 See [how-it-works.md](how-it-works.md) and [algorithms.md](algorithms.md) for how the tools work.

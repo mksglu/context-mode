@@ -24,6 +24,45 @@ function datedRow(id, quote) {
   assert.ok(rows[0].includes(quote), `the ${id} row quotes the owner`);
 }
 
+// D-TIC-README-2: the README and docs/tools.md show real tool calls the way the agent terminal shows them.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const readRoot = (rel) => readFileSync(path.join(ROOT, rel), "utf8");
+// The terminal form of an MCP tool call as Claude Code shows it: the call line with its parameters, then the result.
+// A string parameter keeps its JSON form; its \n breaks the line. A line over `cut` chars keeps its start and its end, with "…" between.
+function terminalForm(tool, input, result, { cut = 100, lines = Infinity } = {}) {
+  const call = `⏺ context-mode - ${tool} (MCP)(${Object.entries(input).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ")})`.split("\\n");
+  const out = result.split("\n");
+  const rows = [...call.map((l, i) => (i ? "  " : "") + l), ...out.slice(0, lines).map((l, i) => (i ? "     " : "  ⎿  ") + l)];
+  if (out.length > lines) rows.push(`     … +${out.length - lines} lines (ctrl+o to expand)`);
+  return rows.map((l) => (l.length > cut ? l.slice(0, cut - 40) + "…" + l.slice(-39) : l)).join("\n");
+}
+// The text fences of a Markdown part, with the list-item indent taken off.
+function textFences(md) {
+  const all = [];
+  let cur = null;
+  let pad = "";
+  for (const line of md.split("\n")) {
+    if (cur === null && line.trimStart() === "```text") { cur = []; pad = line.slice(0, line.indexOf("```")); continue; }
+    if (cur !== null && line === pad + "```") { all.push(cur.join("\n")); cur = null; continue; }
+    if (cur !== null) cur.push(line.startsWith(pad) ? line.slice(pad.length) : line);
+  }
+  return all;
+}
+// The two real calls: ctx_execute from the Try-it stream (04-api-json) and ctx_batch from its live MCP run.
+function realCalls() {
+  const ev = JSON.parse(readRoot("bench/evidence/try-it-2026-11-02/04-api-json.json"));
+  const use = ev.stream.flatMap((e) => (e.type === "assistant" ? e.message.content : [])).find((c) => c.type === "tool_use");
+  const res = ev.stream.flatMap((e) => (e.type === "user" ? e.message.content : [])).find((c) => c.tool_use_id === use.id);
+  const text = res.content.map((c) => c.text).join("");
+  const agent = readRoot("bench/evidence/try-it-2026-11-02/README.md").match(/Claude Code (\d+\.\d+\.\d+)/)[1];
+  const b = JSON.parse(readRoot("bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json"));
+  const produced = b.files.reduce((n, f) => n + statSync(path.join(ROOT, f)).size, 0);
+  return {
+    exec: { tool: use.name.split("__").pop(), form: terminalForm("ctx_execute", use.input, text), read: ev.summary.raw_bytes, returned: Buffer.byteLength(text), agent, version: ev.summary.version },
+    batch: { ev: b, form: terminalForm("ctx_batch", b.input, b.result, { lines: b.shown_lines }), produced, returned: Buffer.byteLength(b.result) },
+  };
+}
+
 describe("ADR-0013 / ADR-0014 / ADR-0015 repo hygiene", { concurrency: CONC }, () => {
 describe("ADR-0015 repo: removed-file gate (allow-list)", () => {
   // build/check-removed.mjs — GS5 repo-cleanup gate (impl/15 §2, TECH-SPEC §1 GS5 + §3.10,
@@ -910,6 +949,13 @@ describe("ADR-0015 repo: doc facts", () => {
       assert.ok(part.includes(B(m.raw_bytes.median)) && part.includes(B(m.ctx_bytes.median)), `${id} bytes from the results JSON`);
       assert.ok(part.includes(`../bench/results/2026-11-01-darwin-arm64.json`) && part.includes("```"), `${id} links its row and shows the call`);
     }
+    // D-TIC-README-2: each section shows the real call in its terminal form, not a bare script.
+    const calls = realCalls();
+    assert.deepEqual(textFences(exec), [calls.exec.form], "ctx_execute shows the real call as the terminal shows it");
+    assert.deepEqual(textFences(batch), [calls.batch.form], "ctx_batch shows the real call as the terminal shows it");
+    assert.ok(!md.includes("```js"), "docs/tools.md shows tool calls, not bare scripts");
+    for (const n of [calls.exec.read, calls.exec.returned]) assert.ok(exec.includes(B(n)), `ctx_execute lacks ${B(n)}`);
+    for (const n of [calls.batch.produced, calls.batch.returned]) assert.ok(batch.includes(B(n)), `ctx_batch lacks ${B(n)}`);
     assert.ok(exec.includes("https://contextmode.ai/docs/"), "the Gateway line links its own page");
     const how = read("docs/how-it-works.md");
     const during = how.slice(how.indexOf("2. **During the call**"), how.indexOf("3. **After the call**"));
@@ -1637,35 +1683,34 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     devRow("D-README-USECASES-2", "playwright i silelim");
   });
 
-  test("README Thinking in Code: after Why, 3 sentences, one real script, bench and Try-it bytes from their JSON, marked rows and step (D-TIC-README-1)", () => {
-    // Owner 2026-11-03: "Tum web'de, readme'de docslarda her yerde Thinking in Code felsefesini prensibini methodunu gostermek gormek istiyorum".
+  test("README Thinking in Code lives in How it works step 5: the real ctx_execute and ctx_batch calls in their terminal form, bytes from the evidence (D-TIC-README-2)", () => {
+    // Owner 2026-11-03: "ctx_execute ve batch tool lari icerisinde terminalde nasil gozukecek onu vermeliydin ... Bunu ayrica how its works kismina ekle en basa degil."
     const readme = readRepo("README.md");
-    const at = readme.indexOf("\n## Thinking in Code\n");
-    assert.ok(at > readme.indexOf("\n## Why\n") && at < readme.indexOf("\n## Adoption: stars and npm downloads\n"), "Thinking in Code sits right after Why");
-    assert.ok(readme.split("\n").find((l) => l.startsWith("**Contents:** ")).includes("[Thinking in Code](#thinking-in-code)"), "Contents links it");
-    const sec = readme.slice(at, readme.indexOf("\n## Adoption"));
+    assert.ok(!readme.includes("\n## Thinking in Code\n"), "no top-level Thinking in Code section");
+    assert.ok(!readme.split("\n").find((l) => l.startsWith("**Contents:** ")).includes("Thinking in Code"), "Contents names the sections only");
+    const why = readme.slice(readme.indexOf("\n## Why\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
+    assert.ok(why.split("\n").some((l) => l.startsWith("- **Thinking in Code.**") && l.includes("](#thinking-in-code)")), "a Why bullet names the principle and links it");
+    const how = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
+    const step5 = how.slice(how.indexOf("\n5. **The sandbox.** "), how.indexOf("\n6. **Indexing.** "));
+    assert.ok(step5.includes('<a id="thinking-in-code"></a>'), "step 5 holds the #thinking-in-code anchor");
     const B = (n) => `${n.toLocaleString("en-US")} B`;
-    const bench = JSON.parse(readRepo("bench/results/2026-11-01-darwin-arm64.json")).results.find((r) => r.id === "a-git-log-stat-vite").metrics;
-    const tryIt = JSON.parse(readRepo("bench/evidence/try-it-2026-11-02/04-api-json.json")).summary;
-    for (const need of [B(bench.raw_bytes.median), B(bench.ctx_bytes.median), "](bench/a-sandbox/README.md#a-git-log-stat-vite)", "](bench/results/2026-11-01-darwin-arm64.json)",
-      B(tryIt.raw_bytes), B(tryIt.context_bytes), "](bench/evidence/try-it-2026-11-02/04-api-json.json)", "`ctx_execute`", "`ctx_batch`",
-      "](https://contextmode.ai/thinking-in-code?utm_source=github&utm_medium=readme&utm_content=thinking-in-code)"]) {
-      assert.ok(sec.includes(need), `Thinking in Code lacks ${need}`);
+    const { exec, batch } = realCalls();
+    assert.equal(exec.tool, "ctx_execute");
+    const [f1, f2] = textFences(step5);
+    assert.equal(f1, exec.form, "the ctx_execute transcript is the stored stream, line for line");
+    assert.equal(f2, batch.form, "the ctx_batch transcript is the stored MCP reply, line for line");
+    assert.equal(batch.ev.produced_bytes, batch.produced, "produced bytes equal the input file sizes");
+    assert.equal(batch.ev.returned_bytes, batch.returned, "returned bytes equal the stored reply");
+    for (const need of [B(exec.read), B(exec.returned), `Claude Code ${exec.agent}`, exec.version, "](bench/evidence/try-it-2026-11-02/04-api-json.json)",
+      B(batch.produced), B(batch.returned), batch.ev.version, batch.ev.date, "](bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)"]) {
+      assert.ok(step5.includes(need), `step 5 lacks ${need}`);
     }
-    // The fenced script is the first script the agent wrote in that Try-it run, line for line.
-    const fence = sec.slice(sec.indexOf("```js\n") + 6, sec.indexOf("\n```", sec.indexOf("```js\n") + 6));
-    const firstCall = JSON.stringify(JSON.parse(readRepo("bench/evidence/try-it-2026-11-02/04-api-json.json")).stream);
-    const code = JSON.parse(firstCall.slice(firstCall.indexOf('"code":') + 7, firstCall.indexOf(',"intent"')));
-    assert.equal(fence, code, "the README script is the real one from the run");
-    const gw = sec.split("\n").filter((l) => l.includes("Gateway"));
-    assert.ok(gw.length === 1 && gw[0].includes("](#context-mode-gateway)"), "one Gateway line that links the Gateway section (its guide link lives there, D-README-LINKS-2)");
+    assert.ok(!how.includes("```js"), "How it works shows tool calls, not bare scripts");
     const use = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n")).split("\n").filter((l) => l.startsWith("| ["));
     for (const row of use) {
       assert.equal(row.includes("[Thinking in Code](#thinking-in-code)"), row.includes("](bench/a-sandbox/README.md#"), `mark only the sandbox script rows: ${row.slice(0, 70)}`);
     }
-    const how = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
-    assert.ok(how.split("\n").some((l) => l.includes(". **The sandbox.** ") && l.includes("Thinking in Code")), "the sandbox step names Thinking in Code");
-    devRow("D-TIC-README-1", "readme'de docslarda her yerde Thinking in Code");
+    devRow("D-TIC-README-2", "terminalde nasil gozukecek");
   });
 
   test("README install: one collapsed block per agent, its own install command first, then update, check and remove from its page (D-README-INSTALL-2)", () => {
@@ -1846,7 +1891,8 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     }
     assert.ok(steps.length >= 9 && steps.length <= 12, `${steps.length} steps`);
     for (const s of steps) {
-      const sentences = s.split(". ").length;
+      // The step text is its first paragraph; an indented sub-part below it (step 5: Thinking in Code, D-TIC-README-2) is not counted.
+      const sentences = s.split("\n\n")[0].split(". ").length;
       assert.ok(sentences >= 2 && sentences <= 6, `step has ${sentences} sentences: ${s.slice(0, 80)}`);
       assert.ok(s.includes("](src/") || s.includes("](docs/architecture/adr/") || s.includes("](docs/v2/adr/"), `step has no source or ADR link: ${s.slice(0, 80)}`);
     }

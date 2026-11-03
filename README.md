@@ -13,7 +13,7 @@
   <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, zero telemetry, the plugin keeps your data on your machine. Bench of 2026-11-01: 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output). A full debugging session (row g-session-total): 281,261 B raw to 3,266 B in context, about 70K to 817 tokens (an estimate at 4 B per token). Resume after compaction (row e-long-session): a 442,893 B transcript to a 2,019 B block, about 111K to 505 tokens (an estimate). Runs in 10 coding agents with 9 MCP tools.">
 </picture>
 
-**Contents:** [Why](#why) · [Thinking in Code](#thinking-in-code) · [Adoption](#adoption-stars-and-npm-downloads) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [License](#license) · [Community](#community)
+**Contents:** [Why](#why) · [Adoption](#adoption-stars-and-npm-downloads) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [License](#license) · [Community](#community)
 
 ## Why
 
@@ -25,36 +25,8 @@ The Context Mode plugin runs that work in a local sandbox, keeps the full output
 - **The plugin keeps your data on your machine.** Every index lives in `~/.context-mode`: one `context.db` per project.
 - **Zero telemetry.** The plugin keeps all usage data on your machine. [Security and privacy](#security-and-privacy) lists each network call it makes.
 - **Works offline after install.** Sandbox runs, file indexing and search use local SQLite and your own runtimes.
+- **Thinking in Code.** The agent writes a short script instead of reading the data, and only what the script prints reaches the context: see [How it works, step 5](#thinking-in-code).
 - **Small replies.** On the 36 bench rows with 10 KB or more of raw output, the plugin's median reply is 99.4% smaller than the raw output.
-
-## Thinking in Code
-
-The agent writes a short script instead of reading the data.
-The script runs in the sandbox on your machine, through `ctx_execute` or `ctx_batch`.
-Only what the script prints goes into the context.
-
-In the [Try it](#try-it) run on 5,000 JSON records, the agent wrote this script:
-
-```js
-const res = await fetch("https://jsonplaceholder.typicode.com/photos");
-if (!res.ok) throw new Error("HTTP " + res.status);
-const photos = await res.json();
-let longest = null;
-for (const p of photos) {
-  if (!longest || p.title.length > longest.title.length) longest = p;
-}
-const withEst = photos.filter(p => p.title.includes("est")).length;
-const ties = photos.filter(p => p.title.length === longest.title.length).map(p => p.id);
-console.log(JSON.stringify({ total: photos.length, longest: { id: longest.id, title: longest.title, length: longest.title.length }, longestTieIds: ties, titlesContainingEst: withEst }, null, 2));
-```
-
-| What you do | Raw | Reaches the context |
-|---|---:|---:|
-| [Find the longest of 5,000 photo titles](bench/evidence/try-it-2026-11-02/04-api-json.json) | 1,039,898 B | 393 B |
-| [Read 300 commits with file stats](bench/a-sandbox/README.md#a-git-log-stat-vite) | 164,385 B | 268 B |
-
-Source: the first row is one live run, in the file it links; the second row is the median of 5 runs in [bench/results/2026-11-01-darwin-arm64.json](bench/results/2026-11-01-darwin-arm64.json). The page [Thinking in Code](https://contextmode.ai/thinking-in-code?utm_source=github&utm_medium=readme&utm_content=thinking-in-code) shows more runs.
-The hosted Gateway has its own Thinking in Code tools, apart from the plugin: see [Context Mode Gateway](#context-mode-gateway).
 
 ## Adoption: stars and npm downloads
 
@@ -465,6 +437,48 @@ One tool call, in time order, from the install to a hook error.
 3. **PreToolUse checks.** Before a tool runs, the `PreToolUse` hook checks the call in a fixed order: the user's deny list, WebFetch, curl and wget, inline HTTP and build commands, then a full-file Read over `OUTPUT_CAP` (16,384 B) and one-file shell dumps such as `cat` or `tail`. A Read with a line range runs as usual ([decide.ts](src/core/policy/decide.ts)).
 4. **The exact call.** When a check matches, the hook stops the call and its reply names the exact `ctx_*` call to use, for example `ctx_execute` with `{"language":"shell","code":"<the command>","intent":"<what you need>"}`. For WebFetch the reply names `ctx_index`, then `ctx_search` ([read-deny.ts](src/core/policy/read-deny.ts)).
 5. **The sandbox.** This is the Thinking in Code step: the agent's script runs here, and only what it prints comes back. `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](src/core/tools/execute.ts)).
+   <a id="thinking-in-code"></a>**Thinking in Code.** The agent sends a short script as a tool parameter, the script reads the data in the sandbox, and only what it prints goes into the context. Two real calls, in the form the Claude Code terminal shows them:
+
+   `ctx_execute` on 5,000 JSON records, from the Claude Code 2.1.312 stream of the Try-it run with Context Mode 2.0.0-next.26 ([04-api-json.json](bench/evidence/try-it-2026-11-02/04-api-json.json)). The data is 1,039,898 B; the agent gets 254 B.
+
+   ```text
+   ⏺ context-mode - ctx_execute (MCP)(language: "javascript", c…jsonplaceholder.typicode.com/photos\");
+     if (!res.ok) throw new Error(\"HTTP \" + res.status);
+     const photos = await res.json();
+     let longest = null;
+     for (const p of photos) {
+       if (!longest || p.title.length > longest.title.length) longest = p;
+     }
+     const withEst = photos.filter(p => p.title.includes(\"est\")).length;
+     const ties = photos.filter(p => p.title.length === longest.title.length).map(p => p.id);
+     console.log(JSON.stringify({ total: photos.length, longest…nd count of titles containing \"est\"")
+     ⎿  exit 0 · 239 B
+        {
+          "total": 5000,
+          "longest": {
+            "id": 653,
+            "title": "temporibus commodi et fugit doloremque re…rit exercitationem necessitatibus aut",
+            "length": 86
+          },
+          "longestTieIds": [
+            653
+          ],
+          "titlesContainingEst": 892
+        }
+   ```
+
+   `ctx_batch` on an install log and a long git log, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([2026-11-03-ctx-batch.json](bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)). The commands print 228,881 B; the agent gets 8,667 B, the parts that match its two queries, and the full output stays in the index.
+
+   ```text
+   ⏺ context-mode - ctx_batch (MCP)(commands: ["cat npm-install… queries: ["cache miss","feat commit"])
+     ⎿  ## cache miss
+        js.org/@esbuild%2fwin32-x64 282ms (cache miss)
+        npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2flinux-s390x 79ms (cache miss)
+        npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fopenbsd-x64 101ms (cache miss)
+        npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fwin32-arm64 99ms (cache miss)
+        npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fdarwin-arm64 99ms (cache miss)
+        … +95 lines (ctrl+o to expand)
+   ```
 6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](src/core/store/fts.ts)).
 7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](src/core/tools/search.ts)).
 8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](src/core/hooks/dispatch.ts)).
