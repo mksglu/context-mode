@@ -44,6 +44,8 @@ MCP server process can both read and write it without stepping on each other (`0
 2. **During the call**: for `ctx_execute`/`ctx_batch`, code runs in a sandboxed child process, inside the
    project directory, with a kill switch on the whole process tree if it times out or is cancelled
    (`docs/algorithms.md` §9). Only what the code prints comes back, up to `OUTPUT_CAP` (16,384 bytes).
+   This is Thinking in Code: the agent writes a script that prints only the answer, instead of reading the data
+   ([tools.md](tools.md#ctx_execute)).
 3. **After the call** (`PostToolUse`): if the real output from a host tool (not `ctx_*`) is over
    `REPLACE_TRIGGER_BYTES` (4,096), the hook chunks it, indexes it whole, and replaces what the agent sees with
    the best-matching whole chunks (at most `REPLACE_RETURN_BYTES`, 96) plus a line it can run to search for more.

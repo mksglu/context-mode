@@ -911,6 +911,9 @@ describe("ADR-0015 repo: doc facts", () => {
       assert.ok(part.includes(`../bench/results/2026-11-01-darwin-arm64.json`) && part.includes("```"), `${id} links its row and shows the call`);
     }
     assert.ok(exec.includes("https://contextmode.ai/docs/"), "the Gateway line links its own page");
+    const how = read("docs/how-it-works.md");
+    const during = how.slice(how.indexOf("2. **During the call**"), how.indexOf("3. **After the call**"));
+    assert.ok(during.includes("Thinking in Code") && during.includes("tools.md#ctx_execute"), "docs/how-it-works.md names the sandbox step Thinking in Code");
   });
 
   test("docs/tools.md says where a doctor report over REPORT_CAP is stored (D-NO-LOSSY-CUT-1)", () => {
@@ -1355,9 +1358,9 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(!out.includes('"docs'), "OUT_FILES names a docs path");
   });
 
-  test("README line cap is 600 (D-README-DWELL-1, was 400) and its DEVIATIONS row quotes the owner", async () => {
+  test("README line cap is 650 (D-TIC-README-1, was 600 by D-README-DWELL-1, 400 before) and its DEVIATIONS row quotes the owner", async () => {
     const { README_MAX_LINES } = await import("../src/core/contracts/constants.ts");
-    assert.equal(README_MAX_LINES, 600);
+    assert.equal(README_MAX_LINES, 650);
     const rows = readRepo("docs/architecture/modules/DEVIATIONS.md").split("\n").filter((l) => l.includes("(D-README-THESIS-1)")); // the row id; later rows may name it in their text
     assert.equal(rows.length, 1);
     assert.ok(rows[0].includes("akademik bir tez"));
@@ -1632,6 +1635,37 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     const med = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
     assert.ok(readme.includes(`${big.length} bench rows with 10 KB or more`) && readme.includes(`${med.toFixed(1)}%`), `README headline is ${med.toFixed(1)}% over ${big.length} rows`);
     devRow("D-README-USECASES-2", "playwright i silelim");
+  });
+
+  test("README Thinking in Code: after Why, 3 sentences, one real script, bench and Try-it bytes from their JSON, marked rows and step (D-TIC-README-1)", () => {
+    // Owner 2026-11-03: "Tum web'de, readme'de docslarda her yerde Thinking in Code felsefesini prensibini methodunu gostermek gormek istiyorum".
+    const readme = readRepo("README.md");
+    const at = readme.indexOf("\n## Thinking in Code\n");
+    assert.ok(at > readme.indexOf("\n## Why\n") && at < readme.indexOf("\n## Adoption: stars and npm downloads\n"), "Thinking in Code sits right after Why");
+    assert.ok(readme.split("\n").find((l) => l.startsWith("**Contents:** ")).includes("[Thinking in Code](#thinking-in-code)"), "Contents links it");
+    const sec = readme.slice(at, readme.indexOf("\n## Adoption"));
+    const B = (n) => `${n.toLocaleString("en-US")} B`;
+    const bench = JSON.parse(readRepo("bench/results/2026-11-01-darwin-arm64.json")).results.find((r) => r.id === "a-git-log-stat-vite").metrics;
+    const tryIt = JSON.parse(readRepo("bench/evidence/try-it-2026-11-02/04-api-json.json")).summary;
+    for (const need of [B(bench.raw_bytes.median), B(bench.ctx_bytes.median), "](bench/a-sandbox/README.md#a-git-log-stat-vite)", "](bench/results/2026-11-01-darwin-arm64.json)",
+      B(tryIt.raw_bytes), B(tryIt.context_bytes), "](bench/evidence/try-it-2026-11-02/04-api-json.json)", "`ctx_execute`", "`ctx_batch`",
+      "](https://contextmode.ai/thinking-in-code?utm_source=github&utm_medium=readme&utm_content=thinking-in-code)"]) {
+      assert.ok(sec.includes(need), `Thinking in Code lacks ${need}`);
+    }
+    // The fenced script is the first script the agent wrote in that Try-it run, line for line.
+    const fence = sec.slice(sec.indexOf("```js\n") + 6, sec.indexOf("\n```", sec.indexOf("```js\n") + 6));
+    const firstCall = JSON.stringify(JSON.parse(readRepo("bench/evidence/try-it-2026-11-02/04-api-json.json")).stream);
+    const code = JSON.parse(firstCall.slice(firstCall.indexOf('"code":') + 7, firstCall.indexOf(',"intent"')));
+    assert.equal(fence, code, "the README script is the real one from the run");
+    const gw = sec.split("\n").filter((l) => l.includes("Gateway"));
+    assert.ok(gw.length === 1 && gw[0].includes("](#context-mode-gateway)"), "one Gateway line that links the Gateway section (its guide link lives there, D-README-LINKS-2)");
+    const use = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n")).split("\n").filter((l) => l.startsWith("| ["));
+    for (const row of use) {
+      assert.equal(row.includes("[Thinking in Code](#thinking-in-code)"), row.includes("](bench/a-sandbox/README.md#"), `mark only the sandbox script rows: ${row.slice(0, 70)}`);
+    }
+    const how = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
+    assert.ok(how.split("\n").some((l) => l.includes(". **The sandbox.** ") && l.includes("Thinking in Code")), "the sandbox step names Thinking in Code");
+    devRow("D-TIC-README-1", "readme'de docslarda her yerde Thinking in Code");
   });
 
   test("README install: one collapsed block per agent, its own install command first, then update, check and remove from its page (D-README-INSTALL-2)", () => {

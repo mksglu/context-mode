@@ -192,7 +192,7 @@ export const LIVE_MODEL = "claude-sonnet-5";
 export const LIVE_EFFORT = "low";
 export const LIVE_BUDGET_USD = 0.25;
 export const LIVE_SKIP_LIMIT = 3;
-export const README_MAX_LINES = 600; // ADR-0015: CI cap on README.md length (D-README-THESIS-1: 200 -> 400; D-README-DWELL-1: 400 -> 600)
+export const README_MAX_LINES = 650; // ADR-0015: CI cap on README.md length (D-README-THESIS-1: 200 -> 400; D-README-DWELL-1: 400 -> 600; D-TIC-README-1: 600 -> 650)
 
 // Enforcement (M3; impl/08 §2.3 step 2a, §2.4, §6.1 steps 3, 5b, 5d, 6, §6.2; DEVIATIONS D-M3-arch-5:
 // the text templates are fixed strings here; the Read deny is a src/prompt template, D-DU-DENY-1).

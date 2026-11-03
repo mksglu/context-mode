@@ -13,7 +13,7 @@
   <img src="docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, zero telemetry, the plugin keeps your data on your machine. Bench of 2026-11-01: 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output). A full debugging session (row g-session-total): 281,261 B raw to 3,266 B in context, about 70K to 817 tokens (an estimate at 4 B per token). Resume after compaction (row e-long-session): a 442,893 B transcript to a 2,019 B block, about 111K to 505 tokens (an estimate). Runs in 10 coding agents with 9 MCP tools.">
 </picture>
 
-**Contents:** [Why](#why) · [Adoption](#adoption-stars-and-npm-downloads) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [License](#license) · [Community](#community)
+**Contents:** [Why](#why) · [Thinking in Code](#thinking-in-code) · [Adoption](#adoption-stars-and-npm-downloads) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [License](#license) · [Community](#community)
 
 ## Why
 
@@ -26,6 +26,35 @@ The Context Mode plugin runs that work in a local sandbox, keeps the full output
 - **Zero telemetry.** The plugin keeps all usage data on your machine. [Security and privacy](#security-and-privacy) lists each network call it makes.
 - **Works offline after install.** Sandbox runs, file indexing and search use local SQLite and your own runtimes.
 - **Small replies.** On the 36 bench rows with 10 KB or more of raw output, the plugin's median reply is 99.4% smaller than the raw output.
+
+## Thinking in Code
+
+The agent writes a short script instead of reading the data.
+The script runs in the sandbox on your machine, through `ctx_execute` or `ctx_batch`.
+Only what the script prints goes into the context.
+
+In the [Try it](#try-it) run on 5,000 JSON records, the agent wrote this script:
+
+```js
+const res = await fetch("https://jsonplaceholder.typicode.com/photos");
+if (!res.ok) throw new Error("HTTP " + res.status);
+const photos = await res.json();
+let longest = null;
+for (const p of photos) {
+  if (!longest || p.title.length > longest.title.length) longest = p;
+}
+const withEst = photos.filter(p => p.title.includes("est")).length;
+const ties = photos.filter(p => p.title.length === longest.title.length).map(p => p.id);
+console.log(JSON.stringify({ total: photos.length, longest: { id: longest.id, title: longest.title, length: longest.title.length }, longestTieIds: ties, titlesContainingEst: withEst }, null, 2));
+```
+
+| What you do | Raw | Reaches the context |
+|---|---:|---:|
+| [Find the longest of 5,000 photo titles](bench/evidence/try-it-2026-11-02/04-api-json.json) | 1,039,898 B | 393 B |
+| [Read 300 commits with file stats](bench/a-sandbox/README.md#a-git-log-stat-vite) | 164,385 B | 268 B |
+
+Source: the first row is one live run, in the file it links; the second row is the median of 5 runs in [bench/results/2026-11-01-darwin-arm64.json](bench/results/2026-11-01-darwin-arm64.json). The page [Thinking in Code](https://contextmode.ai/thinking-in-code?utm_source=github&utm_medium=readme&utm_content=thinking-in-code) shows more runs.
+The hosted Gateway has its own Thinking in Code tools, apart from the plugin: see [Context Mode Gateway](#context-mode-gateway).
 
 ## Adoption: stars and npm downloads
 
@@ -340,17 +369,17 @@ Real tool output from public projects, run through Context Mode. Bench of 2026-1
 
 | What you do | Tool | Raw | Reaches the context | Saved |
 |---|---|---:|---:|---:|
-| [Read a browser page](bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot` | 136,514 B | 463 B | 99.7% |
-| [List 40 issues](bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json` | 182,943 B | 850 B | 99.5% |
-| [List 25 pull requests with checks](bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json` | 195,471 B | 776 B | 99.6% |
-| [Look up library docs](bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs` | 6,917 B | 473 B | 93.2% |
-| [Run 1,106 tests](bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose` | 62,909 B | 429 B | 99.3% |
-| [Lint a source folder](bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json` | 288,523 B | 577 B | 99.8% |
-| [Install a workspace](bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile` | 14,988 B | 199 B | 98.7% |
-| [Install packages](bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http` | 37,761 B | 435 B | 98.8% |
-| [Read container logs](bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs` | 60,374 B | 587 B | 99.0% |
-| [Plan 72 resources](bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan` | 34,081 B | 166 B | 99.5% |
-| [Read 300 commits with file stats](bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat` | 164,385 B | 268 B | 99.8% |
+| [Read a browser page](bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot`, [Thinking in Code](#thinking-in-code) | 136,514 B | 463 B | 99.7% |
+| [List 40 issues](bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json`, [Thinking in Code](#thinking-in-code) | 182,943 B | 850 B | 99.5% |
+| [List 25 pull requests with checks](bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json`, [Thinking in Code](#thinking-in-code) | 195,471 B | 776 B | 99.6% |
+| [Look up library docs](bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs`, [Thinking in Code](#thinking-in-code) | 6,917 B | 473 B | 93.2% |
+| [Run 1,106 tests](bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose`, [Thinking in Code](#thinking-in-code) | 62,909 B | 429 B | 99.3% |
+| [Lint a source folder](bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json`, [Thinking in Code](#thinking-in-code) | 288,523 B | 577 B | 99.8% |
+| [Install a workspace](bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile`, [Thinking in Code](#thinking-in-code) | 14,988 B | 199 B | 98.7% |
+| [Install packages](bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http`, [Thinking in Code](#thinking-in-code) | 37,761 B | 435 B | 98.8% |
+| [Read container logs](bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs`, [Thinking in Code](#thinking-in-code) | 60,374 B | 587 B | 99.0% |
+| [Plan 72 resources](bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan`, [Thinking in Code](#thinking-in-code) | 34,081 B | 166 B | 99.5% |
+| [Read 300 commits with file stats](bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat`, [Thinking in Code](#thinking-in-code) | 164,385 B | 268 B | 99.8% |
 | [Read an 89 KB source file](bench/f-hook-redirect/README.md#f-read-vite-config) | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
 | [Fetch a 265 KB docs page](bench/f-hook-redirect/README.md#f-webfetch-vite-docs) | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
 | [Fetch a 214 KB API reply](bench/f-hook-redirect/README.md#f-bash-curl-post) | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
@@ -435,7 +464,7 @@ One tool call, in time order, from the install to a hook error.
 2. **Session start.** The `SessionStart` hook opens the project database. When the session ran before, the agent gets one line that tells it to call `ctx_resume` ([dispatch.ts](src/core/hooks/dispatch.ts)).
 3. **PreToolUse checks.** Before a tool runs, the `PreToolUse` hook checks the call in a fixed order: the user's deny list, WebFetch, curl and wget, inline HTTP and build commands, then a full-file Read over `OUTPUT_CAP` (16,384 B) and one-file shell dumps such as `cat` or `tail`. A Read with a line range runs as usual ([decide.ts](src/core/policy/decide.ts)).
 4. **The exact call.** When a check matches, the hook stops the call and its reply names the exact `ctx_*` call to use, for example `ctx_execute` with `{"language":"shell","code":"<the command>","intent":"<what you need>"}`. For WebFetch the reply names `ctx_index`, then `ctx_search` ([read-deny.ts](src/core/policy/read-deny.ts)).
-5. **The sandbox.** `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](src/core/tools/execute.ts)).
+5. **The sandbox.** This is the Thinking in Code step: the agent's script runs here, and only what it prints comes back. `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](src/core/tools/execute.ts)).
 6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](src/core/store/fts.ts)).
 7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](src/core/tools/search.ts)).
 8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](src/core/hooks/dispatch.ts)).
