@@ -33,6 +33,7 @@ export interface HookCheckInput {
   now?: () => number;               // wall clock in ms; tests pin it, default performance.now
   samples?: number;                 // fixed number of hook and bare-node pairs; default: D5_MIN_PAIRS up to D5_MAX_PAIRS (D-D5-MORE-PAIRS-1)
   bareMs?: () => Promise<number>;   // one bare node wall in ms; tests pin it, default a real `node -e ""` run
+  timeoutMs?: number;               // kill limit per hook and bare-node run; default HOOK_TIMEOUT_MS, the host limit (D-D5-TEST-TIMEOUT-1)
 }
 
 // Noise only adds time; a hook over budget is over it in every pair (D-CI-PERF-1). A noisy runner can slow the first pairs
@@ -151,9 +152,10 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
   const fixed = i.samples === undefined ? null : Math.max(1, i.samples);
   const maxPairs = fixed ?? D5_MAX_PAIRS;
   const minPairs = fixed ?? D5_MIN_PAIRS;
+  const timeoutMs = i.timeoutMs ?? HOOK_TIMEOUT_MS;
   const bareMs = i.bareMs ?? (async () => {
     const t = performance.now();
-    await runProcess([process.execPath, "-e", ""], { cwd: i.bundleDir, env: i.env, signal: i.signal, timeoutMs: HOOK_TIMEOUT_MS });
+    await runProcess([process.execPath, "-e", ""], { cwd: i.bundleDir, env: i.env, signal: i.signal, timeoutMs });
     return performance.now() - t;
   });
   const hookWalls: number[] = [];
@@ -165,7 +167,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
       cwd: i.bundleDir,
       env: i.env,
       signal: i.signal,
-      timeoutMs: HOOK_TIMEOUT_MS,
+      timeoutMs,
       stdin: JSON.stringify(payloadFor(fixture.payload, i.worktree)),
     });
     hookWalls.push(now() - start);

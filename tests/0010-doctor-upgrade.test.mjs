@@ -858,13 +858,16 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     return dir;
   }
 
+  // D-D5-TEST-TIMEOUT-1: a stub hook on a busy runner can need over HOOK_TIMEOUT_MS to start; the tests give it 30 s.
+  const STUB_TIMEOUT_MS = 30_000;
+
   function clock(...ticks) { let i = 0; return () => ticks[Math.min(i++, ticks.length - 1)]; }
 
   function input(dir, extra = {}) {
     return {
       agent: "claude-code", bundleDir: dir, env: { PATH: process.env.PATH ?? "" },
       signal: new AbortController().signal, codexConfigDir: path.join(dir, "no-codex"), db: null,
-      now: clock(0, 5), samples: 1, bareMs: async () => 0, ...extra,
+      now: clock(0, 5), samples: 1, bareMs: async () => 0, timeoutMs: STUB_TIMEOUT_MS, ...extra,
     };
   }
 
@@ -980,6 +983,16 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const slow = await checkHookRoundTrip(base);
     assert.equal(slow.status, "FAIL");
     assert.equal(slow.fixCommand, C.D5_FIX);
+  });
+
+  // D-D5-TEST-TIMEOUT-1: release run 41679948852 (macos-latest, node 26): 12 stub-hook tests each took 6-8 s and got
+  // "not the agent's native shape", because the busy runner needed over HOOK_TIMEOUT_MS (5000) to start a stub hook.
+  // The kill limit is an input, so the tests give the stub room; the server keeps HOOK_TIMEOUT_MS, the host limit.
+  test("[D-D5-TEST-TIMEOUT-1] D5 kills the hook at the timeoutMs it gets, a FAIL on shape", async (t) => {
+    const dir = bundle(t, native);
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), `setTimeout(()=>{process.stdout.write(${JSON.stringify(native)});},1500);process.stdin.resume();`);
+    const r = await checkHookRoundTrip(input(dir, { timeoutMs: 300 }));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_SHAPE_DETAIL, fixCommand: C.D5_FIX });
   });
 
   test("[M5] doctor-hook/D5-exactly-HOOK_P95_MS-passes", async (t) => {
