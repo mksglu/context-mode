@@ -2108,6 +2108,13 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     assert.ok(rows.find((r) => r.id === "D1").detail.startsWith("dev build: "));
   });
 
+  test("[M5] doctor-issue/tilde-prints-a-Windows-home-path-with-forward-slashes (D-DOCTOR-WIN-1)", async () => {
+    const { tildeOf } = await import("../src/core/ops/doctor-issue.ts");
+    const tilde = tildeOf({ USERPROFILE: "C:\\Users\\runner", HOME: "C:\\Users\\runner" });
+    assert.equal(tilde("C:\\Users\\runner\\.context-mode\\reports\\doctor-1.md"), "~/.context-mode/reports/doctor-1.md");
+    assert.equal(tilde("Project: C:\\Users\\runner\\a\\b (key k)"), "Project: ~/a/b (key k)");
+  });
+
   test("[M5] doctor-issue/FAIL-writes-the-report-file-and-prints-gh-and-the-form-URL", async (t) => {
     const h = home(t);
     const ctx = ctxOf(h);

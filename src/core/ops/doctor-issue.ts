@@ -31,7 +31,9 @@ export function tildeOf(env: NodeJS.ProcessEnv): (text: string) => string {
     if (real !== home) homes.push(real);
   } catch { /* HOME is absent on disk; the text form is enough */ }
   homes.sort((a, b) => b.length - a.length);
-  return (t) => homes.reduce((acc, h) => acc.split(h).join("~"), t);
+  // D-DOCTOR-WIN-1: a Windows path under home prints with "/" after the "~", so the report, the gh line and the form agree on every OS.
+  const slash = (rest: string): string => rest.replace(/^[^\s"'`|)>,;]*/, (run) => run.replace(/\\/g, "/"));
+  return (t) => homes.reduce((acc, h) => acc.split(h).map((piece, n) => (n === 0 ? piece : slash(piece))).join("~"), t);
 }
 
 /** A line that names a secret word or a token prefix keeps its key and loses its value. */
