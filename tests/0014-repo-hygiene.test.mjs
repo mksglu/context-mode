@@ -1808,6 +1808,8 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
       { timestamp: "2026-11-03T00:00:00Z", count: 1, uniques: 1 }] };
     assert.deepEqual(H.trafficDays(body, "clones", "2026-11-03"), [["2026-11-01", 5, 2], ["2026-11-02", 4, 3]], "oldest first; the read day is partial and waits for the next read");
     assert.throws(() => H.trafficDays({}, "views", "2026-11-03"), /views/);
+    assert.deepEqual(H.trafficWindow(body, "2026-11-03"), ["2026-11-03", 10, 6], "the 14-day totals GitHub gives with the days");
+    assert.throws(() => H.trafficWindow({ count: 1 }, "2026-11-03"), /uniques/);
     assert.deepEqual(H.versionSplit({ package: "context-mode", downloads: { "1.0.169": 30, "1.0.168": 5, "2.0.0-next.33": 4, "0.9.1": 1 } }), { v1: 35, next: 4, other: 1, versions: 4 });
     assert.throws(() => H.versionSplit({}), /downloads/);
     const old = { read_at: "2026-11-01", github_clones: [["2026-10-01", 7, 6], ["2026-10-31", 1, 1]], v1_marketplace: [["2026-02-25", 211, "abc"]] };
@@ -1836,6 +1838,7 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     }
     assert.ok(h.github_clones.length >= 13 && h.github_views.length >= 13, "the 14-day traffic window, less the partial read day");
     assert.ok(h.v1_marketplace.length >= 100, "the v1 backfill");
+    assert.ok(h.github_clones_14d.length >= 1 && h.github_views_14d.length >= 1, "the 14-day windows as GitHub gives them");
     for (const r of h.v1_marketplace) assert.ok(Number.isInteger(r[1]) && r[2].length === 40, `v1 row ${r[0]} names its commit`);
   });
 

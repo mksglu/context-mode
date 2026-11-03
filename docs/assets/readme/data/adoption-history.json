@@ -3,6 +3,8 @@
   "series": {
     "github_clones": "[day, clones, unique cloners] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/clones (keeps 14 days). Counts git clones and fetches of the repo: Claude Code, Codex, Gemini CLI and Qwen Code plugin installs and updates, CI machines and people.",
     "github_views": "[day, views, unique visitors] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/views (keeps 14 days).",
+    "github_clones_14d": "[read day, clones, unique cloners] for the 14 days GitHub keeps, as GitHub counts them (a person who clones on two days counts once). Do not add days of github_clones uniques together; use this.",
+    "github_views_14d": "[read day, views, unique visitors] for the 14 days GitHub keeps, as GitHub counts them.",
     "github_referrers": "[read day, [[referrer, views, unique visitors], ...]]: the top 10 referrers for the 14 days before the read day. GitHub REST /repos/mksglu/context-mode/traffic/popular/referrers.",
     "stars": "[read day, GitHub stars total]. GitHub REST /repos/mksglu/context-mode stargazers_count.",
     "npm_totals": "[read day, all-time, last week, last month] npm downloads of context-mode. api.npmjs.org/downloads/point/{2000-01-01:<day>,last-week,last-month}/context-mode. Counts installs, updates and CI runs of Pi, OpenCode, Copilot CLI, Kiro, VS Code and ZCode setups.",
@@ -40,6 +42,12 @@
     ["2026-10-31",1869,1202],
     ["2026-11-01",2537,1543],
     ["2026-11-02",3400,2093]
+  ],
+  "github_clones_14d": [
+    ["2026-11-03",646294,63364]
+  ],
+  "github_views_14d": [
+    ["2026-11-03",34391,17382]
   ],
   "github_referrers": [
     ["2026-11-03",[["github.com",6959,5029],["Google",6856,4628],["t.co",788,634],["Bing",652,439],["youtube.com",414,321],["search.brave.com",374,230],["teams.public.onecdn.static.microsoft",182,126],["linkedin.com",153,119],["reddit.com",141,101],["DuckDuckGo",125,88]]]

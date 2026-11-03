@@ -53,10 +53,12 @@ export function statsJson({ npmDownloads, stars, readAt }) {
 // never sees them: their only count is the clone traffic. The file keeps every day it ever read (merge by day, the
 // newer read wins its own day, old days stay; nothing is cut).
 export const HISTORY_FILE = "docs/assets/readme/data/adoption-history.json";
-export const HISTORY_SERIES = ["github_clones", "github_views", "github_referrers", "stars", "npm_totals", "npm_versions_last_week", "v1_marketplace"];
+export const HISTORY_SERIES = ["github_clones", "github_views", "github_clones_14d", "github_views_14d", "github_referrers", "stars", "npm_totals", "npm_versions_last_week", "v1_marketplace"];
 const SERIES_TEXT = {
   github_clones: "[day, clones, unique cloners] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/clones (keeps 14 days). Counts git clones and fetches of the repo: Claude Code, Codex, Gemini CLI and Qwen Code plugin installs and updates, CI machines and people.",
   github_views: "[day, views, unique visitors] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/views (keeps 14 days).",
+  github_clones_14d: "[read day, clones, unique cloners] for the 14 days GitHub keeps, as GitHub counts them (a person who clones on two days counts once). Do not add days of github_clones uniques together; use this.",
+  github_views_14d: "[read day, views, unique visitors] for the 14 days GitHub keeps, as GitHub counts them.",
   github_referrers: "[read day, [[referrer, views, unique visitors], ...]]: the top 10 referrers for the 14 days before the read day. GitHub REST /repos/mksglu/context-mode/traffic/popular/referrers.",
   stars: "[read day, GitHub stars total]. GitHub REST /repos/mksglu/context-mode stargazers_count.",
   npm_totals: "[read day, all-time, last week, last month] npm downloads of context-mode. api.npmjs.org/downloads/point/{2000-01-01:<day>,last-week,last-month}/context-mode. Counts installs, updates and CI runs of Pi, OpenCode, Copilot CLI, Kiro, VS Code and ZCode setups.",
@@ -97,6 +99,12 @@ export function trafficDays(body, key, readDay) {
   if (!Array.isArray(list)) throw new Error(`traffic answer has no ${key} list`);
   return list.map((r) => [String(r.timestamp).slice(0, ISO_DAY), r.count, r.uniques])
     .filter((r) => r[0] < readDay).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+
+/** A traffic answer -> [read day, count, uniques]: the 14-day totals GitHub gives with the days. */
+export function trafficWindow(body, readDay) {
+  if (!body || !Number.isInteger(body.count) || !Number.isInteger(body.uniques)) throw new Error("traffic answer has no count or uniques");
+  return [readDay, body.count, body.uniques];
 }
 
 /** api.npmjs.org/versions/<pkg>/last-week -> { v1, next, other, versions }. */
@@ -170,10 +178,13 @@ async function readHistory(slug, today, calls) {
   if (!Array.isArray(refs)) throw new Error("traffic referrers answer is not a list");
   const stars = gh(`repos/${slug}`).stargazers_count;
   if (!Number.isInteger(stars)) throw new Error("repo answer has no stargazers_count");
+  const clones = gh(`repos/${slug}/traffic/clones`), views = gh(`repos/${slug}/traffic/views`);
   return {
     read_at: today,
-    github_clones: trafficDays(gh(`repos/${slug}/traffic/clones`), "clones", today),
-    github_views: trafficDays(gh(`repos/${slug}/traffic/views`), "views", today),
+    github_clones: trafficDays(clones, "clones", today),
+    github_views: trafficDays(views, "views", today),
+    github_clones_14d: [trafficWindow(clones, today)],
+    github_views_14d: [trafficWindow(views, today)],
     github_referrers: [[today, refs.slice(0, 10).map((r) => [r.referrer, r.count, r.uniques])]],
     stars: [[today, stars]],
     npm_totals: [[today, all.downloads, week.downloads, month.downloads]],
