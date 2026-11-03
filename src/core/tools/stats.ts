@@ -1,6 +1,7 @@
 // impl/06 §5, PRD §12, TECH-SPEC GP10 + §6.2a D3; DECISIONS-r4 I1-14, I1-15, I1-19; DECISIONS-r9 V18, V19;
 // DEVIATIONS D-M4-arch-3 (handler shape (input, ctx)), D-M4-arch-4 (sums sandbox_bytes/returned_bytes),
-// D-M4-S3-1 (call rows, scopes, labels), D-STATS-REPORT-1 (detailed text report, ctx_stats rows not counted).
+// D-M4-S3-1 (call rows, scopes, labels), D-STATS-REPORT-1 (detailed text report, ctx_stats rows not counted),
+// D-STATS-VALUE-1 (context window, hook work, largest outputs, index and search, last 7 days, footer).
 // ctx_stats: on demand, one read-only open of this project's own context.db; it opens no other DB, so no
 // sibling DB is ever opened or touched (#1213, #1236).
 import type { DatabaseSync } from "node:sqlite";
@@ -9,6 +10,7 @@ import {
   MS_PER_DAY,
   OUTPUT_CAP,
   PERCENT_SCALE,
+  RUN_LABEL_PREFIX,
   STATS_BYTES_PER_TOKEN,
   STATS_CALLS_W,
   STATS_CLOCK_DIGITS,
@@ -35,6 +37,17 @@ import {
   STATS_SUMMARY,
   STATS_UNKNOWN_FIELD_LINE,
   STATS_WIDTH,
+  STATS_CARD_W,
+  STATS_DAY_BAR,
+  STATS_DAYS,
+  STATS_FOOTER,
+  STATS_INDEX_TOOLS,
+  STATS_SPARK,
+  STATS_THOUSAND,
+  STATS_TOP_OUTPUTS,
+  STATS_WAYS,
+  STATS_WHOLE_FROM,
+  STATS_WINDOW_TOKENS,
 } from "../contracts/constants.ts";
 import type { CtxStatsInput, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
@@ -50,6 +63,9 @@ export const ctxStatsSchema = z.object({}, {
 interface Totals { calls: number; produced: number; returned: number; saved: number; }
 interface Group extends Totals { session: string; agent: string; }
 interface Named extends Totals { name: string; }
+type WayKey = (typeof STATS_WAYS)[number][0];
+// D-STATS-VALUE-1: one UTC day of "Last 7 days": calls counted and bytes saved per way of saving.
+interface Day { day: number; calls: number; ways: Record<WayKey, number>; }
 interface Facts {
   groups: Group[];
   tools: Named[];
@@ -60,6 +76,10 @@ interface Facts {
   days: number;
   sources: { count: number; chunks: number; bytes: number };
   dbBytes: number;
+  top: Named[];
+  replaced: number;
+  redirected: number;
+  week: Day[];
 }
 
 // D-M4-S3-1: a call row has a tool name (prompt rows have none); `cost` rows are the M5 plugin usage
@@ -84,6 +104,56 @@ const SPAN = "SELECT COALESCE(MAX(created_at) - MIN(created_at), 0) AS span FROM
 const SOURCES =
   "SELECT COUNT(*) AS n, COALESCE(SUM(chunk_count), 0) AS chunks, COALESCE(SUM(bytes_total), 0) AS bytes FROM sources";
 
+// D-STATS-VALUE-1. Hook work: a host row that sent fewer bytes to the chat than it made is an output the
+// PostToolUse hook replaced after it ran; a run.mjs source is a large command the PreToolUse hook sent to the
+// sandbox (ADR-0016 case B), which writes the source and no events row. A redirect saves its bytes past
+// OUTPUT_CAP (the reply the host would have shown is the capped preview).
+const HOST = "tool NOT LIKE 'ctx\\_%' ESCAPE '\\'";
+const REPLACED = `SELECT COUNT(*) AS n FROM events WHERE ${CALLS} AND ${HOST} AND returned_bytes < sandbox_bytes`;
+const RUNS = "FROM sources WHERE substr(label, 1, ?) = ?";
+const REDIRECTED = `SELECT COUNT(*) AS n, COALESCE(MAX(created_ts), 0) AS last ${RUNS}`;
+const LAST = `SELECT COALESCE(MAX(created_at), 0) AS last FROM events WHERE ${CALLS}`;
+const WEEK =
+  `SELECT created_at / ${MS_PER_DAY} AS day, tool, COUNT(*) AS calls, COALESCE(SUM(sandbox_bytes), 0) AS produced,` +
+  ` COALESCE(SUM(returned_bytes), 0) AS returned FROM events WHERE ${CALLS} AND created_at >= ? GROUP BY day, tool`;
+const WEEK_RUNS =
+  `SELECT created_ts / ${MS_PER_DAY} AS day, COUNT(*) AS calls,` +
+  ` COALESCE(SUM(MAX(0, bytes_total - ${OUTPUT_CAP})), 0) AS saved ${RUNS} AND created_ts >= ? GROUP BY day`;
+const TOP =
+  "SELECT tool, 1 AS calls, sandbox_bytes AS produced, returned_bytes AS returned FROM events" +
+  ` WHERE ${CALLS} AND sandbox_bytes > 0 ORDER BY sandbox_bytes DESC, seq ASC LIMIT ${STATS_TOP_OUTPUTS}`;
+
+function wayOf(tool: string): WayKey {
+  if (STATS_INDEX_TOOLS.includes(tool)) return "index";
+  return tool.startsWith("ctx_") ? "sandbox" : "replace";
+}
+
+// The last STATS_DAYS UTC days, ending on the day of the latest row: same journal, same days (no clock).
+function readWeek(raw: DatabaseSync, lastMs: number): Day[] {
+  const last = Math.floor(lastMs / MS_PER_DAY);
+  const first = last - STATS_DAYS + 1;
+  const days: Day[] = Array.from({ length: STATS_DAYS }, (_, i) => ({
+    day: first + i, calls: 0, ways: { sandbox: 0, index: 0, redirect: 0, replace: 0 },
+  }));
+  const net = new Map<string, number>();
+  for (const r of raw.prepare(WEEK).all(first * MS_PER_DAY) as Row[]) {
+    const d = days[Number(r.day) - first];
+    if (d === undefined) continue;
+    d.calls += Number(r.calls);
+    const key = `${d.day}:${wayOf(String(r.tool))}`;
+    net.set(key, (net.get(key) ?? 0) + Number(r.produced) - Number(r.returned));
+  }
+  // Net bytes per day and way, like a saving unit: a ctx_search reply counts against the index it reads.
+  for (const d of days) for (const [way] of STATS_WAYS) d.ways[way] = Math.max(0, net.get(`${d.day}:${way}`) ?? 0);
+  for (const r of raw.prepare(WEEK_RUNS).all(RUN_LABEL_PREFIX.length, RUN_LABEL_PREFIX, first * MS_PER_DAY) as Row[]) {
+    const d = days[Number(r.day) - first];
+    if (d === undefined) continue;
+    d.calls += Number(r.calls);
+    d.ways.redirect += Number(r.saved);
+  }
+  return days;
+}
+
 const EMPTY: Totals = Object.freeze({ calls: 0, produced: 0, returned: 0, saved: 0 });
 type Row = Record<string, string | number | null>;
 
@@ -105,6 +175,8 @@ function readFacts(raw: DatabaseSync, sessionId: string): Facts {
   const meta = raw.prepare(META).get() as Row;
   const span = Number((raw.prepare(SPAN).get(sessionId) as Row).span);
   const src = raw.prepare(SOURCES).get() as Row;
+  const runs = raw.prepare(REDIRECTED).get(RUN_LABEL_PREFIX.length, RUN_LABEL_PREFIX) as Row;
+  const last = Math.max(Number((raw.prepare(LAST).get() as Row).last), Number(runs.last));
   const pages = raw.prepare("PRAGMA page_count").get() as Row;
   const size = raw.prepare("PRAGMA page_size").get() as Row;
   return {
@@ -112,6 +184,10 @@ function readFacts(raw: DatabaseSync, sessionId: string): Facts {
     sessions: Number(meta.sessions), agents: Number(meta.agents), days: Number(meta.days),
     sources: { count: Number(src.n), chunks: Number(src.chunks), bytes: Number(src.bytes) },
     dbBytes: Number(pages.page_count) * Number(size.page_size),
+    top: (raw.prepare(TOP).all() as Row[]).map((r) => ({ name: String(r.tool), ...totals(r) })),
+    replaced: Number((raw.prepare(REPLACED).get() as Row).n),
+    redirected: Number(runs.n),
+    week: readWeek(raw, last),
   };
 }
 
@@ -199,11 +275,102 @@ function bySaved(a: Named, b: Named): number {
   return b.saved - a.saved || b.produced - a.produced || a.returned - b.returned || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 }
 
+function toolName(tool: string): string {
+  return tool.startsWith("ctx_") ? tool : "hook " + tool;
+}
+
+// D-STATS-VALUE-1 (6): two or more rows with 0 B saved fold into one "other" row; past STATS_MAX_TOOL_ROWS
+// the rows with the smallest saving join it.
 function toolRows(tools: Named[]): Named[] {
-  const named = tools.map((t) => ({ ...t, name: t.name.startsWith("ctx_") ? t.name : "hook " + t.name })).sort(bySaved);
-  if (named.length <= STATS_MAX_TOOL_ROWS) return named;
-  const rest = named.slice(STATS_MAX_TOOL_ROWS - 1);
-  return [...named.slice(0, STATS_MAX_TOOL_ROWS - 1), { name: `other (${rest.length} tools)`, ...sum(rest) }];
+  const named = tools.map((t) => ({ ...t, name: toolName(t.name) })).sort(bySaved);
+  const zero = named.filter((t) => t.saved <= 0);
+  const fold = zero.length > 1 ? zero : [];
+  const keep = named.filter((t) => !fold.includes(t));
+  const room = fold.length > 0 ? STATS_MAX_TOOL_ROWS - 1 : STATS_MAX_TOOL_ROWS;
+  const over = keep.length > room;
+  const shown = over ? keep.slice(0, STATS_MAX_TOOL_ROWS - 1) : keep;
+  const rest = over ? [...keep.slice(STATS_MAX_TOOL_ROWS - 1), ...fold] : fold;
+  return rest.length === 0 ? shown : [...shown, { name: `other (${plural(rest.length, "tool")})`, ...sum(rest) }];
+}
+
+// ---- D-STATS-VALUE-1: the business-value lines. ----
+
+const TOKEN_UNITS = ["K", "M", "B", "T"] as const;
+const SPARK = [...STATS_SPARK];
+
+// One decimal below STATS_WHOLE_FROM, a whole number at or past it.
+function whole(v: number): string {
+  return v >= STATS_WHOLE_FROM ? int(v) : v.toFixed(1);
+}
+
+function tokens(n: number): string {
+  if (n < STATS_THOUSAND) return int(n);
+  let v = n / STATS_THOUSAND;
+  let u = 0;
+  while (v >= STATS_THOUSAND && u < TOKEN_UNITS.length - 1) { v /= STATS_THOUSAND; u++; }
+  return whole(v) + TOKEN_UNITS[u];
+}
+
+// Tokens are bytes / STATS_BYTES_PER_TOKEN, so the line says "about"; the window is a Claude context window.
+function windowLine(saved: number): string {
+  const t = saved / STATS_BYTES_PER_TOKEN;
+  const share = t / STATS_WINDOW_TOKENS;
+  const win = `a ${tokens(STATS_WINDOW_TOKENS)} window`;
+  const head = `  about ${tokens(t)} tokens kept out`;
+  if (share >= 1) return `${head}, ${whole(share)} times ${win}`;
+  const p = share * PERCENT_SCALE;
+  return p * STATS_WHOLE_FROM < 1 ? head : `${head}, ${whole(p)}% of ${win}`;
+}
+
+function spark(values: number[]): string {
+  const top = SPARK.length - 1;
+  const max = Math.max(0, ...values);
+  return values.map((v) => SPARK[v <= 0 || max <= 0 ? 0 : Math.min(top, Math.max(1, Math.round((v / max) * top)))]).join("");
+}
+
+function mmdd(day: number): string {
+  const d = new Date(day * MS_PER_DAY);
+  const two = (n: number): string => String(n).padStart(STATS_CLOCK_DIGITS, "0");
+  return two(d.getUTCMonth() + 1) + "-" + two(d.getUTCDate());
+}
+
+// One stacked bar: ways in STATS_WAYS order, cut at rounded running sums so the parts add up to the whole.
+function stack(parts: number[], max: number, width: number): string {
+  let total = 0;
+  let at = 0;
+  let out = "";
+  parts.forEach((v, i) => {
+    total += v;
+    const end = max <= 0 ? 0 : Math.round((total / max) * width);
+    if (end > at) { out += STATS_WAYS[i]![1].repeat(end - at); at = end; }
+  });
+  if (out === "" && total > 0) out = STATS_WAYS[parts.indexOf(Math.max(...parts))]![1];
+  return out;
+}
+
+function cards(cells: string[]): string {
+  return ("  " + cells.map((c) => c.padEnd(STATS_CARD_W)).join("")).trimEnd();
+}
+
+// The Gateway Analytics shape from local data: four cards with a spark line each, then saved per day by way.
+function lastDays(week: Day[]): string[] {
+  const saved = week.map((d) => STATS_WAYS.reduce((t, [w]) => t + d.ways[w], 0));
+  const all = saved.reduce((a, b) => a + b, 0);
+  const calls = week.reduce((a, d) => a + d.calls, 0);
+  const per = week.map((d, i) => (d.calls > 0 ? saved[i]! / d.calls : 0));
+  const max = Math.max(0, ...saved);
+  return [
+    `Last ${STATS_DAYS} days · ${mmdd(week[0]!.day)} to ${mmdd(week[week.length - 1]!.day)}`,
+    cards(["Saved bytes", "Tokens kept out", "Calls counted", "Saved per call"]),
+    cards([bytes(all), "about " + tokens(all / STATS_BYTES_PER_TOKEN), count(calls), bytes(calls > 0 ? all / calls : 0)]),
+    cards([spark(saved), spark(saved), spark(week.map((d) => d.calls)), spark(per)]),
+    "",
+    "Saved over time",
+    ...week.map((d, i) => "  " + mmdd(d.day) + " " +
+      stack(STATS_WAYS.map(([w]) => d.ways[w]), max, STATS_DAY_BAR).padEnd(STATS_DAY_BAR) + bytes(saved[i]!).padStart(NUM_W)),
+    "  " + STATS_WAYS.map(([, ch, name]) => `${ch} ${name}`).join("  "),
+    "",
+  ];
 }
 
 function fit(line: string): string {
@@ -225,13 +392,22 @@ function report(f: Facts, sessionId: string, agent: string): string {
     `${scopeName} · ${plural(focus.calls, "call")}${extra}`,
     "  " + "Without context-mode".padEnd(LABEL_W) + "|" + bar(focus.produced, top, STATS_HEAD_BAR, "█", "░") + "|" + bytes(focus.produced).padStart(NUM_W),
     "  " + "With context-mode".padEnd(LABEL_W) + "|" + bar(focus.returned, top, STATS_HEAD_BAR, "█", "░") + "|" + bytes(focus.returned).padStart(NUM_W),
-    `  ${bytes(focus.saved)} saved (${pct(focus)}) · about ${int(focus.saved / STATS_BYTES_PER_TOKEN)} tokens kept out of the chat`,
+    `  ${bytes(focus.saved)} saved (${pct(focus)})`,
+    ...(focus.saved > 0 ? [windowLine(focus.saved)] : []),
+    ...(f.redirected + f.replaced > 0
+      ? [`  Hooks sent ${plural(f.redirected + f.replaced, "large output")} to the sandbox · ${int(f.redirected)} redirected, ${int(f.replaced)} replaced`]
+      : []),
     "",
+    ...lastDays(f.week),
     ...table("Scope", [{ name: "session", ...session }, { name: "project", ...project }, { name: "all-time", ...project }]),
     "",
     "Where the savings came from (this project)",
     ...table("Tool", toolRows(f.tools)),
     "",
+    ...(f.top.length > 0
+      ? ["Largest single outputs (made → sent to the chat)",
+        ...f.top.map((t) => "  " + label(toolName(t.name)) + bytes(t.produced).padStart(NUM_W) + " → " + bytes(t.returned).padStart(NUM_W)), ""]
+      : []),
   ];
 
   const agents = new Map<string, Totals>();
@@ -249,8 +425,12 @@ function report(f: Facts, sessionId: string, agent: string): string {
 
   lines.push(
     "  " + "Indexed sources".padEnd(LABEL_W) + `${int(f.sources.count)} · ${plural(f.sources.chunks, "chunk")} · ${bytes(f.sources.bytes)} of content`,
+    "  " + "Index and search".padEnd(LABEL_W) +
+      `${plural(f.sources.count, "source")} indexed · ${plural(f.tools.find((t) => t.name === "ctx_search")?.calls ?? 0, "ctx_search call")}`,
     "  " + "Database file".padEnd(LABEL_W) + bytes(f.dbBytes),
     "  " + "Sessions".padEnd(LABEL_W) + `${int(f.sessions)} · agents ${int(f.agents)} · active days ${int(f.days)}`,
+    "",
+    STATS_FOOTER,
   );
   return lines.map(fit).join("\n");
 }

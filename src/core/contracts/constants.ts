@@ -391,6 +391,24 @@ export const STATS_JOURNAL_HINTS = Object.freeze([
   "after a compact or a restart; ctx_search finds indexed content by words.",
 ] as const);
 
+// D-STATS-VALUE-1: the business-value lines of the report (context window, hook work, largest outputs,
+// index and search, last 7 days, footer). Same rules: plain text, STATS_WIDTH columns, no clock.
+export const STATS_WINDOW_TOKENS = 200_000; // Claude context window size (Anthropic models overview), labelled "about"
+export const STATS_THOUSAND = 1000; // K, M, B, T steps of a token count
+export const STATS_WHOLE_FROM = 10; // at or past this, a whole number (token steps, windows); below it one decimal
+export const STATS_DAYS = 7; // UTC days in "Last 7 days", ending on the day of the latest row
+export const STATS_TOP_OUTPUTS = 3;
+export const STATS_CARD_W = 19; // one card column: 4 cards = 76 columns with the indent
+export const STATS_DAY_BAR = 48; // the largest day of "Saved over time"
+export const STATS_SPARK = "▁▂▃▄▅▆▇█";
+// The plugin's own ways of saving, in bar order: [key, bar character, legend name].
+export const STATS_WAYS = Object.freeze([
+  ["sandbox", "█", "sandbox run"], ["index", "▓", "index + search"],
+  ["redirect", "▒", "hook redirect"], ["replace", "░", "output replaced"],
+] as const);
+export const STATS_INDEX_TOOLS: readonly string[] = Object.freeze(["ctx_index", "ctx_search"]);
+export const STATS_FOOTER = "contextmode.ai · github.com/mksglu/context-mode";
+
 // ctx_purge (impl/06 §6)
 export const PURGE_SCOPES = Object.freeze(["session", "source", "project"] as const);
 export const PURGE_NO_SCOPE_LINE = "ctx_purge: pick one scope — session, source, or project.";

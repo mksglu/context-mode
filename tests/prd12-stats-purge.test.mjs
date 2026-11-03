@@ -233,7 +233,7 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       assert.ok(rep.includes("This session · 9 calls · 10m active"), rep);
       assert.ok(rep.includes("  Without context-mode |" + "█".repeat(40) + "|   544.2 KB"), rep);
       assert.ok(rep.includes("  With context-mode    |█" + "░".repeat(39) + "|    12.1 KB"), rep);
-      assert.ok(rep.includes("  532.0 KB saved (97.8%) · about 136,198 tokens kept out of the chat"), rep);
+      assert.ok(rep.includes("\n  532.0 KB saved (97.8%)\n"), rep);
       // The Markdown table stays for agents that read numbers; ctx_stats rows are not in it either.
       assert.deepEqual(row(out.text, "project"), ["566214 B", "12921 B", "553293 B", "97.7"]);
     }));
@@ -242,7 +242,8 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       const ctx = ctxFor(root);
       await addFixed(ctx);
       const rep = report((await ctxStats.handler({}, ctx)).text);
-      assert.deepEqual(labels(rep, "Tool"), ["ctx_index", "hook Bash", "ctx_batch", "ctx_execute", "hook Edit", "hook AskUserQuestion", "ctx_search"]);
+      // D-STATS-VALUE-1 (6): the three rows with 0 B saved fold into one "other" row.
+      assert.deepEqual(labels(rep, "Tool"), ["ctx_index", "hook Bash", "ctx_batch", "ctx_execute", "other (3 tools)"]);
       assert.ok(rep.includes("  ctx_index                  1   216.8 KB      300 B   216.5 KB   99.9% ████████"), rep);
       assert.ok(rep.includes("  hook Bash                  2   161.1 KB     5.3 KB   155.9 KB   96.7% ██████"), rep);
       assert.deepEqual(labels(rep, "Agent"), ["claude-code", "codex"]);
@@ -269,6 +270,7 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       // The report block and the summary line; the Markdown table below holds raw byte counts for agents.
       for (const line of [out.text.split("\n")[0], ...report(out.text).split("\n")]) assert.ok([...line].length <= 80, `${[...line].length} columns: ${line}`);
       assert.ok(report(out.text).includes("4.5 TB"), "TB unit with one decimal");
+      assert.ok(report(out.text).includes(" times a 200K window"), "a saving past one window reads as times");
     }));
 
     test("[R6] stats/report-deterministic: same journal, same bytes", () => withRoot(async (root) => {
@@ -277,6 +279,78 @@ describe("PRD-v2 sections 8 and 12: stats and purge (concurrent)", { concurrency
       const a = await ctxStats.handler({}, ctx);
       const b = await ctxStats.handler({}, ctx);
       assert.equal(a.text, b.text);
+    }));
+
+    // D-STATS-VALUE-1: the business-value lines (owner, 2026-11-02: "en value uretenleri yapalim ekleyelim").
+    // A week of extra rows in session s0, written straight to the DB with their own created_at (UTC days
+    // T0 - 9, - 6, - 3, - 2 = 10-17, 10-20, 10-23, 10-24), and one run.mjs source (a hook redirect, ADR-0016 case B).
+    const DAY = 86400000;
+    const WEEK = [
+      { d: -6, tool: "ctx_execute", p: 30000, r: 1000 }, { d: -3, tool: "Bash", p: 90000, r: 500 },
+      { d: -3, tool: "ctx_index", kind: "index", p: 50000, r: 200 }, { d: -9, tool: "ctx_batch", p: 70000, r: 700 },
+    ];
+    async function addWeek(ctx) {
+      await addFixed(ctx);
+      const raw = new DatabaseSync(ctx.project.dbPath);
+      try {
+        const ins = raw.prepare("INSERT INTO events (session_id, worktree, agent, kind, tool, key, path, ok, exit_code, bytes, body, turn, sandbox_bytes, returned_bytes, created_at, accessed_at) VALUES ('s0', ?, 'claude-code', ?, ?, NULL, NULL, 1, NULL, ?, 'x', 1, ?, ?, ?, ?)");
+        for (const x of WEEK) ins.run(ctx.project.worktree, x.kind ?? "cmd", x.tool, x.p, x.p, x.r, T0 + x.d * DAY, T0 + x.d * DAY);
+        raw.prepare("INSERT INTO sources (session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts) VALUES ('s0', ?, 'claude-code', 'content', ?, 80000, 20, ?, '', 0)")
+          .run(ctx.project.worktree, "run.mjs:git diff --no-index a b", T0 - 2 * DAY);
+      } finally { raw.close(); }
+    }
+
+    test("[R8] stats/context-window: tokens kept out (bytes / 4, about) as a share of a 200K window", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addFixed(ctx);
+      const rep = report((await ctxStats.handler({}, ctx)).text);
+      // session s1 saved 544,793 B -> 136,198 tokens -> 68.1% of 200,000.
+      assert.ok(rep.includes("\n  about 136K tokens kept out, 68% of a 200K window\n"), rep);
+    }));
+
+    test("[R8] stats/hook-work: redirects (run.mjs sources) and replaces (host rows returned < produced) are counted", () => withRoot(async (root) => {
+      const a = ctxFor(root);
+      await addFixed(a);
+      assert.ok(report((await ctxStats.handler({}, a)).text).includes("\n  Hooks sent 1 large output to the sandbox · 0 redirected, 1 replaced\n"));
+      const b = ctxFor(root, "s1", "claude-code");
+      b.project = { ...b.project, projectKey: "6".repeat(16), projectDir: join(root, "projects", "6".repeat(16)), dbPath: join(root, "projects", "6".repeat(16), "context.db") };
+      await addWeek(b);
+      assert.ok(report((await ctxStats.handler({}, b)).text).includes("\n  Hooks sent 3 large outputs to the sandbox · 1 redirected, 2 replaced\n"));
+    }));
+
+    test("[R8] stats/top-outputs + index-and-search + footer: largest single outputs, sources vs searches, last line", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addWeek(ctx);
+      const rep = report((await ctxStats.handler({}, ctx)).text);
+      const top = (name, p, r) => "  " + name.padEnd(21) + p.padStart(11) + " → " + r.padStart(11);
+      assert.ok(rep.includes("Largest single outputs (made → sent to the chat)\n" +
+        [top("ctx_index", "216.8 KB", "300 B"), top("hook Bash", "156.3 KB", "421 B"), top("ctx_batch", "117.2 KB", "2.0 KB")].join("\n") + "\n\n"), rep);
+      assert.ok(rep.includes("\n  Index and search     3 sources indexed · 1 ctx_search call\n"), rep);
+      assert.equal(rep.split("\n").at(-1), "contextmode.ai · github.com/mksglu/context-mode");
+    }));
+
+    test("[R8] stats/last-7-days: four cards with spark lines, then one stacked bar per UTC day by way of saving", () => withRoot(async (root) => {
+      const ctx = ctxFor(root);
+      await addWeek(ctx);
+      const rep = report((await ctxStats.handler({}, ctx)).text);
+      // Window 10-20..10-26 (the day of the latest row; 10-17 is out). Saved per day by way, worked by hand:
+      // 10-20 sandbox 29,000; 10-23 index 49,800 + replace 89,500; 10-24 redirect 80,000 - 16,384 (OUTPUT_CAP) = 63,616;
+      // 10-26 sandbox 175,000 + index 218,700 + replace 159,593 = 553,293. Sum 785,209 B, 14 calls (13 rows + 1 run).
+      assert.ok(rep.includes([
+        "Last 7 days · 10-20 to 10-26",
+        "  Saved bytes        Tokens kept out    Calls counted      Saved per call",
+        "  766.8 KB           about 196K         14                 54.8 KB",
+        "  ▂▁▁▃▂▁█            ▂▁▁▃▂▁█            ▂▁▁▂▂▁█            ▄▁▁█▇▁▇",
+      ].join("\n")), rep);
+      const day = (d, bar, v) => "  " + d + " " + bar.padEnd(48) + v.padStart(11);
+      assert.ok(rep.includes(["Saved over time",
+        day("10-20", "█".repeat(3), "28.3 KB"), day("10-21", "", "0 B"), day("10-22", "", "0 B"),
+        day("10-23", "▓".repeat(4) + "░".repeat(8), "136.0 KB"), day("10-24", "▒".repeat(6), "62.1 KB"), day("10-25", "", "0 B"),
+        day("10-26", "█".repeat(15) + "▓".repeat(19) + "░".repeat(14), "540.3 KB"),
+        "  █ sandbox run  ▓ index + search  ▒ hook redirect  ░ output replaced",
+      ].join("\n")), rep);
+      for (const line of rep.split("\n")) assert.ok([...line].length <= 80, line);
+      assert.equal((await ctxStats.handler({}, ctx)).text, (await ctxStats.handler({}, ctx)).text, "same journal, same bytes");
     }));
 
     test("[R6] stats/report-empty: an empty journal gives a short, friendly report", () => withRoot(async (root) => {
