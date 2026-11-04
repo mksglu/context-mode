@@ -208,7 +208,7 @@ export type DoctorCheckId = "D1" | "D2" | "D3" | "D4" | "D5" | "D5b" | "D6" | "D
 export interface DoctorRow {
   id: DoctorCheckId;
   label: string;                 // e.g. "version", "context.db"
-  status: "PASS" | "FAIL" | "UNKNOWN";
+  status: "PASS" | "WARN" | "FAIL" | "UNKNOWN";
   detail: string;                // the <cause>, plain English, one line
   fixCommand?: string;           // the <command>; omitted when status is PASS
 }

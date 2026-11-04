@@ -5,11 +5,12 @@
 // the hook's own cost against HOOK_P95_MS. An agent with no recorded payload is UNKNOWN, never a guessed payload.
 // D-D5-BARE-1: the cost is hook wall minus bare `node -e ""` wall, the D3 rule (ADR-0019 D3), fastest of 3 to 9 pairs (D-D5-MORE-PAIRS-1).
 // node.exe start is paid by the host with or without the hook (42.7 ms p50 on windows-latest), so it is not in the budget.
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
@@ -118,6 +119,47 @@ function isNativeShape(agent: AgentId, stdout: string, exitCode: number | null, 
   }
 }
 
+// D-D5-READ-SHAPE-1 (#1304): "D5 passes because the round trip does not check the shape of updatedToolOutput for Read".
+// claude-code only: one PostToolUse Read call over REPLACE_TRIGGER_BYTES, in Claude Code's Read output shape (2.1.274 binary
+// outputSchema), runs with HOME in a temp dir of its own, so the probe writes nothing to the user's store.
+const READ_PROBE_LINES = 4 * Math.ceil(REPLACE_TRIGGER_BYTES / 40);
+
+function readProbePayload(cwd: string): unknown {
+  const content = Array.from({ length: READ_PROBE_LINES }, (_, n) => "d5 read probe line " + n + " ".padEnd(20, "x")).join("\n");
+  const filePath = path.join(cwd, "d5-read-probe.txt");
+  return {
+    session_id: "d5-read-probe", transcript_path: "", cwd, hook_event_name: "PostToolUse", tool_name: "Read",
+    tool_use_id: "toolu_d5_read_probe", tool_input: { file_path: filePath },
+    tool_response: { type: "text", file: { filePath, content, numLines: READ_PROBE_LINES, startLine: 1, totalLines: READ_PROBE_LINES } },
+  };
+}
+
+/** True when updatedToolOutput is absent (no replace) or is Read's own text object. */
+export function isReadShape(stdout: string): boolean {
+  if (stdout.trim() === "") return true;
+  let out: unknown;
+  try { out = JSON.parse(stdout); } catch { return false; }
+  if (!isObject(out) || !isObject(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput")) return true;
+  const r = out.hookSpecificOutput.updatedToolOutput;
+  if (!isObject(r) || r.type !== "text" || !isObject(r.file)) return false;
+  const f = r.file;
+  return typeof f.filePath === "string" && typeof f.content === "string"
+    && ["numLines", "startLine", "totalLines"].every((k) => typeof f[k] === "number");
+}
+
+async function readProbeOk(i: HookCheckInput, timeoutMs: number): Promise<boolean> {
+  const home = mkdtempSync(path.join(tmpdir(), "cm-d5-read-"));
+  try {
+    const r = await runProcess([process.execPath, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir, env: { ...i.env, HOME: home, USERPROFILE: home }, signal: i.signal, timeoutMs,
+      stdin: JSON.stringify(readProbePayload(i.worktree ?? home)),
+    });
+    return isReadShape(r.stdout.toString("utf8"));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 /** R6: true when at least one journal row of any Codex session exists in this project's context.db. */
 export function codexHookJournaled(db: DbHandle | null): boolean {
   if (db === null) return false;
@@ -195,5 +237,6 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
+  if (i.agent === "claude-code" && !(await readProbeOk(i, timeoutMs))) return row("FAIL", D5_READ_SHAPE_DETAIL, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }

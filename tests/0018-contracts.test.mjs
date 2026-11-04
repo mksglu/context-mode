@@ -399,7 +399,7 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
       const src = readFileSync(join(SRC, "types.ts"), "utf8");
       for (const s of [
         'export type DoctorCheckId = "D1" | "D2" | "D3" | "D4" | "D5" | "D5b" | "D6" | "D7" | "D8" | "D9" | "D10" | "D11";',
-        "export interface DoctorRow {", "id: DoctorCheckId;", "label: string;", 'status: "PASS" | "FAIL" | "UNKNOWN";',
+        "export interface DoctorRow {", "id: DoctorCheckId;", "label: string;", 'status: "PASS" | "WARN" | "FAIL" | "UNKNOWN";',
         "detail: string;", "fixCommand?: string;",
         "export interface V1Finding { file: string; path: string; reason: string; }",
         'export type UpgradeMode = "upgrade" | "uninstall";',

@@ -239,7 +239,7 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     mkdirSync(path.join(home, ".claude", "context-mode"), { recursive: true });
     const d4 = checkV1Leftovers("claude-code", home, { tmp: empty });
     assert.equal(d4.id, "D4");
-    assert.equal(d4.status, "FAIL");
+    assert.equal(d4.status, "WARN", "D-D4-WARN-1 (#1304): a 1.x leftover is WARN, not FAIL");
     assert.ok(d4.detail.split("; ").length >= 2, d4.detail);
     assert.equal(d4.fixCommand, "run ctx_upgrade");
   });
@@ -960,6 +960,26 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const out = JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse" } });
     const r = await checkHookRoundTrip(input(bundle(t, out)));
     assert.equal(r.detail, C.D5_SHAPE_DETAIL);
+  });
+
+  // D-D5-READ-SHAPE-1 (#1304): claude-code D5 also sends a large PostToolUse Read and checks updatedToolOutput.
+  const readHook = (out) => `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
+    `process.stdout.write(p.hook_event_name==="PostToolUse"?JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",updatedToolOutput:${out}}}):${JSON.stringify(native)});});`;
+  function readBundle(t, out) {
+    const dir = bundle(t, native);
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), readHook(out));
+    return dir;
+  }
+
+  test("[M5] doctor-hook/D5-read-replace-as-string-FAILs (#1304)", async (t) => {
+    const r = await checkHookRoundTrip(input(readBundle(t, JSON.stringify("pointer"))));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_SHAPE_DETAIL, fixCommand: C.D5_FIX });
+  });
+
+  test("[M5] doctor-hook/D5-read-replace-in-Read-shape-PASSes (#1304)", async (t) => {
+    const obj = JSON.stringify({ type: "text", file: { filePath: "/a", content: "c", numLines: 1, startLine: 1, totalLines: 1 } });
+    const r = await checkHookRoundTrip(input(readBundle(t, obj)));
+    assert.equal(r.status, "PASS", r.detail);
   });
 
   test("[M5] doctor-hook/D5-bad-exit-code-FAILs-shape", async (t) => {
@@ -2260,7 +2280,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, V1_TOML);
     const d4 = checkV1Leftovers("codex", s.home, { tmp: s.tmp });
-    assert.equal(d4.status, "FAIL");
+    assert.equal(d4.status, "WARN"); // D-D4-WARN-1 (#1304)
     assert.match(d4.detail, /\[mcp_servers\.context-mode\*\]/);
   });
 

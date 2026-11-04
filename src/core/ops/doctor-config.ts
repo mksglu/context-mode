@@ -264,7 +264,8 @@ export function checkV1Leftovers(agent: AgentId, home: string, scope: V1Scope = 
   const detail = findings.map((f) => f.reason).join(D4_REASON_JOIN);
   // D-DOCTOR-ISSUE-1: a report-only finding (old temp file) asks for no step, so the row is PASS with the finding as detail.
   if (findings.every((f) => f.reason === V1_REASON.tmpFile)) return { ...pass("D4"), detail };
-  return fail("D4", detail, DOCTOR_FIX_UPGRADE);
+  // D-D4-WARN-1 (#1304): a 1.x leftover does not stop 2.x from working, so the row is WARN with the fix, never FAIL.
+  return { ...fail("D4", detail, DOCTOR_FIX_UPGRADE), status: "WARN" };
 }
 
 // A file we cannot read or parse turns nothing on (same rule as detect-v1, D-M5-O2-5). VS Code settings are JSONC.
