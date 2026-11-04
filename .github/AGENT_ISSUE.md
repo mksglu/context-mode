@@ -224,7 +224,7 @@ Read keeps its object shape; the warning stays away; the agent sees a 180 B poin
 
 Reproduced: yes (2 of 2)
 1. `export REPRO=$(mktemp -d); export HOME="$REPRO/home"; mkdir -p "$HOME"; cd "$REPRO"`
-2. `claude plugin marketplace add mksglu/context-mode#release` then `claude plugin install context-mode@context-mode`
+2. `claude plugin marketplace add mksglu/context-mode` then `claude plugin install context-mode@context-mode`
 3. `head -c 30000 /dev/urandom | base64 > big.txt; wc -c big.txt` gives 40538 B
 4. Send the PostToolUse Read payload for big.txt to the hook:
 
