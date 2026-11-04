@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${PLUGIN_ROOT}/hook.mjs\" --agent codex",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "^(Bash|apply_patch|mcp__context_mode__ctx_.*)$"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${PLUGIN_ROOT}/hook.mjs\" --agent codex",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "^(Bash|apply_patch|mcp__context_mode__ctx_.*)$"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${PLUGIN_ROOT}/hook.mjs\" --agent codex",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${PLUGIN_ROOT}/hook.mjs\" --agent codex",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

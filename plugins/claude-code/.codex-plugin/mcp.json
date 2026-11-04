@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "context-mode": {
+      "args": [
+        "./server.mjs",
+        "--agent",
+        "codex"
+      ],
+      "command": "node",
+      "cwd": ".",
+      "default_tools_approval_mode": "approve"
+    }
+  }
+}

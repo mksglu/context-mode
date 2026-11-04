@@ -1,0 +1,16 @@
+{
+  "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
+  "hooks": "hooks/qwen.json",
+  "mcpServers": {
+    "context-mode": {
+      "args": [
+        "${extensionPath}${/}plugins/claude-code/server.mjs",
+        "--agent",
+        "qwen"
+      ],
+      "command": "node"
+    }
+  },
+  "name": "context-mode",
+  "version": "2.0.0"
+}

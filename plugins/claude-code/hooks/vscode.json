@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "command": "node hook.mjs --agent vscode",
+        "timeout": 5,
+        "type": "command"
+      }
+    ],
+    "PreCompact": [
+      {
+        "command": "node hook.mjs --agent vscode",
+        "timeout": 5,
+        "type": "command"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "command": "node hook.mjs --agent vscode",
+        "timeout": 5,
+        "type": "command"
+      }
+    ],
+    "SessionStart": [
+      {
+        "command": "node hook.mjs --agent vscode",
+        "timeout": 5,
+        "type": "command"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "command": "node hook.mjs --agent vscode",
+        "timeout": 5,
+        "type": "command"
+      }
+    ]
+  },
+  "version": 1
+}

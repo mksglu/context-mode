@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "enabled": true,
+    "events": {
+      "PostToolUse": [
+        {
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ],
+          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
+        }
+      ],
+      "PreToolUse": [
+        {
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ],
+          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
+        }
+      ],
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ]
+        }
+      ],
+      "UserPromptSubmit": [
+        {
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

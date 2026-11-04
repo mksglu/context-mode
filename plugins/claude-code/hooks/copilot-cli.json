@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": "node hook.mjs --agent copilot-cli",
+        "timeoutSec": 5,
+        "type": "command"
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "node hook.mjs --agent copilot-cli",
+        "timeoutSec": 5,
+        "type": "command"
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "node hook.mjs --agent copilot-cli",
+        "timeoutSec": 5,
+        "type": "command"
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "command": "node hook.mjs --agent copilot-cli",
+        "timeoutSec": 5,
+        "type": "command"
+      }
+    ]
+  },
+  "version": 1
+}

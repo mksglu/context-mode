@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${extensionPath}${/}plugins/claude-code/hook.mjs\" --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${extensionPath}${/}plugins/claude-code/hook.mjs\" --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${extensionPath}${/}plugins/claude-code/hook.mjs\" --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreCompress": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${extensionPath}${/}plugins/claude-code/hook.mjs\" --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

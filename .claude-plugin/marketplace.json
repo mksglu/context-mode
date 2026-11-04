@@ -1,40 +1,15 @@
 {
   "name": "context-mode",
   "owner": {
-    "name": "Mert Koseoglu",
-    "email": "code.bm.ksglu@gmail.com"
-  },
-  "metadata": {
-    "description": "Context Mode plugins by Mert Koseoglu",
-    "version": "2.0.0-next.39"
+    "name": "context-mode"
   },
   "plugins": [
     {
-      "name": "context-mode",
-      "source": "./",
       "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
-      "version": "2.0.0-next.39",
-      "author": {
-        "name": "Mert Koseoglu"
-      },
-      "category": "development",
-      "keywords": [
-        "claude-code",
-        "codex",
-        "gemini-cli",
-        "qwen-code",
-        "copilot-cli",
-        "vscode",
-        "opencode",
-        "pi",
-        "kiro",
-        "zcode",
-        "mcp",
-        "context-window",
-        "sandbox",
-        "fts5",
-        "pi-package"
-      ]
+      "name": "context-mode",
+      "skills": "./claude-code/skills",
+      "source": "./plugins/claude-code",
+      "version": "2.0.0"
     }
   ]
 }

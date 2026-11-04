@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugins/claude-code/hook.mjs\" --agent qwen",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "^(run_shell_command|Shell|read_file|grep_search|web_fetch|mcp__context-mode__ctx_.*)$"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugins/claude-code/hook.mjs\" --agent qwen",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "^(run_shell_command|Shell|read_file|grep_search|web_fetch|mcp__context-mode__ctx_.*)$"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugins/claude-code/hook.mjs\" --agent qwen",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugins/claude-code/hook.mjs\" --agent qwen",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

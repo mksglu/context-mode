@@ -7,8 +7,8 @@
     {
       "name": "context-mode",
       "source": {
-        "source": "url",
-        "url": "./"
+        "source": "local",
+        "path": "./plugins/claude-code"
       },
       "policy": {
         "installation": "AVAILABLE",
