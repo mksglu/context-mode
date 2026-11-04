@@ -9,7 +9,7 @@
 //   3. spawn release-out/server.mjs --agent <agent> (the built server bundle; D-M7-arch-6 calls it
 //      "server.bundle.mjs", build/build.mjs writes server.mjs) and call MCP ctx_doctor (before), ctx_upgrade,
 //      ctx_doctor (after)
-//   4. assert: D4 after the upgrade is PASS, or FAIL only for this agent's report-only leftovers (Gemini shared
+//   4. assert: D4 after the upgrade is PASS, or WARN only for this agent's report-only leftovers (Gemini shared
 //      data dir: the prompt is declined, the dir is kept; VS Code .vscode/mcp.json entry; Kiro steering doc);
 //      VS Code: both session-data paths are in the D4 row before the upgrade; Kiro: KIRO.md is flagged, never
 //      deleted
@@ -64,7 +64,7 @@ function finish(tempDir) {
 
 const text = (r) => r?.content?.[0]?.text ?? "";
 
-/** The D4 row {status, detail, line} from the doctor table ("| D4 old entries | FAIL | <detail> | <fix> |"), or null. */
+/** The D4 row {status, detail, line} from the doctor table ("| D4 old entries | WARN | <detail> | <fix> |"), or null. */
 function d4Row(report) {
   for (const line of report.split("\n")) {
     if (!line.startsWith(D4_PREFIX)) continue;
@@ -152,7 +152,8 @@ async function main() {
 
   // Step 4: D4 before lists old entries; after is clean except the report-only ones.
   const d4Before = d4Row(before);
-  step("doctor-before-d4-fail", d4Before?.status === "FAIL", d4Before?.line ?? before.split("\n")[0]);
+  // D-D4-WARN-1 (#1304): 1.x leftovers are WARN with the fix, not FAIL.
+  step("doctor-before-d4-warn", d4Before?.status === "WARN", d4Before?.line ?? before.split("\n")[0]);
   step("upgrade", !upgradeErr && upgrade.length > 0, upgrade.split("\n").slice(0, 3).join(" / "));
   const d4After = d4Row(after);
   const kept = KEPT[agent] ?? [];
