@@ -21,7 +21,7 @@ Run each command in the user's real HOME, where the problem happened, and keep i
 | Fact | Command | Template field |
 |---|---|---|
 | context-mode version | row D1 of the doctor table; also `npm ls -g context-mode --depth=0` | Environment: context-mode version |
-| install route | the native command from the README that installed it (for example `codex plugin add context-mode@context-mode`), or `npm i -g context-mode@next` | Environment: Install route |
+| install route | the native command from the README that installed it (for example `codex plugin add context-mode@context-mode`), or `npm i -g context-mode` | Environment: Install route |
 | agent and version | `claude --version`, `codex --version`, `gemini --version`, `qwen --version`, `pi --version`, `opencode --version` (run your own) | Environment: Agent and version |
 | OS and arch | `uname -sm` (macOS, Linux); `$env:OS` and `$env:PROCESSOR_ARCHITECTURE` in PowerShell | Environment: OS and arch |
 | Node version | `node --version` | Environment: Node version |
@@ -53,13 +53,13 @@ Run these steps yourself before you file, in a new shell session with a temporar
    ```
    (PowerShell: set `$env:USERPROFILE` to a new folder.) Agent logins live under HOME; steps that need a model call say so under Steps and name the agent. The doctor, setup and hook steps run with the agent logged out.
 2. Install with the agent's own native command, then run the terminal doctor:
-   - Claude Code: `claude plugin marketplace add mksglu/context-mode#release` then `claude plugin install context-mode@context-mode`
-   - Codex: `codex plugin marketplace add mksglu/context-mode@release` then `codex plugin add context-mode@context-mode`
-   - Gemini CLI: `gemini extensions install https://github.com/mksglu/context-mode --ref release`
-   - Qwen Code: `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release`
-   - Pi: `pi install npm:context-mode@next`
-   - OpenCode: `opencode plugin add context-mode@next`
-   - Copilot CLI, Kiro, VS Code, ZCode: `npm i -g context-mode@next` then `context-mode setup --agents <agent>`
+   - Claude Code: `claude plugin marketplace add mksglu/context-mode` then `claude plugin install context-mode@context-mode`
+   - Codex: `codex plugin marketplace add mksglu/context-mode` then `codex plugin add context-mode@context-mode`
+   - Gemini CLI: `gemini extensions install https://github.com/mksglu/context-mode`
+   - Qwen Code: `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
+   - Pi: `pi install npm:context-mode`
+   - OpenCode: `opencode plugin add context-mode`
+   - Copilot CLI, Kiro, VS Code, ZCode: `npm i -g context-mode` then `context-mode setup --agents <agent>`
    - Check: `context-mode doctor --agents <agent>`
 3. The smallest file or command that shows the defect, with sizes in place of content:
    ```sh
@@ -77,7 +77,7 @@ The fix may exist already. Before you file:
 
 ```sh
 npm view context-mode dist-tags --json
-npm i --prefix "$REPRO/next" context-mode@next
+npm i --prefix "$REPRO/next" context-mode
 "$REPRO/next/node_modules/.bin/context-mode" doctor --agents <agent>
 ```
 

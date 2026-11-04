@@ -7,3 +7,5 @@ If you are a coding agent: read [.github/AGENT_ISSUE.md](.github/AGENT_ISSUE.md)
 If you are a person: ask your agent to "file a context-mode issue", or run `/ctx-doctor` and fill in the Bug report form with its block.
 
 Security problems go to https://github.com/mksglu/context-mode/security/advisories/new, never to a public issue.
+
+Main is the only source: every fix lands on main, and the next release run ships it.

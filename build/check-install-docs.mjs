@@ -8,7 +8,7 @@
 // only an agent variable ({env:HOME}, ${extensionPath}, ${CLAUDE_PLUGIN_ROOT}) passes.
 // Shell fences also fail on forms that do not expand as copied: a quoted "~/..." in sh (the shell keeps the ~),
 // $env:USERPROFILE in sh, and ~ or %USERPROFILE% in powershell (Windows PowerShell 5.1 passes them to git/node as is).
-// A fenced `npm i -g context-mode` without a version tag fails (@next = v2 preview, @1 = v1): latest is v1 until the owner moves it (ADR-0019 D2). The default run also checks README.md.
+// A fenced `npm i -g context-mode@next` fails: main is the only source and npm latest is v2, so users install the plain name. The default run also checks README.md.
 // Any fenced line with "change this", "your path" or "edit this" fails: the reader must not edit a block.
 // D-INST-4 (npm route): a fenced `context-mode setup|doctor|upgrade` line may use only flags that command has (checkLines);
 // checkPages: README.md names Node 24.15.0, the two-command install and the uninstall command; each agent page names `context-mode setup` (no upgrade section: D-V1OUT-1).
@@ -18,7 +18,7 @@
 // Simple rules (owner 2026-10-25: users never type paths, JSON or scripts), checkSimpleLines over docFiles: a fenced line
 // must not hold `node -e`, `npm root -g`, `$(...)` or a path under a home dir (~/, $HOME, %USERPROFILE%, $env:USERPROFILE,
 // {env:HOME}, /Users/, /home/, C:\Users); a line in a shell or unlabelled fence is at most 100 chars. checkSimplePages: a
-// README names `npm i -g context-mode@next` and `context-mode setup` as two fenced lines; an agent page <id>.md names
+// README names `npm i -g context-mode` and `context-mode setup` as two fenced lines; an agent page <id>.md names
 // `context-mode setup --agents <id>` (or the two lines), `context-mode setup --print <id>` and `context-mode setup --remove --agents <id>`.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -48,7 +48,7 @@ export function checkPages(pages) {
   for (const [name, text] of Object.entries(pages)) {
     if (name === "README.md") {
       if (!text.includes("24.15.0")) bad.push("README.md needs Node 24.15.0");
-      if (!text.includes("npm i -g context-mode@next && context-mode setup") && !hasTwoLines(text)) bad.push("README.md needs the two-command install");
+      if (!text.includes("npm i -g context-mode && context-mode setup") && !hasTwoLines(text)) bad.push("README.md needs the two-command install");
       if (!text.includes("context-mode setup --remove && npm rm -g context-mode") && !/^context-mode setup --remove\n(?:[^\n]*\n)*?npm rm -g context-mode$/m.test(fencedLines(text).join("\n"))) bad.push("README.md needs the uninstall command");
     } else {
       if (!text.includes("context-mode setup")) bad.push(`${name} needs context-mode setup`);
@@ -77,8 +77,8 @@ export function checkLines(name, text) {
     const at = `${name}:${i + 1}`;
     if (/<[A-Za-z.][^<>\n]*>/.test(line) || /\.\.\.>/.test(line)) bad.push(`${at} placeholder: ${line.trim()}`);
     if (/npx\s+(-y\s+)?context-mode/.test(line)) bad.push(`${at} npx context-mode: ${line.trim()}`);
-    // v2 preview is on dist-tag next; a bare install gets v1 until the owner moves latest (ADR-0019 D2).
-    if (/\bnpm\s+(i|install|add)\b[^\n&;|]*\bcontext-mode(?![\w./@-])/.test(line)) bad.push(`${at} npm install of context-mode needs a version tag (@next for v2, @1 for v1): ${line.trim()}`);
+    // main is the only source and latest is v2: the plain package name is the install (no @next).
+    if (/\bnpm\s+(i|install|add)\b[^\n&;|]*\bcontext-mode@next\b/.test(line)) bad.push(`${at} npm install of context-mode@next: use the plain name context-mode: ${line.trim()}`);
     for (const c of line.matchAll(CLI_CMD)) {
       for (const f of c[2].match(/(?:^|\s)(--?[A-Za-z][\w-]*)/g) ?? []) if (!CLI_FLAGS.has(f.trim())) bad.push(`${at} unknown flag ${f.trim()} for context-mode ${c[1]}: ${line.trim()}`);
     }
@@ -121,7 +121,7 @@ function fenced(text) {
   return out;
 }
 const fencedLines = (text) => fenced(text).map((l) => l.line.trim());
-const hasTwoLines = (text) => { const l = fencedLines(text); return l.includes("npm i -g context-mode@next") && l.includes("context-mode setup"); };
+const hasTwoLines = (text) => { const l = fencedLines(text); return l.includes("npm i -g context-mode") && l.includes("context-mode setup"); };
 
 const HOME_PATH = /(^|[^\w])~[\/\\]|\$HOME\b|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\{env:(HOME|USERPROFILE)\}|\/Users\/|\/home\/|[A-Z]:\\+Users\\/i;
 const SHELL_OR_PLAIN = /^(|sh|bash|zsh|shell|console|powershell|pwsh|ps1|cmd|bat)$/i;
@@ -147,7 +147,7 @@ export function checkSimplePages(pages) {
   const bad = [];
   for (const [name, text] of Object.entries(pages)) {
     const base = path.basename(name);
-    if (base === "README.md") { if (!hasTwoLines(text)) bad.push(`${name} needs the two-command path (npm i -g context-mode@next, then context-mode setup)`); continue; }
+    if (base === "README.md") { if (!hasTwoLines(text)) bad.push(`${name} needs the two-command path (npm i -g context-mode, then context-mode setup)`); continue; }
     const id = base.replace(/\.md$/, "");
     if (!hasTwoLines(text) && !fencedLines(text).includes(`context-mode setup --agents ${id}`)) bad.push(`${name} needs the two-command path or context-mode setup --agents ${id}`);
     if (!text.includes(`context-mode setup --print ${id}`)) bad.push(`${name} needs context-mode setup --print ${id}`);
@@ -158,7 +158,6 @@ export function checkSimplePages(pages) {
 
 /** Hosts whose own native command installs context-mode (ADR-0023). Other hosts open with the npm fallback. */
 export const NATIVE_HOSTS = Object.freeze(["claude-code", "codex", "gemini", "qwen", "pi", "opencode"]);
-export const NEXT_LINE = "`next` is the v2 prerelease tag";
 export const CHECK_LINE = "Check: `context-mode doctor`";
 const UPDATE_WORDS = ["update", "upgrade", "--force"];
 
@@ -186,14 +185,14 @@ export function installSection(text) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
-// D-OC2-NATIVE-CMD-1: OpenCode 2 (@opencode/cli 2.2.5) installs with `opencode plugin add context-mode@next`, updates with
-// `opencode plugin update` and removes with `opencode plugin remove context-mode@next`. `opencode plugin context-mode@next --global`
+// D-OC2-NATIVE-CMD-1: OpenCode 2 (@opencode/cli 2.2.5) installs with `opencode plugin add context-mode`, updates with
+// `opencode plugin update` and removes with `opencode plugin remove context-mode`. `opencode plugin context-mode --global`
 // is the 1.19 (opencode-ai) form: on 2.x it is 'Unknown subcommand' plus 'Unrecognized flag: --global'. The 1.19 form may only
 // stand on a line that names 1.19. Plain string search, no regex.
-export const OPENCODE2_INSTALL = "opencode plugin add context-mode@next";
+export const OPENCODE2_INSTALL = "opencode plugin add context-mode";
 export const OPENCODE2_UPDATE = "opencode plugin update";
-export const OPENCODE2_REMOVE = "opencode plugin remove context-mode@next";
-const OPENCODE1_FORM = "opencode plugin context-mode@next --global";
+export const OPENCODE2_REMOVE = "opencode plugin remove context-mode";
+const OPENCODE1_FORM = "opencode plugin context-mode --global";
 
 /** Every line with the 1.19 form that does not name 1.19, and an opencode install page whose first install line is not the OpenCode 2 command. */
 export function checkOpencodeCommands(pages) {
@@ -207,7 +206,7 @@ export function checkOpencodeCommands(pages) {
   return bad;
 }
 
-/** ADR-0023 page rules: a native host opens with its own command and then its update command; every page has the check line and the next line. */
+/** ADR-0023 page rules: a native host opens with its own command and then its update command; every page has the check line. */
 export function checkNativePages(pages) {
   const bad = [];
   for (const [name, text] of Object.entries(pages)) {
@@ -224,67 +223,22 @@ export function checkNativePages(pages) {
       if (!UPDATE_WORDS.some((w) => second.includes(w))) bad.push(`${name} needs an update block (the native update command) right after the install block`);
     } else if (second !== "context-mode upgrade") bad.push(`${name} needs a context-mode upgrade block right after the install block`);
     if (!install.includes(CHECK_LINE)) bad.push(`${name} needs ${CHECK_LINE}`);
-    if (!install.includes(NEXT_LINE)) bad.push(`${name} needs the next-tag line: ${NEXT_LINE}`);
   }
   return bad;
 }
 
-// D-NI-DOCS-REF-2: until v2 is on main, main holds the old build. Every GitHub-source command a user copies names the
-// release ref in the host's own syntax (claude and codex: a #release or @release suffix on the repo; gemini and qwen: --ref release).
-// Only a line that starts with "After v2 is on main: " may hold the command without it. No regex: plain string search.
-export const SWITCH_HEADING = "Already installed from GitHub?";
-export const AFTER_PREFIX = "After v2 is on main: ";
-const REF_HOSTS = Object.freeze(["claude-code", "codex", "gemini", "qwen"]);
-const REF_BOUNDARY = " `,.|)\"'";
-const SUFFIX_CMD = "plugin marketplace add mksglu/context-mode"; // claude, /plugin in claude, codex
-const FLAG_CMD = "extensions install https://github.com/mksglu/context-mode"; // gemini, qwen
-const atBoundary = (rest) => rest === "" || REF_BOUNDARY.includes(rest[0]);
+// Trunk on main (merge-day ticket, "Trunk on main"): main holds v2 and is the only source. A user copies the plain
+// command: no release branch ref (claude #release, codex @release, gemini and qwen --ref release), no npm dist-tag @next,
+// and no "Until v2 is on main" or "After v2 is on main" note. No regex: plain string search.
+export const OLD_FORMS = Object.freeze(["mksglu/context-mode#release", "mksglu/context-mode@release", "--ref release", "context-mode@next", "Until v2 is on", "After v2 is on main"]);
 
-/** The "### Already installed from GitHub?" part of a page: from its heading to the next heading, or "" when absent. */
-export function switchSection(text) {
-  const start = text.indexOf(`### ${SWITCH_HEADING}`);
-  if (start < 0) return "";
-  const rest = text.slice(start + 4);
-  const end = rest.indexOf("\n#");
-  return end < 0 ? rest : rest.slice(0, end);
-}
-
-/** Each GitHub-source command in `line` that lacks the release ref (one entry per command). */
-function bareCommands(line) {
-  const out = [];
-  for (const [cmd, flag] of [[SUFFIX_CMD, false], [FLAG_CMD, true]]) {
-    let at = line.indexOf(cmd);
-    while (at >= 0) {
-      const rest = line.slice(at + cmd.length);
-      if (!flag) {
-        const ok = rest.startsWith("#release") || rest.startsWith("@release") ? atBoundary(rest.slice(8)) : false;
-        if (!ok && atBoundary(rest)) out.push(cmd);
-      } else if (rest === "" || rest[0] === ":" || atBoundary(rest)) {
-        let tail = 0;
-        while (tail < rest.length && !" `,|".includes(rest[tail])) tail++;
-        const after = rest.slice(tail);
-        if (!(after.startsWith(" --ref release") && atBoundary(after.slice(14)))) out.push(cmd);
-      }
-      at = line.indexOf(cmd, at + cmd.length);
-    }
-  }
-  return out;
-}
-
-/** pages: { relative path: text }. Fails a GitHub-source command without the release ref, and a host page without the switch step. */
-export function checkReleaseRef(pages) {
+/** pages: { relative path: text }. Each line that holds an old release-branch or preview form. */
+export function checkPlainCommands(pages) {
   const bad = [];
   for (const [name, text] of Object.entries(pages)) {
     text.split("\n").forEach((line, i) => {
-      if (line.trim().startsWith(AFTER_PREFIX)) return;
-      for (const cmd of bareCommands(line)) bad.push(`${name}:${i + 1} GitHub-source command without the release ref (claude #release, codex @release, gemini and qwen --ref release): ${cmd}`);
+      for (const form of OLD_FORMS) if (line.includes(form)) bad.push(`${name}:${i + 1} old form ${form}: main is the only source, use the plain command`);
     });
-    const parts = name.split("/");
-    const id = parts[parts.length - 1].replace(".md", "");
-    const inInstall = parts.length === 1 || parts[parts.length - 2] === "install";
-    if (inInstall && REF_HOSTS.includes(id) && (!installSection(text).includes(`### ${SWITCH_HEADING}`) || fencedBlocks(switchSection(text)).length !== 1)) {
-      bad.push(`${name} needs the switch step: a "### ${SWITCH_HEADING}" part in Install with one block of the host's own remove and add commands`);
-    }
   }
   return bad;
 }
@@ -334,7 +288,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     pages["../../README.md"] = readFileSync(readme, "utf8"); // root README: same two-command rule
     bad.push(...checkSimplePages(pages));
     bad.push(...checkNativePages(pages));
-    bad.push(...checkReleaseRef(Object.fromEntries(docFiles(repo).map((f) => [path.relative(repo, f), readFileSync(f, "utf8")]))));
+    bad.push(...checkPlainCommands(Object.fromEntries(docFiles(repo).map((f) => [path.relative(repo, f), readFileSync(f, "utf8")]))));
   }
   for (const b of bad) console.log("  " + b);
   console.log(`${bad.length ? "FAIL" : "PASS"} install-docs ${files.length} files`);

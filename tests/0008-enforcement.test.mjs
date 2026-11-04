@@ -1359,7 +1359,7 @@ describe("ADR-0008 privacy: network call sites in src (D-PRIVACY-NET-1)", { conc
 
   test("README names the zero telemetry line and each allowed call site", () => {
     const readme = readFileSync(join(ROOT, "README.md"), "utf8");
-    for (const need of ["Zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "git clone", "gh issue create", "npm i -g context-mode@next", "D-PRIVACY-NET-1"]) {
+    for (const need of ["Zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "git clone", "gh issue create", "npm i -g context-mode", "D-PRIVACY-NET-1"]) {
       assert.ok(readme.includes(need), `README lacks ${need}`);
     }
   });

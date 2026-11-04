@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-claude plugin marketplace add mksglu/context-mode#release
+claude plugin marketplace add mksglu/context-mode
 claude plugin install context-mode@context-mode
 ```
 
@@ -15,13 +15,9 @@ claude plugin update context-mode@context-mode
 
 Check: `context-mode doctor`
 
-Until v2 is on `main`, `main` holds the old build (1.0.169), so the commands above name the `release` branch (`#release`).
-
-After v2 is on main: `claude plugin marketplace add mksglu/context-mode`, then `claude plugin install context-mode@context-mode`
-
 Restart Claude Code after the install and after each update.
 
-`next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:
 
@@ -32,18 +28,6 @@ context-mode setup --agents claude-code
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents claude-code`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print claude-code` and follow what it prints.
-
-### Already installed from GitHub?
-
-You added `mksglu/context-mode` without `#release` and `claude plugin list` shows 1.0.169. `claude plugin marketplace remove` removes a configured marketplace and its plugins. Then add the marketplace again with `#release`:
-
-```sh
-claude plugin marketplace remove context-mode
-claude plugin marketplace add mksglu/context-mode#release
-claude plugin install context-mode@context-mode
-```
-
-`claude plugin list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 
@@ -64,6 +48,12 @@ claude plugin list
 `context-mode@context-mode` must be listed and enabled. Then run `/ctx-doctor` in Claude Code.
 
 ## Remove
+
+```sh
+claude plugin marketplace remove context-mode
+```
+
+`claude plugin marketplace remove` removes the marketplace and its plugins. If you also ran setup, undo it first:
 
 ```sh
 context-mode setup --remove --agents claude-code
@@ -93,4 +83,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents claude-code` | 2.1.309 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 2.1.309 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Claude Code session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a live, logged-in Claude Code session that fires the hooks. Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).

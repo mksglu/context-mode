@@ -2,7 +2,7 @@
 
 Use your agent's own install command. Each line below is the native command, then the native update command. After it, run the check: `context-mode doctor`.
 
-`next` is the v2 prerelease tag on npm. `latest` stays on the old release until the owner moves it. The agents with no install command of their own use the npm route: `npm i -g context-mode@next`, then `context-mode setup`.
+The agents with no install command of their own use the npm route: `npm i -g context-mode`, then `context-mode setup`.
 
 ## Requirements
 
@@ -14,24 +14,18 @@ Use your agent's own install command. Each line below is the native command, the
 
 | Agent | Install | Update |
 |---|---|---|
-| Claude Code | `claude plugin marketplace add mksglu/context-mode#release`, then `claude plugin install context-mode@context-mode` | `claude plugin update context-mode@context-mode` |
-| Codex | `codex plugin marketplace add mksglu/context-mode@release`, then `codex plugin add context-mode@context-mode` | `codex plugin marketplace upgrade context-mode` |
-| Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | `gemini extensions update context-mode` |
-| Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | `qwen extensions update context-mode` |
-| Pi | `pi install npm:context-mode@next` | `pi update --extensions` |
-| OpenCode | `opencode plugin add context-mode@next` (1.19: `opencode plugin context-mode@next --global`) | `opencode plugin update` (1.19: `opencode plugin context-mode@next --global --force`) |
-| Copilot CLI, Kiro, VS Code, ZCode | `npm i -g context-mode@next`, then `context-mode setup --agents <id>` | `context-mode upgrade` |
-
-Until v2 is on `main`, `main` holds the old build (1.0.169), so the four GitHub-source rows name the `release` branch with each agent's own syntax.
-
-After v2 is on main: `claude plugin marketplace add mksglu/context-mode`, `codex plugin marketplace add mksglu/context-mode`, `gemini extensions install https://github.com/mksglu/context-mode`, `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
-
-Already installed from GitHub without the ref? Each agent page has the steps to switch: see "Already installed from GitHub?" in [Claude Code](claude-code.md#already-installed-from-github), [Codex](codex.md#already-installed-from-github), [Gemini CLI](gemini.md#already-installed-from-github) and [Qwen Code](qwen.md#already-installed-from-github).
+| Claude Code | `claude plugin marketplace add mksglu/context-mode`, then `claude plugin install context-mode@context-mode` | `claude plugin update context-mode@context-mode` |
+| Codex | `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode` | `codex plugin marketplace upgrade context-mode` |
+| Gemini CLI | `gemini extensions install https://github.com/mksglu/context-mode` | `gemini extensions update context-mode` |
+| Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode` | `qwen extensions update context-mode` |
+| Pi | `pi install npm:context-mode` | `pi update --extensions` |
+| OpenCode | `opencode plugin add context-mode` (1.19: `opencode plugin context-mode --global`) | `opencode plugin update` (1.19: `opencode plugin context-mode --global --force`) |
+| Copilot CLI, Kiro, VS Code, ZCode | `npm i -g context-mode`, then `context-mode setup --agents <id>` | `context-mode upgrade` |
 
 Fallback for any agent, and the only route for Copilot CLI, Kiro, VS Code and ZCode:
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup
 ```
 
@@ -43,7 +37,7 @@ context-mode doctor
 
 Restart your agent after an install or an update. Then run `/ctx-doctor` in the agent.
 
-The native step carries the MCP server, the hooks and the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` where the host lets it. `context-mode setup` is the fallback and the repair for the part it cannot do ([ADR-0023](../v2/adr/ADR-0023-native-install.md)). Doctor names the one fix on a FAIL.
+The native step carries the MCP server, the hooks and the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` where the host lets it. `context-mode setup` is the fallback and the repair for the part it cannot do ([ADR-0023](../architecture/adr/ADR-0023-native-install.md)). Doctor names the one fix on a FAIL.
 
 With no terminal (a script or CI), add `--yes` to setup: `context-mode setup --yes`. Setup asks one question, and with no terminal it stops with exit 2 instead.
 
@@ -93,14 +87,13 @@ Each page gives one command, what setup changes, how to check it, how to remove 
 
 "Checked in a clean HOME" means the command ran on macOS with a temporary HOME against the npm-packed build, the agent CLI was installed in a temporary prefix, and setup, a second setup, doctor and remove all passed. It does not mean a logged-in agent session fired the hooks: no run did that. No page is checked on Windows.
 
-The git `release` branch goes away: npm is the only release channel ([ADR-0023](../v2/adr/ADR-0023-native-install.md)).
-
+Each agent installs from `main` or from npm ([ADR-0023](../architecture/adr/ADR-0023-native-install.md)).
 
 ## Hooks, skills and saving
 
-Every agent gets hooks and the skills `/ctx-doctor`, `/ctx-stats`, `/ctx-upgrade` ([ADR-0020](../v2/adr/0020-hooks-and-skills-on-every-agent.md)). Each agent has one hook channel and one saving effect. R = the call runs, then a large result is replaced. D = a large call is denied and the reason names `ctx_execute`.
+Every agent gets hooks and the skills `/ctx-doctor`, `/ctx-stats`, `/ctx-upgrade` ([ADR-0020](../architecture/adr/0020-hooks-and-skills-on-every-agent.md)). Each agent has one hook channel and one saving effect. R = the call runs, then a large result is replaced. D = a large call is denied and the reason names `ctx_execute`.
 
-"Live saving" is the bytes of one large tool result that reach the model: without context-mode -> with v2. No run used a logged-in model session: each run piped the host's documented payload into the installed hook or plugin. Full runs: [hooks-all RESULT](../v2/spikes/hooks-all/RESULT.md).
+"Live saving" is the bytes of one large tool result that reach the model: without context-mode -> with context-mode. No run used a logged-in model session: each run piped the host's documented payload into the installed hook or plugin. Full runs: [hooks-all RESULT](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/spikes/hooks-all/RESULT.md).
 
 | Agent | Hook channel | Skills | Effect | Live saving (bytes off -> v2) | Date | Host version | Doc-verified |
 |---|---|---|---|---|---|---|---|
@@ -136,7 +129,7 @@ context-mode upgrade
 
 `upgrade` installs the newest version on the tag you are on (`next` for a `-next` version), then runs `setup --repair`. Add `--tag <tag>` to pick a tag. Restart your agent after it.
 
-If you update with npm yourself (`npm i -g context-mode@next`), most agents need nothing more: they run the npm files. Per agent:
+If you update with npm yourself (`npm i -g context-mode`), most agents need nothing more: they run the npm files. Per agent:
 
 | Agent | After `npm i -g` |
 |---|---|
@@ -173,7 +166,7 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME per run, npm-packed bui
 | `context-mode doctor --agents <all seven>` | 2026-10-23 | Pass: 7 of 7 |
 | `context-mode setup --remove --yes` | 2026-10-23 | Pass: touched files restored (`Restored N file(s).`) |
 
-The first run failed, and the failures were real defects. All four are fixed and logged in [DEVIATIONS](../v2/impl/DEVIATIONS.md):
+The first run failed, and the failures were real defects. All four are fixed and logged in [DEVIATIONS](../architecture/modules/DEVIATIONS.md):
 
 | Defect | Row |
 |---|---|
@@ -182,4 +175,4 @@ The first run failed, and the failures were real defects. All four are fixed and
 | The npm package had no `.claude-plugin/marketplace.json`, and Claude Code needs an `owner` object in it | D-INST-3 |
 | Install-docs checker had no rule for CLI flags or page content | D-INST-4 |
 
-Open: Kiro, VS Code and ZCode were not installed, so their rows prove the config entry and handshake only. No logged-in agent session fired a hook. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [manifest tests](../../tests/build/manifests.test.mjs).
+Open: Kiro, VS Code and ZCode were not installed, so their rows prove the config entry and handshake only. No logged-in agent session fired a hook. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [manifest tests](../../tests/build/manifests.test.mjs).

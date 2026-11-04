@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents vscode
 ```
 
@@ -15,7 +15,7 @@ context-mode upgrade
 
 Check: `context-mode doctor`
 
-VS Code (Copilot) has no install command of its own that takes the package, so setup is the install path here. `next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+VS Code (Copilot) has no install command of its own that takes the package, so setup is the install path here. `npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents vscode`. Without it, setup stops with exit 2.
 
@@ -70,4 +70,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents vscode` | not installed | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | not installed | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-VS Code (Copilot) was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that VS Code (Copilot) loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.
+VS Code (Copilot) was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that VS Code (Copilot) loaded the server. See [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md) and the [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md). Windows commands are not run.

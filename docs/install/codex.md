@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-codex plugin marketplace add mksglu/context-mode@release
+codex plugin marketplace add mksglu/context-mode
 codex plugin add context-mode@context-mode
 ```
 
@@ -15,16 +15,12 @@ codex plugin marketplace upgrade context-mode
 
 Check: `context-mode doctor`
 
-Until v2 is on `main`, `main` holds the old build (1.0.169), so the commands above name the `release` branch (`@release`).
-
-After v2 is on main: `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode`
-
 The plugin brings the MCP server, the hooks and the skills. Codex runs a hook only when it is trusted. After `codex plugin add`, Codex 0.156.1 lists the plugin hooks `untrusted` (`hooks/list`). Run `context-mode setup --agents codex` once: it asks Codex (`codex app-server`, `hooks/list`) for the hooks of `context-mode@context-mode` and writes one `[hooks.state]` trust table per hook in `config.toml`, with the key and hash Codex reports. It trusts only our own plugin hooks, never user hooks or other plugins. Checked live on Codex 0.156.1 in a clean CODEX_HOME: 4 of 4 hooks `trusted`, and a `cat` of a 192 KB log in `codex exec` is blocked by the PreToolUse hook. Restart Codex after the install.
 
 The trust step needs the `context-mode` command, so install it from npm first:
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents codex
 ```
 
@@ -32,7 +28,7 @@ context-mode setup --agents codex
 
 Route with no plugin (npm + setup): `context-mode setup --agents codex` writes `~/.codex/hooks.json` and one `[hooks.state]` trust table per hook in `config.toml` (D-TRUST-KEYDIR-2). The same probe shows `trusted` for all 4 hooks.
 
-`next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:
 
@@ -43,19 +39,6 @@ context-mode setup --agents codex
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents codex`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print codex` and follow what it prints.
-
-### Already installed from GitHub?
-
-You added `mksglu/context-mode` without `@release` and `codex plugin list` shows 1.0.169. `codex plugin remove` uninstalls a plugin and removes its local cache; `codex plugin marketplace remove` removes a configured marketplace source by name. Then add it again with `@release`:
-
-```sh
-codex plugin remove context-mode@context-mode
-codex plugin marketplace remove context-mode
-codex plugin marketplace add mksglu/context-mode@release
-codex plugin add context-mode@context-mode
-```
-
-`codex plugin list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 
@@ -76,6 +59,12 @@ codex mcp list
 `context-mode` must show as enabled. The Auth column may say `Unsupported`: that is normal, because the server needs no login. Then run `/ctx-doctor` in Codex.
 
 ## Remove
+
+```sh
+codex plugin remove context-mode@context-mode
+```
+
+`codex plugin remove` uninstalls the plugin and removes its local cache. If you also ran setup, undo it first:
 
 ```sh
 context-mode setup --remove --agents codex
@@ -107,4 +96,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents codex` | 0.164.0 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 0.164.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Codex session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a live, logged-in Codex session that fires the hooks. Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).

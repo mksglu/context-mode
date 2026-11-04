@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SWITCH_HEADING, checkLines, checkNativePages, checkNoV1, checkOpencodeCommands, OPENCODE2_INSTALL, checkPages, checkReleaseRef, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, switchSection, v1FreeFiles } from "../build/check-install-docs.mjs";
+import { OLD_FORMS, checkLines, checkNativePages, checkNoV1, checkOpencodeCommands, OPENCODE2_INSTALL, checkPages, checkPlainCommands, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, v1FreeFiles } from "../build/check-install-docs.mjs";
 import { getAdapter } from "../src/adapters/table.ts";
 
 describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () => {
@@ -66,10 +66,10 @@ describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () =>
     assert.deepEqual(files.flatMap((f) => checkLines(f, readFileSync(path.join(DIR, f), "utf8"))), []);
   });
 
-  test("install-docs: npm install of context-mode needs a version tag", () => {
-    const bad = checkLines("n.md", ["```sh", "npm i -g context-mode", "npm install -g context-mode && context-mode setup", "```"].join("\n")).join("\n");
+  test("install-docs: npm install of context-mode uses the plain name, @next fails", () => {
+    const bad = checkLines("n.md", ["```sh", "npm i -g context-mode@next", "npm install -g context-mode@next && context-mode setup", "```"].join("\n")).join("\n");
     assert.ok(bad.includes("n.md:2 npm install") && bad.includes("n.md:3 npm install"), bad);
-    assert.deepEqual(checkLines("n.md", ["```sh", "npm i -g context-mode@next && context-mode setup", "npm uninstall -g context-mode", "```"].join("\n")), []);
+    assert.deepEqual(checkLines("n.md", ["```sh", "npm i -g context-mode && context-mode setup", "npm uninstall -g context-mode", "```"].join("\n")), []);
   });
 
   test("install-docs: the root README fences pass", () => {
@@ -85,7 +85,7 @@ describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () =>
   });
 
   test("install-docs: page rules for the install page and the agent pages", () => {
-    const good = "Node 24.15.0\n```sh\nnpm i -g context-mode@next && context-mode setup\ncontext-mode setup --remove && npm rm -g context-mode\n```\n";
+    const good = "Node 24.15.0\n```sh\nnpm i -g context-mode && context-mode setup\ncontext-mode setup --remove && npm rm -g context-mode\n```\n";
     assert.deepEqual(checkPages({ "README.md": good, "codex.md": "run context-mode setup\n" }), []);
     const out = checkPages({ "README.md": "nothing", "codex.md": "## Install\n" }).join("\n");
     for (const s of ["README.md needs Node 24.15.0", "README.md needs the two-command install", "README.md needs the uninstall command", "codex.md needs context-mode setup"]) assert.ok(out.includes(s), s + "\n" + out);
@@ -104,16 +104,16 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
   const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
   const read = (...p) => readFileSync(path.join(REPO, ...p), "utf8");
 
-  const NPM = ["npm i -g context-mode@next", "context-mode setup --agents"];
+  const NPM = ["npm i -g context-mode", "context-mode setup --agents"];
   // id -> [install block lines, update block lines]
   const NATIVE = {
-    "claude-code": [["claude plugin marketplace add mksglu/context-mode#release", "claude plugin install context-mode@context-mode"], ["claude plugin update context-mode@context-mode"]],
-    codex: [["codex plugin marketplace add mksglu/context-mode@release", "codex plugin add context-mode@context-mode"], ["codex plugin marketplace upgrade context-mode"]],
-    gemini: [["gemini extensions install https://github.com/mksglu/context-mode --ref release"], ["gemini extensions update context-mode"]],
-    qwen: [["qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release"], ["qwen extensions update context-mode"]],
-    pi: [["pi install npm:context-mode@next"], ["pi update --extensions"]],
+    "claude-code": [["claude plugin marketplace add mksglu/context-mode", "claude plugin install context-mode@context-mode"], ["claude plugin update context-mode@context-mode"]],
+    codex: [["codex plugin marketplace add mksglu/context-mode", "codex plugin add context-mode@context-mode"], ["codex plugin marketplace upgrade context-mode"]],
+    gemini: [["gemini extensions install https://github.com/mksglu/context-mode"], ["gemini extensions update context-mode"]],
+    qwen: [["qwen extensions install https://github.com/mksglu/context-mode:context-mode"], ["qwen extensions update context-mode"]],
+    pi: [["pi install npm:context-mode"], ["pi update --extensions"]],
     // D-OC2-NATIVE-CMD-1: OpenCode 2 first (@opencode/cli 2.2.5: `plugin add`, `plugin update`); the 1.19 form is a plain line after the block.
-    opencode: [["opencode plugin add context-mode@next"], ["opencode plugin update"]],
+    opencode: [["opencode plugin add context-mode"], ["opencode plugin update"]],
   };
   const FALLBACK = ["copilot-cli", "vscode", "kiro", "zcode"];
 
@@ -128,21 +128,21 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
   test("install-native: a host with no native step opens with the npm fallback and updates with context-mode upgrade", () => {
     for (const id of FALLBACK) {
       const blocks = fencedBlocks(installSection(read("docs", "install", `${id}.md`)));
-      assert.deepEqual(blocks[0], ["npm i -g context-mode@next", `context-mode setup --agents ${id}`], `${id}.md first block`);
+      assert.deepEqual(blocks[0], ["npm i -g context-mode", `context-mode setup --agents ${id}`], `${id}.md first block`);
       assert.deepEqual(blocks[1], ["context-mode upgrade"], `${id}.md second block`);
     }
   });
 
-  // D-OC2-NATIVE-CMD-1 (owner side, real @opencode/cli 2.2.5 in a temp HOME): `opencode plugin context-mode@next --global` is
-  // 'Unknown subcommand "context-mode@next" for "opencode plugin"' plus 'Unrecognized flag: --global' on 2.x; it is the 1.19 form.
+  // D-OC2-NATIVE-CMD-1 (owner side, real @opencode/cli 2.2.5 in a temp HOME): `opencode plugin context-mode --global` is
+  // 'Unknown subcommand "context-mode" for "opencode plugin"' plus 'Unrecognized flag: --global' on 2.x; it is the 1.19 form.
   test("install-native: opencode.md opens with the OpenCode 2 command and names the 1.19 form on its own line", () => {
     const page = read("docs", "install", "opencode.md");
-    assert.equal(OPENCODE2_INSTALL, "opencode plugin add context-mode@next");
+    assert.equal(OPENCODE2_INSTALL, "opencode plugin add context-mode");
     const install = installSection(page);
-    assert.ok(install.split("\n").some((l) => l.includes("1.19") && l.includes("opencode plugin context-mode@next --global")), "1.19 line");
-    assert.ok(install.split("\n").some((l) => l.includes("1.19") && l.includes("opencode plugin context-mode@next --global --force")), "1.19 update line");
+    assert.ok(install.split("\n").some((l) => l.includes("1.19") && l.includes("opencode plugin context-mode --global")), "1.19 line");
+    assert.ok(install.split("\n").some((l) => l.includes("1.19") && l.includes("opencode plugin context-mode --global --force")), "1.19 update line");
     const remove = page.slice(page.indexOf("\n## Remove\n"));
-    assert.equal(fencedBlocks(remove)[0][0], "opencode plugin remove context-mode@next", "native remove first");
+    assert.equal(fencedBlocks(remove)[0][0], "opencode plugin remove context-mode", "native remove first");
   });
 
   test("install-native: the real docs pass checkOpencodeCommands", () => {
@@ -151,27 +151,27 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
   });
 
   test("install-native: checkOpencodeCommands fails the 1.19 form as the OpenCode 2 line, in a fence, a table row and the reply", () => {
-    const fence = "# x\n\n## Install\n\n```sh\nopencode plugin context-mode@next --global\n```\n\nOpenCode 1.19: `opencode plugin context-mode@next --global`\n";
+    const fence = "# x\n\n## Install\n\n```sh\nopencode plugin context-mode --global\n```\n\nOpenCode 1.19: `opencode plugin context-mode --global`\n";
     const out = checkOpencodeCommands({ "docs/install/opencode.md": fence }).join("\n");
     assert.ok(out.includes("docs/install/opencode.md:6"), out);
     assert.ok(!out.includes("opencode.md:9"), "a line that names 1.19 is the 1.19 form, allowed: " + out);
     assert.ok(out.includes("first install line"), out);
-    const row = "| OpenCode | `opencode plugin context-mode@next --global` | `opencode plugin context-mode@next --global --force` |\n";
+    const row = "| OpenCode | `opencode plugin context-mode --global` | `opencode plugin context-mode --global --force` |\n";
     assert.equal(checkOpencodeCommands({ "README.md": row }).length, 1, "one row, one finding");
-    assert.deepEqual(checkOpencodeCommands({ "README.md": "| OpenCode | `opencode plugin add context-mode@next` (1.19: `opencode plugin context-mode@next --global`) | `opencode plugin update` |\n" }), []);
+    assert.deepEqual(checkOpencodeCommands({ "README.md": "| OpenCode | `opencode plugin add context-mode` (1.19: `opencode plugin context-mode --global`) | `opencode plugin update` |\n" }), []);
   });
 
   test("install-native: checkNativePages fails an opencode page whose first block is the 1.19 form", () => {
-    const bad = "# Install context-mode v2 on OpenCode\n\n## Install\n\n```sh\nopencode plugin context-mode@next --global\n```\n\n```sh\nopencode plugin update\n```\n\nCheck: `context-mode doctor`\n\n`next` is the v2 prerelease tag\n";
+    const bad = "# Install context-mode v2 on OpenCode\n\n## Install\n\n```sh\nopencode plugin context-mode --global\n```\n\n```sh\nopencode plugin update\n```\n\nCheck: `context-mode doctor`\n";
     assert.ok(checkNativePages({ "opencode.md": bad }).join("\n").includes("OpenCode 2 command"), "first block must be the OpenCode 2 command");
   });
 
-  test("install-native: every page says check: context-mode doctor and what next is, and has no node -e", () => {
+  test("install-native: every page says check: context-mode doctor, names no prerelease tag, and has no node -e", () => {
     for (const id of [...Object.keys(NATIVE), ...FALLBACK]) {
       const text = read("docs", "install", `${id}.md`);
       const install = installSection(text);
       assert.ok(install.includes("Check: `context-mode doctor`"), `${id}.md lacks the check line`);
-      assert.ok(install.includes("`next` is the v2 prerelease tag"), `${id}.md lacks the next line`);
+      assert.ok(!install.includes("prerelease tag"), `${id}.md still names the prerelease tag`);
       assert.ok(!text.includes("node -e"), `${id}.md has node -e`);
     }
   });
@@ -181,10 +181,10 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     assert.deepEqual(checkNativePages(pages), []);
   });
 
-  test("install-native: checkNativePages fails a page that opens with the npm route on a native host, or lacks check, update or next", () => {
-    const bad = "# Install context-mode v2 on Codex\n\n## Install\n\n```sh\nnpm i -g context-mode@next\ncontext-mode setup --agents codex\n```\n\n## What setup changes\n";
+  test("install-native: checkNativePages fails a page that opens with the npm route on a native host, or lacks check or update", () => {
+    const bad = "# Install context-mode v2 on Codex\n\n## Install\n\n```sh\nnpm i -g context-mode\ncontext-mode setup --agents codex\n```\n\n## What setup changes\n";
     const out = checkNativePages({ "codex.md": bad }).join("\n");
-    for (const s of ["codex.md first block is the npm route", "codex.md needs an update block", "codex.md needs Check: `context-mode doctor`", "codex.md needs the next-tag line"]) assert.ok(out.includes(s), s + "\n" + out);
+    for (const s of ["codex.md first block is the npm route", "codex.md needs an update block", "codex.md needs Check: `context-mode doctor`"]) assert.ok(out.includes(s), s + "\n" + out);
     const fb = checkNativePages({ "kiro.md": bad.replace("Codex", "Kiro") }).join("\n");
     assert.ok(!fb.includes("first block is the npm route"), "a fallback host may open with npm: " + fb);
   });
@@ -196,88 +196,38 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
         // D-README-FIX-1: README.md shows the install commands as fence lines, so it checks the plain command.
         for (const cmd of [...install, ...update]) assert.ok(text.includes(file.length === 1 ? cmd : `\`${cmd}\``), `${file.join("/")} lacks ${cmd} (${id})`);
       }
-      const nextLine = file.length === 1 ? "`@next`, the current 2.0 release tag" : "`next` is the v2 prerelease tag";
-      assert.ok(text.includes(nextLine), `${file.join("/")} lacks the next line`);
+      assert.ok(!text.includes("prerelease tag") && !text.includes("current 2.0 release tag"), `${file.join("/")} still names the preview tag`);
       assert.ok(text.includes("context-mode doctor"), `${file.join("/")} lacks doctor`);
       assert.ok(!text.includes("node -e"), `${file.join("/")} has node -e`);
     }
   });
 
-  // ADR-0023 + https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/release-on-demand-no-release-branch.md: until v2 is on main, main holds the old build (1.0.169), so
-  // every command a user copies for the 4 GitHub-source hosts names the release ref in the host's own syntax. D-NI-DOCS-REF-2
-  // (D-NI-DOCS-REF-1 proved the syntax live). Only the "After v2 is on main:" line may hold the command without the ref.
-  const AFTER = {
-    "claude-code": ["`claude plugin marketplace add mksglu/context-mode`", "`claude plugin install context-mode@context-mode`"],
-    codex: ["`codex plugin marketplace add mksglu/context-mode`", "`codex plugin add context-mode@context-mode`"],
-    gemini: ["`gemini extensions install https://github.com/mksglu/context-mode`"],
-    qwen: ["`qwen extensions install https://github.com/mksglu/context-mode:context-mode`"],
-  };
-  // The host's own commands to switch from the old release (installed from main) to the release ref.
-  const SWITCH = {
-    "claude-code": ["claude plugin marketplace remove context-mode", "claude plugin marketplace add mksglu/context-mode#release", "claude plugin install context-mode@context-mode"],
-    codex: ["codex plugin remove context-mode@context-mode", "codex plugin marketplace remove context-mode", "codex plugin marketplace add mksglu/context-mode@release", "codex plugin add context-mode@context-mode"],
-    gemini: ["gemini extensions uninstall context-mode", "gemini extensions install https://github.com/mksglu/context-mode --ref release"],
-    qwen: ["qwen extensions uninstall context-mode", "qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release"],
-  };
-
-  test("install-native: each GitHub-source page has one After v2 is on main line, without the ref, with the plain commands", () => {
-    for (const [id, cmds] of Object.entries(AFTER)) {
-      const install = installSection(read("docs", "install", `${id}.md`));
-      const afters = install.split("\n").filter((l) => l.startsWith("After v2 is on main: "));
-      assert.equal(afters.length, 1, `${id}.md needs exactly one "After v2 is on main: " line`);
-      assert.ok(!afters[0].includes("#release") && !afters[0].includes("@release") && !afters[0].includes("--ref"), `${id}.md after line holds a ref`);
-      for (const c of cmds) assert.ok(afters[0].includes(c), `${id}.md after line lacks ${c}`);
-      assert.ok(!install.includes("Testing v2 (next):"), `${id}.md still has a separate Testing line; the top block is the test command`);
-    }
-    // D-README-FIX-1: the README carries no maintainer comment; the After line lives in docs/install/README.md.
-    assert.ok(read("docs", "install", "README.md").split("\n").some((l) => l.startsWith("After v2 is on main: ")), "docs/install/README.md lacks the After line");
-    assert.ok(!read("README.md").includes("After v2"), "README.md holds the maintainer After line");
+  // Trunk on main (merge-day ticket): main holds v2 and is the only source, so every command a user copies is the
+  // host's own plain command: no release ref, no @next, no "Until/After v2 is on main" note, no switch step.
+  test("install-native: no doc holds an old release-branch or preview form", () => {
+    const pages = Object.fromEntries(docFiles(REPO).map((f) => [path.relative(REPO, f), readFileSync(f, "utf8")]));
+    assert.deepEqual(checkPlainCommands(pages), []);
+    for (const id of ["claude-code", "codex", "gemini", "qwen"]) assert.ok(!read("docs", "install", `${id}.md`).includes("Already installed from GitHub?"), `${id}.md still has the switch step`);
   });
 
-  test("install-native: no doc names a GitHub-source command without the release ref, except the After line", () => {
-    const repo = REPO;
-    const pages = Object.fromEntries(docFiles(repo).map((f) => [path.relative(repo, f), readFileSync(f, "utf8")]));
-    assert.deepEqual(checkReleaseRef(pages), []);
-  });
-
-  test("install-native: checkReleaseRef fails each host syntax without the ref and passes it with the ref or on the After line", () => {
-    const bare = {
-      "a.md": "```sh\nclaude plugin marketplace add mksglu/context-mode\n```",
-      "b.md": "| Codex | `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode` |",
-      "c.md": "```sh\ngemini extensions install https://github.com/mksglu/context-mode\n```",
-      "d.md": "```sh\nqwen extensions install https://github.com/mksglu/context-mode:context-mode\n```",
-      "e.md": "In Claude Code itself: `/plugin marketplace add mksglu/context-mode`, then `/plugin install context-mode@context-mode`.",
-    };
-    for (const [name, text] of Object.entries(bare)) assert.equal(checkReleaseRef({ [name]: text }).length, 1, name + " must fail");
-    const ok = {
+  test("install-native: checkPlainCommands fails each old form and passes the plain commands", () => {
+    const old = {
       "a.md": "```sh\nclaude plugin marketplace add mksglu/context-mode#release\n```",
       "b.md": "| Codex | `codex plugin marketplace add mksglu/context-mode@release` |",
       "c.md": "`gemini extensions install https://github.com/mksglu/context-mode --ref release`",
-      "d.md": "```sh\nqwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release\n```",
-      "e.md": "After v2 is on main: `claude plugin marketplace add mksglu/context-mode`, then `claude plugin install context-mode@context-mode`",
+      "d.md": "```sh\nnpm i -g context-mode@next\n```",
+      "e.md": "Until v2 is on `main`, `main` holds the old build.",
+      "f.md": "After v2 is on main: `claude plugin marketplace add mksglu/context-mode`",
     };
-    assert.deepEqual(checkReleaseRef(ok), []);
-    assert.equal(checkReleaseRef({ "f.md": "`gemini extensions install https://github.com/mksglu/context-mode`, then `gemini extensions install https://github.com/mksglu/context-mode --ref release`" }).length, 1, "one bare command beside a ref'd one must fail");
-  });
-
-  test("install-native: each GitHub-source page has the switch step with the host's own remove command and the ref'd add", () => {
-    for (const [id, lines] of Object.entries(SWITCH)) {
-      const text = read("docs", "install", `${id}.md`);
-      assert.ok(installSection(text).includes(SWITCH_HEADING), `${id}.md lacks the "${SWITCH_HEADING}" step in its Install section`);
-      assert.deepEqual(fencedBlocks(switchSection(text)), [lines], `${id}.md switch block`);
-      assert.ok(!text.includes("node -e"), `${id}.md has node -e`);
-    }
-    for (const file of [["README.md"], ["docs", "install", "README.md"]]) assert.ok(read(...file).includes(SWITCH_HEADING), `${file.join("/")} lacks the switch pointer`);
-    // D-README-LINKS-2: the README pointer is one link to the published install guide, not four repo pages.
-    const readme = read("README.md");
-    assert.ok(readme.includes("](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github)"), "README switch pointer links the site install page");
-    assert.ok(!readme.includes("#already-installed-from-github)") || !readme.includes("](docs/install/"), "README links a repo install page");
-  });
-
-  test("install-native: checkReleaseRef fails a page without the switch step", () => {
-    const page = "# Install context-mode v2 on Qwen Code\n\n## Install\n\n```sh\nqwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release\n```\n\n## Remove\n";
-    const out = checkReleaseRef({ "qwen.md": page }).join("\n");
-    assert.ok(out.includes("qwen.md needs the switch step"), out);
+    for (const [name, text] of Object.entries(old)) assert.equal(checkPlainCommands({ [name]: text }).length, 1, name + " must fail");
+    assert.equal(OLD_FORMS.length, 6);
+    const plain = {
+      "a.md": "```sh\nclaude plugin marketplace add mksglu/context-mode\nclaude plugin install context-mode@context-mode\n```",
+      "b.md": "| Codex | `codex plugin marketplace add mksglu/context-mode`, then `codex plugin add context-mode@context-mode` |",
+      "c.md": "`gemini extensions install https://github.com/mksglu/context-mode`",
+      "d.md": "```sh\nqwen extensions install https://github.com/mksglu/context-mode:context-mode\npi install npm:context-mode\nnpm i -g context-mode\n```",
+    };
+    assert.deepEqual(checkPlainCommands(plain), []);
   });
 
   // Z-WIN-6, D-WIN-ZCODE-HOME-1: ZCode has no Windows page of its own; the install page must say where the files go on Windows.
@@ -301,7 +251,7 @@ describe("ADR-0023 pi and Gemini pages", { concurrency: CONC }, () => {
     assert.doesNotMatch(md, /It does not work yet/);
     assert.match(md, /gemini extensions update context-mode/);
     assert.match(md, /gemini extensions uninstall context-mode/);
-    assert.match(read("docs/install/README.md"), /\| Gemini CLI \| `gemini extensions install https:\/\/github\.com\/mksglu\/context-mode --ref release` \| `gemini extensions update context-mode` \|/);
+    assert.match(read("docs/install/README.md"), /\| Gemini CLI \| `gemini extensions install https:\/\/github\.com\/mksglu\/context-mode` \| `gemini extensions update context-mode` \|/);
   });
 
   test("pi guide does not claim a missing package.json or a /ctx-doctor command in Pi", () => {
@@ -336,7 +286,7 @@ describe("ADR-0023 Qwen and Kiro pages", { concurrency: CONC }, () => {
     assert.match(md, /qwen extensions uninstall context-mode/);
     assert.match(md, /qwen extensions update context-mode/);
     const readme = read("docs/install/README.md");
-    assert.match(readme, /\| Qwen Code \| `qwen extensions install https:\/\/github\.com\/mksglu\/context-mode:context-mode --ref release` \| `qwen extensions update context-mode` \|/, "README row for Qwen Code does not name the extension command");
+    assert.match(readme, /\| Qwen Code \| `qwen extensions install https:\/\/github\.com\/mksglu\/context-mode:context-mode` \| `qwen extensions update context-mode` \|/, "README row for Qwen Code does not name the extension command");
   });
 
   test("kiro guide does not claim the release hook file uses PromptSubmit or that hook.mjs drops UserPromptSubmit", () => {
@@ -377,17 +327,17 @@ describe("ADR-0023 simple wording", { concurrency: CONC }, () => {
   });
 
   test("install-docs-simple: the simple forms pass", () => {
-    const ok = ["```sh", "npm i -g context-mode@next", "context-mode setup", "context-mode setup --agents codex",
+    const ok = ["```sh", "npm i -g context-mode", "context-mode setup", "context-mode setup --agents codex",
       "context-mode setup --print codex", "claude plugin marketplace add mksglu/context-mode", "context-mode doctor", "```"].join("\n");
     assert.deepEqual(checkSimpleLines("ok.md", ok), []);
   });
 
   test("install-docs-simple: every page has the two-command path or setup --agents", () => {
-    const two = "```sh\nnpm i -g context-mode@next\ncontext-mode setup\n```\n";
+    const two = "```sh\nnpm i -g context-mode\ncontext-mode setup\n```\n";
     // A full agent page (the next test covers --print and --remove); this test is about the install command only.
     const full = "```sh\ncontext-mode setup --agents codex\n```\ncontext-mode setup --print codex\ncontext-mode setup --remove --agents codex\n";
     assert.deepEqual(checkSimplePages({ "README.md": two, "codex.md": full }), []);
-    const out = checkSimplePages({ "README.md": "```sh\nnpm i -g context-mode@next\n```\n", "codex.md": "run context-mode setup\n" }).join("\n");
+    const out = checkSimplePages({ "README.md": "```sh\nnpm i -g context-mode\n```\n", "codex.md": "run context-mode setup\n" }).join("\n");
     assert.ok(out.includes("README.md needs the two-command path"), out);
     assert.ok(out.includes("codex.md needs the two-command path or context-mode setup --agents"), out);
   });

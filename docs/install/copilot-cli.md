@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents copilot-cli
 ```
 
@@ -15,7 +15,7 @@ context-mode upgrade
 
 Check: `context-mode doctor`
 
-Copilot CLI has no install command of its own that takes the package, so setup is the install path here. `next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+Copilot CLI has no install command of its own that takes the package, so setup is the install path here. `npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents copilot-cli`. Without it, setup stops with exit 2.
 
@@ -72,4 +72,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents copilot-cli` | 1.0.103 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 1.0.103 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Copilot CLI session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a live, logged-in Copilot CLI session that fires the hooks. Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).

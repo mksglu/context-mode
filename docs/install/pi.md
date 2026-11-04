@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-pi install npm:context-mode@next
+pi install npm:context-mode
 ```
 
 Update:
@@ -16,7 +16,7 @@ Check: `context-mode doctor`
 
 Pi gets the hooks and the skills from the package. Restart Pi after the install.
 
-`next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:
 
@@ -48,7 +48,7 @@ The package must be listed, and its `packages[]` entry in `settings.json` must n
 ## Remove
 
 ```sh
-pi remove npm:context-mode@next
+pi remove npm:context-mode
 ```
 
 `pi remove` uninstalls the package and drops it from `settings.json`. If you also ran setup, undo it first:
@@ -79,6 +79,6 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents pi` | 1.4.0 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 1.4.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a logged-in Pi session (the live check uses a fake local model). Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a logged-in Pi session (the live check uses a fake local model). Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).
 
-Earlier git-route run, commit 05e97724, Pi 1.4.0, 2026-10-22: `pi install git:github.com/mksglu/context-mode@release` Pass; `pi list` Pass; `pi update --extensions` Pass; `pi remove` Pass; `/ctx-doctor` in Pi Fail (the command does not exist, D-FU-RM-DOCS-1).
+Earlier git-route run, commit 05e97724, Pi 1.4.0, 2026-10-22: `pi install git:github.com/mksglu/context-mode` Pass; `pi list` Pass; `pi update --extensions` Pass; `pi remove` Pass; `/ctx-doctor` in Pi Fail (the command does not exist, D-FU-RM-DOCS-1).

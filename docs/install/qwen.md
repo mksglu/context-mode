@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
+qwen extensions install https://github.com/mksglu/context-mode:context-mode
 ```
 
 Update:
@@ -14,13 +14,9 @@ qwen extensions update context-mode
 
 Check: `context-mode doctor`
 
-Until v2 is on `main`, `main` holds the old build (1.0.169), so the command above names the `release` branch (`--ref release`).
-
-After v2 is on main: `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
-
 Qwen Code asks you to confirm the install, and `qwen extensions update` asks the same question (`Do you want to continue? [Y/n]`). Answer `Y`. Restart Qwen Code after the install and after each update.
 
-`next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:
 
@@ -31,17 +27,6 @@ context-mode setup --agents qwen
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents qwen`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print qwen` and follow what it prints.
-
-### Already installed from GitHub?
-
-You installed without `--ref release` and `qwen extensions list` shows 1.0.169. `qwen extensions uninstall` uninstalls an extension. Then install again with the ref:
-
-```sh
-qwen extensions uninstall context-mode
-qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
-```
-
-`qwen extensions list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 
@@ -65,16 +50,20 @@ qwen extensions list
 ## Remove
 
 ```sh
+qwen extensions uninstall context-mode
+```
+
+`qwen extensions uninstall` removes the extension. If you also ran setup, undo it first:
+
+```sh
 context-mode setup --remove --agents qwen
 ```
 
 It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
-If you used the git route, run `qwen extensions uninstall context-mode`.
-
 ## Known limits
 
-- `qwen extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
+- `qwen extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode` again.
 - Qwen runs no hook while `"disableAllHooks": true` is in `~/.qwen/settings.json`, `<project>/.qwen/settings.json` or the system settings file, or while the extension is disabled for the project (`Enabled (Workspace): false` in `qwen extensions list`). Doctor fails and names the file and the fix. Setup never edits your settings file.
 - No logged-in Qwen session ran `/ctx-doctor`, `/hooks` or the other three hooks.
 
@@ -95,4 +84,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 
 Live: Qwen Code 0.26.4 (`-o stream-json`, fake local OpenAI-compatible provider, no login) calls `run_shell_command` with `cat` of a 192 KB file; the model receives the `ctx_execute` redirect (210 bytes), and 4814 bytes of truncated output when `disableAllHooks` is true ([qwen-fire test](../../tests/e2e/qwen-fire.test.mjs)).
 
-Not run: a logged-in Qwen Code session. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a logged-in Qwen Code session. Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).

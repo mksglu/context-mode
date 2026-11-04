@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents kiro
 ```
 
@@ -15,7 +15,7 @@ context-mode upgrade
 
 Check: `context-mode doctor`
 
-Kiro has no install command of its own that takes the package, so setup is the install path here. `next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+Kiro has no install command of its own that takes the package, so setup is the install path here. `npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents kiro`. Without it, setup stops with exit 2.
 
@@ -69,4 +69,4 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents kiro` | not installed | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | not installed | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Kiro was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that Kiro loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.
+Kiro was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that Kiro loaded the server. See [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md) and the [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md). Windows commands are not run.

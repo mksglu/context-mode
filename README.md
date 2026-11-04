@@ -55,13 +55,12 @@ Open its block and copy its own install command. Each block also holds the updat
 
 The plugin needs Node 24.15.0 or later, from the engines field in [package.json](package.json). On Windows, add Git for Windows: the shell tools run in Git Bash, and doctor checks for it.
 contextmode installs as the npm package and command `context-mode`.
-The npm commands use `@next`, the current 2.0 release tag; the plain package name gives the 1.x line.
 Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the release branch.
 
 <details id="install-claude-code"><summary><b>Claude Code</b></summary>
 
 ```sh
-claude plugin marketplace add mksglu/context-mode#release
+claude plugin marketplace add mksglu/context-mode
 claude plugin install context-mode@context-mode
 ```
 
@@ -80,10 +79,10 @@ Hooks ✓ (package) · MCP ✓ · Skills ✓
 <details id="install-codex"><summary><b>Codex</b></summary>
 
 ```sh
-codex plugin marketplace add mksglu/context-mode@release
+codex plugin marketplace add mksglu/context-mode
 codex plugin add context-mode@context-mode
 # one-time step: trust the plugin hooks
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents codex
 ```
 
@@ -94,7 +93,6 @@ codex plugin marketplace upgrade context-mode
 codex mcp list
 # remove
 codex plugin remove context-mode@context-mode
-codex plugin marketplace remove context-mode
 ```
 
 Hooks ✓ (hook file) · MCP ✓ · Skills ✓
@@ -103,7 +101,7 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 <details id="install-gemini"><summary><b>Gemini CLI</b></summary>
 
 ```sh
-gemini extensions install https://github.com/mksglu/context-mode --ref release
+gemini extensions install https://github.com/mksglu/context-mode
 ```
 
 ```sh
@@ -121,7 +119,7 @@ Hooks ✓ (package) · MCP ✓ · Skills ✓
 <details id="install-qwen"><summary><b>Qwen Code</b></summary>
 
 ```sh
-qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release
+qwen extensions install https://github.com/mksglu/context-mode:context-mode
 ```
 
 ```sh
@@ -139,7 +137,7 @@ Hooks ✓ (package) · MCP ✓ · Skills ✓
 <details id="install-pi"><summary><b>Pi</b></summary>
 
 ```sh
-pi install npm:context-mode@next
+pi install npm:context-mode
 ```
 
 ```sh
@@ -148,7 +146,7 @@ pi update --extensions
 # check
 pi list
 # remove
-pi remove npm:context-mode@next
+pi remove npm:context-mode
 ```
 
 Hooks ✓ (the plugin's own event handlers) · MCP ✓ (ctx tools built into the plugin) · Skills ✓
@@ -157,7 +155,7 @@ Hooks ✓ (the plugin's own event handlers) · MCP ✓ (ctx tools built into the
 <details id="install-opencode"><summary><b>OpenCode</b></summary>
 
 ```sh
-opencode plugin add context-mode@next
+opencode plugin add context-mode
 ```
 
 ```sh
@@ -167,7 +165,7 @@ opencode plugin update
 opencode mcp list --pure          # OpenCode 1.19
 opencode mcp list --standalone    # OpenCode 2
 # remove
-opencode plugin remove context-mode@next
+opencode plugin remove context-mode
 ```
 
 Hooks ✓ (the plugin's own event handlers) · MCP ✓ · Skills ✓
@@ -176,7 +174,7 @@ Hooks ✓ (the plugin's own event handlers) · MCP ✓ · Skills ✓
 <details id="install-copilot-cli"><summary><b>Copilot CLI</b></summary>
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents copilot-cli
 ```
 
@@ -196,7 +194,7 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 <details id="install-kiro"><summary><b>Kiro</b></summary>
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents kiro
 ```
 
@@ -215,7 +213,7 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 <details id="install-vscode"><summary><b>VS Code (Copilot)</b></summary>
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents vscode
 ```
 
@@ -234,7 +232,7 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 <details id="install-zcode"><summary><b>ZCode</b></summary>
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup --agents zcode
 ```
 
@@ -251,12 +249,10 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 
 </details>
 
-Moving Claude Code, Codex, Gemini CLI or Qwen Code from the main branch to the release ref? Follow [Already installed from GitHub?](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github).
-
 The npm route works for every agent:
 
 ```sh
-npm i -g context-mode@next
+npm i -g context-mode
 context-mode setup
 ```
 
@@ -482,7 +478,7 @@ One tool call, in time order, from the install to a hook error.
    ```
 6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](src/core/store/fts.ts)).
 
-   `ctx_index` on a copy of this repo's `docs/how-it-works.md`, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](bench/evidence/terminal-calls-2026-11-03/calls.json)). The file is 11,569 B; the agent gets 64 B.
+   `ctx_index` on a copy of this repo's `docs/how-it-works.md`, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](bench/evidence/terminal-calls-2026-11-03/calls.json)). The file is 11,577 B; the agent gets 64 B.
 
    ```text
    ⏺ context-mode - ctx_index (MCP)(path: "how-it-works.md")
@@ -577,7 +573,7 @@ Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` 
 | Fetch of a URL, for `ctx_index` | Your agent asks for a page. The fetch blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect. | [fetch.ts](src/core/sandbox/fetch.ts) |
 | One read of the npm dist-tags, with `git ls-remote` of the release tags as the fallback | You run `context-mode doctor`, to check for a new version | [doctor-env.ts](src/core/ops/doctor-env.ts) |
 | `git clone --depth 1` of the release branch | You run `ctx_upgrade` | [release-fetch.ts](src/core/ops/release-fetch.ts) |
-| `npm i -g context-mode@next`, or `gh issue create` | You run `context-mode upgrade`, or you press a key to send the debug report | [commands.ts](src/cli/commands.ts) |
+| `npm i -g context-mode`, or `gh issue create` | You run `context-mode upgrade`, or you press a key to send the debug report | [commands.ts](src/cli/commands.ts) |
 | Your agent's own install command, npm or git | You install or update | Your agent |
 
 - The guard test D-PRIVACY-NET-1 in [tests/0008-enforcement.test.mjs](tests/0008-enforcement.test.mjs) scans the source for HTTP clients, sockets, DNS lookups, git network calls and gh or npm spawns. It flags each new call site, so this table stays true.

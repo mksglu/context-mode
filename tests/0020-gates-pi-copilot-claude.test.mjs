@@ -640,14 +640,14 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       chmodSync(file, 0o755);
     }
 
-    test("OpenCode 2 with no plugin entry: doctor FAILs and the fix line is opencode plugin add context-mode@next", SKIP_SH_OC, async (t) => {
+    test("OpenCode 2 with no plugin entry: doctor FAILs and the fix line is opencode plugin add context-mode", SKIP_SH_OC, async (t) => {
       const s = sandbox(t);
       fakeOpencode(s, "opencode v2.2.5");
       put(s, {});
       const d0 = await runDoctor(opts(s));
       assert.ok(d0.agents.length, String(d0.error));
       assert.equal(d0.agents[0].status, "FAIL");
-      assert.ok(d0.agents[0].reason.includes("opencode plugin add context-mode@next"), d0.agents[0].reason);
+      assert.ok(d0.agents[0].reason.includes("opencode plugin add context-mode"), d0.agents[0].reason);
     });
 
     test("OpenCode 1.19 with no plugin entry: doctor FAILs and the fix line stays context-mode setup, no OpenCode 2 command", SKIP_SH_OC, async (t) => {

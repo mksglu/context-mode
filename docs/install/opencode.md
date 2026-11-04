@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-opencode plugin add context-mode@next
+opencode plugin add context-mode
 ```
 
 Update:
@@ -12,7 +12,7 @@ Update:
 opencode plugin update
 ```
 
-OpenCode 1.19 (`opencode-ai`) installs with `opencode plugin context-mode@next --global` and updates with `opencode plugin context-mode@next --global --force`. On OpenCode 2 that form is an error (`Unknown subcommand`, `Unrecognized flag: --global`).
+OpenCode 1.19 (`opencode-ai`) installs with `opencode plugin context-mode --global` and updates with `opencode plugin context-mode --global --force`. On OpenCode 2 that form is an error (`Unknown subcommand`, `Unrecognized flag: --global`).
 
 Check: `context-mode doctor`
 
@@ -20,7 +20,7 @@ Two OpenCode lines exist: `opencode-ai` (1.19.x, stops at 1.19.5) and `@opencode
 
 OpenCode loads the plugin from the npm package `main`. `2.0.0-next.5` has no `main`, so OpenCode refuses it; the next npm release has it (D-NI-OPENCODE-1). The MCP entry may still need the fallback below.
 
-`next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:
 
@@ -54,7 +54,7 @@ opencode mcp list --standalone    # OpenCode 2
 ## Remove
 
 ```sh
-opencode plugin remove context-mode@next
+opencode plugin remove context-mode
 ```
 
 Then put back what setup changed (OpenCode 1.19 has no `plugin remove`, so use this line there too):
@@ -69,7 +69,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 - Setup adds the hooks plugin to the `plugin` list in `~/.config/opencode/opencode.json`. On its first start after that, OpenCode installs `@opencode-ai/plugin` into `~/.config/opencode` (30-60 s on OpenCode 1.19.4, needs the network). Setup checks the server with `opencode mcp list --pure`, so it does not wait on that install (D-HF-OPENCODE-LIST-1).
 
-- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin add context-mode@next` (OpenCode 2, key `plugins`) or `opencode plugin context-mode@next --global` (1.19, key `plugin`) the config holds `context-mode@next`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1). On OpenCode 2 with no entry the fix line is `opencode plugin add context-mode@next` (D-OC2-NATIVE-CMD-1).
+- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin add context-mode` (OpenCode 2, key `plugins`) or `opencode plugin context-mode --global` (1.19, key `plugin`) the config holds `context-mode`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1). On OpenCode 2 with no entry the fix line is `opencode plugin add context-mode` (D-OC2-NATIVE-CMD-1).
 
 ## Report a problem
 
@@ -88,6 +88,6 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 
 Read, not run: the 1.19.4 plugin resolver treats a `file://` value, an absolute path and a drive-letter path (`C:\\` or `C:/`) as a file entry and converts it with `pathToFileURL`, so setup writes the bare absolute path on Windows too (D-WIN-OCENTRY-1). On macOS a path with spaces showed as `file:///.../home%20dir/...` in `opencode debug config`.
 
-Live fire (OpenCode 1.19.5, macOS arm64, temp HOME, fake local OpenAI-compatible provider, no key): the plugin installed with `opencode plugin context-mode@next --global` replaced the output of `cat big.log` (192 KB) with a 160-byte `ctx_execute` redirect. Test: `tests/e2e/opencode-fire.test.mjs`, skipped when `opencode` is not on PATH. Not run: Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Live fire (OpenCode 1.19.5, macOS arm64, temp HOME, fake local OpenAI-compatible provider, no key): the plugin installed with `opencode plugin context-mode --global` replaced the output of `cat big.log` (192 KB) with a 160-byte `ctx_execute` redirect. Test: `tests/e2e/opencode-fire.test.mjs`, skipped when `opencode` is not on PATH. Not run: Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).
 
 Live fire (OpenCode 2.2.5 `@opencode/cli`, macOS arm64, temp HOME, fake local provider, no key): the built package directory in the `plugin` list loaded with no warning, the model request listed `ctx_execute`, `ctx_search` and `ctx_stats`, and `cat big.log` was replaced with the `ctx_execute` redirect. Before the fix the 2.2.5 loader logged `failed to load plugin ... app.tool is not a function`. Test: `tests/0020-fire-plugin-ext.test.mjs` (`CM_OPENCODE2_DIR`; CI installs 1.19.5 and 2.2.5 on all 3 OS). The doctor reads the host version and runs `mcp list --standalone` on 2.x (D-OC2-DOCTOR-1). Not run: Windows commands.

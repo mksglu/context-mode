@@ -695,8 +695,8 @@ export const UPGRADE_DATA_DELETED = "user data deleted"; // uninstall step 4 wit
 export const UPGRADE_HOST_COMMAND: Readonly<Partial<Record<AgentId, string>>> = Object.freeze({
   "claude-code": "claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode",
   codex: "rewrite config.toml's [mcp_servers.context-mode*] block to the v2 entry, then restart Codex",
-  gemini: "gemini extensions install https://github.com/mksglu/context-mode --ref release --auto-update",
-  qwen: "qwen extensions install https://github.com/mksglu/context-mode --ref release --auto-update",
+  gemini: "gemini extensions install https://github.com/mksglu/context-mode --auto-update",
+  qwen: "qwen extensions install https://github.com/mksglu/context-mode --auto-update",
 });
 export const PI_GIT_PACKAGE = "git:github.com/mksglu/context-mode@release"; // ADR-0011 Pi row
 export const OPENCODE_GIT_SPEC = "git+https://github.com/mksglu/context-mode.git#release"; // ADR-0011 OpenCode row
@@ -896,16 +896,16 @@ export const DOCTOR_MASK = "<masked>";
 // D-DOCTOR-ISSUE-1: each agent's own native install command (docs/install/<agent>.md, first code block), so the
 // report names the route the user took and the repro script reinstalls the same way (owner rule: native install first).
 export const NATIVE_INSTALL: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  "claude-code": ["claude plugin marketplace add mksglu/context-mode#release", "claude plugin install context-mode@context-mode"],
-  codex: ["codex plugin marketplace add mksglu/context-mode@release", "codex plugin add context-mode@context-mode"],
-  gemini: ["gemini extensions install https://github.com/mksglu/context-mode --ref release"],
-  qwen: ["qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release"],
-  opencode: ["opencode plugin add context-mode@next"],
-  pi: ["pi install npm:context-mode@next"],
-  "copilot-cli": ["npm i -g context-mode@next", "context-mode setup --agents copilot-cli"],
-  vscode: ["npm i -g context-mode@next", "context-mode setup --agents vscode"],
-  kiro: ["npm i -g context-mode@next", "context-mode setup --agents kiro"],
-  zcode: ["npm i -g context-mode@next", "context-mode setup --agents zcode"],
+  "claude-code": ["claude plugin marketplace add mksglu/context-mode", "claude plugin install context-mode@context-mode"],
+  codex: ["codex plugin marketplace add mksglu/context-mode", "codex plugin add context-mode@context-mode"],
+  gemini: ["gemini extensions install https://github.com/mksglu/context-mode"],
+  qwen: ["qwen extensions install https://github.com/mksglu/context-mode:context-mode"],
+  opencode: ["opencode plugin add context-mode"],
+  pi: ["pi install npm:context-mode"],
+  "copilot-cli": ["npm i -g context-mode", "context-mode setup --agents copilot-cli"],
+  vscode: ["npm i -g context-mode", "context-mode setup --agents vscode"],
+  kiro: ["npm i -g context-mode", "context-mode setup --agents kiro"],
+  zcode: ["npm i -g context-mode", "context-mode setup --agents zcode"],
 });
 export const ISSUE_FORM_URL = `https://github.com/${ISSUE_REPO_SLUG}/issues/new?template=${ISSUE_FORM_FILE}`; // + &title=&summary=
 export const DOCTOR_GIT_VERSION_TIMEOUT_MS = 5000; // git --version for the report file only

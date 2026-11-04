@@ -1,6 +1,6 @@
 # How context-mode works
 
-This page is for users and contributors. It describes v2 as built on `v2-design`, from `PRD-v2.md` and
+This page is for users and contributors. It describes context-mode as built on `main`. The design notes are at
 `https://github.com/mksglu/context-mode/tree/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/`. `docs/architecture/modules/DEVIATIONS.md` records each place where the code differs from the design docs.
 
 ## In one line

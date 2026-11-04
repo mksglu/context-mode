@@ -2411,7 +2411,7 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     }
     for (const need of ["SEEDLABEL", "2026-11-03T01:02:03.000Z", "| kind | tool | bytes | ok | exit_code | created_at |", "| cmd | Bash | 1234 | 0 | 2 |",
       "~/.claude/settings.json", "context-mode@context-mode", "CODEX_HOME=~/codex-home", "CLAUDE_CONFIG_DIR", "PATH holds node:", "git version",
-      "Install route:", "claude plugin marketplace add mksglu/context-mode#release", "Prompt or command:", "Expected:", "Actual:", "mktemp -d", "Reproduced:", C.REPORT_HEADER]) {
+      "Install route:", "claude plugin marketplace add mksglu/context-mode", "Prompt or command:", "Expected:", "Actual:", "mktemp -d", "Reproduced:", C.REPORT_HEADER]) {
       assert.ok(body.includes(need), "report must hold: " + need);
     }
     for (const leak of ["SECRETBODY", "ghp_seedsecret", h]) assert.ok(!body.includes(leak), "report leaks: " + leak);

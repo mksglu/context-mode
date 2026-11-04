@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-gemini extensions install https://github.com/mksglu/context-mode --ref release
+gemini extensions install https://github.com/mksglu/context-mode
 ```
 
 Update:
@@ -14,13 +14,9 @@ gemini extensions update context-mode
 
 Check: `context-mode doctor`
 
-Until v2 is on `main`, `main` holds the old build (1.0.169), so the command above names the `release` branch (`--ref release`).
-
-After v2 is on main: `gemini extensions install https://github.com/mksglu/context-mode`
-
 Gemini CLI asks you to confirm the install, and `gemini extensions update` asks the same question (`Do you want to continue? [Y/n]`). Answer `Y`. Restart Gemini CLI after the install and after each update.
 
-`next` is the v2 prerelease tag on npm (`npm i -g context-mode@next` also gives the `context-mode` command for doctor). `latest` stays on the old release.
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:
 
@@ -31,17 +27,6 @@ context-mode setup --agents gemini
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents gemini`. Without it, setup stops with exit 2.
 
 To do the setup step by hand, run `context-mode setup --print gemini` and follow what it prints.
-
-### Already installed from GitHub?
-
-You installed without `--ref release` and `gemini extensions list` shows 1.0.169. `gemini extensions uninstall` uninstalls one or more extensions. Then install again with the ref:
-
-```sh
-gemini extensions uninstall context-mode
-gemini extensions install https://github.com/mksglu/context-mode --ref release
-```
-
-`gemini extensions list` must show `2.0.0-next.8` or later.
 
 ## What setup changes
 
@@ -65,16 +50,20 @@ GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list
 ## Remove
 
 ```sh
+gemini extensions uninstall context-mode
+```
+
+`gemini extensions uninstall` removes the extension. If you also ran setup, undo it first:
+
+```sh
 context-mode setup --remove --agents gemini
 ```
 
 It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
-If you used the git route, run `gemini extensions uninstall context-mode`.
-
 ## Known limits
 
-- `gemini extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
+- `gemini extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode` again.
 - `hooks/hooks.json` has no SessionStart (D-FU-GCH-1). The resume hint comes on the first BeforeAgent of a session (D-FU-GCH-2).
 - No logged-in Gemini session loaded the hooks in any run. A real `gemini -p` (0.66.0) against a local fake API, with the built extension linked into a temp HOME, ran the BeforeTool hook: `cat big.log` (208 KB) was blocked and the model saw the `ctx_execute` redirect (`tests/e2e/gemini-fire.test.mjs`).
 - Gemini installs the extension but runs none of its hooks when: `hooksConfig.enabled` is `false` in the system, workspace or user `settings.json`; the context-mode hook command is listed in `hooksConfig.disabled`; `admin.extensions.enabled` is `false`; or the extension is off for the workspace scope (`gemini extensions list` shows `Enabled (Workspace): false`). Setup and doctor read these and FAIL with a one-line fix. They never edit your settings. For the workspace scope run `gemini extensions enable context-mode --scope workspace` (D-NI-GEMINI-GATE-1).
@@ -94,6 +83,6 @@ Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build o
 | `context-mode doctor --agents gemini` | 0.65.0 | 2026-10-23 | Pass |
 | `context-mode setup --remove --yes` | 0.65.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live, logged-in Gemini CLI session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+Not run: a live, logged-in Gemini CLI session that fires the hooks. Windows commands. Evidence: [CLI report](https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/CLI-REPORT.md), [engine tests](../../tests/0019-setup-engine.test.mjs), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).
 
-Earlier git-route run, commit 05e97724, Gemini CLI 0.65.0, 2026-10-22: `gemini extensions install https://github.com/mksglu/context-mode --ref release --consent` Pass; `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` Pass: Connected; `tools/list` over stdio Pass: 9 tools. `gemini extensions update` and `uninstall` were not run.
+Earlier git-route run, commit 05e97724, Gemini CLI 0.65.0, 2026-10-22: `gemini extensions install https://github.com/mksglu/context-mode --consent` Pass; `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` Pass: Connected; `tools/list` over stdio Pass: 9 tools. `gemini extensions update` and `uninstall` were not run.

@@ -1089,8 +1089,8 @@ describe("ADR-0015 repo: README agent lines", () => {
     // Owner main rule: "tum agentlerin kendi native install commandleri ne ise onlari kullanalim userler yabancilik cekmesin".
     // A reader who copies the cell runs the whole install: Claude Code and Codex need the marketplace step first.
     const by = Object.fromEntries(agentRows().map((r) => [r.id, r.install]));
-    assert.equal(by["claude-code"], "`claude plugin marketplace add mksglu/context-mode#release`<br>`claude plugin install context-mode@context-mode`");
-    assert.equal(by.codex, "`codex plugin marketplace add mksglu/context-mode@release`<br>`codex plugin add context-mode@context-mode`");
+    assert.equal(by["claude-code"], "`claude plugin marketplace add mksglu/context-mode`<br>`claude plugin install context-mode@context-mode`");
+    assert.equal(by.codex, "`codex plugin marketplace add mksglu/context-mode`<br>`codex plugin add context-mode@context-mode`");
     assert.ok(!by.gemini.includes("<br>") && !by.pi.includes("<br>"), "one-command agents keep one command");
     const rows = readFileSync(path.join(REPO, "docs/architecture/DEVIATIONS.md"), "utf8").split("\n").filter((l) => l.startsWith("| D-README-INSTALL-CELL-1 |"));
     assert.equal(rows.length, 1, "DEVIATIONS has one D-README-INSTALL-CELL-1 row");
@@ -1152,9 +1152,9 @@ describe("ADR-0015 repo: README agent lines", () => {
       const bin = r.cmds.install[0].split(" ")[0];
       for (const l of r.cmds.remove) assert.ok(l.startsWith(bin + " "), `${r.id}: remove uses ${bin}: ${l}`);
     }
-    assert.ok(renderAgentBlocks().pi.includes("\n# remove\npi remove npm:context-mode@next\n"), "Pi removes with pi remove");
+    assert.ok(renderAgentBlocks().pi.includes("\n# remove\npi remove npm:context-mode\n"), "Pi removes with pi remove");
     const codex = renderAgentBlocks().codex.split("```sh\n")[1].split("\n```")[0].split("\n");
-    assert.deepEqual(codex.slice(-2), ["npm i -g context-mode@next", "context-mode setup --agents codex"], "Codex installs the context-mode command, then trusts the hooks");
+    assert.deepEqual(codex.slice(-2), ["npm i -g context-mode", "context-mode setup --agents codex"], "Codex installs the context-mode command, then trusts the hooks");
   });
 });
 
@@ -1536,7 +1536,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     for (const g of guides) assert.ok(LIVE.includes(g), `${g}: a guide outside the live sitemap`);
     for (const g of new Set(guides)) assert.ok(guides.filter((x) => x === g).length <= (g === "install" ? 2 : 1), `${g}: linked more than once`);
     assert.ok(guides.length >= 8, `README links ${guides.length} guides`);
-    assert.ok(readme.includes(ENGINE + "install?utm_source=github&utm_medium=readme&utm_content=install-switch#already-installed-from-github"), "one switch link to the site install page");
+    assert.ok(!readme.includes("#already-installed-from-github"), "no switch link: main is the only source");
     // Repo docs links: architecture records only (ADRs, the hook-run record); install guides live on contextmode.ai.
     // D-README-HOW-2: How it works ends with one link to docs/how-it-works.md, the long form of its steps.
     for (const t of repoDocLinks(readme)) assert.ok(t.startsWith("docs/architecture/") || t === "docs/how-it-works.md", `README links a repo docs page outside docs/architecture: ${t}`);
