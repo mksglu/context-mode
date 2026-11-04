@@ -14,6 +14,7 @@ import {
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import { atomicWriteFile } from "./atomic-file.ts";
+import { ownBundleDir } from "./bundle-dir.ts";
 import { hostLayout, hostText, withLayout } from "./host-text.ts";
 import type { HostLayout } from "./host-text.ts";
 import type { AdapterRow, AgentId, HostConfigEdit, HostConfigFormat, HostConfigResult } from "../contracts/types.ts";
@@ -464,7 +465,7 @@ export interface OwnAccept {
 
 /** D-DOC-RT-1, D-OC2-ENTRY-1: the OpenCode plugin entry setup lists (D-WIN-OCENTRY-1): the package dir, the running server bundle's dir. */
 export function opencodePluginFile(): string {
-  return dirname(process.argv[1] ?? "");
+  return ownBundleDir(); // D-OC2-BUNDLE-DIR-1: argv[1] is the host binary under OpenCode
 }
 
 function listTarget(key: string, own: string, v1: string, alt: readonly string[] = []): OwnTarget {

@@ -17,6 +17,7 @@ import { getAdapter } from "../../adapters/table.ts";
 import { claudeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir } from "../project/config-dir.ts";
 import { detectV1 } from "../ops/detect-v1.ts";
 import { regenerateHostConfig, type HostFileWriter } from "../ops/host-write.ts";
+import { ownBundleDir } from "../ops/bundle-dir.ts";
 import { resolvePluginRoot } from "../ops/plugin-root.ts";
 import { swapPluginCurrent, type PluginSwapResult } from "../ops/plugin-swap.ts";
 import { fetchRelease } from "../ops/release-fetch.ts";
@@ -48,7 +49,7 @@ function row(area: string, before: string, after: string): UpgradeChangeRow {
 
 // The running server bundle's dir: the same anchor host-config.ts uses for the MCP entry (D-M3-arch-3).
 function bundleDir(): string {
-  return dirname(process.argv[1] ?? "");
+  return ownBundleDir(); // D-OC2-BUNDLE-DIR-1
 }
 
 // Step 0 (both modes): resolvePluginRoot vs the running bundle dir. Equal: no row. Different or missing: one

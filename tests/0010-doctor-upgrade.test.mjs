@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
+import { bundleDirOf } from "../src/core/ops/bundle-dir.ts";
 import { getAdapter, ADAPTERS } from "../src/adapters/table.ts";
 import { checkDb, checkIndex } from "../src/core/ops/doctor-db.ts";
 import { openDb, closeDb } from "../src/core/store/db.ts";
@@ -408,6 +409,24 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
       });
     }
   }
+
+  // D-OC2-D3-PLUGINS-1 (#1307, bhazard451, OpenCode 2.2.5 on Windows): "D3 PASS on an OpenCode 2.x plugin install".
+  // The reporter's file: ~/.config/opencode/opencode.jsonc with "plugins": ["context-mode@2.0.1"].
+  const OC2_CASES = [
+    ["the reporter's plugins array with name@version (#1307)", "// ~/.config/opencode/opencode.jsonc\n{\n  \"plugins\": [\"context-mode@2.0.1\"]\n}\n", "PASS"],
+    ["the plugins array with the bare name (opencode plugin add context-mode)", "{\n  \"plugins\": [\"context-mode\"]\n}\n", "PASS"],
+    ["the plugin array with name@tag (OpenCode 1.x native install)", "{\n  \"plugin\": [\"context-mode@latest\"]\n}\n", "PASS"],
+    ["the plugins array with the release git spec", `{ "plugins": ["${C.OPENCODE_GIT_SPEC}"] }`, "PASS"],
+    ["a plugins array that holds only another plugin", "{\n  \"plugins\": [\"other-plugin@1.0.0\", \"context-mode-extra@1.0.0\"]\n}\n", "FAIL"],
+  ];
+  for (const [name, text, want] of OC2_CASES) {
+    test(`[D-OC2-D3-PLUGINS-1] doctor-config/D3 opencode: ${name} is ${want}`, (t) => {
+      const home = tmp(t);
+      put(path.join(home, ".config", "opencode", "opencode.jsonc"), text);
+      const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home);
+      assert.equal(d3.status, want, d3.detail);
+    });
+  }
 });
 
 describe("ADR-0010 doctor D3 fix: setup fixes a wrong or missing MCP entry (D-D3-SETUP-FIX-1)", { concurrency: CONC }, () => {
@@ -786,6 +805,29 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     const row = await run(env, SHA_A, { version: undefined });
     assert.deepEqual(row, { id: "D1", label: "version", status: "UNKNOWN", detail: "bundle (aaaaaaa): latest unknown, no version in package.json", fixCommand: NPM_FIX });
     assert.equal(existsSync(path.join(env.HOME, "git-argv")), false);
+  });
+
+  // D-OC2-BUNDLE-DIR-1 (#1306, bhazard451): inside the Bun-compiled OpenCode binary process.argv[1] is "B:/~BUN/root/...",
+  // while the plugin loads from ~/.cache/opencode/npm/context-mode@2.0.1/<stamp>/node_modules/context-mode/opencode/plugin.js.
+  test("[D-OC2-BUNDLE-DIR-1] doctor-env/D1 reads 2.0.1 from the loaded plugin's package when argv[1] is Bun's B:/~BUN/root", (t) => {
+    const cache = tmp(t);
+    const pkg = path.join(cache, ".cache", "opencode", "npm", "context-mode@2.0.1", "1793822759080", "node_modules", "context-mode");
+    mkdirSync(path.join(pkg, "opencode"), { recursive: true });
+    writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.1" }));
+    writeFileSync(path.join(pkg, "server.mjs"), "");
+    writeFileSync(path.join(pkg, "opencode", "plugin.js"), "");
+    // the wrapper dir one level up has no version field (the reporter's `cat .../1793822759080/package.json`)
+    writeFileSync(path.join(cache, ".cache", "opencode", "npm", "context-mode@2.0.1", "1793822759080", "package.json"), JSON.stringify({ dependencies: { "context-mode": "2.0.1" } }));
+    const dir = bundleDirOf("B:/~BUN/root/src/index.js", path.join(pkg, "opencode", "plugin.js"));
+    assert.equal(dir, pkg);
+    assert.equal(bundleVersion(dir), "2.0.1");
+  });
+
+  test("[D-OC2-BUNDLE-DIR-1] doctor-env/bundle dir stays the server bundle's dir when argv[1] is server.mjs", (t) => {
+    const pkg = tmp(t);
+    writeFileSync(path.join(pkg, "server.mjs"), "");
+    assert.equal(bundleDirOf(path.join(pkg, "server.mjs"), path.join(pkg, "server.mjs")), pkg);
+    assert.equal(bundleDirOf(path.join(pkg, "server.mjs"), "/elsewhere/src/core/ops/host-config.ts"), pkg);
   });
 
   test("[M5] doctor-env/D1-git-missing-registry-same-version-is-PASS", async (t) => {

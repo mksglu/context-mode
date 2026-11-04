@@ -10,7 +10,7 @@ import {
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
-  OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
+  OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
   REGEX_SPECIAL_CHARS, SETTINGS_FILE, SHELL_QUOTE, TOOL_HOOK_EVENTS, V1_PATH_SEPS, VSCODE_CLAUDE_HOOKS_SETTING,
   VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE,
 } from "../contracts/constants.ts";
@@ -175,6 +175,24 @@ function nativeMcpWrong(dir: string, row: AdapterRow): boolean {
   }
 }
 
+// D-OC2-D3-PLUGINS-1 (#1307): OpenCode loads context-mode from a list entry: "plugin" (1.x) or "plugins" (2.x), as the
+// npm spec ("context-mode@2.0.1", "context-mode@latest"), the release git spec, the package dir setup writes, or an
+// object with "package". On 2.x `opencode plugin add context-mode` writes the bare name; under 1.x "plugin" the bare
+// name is the v1 entry that D4 reports.
+function isOwnOpencodeEntry(entry: unknown, key: string, own: readonly string[]): boolean {
+  const spec = isObject(entry) ? entry[OPENCODE_PACKAGE_FIELD] : entry;
+  if (typeof spec !== "string") return false;
+  if (spec === OPENCODE_GIT_SPEC || spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || own.includes(spec)) return true;
+  return key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
+}
+
+/** True when the OpenCode config (the .jsonc wins, #849) lists context-mode under "plugin" or "plugins". */
+function opencodeListed(file: string): boolean {
+  const { value } = readParsed("opencode", file);
+  const own = [opencodePluginFile()];
+  return [OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY].some((key) => list(isObject(value) ? value[key] : undefined).some((e) => isOwnOpencodeEntry(e, key, own)));
+}
+
 function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): boolean {
   const native = row.id === "codex" ? codexNativeDir(env, home) : null;
   if (native !== null) return nativeMcpWrong(native, row);
@@ -184,6 +202,7 @@ function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktre
       resolvePluginRoot(row, env, worktree);
       return false;
     }
+    if (row.id === "opencode") return !opencodeListed(file);
     const cur = readHostConfig(row.id, file);
     // D-DOC-RT-1: accept the entry setup writes (absolute node, OpenCode plugin file), not only the ctx_upgrade form.
     return mergeOwnEntries(row.id, cur.text, cur.format, row, { nodePath: true, listEntries: [opencodePluginFile()] }).edits.length > 0;

@@ -751,6 +751,9 @@ export const HOOKS_KEY = "hooks";
 export const STATUS_LINE_KEY = "statusLine";
 export const PI_PACKAGES_KEY = "packages";
 export const OPENCODE_PLUGIN_KEY = "plugin";
+export const OPENCODE_PLUGINS_KEY = "plugins"; // D-OC2-D3-PLUGINS-1: `opencode plugin add context-mode` on OpenCode 2.x writes this key (#1307)
+export const OPENCODE_PACKAGE_FIELD = "package"; // D-OC2-D3-PLUGINS-1: an object entry {"package": "context-mode@2.0.1"} in the list (#1307)
+export const OPENCODE_NPM_SPEC_PREFIX = `${SERVER_KEY}@`; // D-OC2-D3-PLUGINS-1: the npm spec form "context-mode@2.0.1" / "context-mode@latest"
 export const V1_DATA_DIR_NAME = "context-mode"; // <agent home>/context-mode/
 // detectV1 (impl/07 §3; DEVIATIONS D-M5-O2-1..3). v1 wrote only these entries under ~/.context-mode/ (v1 main:
 // "content" dir, "platform.json"); v2 shares the dir (DATA_ROOT), so only these names are v1 content.

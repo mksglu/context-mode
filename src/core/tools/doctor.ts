@@ -14,6 +14,7 @@ import { CtxError } from "../contracts/errors.ts";
 import type {
   AdapterRow, CtxDoctorInput, DbHandle, DoctorCheckId, DoctorRow, ToolContext, ToolReply,
 } from "../contracts/types.ts";
+import { ownBundleDir } from "../ops/bundle-dir.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers } from "../ops/doctor-config.ts";
 import { checkDb, checkIndex } from "../ops/doctor-db.ts";
 import type { DbCheck } from "../ops/doctor-db.ts";
@@ -194,7 +195,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
 }
 
 async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolReply> {
-  return doctorReply(ctx, { env: process.env, bundleDir: dirname(process.argv[1] as string), piCwd: undefined });
+  return doctorReply(ctx, { env: process.env, bundleDir: ownBundleDir(), piCwd: undefined });
 }
 
 export const ctxDoctor = Object.freeze({
