@@ -1,0 +1,194 @@
+{
+  "source": "origin/main 90af14e34bf35120c3310f7a75f54fa99d2cabba: part1 = tests/ecosystem-benchmark.ts scenarios (code strings byte-exact), part2 = tests/live-benchmark.ts scenarios (queries byte-exact)",
+  "part1": [
+    {
+      "tool": "Context7",
+      "name": "React useEffect docs",
+      "fixture": "context7-react-docs.md",
+      "description": "Context7 query: React useEffect hook usage and cleanup",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.split(\"\\n\");\n      const codeBlocks = FILE_CONTENT.match(/```[\\s\\S]*?```/g) || [];\n      const sections = FILE_CONTENT.split(/^---+$/m).filter(Boolean);\n      const apis = [...FILE_CONTENT.matchAll(/`(use\\w+)`/g)].map(m => m[1]);\n      const uniqueApis = [...new Set(apis)];\n\n      console.log(\"Context7 — React Docs Summary\");\n      console.log(\"Lines:\", lines.length, \"| Sections:\", sections.length, \"| Code blocks:\", codeBlocks.length);\n      console.log(\"APIs mentioned:\", uniqueApis.join(\", \"));\n      console.log(\"Key topics:\");\n      if (FILE_CONTENT.includes(\"cleanup\")) console.log(\"  - Cleanup functions\");\n      if (FILE_CONTENT.includes(\"dependencies\")) console.log(\"  - Dependency arrays\");\n      if (FILE_CONTENT.includes(\"fetch\")) console.log(\"  - Data fetching patterns\");\n      if (FILE_CONTENT.includes(\"subscribe\")) console.log(\"  - Event subscriptions\");\n      console.log(\"Total size:\", FILE_CONTENT.length, \"chars →\", codeBlocks.length, \"examples extracted\");\n    "
+    },
+    {
+      "tool": "Context7",
+      "name": "Next.js App Router docs",
+      "fixture": "context7-nextjs-docs.md",
+      "description": "Context7 query: App Router server components data fetching",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.split(\"\\n\");\n      const codeBlocks = FILE_CONTENT.match(/```[\\s\\S]*?```/g) || [];\n      const sections = FILE_CONTENT.split(/^---+$/m).filter(Boolean);\n      const patterns = [];\n      if (FILE_CONTENT.includes(\"async\")) patterns.push(\"async components\");\n      if (FILE_CONTENT.includes(\"cache\")) patterns.push(\"caching strategies\");\n      if (FILE_CONTENT.includes(\"revalidate\")) patterns.push(\"ISR/revalidation\");\n      if (FILE_CONTENT.includes(\"no-store\")) patterns.push(\"no-cache SSR\");\n      if (FILE_CONTENT.includes(\"generateStaticParams\")) patterns.push(\"static generation\");\n      if (FILE_CONTENT.includes(\"use client\")) patterns.push(\"client components\");\n\n      console.log(\"Context7 — Next.js App Router Summary\");\n      console.log(\"Lines:\", lines.length, \"| Sections:\", sections.length, \"| Code blocks:\", codeBlocks.length);\n      console.log(\"Data fetching patterns:\", patterns.join(\", \"));\n      console.log(\"Migration from Pages Router:\", FILE_CONTENT.includes(\"getServerSideProps\") ? \"Yes\" : \"No\");\n      console.log(\"Total size:\", FILE_CONTENT.length, \"chars → summary above\");\n    "
+    },
+    {
+      "tool": "Context7",
+      "name": "Tailwind CSS docs",
+      "fixture": "context7-tailwind-docs.md",
+      "description": "Context7 query: Tailwind responsive design, flexbox, grid",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.split(\"\\n\");\n      const codeBlocks = FILE_CONTENT.match(/```[\\s\\S]*?```/g) || [];\n      const classes = [...FILE_CONTENT.matchAll(/(?:class(?:Name)?=\")([^\"]+)/g)].map(m => m[1]);\n      const allClasses = classes.join(\" \").split(/\\s+/);\n      const responsive = allClasses.filter(c => /^(sm|md|lg|xl|2xl):/.test(c));\n      const flexGrid = allClasses.filter(c => /^(flex|grid|col|row|gap|justify|items|self)/.test(c));\n\n      console.log(\"Context7 — Tailwind CSS Summary\");\n      console.log(\"Lines:\", lines.length, \"| Code blocks:\", codeBlocks.length);\n      console.log(\"Total classes found:\", allClasses.length);\n      console.log(\"Responsive variants:\", responsive.length, \"→\", [...new Set(responsive.map(c => c.split(\":\")[0]))].join(\", \"));\n      console.log(\"Flex/Grid classes:\", flexGrid.length);\n      console.log(\"Total size:\", FILE_CONTENT.length, \"chars → summary above\");\n    "
+    },
+    {
+      "tool": "Playwright",
+      "name": "Page snapshot (HN)",
+      "fixture": "playwright-snapshot.txt",
+      "description": "Playwright browser_snapshot: Hacker News accessibility tree",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.split(\"\\n\");\n      const links = [...FILE_CONTENT.matchAll(/- link \"([^\"]+)\"/g)].map(m => m[1]);\n      const buttons = [...FILE_CONTENT.matchAll(/- button \"([^\"]+)\"/g)].map(m => m[1]);\n      const textItems = [...FILE_CONTENT.matchAll(/- text: (.+)/g)].map(m => m[1]);\n      const refs = [...FILE_CONTENT.matchAll(/\\[ref=(\\w+)\\]/g)];\n\n      console.log(\"Playwright — Page Snapshot Summary\");\n      console.log(\"Lines:\", lines.length, \"| DOM refs:\", refs.length);\n      console.log(\"Links:\", links.length, \"| Buttons:\", buttons.length, \"| Text nodes:\", textItems.length);\n\n      // Extract story titles (HN specific)\n      const stories = links.filter(l => !l.startsWith(\"http\") && l.length > 10 && ![\"new\", \"past\", \"comments\", \"ask\", \"show\", \"jobs\", \"submit\", \"login\"].includes(l.toLowerCase()));\n      console.log(\"Stories found:\", Math.min(stories.length, 30));\n      if (stories.length > 0) {\n        console.log(\"Top 5:\");\n        stories.slice(0, 5).forEach((s, i) => console.log(\"  \" + (i+1) + \". \" + s));\n      }\n      console.log(\"Raw snapshot:\", FILE_CONTENT.length, \"chars → summary above\");\n    "
+    },
+    {
+      "tool": "Playwright",
+      "name": "Network requests",
+      "fixture": "playwright-network.txt",
+      "description": "Playwright browser_network_requests: all HTTP requests",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.trim().split(\"\\n\").filter(Boolean);\n      const requests = lines.map(l => {\n        const parts = l.split(\" \");\n        return { method: parts[0], status: parts[1], url: parts.slice(2).join(\" \") };\n      }).filter(r => r.method && r.status);\n\n      console.log(\"Playwright — Network Summary\");\n      console.log(\"Requests:\", requests.length);\n      const byStatus = {};\n      requests.forEach(r => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });\n      console.log(\"Status:\", Object.entries(byStatus).map(([s,c]) => s + \":\" + c).join(\", \"));\n      const types = { doc: 0, css: 0, js: 0, img: 0, other: 0 };\n      requests.forEach(r => {\n        const url = r.url || \"\";\n        if (url.endsWith(\".css\")) types.css++;\n        else if (url.endsWith(\".js\")) types.js++;\n        else if (/\\.(png|jpg|svg|gif|ico|webp)/.test(url)) types.img++;\n        else if (url.includes(\"text/html\") || requests.indexOf(r) === 0) types.doc++;\n        else types.other++;\n      });\n      console.log(\"Types:\", Object.entries(types).filter(([,v]) => v > 0).map(([k,v]) => k + \":\" + v).join(\", \"));\n    "
+    },
+    {
+      "tool": "GitHub",
+      "name": "PR list (Next.js)",
+      "fixture": "github-prs.json",
+      "description": "gh pr list --repo vercel/next.js: 5 recent PRs with bodies",
+      "language": "javascript",
+      "code": "\n      const prs = JSON.parse(FILE_CONTENT);\n      console.log(\"GitHub — PR List Summary\");\n      console.log(\"PRs:\", prs.length, \"| Repo: vercel/next.js\");\n\n      let totalAdd = 0, totalDel = 0, totalFiles = 0;\n      prs.forEach(pr => {\n        totalAdd += pr.additions || 0;\n        totalDel += pr.deletions || 0;\n        totalFiles += pr.changedFiles || 0;\n        const labels = (pr.labels || []).map(l => l.name).join(\", \") || \"none\";\n        console.log(\"  #\" + pr.number + \" \" + pr.title);\n        console.log(\"    by \" + pr.author?.login + \" | +\" + (pr.additions||0) + \" -\" + (pr.deletions||0) + \" | \" + (pr.changedFiles||0) + \" files | labels: \" + labels);\n      });\n      console.log(\"Total: +\" + totalAdd + \" -\" + totalDel + \" across \" + totalFiles + \" files\");\n    "
+    },
+    {
+      "tool": "GitHub",
+      "name": "Issues (React)",
+      "fixture": "github-issues.json",
+      "description": "gh issue list --repo facebook/react: 20 open issues",
+      "language": "javascript",
+      "code": "\n      const issues = JSON.parse(FILE_CONTENT);\n      console.log(\"GitHub — Issues Summary\");\n      console.log(\"Issues:\", issues.length, \"| Repo: facebook/react\");\n\n      const byLabel = {};\n      issues.forEach(issue => {\n        (issue.labels || []).forEach(l => {\n          byLabel[l.name] = (byLabel[l.name] || 0) + 1;\n        });\n      });\n\n      console.log(\"\\nBy label:\");\n      Object.entries(byLabel).sort((a,b) => b[1]-a[1]).slice(0, 8).forEach(([l,c]) => {\n        console.log(\"  \" + l + \": \" + c);\n      });\n\n      console.log(\"\\nRecent issues:\");\n      issues.slice(0, 8).forEach(issue => {\n        const labels = (issue.labels || []).map(l => l.name).join(\", \") || \"unlabeled\";\n        console.log(\"  #\" + issue.number + \" \" + issue.title.slice(0, 60));\n        console.log(\"    by \" + issue.author?.login + \" [\" + labels + \"]\");\n      });\n    "
+    },
+    {
+      "tool": "vitest",
+      "name": "Test output (30 suites)",
+      "fixture": "test-output.txt",
+      "description": "vitest run: 30 test suites with pass/fail details",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.split(\"\\n\");\n      const suitePass = lines.filter(l => l.trimStart().startsWith(\"\\u2713\") && !l.startsWith(\"  \")).length;\n      const suiteFail = lines.filter(l => l.trimStart().startsWith(\"\\u2717\") && !l.startsWith(\"  \")).length;\n      const testPass = lines.filter(l => l.match(/^\\s+\\u2713/)).length;\n      const testFail = lines.filter(l => l.match(/^\\s+\\u2717/)).length;\n      console.log(\"vitest — Test Results Summary\");\n      console.log(\"Suites:\", suitePass, \"passed,\", suiteFail, \"failed\");\n      console.log(\"Tests:\", testPass, \"passed,\", testFail, \"failed\");\n      const failLines = lines.filter(l => l.match(/^\\s+\\u2717/));\n      if (failLines.length) {\n        console.log(\"Failures:\");\n        failLines.slice(0, 5).forEach(l => console.log(\"  \" + l.trim()));\n      }\n    "
+    },
+    {
+      "tool": "tsc",
+      "name": "TypeScript errors (50)",
+      "fixture": "tsc-errors.txt",
+      "description": "tsc --noEmit: 50 type errors across 8 files",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.trim().split(\"\\n\").filter(l => l.includes(\"error TS\"));\n      const byFile = {};\n      const byCode = {};\n      lines.forEach(l => {\n        const file = l.split(\"(\")[0];\n        const code = l.match(/TS\\d+/)?.[0] || \"?\";\n        byFile[file] = (byFile[file] || 0) + 1;\n        byCode[code] = (byCode[code] || 0) + 1;\n      });\n      console.log(\"tsc — Error Summary\");\n      console.log(\"Errors:\", lines.length, \"in\", Object.keys(byFile).length, \"files\");\n      console.log(\"By file:\");\n      Object.entries(byFile).sort((a,b) => b[1]-a[1]).forEach(([f,c]) => console.log(\"  \" + f + \":\", c));\n      console.log(\"Top codes:\");\n      Object.entries(byCode).sort((a,b) => b[1]-a[1]).slice(0,5).forEach(([c,n]) => console.log(\"  \" + c + \":\", n));\n    "
+    },
+    {
+      "tool": "next build",
+      "name": "Build output (100+ lines)",
+      "fixture": "build-output.txt",
+      "description": "next build: compiled routes, warnings, errors",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.split(\"\\n\");\n      const errors = lines.filter(l => /error/i.test(l)).length;\n      const warnings = lines.filter(l => /warn/i.test(l)).length;\n      const routes = lines.filter(l => /^[○●ƒλ]/.test(l.trim()) || /^\\//.test(l.trim())).length;\n      console.log(\"next build — Summary\");\n      console.log(\"Lines:\", lines.length, \"| Routes:\", routes, \"| Warnings:\", warnings, \"| Errors:\", errors);\n      if (errors > 0) {\n        console.log(\"Error lines:\");\n        lines.filter(l => /error/i.test(l)).slice(0, 3).forEach(l => console.log(\"  \" + l.trim()));\n      }\n    "
+    },
+    {
+      "tool": "MCP tools/list",
+      "name": "MCP tools (40 tools)",
+      "fixture": "mcp-tools.json",
+      "description": "MCP server tools/list: 40 tools with JSON Schema",
+      "language": "javascript",
+      "code": "\n      const tools = JSON.parse(FILE_CONTENT);\n      console.log(\"MCP — Tools Discovery Summary\");\n      console.log(\"Total tools:\", tools.length);\n      const categories = {};\n      tools.forEach(t => {\n        const cat = t.name.split(\"_\")[0] || \"other\";\n        categories[cat] = (categories[cat] || 0) + 1;\n      });\n      console.log(\"Categories:\", Object.entries(categories).map(([k,v]) => k + \":\" + v).join(\", \"));\n      console.log(\"\\nTool signatures:\");\n      tools.slice(0, 10).forEach(t => {\n        const props = Object.keys(t.inputSchema?.properties || {});\n        const req = t.inputSchema?.required || [];\n        const sig = props.map(p => req.includes(p) ? p : p + \"?\").join(\", \");\n        console.log(\"  \" + t.name + \"(\" + sig + \")\");\n      });\n      if (tools.length > 10) console.log(\"  ... +\" + (tools.length - 10) + \" more\");\n    "
+    },
+    {
+      "tool": "nginx",
+      "name": "Access log (500 req)",
+      "fixture": "access.log",
+      "description": "nginx access log: 500 HTTP requests with latency",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.trim().split(\"\\n\");\n      const statuses = {};\n      let errors = 0, totalMs = 0, count = 0;\n      lines.forEach(l => {\n        const s = l.match(/\" (\\d+) /)?.[1]; if (s) { statuses[s] = (statuses[s]||0)+1; if (+s >= 400) errors++; }\n        const ms = l.match(/(\\d+)ms$/)?.[1]; if (ms) { totalMs += +ms; count++; }\n      });\n      console.log(\"nginx — Access Log Summary\");\n      console.log(\"Requests:\", lines.length, \"| Errors:\", errors, \"(\" + ((errors/lines.length)*100).toFixed(1) + \"%)\");\n      console.log(\"Avg latency:\", Math.round(totalMs/count) + \"ms\");\n      console.log(\"Status:\", Object.entries(statuses).sort((a,b)=>b[1]-a[1]).map(([s,c])=>s+\":\"+c).join(\", \"));\n    "
+    },
+    {
+      "tool": "git",
+      "name": "Git log (150+ commits)",
+      "fixture": "git-log.txt",
+      "description": "git log --oneline: 150+ conventional commits",
+      "language": "javascript",
+      "code": "\n      const lines = FILE_CONTENT.trim().split(\"\\n\");\n      const byType = {};\n      lines.forEach(l => {\n        const type = l.split(\" \")[4]?.replace(\":\", \"\") || \"other\";\n        byType[type] = (byType[type] || 0) + 1;\n      });\n      console.log(\"git — Log Summary\");\n      console.log(\"Commits:\", lines.length);\n      console.log(\"By type:\", Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,c])=>t+\":\"+c).join(\", \"));\n    "
+    },
+    {
+      "tool": "analytics",
+      "name": "Analytics CSV (500 rows)",
+      "fixture": "analytics.csv",
+      "description": "Event analytics: 500 events with user_id, action, status",
+      "language": "python",
+      "code": "\nimport csv, io\nfrom collections import Counter\n\nreader = csv.DictReader(io.StringIO(FILE_CONTENT))\nrows = list(reader)\n\nactions = Counter(r[\"action\"] for r in rows)\nstatuses = Counter(r[\"status\"] for r in rows)\nunique_users = len(set(r[\"user_id\"] for r in rows))\navg_ms = sum(int(r[\"duration_ms\"]) for r in rows) / len(rows)\n\nprint(f\"analytics — CSV Summary\")\nprint(f\"Events: {len(rows)} | Users: {unique_users} | Avg latency: {avg_ms:.0f}ms\")\nprint(f\"Actions: {dict(actions.most_common())}\")\nprint(f\"Statuses: {dict(statuses.most_common())}\")\n    "
+    }
+  ],
+  "part2": [
+    {
+      "scenario": "Supabase Edge Functions (5 examples)",
+      "source": "Context7: Supabase",
+      "queries": [
+        "CORS handling edge function",
+        "database connection Deno Postgres",
+        "unit test edge function invoke"
+      ],
+      "fixture": "context7-supabase-edge.md"
+    },
+    {
+      "scenario": "React useEffect docs",
+      "source": "Context7: React",
+      "queries": [
+        "useEffect cleanup function",
+        "fetch data ignore stale",
+        "dependency array rules"
+      ],
+      "fixture": "context7-react-docs.md"
+    },
+    {
+      "scenario": "Next.js App Router docs",
+      "source": "Context7: Next.js",
+      "queries": [
+        "App Router data fetching",
+        "server components",
+        "route handlers"
+      ],
+      "fixture": "context7-nextjs-docs.md"
+    },
+    {
+      "scenario": "Tailwind CSS docs",
+      "source": "Context7: Tailwind",
+      "queries": [
+        "responsive breakpoints",
+        "custom colors theme"
+      ],
+      "fixture": "context7-tailwind-docs.md"
+    },
+    {
+      "scenario": "Skill: context-mode (main prompt)",
+      "source": "Skill: context-mode",
+      "queries": [
+        "when to use execute vs execute_file",
+        "language selection guide",
+        "anti-patterns avoid"
+      ],
+      "fixture": "skills/skill-main.md"
+    },
+    {
+      "scenario": "Skill references (4 files combined)",
+      "source": "Skill Refs: context-mode",
+      "queries": [
+        "JSON parse transform pattern",
+        "CSV analysis Python",
+        "file processing shell awk"
+      ],
+      "concat": [
+        "skills/patterns-javascript.md",
+        "skills/patterns-python.md",
+        "skills/patterns-shell.md",
+        "skills/anti-patterns.md"
+      ],
+      "sep": "\n\n---\n\n"
+    },
+    {
+      "scenario": "MCP tools/list (40 tools)",
+      "source": "MCP: tools/list",
+      "queries": [
+        "browser screenshot tool",
+        "file search glob",
+        "git commit tool"
+      ],
+      "mcpTools": "mcp-tools.json"
+    }
+  ]
+}

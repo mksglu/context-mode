@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-21",
+  "commit": "980272a5",
+  "claudeCode": "2.1.303",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "runsPerCell": 2,
+  "task": "Bash seq 1 N, then give the last number",
+  "cells": [
+    {
+      "fullBytes": 8893,
+      "cwd": "git",
+      "modelSawChars": [
+        152,
+        152
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 8893,
+      "cwd": "non-git",
+      "modelSawChars": [
+        152,
+        152
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 19998,
+      "cwd": "git",
+      "modelSawChars": [
+        187,
+        187
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 19998,
+      "cwd": "non-git",
+      "modelSawChars": [
+        187,
+        187
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 28003,
+      "cwd": "git",
+      "modelSawChars": [
+        182,
+        182
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 28003,
+      "cwd": "non-git",
+      "modelSawChars": [
+        182,
+        182
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 60090,
+      "cwd": "git",
+      "modelSawChars": [
+        190,
+        190
+      ],
+      "correct": "2/2"
+    },
+    {
+      "fullBytes": 60090,
+      "cwd": "non-git",
+      "modelSawChars": [
+        190,
+        190
+      ],
+      "correct": "2/2"
+    }
+  ],
+  "totalRuns": 16,
+  "correct": 16
+}

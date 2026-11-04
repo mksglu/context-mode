@@ -1,0 +1,7 @@
+{
+  "id": "release-staging-smoke",
+  "kind": "local",
+  "covers": ["scripts/release/smoke.mjs", "scripts/release/publish.mjs", ".github/workflows/release.yml"],
+  "run": ["node", "e2e/checks/release-staging-smoke.mjs", "--root", "/private/tmp/cm-v2-impl-verify"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

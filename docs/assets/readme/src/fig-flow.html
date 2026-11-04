@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README fig-flow 1280x640</title>
+<script>var T=new URLSearchParams(location.search).get('theme')||'dark';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<style>
+:root{--w:1280px;--h:640px}
+.h2{position:absolute;left:64px;top:38px;font-size:34px}
+.box{width:250px;height:140px;padding:16px 18px}
+.s{font-size:12.5px;margin-top:8px;line-height:1.55}
+.n{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em;position:absolute;left:64px}
+.lb{position:absolute;font-family:var(--mono);font-size:12.5px;color:var(--save);transform:translateX(-50%);white-space:nowrap;background:var(--bg);padding:0 8px}
+</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="h h2">One tool call, step by step. <em>Output stays in the sandbox.</em></div>
+
+<div class="n" style="top:100px">Every tool call</div>
+<div class="box" data-box style="left:64px;top:122px"><div class="t">Agent</div><div class="s">Claude Code, Codex, Gemini CLI, Pi, and 6 more. Runs a tool.</div></div>
+<div class="box" data-box style="left:352px;top:122px"><div class="t">Hook</div><div class="s">PreToolUse denies a big Read and names the exact <b>ctx_execute</b> call. A hook failure ends in exit 0.</div></div>
+<div class="box" data-box style="left:640px;top:122px"><div class="t">ctx_* MCP server</div><div class="s"><b>ctx_execute</b>, <b>ctx_batch</b>, <b>ctx_index</b>, <b>ctx_search</b>, and 5 more tools.</div></div>
+<div class="box" data-box style="left:928px;top:122px"><div class="t">Sandbox / SQLite FTS5</div><div class="s">Code runs in a subprocess; its printed output returns. One <b>context.db</b> per project; BM25 and trigram.</div></div>
+
+<div class="n" style="top:350px">When the host compacts</div>
+<div class="box" data-box style="left:64px;top:372px"><div class="t">Compaction</div><div class="s">The host fires PreCompact, or its own event. The hook reads the journal.</div></div>
+<div class="box" data-box style="left:352px;top:372px"><div class="t">Snapshot</div><div class="s">State block of 2,048 B at most. A long line becomes a <b>ctx_resume(seq)</b> pointer; every line stays whole.</div></div>
+<div class="box" data-box style="left:640px;top:372px"><div class="t">Resume</div><div class="s">Next prompt: a recall block of whole rows, 2,048 B at most. <b>ctx_resume</b> reads a full row.</div></div>
+<div class="box gw" data-box style="left:928px;top:372px;border-width:1px;border-color:var(--card-b)"><div class="t">Agent carries on</div><div class="s">Same task, same files, small context.</div></div>
+
+<svg width="1280" height="640" id="sv"></svg>
+<div class="lb" style="left:640px;top:284px">small reply</div>
+
+<div class="cap"><b>Reading the figure.</b> Top: a tool call goes through the hook to the MCP server; the sandbox and the index keep the raw output; a small reply returns. Bottom: the journal in <b>context.db</b> feeds the snapshot and the resume. "Sandbox" means output stays in the sandbox, out of the context. The code runs on your host as your user. Source: context-mode 2.0.0-next.20, src/core, checked 2026-11-01.</div>
+</main>
+<script>
+var sv=document.getElementById('sv'),NS='http://www.w3.org/2000/svg';
+function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);sv.appendChild(e);return e}
+function arrow(x1,y1,x2,y2,cls){el('line',{x1:x1,y1:y1,x2:x2-6,y2:y2,class:cls||'ln'});el('polygon',{points:x2+','+y2+' '+(x2-8)+','+(y2-4.5)+' '+(x2-8)+','+(y2+4.5),class:'ah'})}
+[[314,352],[602,640],[890,928]].forEach(function(a){arrow(a[0],192,a[1],192)});
+[[314,352],[602,640],[890,928]].forEach(function(a){arrow(a[0],442,a[1],442)});
+/* reply: server bottom, back to agent bottom */
+el('path',{d:'M765 262 L765 292 L189 292 L189 270',class:'sv'});
+el('polygon',{points:'189,262 184.5,272 193.5,272',class:'ahs'});
+/* sandbox to server back is implied by the reply */
+</script></body></html>

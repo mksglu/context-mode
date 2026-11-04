@@ -1,0 +1,16 @@
+{
+  "id": "T-SAVE",
+  "kind": "agent",
+  "covers": [
+    "src/core/tools/execute.ts",
+    "src/core/sandbox/cap.ts",
+    "src/core/tools/stats.ts"
+  ],
+  "prompt": "Use ctx_execute to run `seq 1 300000` (a large output). Reply with only the first line of the ctx_execute reply, verbatim; it names the full byte count kept out of the conversation.",
+  "tools": [
+    "mcp__context-mode__ctx_execute"
+  ],
+  "expect": {
+    "firstLineStartsWith": "exit"
+  }
+}

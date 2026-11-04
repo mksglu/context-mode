@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "CWD=<proj>\nSCRIPT=<tmp-script-dir>/code.js\n"
+    }
+  ],
+  "isError": false
+}

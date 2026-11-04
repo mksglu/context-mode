@@ -1,0 +1,20 @@
+{
+  "header": [
+    "| Check | Status | Detail | Fix |",
+    "|---|---|---|---|"
+  ],
+  "checks": [
+    "D1 version",
+    "D2 node",
+    "D3 host config",
+    "D4 old entries",
+    "D5 hook round trip",
+    "D5b double-fire",
+    "D6 MCP",
+    "D7 project and worktree",
+    "D8 context.db",
+    "D9 index",
+    "D10 enforcement mode",
+    "D11 shell"
+  ]
+}

@@ -1,0 +1,4 @@
+{ "id": "memory-r6-eval-local", "kind": "local",
+  "covers": ["src/core/compaction/", "src/core/tools/search.ts", "e2e/live/memory-r6/"],
+  "run": ["node", "-e", "const f=require('fs');const d='e2e/live/memory-r6/fixtures/';const ids=f.readdirSync(d);let ok=true;for(const id of ids){const j=JSON.parse(f.readFileSync(d+id+'/journal.json','utf8'));const gt=JSON.parse(f.readFileSync(d+id+'/ground_truth.json','utf8'));const last=Math.max(...j.map(r=>r.seq));if(last!==gt.lastRequestSeq){console.error('last-request mismatch in '+id);ok=false;}}console.log(JSON.stringify({deterministicOnly:ok}));if(!ok)process.exit(1);"],
+  "expect": { "jsonField": "deterministicOnly", "equals": true } }

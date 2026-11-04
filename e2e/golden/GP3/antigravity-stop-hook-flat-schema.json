@@ -1,0 +1,51 @@
+{
+  "claude-code": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart",
+    "UserPromptSubmit"
+  ],
+  "codex": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart",
+    "UserPromptSubmit"
+  ],
+  "gemini": [
+    "AfterTool",
+    "BeforeAgent",
+    "BeforeTool",
+    "PreCompress"
+  ],
+  "qwen": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart",
+    "UserPromptSubmit"
+  ],
+  "copilot-cli": [
+    "postToolUse",
+    "preToolUse",
+    "sessionStart",
+    "userPromptSubmitted"
+  ],
+  "vscode": [
+    "PostToolUse",
+    "PreCompact",
+    "PreToolUse",
+    "SessionStart",
+    "UserPromptSubmit"
+  ],
+  "kiro": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart",
+    "UserPromptSubmit"
+  ],
+  "zcode": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart",
+    "UserPromptSubmit"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "mustKeep": ["open_error", "last_request"],
+  "openErrorSeq": 3,
+  "lastRequestSeq": 5,
+  "note": "synthetic fixture; real transcript text is never stored here"
+}

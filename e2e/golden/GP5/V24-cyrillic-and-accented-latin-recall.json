@@ -1,0 +1,29 @@
+{
+  "indexed": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Indexed 1 source(s), 1 chunk(s) from s9. Label: V24"
+      }
+    ],
+    "isError": false
+  },
+  "hitsCyrillic": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Query \"привет\":\nV24 #0: Привет мир, café crème"
+      }
+    ],
+    "isError": false
+  },
+  "hitsAccented": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Query \"cafe\":\nV24 #0: Привет мир, café crème"
+      }
+    ],
+    "isError": false
+  }
+}

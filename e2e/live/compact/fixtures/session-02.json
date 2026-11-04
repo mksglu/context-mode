@@ -1,0 +1,30 @@
+{
+  "id": "session-02",
+  "title": "config loader: layered option",
+  "facts": [
+    {
+      "kind": "option",
+      "value": "Chosen option for the config loader: option C, a layered loader. We compared three options. Option A read one JSON file and failed hard on any unknown key; it was simple but broke every user who had an old key left over. Option B merged environment variables over the file with no schema; it was flexible but a typo in a variable name silently did nothing, which cost a full afternoon in the last release. Option C, the one we chose, loads in three layers: built-in defaults, then the project file, then the user file, and checks the merged result against one schema. Unknown keys produce a warning that names the key and the layer, never an error, so old configs keep working. Each value records which layer set it, so the doctor command can print where a value came from. The schema version we agreed on for the merged result is cfg-schema-v4, and the loader must refuse any file that declares a newer schema version than that. Option C costs one extra file read at start, which we measured at under 2 ms."
+    },
+    {
+      "kind": "path",
+      "value": "packages/cli/lib/config/layered-loader.mjs"
+    },
+    {
+      "kind": "errorfix",
+      "value": "Fix for 'ENOENT: no such file or directory' on first run: create the user config folder with mkdir recursive before the first write."
+    }
+  ],
+  "turns": [
+    "We have to choose a design for the config loader. Here is the comparison and the decision: Chosen option for the config loader: option C, a layered loader. We compared three options. Option A read one JSON file and failed hard on any unknown key; it was simple but broke every user who had an old key left over. Option B merged environment variables over the file with no schema; it was flexible but a typo in a variable name silently did nothing, which cost a full afternoon in the last release. Option C, the one we chose, loads in three layers: built-in defaults, then the project file, then the user file, and checks the merged result against one schema. Unknown keys produce a warning that names the key and the layer, never an error, so old configs keep working. Each value records which layer set it, so the doctor command can print where a value came from. The schema version we agreed on for the merged result is cfg-schema-v4, and the loader must refuse any file that declares a newer schema version than that. Option C costs one extra file read at start, which we measured at under 2 ms.",
+    "Write the loader to packages/cli/lib/config/layered-loader.mjs and export one function, loadConfig.",
+    "First run fails with ENOENT: no such file or directory. Fix for 'ENOENT: no such file or directory' on first run: create the user config folder with mkdir recursive before the first write.",
+    "Tests pass. Next, add the doctor output for config values."
+  ],
+  "nextRequest": "Add a unit test file next to the config loader we wrote earlier. In which exact file path does the loader live? Answer with the path only.",
+  "needs": "path",
+  "answer": {
+    "kind": "path",
+    "exact": "packages/cli/lib/config/layered-loader.mjs"
+  }
+}

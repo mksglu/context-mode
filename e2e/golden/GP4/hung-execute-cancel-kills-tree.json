@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Timed out after 500 ms. Fix: pass background: true."
+    }
+  ],
+  "isError": true
+}

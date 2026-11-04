@@ -1,0 +1,11 @@
+{
+  "search": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Query \"shared-term\":\ndocA #0: shared-term from the main worktree session\ndocB #0: shared-term from the other worktree session"
+      }
+    ],
+    "isError": false
+  }
+}

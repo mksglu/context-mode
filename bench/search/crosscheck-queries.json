@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "written": "2026-10-23",
+ "rule": "Second held-out set, written after the search fix by a checker that did not read engine output first. Labels are substrings of the source text. Same scoring as e2e/fixtures/search/heldout.json. Used to check the first set for over-fit.",
+ "queries": [
+  { "id": "x01", "source": "Context7: Supabase", "kind": "natural", "query": "forward the user's auth header to the supabase client", "expect": ["req.headers.get('Authorization')"] },
+  { "id": "x02", "source": "Context7: React", "kind": "natural", "query": "run an effect before the browser paints", "expect": ["useLayoutEffect"] },
+  { "id": "x03", "source": "Context7: Next.js", "kind": "natural", "query": "skip the cache so every request gets fresh data", "expect": ["no-store"] },
+  { "id": "x04", "source": "Context7: Tailwind", "kind": "natural", "query": "newspaper style text columns", "expect": ["columns-1"] },
+  { "id": "x05", "source": "Skill Refs: context-mode", "kind": "natural", "query": "which folders use the most disk space", "expect": ["du -sh"] },
+  { "id": "x06", "source": "MCP: tools/list", "kind": "natural", "query": "remove an npm dependency", "expect": ["Remove npm packages"] },
+  { "id": "x07", "source": "MCP: tools/list", "kind": "natural", "query": "read the server logs", "expect": ["View application or server logs"] },
+  { "id": "x08", "source": "docs: 02-store", "kind": "natural", "query": "how long sqlite waits on a locked database", "expect": ["busy_timeout"] },
+  { "id": "x09", "source": "docs: PRD-v2", "kind": "natural", "query": "largest reply a tool may return in bytes", "expect": ["OUTPUT_CAP"] },
+  { "id": "x10", "source": "docs: LAUNCH", "kind": "natural", "query": "which coding agents are supported", "expect": ["Kiro"] }
+ ]
+}

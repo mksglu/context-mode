@@ -1,0 +1,7 @@
+{
+  "id": "v1-migration-vscode",
+  "covers": ["docs/architecture/adr/0011-release-and-v1-transition.md", "src/core/ops/detect-v1.ts", "src/core/tools/upgrade.ts"],
+  "kind": "local",
+  "run": ["node", "e2e/checks/v1-migration.mjs", "vscode"],
+  "expect": {}
+}

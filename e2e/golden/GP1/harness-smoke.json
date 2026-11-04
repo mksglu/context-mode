@@ -1,0 +1,13 @@
+{
+  "toolNames": [
+    "ctx_execute",
+    "ctx_batch",
+    "ctx_index",
+    "ctx_search",
+    "ctx_resume",
+    "ctx_stats",
+    "ctx_doctor",
+    "ctx_upgrade",
+    "ctx_purge"
+  ]
+}

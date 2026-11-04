@@ -1,100 +1,190 @@
-name: CI
+# v2 CI (docs/architecture/modules/13-build-release.md §8, impl/14-tests.md §8, TECH-SPEC §6.6).
+# 3 OS x 2 Node lines. No live layer, no secrets, no key env (ADR-0012).
+# Pull requests are disabled on the repo (ADR-0014 §5), so push is the only event trigger.
+# release.yml reuses this job through workflow_call (impl/13 A10).
+name: ci
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main, next]
-  pull_request:
-    branches: [main, next]
+    branches: [main, v2, v2-design, "impl/**"]
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  ci:
+    name: ci (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    name: test (${{ matrix.os }})
-
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        node: ["24.15.0", "26"]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.5"
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-          cache: false
-
-      - uses: erlef/setup-beam@v1
-        if: runner.os != 'Windows'
-        with:
-          elixir-version: "1.17"
-          otp-version: "27"
-
-      - name: Install Elixir (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: choco install elixir --yes --no-progress
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Typecheck
-        run: npx tsc -b --noEmit
-
-      - name: Build
-        run: npm run build
-
-      - name: Bundle
-        run: npm run bundle
-
-      - name: Assert bundle invariants (G3 — Issue #511 guardrail)
-        run: npm run assert-bundle
-
-      - name: Run all tests
+          node-version: ${{ matrix.node }}
+      - run: node scripts/ci-install.mjs
+        id: install
+        name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
+      # Gate selection (DEVIATIONS D-M2-arch-4, D-M2-CI-4, D-M7-CLN-5, D-REPO-CLEAN-1): the milestone is the highest one
+      # the local gate passed before it was marked done. The old source, https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/.impl/progress.json, left the repo; its last
+      # value was M6. Raise it here to M7 when the M7 gate is the one to run.
+      - name: gate milestone selection (D-M2-arch-4)
         shell: bash
         run: |
-          # Run tests, capture output + exit code.
-          # Vitest fork workers can crash during cleanup on CI (native addon teardown race)
-          # even when all tests pass. We check the actual test results instead of relying
-          # solely on the exit code.
-          set +e
-          npx vitest run 2>&1 | tee /tmp/vitest-output.txt
-          VITEST_EXIT=$?
-          set -e
-
-          # Extract results from vitest output
-          if grep -q "Tests.*failed" /tmp/vitest-output.txt; then
-            echo "❌ Test failures detected"
-            exit 1
-          elif grep -q "Test Files.*failed" /tmp/vitest-output.txt; then
-            echo "❌ Test file failures detected"
-            exit 1
-          elif grep -q "Tests.*passed" /tmp/vitest-output.txt; then
-            echo "✅ All tests passed (exit code $VITEST_EXIT may reflect worker cleanup noise)"
-            exit 0
-          elif grep -q "Error: kill EPERM" /tmp/vitest-output.txt; then
-            # Vitest crashed during worker teardown (Windows-only kill EPERM race, errno -4048)
-            # BEFORE printing the summary line. Look for per-suite failure markers instead —
-            # if none, treat as pass (the same cleanup noise the comment above acknowledges).
-            if grep -qE "FAIL +tests/|⨯ +tests/" /tmp/vitest-output.txt; then
-              echo "❌ Per-suite failures detected before teardown crash"
-              exit 1
-            fi
-            echo "⚠️ Vitest worker teardown race (Windows kill EPERM) — no failures detected; treating as pass."
-            exit 0
-          else
-            echo "❌ Could not parse test results"
-            exit $VITEST_EXIT
-          fi
-
-      - name: Doctor (verify server starts)
-        run: npx tsx src/cli.ts doctor
+          echo "gate milestone M6" >&2
+          echo "GATE_MILESTONE=M6" >> "$GITHUB_ENV"
+      - run: node build/build.mjs --out release-out
+        name: build (esbuild, no package.json in output)
+      # T-F5 (DECISIONS-r9 F5, impl/03 section 4): grandchild kill, Windows only. Runs right after the build,
+      # so a red later step never hides the T-F5 result.
+      - run: node e2e/checks/windows-grandchild-kill.mjs
+        name: T-F5 Windows grandchild kill (0 alive after KILL_GRACE_MS)
+        if: runner.os == 'Windows'
+      # D-TF5-TIMING-1: info only. Times taskkill /F /T and the wait until the grandchild PID is gone (30 runs), to tell a slow
+      # taskkill.exe from a slow process teardown when T-F5 misses KILL_GRACE_MS.
+      - run: node e2e/checks/windows-kill-timing.mjs
+        name: T-F5 kill timing probe (info)
+        if: runner.os == 'Windows'
         continue-on-error: true
+      # Viet report 1 (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/viet/README.md): ctx_stats / ctx_search after ctx_index took 1.45 s on Windows, all in
+      # PRAGMA wal_checkpoint(TRUNCATE). Per-call latency of the tester's repro on all 3 OS; the trace run prints the checkpoint ms (info).
+      - run: node e2e/checks/checkpoint-latency.mjs --trace
+        name: ckpt latency, trace of wal_checkpoint ms (info)
+        continue-on-error: true
+      - run: node e2e/checks/checkpoint-latency.mjs
+        name: ckpt latency, per-call budget after ctx_index (D-CKPT-LAT-1)
+      - run: node e2e/checks/checkpoint-latency.mjs --crash
+        name: ckpt durability, kill the server right after ctx_index, reopen, search finds it (D-CKPT-LAT-1)
+      # ADR-0019 D3: the one hook overhead gate (warm-up, lowest of 5 batch p95 values, 15 ms), all three OSes
+      # (DEVIATIONS D-CI-PERF-1, D-CI-PERF-5). It also prints the cold first call of a fresh bundle copy as info.
+      - run: node e2e/checks/setup-hook-overhead.mjs
+        name: D3 hook overhead p95 <= 15 ms (perf check; cold first call is info)
+      # Viet round (Windows Claude Desktop): ctx_doctor D5 FAIL 72 ms and 58 ms against 40 ms. Info only: splits the claude-code hook wall
+      # into bare node, empty module, hook bundle, idle and under load, sync and async spawn, so the Windows cost is read from numbers.
+      - run: node e2e/checks/hook-phase-profile.mjs
+        name: hook phase profile (info only)
+        continue-on-error: true
+      - run: node build/prompt-lint.mjs --out release-out
+        name: prompt lint, bundle mode (impl/13 §7; gate layer prompt-lint from M2, D-M0-1)
+      - run: node e2e/cases/run.mjs --milestone "$GATE_MILESTONE"
+        name: GP cases tagged <= gate milestone (D-M0-2, D-M2-arch-4)
+        shell: bash
+      # D-C166-WIN-FIRE-1: the real Codex CLI on all 3 OS, so the codex fire tests (tests/0020-fire-hook-config) run
+      # on the Windows runner too. Fake local provider, temp HOME and CODEX_HOME, no login, no key.
+      # A global agent CLI, not a dev install, so it does not go through scripts/ci-install.mjs.
+      - run: npm i -g @openai/codex@0.166.0
+        name: codex 0.166.0 for the codex fire tests (D-C166-WIN-FIRE-1)
+      - run: codex --version
+        name: codex version (info)
+      # D-OC2-FIRE-1: both OpenCode lines on all 3 OS for the opencode fire tests (tests/0020-fire-plugin-ext). 1.19.5 is the
+      # global `opencode`; 2.2.5 (npm @opencode/cli) owns the same bin name, so it goes into its own prefix, found through
+      # CM_OPENCODE2_DIR. Fake local provider, temp HOME, no login, no key.
+      - run: npm i -g opencode-ai@1.19.5
+        name: opencode 1.19.5 for the opencode fire tests (D-OC2-FIRE-1)
+      - run: opencode --version
+        name: opencode 1.19.5 version (info)
+      - run: npm i --prefix "${{ runner.temp }}/opencode2" @opencode/cli@2.2.5
+        name: opencode 2.2.5 (@opencode/cli) for the opencode 2 fire test (D-OC2-FIRE-1)
+        shell: bash
+      - run: echo "CM_OPENCODE2_DIR=${{ runner.temp }}/opencode2" >> "$GITHUB_ENV"
+        name: CM_OPENCODE2_DIR
+        shell: bash
+      - run: node build/build.mjs --generated-only
+        name: src/prompt/_generated.ts for v2 unit tests (D-M2-arch-6)
+      # D-OC2-NATIVE-CMD-1: the documented OpenCode 2 install, update and remove lines run with the real @opencode/cli 2.2.5 in a temp HOME.
+      - run: node e2e/checks/opencode2-native-install.mjs
+        name: OpenCode 2 native install, update, remove (D-OC2-NATIVE-CMD-1)
+      - run: npm run typecheck
+        name: typecheck, tsc --noEmit (D-TSC-GATE-1)
+      - run: node --test "tests/**/*.test.mjs"
+        name: v2 unit tests (TECH-SPEC 6.2a, DEVIATIONS D-M1-13, same as gate layer v2-unit)
+      # Keyless local live cases (ADR-0012: kind "local" runs no model). They failed on a dev machine while CI never ran
+      # them. Same harness the owner runs by hand: node e2e/live/run.mjs --only <ids>. T-GS6 and T-F1 are wall-time
+      # budgets, so they stay on a quiet dev machine; setup-hook-overhead above is the CI timing gate.
+      - run: node e2e/live/run.mjs --only ci-config,release-plan-bump,repo-cleanup-gate
+        name: live local cases (ci-config, release-plan-bump, repo-cleanup-gate)
+      - run: node e2e/live/run.mjs --only v1-migration-gemini
+        name: live local case v1-migration-gemini (hook file and ${extensionPath} fill)
+        if: runner.os != 'Windows'
+      # Fixture benchmark (bench/evidence/fixtures, DEVIATIONS D-BENCH-FX-1): 21 v1 scenarios, no network,
+      # under 60 s. Fails on any scenario error or a part total off by more than 5% from results.json.
+      - run: node bench/fixtures/run.mjs --check --bundle release-out
+        name: fixture benchmark check (bench/fixtures/results.json, 5% tolerance)
+      # Benchmark suite (bench/README.md, DEVIATIONS D-BENCH-SUITE-1): proves every scenario runs once. Never gates on numbers.
+      - run: node bench/run.mjs --runs 1 --no-write --bundle release-out
+        name: benchmark suite runs (--runs 1, no numbers gate)
+        if: runner.os == 'Linux'
+      # The repo checks below do not depend on the test steps above. `!cancelled()` runs them after a
+      # red test step too, so a test fail never hides their result on any OS (the job stays red).
+      - run: node scripts/ci-gs4-lint.mjs
+        name: GS4 lint (no e2e import of src, ledger verdicts)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - run: node build/check-readme.mjs
+        name: README line cap (ADR-0015, README_MAX_LINES)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - run: node build/check-install-docs.mjs
+        name: Install docs (no placeholder or npx in code blocks)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - run: node build/check-secrets.mjs
+        name: No tenant id in tracked files (D-FU-OI-TENANT-1)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - run: node build/check-prompt-static.mjs
+        name: No dynamic token in tool descriptions or instructions (ADR-0021 rule 1, D-C5-PREFIX-1)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      # GS5 repo-cleanup gate (impl/15 §2, DEVIATIONS D-M7-arch-3/4). The check-removed layer starts
+      # at M7 (D-M6-arch-2), the same rule as scripts/gate.mjs LAYER_START.
+      - run: node build/check-removed.mjs
+        name: GS5 check-removed (from gate milestone M7, D-M6-arch-2)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && env.GATE_MILESTONE == 'M7' }}
+
+  # ADR-0019 D1/D2: npm pack -> npm i -g (temp prefix, temp HOME) -> context-mode setup/doctor/--remove with fake agent CLIs.
+  # No network beyond npm tooling, no real agent CLI, no key. Windows runs the .cmd shim path.
+  setup-e2e:
+    name: setup e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - run: node scripts/ci-install.mjs --no-package-lock
+        id: install
+        name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
+      - run: node build/build.mjs --generated-only
+        name: src/prompt/_generated.ts
+      - run: node --test e2e/cases/GP-SETUP-npm-install.e2e.mjs
+        name: GP-SETUP npm pack, global install, setup twice, remove byte for byte
+
+  # Windows host proof (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/windows-all.workflow.js): npm pack -> npm i -g under a prefix with a space, install each
+  # host CLI npm can install without login, then per agent: setup, doctor, the 200 KB shell-cat hook payload piped into the
+  # registered hook command, and an MCP initialize + tools/list from the host config. No key, no login.
+  windows-hosts:
+    name: windows hosts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - run: node scripts/ci-install.mjs --no-package-lock
+        id: install
+        name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
+      - run: node build/build.mjs --generated-only
+        name: src/prompt/_generated.ts
+      - run: node e2e/checks/windows-hosts.mjs
+        name: 10 agents x setup, doctor, hook, MCP handshake from the packed package

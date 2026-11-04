@@ -1,0 +1,10 @@
+{
+  "mine": [
+    "fresh-own",
+    "older-cross"
+  ],
+  "theirs": [
+    "older-cross",
+    "fresh-own"
+  ]
+}

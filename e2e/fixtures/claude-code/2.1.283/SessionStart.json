@@ -1,0 +1,7 @@
+{
+  "session_id": "<sid:0>",
+  "transcript_path": "<transcript_path>",
+  "cwd": "<proj>",
+  "hook_event_name": "SessionStart",
+  "source": "startup"
+}

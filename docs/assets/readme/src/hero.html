@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README hero 1280x640</title>
+<script>var T=new URLSearchParams(location.search).get('theme')||'dark';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<style>
+:root{--w:1280px;--h:640px}
+.nav{position:absolute;left:76px;right:76px;top:56px;display:flex;align-items:center;justify-content:space-between}
+.url{font-family:var(--mono);font-size:16px;color:var(--muted)}
+.h1{position:absolute;left:76px;top:150px;font-size:66px}
+.lead{position:absolute;left:76px;top:300px;font-size:20px;line-height:1.5;color:var(--fg2)}
+.tiles{position:absolute;left:76px;right:76px;bottom:56px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.tile{background:var(--card);border:1px solid var(--card-b);border-radius:10px;padding:20px 22px;height:196px;display:flex;flex-direction:column}
+.k{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted)}
+.n{font-weight:600;font-size:50px;white-space:nowrap;letter-spacing:-.045em;line-height:1;color:var(--fg);margin-top:14px}
+.n i{font-style:normal;color:var(--save)}
+.small{position:absolute;left:76px;right:76px;top:342px;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.r{font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--muted);margin-top:auto}
+</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="nav"><img class="wm" id="wm" alt="Context Mode"><span class="url">github.com/mksglu/context-mode</span></div>
+<div class="h h1">Tool output stays out of context.<br><em>Only the answer comes back.</em></div>
+<div class="lead">Free and local. Zero telemetry. Your data stays on your machine.</div>
+<div class="small">Runs in Claude Code, Codex, Gemini CLI, Qwen Code, Copilot CLI, VS Code, Kiro, Z Code, Pi and OpenCode, with 9 MCP tools.</div>
+<div class="tiles">
+ <div class="tile" data-box><div class="k">Output bytes saved</div><div class="n"><i>99.4%</i></div><div class="r">Median of 36 rows with 10 KB or more of raw output, 5 runs each. Bench 2026-11-01.</div></div>
+ <div class="tile" data-box><div class="k">Full debugging session, tokens</div><div class="n">70K → <i>817</i></div><div class="r">Row g-session-total: 281,261 B raw to 3,266 B in context. Tokens: an estimate at 4 B per token.</div></div>
+ <div class="tile" data-box><div class="k">Resume after compaction, tokens</div><div class="n">111K → <i>505</i></div><div class="r">Row e-long-session: a 442,893 B transcript to a 2,019 B resume block. Tokens: an estimate at 4 B per token.</div></div>
+</div></main>
+<script>document.getElementById('wm').src='brand/wordmark-on-'+T+'.svg';</script>
+</body></html>

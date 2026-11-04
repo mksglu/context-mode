@@ -1,0 +1,32 @@
+Usage: context-mode setup [options]
+
+Find your agents, show the plan, apply it, then verify each agent (MCP handshake, one hook call).
+A failed agent is rolled back byte for byte. Instruction files (CLAUDE.md, AGENTS.md, ...) are never touched.
+
+Options:
+  --list             Print every supported agent and its support level; change nothing
+  --dry-run          Show the plan; change nothing
+  --remove           Undo every setup run: put each touched file back
+  --repair           Apply again and verify (upgrade runs this)
+  --print <id>       Print the manual step for one agent, paths filled in; change nothing
+  --agents <ids>     Only these agents, comma-separated (ids: context-mode setup --list)
+  -y, --yes          Do not ask; apply
+  --no-input         Never prompt; exit 2 if an answer is needed
+  --json             Write only JSON to stdout
+  -q, --quiet        Results only; no progress lines
+  --verbose          Show every check
+  --debug            Print the full debug report on failure
+  --no-color         No colour (also NO_COLOR, TERM=dumb, or no TTY)
+  -h, --help         Show this help
+
+Exit codes:
+  0    success
+  1    a check or step failed
+  2    usage error (unknown command, option or agent; an answer is needed but there is no TTY)
+  130  stopped with Ctrl-C (the agent in progress is rolled back)
+
+Examples:
+  context-mode setup
+  context-mode setup --yes --agents codex,claude-code
+  context-mode setup --dry-run --json
+  context-mode setup --print codex

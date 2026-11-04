@@ -1,0 +1,509 @@
+{
+ "version": 1,
+ "frozen": "2026-10-23",
+ "rule": "Labels come from the source text, not from any engine output. A query is a hit at rank r when the r-th result text contains any `expect` substring. recall@5 = share of queries with a hit at rank <= 5; MRR@10 = mean of 1/r for the first hit at r <= 10, else 0. No expected string holds < > & (v2 escapes them in snippets).",
+ "corpus_note": "concat and mcpTools inputs are built exactly as bench/fixtures/run.mjs part2Content builds them. Paths are relative to the repo root.",
+ "sources": [
+  {
+   "label": "Context7: Supabase",
+   "fixture": "bench/fixtures/data/context7-supabase-edge.md"
+  },
+  {
+   "label": "Context7: React",
+   "fixture": "bench/fixtures/data/context7-react-docs.md"
+  },
+  {
+   "label": "Context7: Next.js",
+   "fixture": "bench/fixtures/data/context7-nextjs-docs.md"
+  },
+  {
+   "label": "Context7: Tailwind",
+   "fixture": "bench/fixtures/data/context7-tailwind-docs.md"
+  },
+  {
+   "label": "Skill: context-mode",
+   "fixture": "bench/fixtures/data/skills/skill-main.md"
+  },
+  {
+   "label": "Skill Refs: context-mode",
+   "concat": [
+    "bench/fixtures/data/skills/patterns-javascript.md",
+    "bench/fixtures/data/skills/patterns-python.md",
+    "bench/fixtures/data/skills/patterns-shell.md",
+    "bench/fixtures/data/skills/anti-patterns.md"
+   ],
+   "sep": "\n\n---\n\n"
+  },
+  {
+   "label": "MCP: tools/list",
+   "mcpTools": "bench/fixtures/data/mcp-tools.json"
+  },
+  {
+   "label": "docs: 02-store",
+   "fixture": "docs/architecture/modules/02-store.md"
+  },
+  {
+   "label": "docs: PRD-v2",
+   "fixture": "docs/architecture/PRD.md"
+  },
+  {
+   "label": "docs: LAUNCH",
+   "fixture": "bench/fixtures/data/launch-plan.md"
+  }
+ ],
+ "queries": [
+  {
+   "id": "q01",
+   "source": "Context7: Supabase",
+   "kind": "identifier",
+   "query": "SUPABASE_PUBLISHABLE_KEY",
+   "expect": [
+    "SUPABASE_PUBLISHABLE_KEY"
+   ]
+  },
+  {
+   "id": "q02",
+   "source": "Context7: Supabase",
+   "kind": "natural",
+   "query": "how do I call a deployed edge function with curl",
+   "expect": [
+    "functions/v1/hello-world"
+   ]
+  },
+  {
+   "id": "q03",
+   "source": "Context7: Supabase",
+   "kind": "code",
+   "query": "assertEquals func_data.message",
+   "expect": [
+    "assertEquals(func_data.message, 'Hello bar!')"
+   ]
+  },
+  {
+   "id": "q04",
+   "source": "Context7: Supabase",
+   "kind": "typo",
+   "query": "postgress conection",
+   "expect": [
+    "supabase.from('countries')"
+   ]
+  },
+  {
+   "id": "q05",
+   "source": "Context7: Supabase",
+   "kind": "morph",
+   "query": "connecting to the database from deno",
+   "expect": [
+    "supabase.from('countries')"
+   ]
+  },
+  {
+   "id": "q06",
+   "source": "Context7: React",
+   "kind": "code",
+   "query": "ignore = true",
+   "expect": [
+    "ignore = true;"
+   ]
+  },
+  {
+   "id": "q07",
+   "source": "Context7: React",
+   "kind": "natural",
+   "query": "what happens when the dependency array is empty",
+   "expect": [
+    "Effect runs once after initial mount"
+   ]
+  },
+  {
+   "id": "q08",
+   "source": "Context7: React",
+   "kind": "identifier",
+   "query": "createConnection",
+   "expect": [
+    "createConnection(serverUrl, roomId)"
+   ]
+  },
+  {
+   "id": "q09",
+   "source": "Context7: React",
+   "kind": "phrase",
+   "query": "Strict Mode extra setup cleanup cycle",
+   "expect": [
+    "Strict Mode runs extra setup+cleanup cycle",
+    "Strict Mode adds extra setup+cleanup cycle"
+   ]
+  },
+  {
+   "id": "q10",
+   "source": "Context7: React",
+   "kind": "typo",
+   "query": "useEfect clenup function",
+   "expect": [
+    "Fetch Data with Cleanup Function",
+    "useEffect with External System Connection and Cleanup"
+   ]
+  },
+  {
+   "id": "q11",
+   "source": "Context7: React",
+   "kind": "morph",
+   "query": "comparing dependencies with Object.is",
+   "expect": [
+    "Compared using `Object.is()` comparison"
+   ]
+  },
+  {
+   "id": "q12",
+   "source": "Context7: Next.js",
+   "kind": "identifier",
+   "query": "getServerSideProps",
+   "expect": [
+    "export async function getServerSideProps()"
+   ]
+  },
+  {
+   "id": "q13",
+   "source": "Context7: Next.js",
+   "kind": "code",
+   "query": "revalidate: 10",
+   "expect": [
+    "next: { revalidate: 10 }"
+   ]
+  },
+  {
+   "id": "q14",
+   "source": "Context7: Next.js",
+   "kind": "flag",
+   "query": "no-store",
+   "expect": [
+    "cache: 'no-store'"
+   ]
+  },
+  {
+   "id": "q15",
+   "source": "Context7: Next.js",
+   "kind": "natural",
+   "query": "how are fetch requests cached by default",
+   "expect": [
+    "`force-cache` is the default"
+   ]
+  },
+  {
+   "id": "q16",
+   "source": "Context7: Next.js",
+   "kind": "morph",
+   "query": "incremental static regenerations",
+   "expect": [
+    "Incremental Static Regeneration"
+   ]
+  },
+  {
+   "id": "q17",
+   "source": "Context7: Next.js",
+   "kind": "typo",
+   "query": "revalidte 60 seconds",
+   "expect": [
+    "revalidate: 60"
+   ]
+  },
+  {
+   "id": "q18",
+   "source": "Context7: Tailwind",
+   "kind": "code",
+   "query": "md:grid-cols-4",
+   "expect": [
+    "grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+   ]
+  },
+  {
+   "id": "q19",
+   "source": "Context7: Tailwind",
+   "kind": "natural",
+   "query": "use custom breakpoints from the theme",
+   "expect": [
+    "xs:grid-cols-2 3xl:grid-cols-6"
+   ]
+  },
+  {
+   "id": "q20",
+   "source": "Context7: Tailwind",
+   "kind": "morph",
+   "query": "multi column layouts",
+   "expect": [
+    "Multi-column Layout with Tailwind CSS"
+   ]
+  },
+  {
+   "id": "q21",
+   "source": "Context7: Tailwind",
+   "kind": "typo",
+   "query": "responsiv flex layot",
+   "expect": [
+    "md:shrink-0"
+   ]
+  },
+  {
+   "id": "q22",
+   "source": "Skill: context-mode",
+   "kind": "identifier",
+   "query": "ctx_fetch_and_index",
+   "expect": [
+    "Use ctx_fetch_and_index → ctx_search"
+   ]
+  },
+  {
+   "id": "q23",
+   "source": "Skill: context-mode",
+   "kind": "natural",
+   "query": "is Playwright safe to run in parallel",
+   "expect": [
+    "SINGLE browser instance"
+   ]
+  },
+  {
+   "id": "q24",
+   "source": "Skill: context-mode",
+   "kind": "phrase",
+   "query": "file mutations",
+   "expect": [
+    "**File mutations**"
+   ]
+  },
+  {
+   "id": "q25",
+   "source": "Skill: context-mode",
+   "kind": "natural",
+   "query": "which git commands may run in Bash directly",
+   "expect": [
+    "`git add`, `git commit`"
+   ]
+  },
+  {
+   "id": "q26",
+   "source": "Skill: context-mode",
+   "kind": "typo",
+   "query": "playwrite snapshot to file",
+   "expect": [
+    "browser_snapshot(filename)"
+   ]
+  },
+  {
+   "id": "q27",
+   "source": "Skill Refs: context-mode",
+   "kind": "code",
+   "query": "csv.DictReader",
+   "expect": [
+    "reader = csv.DictReader(f)"
+   ]
+  },
+  {
+   "id": "q28",
+   "source": "Skill Refs: context-mode",
+   "kind": "natural",
+   "query": "count HTTP status codes in an access log",
+   "expect": [
+    "awk '{print $9}'"
+   ]
+  },
+  {
+   "id": "q29",
+   "source": "Skill Refs: context-mode",
+   "kind": "code",
+   "query": "sort | uniq -c | sort -rn",
+   "expect": [
+    "sort | uniq -c | sort -rn"
+   ]
+  },
+  {
+   "id": "q30",
+   "source": "Skill Refs: context-mode",
+   "kind": "morph",
+   "query": "forgot to print the output",
+   "expect": [
+    "Forgetting to Print Output"
+   ]
+  },
+  {
+   "id": "q31",
+   "source": "Skill Refs: context-mode",
+   "kind": "flag",
+   "query": "timeout_ms",
+   "expect": [
+    "timeout_ms: 120000",
+    "timeout_ms: 60000"
+   ]
+  },
+  {
+   "id": "q32",
+   "source": "Skill Refs: context-mode",
+   "kind": "code",
+   "query": "JSON.stringify(data, null, 2)",
+   "expect": [
+    "JSON.stringify(data, null, 2)"
+   ]
+  },
+  {
+   "id": "q33",
+   "source": "Skill Refs: context-mode",
+   "kind": "typo",
+   "query": "lock fle drift detection",
+   "expect": [
+    "Lock file drift detection"
+   ]
+  },
+  {
+   "id": "q34",
+   "source": "Skill Refs: context-mode",
+   "kind": "natural",
+   "query": "find TODOs and FIXMEs",
+   "expect": [
+    "Extract TODOs and FIXMEs from codebase"
+   ]
+  },
+  {
+   "id": "q35",
+   "source": "Skill Refs: context-mode",
+   "kind": "phrase",
+   "query": "disk usage investigation",
+   "expect": [
+    "du -sh */"
+   ]
+  },
+  {
+   "id": "q36",
+   "source": "MCP: tools/list",
+   "kind": "natural",
+   "query": "take a screenshot of a web page",
+   "expect": [
+    "take_screenshot"
+   ]
+  },
+  {
+   "id": "q37",
+   "source": "MCP: tools/list",
+   "kind": "identifier",
+   "query": "git_commit",
+   "expect": [
+    "Create a new commit with staged changes"
+   ]
+  },
+  {
+   "id": "q38",
+   "source": "MCP: tools/list",
+   "kind": "natural",
+   "query": "apply database migrations",
+   "expect": [
+    "database_migrate"
+   ]
+  },
+  {
+   "id": "q39",
+   "source": "MCP: tools/list",
+   "kind": "morph",
+   "query": "renaming symbols across the codebase",
+   "expect": [
+    "rename_symbol"
+   ]
+  },
+  {
+   "id": "q40",
+   "source": "MCP: tools/list",
+   "kind": "typo",
+   "query": "prettier formating",
+   "expect": [
+    "format_code"
+   ]
+  },
+  {
+   "id": "q41",
+   "source": "MCP: tools/list",
+   "kind": "natural",
+   "query": "where is a symbol defined",
+   "expect": [
+    "find_definition"
+   ]
+  },
+  {
+   "id": "q42",
+   "source": "docs: 02-store",
+   "kind": "identifier",
+   "query": "RETENTION_SIZE_CAP_BYTES",
+   "expect": [
+    "524_288_000"
+   ]
+  },
+  {
+   "id": "q43",
+   "source": "docs: 02-store",
+   "kind": "natural",
+   "query": "what busy timeout does the store set",
+   "expect": [
+    "PRAGMA busy_timeout = 5000"
+   ]
+  },
+  {
+   "id": "q44",
+   "source": "docs: 02-store",
+   "kind": "identifier",
+   "query": "applyMigrations",
+   "expect": [
+    "PRAGMA user_version"
+   ]
+  },
+  {
+   "id": "q45",
+   "source": "docs: 02-store",
+   "kind": "phrase",
+   "query": "journal mode WAL",
+   "expect": [
+    "PRAGMA journal_mode = WAL"
+   ]
+  },
+  {
+   "id": "q46",
+   "source": "docs: PRD-v2",
+   "kind": "natural",
+   "query": "which tool is loaded from turn one on Claude Code",
+   "expect": [
+    "anthropic/alwaysLoad"
+   ]
+  },
+  {
+   "id": "q47",
+   "source": "docs: PRD-v2",
+   "kind": "natural",
+   "query": "how many tools does v2 have",
+   "expect": [
+    "Nine tools, in this fixed order"
+   ]
+  },
+  {
+   "id": "q48",
+   "source": "docs: PRD-v2",
+   "kind": "typo",
+   "query": "ctx_insigt removed",
+   "expect": [
+    "`ctx_insight` is removed"
+   ]
+  },
+  {
+   "id": "q49",
+   "source": "docs: LAUNCH",
+   "kind": "phrase",
+   "query": "claims we do not make",
+   "expect": [
+    "## Claims we do not make"
+   ]
+  },
+  {
+   "id": "q50",
+   "source": "docs: LAUNCH",
+   "kind": "identifier",
+   "query": "T-CMP",
+   "expect": [
+    "Compaction pointer, `T-CMP`"
+   ]
+  }
+ ]
+}

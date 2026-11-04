@@ -1,0 +1,7 @@
+{
+  "id": "release-plan-bump",
+  "kind": "local",
+  "covers": ["scripts/release/plan.mjs"],
+  "run": ["node", "e2e/checks/release-plan-bump.mjs"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

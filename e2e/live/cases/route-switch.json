@@ -1,0 +1,17 @@
+{
+  "id": "T-ROUTE",
+  "kind": "agent",
+  "plugin": true,
+  "covers": ["src/core/enforcement/"],
+  "prompt": "Use WebFetch to fetch https://example.com/does-not-exist-context-mode-fixture. When it is denied, call ToolSearch for the named alternative tool, then call that alternative tool instead of retrying WebFetch or giving up. Reply with only the short tool name you called after the deny, in the form ctx_<name> (drop any mcp__ or plugin prefix), and nothing else.",
+  "tools": [
+    "WebFetch",
+    "ToolSearch",
+    "mcp__context-mode__ctx_index",
+    "mcp__context-mode__ctx_search",
+    "mcp__context-mode__ctx_execute"
+  ],
+  "expect": {
+    "firstLineStartsWith": "ctx_"
+  }
+}

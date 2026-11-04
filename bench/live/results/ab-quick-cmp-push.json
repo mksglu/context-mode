@@ -1,0 +1,124 @@
+{
+  "date": "2026-10-21",
+  "agent": "2.1.303 (Claude Code)",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "runs": 2,
+  "wallSeconds": 50,
+  "v1Skipped": true,
+  "arms": {
+    "off": {
+      "sessions": 10,
+      "pass": 10,
+      "medianTokens": 36182.5,
+      "medianToolResultBytes": 32,
+      "savingVsOffPct": null,
+      "savingVsV1Pct": null,
+      "ctxCalls": 0,
+      "costUsd": 0.2368
+    },
+    "v2": {
+      "sessions": 10,
+      "pass": 10,
+      "medianTokens": 38202,
+      "medianToolResultBytes": 31,
+      "savingVsOffPct": {
+        "median": -5.7,
+        "min": -7.8,
+        "max": -5.4
+      },
+      "savingVsV1Pct": null,
+      "ctxCalls": 1,
+      "costUsd": 0.6993
+    }
+  },
+  "perTask": [
+    {
+      "task": "log-1",
+      "off": {
+        "medianTokens": 36182.5,
+        "medianToolResultBytes": 62,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.0527
+      },
+      "v2": {
+        "medianTokens": 38147.5,
+        "medianToolResultBytes": 32,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.1586
+      }
+    },
+    {
+      "task": "json-1",
+      "off": {
+        "medianTokens": 54971.5,
+        "medianToolResultBytes": 729.5,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.0562
+      },
+      "v2": {
+        "medianTokens": 59245,
+        "medianToolResultBytes": 1839,
+        "pass": "2/2",
+        "ctxCalls": 1,
+        "cost": 0.1754
+      }
+    },
+    {
+      "task": "tests-1",
+      "off": {
+        "medianTokens": 36123,
+        "medianToolResultBytes": 2,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.042
+      },
+      "v2": {
+        "medianTokens": 38166,
+        "medianToolResultBytes": 2,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.1585
+      }
+    },
+    {
+      "task": "file-1",
+      "off": {
+        "medianTokens": 36159,
+        "medianToolResultBytes": 31,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.0432
+      },
+      "v2": {
+        "medianTokens": 38202,
+        "medianToolResultBytes": 31,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.1597
+      }
+    },
+    {
+      "task": "git-1",
+      "off": {
+        "medianTokens": 36259,
+        "medianToolResultBytes": 20.5,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.0426
+      },
+      "v2": {
+        "medianTokens": 38301,
+        "medianToolResultBytes": 20.5,
+        "pass": "2/2",
+        "ctxCalls": 0,
+        "cost": 0.047
+      }
+    }
+  ],
+  "totalCostUsd": 0.936
+}

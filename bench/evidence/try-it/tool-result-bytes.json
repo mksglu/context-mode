@@ -1,0 +1,2651 @@
+{
+ "schema": "context-mode.tryit-tool-result-bytes/1",
+ "method": "Sum over every tool_result block in the session transcript (stream-json user events): UTF-8 bytes of each text part; a non-text part counts as the bytes of its JSON. Tool calls: tool_use blocks in assistant events. compact_boundary: system events of that subtype.",
+ "sessions": [
+  {
+   "w": "repo-research",
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 15718,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "4d9fa8c5725b9b452ef7c648e096281e606c2206929a9e37f90beb82e890a666"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 51351,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_batch_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1feaa7aae23d83c6d9d4d001ce0f4d5199575e6aea0baf1287fc2114c1493c45"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 14445,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "caa006e4a0579e553434bf6056077bce14b67233091e4e8147bbcab32f7d746d"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "cc1cc7a5ded42a8586cdc11bd4ebfb1020698628ddf2f775c931051f657b105b"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 48995,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_batch_execute": 2,
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "274cf56a1c4630dd1b350ae2c7fcf5d59fb0ef32fbbe98dfa51ddeb6a4ec4858"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 13122,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "730e7518b5467a307f9963fda93870e06e74d508d4524c4fdfa3b73e12def6aa"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "b26f1a34ab9b3918bcc11121d081a5b29a6a3099e7ca4d721e7256b54c9268ea"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 25190,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "a52098b189561bbfb55b5a84f76049e42696cd3e5b54d36a093b1cc03a7494e6"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 17283,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "9a75a247dc397655f373cc3e2fe87c45d49947af48bebcb06bc4407d63eef58b"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 4020,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "f8a95c3a7256e7e32f000f4f5fcbbd84d74472b9c70bf12e79dbab03f89fa58a"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 20856,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "5169c47b29374cf57fb36006966a509602c3567327534addff34e4c9de02d390"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 53116,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_batch_execute": 1,
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "a1c855de0bfadc93f20183c7f81c183a3beb175ad93e294711f66e0e3e7b4edc"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 6972,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "476a4c90ddea9d6e62b9938881f2f6134e14681b5086db29567bda0b53ee6bd0"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 31365,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "4eb85f5370b53b272c2782c1f6aa5bfa63ba6831cde9d36ffed1530525b0e380"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16030,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "ad436070e00b20deec273f39228e5c3251c4990444e0299e68f1dfde107dc28f"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 21300,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b3877441f4ba5ba7c7d039ee56709bc40f31946f82fc88678d995af6d9f87413"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 22943,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b325d895fbe15b804f2bffe067f511a78956a459780104c58fcf8430c5e9b65d"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16478,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "12ff205732a77500e6c114fe6f4996991d711bf0014ce72ab9ae46c241c8ef84"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 13290,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "61d5d84f9ef8811255aa5dcc0262162775ee8143b541c510225598aac82b991e"
+  },
+  {
+   "w": "repo-research",
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 11448,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "69472a7fe6f5369032c6b3dfe00a4ce6f949c2e9d7776af85f10c8c95d73a4f9"
+  },
+  {
+   "w": "git-history",
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2018,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "fe242583aa1af63615e41958b324cd5de5235280fd1ebc40b08129d0467bd56f"
+  },
+  {
+   "w": "git-history",
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3236,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "da575b3b11b8c66145560c878d4e5f4c3009d1191801a64bfeb8c1a483d4e692"
+  },
+  {
+   "w": "git-history",
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1673,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "79b959483e27c96c562da849369e276d76349d7edcc25922c3df899df656b073"
+  },
+  {
+   "w": "git-history",
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1624,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "416d37fca4914fb9110a89dd69b6d250e695d453fd5ebccc1e21d8b77d2ccee2"
+  },
+  {
+   "w": "git-history",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2030,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "da6610b9edcc3ccf5dcf22d16ca7c283eb6ab26d27c4f46cb596eda98f266c0b"
+  },
+  {
+   "w": "git-history",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3244,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "f3006b0c60a48ccc81e87b11790e2ce43010316ee0317a0bf5a0d68de84aad21"
+  },
+  {
+   "w": "git-history",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1405,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "c307c2fa9c0577cce7c6ed1df075c152ca18c8d1b80573d834998f21ae737b0c"
+  },
+  {
+   "w": "git-history",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2115,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1b3cbd7535e2a603d4fcace84e96ee424a19b7c29b5c7c97a61a9c8f9970c561"
+  },
+  {
+   "w": "git-history",
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2144,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 2,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "6646d7f4e1f619579f0067c43b252a55c39012b79132b9417c71e4830adc7e51"
+  },
+  {
+   "w": "git-history",
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1665,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "203412f136f40a73c741ba30cbe9a51f1a21bf765d0a3c64937e71bb4c522622"
+  },
+  {
+   "w": "git-history",
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3383,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Bash": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "7671e722a46593cad62ca0aca5eba837054bacddae96b289df6f912a39ece9cc"
+  },
+  {
+   "w": "git-history",
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2001,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "7503d5dcec8005d0bafb52450f49a25fedf7563324ec4671337eecdaaadfaa93"
+  },
+  {
+   "w": "git-history",
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1049,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "c8114fecf5ab3dbac67cbab3ad49a0ba7d430bcff015baf8fff1ec4fc2df45dd"
+  },
+  {
+   "w": "git-history",
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3672,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Bash": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "3930cc19450d6135573b70f3beed7bd02bfe739fe6659a22819e059d5e925c80"
+  },
+  {
+   "w": "git-history",
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2096,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b179ea56740a9eeef91ef5013c4b8ca63b0d5eaec517974bd8e2c5fcbb5ff1d8"
+  },
+  {
+   "w": "git-history",
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2737,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "bcc3ef5c932e9f5e664dbc1a3f047d0fab08ebc84ab75d939284ae89537514c1"
+  },
+  {
+   "w": "git-history",
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2614,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "525dfb2d64c738670bc07bfe6f5f11872b6d711ab3cbb5be2decded7ee950aa5"
+  },
+  {
+   "w": "git-history",
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2035,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "7cc3accae2a08eb0a6f877365dbab88cb52d24f0d62f75fa16ecd3ed5f2b1a52"
+  },
+  {
+   "w": "git-history",
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2609,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "976f56dbce6406093b9a2aca35a26991601c74a679ab4b3a448186c74311239e"
+  },
+  {
+   "w": "git-history",
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1373,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "575cf7622b02f1015f54aad2900cf27d21e3959479955b95a2577b5fa383d419"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2241,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "d5ffa4dbfd01ab78c2fa2652c9010a5c60adbcc8990c7f27f52a2ca563352944"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5822,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "ae039de47a936c48b0a6b60c2c985b9bbf696007c1f25cc2291b6f203a406dd2"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5938,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "a170d7adf47c8352500c26b725f5d4046509eabd918c104c9e58826f937a6482"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "58e329b5672e3def3ca7357d640a849a8db45d420c920c80b01f98c5c41d4f9d"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2186,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "bc6d0b8cbe4e4c43b100716e2753dece9e13fe4c383f896aa3cd78e51d86cd07"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5861,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "4861396994c1e10078db634fe4d9b7a687b148eb096e8802de6d99de6b0eb82c"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "d8dd2fa29600f00a30339a81bcd881bb6041626c5127d2f231d7e16516082147"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2224,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "bdf4ff399801b2987ed9e41ab6e0dbb1b5042b51dd2f66d25f0518aca413708e"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5879,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b746c8fde67b8c3882d2e64083d14d4809c2c0e6d0374200d907dbd199221484"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "534845e4f73668dc2bca1d95e59898f3debb5ca0b496332a7c29639ebbf19aa7"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2413,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "4eef2fdd564260b3c4c190cad12c86da8ad5dc01ea9f1d46a7edbf1c8353a8ee"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2234,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "37b4765a5076b934c247256f97d6de0129a0dbe655f81f860a67080fd9c207fc"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "6b8a856581b146e945bf97a8cfbd814ef068947c5a0cc9f4ca04b2aaff1387c8"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2205,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1285c3d91d75a4599d507cf3cea6bbedceec030fd8101b6d5db9611a93b51602"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3639,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 1,
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b43babb087ef20ba6eee90acfec422eb4b7fe3a39d53b7338493ce942b05d432"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5843,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "657f50fb3066204545a096ccf1ea6c53af023ab0061d282fdd1cf1144be5b500"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2516,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "2e4957a9cff065044de791d5add6c33800043113292ff4524655f5e2562f935e"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2199,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "34ea1a949850460e0192cce2a073fa03b4c08de1e5a632bd4add23b96d220884"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5683,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "c7a10d897e818faf5f6c8042e8ef4ab45e4ef4418c89663c68d5737cbeccec83"
+  },
+  {
+   "w": "web-scrape",
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "f1ae048f0cb85265e03692fd4315b40a762d03e737570304511e67b8cdfed930"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2385,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "9b7cdd715f9e93218a68c579f28384c2864373745e07849cd1ebe31a91cd7769"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5803,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "fd279ffc980ab2f37234f7f7e8ddde023c47709c8b0c0d3653ab74bce877e298"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 6078,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "81648fe86a5aca4a28ec88557531cea81132c683b81287e77ff3ee47a54e325a"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "d2de52eee74b805982f4b27a1ab81d5f3bfc9f60b1a7daefe47983039b97ac2b"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2277,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "42ec4b24cde6729fb7c84fed6cc95d85343e7d3e80c58761bb4f40a3a8ddd4cd"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5980,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "7be4b9c1c0003173d1d735ebac4a75761a0571561619cac7457e1a2ab4938627"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "cd5e5c35bfa0867a26ba04bf770bf3e728a532d5f20a72dcfed35558b86245cd"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2375,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "233bc6814563c5e8b071330fab0bf90f66459d219b9d02e8f11a27190b45b259"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5900,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "e18845b4221f6d8855c2b800e209d118bc1775bd7de61098bfb5413ad09c0322"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "7facd82264710d53574a134d785241089e6469a7916f7fb01793610c8ebee5b5"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2327,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "fa21a1637466114bad96f318d2e3f7d82f6c41ec3eb572883ca6568459464079"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3414,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1babf97a1eb8b6e4b0223b5913b5a5f84c4021c7f545c02205feabe92eb0714b"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "d752c9b08e424f9dbda71b3c8ea81940bd04729dfbe015919a71ce38b196685e"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2386,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "6038ff3bbbe397b6fd661c533f5c5f26811e12da1b3629c734c51e558b639c34"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 4008,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "f297581ededb213cf2b0c277eb1a53c24c836e24910fd84c460ec4ec3930804a"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 5811,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "fee89720529f10db7caa510a618f2b3647e84b547dd917956af3bab2473dd7db"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2395,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "bc70d02ce5296232b396e9ee9422dfd629d285d30da4d5431d7ad9af9c84d3ff"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 4249,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 1,
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "2196ae760aaa69e6343b4ef191115d96e902bed36ede1729d3d9a6930c4b6542"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 6060,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "mcp__context-mode__ctx_execute": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "de9d10bf5f5104d823b9b84376ea5a30838ead6148634154222015c963567652"
+  },
+  {
+   "w": "web-scrape",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "70a7d17b2692aa061479b1bb1480cd53143a6f2bf9f71fa2e419702047045e5f"
+  },
+  {
+   "w": "large-json",
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 285,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "6f3b22eb88f689f6491933ccc2ff893b43fee8dc3456b66cb2c08dc2a9e716f5"
+  },
+  {
+   "w": "large-json",
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1894,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "9323830cf3936def5c66f8e2e68ac678b65205a3b0f6186d25e8ca6e69af568e"
+  },
+  {
+   "w": "large-json",
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1401,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 2,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b84f581f3ae06904b0911ebe9dcb9e1b5309c82bbd3b70243a4d85a6df001499"
+  },
+  {
+   "w": "large-json",
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 878,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "49771e2e3c4cfb7100359c72d89c452cc984b921786bbe4f27badcf9e07edca6"
+  },
+  {
+   "w": "large-json",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 3063,
+   "tool_result_blocks": 8,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 4,
+    "ToolSearch": 1,
+    "Edit": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "d3f2f9d31cd82bd52cebf0c486333c77de74a2124f674a0c070ef749ef8a2601"
+  },
+  {
+   "w": "large-json",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1544,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b5e70ab90697efd10daedd889d19a171f2a693f5a0d435190896560de4c58eae"
+  },
+  {
+   "w": "large-json",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 683,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "40b77e925fda6a7649bbd26e249c105e96330d063a1138702199986e39f1cdc2"
+  },
+  {
+   "w": "large-json",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 2549,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Bash": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "ed42e5e2b759ac0d9b2dcfd3a01b391e4fa503a2735d8de5e43742064ece04d7"
+  },
+  {
+   "w": "large-json",
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1788,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "d79426c44f6291c64a0e24e237b3464958105e5d6e6ffd34f4ca8fb1c5302e13"
+  },
+  {
+   "w": "large-json",
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1243,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "82a84f713318404ac6f17a51e923b641b3c10f71b6da6e1b97c0da0be42ad170"
+  },
+  {
+   "w": "large-json",
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-8-values",
+   "tool_result_bytes": 1662,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "9b8922b88c146cf5708ba6d11139daba60ff86330e65ab82dce2a9e20e0be43b"
+  },
+  {
+   "w": "large-json",
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 4254,
+   "tool_result_blocks": 9,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 6,
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "6272cf928d661ad90a8ba493386fcbf4585fc77fd872127cce3e5287ecad650b"
+  },
+  {
+   "w": "large-json",
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 629,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "60b4a9448ca9ea044f5ea69ae9186ccec943f15f20d816c7b52302d32ffb251b"
+  },
+  {
+   "w": "large-json",
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-4-values",
+   "tool_result_bytes": 1586,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b673aa28ef8a267a8808c3d3b16a819fd3eaad593014ce7970d01f45c4bac181"
+  },
+  {
+   "w": "large-json",
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 3913,
+   "tool_result_blocks": 8,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 5,
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "5ef1d39d1fa458db66caade64bc3eb60d6e1d966cd36dfd6e7fcf52766135a1b"
+  },
+  {
+   "w": "large-json",
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1494,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "2eef63949e242937c1b8192ba891f98591e7a4f071ce6a44fe69f7fa842dc11b"
+  },
+  {
+   "w": "large-json",
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-8-values",
+   "tool_result_bytes": 1504,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "df707cb26f186400bd3584730ab68221a4e7ff98270a74d7a104f9dcb732898a"
+  },
+  {
+   "w": "large-json",
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 1778,
+   "tool_result_blocks": 6,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 3,
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "06360c26a364183e4a4c2d6aebe7987ebc835ca585d487d741924c356044a108"
+  },
+  {
+   "w": "large-json",
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 2037,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1b3159d3bb58e92d01f6d21183d9b32af5feecc5badc8602401c07c1ef9c1904"
+  },
+  {
+   "w": "large-json",
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-served-data-on-disk",
+   "tool_result_bytes": 409,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "6b2fe79aae7bcc81b609ab1133381e33b29f4c6e4af2818e4c22fd8a69ae0658"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3020,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "647a8efed793687485973c2d58fae01f3b2b8cb4c8a247d1097536d5d0bbdd9e"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 4049,
+   "tool_result_blocks": 9,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 5,
+    "ToolSearch": 1,
+    "Edit": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "5fcb1debe695bd173d7bd7f5f76ca08bf48ab4eae99423fa6ecad389f540464e"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2192,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "5ee8360f81267f4cf482aa1c6cff918c449357468848be2709d5e18af7b43e33"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 328,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "3a39f0e96c9cc205bec2dd84fc664ffa9a145b77336b86f33bb945d1c2278409"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-6-values",
+   "tool_result_bytes": 3866,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 2,
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "10fa78a2a6716400a003aa613078a5f8d87e37d19d61a820b293fd180e89b0b0"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-10-of-11-values",
+   "tool_result_bytes": 3060,
+   "tool_result_blocks": 9,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 6,
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "result_events": 2,
+   "turns_all_results": 11,
+   "transcript_sha256": "b1ea767642812cb15cf9c0acb2ad56d794cb5dc701e1edd5294f78a084caf252"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-7-values",
+   "tool_result_bytes": 1043,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "50b53787f49471650f306418b1a94979ea2ecd216360b98d2dc136f828366158"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1653,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "bbcc4373675b09100aebbb9043772a8fec3c750c044b7236cba7abd063c5c773"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2345,
+   "tool_result_blocks": 6,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "0cad760a4a70ba9a85adc32131c40eef5ba935832a90b2699e7a2f5883ad0ad4"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-11-values",
+   "tool_result_bytes": 450,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1ec3c0d0893685c4bcb86adbb731e4a53f47035d9a7adb56d2b4253cf4f2b741"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1807,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "095f1647fabedef4aa1345434c4d6e50cab50cf3e21cd2b6346ab939980c8c0b"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-10-values",
+   "tool_result_bytes": 7387,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1c0b2a87e1dc6541954daafcc85ec46640a5989ef7d1c12e26fef7c6a555fe31"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-7-values",
+   "tool_result_bytes": 617,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "8f90161c44353e72ea30c6495a5d4ce7aeb2002e3773d54d2a869bc07e51a185"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1218,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "50300236219b9778738f094f65cd1463889ea58f58f222fc2cd569aa41d41a27"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3859,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "a46bf4c0bbaa00996dcc721182abc207d94646ecfd291d18772d04fea8812efc"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-12-values",
+   "tool_result_bytes": 2391,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 3,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "c8626c836c4ee8640c5039d4aecfa2dc883df873e6e8d86c7eb0b6090d109380"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1704,
+   "tool_result_blocks": 2,
+   "tool_calls": {
+    "Bash": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "d55cf5ec8c4738766236f2e5cff8cf763b825a0acbc0b062eda2e222fde0fff6"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-11-values",
+   "tool_result_bytes": 2037,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 2,
+    "Edit": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "9ad47e87058a823e3dec498c16232f83ed7890e0a9031aab78f1fc78257fbe94"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2840,
+   "tool_result_blocks": 6,
+   "tool_calls": {
+    "Write": 1,
+    "Bash": 4,
+    "mcp__context-mode__ctx_execute": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "900fa86c6957d8e97f5d7d0186f9b3b1f0e50b0b2a086a7eaa2f3fd9fb2cf900"
+  },
+  {
+   "w": "large-json",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "answer-missing-1-of-5-values",
+   "tool_result_bytes": 585,
+   "tool_result_blocks": 1,
+   "tool_calls": {
+    "Bash": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "1ffcc06b1f24248046526f45fe4b5fa40306576e088506d499dcaebbb5bfcd49"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 12231,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Bash": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "90e1ca4e9a9b96c50411a5d26fa4e82dff38ee9b6018b545f5cdae399e43821e"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 17162,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "fd0671b7b44554de61ca60d73e6ceba969f88925789d9882e7bda041bd76c3ef"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 20279,
+   "tool_result_blocks": 8,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 3,
+    "mcp__context-mode__ctx_search": 2,
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "be0fd341e84072c74f46006c468b11aaa98379e835fc3d90f03af4184e236eb0"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "4f50d019b97233455f6466d19f9f4c9f75c325b613fd090d7f503b28332d71aa"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16940,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "db2f6f82310ee35ebc095db0fc491697ae8feefe8d3fe635ebf0ec608c8b2533"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 15285,
+   "tool_result_blocks": 8,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 2,
+    "mcp__context-mode__ctx_execute": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "620871fef05064f21d050381349653c88405df810aa0e4b2575b14f8618ef9ee"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "1681850dc58c97d5d4e21cea9f5845e042e550a9c99c98c887d376a0afe1007d"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 8493,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "741ba329ec5c1aaf76fd0c7c23e0c75a7b8033836b657357a92b44bccae66a2f"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 24358,
+   "tool_result_blocks": 9,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 2,
+    "mcp__context-mode__ctx_execute": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "c24a076450e3c889fcfc4e67c04e95ba75bd58fb81962d774e6be2b609fabb1e"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "7b31c38a0a475253537d67d5f3afcf9786cda58eb887f2ce3a441c980f29ee48"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 14475,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "360f5b8038abc0468ab296187a06d3464f28b327e14b8786f540ff7ea44af63a"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16952,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "857e42993c7f57a0b1567058bbeeecfb96320ac34ba03907fafc4d7e7beaaa79"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "d821bd8097ed5eb00748d4c128c9d73fb784c14b2db4fa2950ebe999b121077a"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 9449,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Bash": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "be8b715ec06112e26116a74e1ee0fe233dd65fdbdc8b88373631d06baf46a436"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 17079,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b7bd98e34cb43303c742e4ca380fd0c0b3e17dc2beca7dbbec07c04c19c333c8"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 24145,
+   "tool_result_blocks": 10,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 2,
+    "mcp__context-mode__ctx_search": 4,
+    "mcp__context-mode__ctx_execute": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "9d28e60e4c7a455334c25e6448d58b3a2edb9621a524932c95d8e137d5e0f3c4"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 13999,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "74cc2872949c3aa18c0120cbc50d0c9b4933e1d094703415f7bdcdd20f08e047"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16913,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "99259cfc5cff5d4e9f1218455ab35a64a305801d8cb8f0a3a9ab721e217d2a16"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16095,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "f53558930e117f1cbe10d805e74cfbf62bd0feb017fabc41e972e2757db62c40"
+  },
+  {
+   "w": "docs-search",
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "no-tool-call",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "6feb35342af0d3f371aaf092fb9fe937f57d3dc90d7db73f83a913e4f16d016e"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "plain",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 15800,
+   "tool_result_blocks": 6,
+   "tool_calls": {
+    "Bash": 6
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "a95eebbedb86214d703f2b2c67156ca9d33616974e67d67411a56e2cf41105c6"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "v1",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16938,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "d004a95bf30387ab3ec926000e9e93f84d72b2af9e23e28fc0da67727b5a7734"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "v2",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 19453,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "74e8e6871625a1b967a08122c447587f48819b4c4b8c2953dc853b4fac2a6308"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 0,
+   "arm": "gateway",
+   "role": "warmup",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "681fe59a2bd84650e83882d040c0c349b719942ab51988aa2aa38cbe1a64f67b"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16957,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "e94cc9515ea3df2948ede54ee5a25c942f1136a565efedd2d1824ed8d358553b"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 24750,
+   "tool_result_blocks": 6,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 2,
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b0c06be649f79d543680d80a2850b727512fbce44d4025b64f9716e25d024a20"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "1067a0f55e6b872619daadabdb5c7f8a7ed5360a8cee141f09e7963203667ff8"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 21701,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "937b29bf1a96c54a892741c34f981f5e224de224918a41460ce48e1b72d3dd16"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16116,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "0d61ff68839e9aaaa35dadf786dd2338459c837552bc2a94c81ee828bb85d240"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "234273171067ed104fc34e7879ec428f89ed6012fa6d29a79c022fa6ad3d0220"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 21384,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "fc2bac09b407f16a38ea7265b6f9423ba6559db62f03a45d8ef61b2237b8a530"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16942,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "15ed13dddb247f68b31bb48c1890c5df64a5ab86a58975949fee52730cca56c4"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "81246671a9696fa4bc6e0b2b99735128c0ddbfee3ece79ef9b1a766bbf69f357"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 20515,
+   "tool_result_blocks": 4,
+   "tool_calls": {
+    "Bash": 4
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "4fb98772c83e6c3159b03ed168ae458644bb64c95a7dea0147086b4eff144567"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 17112,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "80c7e074cd5633cbbec9d14fa2e5e6fd5ff8d4cdf6a274b7309f0d1bd952c2cc"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 3,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 15095,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 1,
+    "mcp__context-mode__ctx_search": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "8900e066fd9784d3a607389905237411c646a2ba46a8cd85e65bc04f8c902a52"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 20357,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "6dec16df5e93aab90bb223c93c1052462dde99dcc69634c795a606d95679b132"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 16975,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_fetch_and_index": 1,
+    "mcp__context-mode__ctx_search": 1
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "60280adb57cfce20eeff295d7199b8194bd6c45d8587f4e14ec9be6a2f65eadb"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 23912,
+   "tool_result_blocks": 8,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__context-mode__ctx_index": 2,
+    "mcp__context-mode__ctx_search": 3,
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "537e270857a5b2abb24d4c35843de175a5681da01abbb0a7dce7dec5d914ddbd"
+  },
+  {
+   "w": "docs-search",
+   "amendment": 1,
+   "cycle": 4,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 0,
+   "tool_result_blocks": 0,
+   "tool_calls": {},
+   "compact_boundary": 0,
+   "transcript_sha256": "8d8902c74b6773119cdd97fec83da63bcb13e98e14c7d03673239677bf508c95"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3640,
+   "tool_result_blocks": 14,
+   "tool_calls": {
+    "Bash": 7,
+    "Write": 7
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "e2f88fc263f5fe3dae57a00d7244610a84e949fcd86883ceba1206a65a5a2fca"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 3084,
+   "tool_result_blocks": 16,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "Bash": 4,
+    "mcp__context-mode__ctx_resume": 1,
+    "Write": 8,
+    "mcp__context-mode__ctx_execute": 2
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "072266d9cc2df1a47cbd18ec7a8efe700432f70541379188b38ae860c806fc8d"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 473,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "4adbb311a5095efb3fbfd42c65f125ee2bace70e9dfe6f6ef3df76f3032b9178"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1571,
+   "tool_result_blocks": 5,
+   "tool_calls": {
+    "Bash": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "56ab949c958e631a98ecca7646f3630d5d34e3d8b3e5b21f70bb3563de35e7d6"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 2,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2137,
+   "tool_result_blocks": 11,
+   "tool_calls": {
+    "ToolSearch": 1,
+    "Bash": 4,
+    "mcp__context-mode__ctx_resume": 1,
+    "Write": 5
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "7a12936cc5a338c7f3df9c2c78377f77e2f883cbaea4ffb322a66de55eead1d0"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 2,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 802,
+   "tool_result_blocks": 3,
+   "tool_calls": {
+    "Bash": 3
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "b773a5018d76b8a91aaafba518026f945ab2f135b5af83f124e46f72196a115a"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 2,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 1304,
+   "tool_result_blocks": 6,
+   "tool_calls": {
+    "Bash": 6
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "186e4aedea76df506624c3969b663a27b000d706b3136977761c2eb13d32563e"
+  },
+  {
+   "w": "session-continuity",
+   "cycle": 2,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "oracle": "ok",
+   "tool_result_bytes": 2372,
+   "tool_result_blocks": 8,
+   "tool_calls": {
+    "Bash": 8
+   },
+   "compact_boundary": 0,
+   "transcript_sha256": "868bcedc7144671cbb02c3fbb982a0d462f03884456eaceffdbcd7105744bacd"
+  }
+ ]
+}

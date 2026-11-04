@@ -1,0 +1,10 @@
+{
+  "session_id": "<sid:0>",
+  "turn_id": "<sid:1>",
+  "transcript_path": "<transcript_path>",
+  "cwd": "<proj>",
+  "hook_event_name": "UserPromptSubmit",
+  "model": "gpt-6-astra",
+  "permission_mode": "bypassPermissions",
+  "prompt": "Run exactly one Bash command: echo gp3-fixture-probe. Then stop."
+}

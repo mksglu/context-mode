@@ -1,0 +1,11 @@
+{
+  "isError": false,
+  "labels": [
+    ".gitignore",
+    "a/.gitignore",
+    "a/keep.log",
+    "a/y",
+    "build/keep.txt",
+    "x"
+  ]
+}

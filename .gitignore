@@ -1,13 +1,29 @@
 node_modules/
-build/
+# v1 tsc outDir; v2 build scripts in build/ are tracked (impl/13 §2)
+/build/*
+!/build/build.mjs
+!/build/check-readme.mjs
+!/build/check-secrets.mjs
+!/build/check-prompt-static.mjs
+!/build/check-install-docs.mjs
+!/build/check-removed.mjs
+!/build/hash.mjs
+!/build/manifests.ts
+!/build/main-tree.mjs
+!/build/readme-agents.mjs
+!/build/readme-links.mjs
+!/build/readme.mjs
+!/build/readme-stats.mjs
+!/build/npm-downloads.mjs
+# v2 build output and the prompt file build.mjs generates and deletes (impl/13 §2.2)
+release-out/
+src/prompt/_generated.ts
 packages/*/dist/
 *.tsbuildinfo
 .DS_Store
 /tmp/
 tmp.*/
 *.db
-server.bundle.mjs
-cli.bundle.mjs
 package-lock.json
 hooks/session-extract.bundle.mjs
 hooks/session-snapshot.bundle.mjs

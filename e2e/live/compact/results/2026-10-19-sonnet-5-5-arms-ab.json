@@ -1,0 +1,967 @@
+{
+  "id": "T-CMP",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "runsPerArm": 10,
+  "arms": [
+    "a",
+    "b"
+  ],
+  "complete": true,
+  "costUsd": 2.3009,
+  "stats": {
+    "a": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "b": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "c": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    },
+    "d": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    },
+    "e": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    }
+  },
+  "checks": [
+    {
+      "name": "runs_per_arm",
+      "pass": false,
+      "want": ">= 10 each"
+    },
+    {
+      "name": "a_call_rate",
+      "pass": false,
+      "got": 0,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "a_correct",
+      "pass": false,
+      "got": 0.7,
+      "want": ">= 0.8"
+    },
+    {
+      "name": "a_correct_ge_c",
+      "pass": false,
+      "got": 0.7,
+      "want": ">= c null"
+    },
+    {
+      "name": "d_correct",
+      "pass": false,
+      "got": null,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "resume_seq",
+      "pass": true,
+      "got": "20/20",
+      "want": "all, >= 10"
+    }
+  ],
+  "info": {
+    "a_correct_minus_b": 0
+  },
+  "runs": {
+    "a": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.14530879999999996,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01QKAHCnayLG962tZ3wvqZRP",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-a-b97tEX-project/memory/journal-writer-shared-queue.md",
+              "content": "---\nname: journal-writer-shared-queue\ndescription: Decision on how two processes write the journal: one shared writer queue, not a lock file\nmetadata:\n  type: project\n---\n\nTwo processes write the journal through one shared writer queue. A lock file was considered and rejected.\n\n**Why:** The user chose the queue over the lock file (2026-10-19). No further rationale was given.\n**How to apply:** Route all journal writes through the shared queue. Don't add lock-file-based coordination.\n"
+            }
+          },
+          {
+            "turn": 0,
+            "id": "toolu_01Koh17Ac91WuVvQUGgWWSwt",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-a-b97tEX-project/memory/MEMORY.md",
+              "content": "- [Journal writer: shared queue](journal-writer-shared-queue.md) — two processes write the journal via one shared writer queue, not a lock file\n"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01GC8h8dhq57GE11sViSTq9j",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -la; ls -R src 2>/dev/null | head -50; git log --oneline | head; grep -ril journal . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1718405,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01QNec9CWUCM5kBtcezbHeY1",
+            "name": "mcp__claude_ai_Claude_Docs__guide",
+            "input": {}
+          },
+          {
+            "turn": 0,
+            "id": "toolu_01NmzT3uLvZKYiM2CHkE6DbN",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "d=\"/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-a-oJUtO6-project/memory\"\ncat > \"$d/config-loader-design.md\" <<'EOF'\n---\nname: config-loader-design\ndescription: Decided config loader design (option C, layered, cfg-schema-v4) and the reasons the alternatives were rejected\nmetadata:\n  type: project\n---\n\nConfig loader uses option C, a layered loader: built-in defaults, then project file, then user file. The merged result is checked against one schema, version `cfg-schema-v4`.\n\n- Unknown keys produce a warning naming the key and the layer. They are never an error, so old configs keep working.\n- Each value records which layer set it, so the doctor command can print where a value came from.\n- The loader must refuse any file declaring a schema version newer than cfg-schema-v4.\n- Cost: one extra file read at start, measured under 2 ms.\n\n**Why:** Option A (single JSON file, hard-fail on unknown keys) broke users with leftover old keys. Option B (env vars merged over file, no schema) silently ignored typo'd variable names, which cost an afternoon in the last release.\n\n**How to apply:** Do not propose hard-failing on unknown keys or schema-less env merging. Keep per-value layer provenance for the doctor command.\nEOF\necho \"- [Config loader design](config-loader-design.md) — option C layered loader, cfg-schema-v4, warn on unknown keys\" >> \"$d/MEMORY.md\"\nls \"$d\""
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_019oeCkg2wPLNfbaD2uD6ufU",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config\ncat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\nconst SCHEMA_PREFIX = \"cfg-schema-v\";\nconst SUPPORTED_SCHEMA = 4;\nconst SCHEMA_KEY = \"schema\";\n\nconst isPlainObject = (v) =>\n  v !== null && typeof v === \"object\" && !Array.isArray(v);\n\nfunction readLayerFile(path, layer) {\n  let text;\n  try {\n    text = readFileSync(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw new Error(`config: cannot read ${layer} file ${path}: ${err.message}`);\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`config: invalid JSON in ${layer} file ${path}: ${err.message}`);\n  }\n  if (!isPlainObject(data)) {\n    throw new Error(`config: ${layer} file ${path} must contain a JSON object`);\n  }\n  return data;\n}\n\nfunction checkSchemaVersion(data, layer, path) {\n  if (!(SCHEMA_KEY in data)) return;\n  const declared = data[SCHEMA_KEY];\n  const match =\n    typeof declared === \"string\" && declared.startsWith(SCHEMA_PREFIX)\n      ? /^\\d+$/.exec(declared.slice(SCHEMA_PREFIX.length))\n      : null;\n  if (!match) {\n    throw new Error(`config: ${layer} file ${path} has malformed schema \"${declared}\"`);\n  }\n  if (Number(match[0]) > SUPPORTED_SCHEMA) {\n    throw new Error(\n      `config: ${layer} file ${path} declares ${declared}, newer than ${SCHEMA_PREFIX}${SUPPORTED_SCHEMA}`,\n    );\n  }\n}\n\n// Merge `input` over `target`. Unknown keys (absent from the defaults tree)\n// warn with their key path and layer, and are dropped from the merged result.\nfunction mergeLayer(target, input, known, layer, sources, warn, prefix = \"\") {\n  for (const [key, value] of Object.entries(input)) {\n    const path = prefix + key;\n    if (prefix === \"\" && key === SCHEMA_KEY) continue;\n    if (!Object.hasOwn(known, key)) {\n      warn(`config: unknown key \"${path}\" in ${layer} layer`);\n      continue;\n    }\n    if (isPlainObject(known[key]) && isPlainObject(value)) {\n      mergeLayer(target[key], value, known[key], layer, sources, warn, `${path}.`);\n    } else {\n      target[key] = value;\n      sources[path] = layer;\n    }\n  }\n}\n\nfunction seed(defaults, sources, prefix = \"\") {\n  const out = {};\n  for (const [key, value] of Object.entries(defaults)) {\n    const path = prefix + key;\n    if (isPlainObject(value)) {\n      out[key] = seed(value, sources, `${path}.`);\n    } else {\n      out[key] = value;\n      sources[path] = \"default\";\n    }\n  }\n  return out;\n}\n\n/**\n * Load config from three layers: defaults, project file, user file.\n * Returns { config, sources } where sources maps each dotted key path to\n * the layer that set its value (\"default\" | \"project\" | \"user\").\n *\n * Unknown keys warn (via `warn`) and are ignored; files declaring a schema\n * newer than cfg-schema-v4 are refused.\n */\nexport function loadConfig({\n  defaults = {},\n  projectPath,\n  userPath,\n  warn = (msg) => console.warn(msg),\n} = {}) {\n  const sources = {};\n  const config = seed(defaults, sources);\n  const layers = [\n    [\"project\", projectPath],\n    [\"user\", userPath],\n  ];\n  for (const [layer, path] of layers) {\n    if (!path) continue;\n    const data = readLayerFile(path, layer);\n    if (!data) continue;\n    checkSchemaVersion(data, layer, path);\n    mergeLayer(config, data, defaults, layer, sources, warn);\n  }\n  config[SCHEMA_KEY] = `${SCHEMA_PREFIX}${SUPPORTED_SCHEMA}`;\n  return { config, sources };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo ok"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.09374279999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01HHbTkxwpPJhfNubHvkEJdf",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_017evkV3J5SGCY2eZfBYagtm",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-tcmp-out/scratch-s1/cm-t-cmp-ELVllK/arm-a-rJ0jc8/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01N2QKnKoVwaosQyK4RgVnv9",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.10279769999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Dkc4Xvo88VfRiPsq43sRSx",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>/dev/null; cat package.json tsconfig.json 2>/dev/null | head -40; grep -ril journal src 2>/dev/null",
+              "intent": "project layout"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1199344,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_011Dz6p5UKgGHKXxyQbQVFvm",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_resume",
+            "input": {}
+          },
+          {
+            "turn": 0,
+            "id": "toolu_01Pga4gjdx6XSCNzTguAaEBJ",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-a-lCCczz-project/memory/config-loader-layered-design.md",
+              "content": "---\nname: config-loader-layered-design\ndescription: Decision to build the config loader as a three-layer loader (option C) with schema cfg-schema-v4\nmetadata:\n  type: project\n---\n\nConfig loader design: option C, a layered loader.\n\n- Layers, in order: built-in defaults, then the project file, then the user file. The merged result is validated against one schema.\n- Schema version for the merged result is `cfg-schema-v4`. The loader must refuse any file that declares a newer schema version.\n- Unknown keys produce a warning naming the key and the layer. They are never an error, so old configs keep working.\n- Each value records which layer set it, so the doctor command can print where a value came from.\n- Cost: one extra file read at start, measured under 2 ms.\n\n**Why:** Option A (one JSON file, hard fail on unknown keys) broke users with leftover old keys. Option B (env vars merged over the file, no schema) silently ignored typos in variable names, which cost an afternoon in the last release.\n\n**How to apply:** Implement the loader and the doctor provenance output to match this design. Do not reintroduce hard failure on unknown keys or schema-less env merging.\n"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0936042,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_0135zpQnJbDb4Xo9DvpcMqm1",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_014YQX1Bp3vsvfyhCqmF7AZY",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-tcmp-out/scratch-s1/cm-t-cmp-ELVllK/arm-a-tNO1hF/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_016Ni2dtyDfVi9PYNkwMd6SB",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export | head -50"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1069965,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01QCNetcofqAzKwDx6pdcWKx",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>&1 | head -30; cat package.json 2>/dev/null | head -30; ls tsconfig.json"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_016zMZREMFU1SwVRKEkf215A",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls -a; ls -R src 2>&1 | head -30; head -30 package.json"
+              ],
+              "queries": [
+                "project layout and package.json"
+              ]
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_014xNHG5i1h8ZQ643GBTJEfr",
+            "name": "mcp__claude_ai_Claude_Docs__guide",
+            "input": {
+              "items": []
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.13825210000000002,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01Cth5ckuvQ8USp6uLJNMY6w",
+            "name": "mcp__claude_ai_Claude_Docs__guide",
+            "input": {
+              "items": []
+            }
+          },
+          {
+            "turn": 0,
+            "id": "toolu_0119vf6jjgGq2zRYpwYpLuVL",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "d=\"/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-a-9njjv7-project/memory\"\ncat > \"$d/config-loader-layered-design.md\" <<'EOF'\n---\nname: config-loader-layered-design\ndescription: Decided design for the config loader: option C, three-layer loader with one schema (cfg-schema-v4)\nmetadata:\n  type: project\n---\n\nConfig loader design chosen: option C, a layered loader.\n\n- Layers, in order: built-in defaults, then project file, then user file. The merged result is validated against one schema.\n- Unknown keys produce a warning naming the key and the layer, never an error, so old configs keep working.\n- Each value records which layer set it, so the doctor command can print where a value came from.\n- Schema version for the merged result is `cfg-schema-v4`. The loader must refuse any file declaring a newer schema version.\n- Cost: one extra file read at start, measured under 2 ms.\n\n**Why:** Option A (single JSON file, hard-fail on unknown keys) broke users with leftover old keys. Option B (env vars merged over file, no schema) silently ignored typo'd variable names and cost an afternoon in the last release.\n**How to apply:** Implement the loader as layered with provenance tracking; warn on unknown keys, reject newer schema versions than cfg-schema-v4.\nEOF\necho \"- [Config loader design](config-loader-layered-design.md) — option C layered loader, cfg-schema-v4, warn on unknown keys\" >> \"$d/MEMORY.md\"\nls \"$d\""
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_0178CPScZUWHx99aMWPfhJ9J",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\nconst SCHEMA_VERSION = \"cfg-schema-v4\";\nconst VERSION_RE = /^cfg-schema-v(\\d+)$/;\n\nfunction versionNumber(value) {\n  const match = VERSION_RE.exec(value);\n  return match ? Number(match[1]) : null;\n}\n\nfunction readLayer(name, path) {\n  if (!path) return null;\n  let text;\n  try {\n    text = readFileSync(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`Invalid JSON in ${name} config ${path}: ${err.message}`);\n  }\n  if (data === null || typeof data !== \"object\" || Array.isArray(data)) {\n    throw new Error(`The ${name} config ${path} must contain a JSON object`);\n  }\n  if (\"schemaVersion\" in data) {\n    const declared = versionNumber(data.schemaVersion);\n    if (declared === null) {\n      throw new Error(`The ${name} config ${path} has an invalid schemaVersion: ${data.schemaVersion}`);\n    }\n    if (declared > versionNumber(SCHEMA_VERSION)) {\n      throw new Error(\n        `The ${name} config ${path} declares ${data.schemaVersion}, newer than supported ${SCHEMA_VERSION}`,\n      );\n    }\n  }\n  return data;\n}\n\n/**\n * Load config in three layers: defaults, project file, user file (later wins).\n * `schema` maps each known key to a type name (\"string\", \"number\", \"boolean\",\n * \"object\", \"array\"). Unknown keys warn and are kept; they never throw.\n *\n * @returns {{ config: object, sources: Record<string, string>, warnings: string[], schemaVersion: string }}\n */\nexport function loadConfig({ defaults = {}, projectPath, userPath, schema = {} } = {}) {\n  const layers = [\n    [\"defaults\", defaults],\n    [\"project\", readLayer(\"project\", projectPath)],\n    [\"user\", readLayer(\"user\", userPath)],\n  ];\n  const config = {};\n  const sources = {};\n  const warnings = [];\n\n  for (const [layer, data] of layers) {\n    if (!data) continue;\n    for (const [key, value] of Object.entries(data)) {\n      if (key === \"schemaVersion\") continue;\n      if (layer !== \"defaults\" && !(key in schema)) {\n        warnings.push(`Unknown config key \"${key}\" in ${layer} layer`);\n      }\n      config[key] = value;\n      sources[key] = layer;\n    }\n  }\n\n  for (const [key, type] of Object.entries(schema)) {\n    if (!(key in config)) continue;\n    const value = config[key];\n    const actual = Array.isArray(value) ? \"array\" : value === null ? \"null\" : typeof value;\n    if (actual !== type) {\n      throw new Error(`Config key \"${key}\" (from ${sources[key]} layer) must be ${type}, got ${actual}`);\n    }\n  }\n\n  return { config, sources, warnings, schemaVersion: SCHEMA_VERSION };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo ok"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0878426,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_013p3jPdd922fzSY7e7peWTo",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls services/reports/export/ 2>&1; wc -l services/reports/export/paginate.ts 2>&1"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_016aEev8XtYrpCKH4vhjL3Ph",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-tcmp-out/scratch-s1/cm-t-cmp-ELVllK/arm-a-nrLSdN/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_014EBUdKrjUNdLKaoawntf8J",
+            "name": "Glob",
+            "input": {
+              "pattern": "services/reports/export/**"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1095214,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Nq9R65S7sd8RMYVarpprnX",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>/dev/null; cat package.json tsconfig.json 2>/dev/null | head -40; git log --oneline | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ],
+    "b": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.11254869999999999,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01MQJrvCYjkY7Vi4Qbxz6reR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_resume",
+            "input": {}
+          },
+          {
+            "turn": 0,
+            "id": "toolu_0158uJjbW4HvGFinVjNY7Dqt",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-b-kXVoG3-project/memory/journal-writer-queue.md",
+              "content": "---\nname: journal-writer-queue\ndescription: Decision on how two processes write the journal - one shared writer queue, not a lock file\nmetadata:\n  type: project\n---\n\nTwo processes write the journal through one shared writer queue. A lock file was considered and rejected.\n\n**Why:** The user chose this on 2026-10-19 from two options: (1) a lock file, (2) one shared writer queue. They gave no rationale.\n\n**How to apply:** Route all journal writes through the single queue. Don't add lock-file-based coordination for the journal.\n"
+            }
+          },
+          {
+            "turn": 0,
+            "id": "toolu_017muBhQMQbPtYMXwpWbEWEj",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-b-kXVoG3-project/memory/MEMORY.md",
+              "content": "- [Journal writer queue](journal-writer-queue.md) — two processes write the journal via one shared writer queue, not a lock file\n"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_017tA5huxXd9WsFS2yQgZoCM",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>&1 | head -30; grep -ril journal src 2>/dev/null | head; cat package.json tsconfig.json 2>/dev/null | head -40"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_013kqBkxZyRyQME7KPpVfFtL",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>&1 | head -30; ls src/store 2>&1"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.15215679999999998,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_017kLmeYBBuuDW1iA96NnDyU",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\nconst SCHEMA_VERSION = 4;\nconst SCHEMA_ID = `cfg-schema-v${SCHEMA_VERSION}`;\nconst VERSION_KEY = \"schema\";\n\nconst isPlainObject = (v) =>\n  v !== null && typeof v === \"object\" && !Array.isArray(v);\n\nconst typeOf = (v) => (Array.isArray(v) ? \"array\" : v === null ? \"null\" : typeof v);\n\nfunction readLayer(path, layer) {\n  if (!path) return null;\n  let text;\n  try {\n    text = readFileSync(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`${layer} config ${path} is not valid JSON: ${err.message}`);\n  }\n  if (!isPlainObject(data)) {\n    throw new Error(`${layer} config ${path} must be a JSON object`);\n  }\n  if (VERSION_KEY in data) {\n    const declared = data[VERSION_KEY];\n    const match = typeof declared === \"string\" && /^cfg-schema-v(\\d+)$/.exec(declared);\n    if (!match) {\n      throw new Error(`${layer} config ${path} has an invalid ${VERSION_KEY} value: ${JSON.stringify(declared)}`);\n    }\n    if (Number(match[1]) > SCHEMA_VERSION) {\n      throw new Error(\n        `${layer} config ${path} declares ${declared}, newer than supported ${SCHEMA_ID}`,\n      );\n    }\n    delete data[VERSION_KEY];\n  }\n  return data;\n}\n\n// Merge one layer into `config`, validating against `defaults` (the schema).\nfunction applyLayer(config, sources, defaults, data, layer, warnings, prefix = \"\") {\n  for (const [key, value] of Object.entries(data)) {\n    const path = prefix + key;\n    if (!Object.hasOwn(defaults, key)) {\n      warnings.push({ key: path, layer, message: `unknown key \"${path}\" in ${layer} layer` });\n      continue;\n    }\n    const expected = defaults[key];\n    if (isPlainObject(expected)) {\n      if (!isPlainObject(value)) {\n        throw new Error(`${layer} layer: \"${path}\" must be an object, got ${typeOf(value)}`);\n      }\n      applyLayer(config[key], sources, expected, value, layer, warnings, `${path}.`);\n      continue;\n    }\n    if (typeOf(value) !== typeOf(expected)) {\n      throw new Error(\n        `${layer} layer: \"${path}\" must be ${typeOf(expected)}, got ${typeOf(value)}`,\n      );\n    }\n    config[key] = value;\n    sources[path] = layer;\n  }\n}\n\nfunction seed(defaults, sources, prefix = \"\") {\n  const out = {};\n  for (const [key, value] of Object.entries(defaults)) {\n    const path = prefix + key;\n    if (isPlainObject(value)) {\n      out[key] = seed(value, sources, `${path}.`);\n    } else {\n      out[key] = structuredClone(value);\n      sources[path] = \"default\";\n    }\n  }\n  return out;\n}\n\n/**\n * Load config in three layers: built-in defaults, project file, user file.\n * The defaults object doubles as the schema: its keys are the known keys and\n * its value types are the expected types. Unknown keys warn, never throw.\n * Files declaring a schema newer than cfg-schema-v4 are refused.\n *\n * @param {{ defaults: object, projectPath?: string, userPath?: string }} options\n * @returns {{ config: object, sources: Record<string,string>, warnings: object[], schema: string }}\n */\nexport function loadConfig({ defaults, projectPath, userPath } = {}) {\n  if (!isPlainObject(defaults)) {\n    throw new TypeError(\"loadConfig: `defaults` object is required\");\n  }\n  const sources = {};\n  const warnings = [];\n  const config = seed(defaults, sources);\n  for (const [layer, path] of [[\"project\", projectPath], [\"user\", userPath]]) {\n    const data = readLayer(path, layer);\n    if (data) applyLayer(config, sources, defaults, data, layer, warnings);\n  }\n  return { config, sources, warnings, schema: SCHEMA_ID };\n}\nEOF\nnode --input-type=module -e \"\nimport {loadConfig} from './packages/cli/lib/config/layered-loader.mjs';\nimport fs from 'node:fs';\nfs.writeFileSync('/tmp/p.json',JSON.stringify({a:2,old:1,n:{x:'y'}}));\nfs.writeFileSync('/tmp/u.json',JSON.stringify({schema:'cfg-schema-v4',n:{x:'z'}}));\nconst d={a:1,b:true,n:{x:'q'}};\nconsole.log(JSON.stringify(loadConfig({defaults:d,projectPath:'/tmp/p.json',userPath:'/tmp/u.json'})));\nfs.writeFileSync('/tmp/u.json',JSON.stringify({schema:'cfg-schema-v5'}));\ntry{loadConfig({defaults:d,userPath:'/tmp/u.json'})}catch(e){console.log(e.message)}\n\""
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01Fui6gZnFxyMYUzZM4BeFeM",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | grep -i -E \"doctor|config\" | head -30; ls packages/cli/lib/config 2>&1"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.09824100000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Wdf4rdhhDS1Ekq8k2Tbv6T",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cd services/reports/export 2>/dev/null && ls && wc -l paginate.ts && cat paginate.ts | head -150"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_012HvputDjaVtHtmjBX9ihBw",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-tcmp-out/scratch-s1/cm-t-cmp-ELVllK/arm-b-9cYEvp/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01WFQp3PVL2yQyAd8tpkcEyn",
+            "name": "Grep",
+            "input": {
+              "pattern": "console\\.|logger\\.|log\\(",
+              "path": "/private/tmp/cm-v2-fu-tcmp-out/scratch-s1/cm-t-cmp-ELVllK/arm-b-9cYEvp/project/services/reports/export",
+              "output_mode": "content",
+              "-n": "true"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1130014,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01Qunc7mbUBPBKgFiCDubUZ6",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_resume",
+            "input": {}
+          },
+          {
+            "turn": 0,
+            "id": "toolu_016U4t46Xo1DLrHx7jay1Xmv",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_search",
+            "input": {
+              "queries": [
+                "journal writer queue lock file"
+              ]
+            }
+          },
+          {
+            "turn": 0,
+            "id": "toolu_019zkFJjH3FKmnFtZia5vCJ9",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "d=/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-b-DccPyZ-project/memory\ncat > $d/journal-writer-queue.md <<'EOF'\n---\nname: journal-writer-queue\ndescription: Decision on how two processes write the journal - one shared writer queue, not a lock file\nmetadata:\n  type: project\n---\n\nTwo processes writing the journal will go through one shared writer queue, not a lock file (decided 2026-10-19).\n\n**Why:** user chose the queue over the lock-file option; the rationale wasn't stated.\n**How to apply:** design journal writes as enqueue to a single writer. Don't add lock-file code for journal writes.\nEOF\necho \"- [Journal writer queue](journal-writer-queue.md) — journal writes use one shared writer queue, not a lock file\" >> $d/MEMORY.md"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01JFziRAbnF4DMiLW7wbeuo7",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>&1 | head -30; cat package.json 2>/dev/null | head -30; grep -ril journal src 2>/dev/null | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1335571,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01Ly2Jtj4qNUNdGLd4YHYt8Y",
+            "name": "mcp__claude_ai_Claude_Docs__guide",
+            "input": {
+              "items": []
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01FNazt7BaMGMVdrGxgS3JfN",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\nconst SCHEMA_VERSION = \"cfg-schema-v4\";\nconst VERSION_RE = /^cfg-schema-v(\\d+)$/;\nconst MAX_VERSION = Number(VERSION_RE.exec(SCHEMA_VERSION)[1]);\n\nfunction readLayer(path, layer) {\n  if (!path) return null;\n  let text;\n  try {\n    text = readFileSync(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw new Error(`Cannot read ${layer} config ${path}: ${err.message}`);\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`Invalid JSON in ${layer} config ${path}: ${err.message}`);\n  }\n  if (data === null || typeof data !== \"object\" || Array.isArray(data)) {\n    throw new Error(`${layer} config ${path} must be a JSON object`);\n  }\n  return data;\n}\n\nfunction checkVersion(data, layer, path) {\n  if (!(\"schemaVersion\" in data)) return;\n  const m = VERSION_RE.exec(String(data.schemaVersion));\n  if (!m) {\n    throw new Error(`${layer} config ${path} has unrecognized schemaVersion \"${data.schemaVersion}\"`);\n  }\n  if (Number(m[1]) > MAX_VERSION) {\n    throw new Error(\n      `${layer} config ${path} declares ${data.schemaVersion}, newer than supported ${SCHEMA_VERSION}`,\n    );\n  }\n}\n\n/**\n * Load config in three layers: defaults, project file, user file (later wins).\n * The merged result is checked against `schema`, a map of key -> validator\n * (a typeof string such as \"string\", or a function returning true when valid).\n * Unknown keys warn (naming key and layer) and are kept; they never throw.\n *\n * @returns {{ config: object, sources: Record<string,string>, warnings: string[], schemaVersion: string }}\n */\nexport function loadConfig({ defaults = {}, schema = {}, projectPath, userPath } = {}) {\n  const layers = [{ name: \"defaults\", path: null, data: defaults }];\n  for (const [name, path] of [[\"project\", projectPath], [\"user\", userPath]]) {\n    const data = readLayer(path, name);\n    if (data) {\n      checkVersion(data, name, path);\n      layers.push({ name, path, data });\n    }\n  }\n\n  const config = {};\n  const sources = {};\n  const warnings = [];\n\n  for (const { name, data } of layers) {\n    for (const [key, value] of Object.entries(data)) {\n      if (key === \"schemaVersion\") continue;\n      if (!Object.hasOwn(schema, key)) {\n        warnings.push(`Unknown config key \"${key}\" in ${name} layer`);\n      }\n      config[key] = value;\n      sources[key] = name;\n    }\n  }\n\n  for (const [key, rule] of Object.entries(schema)) {\n    if (!Object.hasOwn(config, key)) continue;\n    const ok = typeof rule === \"function\" ? rule(config[key]) : typeof config[key] === rule;\n    if (!ok) {\n      throw new Error(`Invalid value for \"${key}\" (set by ${sources[key]} layer)`);\n    }\n  }\n\n  return { config, sources, warnings, schemaVersion: SCHEMA_VERSION };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo ok"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0906865,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01DQefo2oCZvVfuwmBswCzkA",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cd services/reports/export 2>&1 && ls && wc -l paginate.ts && cat paginate.ts | head -150",
+              "intent": "paginate.ts contents"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1117401,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01S5WgrMHD3yyYHAp13SMXz4",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>/dev/null; cat package.json 2>/dev/null | head -30; grep -ril journal src 2>/dev/null"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01FsTgRumUTm4RTXmEqXto4Z",
+            "name": "mcp__claude_ai_Claude_Docs__guide",
+            "input": {
+              "items": []
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.11815659999999999,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01XKSivuDgiDjtvMjBd3mkuR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_resume",
+            "input": {}
+          },
+          {
+            "turn": 0,
+            "id": "toolu_01Hh8H5sdBNrVc7NQVnbktUt",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-b-lmPkbO-project/memory/config-loader-layered-design.md",
+              "content": "---\nname: config-loader-layered-design\ndescription: Decided design for the config loader (option C, layered, schema cfg-schema-v4)\nmetadata:\n  type: project\n---\n\nConfig loader design chosen: option C, a layered loader.\n\n- Layers load in order: built-in defaults, then project file, then user file. The merged result is validated against one schema.\n- Schema version for the merged result is `cfg-schema-v4`. The loader must refuse any file that declares a newer schema version.\n- Unknown keys produce a warning naming the key and the layer. They are never an error, so old configs keep working.\n- Each value records which layer set it, so the doctor command can print where a value came from.\n- Cost: one extra file read at start, measured under 2 ms.\n\n**Why:** Option A (one JSON file, hard-fail on unknown keys) broke users with leftover old keys. Option B (env vars merged over the file, no schema) let a typo in a variable name silently do nothing, which cost an afternoon in the last release.\n\n**How to apply:** Implement the loader and the doctor provenance output to this spec. Don't reintroduce hard-fail on unknown keys or schema-less env merging.\n"
+            }
+          },
+          {
+            "turn": 0,
+            "id": "toolu_01VphUrpW5gzNQK2kg1upFHK",
+            "name": "Write",
+            "input": {
+              "file_path": "/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-s1-cm-t-cmp-ELVllK-arm-b-lmPkbO-project/memory/MEMORY.md",
+              "content": "- [Config loader design](config-loader-layered-design.md) — option C layered loader, cfg-schema-v4, warn on unknown keys\n"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01JjAXUiUWh4d1Gr6Cbisi2f",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib 2>&1 | head; ls packages/cli 2>&1 | head; cat package.json 2>&1 | head -20"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0912888,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01HMCbjr1CjwTpkvhuVgy7rL",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls services/reports/export/ 2>&1; wc -l services/reports/export/paginate.ts 2>&1"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01QPJ1G3Zvbft3DxuHo2euWz",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-tcmp-out/scratch-s1/cm-t-cmp-ELVllK/arm-b-HxeE5P/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_018aTw3Tt4J1VLsHqDxakau5",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "cat services/reports/export/paginate.ts; ls services/reports/export"
+              ],
+              "queries": [
+                "paginate loop"
+              ]
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1097168,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01WRPm2tXFidCGVrJSMP8DjZ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>/dev/null; grep -ril journal --exclude-dir=node_modules --exclude-dir=.git . | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ]
+  }
+}

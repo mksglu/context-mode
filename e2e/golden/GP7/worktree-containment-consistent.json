@@ -1,0 +1,20 @@
+{
+  "execReply": {
+    "content": [
+      {
+        "type": "text",
+        "text": "worktree data\n"
+      }
+    ],
+    "isError": false
+  },
+  "batchReply": {
+    "content": [
+      {
+        "type": "text",
+        "text": "## worktree data\nworktree data"
+      }
+    ],
+    "isError": false
+  }
+}

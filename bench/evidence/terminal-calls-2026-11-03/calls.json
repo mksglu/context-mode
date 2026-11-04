@@ -1,0 +1,69 @@
+{
+  "date": "2026-11-03",
+  "version": "2.0.0-next.36",
+  "server": {
+    "name": "context-mode",
+    "version": "dev"
+  },
+  "how": "node release-out/server.mjs over stdio MCP (initialize, then one tools/call per tool in order), HOME and the project folder in a new temp folder that holds a copy of docs/how-it-works.md and a short AGENTS.md (memory file); script: bench/evidence/terminal-calls-2026-11-03/calls-live.mjs",
+  "calls": [
+    {
+      "tool": "ctx_index",
+      "input": {
+        "path": "how-it-works.md"
+      },
+      "file": "docs/how-it-works.md",
+      "produced_bytes": 11569,
+      "returned_bytes": 64,
+      "shown_lines": 1,
+      "isError": false,
+      "result": "Indexed 1 source(s), 17 chunk(s) from s1. Label: how-it-works.md"
+    },
+    {
+      "tool": "ctx_search",
+      "input": {
+        "queries": [
+          "compaction state block"
+        ]
+      },
+      "returned_bytes": 1268,
+      "shown_lines": 5,
+      "isError": false,
+      "result": "Query \"compaction state block\":\nhow-it-works.md #14: ### Session continuity\n\nThe hooks log each prompt, edit, command, tool error, index, cost and decision. After a compaction the agent gets a state block of at most 2,048 B built from that log. Every line stays whole: a long line becomes a `ctx_resume(seq)` pointer that reads the full row. On the next prompt, a prompt match block of at most 2,048 B brings back the log rows that match it by BM25, always as whole rows. The same rows always give the same bytes.\nmemory AGENTS.md #0: # Agent rules\n\nBefore a compaction, save the state block with ctx_resume.\nhow-it-works.md #6: ## Surviving a context compaction\n\nWhen the agent's host compacts the conversation, most of what hooks added earlier is summarized away. To\ngive the agent its place back, context-mode rebuilds a small block (`STATE_BUDGET`, 2,048 bytes) from the\nsession's journal: the highest-scoring rows (errors first, then prompts, edits, index writes, with older\nrows worth less) are picked until the budget is used up. No row's text is ever cut partway — a row that\nwill not fit whole becomes a one-line pointer into `ctx_search` instead (`docs/algorithms.md` §3).\nMore: ctx_search({queries:[\"compaction state block\"], scope:\"worktree\", offset:2})"
+    },
+    {
+      "tool": "ctx_resume",
+      "input": {},
+      "returned_bytes": 209,
+      "shown_lines": 5,
+      "isError": false,
+      "result": "<context_mode_state session=\"mcp:85e67fa2-28ef-45eb-9d5b-a967129b74c0\" upto=\"2\">\nindexed how-it-works.md\nsource s1: how-it-works.md (11536 B)\nmore: ctx_search(queries:[], scope:\"session\")\n</context_mode_state>"
+    },
+    {
+      "tool": "ctx_stats",
+      "input": {},
+      "returned_bytes": 3097,
+      "shown_lines": 1,
+      "isError": false,
+      "result": "ctx_stats: 82.5% kept out all-time, 82.5% this session.\n\n```text\ncontext-mode stats\n────────────────────────────────────────────────────────────────────────────────\n\nThis session · 3 calls · <1m active\n  11.3 KB became 2.0 KB: 9.3 KB kept out (82.5%)\n  Without context-mode |████████████████████████████████████████|    11.3 KB\n  With context-mode    |███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|     2.0 KB\n  about 2.4K tokens kept out, 1.2% of a 200K window\n  (at 4 bytes per token; a Claude context window is 200K tokens)\n\nLast 7 days of use · 2026-10-28 to 2026-11-03\n  11-03 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓     9.5 KB\n  █ sandbox run  ▓ index + search  ▒ hook sent to sandbox  ░ hook cut down\n\nBy scope\n  Scope                  Calls       Made       Sent   Kept out       %\n  session                    3    11.3 KB     2.0 KB     9.3 KB   82.5% ████████\n  project (all-time)         3    11.3 KB     2.0 KB     9.3 KB   82.5% ████████\n\nBy tool (this project)\n  Tool                   Calls       Made       Sent   Kept out       %\n  ctx_index + search         2    11.3 KB     1.8 KB     9.5 KB   84.3% ████████\n  ctx_resume                 1        0 B      209 B        0 B    0.0%\n\nLargest single outputs (made → sent to the chat)\n  ctx_index                11.3 KB →        64 B\n\nBy agent (this project)\n  Agent                  Calls       Made       Sent   Kept out       %\n  claude-code                3    11.3 KB     2.0 KB     9.3 KB   82.5% ████████\n\nKept in the session journal\n  Journal                Session  Project\n  Content indexed              1        1  ██████████\n  File edits                   0        0\n  Issues kept                  0        0\n  Your decisions               0        0\n  Other tool calls             2        2  ████████████████████\n  Your prompts                 0        0\n\n  ctx_resume brings back your last task, files changed and open issues\n  after a compact or a restart; ctx_search finds indexed content by words.\n\n  Index and search     1 source · 17 chunks · 11.3 KB · 1 ctx_search call\n  Database file        192.0 KB\n  Sessions             1 · agents 1 · active days 1\n\nhttps://contextmode.ai/?utm_source=ctx_stats&utm_medium=stats&utm_content=footer\ngithub.com/mksglu/context-mode\n```\n\n| Scope | Produced | Returned | Saved | Reduction % |\n|---|---|---|---|---|\n| session | 11569 B | 2030 B | 9539 B | 82.5 |\n| project | 11569 B | 2030 B | 9539 B | 82.5 |\n| all-time | 11569 B | 2030 B | 9539 B | 82.5 |\n| agent claude-code | 11569 B | 2030 B | 9539 B | 82.5 |"
+    },
+    {
+      "tool": "ctx_doctor",
+      "input": {},
+      "returned_bytes": 862,
+      "shown_lines": 6,
+      "isError": false,
+      "result": "Environment: context-mode 2.0.0-next.36 (8facf27), agent claude-code 0 (client r20-live)\nEnvironment: darwin-arm64, Node v26.8.1, shell /bin/zsh\n| Check | Status | Detail | Fix |\n|---|---|---|---|\n| D1 version | PASS | 2.0.0-next.36 (8facf27): ahead of next on npm (2.0.0-next.34) |  |\n| D2 node | PASS | ok |  |\n| D3 host config | PASS | ok |  |\n| D4 old entries | PASS | old context-mode temp file context-mode-* under the OS temp dir: report only, safe to keep |  |\n| D5 hook round trip | PASS | ok |  |\n| D5b double-fire | PASS | ok |  |\n| D6 MCP | PASS | ok |  |\n| D7 project and worktree | PASS | ok |  |\n| D8 context.db | PASS | ok |  |\n| D9 index | PASS | 1 sources, 17 chunks indexed |  |\n| D10 enforcement mode | PASS | enforcement mode: deny-reason |  |\n| D11 shell | PASS | sh: /bin/sh |  |\nRun in a terminal: context-mode doctor --agents claude-code"
+    },
+    {
+      "tool": "ctx_purge",
+      "input": {
+        "source": "how-it-works.md"
+      },
+      "returned_bytes": 66,
+      "shown_lines": 1,
+      "isError": false,
+      "result": "ctx_purge: deleted 18 rows (scope: source). This cannot be undone."
+    }
+  ]
+}

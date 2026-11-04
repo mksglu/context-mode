@@ -1,0 +1,653 @@
+{
+ "summary": {
+  "id": "01-repo-history",
+  "date": "2026-11-02",
+  "version": "2.0.0-next.26",
+  "model": "claude-haiku-5-5",
+  "prompt": "Look at the last 300 commits of https://github.com/vitejs/vite. Who are the top 5 committers, and which 5 files changed most often?",
+  "job": "repo history",
+  "verdict": "pass",
+  "reason": "top 5 authors (75,49,36,27,14) and top 5 files (53,41,31,25,20) equal git log on the same 300 commits",
+  "raw_bytes": 359090,
+  "raw_source": "git log -300 --stat (bytes of the full history text)",
+  "context_bytes": 486,
+  "saving_pct": 99.9,
+  "tool_calls": 1,
+  "tools": [
+   "Bash"
+  ],
+  "turns": 2,
+  "cost_usd": 0.00200152,
+  "wall_s": 15,
+  "route": "Bash",
+  "journal": {
+   "events": 2,
+   "sandbox_bytes": 470,
+   "returned_bytes": 470,
+   "tools": {
+    "Bash": 1
+   }
+  },
+  "answer": "**Top 5 authors (last 300 commits on `main`)**\n\nThe committer field doesn't identify people here: 299 of 300 commits list `GitHub` as committer, which is what happens when PRs are squash-merged through the web UI. So I ranked by author instead:\n\n1. 翠: 75 commits\n2. btea: 49\n3. andrew: 36\n4. renovate[bot]: 27\n5. github-actions[bot]: 14\n\nIf you want humans only, drop the two bots and the list becomes 翠, btea, andrew, then two more authors I didn't break out.\n\n**Top 5 files changed most often**\n\n1. `pnpm-lock.yaml`: 53 commits\n2. `packages/vite/package.json`: 41\n3. `package.json`: 31\n4. `packages/create-vite/src/index.ts`: 25\n5. `pnpm-workspace.yaml`: 20\n\nMost of the churn is dependency and release bookkeeping, not source logic. Merge commits are excluded from the file counts, but they don't contribute per-file diffs in `git log` anyway.\n\nI cloned the repo with `--depth 300` into `/TMP to get this. The repo is still there if you want to dig further."
+ },
+ "stream": [
+  {
+   "type": "system",
+   "subtype": "hook_started",
+   "hook_id": "8f895b15-21a0-4038-b69d-fa87b9554d58",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "uuid": "ae433ce0-9419-4399-a951-54e06cdca529",
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5"
+  },
+  {
+   "type": "system",
+   "subtype": "hook_response",
+   "hook_id": "8f895b15-21a0-4038-b69d-fa87b9554d58",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "output": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stderr": "",
+   "exit_code": 0,
+   "outcome": "success",
+   "uuid": "00d19acd-f33b-4ce0-87b3-21672abd63db",
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5"
+  },
+  {
+   "type": "system",
+   "subtype": "init",
+   "cwd": "/TMP",
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "tools": [
+    "Task",
+    "Bash",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "DesignSync",
+    "Edit",
+    "EnterWorktree",
+    "ExitWorktree",
+    "ListAgents",
+    "Monitor",
+    "NotebookEdit",
+    "PushNotification",
+    "Read",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "SendMessage",
+    "Skill",
+    "TaskStop",
+    "ToolSearch",
+    "WebFetch",
+    "WebSearch",
+    "Workflow",
+    "Write",
+    "mcp__plugin_context-mode_context-mode__ctx_batch",
+    "mcp__plugin_context-mode_context-mode__ctx_doctor",
+    "mcp__plugin_context-mode_context-mode__ctx_execute",
+    "mcp__plugin_context-mode_context-mode__ctx_index",
+    "mcp__plugin_context-mode_context-mode__ctx_purge",
+    "mcp__plugin_context-mode_context-mode__ctx_resume",
+    "mcp__plugin_context-mode_context-mode__ctx_search",
+    "mcp__plugin_context-mode_context-mode__ctx_stats",
+    "mcp__plugin_context-mode_context-mode__ctx_upgrade"
+   ],
+   "mcp_servers": [
+    {
+     "name": "plugin:context-mode:context-mode",
+     "status": "connected",
+     "source": "plugin"
+    }
+   ],
+   "model": "claude-haiku-5-5",
+   "permissionMode": "bypassPermissions",
+   "slash_commands": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring",
+    "advisor",
+    "agents",
+    "auto-mode-setup",
+    "autocompact",
+    "clear",
+    "color",
+    "compact",
+    "config",
+    "output-style",
+    "context",
+    "effort",
+    "fast",
+    "focus",
+    "heapdump",
+    "init",
+    "mcp",
+    "import",
+    "model",
+    "__remote-workflow",
+    "workflow-launch-exec",
+    "reload-plugins",
+    "reload-skills",
+    "rename",
+    "security-review",
+    "usage",
+    "insights",
+    "recap",
+    "skill-doctor",
+    "goal",
+    "design-consent",
+    "design-revoke",
+    "list-agents",
+    "team-onboarding"
+   ],
+   "terminal_slash_commands": [
+    "doctor",
+    "color",
+    "focus",
+    "reload-plugins"
+   ],
+   "apiKeySource": "ANTHROPIC_API_KEY",
+   "claude_code_version": "2.1.312",
+   "output_style": "default",
+   "agents": [
+    "claude",
+    "Explore",
+    "general-purpose",
+    "Plan",
+    "statusline-setup"
+   ],
+   "skills": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring"
+   ],
+   "plugins": [
+    {
+     "name": "context-mode",
+     "path": "/TMP",
+     "source": "context-mode@context-mode",
+     "version": "2.0.0-next.26"
+    },
+    {
+     "name": "cc-plugin-agents-md",
+     "path": "builtin",
+     "source": "cc-plugin-agents-md@builtin"
+    },
+    {
+     "name": "cc-plugin-telemetry",
+     "path": "builtin",
+     "source": "cc-plugin-telemetry@builtin"
+    },
+    {
+     "name": "cc-plugin-plugin-authoring",
+     "path": "builtin",
+     "source": "cc-plugin-plugin-authoring@builtin"
+    }
+   ],
+   "capabilities": [
+    "interrupt_receipt_v1",
+    "interrupt_cancel_queued_v1",
+    "interrupt_send_now_v1",
+    "interrupt_requeue_taken_v1",
+    "msg_lifecycle_v1",
+    "request_marker_lists_v1",
+    "ask_user_question_unanswered_v1",
+    "lifecycle_wakeup_source_v1",
+    "sdk_mcp_tools_list_changed",
+    "sdk_mcp_manifests",
+    "mcp_read_resource_v1",
+    "mcp_tool_ui_meta_v1",
+    "ui_surface_v1",
+    "mcp_call_result_not_for_model_v1"
+   ],
+   "analytics_disabled": false,
+   "product_feedback_disabled": false,
+   "uuid": "3ea6634d-e403-49ba-bb55-996fffedafee",
+   "memory_paths": {
+    "auto": "/TMP"
+   },
+   "original_cwd": "/TMP",
+   "additional_directories": [],
+   "messaging_socket_path": "/tmp/cc-socks/55810.sock",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "per_turn_effort_active": true,
+   "view_mode": "default"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "8aef7b52-4f4d-420c-89c3-45dc98b51388"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 250,
+   "estimated_tokens_delta": 200,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "b2f06c11-d434-47fb-9194-607c7a1255bd"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 465,
+   "estimated_tokens_delta": 215,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "3acfa029-c6f6-4207-8143-523ed9edb8d8"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJPBSfphUEjaUTGub2",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6380,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6380,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 8,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "23cc369c-9aaf-4d5c-95b7-af5168f9e834",
+   "timestamp": "2026-11-02T08:25:21.985Z",
+   "request_id": "req_011CgdnJNiQXwfVPWbgzUtMd",
+   "thinking_duration_ms": 2396,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJPBSfphUEjaUTGub2",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01RGoXqgSty8sydzneS3USqf",
+      "name": "Bash",
+      "input": {
+       "command": "set -e; D=/TMP mkdir -p \"$D\" && cd \"$D\" && git clone --quiet --depth 300 --filter=blob:none --no-checkout https://github.com/vitejs/vite . && echo \"commits: $(git rev-list --count HEAD)\"; echo \"--- top committers (committer name, last 300) ---\"; git log -300 --format='%cn' | sort | uniq -c | sort -rn | head -5; echo \"--- top authors (for comparison) ---\"; git log -300 --format='%an' | sort | uniq -c | sort -rn | head -5; echo \"--- top 5 files changed ---\"; git log -300 --format= --name-only --no-merges | sed '/^$/d' | sort | uniq -c | sort -rn | head -5; echo \"$D\"",
+       "description": "Clone vite history and count committers and file changes"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6380,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6380,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 8,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "666e4d2c-034e-4090-a8b3-2f5e5df2c936",
+   "timestamp": "2026-11-02T08:25:23.231Z",
+   "request_id": "req_011CgdnJNiQXwfVPWbgzUtMd",
+   "wire_tool_inputs": {
+    "toolu_01RGoXqgSty8sydzneS3USqf": {
+     "command": "set -e; D=/TMP mkdir -p \"$D\" && cd \"$D\" && git clone --quiet --depth 300 --filter=blob:none --no-checkout https://github.com/vitejs/vite . && echo \"commits: $(git rev-list --count HEAD)\"; echo \"--- top committers (committer name, last 300) ---\"; git log -300 --format='%cn' | sort | uniq -c | sort -rn | head -5; echo \"--- top authors (for comparison) ---\"; git log -300 --format='%an' | sort | uniq -c | sort -rn | head -5; echo \"--- top 5 files changed ---\"; git log -300 --format= --name-only --no-merges | sed '/^$/d' | sort | uniq -c | sort -rn | head -5; echo \"$D\"",
+     "description": "Clone vite history and count committers and file changes"
+    }
+   }
+  },
+  {
+   "type": "system",
+   "subtype": "task_started",
+   "task_id": "b2ngalnna",
+   "run_id": "0mvyzul9g-2a19092a",
+   "tool_use_id": "toolu_01RGoXqgSty8sydzneS3USqf",
+   "description": "Clone vite history and count committers and file changes",
+   "is_backgrounded": false,
+   "task_type": "local_bash",
+   "uuid": "9ccde888-532d-4c60-ac22-c2f8a8877e78",
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5"
+  },
+  {
+   "type": "system",
+   "subtype": "task_notification",
+   "task_id": "b2ngalnna",
+   "run_id": "0mvyzul9g-2a19092a",
+   "tool_use_id": "toolu_01RGoXqgSty8sydzneS3USqf",
+   "status": "completed",
+   "output_file": "",
+   "summary": "Clone vite history and count committers and file changes",
+   "uuid": "edb8fbc4-32c0-4c07-b5b8-9dedfd3bb66e",
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5"
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01RGoXqgSty8sydzneS3USqf",
+      "type": "tool_result",
+      "content": "commits: 300\n--- top committers (committer name, last 300) ---\n 299 GitHub\n   1 sapphi-red\n--- top authors (for comparison) ---\n  75 翠\n  49 btea\n  36 andrew\n  27 renovate[bot]\n  14 github-actions[bot]\n--- top 5 files changed ---\n  53 pnpm-lock.yaml\n  41 packages/vite/package.json\n  31 package.json\n  25 packages/create-vite/src/index.ts\n  20 pnpm-workspace.yaml\n/TMP\nShell cwd was reset to /TMP",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "a8dfa4a5-d879-495c-8b8f-371a6098a83d",
+   "timestamp": "2026-11-02T08:25:27.648Z",
+   "tool_use_result": {
+    "stdout": "commits: 300\n--- top committers (committer name, last 300) ---\n 299 GitHub\n   1 sapphi-red\n--- top authors (for comparison) ---\n  75 翠\n  49 btea\n  36 andrew\n  27 renovate[bot]\n  14 github-actions[bot]\n--- top 5 files changed ---\n  53 pnpm-lock.yaml\n  41 packages/vite/package.json\n  31 package.json\n  25 packages/create-vite/src/index.ts\n  20 pnpm-workspace.yaml\n/TMP",
+    "stderr": "\nShell cwd was reset to /TMP",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01RGoXqgSty8sydzneS3USqf",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "5aabcf81-c69b-4467-81cb-45f274d91188"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 374,
+   "estimated_tokens_delta": 324,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "ca4209fe-53d9-4aac-9051-eed73a50c536"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnK2dTNrXW7zehD3FrS",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 1072,
+     "cache_read_input_tokens": 18371,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 1072,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "e7b511d3-8ff0-4675-8552-8996acfdeb33",
+   "timestamp": "2026-11-02T08:25:29.958Z",
+   "request_id": "req_011CgdnK2EsyjULCxXhEDRXX",
+   "thinking_duration_ms": 1546,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnK2dTNrXW7zehD3FrS",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "**Top 5 authors (last 300 commits on `main`)**\n\nThe committer field doesn't identify people here: 299 of 300 commits list `GitHub` as committer, which is what happens when PRs are squash-merged through the web UI. So I ranked by author instead:\n\n1. 翠: 75 commits\n2. btea: 49\n3. andrew: 36\n4. renovate[bot]: 27\n5. github-actions[bot]: 14\n\nIf you want humans only, drop the two bots and the list becomes 翠, btea, andrew, then two more authors I didn't break out.\n\n**Top 5 files changed most often**\n\n1. `pnpm-lock.yaml`: 53 commits\n2. `packages/vite/package.json`: 41\n3. `package.json`: 31\n4. `packages/create-vite/src/index.ts`: 25\n5. `pnpm-workspace.yaml`: 20\n\nMost of the churn is dependency and release bookkeeping, not source logic. Merge commits are excluded from the file counts, but they don't contribute per-file diffs in `git log` anyway.\n\nI cloned the repo with `--depth 300` into `/TMP to get this. The repo is still there if you want to dig further."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 1072,
+     "cache_read_input_tokens": 18371,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 1072,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "uuid": "0a4ffef7-3b46-4e0c-b47c-773c74c7e624",
+   "timestamp": "2026-11-02T08:25:31.709Z",
+   "request_id": "req_011CgdnK2EsyjULCxXhEDRXX"
+  },
+  {
+   "duration_api_ms": 8468,
+   "stop_reason": "end_turn",
+   "session_id": "6f48a46b-1dcc-4b2a-adf8-4a87e7f44ef5",
+   "total_cost_usd": 0.00200152,
+   "usage": {
+    "input_tokens": 4,
+    "cache_creation_input_tokens": 7452,
+    "cache_read_input_tokens": 30362,
+    "output_tokens": 1532,
+    "output_tokens_details": {
+     "thinking_tokens": 756
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 7452
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 723,
+      "cache_read_input_tokens": 18371,
+      "cache_creation_input_tokens": 1072,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 1072,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "modelUsage": {
+    "claude-haiku-5-5": {
+     "inputTokens": 4,
+     "outputTokens": 1532,
+     "cacheReadInputTokens": 30362,
+     "cacheCreationInputTokens": 7452,
+     "webSearchRequests": 0,
+     "costUSD": 0.00200152,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 756,
+     "cacheCreationEphemeral5mInputTokens": 7452,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   },
+   "permission_denials": [],
+   "terminal_reason": "completed",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+     "background": 0,
+     "foreground": 0,
+     "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+     "parent": 0,
+     "user": 0,
+     "system": 0
+    },
+    "refused": {
+     "depth_limit": 0,
+     "concurrency_limit": 0,
+     "budget": 0
+    },
+    "by_type": {}
+   },
+   "safety_stops": 0,
+   "is_error": false,
+   "num_turns": 2,
+   "subtype": "success",
+   "api_error_status": null,
+   "result": "**Top 5 authors (last 300 commits on `main`)**\n\nThe committer field doesn't identify people here: 299 of 300 commits list `GitHub` as committer, which is what happens when PRs are squash-merged through the web UI. So I ranked by author instead:\n\n1. 翠: 75 commits\n2. btea: 49\n3. andrew: 36\n4. renovate[bot]: 27\n5. github-actions[bot]: 14\n\nIf you want humans only, drop the two bots and the list becomes 翠, btea, andrew, then two more authors I didn't break out.\n\n**Top 5 files changed most often**\n\n1. `pnpm-lock.yaml`: 53 commits\n2. `packages/vite/package.json`: 41\n3. `package.json`: 31\n4. `packages/create-vite/src/index.ts`: 25\n5. `pnpm-workspace.yaml`: 20\n\nMost of the churn is dependency and release bookkeeping, not source logic. Merge commits are excluded from the file counts, but they don't contribute per-file diffs in `git log` anyway.\n\nI cloned the repo with `--depth 300` into `/TMP to get this. The repo is still there if you want to dig further.",
+   "ttft_ms": 3393,
+   "type": "result",
+   "duration_ms": 13137,
+   "uuid": "4ba2e0d9-f7c9-4f35-b82f-460b8fe77de6",
+   "ttft_stream_ms": 997,
+   "time_to_request_ms": 259,
+   "first_content_frame_ms": 997,
+   "queued_turn_count": 0,
+   "result_index": 0,
+   "model_usage_since_last_result": {
+    "claude-haiku-5-5": {
+     "inputTokens": 4,
+     "outputTokens": 1532,
+     "cacheReadInputTokens": 30362,
+     "cacheCreationInputTokens": 7452,
+     "webSearchRequests": 0,
+     "costUSD": 0.00200152,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 756,
+     "cacheCreationEphemeral5mInputTokens": 7452,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,4019 @@
+commit 90bc034a97e7eccd0f3cbc69904fffa625a4c34d
+Author: 翠
+Date: 2026-10-30 19:47:43 +0900
+
+    fix: use top-level `input` for SSR build when `build.ssr: true` (#23898)
+
+
+ packages/vite/src/node/__tests__/config.spec.ts | 24 ++++++++++++++++++++++++
+ packages/vite/src/node/config.ts                |  4 ++++
+ 2 files changed, 28 insertions(+)
+commit 28e1710790ac5ef65ed5e84cbb20438bc3218f01
+Author: 이재윤
+Date: 2026-10-30 19:13:27 +0900
+
+    fix(create-vite): keep TypeScript 6 when using ESLint (#23931)
+
+
+ packages/create-vite/__tests__/cli.spec.ts | 26 ++++++++++++++++++++++++++
+ packages/create-vite/src/index.ts          |  8 +++++---
+ 2 files changed, 31 insertions(+), 3 deletions(-)
+commit 20d355a00b036499f4b9fd5aa99ff754ca3d4d06
+Author: btea
+Date: 2026-10-30 17:52:41 +0800
+
+    build: generate sourcemaps in import-meta-current-dirname plugin (#23904)
+
+
+ packages/vite/rolldown.config.ts | 66 ++++++++++++++++++++++++----------------
+ 1 file changed, 39 insertions(+), 27 deletions(-)
+commit 8109efd30319704224db3b7e3b7090348999effb
+Author: bpuns
+Date: 2026-10-30 17:48:45 +0800
+
+    perf(build): remove preload link listeners on settle (fix #23920) (#23922)
+
+
+ .../vite/src/node/plugins/importAnalysisBuild.ts   | 15 ++++++++++----
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |  4 ++--
+ playground/preload/__tests__/preload.spec.ts       | 24 ++++++++++++++++++++++
+ 3 files changed, 37 insertions(+), 6 deletions(-)
+commit 175bbeb231fe8bbf260b0b3866b30080690c4f5e
+Author: L-zeus
+Date: 2026-10-30 15:36:40 +0800
+
+    fix: await overlapping plugin container close calls (#23935)
+
+
+ .../node/server/__tests__/pluginContainer.spec.ts  | 40 ++++++++++++++++++++++
+ packages/vite/src/node/server/pluginContainer.ts   | 13 ++++++-
+ 2 files changed, 52 insertions(+), 1 deletion(-)
+commit 4f340fdb1b619089bbf8ae5dc56c2c0866224306
+Author: 翠
+Date: 2026-10-30 12:12:37 +0900
+
+    fix(dev): escape ANSI escape sequence for `server.forwardConsole` (#23933)
+
+
+ .../node/__tests__/plugins/forwardConsole.spec.ts  | 67 ++++++++++++++++++++++
+ packages/vite/src/node/plugins/forwardConsole.ts   | 30 +++++++---
+ 2 files changed, 90 insertions(+), 7 deletions(-)
+commit cce559ab158cc6b177d0911a0bea73436b48faff
+Author: github-actions[bot]
+Date: 2026-10-27 18:23:36 +0900
+
+    release: create-vite@9.3.3 (#23916)
+
+
+ packages/create-vite/CHANGELOG.md | 5 +++++
+ packages/create-vite/package.json | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+commit f4abfb51b03b04b16b6322eec1b401dedee56748
+Author: 翠
+Date: 2026-10-27 18:22:04 +0900
+
+    fix(create-vite): include template files in package (#23915)
+
+
+ packages/create-vite/package.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 64e24670e49900c33a3d3e3c701a5ec4d76573f2
+Author: 翠
+Date: 2026-10-27 17:50:46 +0900
+
+    fix(wasm): reject `.wasm` outside `server.fs` (#23914)
+
+
+ packages/vite/src/node/server/middlewares/transform.ts | 2 ++
+ playground/fs-serve/__tests__/commonTests.ts           | 7 +++++++
+ playground/fs-serve/root/matrixTestResultPlugin.ts     | 1 +
+ playground/fs-serve/root/src/index.html                | 5 +++++
+ playground/fs-serve/root/unsafe.wasm                   | 1 +
+ 5 files changed, 16 insertions(+)
+commit cc9bc2131d471bb4d60364614b326ada3ca7d10d
+Author: 翠
+Date: 2026-10-27 16:59:41 +0900
+
+    fix(optimizer): detect cache dir precisely (#23912)
+
+
+ .../src/node/__tests__/optimizer/cacheDir.spec.ts  | 54 ++++++++++++++++++++++
+ packages/vite/src/node/optimizer/index.ts          | 10 ++--
+ 2 files changed, 60 insertions(+), 4 deletions(-)
+commit df365589738866363fff7335ed58948a5c440580
+Author: 翠
+Date: 2026-10-27 15:51:18 +0900
+
+    fix(build): resolve dynamic imports with queries appended when collecting CSS dependencies (#23909)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts     | 68 ++++++++++++++++++++++
+ .../dynamic-import-query-fragment/css-entry.js     |  1 +
+ .../dynamic-import-query-fragment/entry.js         |  1 +
+ .../dynamic-import-query-fragment/lazy.css         |  3 +
+ .../fixtures/dynamic-import-query-fragment/lazy.js |  3 +
+ .../vite/src/node/plugins/importAnalysisBuild.ts   |  5 +-
+ 6 files changed, 79 insertions(+), 2 deletions(-)
+commit 52261e67b81e57a954421174f1fee86f0fca3ead
+Author: github-actions[bot]
+Date: 2026-10-27 15:50:40 +0900
+
+    release: create-vite@9.3.2 (#23911)
+
+
+ packages/create-vite/CHANGELOG.md | 14 ++++++++++++++
+ packages/create-vite/package.json |  2 +-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+commit 0cf91e8435df9e984121893963af09965088e6d4
+Author: 翠
+Date: 2026-10-27 15:44:08 +0900
+
+    feat(create-vite): use typescript v7 where possible (#23910)
+
+
+ packages/create-vite/src/index.ts                     | 3 +++
+ packages/create-vite/template-lit-ts/package.json     | 2 +-
+ packages/create-vite/template-preact-ts/package.json  | 2 +-
+ packages/create-vite/template-qwik-ts/package.json    | 2 +-
+ packages/create-vite/template-react-ts/package.json   | 2 +-
+ packages/create-vite/template-solid-ts/package.json   | 2 +-
+ packages/create-vite/template-vanilla-ts/package.json | 2 +-
+ 7 files changed, 9 insertions(+), 6 deletions(-)
+commit 1b905e562aed9b47c3ab5959149bb1566eb7a9a5
+Author: Max
+Date: 2026-10-27 06:10:00 +0100
+
+    perf(css): index rendered modules once per output for `cssScopeTo` (#23889)
+
+
+ packages/vite/src/node/plugins/css.ts | 55 ++++++++++++++++++++++++-----------
+ 1 file changed, 38 insertions(+), 17 deletions(-)
+commit ef7e2828874d0226ee4e83a171ae9eb11ea5a3b3
+Author: btea
+Date: 2026-10-27 13:08:31 +0800
+
+    docs: use complete bundled types check command (#23906)
+
+
+ CONTRIBUTING.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 46b91c5bf9c2901b8511c893bc3fc38b8bba6e4f
+Author: renovate[bot]
+Date: 2026-10-27 13:39:43 +0900
+
+    fix(deps): update all non-major dependencies (#23896)
+
+
+ .github/workflows/ci.yml                           |    6 +-
+ .github/workflows/copilot-setup-steps.yml          |    2 +-
+ .github/workflows/prepare-release.yml              |    2 +-
+ .github/workflows/preview-release.yml              |    2 +-
+ .github/workflows/publish.yml                      |    4 +-
+ .github/workflows/semgrep.yml                      |    4 +-
+ .github/workflows/zizmor.yml                       |    2 +-
+ docs/package.json                                  |    2 +-
+ package.json                                       |   10 +-
+ packages/create-vite/src/index.ts                  |    2 +-
+ packages/create-vite/template-lit-ts/package.json  |    2 +-
+ packages/create-vite/template-lit/package.json     |    2 +-
+ .../create-vite/template-preact-ts/package.json    |    4 +-
+ packages/create-vite/template-preact/package.json  |    4 +-
+ packages/create-vite/template-qwik-ts/package.json |    2 +-
+ packages/create-vite/template-qwik/package.json    |    2 +-
+ .../create-vite/template-react-ts/package.json     |    4 +-
+ packages/create-vite/template-react/package.json   |    4 +-
+ .../create-vite/template-solid-ts/package.json     |    2 +-
+ packages/create-vite/template-solid/package.json   |    2 +-
+ .../create-vite/template-svelte-ts/package.json    |    2 +-
+ packages/create-vite/template-svelte/package.json  |    2 +-
+ .../create-vite/template-vanilla-ts/package.json   |    2 +-
+ packages/create-vite/template-vanilla/package.json |    2 +-
+ packages/create-vite/template-vue-ts/package.json  |    2 +-
+ packages/create-vite/template-vue/package.json     |    2 +-
+ packages/plugin-legacy/package.json                |    4 +-
+ packages/vite/package.json                         |   12 +-
+ packages/vite/src/node/plugins/oxc.ts              |    5 +-
+ playground/backend-integration/package.json        |    2 +-
+ playground/css-sourcemap/package.json              |    2 +-
+ playground/css/package.json                        |    2 +-
+ playground/multiple-entrypoints/package.json       |    2 +-
+ playground/optimize-deps/package.json              |    2 +-
+ playground/resolve-tsconfig-paths/package.json     |    2 +-
+ pnpm-lock.yaml                                     | 1014 ++++++++++----------
+ 36 files changed, 563 insertions(+), 560 deletions(-)
+commit e954a9cda0b5254be495a937333a0be1b8503d8f
+Author: Alperen
+Date: 2026-10-26 07:05:48 +0300
+
+    fix: watch files that have a query or hash referenced with `new URL(..., import.meta.url)` (#23780)
+
+
+ .../__tests__/plugins/assetImportMetaUrl.spec.ts   | 38 +++++++++++++++++++---
+ .../vite/src/node/plugins/assetImportMetaUrl.ts    |  7 ++--
+ 2 files changed, 38 insertions(+), 7 deletions(-)
+commit 2ed103135ea39fc28c77797d4df12848238e0385
+Author: btea
+Date: 2026-10-26 09:05:16 +0800
+
+    chore: remove outdated `minimumReleaseAgeExclude` config (#23885)
+
+
+ pnpm-workspace.yaml | 4 ----
+ 1 file changed, 4 deletions(-)
+commit ac9a56d8925bf05d0b18bca0b273362d697bb4f4
+Author: renovate[bot]
+Date: 2026-10-26 09:57:30 +0900
+
+    chore(deps): update dependency tsdown to ^0.23.2 (#23895)
+
+
+ packages/create-vite/package.json   |  2 +-
+ packages/plugin-legacy/package.json |  2 +-
+ pnpm-lock.yaml                      | 57 ++++++++++++++++++++++++++++++-------
+ 3 files changed, 48 insertions(+), 13 deletions(-)
+commit 82e7aa0374a15e1c67594557ab5893c91578f897
+Author: 翠
+Date: 2026-10-23 17:34:05 +0900
+
+    fix: respect `build.sourcemap` from environment (#23879)
+
+
+ packages/plugin-legacy/src/index.ts                   | 4 ++--
+ packages/vite/src/node/plugins/assetImportMetaUrl.ts  | 2 +-
+ packages/vite/src/node/plugins/css.ts                 | 2 +-
+ packages/vite/src/node/plugins/workerImportMetaUrl.ts | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+commit ac67ede773f4cfee32b6cef4fbcadd072f26f248
+Author: andrew
+Date: 2026-10-23 15:37:12 +0800
+
+    test: move the dynamic-import cases of optimize-deps to dynamic-import (#23877)
+
+
+ .../__tests__/dynamic-import.spec.ts               | 58 +++++++++++++++++-
+ .../cjs-dynamic-importer-ambiguous/index.js        |  2 +-
+ .../cjs-dynamic-importer-ambiguous/package.json    |  2 +-
+ .../cjs-dynamic-importer-cjs/index.js              |  2 +-
+ .../cjs-dynamic-importer-cjs/package.json          |  2 +-
+ .../dep-cjs-compiled-from-cjs/index.js             |  6 ++
+ .../dep-cjs-compiled-from-cjs/package.json         |  6 ++
+ .../dep-cjs-compiled-from-esm/index.js             |  6 ++
+ .../dep-cjs-compiled-from-esm/package.json         |  6 ++
+ .../dynamic-import/dep-cjs-plain-object/index.js   |  7 +++
+ .../dep-cjs-plain-object/package.json              |  6 ++
+ playground/dynamic-import/dep-cjs-umd/index.js     | 10 ++++
+ playground/dynamic-import/dep-cjs-umd/package.json |  6 ++
+ .../dep-cjs-with-es-module-flag/index.js           |  5 ++
+ .../dep-cjs-with-es-module-flag/package.json       |  6 ++
+ playground/dynamic-import/dep-esm-named/index.js   |  1 +
+ .../dynamic-import/dep-esm-named/package.json      |  7 +++
+ playground/dynamic-import/dynamic-deps.js          | 41 +++++++++++++
+ playground/dynamic-import/index.html               | 20 +++++++
+ playground/dynamic-import/package.json             |  6 ++
+ .../optimize-deps/__tests__/optimize-deps.spec.ts  | 50 ----------------
+ playground/optimize-deps/cjs-dynamic.js            | 61 -------------------
+ playground/optimize-deps/index.html                | 23 --------
+ pnpm-lock.yaml                                     | 68 ++++++++++++++++++++--
+ 24 files changed, 264 insertions(+), 143 deletions(-)
+commit 67c965b1df64249bceb747037e87d22f75b3e471
+Author: btea
+Date: 2026-10-23 15:03:28 +0800
+
+    fix(deps): update `@rollup/plugin-alias` to v6.0.1 (#23862)
+
+
+ packages/vite/package.json                         |  2 +-
+ .../fixtures/alias-special-pattern/$$/index.js     |  1 +
+ .../fixtures/alias-special-pattern/$&/index.js     |  1 +
+ .../alias-special-pattern/regex-target/file.js     |  1 +
+ packages/vite/src/node/__tests__/resolve.spec.ts   | 61 ++++++++++++++++++++++
+ pnpm-lock.yaml                                     | 10 ++--
+ pnpm-workspace.yaml                                |  1 +
+ 7 files changed, 71 insertions(+), 6 deletions(-)
+commit 6de44f35ded04fb0659a59403431ab842a320d84
+Author: 翠
+Date: 2026-10-23 15:46:03 +0900
+
+    test: use `isolate: false` for e2e tests (#23870)
+
+
+ playground/css/__tests__/css.spec.ts               |    4 +-
+ .../__tests__/lightningcss/lightningcss.spec.ts    |    4 +-
+ playground/css/__tests__/tests.ts                  | 1037 +++++++++---------
+ .../fs-serve/__tests__/base/fs-serve-base.spec.ts  |    4 +-
+ playground/fs-serve/__tests__/commonTests.ts       | 1148 ++++++++++----------
+ playground/fs-serve/__tests__/fs-serve.spec.ts     |    4 +-
+ playground/test-utils.ts                           |    4 +-
+ playground/vitestSetup.ts                          |  555 +---------
+ playground/vitestSetupUtils.ts                     |  560 ++++++++++
+ vitest.config.e2e.ts                               |    1 +
+ 10 files changed, 1694 insertions(+), 1627 deletions(-)
+commit a976df38815d00102bb1d9fa32e0fec7c05d210a
+Author: btea
+Date: 2026-10-23 13:28:02 +0800
+
+    chore: align charset case (#23863)
+
+
+ packages/vite/src/node/server/middlewares/indexHtml.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit a236886026c3a5de0680ea616de7de830d7a90e7
+Author: andrew
+Date: 2026-10-23 10:13:22 +0800
+
+    fix(bundled-dev): reload when hmr cannot run an entry again (#23849)
+
+
+ packages/vite/src/client/bundledDevHmrClient.ts    | 96 ++++++++++++++--------
+ playground/hmr/__tests__/hmr.spec.ts               | 45 ++++++++++
+ playground/hmr/entry-cycle/dep.js                  |  3 +
+ playground/hmr/entry-cycle/entry-cycle.js          |  5 ++
+ playground/hmr/entry-cycle/index.html              |  5 ++
+ .../hmr/entry-import-removed/imported-entry.js     |  2 +
+ .../hmr/entry-import-removed/importing-entry.js    |  8 ++
+ playground/hmr/entry-import-removed/index.html     |  7 ++
+ playground/hmr/vite.config.ts                      | 14 ++++
+ 9 files changed, 153 insertions(+), 32 deletions(-)
+commit 6a52d2113d0025cd0dc84679bb9259857e36d37e
+Author: 翠
+Date: 2026-10-23 10:36:42 +0900
+
+    test: workaround flaky test failure caused by Rolldown bug (#23872)
+
+
+ playground/assets/__tests__/assets.spec.ts         |  5 +-
+ .../watch/legacy-styles-only-entry-watch.spec.ts   |  9 +--
+ playground/test-utils.ts                           | 27 ++++++++
+ playground/vitestSetup.ts                          | 81 +++++++++++++++++++++-
+ 4 files changed, 112 insertions(+), 10 deletions(-)
+commit 4ca25e1d3a24cb3343352f781a276cbfd2d206d6
+Author: 翠
+Date: 2026-10-22 18:30:51 +0900
+
+    test: fix css-codesplit dynamic import flaky failure (#23871)
+
+
+ playground/css-codesplit/__tests__/css-codesplit.spec.ts | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+commit 4260c756944a430e897f689efcfa4f8648953488
+Author: andrew
+Date: 2026-10-22 14:25:17 +0800
+
+    fix(bundled-dev): allow named imports from Node built-ins (#23858)
+
+
+ packages/vite/src/node/plugins/resolve.ts       |  1 +
+ playground/resolve/__tests__/resolve.spec.ts    | 23 +++++++++++++++++++++++
+ playground/resolve/index.html                   |  5 +++++
+ playground/resolve/node-builtin-named-import.js | 19 +++++++++++++++++++
+ 4 files changed, 48 insertions(+)
+commit 96d157838f7e3be44c1350644b9fd3a2757c7f5b
+Author: renovate[bot]
+Date: 2026-10-22 13:59:38 +0900
+
+    fix(deps): update dependency @node-rs/bcrypt to v2 (#23866)
+
+
+ playground/ssr-deps/package.json |   2 +-
+ playground/ssr-deps/src/app.js   |   2 +-
+ pnpm-lock.yaml                   | 114 +++++++++++++++++++--------------------
+ 3 files changed, 59 insertions(+), 59 deletions(-)
+commit e9f985aba68f0ec8043e0007bccd8ccdadf9597d
+Author: smeng9
+Date: 2026-10-21 21:42:56 -0700
+
+    test(build): inlined awaited import should not trigger syntax error after transform (#23486)
+
+
+ playground/dynamic-import/__tests__/dynamic-import.spec.ts | 6 ++++++
+ playground/dynamic-import/index.html                       | 3 +++
+ playground/dynamic-import/nested/index.js                  | 9 +++++++++
+ playground/dynamic-import/vite.config.js                   | 8 +++++++-
+ 4 files changed, 25 insertions(+), 1 deletion(-)
+commit a711f1c6328ca7f59857ed99e32853cf49b19a15
+Author: 翠
+Date: 2026-10-22 13:25:23 +0900
+
+    fix(ssr): convert external require against built-in modules to import for `ssr.target=webworker` (#23759)
+
+
+ packages/vite/src/node/build.ts                    |   7 -
+ packages/vite/src/node/plugins/resolve.ts          |   4 +
+ playground/ssr-webworker/__tests__/serve.ts        |   5 +-
+ .../ssr-webworker/__tests__/ssr-webworker.spec.ts  |  46 ++-
+ .../ssr-webworker/cjs-node-builtin/index.cjs       |   4 +
+ .../cjs-node-builtin/installed-node-builtin.cjs    |   3 +
+ .../ssr-webworker/cjs-node-builtin/package.json    |   9 +
+ playground/ssr-webworker/package.json              |   1 +
+ playground/ssr-webworker/src/entry-worker.jsx      |   2 +
+ pnpm-lock.yaml                                     | 358 ++++++++++-----------
+ 10 files changed, 232 insertions(+), 207 deletions(-)
+commit 0672bf86b5963de640c8ca7a05c11848577547c9
+Author: renovate[bot]
+Date: 2026-10-22 13:01:41 +0900
+
+    fix(deps): update dependency preact to v11 (#23867)
+
+
+ packages/create-vite/template-preact-ts/package.json | 2 +-
+ packages/create-vite/template-preact/package.json    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+commit a63eb8722e7d47d1efb710b6410c8d5e5a04a18f
+Author: 翠
+Date: 2026-10-22 12:59:34 +0900
+
+    fix(deps): update rolldown-related dependencies (#23868)
+
+
+ package.json                                       |   2 +-
+ packages/vite/package.json                         |   2 +-
+ packages/vite/src/node/__tests__/build.spec.ts     |   2 +-
+ .../modulePreloadPolyfill.spec.ts.snap             |   3 +-
+ playground/js-sourcemap/package.json               |   2 +-
+ playground/package.json                            |   2 +-
+ pnpm-lock.yaml                                     | 369 ++++++++++++++++-----
+ 7 files changed, 286 insertions(+), 96 deletions(-)
+commit 1b6ed05397c0670e6114e3e1380188f0313ae590
+Author: btea
+Date: 2026-10-22 11:35:12 +0800
+
+    fix(server): preserve `$` patterns in static alias replacements (#23703)
+
+
+ .../server/middlewares/__tests__/static.spec.ts    | 24 ++++++++++++++++++++++
+ .../vite/src/node/server/middlewares/static.ts     |  3 +++
+ 2 files changed, 27 insertions(+)
+commit 6f2730eacae327cc2ce95c87509b7e7779c615e0
+Author: andrew
+Date: 2026-10-21 16:44:56 +0800
+
+    test: mark the optimize-deps playground as unsupported under bundled dev (#23857)
+
+
+ .../optimize-deps/__tests__/optimize-deps.spec.ts  | 817 +++++++++++----------
+ vitest.config.e2e.ts                               |   5 +-
+ 2 files changed, 426 insertions(+), 396 deletions(-)
+commit 6c692040e3ea1e7558a95b45dda94b73fdbb6dbc
+Author: andrew
+Date: 2026-10-21 16:44:55 +0800
+
+    test: exclude the object-hooks playground under bundled dev (#23835)
+
+
+ vitest.config.e2e.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit 8bfe8b9962e2839ceb321421c351e55e1eed3c13
+Author: andrew
+Date: 2026-10-21 16:44:55 +0800
+
+    test: run the legacy env and chunk-importmap cases under bundled dev (#23831)
+
+
+ playground/legacy/__tests__/legacy.spec.ts | 4 +---
+ vitest.config.e2e.ts                       | 1 -
+ 2 files changed, 1 insertion(+), 4 deletions(-)
+commit 4ddbbc3d33ac9f0275e889f35f99f9d6358c0251
+Author: andrew
+Date: 2026-10-21 16:44:54 +0800
+
+    test: tag bundled-dev skips in the json playground (#23801)
+
+
+ playground/json/__tests__/csr/json-csr.spec.ts | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+commit 981f07fa4580fb88b333c4450431e4715d2a0b82
+Author: github-actions[bot]
+Date: 2026-10-21 15:32:26 +0900
+
+    release: v8.3.5 (#23856)
+
+
+ packages/vite/CHANGELOG.md | 42 ++++++++++++++++++++++++++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 43 insertions(+), 1 deletion(-)
+commit 0d86b3485fbbd0fcb9a1f70a14adedfcb7a1fff1
+Author: btea
+Date: 2026-10-21 14:25:09 +0800
+
+    fix(resolve): support subpath imports with multiple `#` (#23631)
+
+
+ .../fixtures/resolve-subpath-imports/package.json  |  8 ++++
+ packages/vite/src/node/__tests__/resolve.spec.ts   | 18 +++++++++
+ packages/vite/src/node/plugins/resolve.ts          | 45 +++++++++++++++++-----
+ playground/resolve/__tests__/resolve.spec.ts       | 40 +++++++++++++++++++
+ .../resolve/imports-path/double-hash/index.js      |  1 +
+ playground/resolve/imports-path/hash.js            |  1 +
+ .../resolve/imports-path/importer-hash-hash.js     |  3 ++
+ playground/resolve/imports-path/mid-hash.js        |  1 +
+ playground/resolve/imports-path/question-mark.js   |  1 +
+ playground/resolve/index.html                      | 42 ++++++++++++++++++++
+ playground/resolve/package.json                    |  6 ++-
+ 11 files changed, 155 insertions(+), 11 deletions(-)
+commit 6a0278055d8501bbaf65b8d34ec094722b4e877a
+Author: Simon Knott
+Date: 2026-10-21 08:18:06 +0200
+
+    perf(ssr): extract inline source maps without a regexp (#23775)
+
+
+ .../vite/src/module-runner/evaluatedModules.ts     | 24 +++++++++++++---------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
+commit 8e890e1ce438bfbc07ea4931ce332e40589940fa
+Author: btea
+Date: 2026-10-21 13:40:21 +0800
+
+    fix(optimizer): skip patches dir check for yarn.lock fallback (#23725)
+
+
+ packages/vite/src/node/optimizer/index.ts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+commit 197daf6c4c7bfdaa005bebcc41dd2ff22fa3a5b6
+Author: btea
+Date: 2026-10-21 13:38:45 +0800
+
+    fix(bundled-dev): declare utf-8 charset in fallback page (#23846)
+
+
+ packages/vite/src/node/server/middlewares/indexHtml.ts | 4 ++++
+ 1 file changed, 4 insertions(+)
+commit 0075c4bdd8d2cd731a839411cf36cf9f8d754a8a
+Author: btea
+Date: 2026-10-21 13:38:10 +0800
+
+    refactor(plugin-legacy): use JSON import for core-js version (#23771)
+
+
+ packages/plugin-legacy/src/index.ts | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+commit 4d16e7c14d5e1c361f148238b1e81131238ab8e9
+Author: 翠
+Date: 2026-10-21 14:23:42 +0900
+
+    fix(build): include preload dependencies to chunk import map hashing (#23793)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts     | 275 +++++++++++++++++++++
+ .../__tests__/plugins/importAnalysisBuild.spec.ts  |  89 +++++++
+ .../vite/src/node/plugins/importAnalysisBuild.ts   | 261 ++++++++++++++++---
+ 3 files changed, 585 insertions(+), 40 deletions(-)
+commit df7b40ee9d691e9f4e2413244f6665ef5482dce3
+Author: 翠
+Date: 2026-10-21 13:43:38 +0900
+
+    refactor(dev): consolidate moduleURL to file path utilities (#23828)
+
+
+ packages/vite/src/node/plugins/resolve.ts          |  8 ++-----
+ .../src/node/server/__tests__/moduleUrl.spec.ts    | 26 ++++++++++++++++++++++
+ .../vite/src/node/server/middlewares/indexHtml.ts  | 19 ++++++----------
+ .../vite/src/node/server/middlewares/transform.ts  | 12 +++++-----
+ packages/vite/src/node/server/moduleUrl.ts         |  8 ++++++-
+ 5 files changed, 47 insertions(+), 26 deletions(-)
+commit a16299092c0f0f3f90e05d4bb5f0168b293c2b52
+Author: 翠
+Date: 2026-10-21 13:43:38 +0900
+
+    refactor(dev): use ModuleURLs throughout HTML transforms (#23815)
+
+
+ .../server/middlewares/__tests__/indexHtml.spec.ts | 12 +++-
+ .../vite/src/node/server/middlewares/indexHtml.ts  | 64 +++++++++-------------
+ 2 files changed, 35 insertions(+), 41 deletions(-)
+commit 611668983d4b717f5e5e66cf9f7125bd94f92bf7
+Author: 翠
+Date: 2026-10-21 13:43:37 +0900
+
+    refactor(dev): separate import resolution from URL conversion (#23791)
+
+
+ packages/vite/src/node/plugins/importAnalysis.ts   | 326 +++++++++++----------
+ .../src/node/server/__tests__/moduleUrl.spec.ts    |  44 ++-
+ packages/vite/src/node/server/moduleUrl.ts         |  35 ++-
+ 3 files changed, 248 insertions(+), 157 deletions(-)
+commit 446954c69c806795c83fe2f97c28ae8f9ef83731
+Author: 翠
+Date: 2026-10-21 13:43:37 +0900
+
+    refactor(dev): share ModuleURL and BrowserURL conversions (#23790)
+
+
+ packages/vite/src/client/client.ts                 | 31 +++++---------
+ packages/vite/src/node/build.ts                    |  2 +-
+ packages/vite/src/node/optimizer/index.ts          | 14 +------
+ packages/vite/src/node/plugins/asset.ts            | 27 +++----------
+ packages/vite/src/node/plugins/css.ts              |  3 +-
+ packages/vite/src/node/plugins/importAnalysis.ts   |  2 +-
+ .../src/node/server/__tests__/moduleUrl.spec.ts    | 47 ++++++++++++++++++++++
+ packages/vite/src/node/server/middlewares/base.ts  |  8 +++-
+ .../src/node/server/middlewares/htmlFallback.ts    |  4 +-
+ .../vite/src/node/server/middlewares/indexHtml.ts  |  8 +++-
+ packages/vite/src/node/server/moduleUrl.ts         | 29 +++++++++++++
+ packages/vite/src/node/server/warmup.ts            | 14 +------
+ packages/vite/src/node/ssr/ssrManifestPlugin.ts    |  2 +-
+ packages/vite/src/node/utils.ts                    | 13 ------
+ packages/vite/src/shared/utils.ts                  | 24 ++++++++++-
+ 15 files changed, 137 insertions(+), 91 deletions(-)
+commit 2601eed4d764f21809652dbba745d0f38b47146c
+Author: andrew
+Date: 2026-10-20 15:55:08 +0800
+
+    test: tag bundled-dev skips in the js-sourcemap playground (#23796)
+
+
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    | 30 ++++++++++++----------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
+commit 7471e8c3b32d3d55243590bb7713e602c9fb0212
+Author: andrew
+Date: 2026-10-20 15:53:38 +0800
+
+    fix(bundled-dev): stop hmr propagation at modules that are no longer imported (#23839)
+
+
+ packages/vite/src/client/bundledDevHmrClient.ts |  50 ++++++++---
+ playground/hmr/__tests__/hmr.spec.ts            | 106 ++++++++++++++++++++++--
+ playground/hmr/hmr.ts                           |   2 +
+ playground/hmr/index.html                       |   4 +
+ playground/hmr/orphan-no-boundary/display.js    |   1 +
+ playground/hmr/orphan-no-boundary/index.js      |  21 +++++
+ playground/hmr/orphan-no-boundary/local.js      |   1 +
+ playground/hmr/orphan-no-boundary/re-export.js  |   7 ++
+ playground/hmr/orphan-reimport/display.js       |   1 +
+ playground/hmr/orphan-reimport/index.js         |  22 +++++
+ playground/hmr/orphan-reimport/re-export.js     |   1 +
+ 11 files changed, 198 insertions(+), 18 deletions(-)
+commit c76991fc09c93ba89c97c1cdb6eb082e00220c07
+Author: github-actions[bot]
+Date: 2026-10-20 11:59:28 +0900
+
+    release: create-vite@9.3.1 (#23842)
+
+
+ packages/create-vite/CHANGELOG.md | 6 ++++++
+ packages/create-vite/package.json | 2 +-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+commit 15c85ddae2bbbc3808d96a223a5a18a800883252
+Author: 翠
+Date: 2026-10-20 11:43:38 +0900
+
+    fix(create-vite): use typescript v6 for now (#23841)
+
+
+ packages/create-vite/src/index.ts                     | 3 ---
+ packages/create-vite/template-lit-ts/package.json     | 2 +-
+ packages/create-vite/template-preact-ts/package.json  | 2 +-
+ packages/create-vite/template-qwik-ts/package.json    | 2 +-
+ packages/create-vite/template-react-ts/package.json   | 2 +-
+ packages/create-vite/template-solid-ts/package.json   | 2 +-
+ packages/create-vite/template-vanilla-ts/package.json | 2 +-
+ 7 files changed, 6 insertions(+), 9 deletions(-)
+commit 467f7ac3b8c7cca0b33290e7fd86f3fc79ce92cb
+Author: Jiahan Chen
+Date: 2026-10-19 19:25:56 +0800
+
+    fix(create-vite): use Vite for TanStack projects (#23838)
+
+
+ packages/create-vite/src/index.ts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+commit 2c81dc7766b1dd7af7c64e4d4253306e6c93c739
+Author: github-actions[bot]
+Date: 2026-10-19 17:04:31 +0900
+
+    release: create-vite@9.3.0 (#23832)
+
+
+ packages/create-vite/CHANGELOG.md | 23 +++++++++++++++++++++++
+ packages/create-vite/package.json |  2 +-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+commit 77d8373510da1b26ce057eb2248e570b7f63fde9
+Author: renovate[bot]
+Date: 2026-10-19 16:24:13 +0900
+
+    fix(deps): update all non-major dependencies (#23826)
+
+
+ .github/workflows/semgrep.yml                      |    4 +-
+ .github/workflows/zizmor.yml                       |    2 +-
+ docs/package.json                                  |    4 +-
+ package.json                                       |   10 +-
+ packages/create-vite/package.json                  |    2 +-
+ packages/create-vite/src/index.ts                  |    4 +-
+ .../create-vite/template-react-ts/package.json     |    6 +-
+ packages/create-vite/template-react/package.json   |    6 +-
+ .../create-vite/template-svelte-ts/package.json    |    2 +-
+ packages/create-vite/template-vue-ts/package.json  |    2 +-
+ packages/create-vite/template-vue/package.json     |    2 +-
+ packages/vite/LICENSE.md                           |    2 +-
+ packages/vite/package.json                         |   16 +-
+ playground/alias/package.json                      |    4 +-
+ playground/backend-integration/package.json        |    2 +-
+ playground/css-sourcemap/package.json              |    2 +-
+ playground/css/package.json                        |    2 +-
+ playground/devtools/package.json                   |    8 +-
+ playground/environment-react-ssr/package.json      |    8 +-
+ playground/extensions/package.json                 |    2 +-
+ playground/external/dep-that-imports/package.json  |    2 +-
+ playground/external/dep-that-requires/package.json |    2 +-
+ playground/external/package.json                   |    2 +-
+ playground/fs-serve/__tests__/commonTests.ts       |   10 +-
+ playground/json/package.json                       |    2 +-
+ playground/multiple-entrypoints/package.json       |    2 +-
+ playground/optimize-deps-no-discovery/package.json |    2 +-
+ .../optimize-deps/dep-linked-include/package.json  |    2 +-
+ playground/optimize-deps/package.json              |    6 +-
+ playground/resolve-tsconfig-paths/package.json     |    2 +-
+ playground/ssr-webworker/package.json              |    2 +-
+ pnpm-lock.yaml                                     | 3720 +++++++++-----------
+ 32 files changed, 1657 insertions(+), 2187 deletions(-)
+commit 9df8bbcbc5307158a3562039fb82ad29e2b232f7
+Author: 翠
+Date: 2026-10-19 15:04:00 +0900
+
+    feat(create-vite): use typescript v7 where possible (#23794)
+
+
+ packages/create-vite/src/index.ts                     | 3 +++
+ packages/create-vite/template-lit-ts/package.json     | 2 +-
+ packages/create-vite/template-preact-ts/package.json  | 2 +-
+ packages/create-vite/template-qwik-ts/package.json    | 2 +-
+ packages/create-vite/template-react-ts/package.json   | 2 +-
+ packages/create-vite/template-solid-ts/package.json   | 2 +-
+ packages/create-vite/template-svelte-ts/package.json  | 2 +-
+ packages/create-vite/template-vanilla-ts/package.json | 2 +-
+ packages/create-vite/template-vue-ts/package.json     | 2 +-
+ 9 files changed, 11 insertions(+), 8 deletions(-)
+commit c2e04187e49aab7ab809989f0537b4906653acab
+Author: renovate[bot]
+Date: 2026-10-19 14:32:57 +0900
+
+    fix(deps): update rolldown-related dependencies (#23827)
+
+
+ package.json                                       |   2 +-
+ packages/vite/package.json                         |   2 +-
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |   4 +-
+ playground/js-sourcemap/package.json               |   2 +-
+ playground/package.json                            |   2 +-
+ pnpm-lock.yaml                                     | 322 ++++++++++-----------
+ 6 files changed, 167 insertions(+), 167 deletions(-)
+commit a3001c5e3f4febb3099b097f4828ea567e1b253f
+Author: btea
+Date: 2026-10-18 14:48:23 +0800
+
+    feat(create-vite): print version before scaffolding (#23806)
+
+
+ packages/create-vite/src/index.ts | 3 +++
+ 1 file changed, 3 insertions(+)
+commit df7503cc499e0b49e45701e3be7546918ee9d322
+Author: andrew
+Date: 2026-10-16 19:59:59 +0800
+
+    test: tag bundled-dev skips in the hmr playground (#23788)
+
+
+ .../__tests__/backend-integration.spec.ts          |  21 +-
+ playground/hmr/__tests__/hmr.spec.ts               | 265 ++++++++++++---------
+ playground/hmr/intermediate-file-delete/index.js   |  10 +-
+ playground/hmr/vite.config.ts                      |   1 +
+ 4 files changed, 178 insertions(+), 119 deletions(-)
+commit 74ae7099f9fd1d5cd1adcd32bcbb2c92d8937007
+Author: btea
+Date: 2026-10-16 17:24:53 +0800
+
+    docs: update development tools list (#23786)
+
+
+ docs/_data/acknowledgements.data.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 928e721b36690ac0f3f118290a21fc0cc4349055
+Author: 翠
+Date: 2026-10-15 20:45:21 +0900
+
+    chore(deps): use typescript v7 (#23778)
+
+
+ docs/package.json                            |   1 +
+ package.json                                 |   2 +-
+ packages/plugin-legacy/tsdown.config.ts      |   1 -
+ playground/hmr-ssr/__tests__/hmr-ssr.spec.ts |   2 +-
+ pnpm-lock.yaml                               | 329 ++++++++++++++++++++++-----
+ pnpm-workspace.yaml                          |   8 +
+ 6 files changed, 285 insertions(+), 58 deletions(-)
+commit 8d7623d9b5647714a5b20cbd787a5401ca846229
+Author: 翠
+Date: 2026-10-15 19:49:49 +0900
+
+    fix(build): handle missing chunk import maps (#23777)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts     | 73 ++++++++++++++++++++++
+ packages/vite/src/node/plugins/css.ts              | 10 +--
+ packages/vite/src/node/plugins/html.ts             |  2 +
+ .../vite/src/node/plugins/importAnalysisBuild.ts   |  4 +-
+ 4 files changed, 80 insertions(+), 9 deletions(-)
+commit 5b73935881424ed5919571036dd89d3868590f92
+Author: 翠
+Date: 2026-10-15 19:48:53 +0900
+
+    chore: migrate to Oxlint (#23746)
+
+
+ docs/_data/acknowledgements.data.ts               |   2 +-
+ eslint.config.js                                  | 307 ---------
+ oxlint.config.ts                                  | 289 ++++++++
+ package.json                                      |  15 +-
+ packages/vite/package.json                        |   2 +-
+ packages/vite/src/client/overlay.ts               |   1 +
+ packages/vite/src/node/build.ts                   |   2 +-
+ packages/vite/src/node/config.ts                  |   4 +-
+ packages/vite/src/node/logger.ts                  |   2 +-
+ packages/vite/src/node/plugins/css.ts             |   2 +-
+ packages/vite/src/node/plugins/license.ts         |   1 +
+ packages/vite/src/node/server/pluginContainer.ts  |   2 +-
+ packages/vite/src/node/utils.ts                   |   5 +-
+ packages/vite/src/types/chokidar.d.ts             |   2 +-
+ packages/vite/src/types/connect.d.ts              |   2 +-
+ packages/vite/src/types/ws.d.ts                   |   3 +-
+ packages/vite/types/internal/devtoolsOptions.d.ts |   6 +-
+ playground/environment-react-ssr/vite.config.ts   |   2 +-
+ playground/hmr-ssr/queries/index.js               |   1 +
+ pnpm-lock.yaml                                    | 803 ++++++++--------------
+ pnpm-workspace.yaml                               |   1 -
+ 21 files changed, 611 insertions(+), 843 deletions(-)
+commit 50b382d31835b8b4bc8b6964738ac03146e44261
+Author: Ernesto
+Date: 2026-10-15 11:37:54 +0100
+
+    fix(css): don't fail on a literal `%` in `url()` (#23676)
+
+
+ packages/vite/src/node/__tests__/plugins/css.spec.ts | 11 +++++++++++
+ packages/vite/src/node/plugins/css.ts                |  5 ++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+commit d112dad9392efdb38eafc2c36fd27b54e614efca
+Author: andrew
+Date: 2026-10-15 18:36:33 +0800
+
+    test: tag bundled-dev skips in the glob-import playground (#23743)
+
+
+ playground/glob-import/__tests__/glob-import.spec.ts | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+commit a7d56967ef0050a09c0507e63a18164bc7a0d486
+Author: btea
+Date: 2026-10-15 18:35:37 +0800
+
+    fix(optimizer): skip patches dir hash for nub lockfile (#23761)
+
+
+ packages/vite/src/node/optimizer/index.ts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+commit b65a4b55a8d3fc4674ebda272f6612c29b01de84
+Author: 翠
+Date: 2026-10-15 19:31:51 +0900
+
+    docs: dynamic import retries (#23709)
+
+
+ docs/guide/build.md           | 2 ++
+ docs/guide/troubleshooting.md | 4 +++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+commit ce4293f15cc5cd221c5ed60f5cd64e82ca5cbaf5
+Author: 翠
+Date: 2026-10-15 19:30:29 +0900
+
+    refactor(deps): replace `@vercel/detect-agent` with `std-env` (#23744)
+
+
+ docs/config/server-options.md          |   2 +-
+ packages/create-vite/LICENSE           | 239 ++++-----------------------------
+ packages/create-vite/package.json      |   2 +-
+ packages/create-vite/src/index.ts      |   5 +-
+ packages/vite/LICENSE.md               | 239 ++++-----------------------------
+ packages/vite/package.json             |   2 +-
+ packages/vite/src/node/server/index.ts |   4 +-
+ pnpm-lock.yaml                         |  18 +--
+ pnpm-workspace.yaml                    |   1 -
+ 9 files changed, 71 insertions(+), 441 deletions(-)
+commit bd3253387fe1dc96831950f9894a456e9cbfe2f8
+Author: andrew
+Date: 2026-10-15 13:19:40 +0800
+
+    test: tag bundled-dev skips in the fs-serve playground (#23742)
+
+
+ playground/fs-serve/__tests__/commonTests.ts | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+commit 11fe1e46ff0c136cb90fbe263ba03993bc94df18
+Author: andrew
+Date: 2026-10-15 13:13:51 +0800
+
+    fix(bundled-dev): map forwarded error stacks through the bundle source maps (#23741)
+
+
+ packages/vite/src/node/plugins/forwardConsole.ts   | 93 +++++++++++++++++++++-
+ .../__test__/forward-console.spec.ts               | 21 +++--
+ 2 files changed, 101 insertions(+), 13 deletions(-)
+commit c2c9ef4dcd05b3e4d88844ea3a13dc23819ca2a5
+Author: Mochammad Fadhlan Al-Ghiffari
+Date: 2026-10-14 15:28:17 +0700
+
+    fix(server): handle socket errors on upgrade requests not taken by the HMR server (#23728)
+
+
+ packages/vite/src/node/server/ws.ts |  6 +++++
+ playground/hmr/__tests__/ws.spec.ts | 49 +++++++++++++++++++++++++++++++++++++
+ playground/hmr/package.json         |  3 ++-
+ pnpm-lock.yaml                      |  3 +++
+ 4 files changed, 60 insertions(+), 1 deletion(-)
+commit 4ea708a3ae9a324c6aabca59fade4082bf72f3e5
+Author: btea
+Date: 2026-10-14 16:10:17 +0800
+
+    fix(resolve): update resolve.exports to 2.0.4 (#23739)
+
+
+ packages/vite/package.json                       |  2 +-
+ playground/resolve/__tests__/resolve.spec.ts     |  5 +++++
+ playground/resolve/imports-path/star/dollar$$.js |  1 +
+ playground/resolve/index.html                    |  6 ++++++
+ pnpm-lock.yaml                                   | 10 +++++-----
+ pnpm-workspace.yaml                              |  1 +
+ 6 files changed, 19 insertions(+), 6 deletions(-)
+commit 38f3cb45b1490ed24775547ceafa677b91a57714
+Author: Parafee41
+Date: 2026-10-14 11:49:46 +0800
+
+    fix(optimizer): scan `oxc.jsxInject` imports (#23758)
+
+
+ packages/vite/src/node/__tests__/scan.spec.ts | 27 +++++++++++++++++++++++++++
+ packages/vite/src/node/optimizer/scan.ts      |  8 ++++----
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+commit cf80aa552cac02eac0293330ccd5fde3c7ae8d29
+Author: renovate[bot]
+Date: 2026-10-13 18:39:36 +0900
+
+    fix(deps): update all non-major dependencies (#23731)
+
+
+ .github/workflows/ci.yml                           |   6 +-
+ .github/workflows/copilot-setup-steps.yml          |   2 +-
+ .github/workflows/ecosystem-ci-trigger.yml         |   2 +-
+ .github/workflows/prepare-release.yml              |   2 +-
+ .github/workflows/preview-release.yml              |   2 +-
+ .github/workflows/publish.yml                      |   4 +-
+ .github/workflows/semgrep.yml                      |   4 +-
+ docs/package.json                                  |   4 +-
+ package.json                                       |   6 +-
+ packages/create-vite/package.json                  |   2 +-
+ packages/create-vite/template-lit-ts/package.json  |   2 +-
+ packages/create-vite/template-lit/package.json     |   2 +-
+ .../create-vite/template-preact-ts/package.json    |   4 +-
+ packages/create-vite/template-preact/package.json  |   2 +-
+ packages/create-vite/template-qwik-ts/package.json |   6 +-
+ packages/create-vite/template-qwik/package.json    |   4 +-
+ .../create-vite/template-react-ts/package.json     |   4 +-
+ packages/create-vite/template-react/package.json   |   2 +-
+ .../create-vite/template-solid-ts/package.json     |   6 +-
+ packages/create-vite/template-solid/package.json   |   4 +-
+ .../create-vite/template-svelte-ts/package.json    |   6 +-
+ packages/create-vite/template-svelte/package.json  |   4 +-
+ .../create-vite/template-vanilla-ts/package.json   |   2 +-
+ packages/create-vite/template-vanilla/package.json |   2 +-
+ packages/create-vite/template-vue-ts/package.json  |   8 +-
+ packages/create-vite/template-vue/package.json     |   4 +-
+ packages/vite/package.json                         |   6 +-
+ playground/css-lightningcss-proxy/package.json     |   2 +-
+ playground/css-sourcemap/package.json              |   2 +-
+ playground/css/package.json                        |   2 +-
+ playground/legacy/package.json                     |   2 +-
+ playground/optimize-missing-deps/package.json      |   2 +-
+ playground/resolve/package.json                    |   2 +-
+ playground/ssr-conditions/package.json             |   2 +-
+ playground/ssr-deps/package.json                   |   2 +-
+ playground/ssr-html/package.json                   |   2 +-
+ playground/ssr-noexternal/package.json             |   2 +-
+ playground/ssr-pug/package.json                    |   2 +-
+ playground/ssr-wasm/package.json                   |   2 +-
+ playground/ssr/package.json                        |   2 +-
+ pnpm-lock.yaml                                     | 378 ++++++++++-----------
+ pnpm-workspace.yaml                                |   2 +-
+ 42 files changed, 254 insertions(+), 254 deletions(-)
+commit 43f0d052e514c3ad2dea2f7dc44b0720e1f62f48
+Author: renovate[bot]
+Date: 2026-10-13 18:13:00 +0900
+
+    fix(deps): update rolldown-related dependencies (#23733)
+
+
+ package.json                        |   2 +-
+ packages/create-vite/package.json   |   2 +-
+ packages/plugin-legacy/package.json |   2 +-
+ packages/vite/LICENSE.md            |   2 +-
+ packages/vite/package.json          |   4 +-
+ playground/package.json             |   2 +-
+ pnpm-lock.yaml                      | 575 ++++++++++++++----------------------
+ 7 files changed, 232 insertions(+), 357 deletions(-)
+commit 726aca5a5390776b563741003a46ac8ea5706f16
+Author: andrew
+Date: 2026-10-13 17:09:47 +0800
+
+    test: tag bundled-dev skips in the environment-react-ssr playground (#23740)
+
+
+ .../__tests__/environment-react-ssr.spec.ts        | 114 +++++++++++++--------
+ 1 file changed, 69 insertions(+), 45 deletions(-)
+commit 6019aa79975465516da7c6f532d568422b019a25
+Author: andrew
+Date: 2026-10-13 16:50:51 +0800
+
+    fix(bundled-dev): include user `import.meta.env.*` defines in the `import.meta.env` object (#23713)
+
+
+ packages/vite/src/node/plugins/define.ts | 2 +-
+ playground/env/__tests__/env.spec.ts     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+commit dce9fe69d37e957b62f3b5df61a761f7f2f949f5
+Author: renovate[bot]
+Date: 2026-10-12 18:39:31 +0900
+
+    chore(deps): update actions/setup-node digest to 949feb2 (#23730)
+
+
+ docs/guide/static-deploy-github-pages.yaml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 40fa7d75b96f598a35bdce985e720db3417026b0
+Author: Aurora
+Date: 2026-10-12 09:12:14 +0200
+
+    docs(env-and-mode): replace dead TypeScript dom/webworker lib links (#23720)
+
+
+ docs/guide/env-and-mode.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit ef40ecf248cb6f9c250d75d059fc89d35d500c6f
+Author: Aditya Pratap
+Date: 2026-10-12 12:39:46 +0530
+
+    docs: fix article in env-and-mode TypeScript section (#23726)
+
+
+ docs/guide/env-and-mode.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit a6d310e42e38f3a12d0f04b1bd599da99cca8dc3
+Author: 多格
+Date: 2026-10-12 15:04:14 +0800
+
+    docs(guide): fix code example errors (#23718)
+
+
+ docs/guide/api-environment-frameworks.md |  2 --
+ docs/guide/api-plugin.md                 |  3 +--
+ docs/guide/migration.md                  | 15 +++++++++------
+ 3 files changed, 10 insertions(+), 10 deletions(-)
+commit 7e4dfe0bf57011239134fa80b5332b4823ecaab6
+Author: andrew
+Date: 2026-10-12 13:22:14 +0800
+
+    test: run the dynamic-import vars worker case under bundled dev (#23712)
+
+
+ .../dynamic-import/__tests__/dynamic-import.spec.ts      | 16 +++++-----------
+ 1 file changed, 5 insertions(+), 11 deletions(-)
+commit 3b72997d42e7dd2b31898d0e68461e3025e836b6
+Author: andrew
+Date: 2026-10-10 00:29:11 +0800
+
+    test: tag bundled-dev skips in the css playground (#23707)
+
+
+ playground/css/__tests__/tests.ts | 60 +++++++++++++++++++++++++--------------
+ 1 file changed, 38 insertions(+), 22 deletions(-)
+commit f20609630faa93026924275115d1426fdc08629e
+Author: Adam Otradovec
+Date: 2026-10-09 16:00:19 +0200
+
+    fix(optimizer): fall back to yarn.lock for lockfile hash (#23667)
+
+
+ .../fixtures/lockfile-hash/yarn-lock/yarn.lock     |  1 +
+ .../fixtures/lockfile-hash/yarn-state/.gitignore   |  1 +
+ .../yarn-state/node_modules/.yarn-state.yml        |  1 +
+ .../fixtures/lockfile-hash/yarn-state/yarn.lock    |  1 +
+ .../node/__tests__/optimizer/lockfileHash.spec.ts  | 36 ++++++++++++++++++++++
+ packages/vite/src/node/optimizer/index.ts          | 30 +++++++++++++-----
+ 6 files changed, 63 insertions(+), 7 deletions(-)
+commit a4bfdb11766696af26186207f686fe8be2e1472d
+Author: andrew
+Date: 2026-10-09 16:10:18 +0800
+
+    test: tag bundled-dev skips in the csp playground (#23705)
+
+
+ playground/csp/__tests__/csp.spec.ts | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
+commit cfe917d67d279a13f20ae9449e3befa736b64b07
+Author: andrew
+Date: 2026-10-09 16:10:18 +0800
+
+    fix(bundled-dev): ignore build.chunkImportMap (#23685)
+
+
+ packages/vite/src/node/build.ts | 3 +++
+ vitest.config.e2e.ts            | 1 -
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+commit df4e02cc8317a62f21edefc79a9690571ffed1f3
+Author: andrew
+Date: 2026-10-09 16:10:17 +0800
+
+    fix(bundled-dev): normalize served output files (#23684)
+
+
+ packages/vite/src/node/server/bundledDev.ts        |  8 +++-
+ .../__tests__/backend-integration.spec.ts          | 48 ++++++++--------------
+ 2 files changed, 22 insertions(+), 34 deletions(-)
+commit 52ba877693c8633458d163117504a8259beb3cf5
+Author: andrew
+Date: 2026-10-09 15:30:54 +0800
+
+    fix(bundled-dev): apply `server.origin` to asset URLs (#23683)
+
+
+ packages/vite/src/node/plugins/asset.ts            |  8 ++-
+ .../__tests__/backend-integration.spec.ts          | 60 ++++++++++------------
+ 2 files changed, 32 insertions(+), 36 deletions(-)
+commit 849c253b00fe77c29ad45c165b3cb78b1086c784
+Author: andrew
+Date: 2026-10-09 15:30:54 +0800
+
+    test: tag bundled-dev skips in the backend-integration playground (#23681)
+
+
+ .../__tests__/backend-integration.spec.ts          | 98 ++++++++++++++--------
+ 1 file changed, 61 insertions(+), 37 deletions(-)
+commit 7a89794331526a67bc9b29047b86957c581c128c
+Author: andrew
+Date: 2026-10-09 12:06:30 +0800
+
+    test: tag bundled-dev skips in the assets playground (#23680)
+
+
+ playground/assets/__tests__/assets.spec.ts         | 175 ++++++++++++---------
+ .../encoded-base/assets-encoded-base.spec.ts       |  29 ++--
+ .../relative-base/assets-relative-base.spec.ts     |  29 ++--
+ .../runtime-base/assets-runtime-base.spec.ts       | 105 ++++++++-----
+ .../__tests__/url-base/assets-url-base.spec.ts     |  29 ++--
+ playground/test-utils.ts                           |  22 +++
+ playground/vitestSetup.ts                          |  12 +-
+ vitest.config.e2e.ts                               |  15 +-
+ 8 files changed, 277 insertions(+), 139 deletions(-)
+commit 3dfde87b90a9f80b125d710e3e5d4fc795662db6
+Author: btea
+Date: 2026-10-09 10:12:25 +0800
+
+    fix(server): only strip base when path matches a full segment (#23641)
+
+
+ packages/vite/src/node/server/middlewares/base.ts |  2 +-
+ playground/base/__tests__/base.spec.ts            | 35 +++++++++++++++++++++++
+ playground/base/foobar/a.js                       |  1 +
+ playground/base/index.html                        |  9 ++++++
+ playground/base/package.json                      | 12 ++++++++
+ playground/base/vite.config.ts                    |  7 +++++
+ 6 files changed, 65 insertions(+), 1 deletion(-)
+commit b6c20f6a8126d8561891e5fb9368e8fc9da37538
+Author: github-actions[bot]
+Date: 2026-10-08 20:57:09 +0900
+
+    release: v8.3.4 (#23702)
+
+
+ packages/vite/CHANGELOG.md | 32 ++++++++++++++++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 33 insertions(+), 1 deletion(-)
+commit b28db28e9e62d9866a9a0f1b22e74589cc180577
+Author: owenn
+Date: 2026-10-08 11:55:01 +0100
+
+    fix(server): match static aliases on path boundaries (#23643)
+
+
+ .../server/middlewares/__tests__/static.spec.ts    | 70 +++++++++++++++++++++-
+ .../vite/src/node/server/middlewares/static.ts     | 31 ++++++----
+ 2 files changed, 89 insertions(+), 12 deletions(-)
+commit bc0f21c56a2e003a4d2dd23ccb9da3ec8c706c4e
+Author: andrew
+Date: 2026-10-08 18:46:52 +0800
+
+    feat(bundled-dev): support `import.meta.hot.acceptExports` (#23463)
+
+
+ packages/vite/src/client/bundledDevClient.ts       |  3 +
+ packages/vite/src/client/bundledDevHmrClient.ts    | 55 ++++++++++++++---
+ packages/vite/src/node/plugins/clientInjections.ts |  4 ++
+ packages/vite/src/shared/hmr.ts                    | 13 ++--
+ playground/hmr/__tests__/hmr.spec.ts               | 44 +++++++------
+ .../hmr-no-partial-accept.spec.ts                  | 72 ++++++++++++++++++++++
+ playground/hmr/package.json                        |  3 +
+ playground/hmr/vite.config-no-partial-accept.js    |  8 +++
+ playground/hmr/vite.config.ts                      | 15 ++++-
+ playground/test-utils.ts                           | 25 +++++++-
+ playground/vitestGlobalSetup.ts                    |  1 +
+ pnpm-lock.yaml                                     |  6 +-
+ 12 files changed, 211 insertions(+), 38 deletions(-)
+commit fa7146938b0ca703653c90c20907191a01c032ba
+Author: Serghei
+Date: 2026-10-08 13:15:46 +0300
+
+    fix(client): skip rewriting unchanged adopted styles (#23697)
+
+
+ packages/vite/src/client/client.ts   |  4 +++-
+ playground/hmr/__tests__/hmr.spec.ts | 22 ++++++++++++++++++++++
+ playground/hmr/css-style/index.html  | 12 ++++++++++++
+ playground/hmr/css-style/main.js     |  7 +++++++
+ playground/hmr/css-style/plugin.ts   | 23 +++++++++++++++++++++++
+ playground/hmr/css-style/styles.css  |  3 +++
+ playground/hmr/vite.config.ts        |  2 ++
+ 7 files changed, 72 insertions(+), 1 deletion(-)
+commit 2a8c0f05c76e35c43ab3560984a5103c8db8dbcd
+Author: 翠
+Date: 2026-10-08 18:50:03 +0900
+
+    fix(build): correct preloads when chunkImportMap is enabled with non-root base (#23698)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts | 36 ++++++++++++++++++++++++++
+ packages/vite/src/node/plugins/html.ts         | 12 ++++-----
+ 2 files changed, 41 insertions(+), 7 deletions(-)
+commit 18f9e07e85c172252c3ec27da1b33a4d728b4e16
+Author: andrew
+Date: 2026-10-08 16:47:45 +0800
+
+    test(lazy-compilation): run only in the bundled-dev suite (#23692)
+
+
+ playground/lazy-compilation/__tests__/lazy-compilation.spec.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit 3a7f2aea757d59bae66ad6edf6b321d26a7e6778
+Author: 翠
+Date: 2026-10-08 16:31:51 +0900
+
+    fix(html): avoid adding filesystem root to watcher (#23689)
+
+
+ .../middlewares/__tests__/fixtures/outside.html    |  6 +++++
+ .../server/middlewares/__tests__/indexHtml.spec.ts | 30 +++++++++++++++++++++-
+ .../vite/src/node/server/middlewares/indexHtml.ts  |  6 ++---
+ 3 files changed, 38 insertions(+), 4 deletions(-)
+commit facc2fb1fffce03d9e2dd7011d0bd0eeddc7d0f6
+Author: 翠
+Date: 2026-10-08 16:31:47 +0900
+
+    fix: remove input option unescaping for now (#23694)
+
+
+ packages/vite/src/node/__tests__/config.spec.ts | 56 +++++--------------------
+ packages/vite/src/node/config.ts                | 39 +----------------
+ 2 files changed, 12 insertions(+), 83 deletions(-)
+commit 70d56ea1848909edab416934f3f68ce14343eb73
+Author: Jason Smathers
+Date: 2026-10-08 01:30:48 -0600
+
+    fix(dev): a restart requested during a restart used to be dropped (fix #23392) (#23484)
+
+
+ packages/vite/src/node/__tests__/dev.spec.ts | 204 +++++++++++++++++++++++++++
+ packages/vite/src/node/server/index.ts       |  59 +++++---
+ 2 files changed, 240 insertions(+), 23 deletions(-)
+commit cf52011c46409a4a45f3d74bba631b8f005c4bc9
+Author: 翠
+Date: 2026-10-08 15:51:30 +0900
+
+    fix(css): resolve imported preprocessors from their file path with lightningcss (#23688)
+
+
+ packages/vite/src/node/plugins/css.ts                    | 8 ++++++--
+ playground/css/__tests__/tests.ts                        | 9 +++++++++
+ playground/css/main.js                                   | 1 +
+ playground/css/preprocessor-import/components/_vars.scss | 1 +
+ playground/css/preprocessor-import/components/box.scss   | 5 +++++
+ playground/css/preprocessor-import/main.css              | 1 +
+ 6 files changed, 23 insertions(+), 2 deletions(-)
+commit fcb6f1252a95857823d935f98554b938888d41a0
+Author: 翠
+Date: 2026-10-08 15:43:38 +0900
+
+    fix: don't treat modules ending with js-like query as js (#23687)
+
+
+ .../vite/src/node/__tests__/plugins/oxc.spec.ts    | 28 +++++++++++++++++++++-
+ packages/vite/src/node/plugins/oxc.ts              |  6 ++++-
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+commit 8579189bae8626b6ddab55a09325e209d62e027e
+Author: 翠
+Date: 2026-10-08 15:43:31 +0900
+
+    fix(optimizer): scan deep imports with custom extensions (#23678)
+
+
+ packages/vite/src/node/optimizer/scan.ts           | 14 ++++----
+ .../optimize-deps/__tests__/optimize-deps.spec.ts  | 12 +++++++
+ .../optimize-deps/dep-not-js/deep-import.svelte    |  5 +++
+ .../optimize-deps/dep-not-js/relative.svelte       |  3 ++
+ playground/optimize-deps/index.html                |  4 +++
+ playground/optimize-deps/svelte-deep-import.js     |  3 ++
+ playground/optimize-deps/vite.config.js            | 39 ++++++++++++++++++++++
+ 7 files changed, 73 insertions(+), 7 deletions(-)
+commit 036b74599b2fe1d8c61475371b856ceb88d26963
+Author: Bhumin Paladiya
+Date: 2026-10-08 12:13:05 +0530
+
+    fix(build): wait for in-flight stylesheets in preload helper (fix #23652) (#23662)
+
+
+ .../__tests__/plugins/importAnalysisBuild.spec.ts  |  40 ++++++++
+ .../vite/src/node/plugins/importAnalysisBuild.ts   | 112 +++++++++++++--------
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |   4 +-
+ 3 files changed, 112 insertions(+), 44 deletions(-)
+commit 574d5e351905fe99891364d03c2440531378f7fd
+Author: Januth Nimnal
+Date: 2026-10-08 10:40:26 +0530
+
+    fix: avoid mutating hmr defaults (fix #23575) (#23576)
+
+
+ packages/vite/src/node/__tests__/config.spec.ts | 34 +++++++++++++++++++++++++
+ packages/vite/src/node/utils.ts                 |  2 +-
+ 2 files changed, 35 insertions(+), 1 deletion(-)
+commit 15d82f7dc679ab9c18d5ce2c3711157c2365ddd1
+Author: Joseph Hungate
+Date: 2026-10-07 21:37:20 -0700
+
+    fix(html): skip caching CSS of chunks in a cycle (fix #23628) (#23636)
+
+
+ packages/vite/src/node/__tests__/html.spec.ts | 26 ++++++++++++++++++++++++++
+ packages/vite/src/node/plugins/html.ts        | 11 +++++++++--
+ 2 files changed, 35 insertions(+), 2 deletions(-)
+commit 3d674869a50a0bca84a8cc8dc55bd35d57100e37
+Author: James Ross
+Date: 2026-10-08 04:03:16 +0100
+
+    perf(module-runner): skip cloning call sites that have no source map (#23646)
+
+
+ .../vite/src/module-runner/sourcemap/interceptor.ts    | 18 ++++++++++++------
+ .../ssr/runtime/__tests__/server-source-maps.spec.ts   | 11 +++++++++++
+ 2 files changed, 23 insertions(+), 6 deletions(-)
+commit 8a4c19cfc035f2dd203f2fa6d00ab9256a5e77c9
+Author: renovate[bot]
+Date: 2026-10-07 08:23:00 +0000
+
+    fix(deps): update all non-major dependencies (#23648)
+
+
+ .github/workflows/semgrep.yml                      |    2 +-
+ docs/config/shared-options.md                      |    3 +-
+ docs/guide/api-environment-runtimes.md             |   11 +-
+ docs/guide/api-hmr.md                              |    2 +-
+ docs/guide/api-plugin.md                           |    8 +-
+ docs/guide/assets.md                               |    1 +
+ docs/guide/build.md                                |    4 +-
+ docs/guide/migration.md                            |    4 +-
+ docs/guide/static-deploy.md                        |    2 +-
+ docs/package.json                                  |    4 +-
+ package.json                                       |   16 +-
+ packages/create-vite/src/index.ts                  |    6 +-
+ packages/create-vite/template-lit-ts/package.json  |    2 +-
+ packages/create-vite/template-lit/package.json     |    2 +-
+ .../create-vite/template-preact-ts/package.json    |    4 +-
+ packages/create-vite/template-preact/package.json  |    2 +-
+ packages/create-vite/template-qwik-ts/package.json |    4 +-
+ packages/create-vite/template-qwik/package.json    |    2 +-
+ .../create-vite/template-react-ts/package.json     |    8 +-
+ packages/create-vite/template-react/package.json   |    6 +-
+ .../create-vite/template-solid-ts/package.json     |    4 +-
+ packages/create-vite/template-solid/package.json   |    2 +-
+ .../create-vite/template-svelte-ts/package.json    |    4 +-
+ packages/create-vite/template-svelte/package.json  |    2 +-
+ .../create-vite/template-vanilla-ts/package.json   |    2 +-
+ packages/create-vite/template-vanilla/package.json |    2 +-
+ packages/create-vite/template-vue-ts/package.json  |    6 +-
+ packages/create-vite/template-vue/package.json     |    2 +-
+ packages/plugin-legacy/package.json                |    6 +-
+ packages/vite/package.json                         |   10 +-
+ playground/backend-integration/package.json        |    2 +-
+ playground/css-sourcemap/package.json              |    4 +-
+ playground/css/package.json                        |    2 +-
+ playground/js-sourcemap/package.json               |    2 +-
+ playground/multiple-entrypoints/package.json       |    2 +-
+ playground/resolve-tsconfig-paths/package.json     |    2 +-
+ pnpm-lock.yaml                                     | 1739 ++++++++------------
+ pnpm-workspace.yaml                                |    1 -
+ 38 files changed, 751 insertions(+), 1136 deletions(-)
+commit 182f5b2a65391da5bee05f9c3df1aeb3794e98d9
+Author: andrew
+Date: 2026-10-07 16:16:57 +0800
+
+    refactor(bundled-dev): import CSS HMR helpers from `/@vite/client` (#23674)
+
+
+ packages/vite/src/client/bundledDevClient.ts       |  7 +------
+ packages/vite/src/node/plugins/clientInjections.ts | 11 ++++++++---
+ packages/vite/src/node/plugins/css.ts              |  8 +++-----
+ 3 files changed, 12 insertions(+), 14 deletions(-)
+commit 5afc5a8876624888fc1e8f43fed1c85c4b0e830b
+Author: andrew
+Date: 2026-10-07 16:16:25 +0800
+
+    fix(bundled-dev): serve `/@vite/client` and stub `@vite/env` (#23664)
+
+
+ packages/vite/src/node/plugins/clientInjections.ts | 49 +++++++++++++++++++++-
+ packages/vite/src/node/plugins/index.ts            |  7 +++-
+ packages/vite/src/node/server/bundledDev.ts        | 10 ++++-
+ .../src/node/server/middlewares/memoryFiles.ts     |  2 +-
+ playground/define/__tests__/define.spec.ts         | 12 ++----
+ 5 files changed, 67 insertions(+), 13 deletions(-)
+commit 794516d50cff80e405bc9b3e5faac1c82987566c
+Author: renovate[bot]
+Date: 2026-10-07 17:05:39 +0900
+
+    fix(deps): update rolldown-related dependencies (#23649)
+
+
+ package.json                         |   2 +-
+ packages/vite/package.json           |   2 +-
+ playground/js-sourcemap/package.json |   2 +-
+ playground/package.json              |   2 +-
+ pnpm-lock.yaml                       | 351 +++++++++++++++++++----------------
+ 5 files changed, 194 insertions(+), 165 deletions(-)
+commit 12bb28c22379c8d2fe90088fa0eefbfa2ab3fb80
+Author: btea
+Date: 2026-10-07 14:12:09 +0800
+
+    fix(watcher): normalize file before root check in `ensureWatchedFile` (#23673)
+
+
+ .../vite/src/node/server/__tests__/watcher.spec.ts | 33 +++++++++++++++++++++-
+ packages/vite/src/node/utils.ts                    |  2 +-
+ 2 files changed, 33 insertions(+), 2 deletions(-)
+commit fea5b21dd9524ed7308632407b996f1fe5942c9c
+Author: github-actions[bot]
+Date: 2026-10-06 12:48:21 +0900
+
+    release: v8.3.3 (#23657)
+
+
+ packages/vite/CHANGELOG.md | 8 ++++++++
+ packages/vite/package.json | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+commit c3e06f92e969952466b4e2f5801e85e1e00cd905
+Author: 翠
+Date: 2026-10-06 12:44:03 +0900
+
+    fix(server): store ids to `safeModulePaths` rather than URLs (#23656)
+
+
+ packages/vite/src/node/__tests__/dev.spec.ts     | 29 ++++++++++++++++++++++++
+ packages/vite/src/node/plugins/importAnalysis.ts |  9 +++-----
+ playground/fs-serve/__tests__/fs-serve.spec.ts   | 10 +++++++-
+ playground/fs-serve/root/safeModulePathPlugin.ts | 24 ++++++++++++++++++++
+ playground/fs-serve/root/src/index.html          | 13 +++++++++++
+ playground/fs-serve/root/vite.config-base.js     |  7 +++++-
+ playground/fs-serve/root/vite.config-deny.js     |  3 ++-
+ playground/fs-serve/root/vite.config.js          |  7 +++++-
+ 8 files changed, 92 insertions(+), 10 deletions(-)
+commit ba8b7ab43b4afa5d0292ab4b6e3a7b5033cc9c73
+Author: 翠
+Date: 2026-10-06 12:30:54 +0900
+
+    fix(server): check `fs.serve` for `?vite-wasm-instance` (#23655)
+
+
+ packages/vite/src/node/server/middlewares/transform.ts |  9 ++++++++-
+ playground/fs-serve/__tests__/commonTests.ts           | 13 +++++++++++++
+ playground/fs-serve/root/matrixTestResultPlugin.ts     |  2 ++
+ playground/fs-serve/root/src/index.html                | 10 ++++++++++
+ 4 files changed, 33 insertions(+), 1 deletion(-)
+commit 22fd1d5238cce2ee9db0eb4122f9e8feb6b06097
+Author: 翠
+Date: 2026-10-06 12:28:48 +0900
+
+    fix(deps): update launch-editor to v2.14.2 (#23654)
+
+
+ packages/vite/package.json |  2 +-
+ pnpm-lock.yaml             | 26 +++++++++++++-------------
+ pnpm-workspace.yaml        |  2 ++
+ 3 files changed, 16 insertions(+), 14 deletions(-)
+commit 7dafd8e56f152403a3230608fa4005273c2e9e17
+Author: 翠
+Date: 2026-10-06 12:23:55 +0900
+
+    fix(html): filename passed to transformIndexHtml should not include queries (#23653)
+
+
+ .../server/middlewares/__tests__/indexHtml.spec.ts | 22 +++++++++++++++++-
+ .../vite/src/node/server/middlewares/indexHtml.ts  | 16 ++++++++++---
+ playground/html/__tests__/html.spec.ts             | 26 ++++++++++++++++++++++
+ playground/html/protocol-relative.html             |  8 +++++++
+ 4 files changed, 68 insertions(+), 4 deletions(-)
+commit 10033218d239c927cdc375970b5741cce408e81b
+Author: github-actions[bot]
+Date: 2026-10-01 19:11:34 +0900
+
+    release: v8.3.2 (#23623)
+
+
+ packages/vite/CHANGELOG.md | 41 +++++++++++++++++++++++++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 42 insertions(+), 1 deletion(-)
+commit 24bd3316f3b2503d04a49361e365532bdb335e19
+Author: Ben Scott
+Date: 2026-10-01 02:34:12 -0700
+
+    fix(worker): align worker urls in client and server when using terser (#23614)
+
+
+ .../vite/src/node/__tests__/plugins/worker.spec.ts | 83 +++++++++++++---------
+ packages/vite/src/node/plugins/terser.ts           |  8 +--
+ 2 files changed, 53 insertions(+), 38 deletions(-)
+commit 94d0080345e23d63d4cd02df2f7fa2afae775c26
+Author: btea
+Date: 2026-10-01 16:56:54 +0800
+
+    perf: only register time middleware when debug logging is enabled (#23621)
+
+
+ packages/vite/src/node/server/index.ts            | 4 ++--
+ packages/vite/src/node/server/middlewares/time.ts | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+commit 89574f6d940a7273a53c5122a4477285801a696a
+Author: Shawn McKay
+Date: 2026-10-01 01:54:36 -0700
+
+    perf: avoid encoding intermediate source maps (#23461)
+
+
+ packages/vite/src/node/__tests__/utils.spec.ts     | 24 ++++++++++++++++++++++
+ .../vite/src/node/plugins/importAnalysisBuild.ts   |  6 +++---
+ packages/vite/src/node/ssr/ssrTransform.ts         | 24 ++++++++++++++--------
+ 3 files changed, 42 insertions(+), 12 deletions(-)
+commit 5a3a010eea4c9ebbdcc080819f93068d4e035bd4
+Author: Tiancheng Xu
+Date: 2026-10-01 13:51:38 +0800
+
+    fix(server): release previous environments after initialization (#23499)
+
+
+ packages/vite/src/node/__tests__/dev.spec.ts | 32 ++++++++++++++++++++++++++++
+ packages/vite/src/node/server/index.ts       |  4 ++++
+ 2 files changed, 36 insertions(+)
+commit 1929b4cc5f38ad53781e3b07b8bdaa32cf18da07
+Author: Aurora
+Date: 2026-10-01 06:15:24 +0200
+
+    docs: fix dead og-image PNG links in vite6/vite7 changelog entries (#23594)
+
+
+ packages/vite/CHANGELOG.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit ce0bfa8776cb5ec4fe7d54fd9d7fdd196fc19e0c
+Author: Jihwan
+Date: 2026-10-01 11:35:29 +0900
+
+    docs: fix Environment API framework example codes (#22570)
+
+
+ docs/guide/api-environment-frameworks.md | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+commit ede50985fbe0f5a20cf33f0cde30633f2923c85e
+Author: Rohan Santhosh Kumar
+Date: 2026-10-01 07:29:36 +0530
+
+    docs: fix grammer in environment API page (#21802)
+
+
+ docs/guide/api-environment.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit dd87d96df4322ff6b8d0bb00874358ec259f01ce
+Author: Remco Haszing
+Date: 2026-10-01 03:44:09 +0200
+
+    docs(troubleshooting): suggest `usePolling` for `EISDIR` error when watching files (#21578)
+
+
+ docs/guide/troubleshooting.md | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+commit 6894f5cbceac589536a0efb476d881a47f5ab1c5
+Author: kingmaker
+Date: 2026-10-01 04:08:39 +0300
+
+    fix(server): handle file watcher errors without crashing (#23503)
+
+
+ packages/vite/src/node/__tests__/dev.spec.ts | 36 ++++++++++++++++++++++++++++
+ packages/vite/src/node/server/index.ts       |  4 ++++
+ 2 files changed, 40 insertions(+)
+commit cf5c0288d526824aead1b24e977400f13c527927
+Author: Andreas Turku
+Date: 2026-09-30 08:59:16 +0200
+
+    perf(build): avoid quadratic link scan in the preload helper (#23510)
+
+
+ .../vite/src/node/plugins/importAnalysisBuild.ts   | 33 ++++++++++++++--------
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |  4 +--
+ playground/preload/__tests__/preload.spec.ts       | 14 +++++++++
+ playground/preload/src/about.js                    |  3 +-
+ playground/preload/vite.config.ts                  | 13 +++++----
+ 5 files changed, 47 insertions(+), 20 deletions(-)
+commit bba3bb8beedd185948956e02667d450672632d79
+Author: Abdellatif Anaflous
+Date: 2026-09-30 07:20:41 +0100
+
+    fix: merge `build.rolldownOptions.output.minify` correctly (#23536)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts | 54 ++++++++++++++++++++++++++
+ packages/vite/src/node/build.ts                | 35 ++++++++++-------
+ 2 files changed, 75 insertions(+), 14 deletions(-)
+commit 5e4b9ca3dcb24b51f58a765fd2d852614bbf3574
+Author: Charan Rathore
+Date: 2026-09-30 09:44:00 +0530
+
+    fix(optimize-deps): avoid "unsupported" warnings for browser:false mappings (#23590)
+
+
+ packages/vite/src/node/optimizer/rolldownDepPlugin.ts    | 11 ++++++++++-
+ playground/optimize-deps/__tests__/optimize-deps.spec.ts | 14 ++++++++++++++
+ playground/optimize-deps/dep-browser-false/index.js      |  4 ++++
+ playground/optimize-deps/dep-browser-false/package.json  |  9 +++++++++
+ playground/optimize-deps/index.html                      |  6 ++++++
+ playground/optimize-deps/package.json                    |  1 +
+ pnpm-lock.yaml                                           | 10 ++++++++++
+ 7 files changed, 54 insertions(+), 1 deletion(-)
+commit 64e0a215c24f0522b27b91f93cfd93e317b94481
+Author: Keshav Jha
+Date: 2026-09-30 08:20:44 +0530
+
+    fix(build): preload CSS correctly when `renderBuiltUrl` returns URLs with queries (#23611)
+
+
+ .../__tests__/plugins/importAnalysisBuild.spec.ts  | 16 +++++++++++
+ .../vite/src/node/plugins/importAnalysisBuild.ts   | 31 +++++++++++++---------
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |  4 +--
+ 3 files changed, 37 insertions(+), 14 deletions(-)
+commit 53f1ce7bfe38426861f6da572ef0e3359f6a80cd
+Author: Zhiqi Zhang
+Date: 2026-09-30 10:31:48 +0800
+
+    fix(html): resolve percent-encoded srcset urls (#23609)
+
+
+ packages/vite/src/node/plugins/html.ts     | 2 +-
+ playground/assets/__tests__/assets.spec.ts | 8 ++++++++
+ playground/assets/index.html               | 4 ++++
+ 3 files changed, 13 insertions(+), 1 deletion(-)
+commit 744269e5b2a155074910ddd275aecf2b83938496
+Author: 翠
+Date: 2026-09-29 19:19:13 +0900
+
+    fix: pass queries to `renderBuiltUrl` (#23586)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts | 36 ++++++++++++++--
+ packages/vite/src/node/plugins/asset.ts        | 58 +++++++++++++++++++-------
+ packages/vite/src/node/plugins/css.ts          |  7 +++-
+ packages/vite/src/node/plugins/html.ts         |  8 +++-
+ 4 files changed, 88 insertions(+), 21 deletions(-)
+commit a2bd6fa897c35c8a691671a7d70061c1cdd5c688
+Author: James Anderson
+Date: 2026-09-29 08:16:50 +0100
+
+    fix(optimizer): preserve excluded optional peer require fallbacks (#23600)
+
+
+ packages/vite/src/node/optimizer/index.ts           |  2 +-
+ .../vite/src/node/optimizer/rolldownDepPlugin.ts    | 21 ++++++++++++++++++++-
+ .../optimize-deps/__tests__/optimize-deps.spec.ts   | 14 ++++++++++++++
+ .../index.js                                        |  9 +++++++++
+ .../package.json                                    | 14 ++++++++++++++
+ playground/optimize-deps/index.html                 | 12 ++++++++++++
+ playground/optimize-deps/package.json               |  1 +
+ playground/optimize-deps/vite.config.js             |  1 +
+ pnpm-lock.yaml                                      | 15 +++++++++++++++
+ 9 files changed, 87 insertions(+), 2 deletions(-)
+commit eb7aa9a8816a1e926d5d9b4cbe7e796b61314ce2
+Author: peter
+Date: 2026-09-29 13:24:54 +0900
+
+    fix(bundled-dev): serve lazy chunk sourcemaps (#23026)
+
+
+ packages/vite/src/node/server/bundledDev.ts             |  9 +++++++++
+ .../__tests__/hmr-full-bundle-mode.spec.ts              | 17 +++++++++++++++++
+ 2 files changed, 26 insertions(+)
+commit 24339f4339d64fd8b5bc37654ac14ccff5aee584
+Author: renovate[bot]
+Date: 2026-09-29 11:25:34 +0900
+
+    chore(deps): update vitest monorepo to v5 (#23604)
+
+
+ package.json                                       |   2 +-
+ packages/vite/package.json                         |   2 +-
+ .../vite/src/node/__tests__/plugins/index.spec.ts  |  41 +++---
+ pnpm-lock.yaml                                     | 150 +++++++--------------
+ pnpm-workspace.yaml                                |   1 +
+ 5 files changed, 73 insertions(+), 123 deletions(-)
+commit ddd0ff1f9d3a8ba97500c7960838aa2708bddf9a
+Author: andrew
+Date: 2026-09-29 09:34:49 +0800
+
+    test(bundled-dev): enable fs-serve, resolve, dynamic-import and assets-sanitize cases (#23246)
+
+
+ .../__tests__/assets-sanitize.spec.ts              | 20 ++++--------
+ .../__tests__/dynamic-import.spec.ts               | 37 +++++++---------------
+ playground/dynamic-import/vite.config.js           | 36 ++++++++++++++-------
+ playground/fs-serve/__tests__/commonTests.ts       | 37 ++++++++++++++--------
+ .../fs-serve/__tests__/deny/fs-serve-deny.spec.ts  |  6 ++--
+ playground/fs-serve/__tests__/fs-serve.spec.ts     | 36 +++++++++++++--------
+ playground/resolve/__tests__/resolve.spec.ts       | 34 +++++++++++---------
+ vitest.config.e2e.ts                               |  3 --
+ 8 files changed, 113 insertions(+), 96 deletions(-)
+commit 634745dcc5648912bc32cb4de72ed8dd2230efa0
+Author: andrew
+Date: 2026-09-28 23:00:45 +0800
+
+    test(bundled-dev): accept a rolldown dev runtime with no helper imports (#23606)
+
+
+ .../vite/src/node/__tests__/plugins/clientInjections.spec.ts   | 10 +++++-----
+ .../__tests__/hmr-full-bundle-mode.spec.ts                     |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+commit afaf48b7327e09564048821b2e7eb772d59e7f80
+Author: andrew
+Date: 2026-09-28 15:51:58 +0800
+
+    test(bundled-dev): enable worker playground specs (#23289)
+
+
+ playground/worker/__tests__/es/worker-es.spec.ts   | 65 ++++++++++----------
+ .../worker/__tests__/iife/worker-iife.spec.ts      | 71 ++++++++++++----------
+ .../worker-relative-base-iife.spec.ts              |  4 +-
+ .../relative-base/worker-relative-base.spec.ts     |  6 +-
+ vitest.config.e2e.ts                               |  4 --
+ 5 files changed, 78 insertions(+), 72 deletions(-)
+commit e57f4da9c6fde10034106cb6a43b40dc4a38c211
+Author: 翠
+Date: 2026-09-28 12:00:08 +0900
+
+    test: replace native config loader incompatible code (#23605)
+
+
+ playground/ssr-resolve/{vite.config.js => vite.config.mjs} | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+commit 88c17415af221b3a13e778f4f2c0e907c8287baf
+Author: renovate[bot]
+Date: 2026-09-28 11:19:04 +0900
+
+    fix(deps): update rolldown-related dependencies (#23602)
+
+
+ package.json                                       |   2 +-
+ packages/vite/package.json                         |   2 +-
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |  16 +-
+ playground/js-sourcemap/package.json               |   2 +-
+ playground/package.json                            |   2 +-
+ pnpm-lock.yaml                                     | 322 ++++++++++-----------
+ vitest.config.e2e.ts                               |   1 +
+ 7 files changed, 178 insertions(+), 169 deletions(-)
+commit 9944fa6033873f13ae88f59e023ab642c50fee2b
+Author: renovate[bot]
+Date: 2026-09-28 10:29:24 +0900
+
+    fix(deps): update all non-major dependencies (#23601)
+
+
+ .github/workflows/semgrep.yml                      |   2 +-
+ package.json                                       |   6 +-
+ packages/create-vite/template-lit-ts/package.json  |   2 +-
+ packages/create-vite/template-lit/package.json     |   2 +-
+ .../create-vite/template-preact-ts/package.json    |   4 +-
+ packages/create-vite/template-preact/package.json  |   2 +-
+ packages/create-vite/template-qwik-ts/package.json |   6 +-
+ packages/create-vite/template-qwik/package.json    |   4 +-
+ .../create-vite/template-react-ts/package.json     |   4 +-
+ packages/create-vite/template-react/package.json   |   2 +-
+ .../create-vite/template-solid-ts/package.json     |   4 +-
+ packages/create-vite/template-solid/package.json   |   2 +-
+ .../create-vite/template-svelte-ts/package.json    |   6 +-
+ packages/create-vite/template-svelte/package.json  |   4 +-
+ .../create-vite/template-vanilla-ts/package.json   |   2 +-
+ packages/create-vite/template-vanilla/package.json |   2 +-
+ packages/create-vite/template-vue-ts/package.json  |   4 +-
+ packages/create-vite/template-vue/package.json     |   2 +-
+ packages/plugin-legacy/package.json                |   4 +-
+ packages/vite/package.json                         |   8 +-
+ playground/css-sourcemap/package.json              |   2 +-
+ playground/devtools/package.json                   |   6 +-
+ playground/fs-serve/package.json                   |   2 +-
+ playground/js-sourcemap/package.json               |   2 +-
+ playground/optimize-deps/package.json              |   2 +-
+ pnpm-lock.yaml                                     | 271 +++++++++++----------
+ 26 files changed, 187 insertions(+), 170 deletions(-)
+commit bc598a6a8a6b7d6e157e9f19c16911cff8d2360c
+Author: andrew
+Date: 2026-09-25 16:08:45 +0800
+
+    fix(bundled-dev): serve the rolldown runtime from the installed rolldown (#23568)
+
+
+ packages/vite/rolldown.config.ts                   |  3 +-
+ .../__tests__/plugins/clientInjections.spec.ts     | 18 ++++++++
+ packages/vite/src/node/constants.ts                |  2 +
+ packages/vite/src/node/plugins/clientInjections.ts | 51 +++++++++++++++++++++-
+ packages/vite/src/node/server/bundledDev.ts        | 44 +++++++++++--------
+ .../__tests__/hmr-full-bundle-mode.spec.ts         | 19 ++++++++
+ 6 files changed, 117 insertions(+), 20 deletions(-)
+commit 3d02335c5125d700a09138e2ef3001598c7fe306
+Author: btea
+Date: 2026-09-25 16:06:09 +0800
+
+    ci: remove unnecessary step (#23582)
+
+
+ .github/workflows/preview-release.yml | 5 -----
+ 1 file changed, 5 deletions(-)
+commit db915e5c0edbe1359dcf0cea340c9571dc7f4ad9
+Author: btea
+Date: 2026-09-25 16:05:20 +0800
+
+    refactor: use `tinyexec` instead of `cross-spawn` (#23583)
+
+
+ package.json                                 |   1 -
+ packages/vite/LICENSE.md                     | 115 +++++++--------------------
+ packages/vite/package.json                   |   2 +-
+ packages/vite/src/node/server/openBrowser.ts |  13 ++-
+ pnpm-lock.yaml                               |  16 +---
+ 5 files changed, 39 insertions(+), 108 deletions(-)
+commit bbc88129c967a8b8eedebd93acc82bee63b86b2a
+Author: Daniel Roe
+Date: 2026-09-25 09:01:10 +0100
+
+    fix(ssr): encode whitespace in module runner sourceURL (#23513)
+
+
+ .../src/module-runner/sourcemap/interceptor.ts     |  7 ++++---
+ .../fixtures/modules/with space/has-error.js       |  3 +++
+ .../src/node/ssr/__tests__/ssrStacktrace.spec.ts   | 18 ++++++++++++++++++
+ packages/vite/src/node/ssr/fetchModule.ts          |  8 ++++----
+ .../fixtures/with space/has-error-deep.ts          |  7 +++++++
+ .../runtime/__tests__/server-source-maps.spec.ts   | 15 +++++++++++++++
+ packages/vite/src/node/ssr/ssrStacktrace.ts        |  6 ++++--
+ packages/vite/src/shared/utils.ts                  | 22 ++++++++++++++++++++++
+ 8 files changed, 77 insertions(+), 9 deletions(-)
+commit 69283019441d93763f085806b374fc53eaea323b
+Author: 翠
+Date: 2026-09-25 13:10:18 +0900
+
+    ci: unpin Node 24 Windows CI (#23581)
+
+
+ .github/workflows/ci.yml | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+commit 972b73a6fcebfb879aef262e7c75d4eff17899b2
+Author: 翠
+Date: 2026-09-25 12:58:50 +0900
+
+    chore: use full version for actions comment (#23580)
+
+
+ .github/actions/issues-helper/action.yml    | 12 ++++++------
+ .github/workflows/bot.yml                   |  2 +-
+ .github/workflows/ci.yml                    | 14 +++++++-------
+ .github/workflows/copilot-setup-steps.yml   |  4 ++--
+ .github/workflows/ecosystem-ci-trigger.yml  | 14 +++++++-------
+ .github/workflows/prepare-release.yml       |  4 ++--
+ .github/workflows/preview-release.yml       |  4 ++--
+ .github/workflows/publish.yml               |  8 ++++----
+ .github/workflows/semantic-pull-request.yml |  2 +-
+ .github/workflows/semgrep.yml               |  2 +-
+ .github/workflows/zizmor.yml                |  2 +-
+ 11 files changed, 34 insertions(+), 34 deletions(-)
+commit 00cb9fd33a80c15db318e062e8bcca52497a725c
+Author: Bjorn Lu
+Date: 2026-09-25 11:46:00 +0800
+
+    ci: use pnpm/setup action (#23579)
+
+
+ .github/workflows/ci.yml                  | 40 ++++++++++---------------------
+ .github/workflows/copilot-setup-steps.yml | 14 ++++-------
+ .github/workflows/prepare-release.yml     | 13 +++-------
+ .github/workflows/preview-release.yml     | 16 ++++---------
+ .github/workflows/publish.yml             | 30 ++++++-----------------
+ 5 files changed, 32 insertions(+), 81 deletions(-)
+commit e64a5877dd3e552843a545749ccc257568917d28
+Author: Hiroshi Ogawa
+Date: 2026-09-25 11:25:41 +0900
+
+    fix: limit size of object and array printing via `forwardConsole` (#23565)
+
+
+ .../src/shared/__tests__/forwardConsole.spec.ts    |  39 ++++-
+ .../src/shared/__tests__/pretty-format.spec.ts     |  27 ++++
+ packages/vite/src/shared/forwardConsole.ts         |  59 +++-----
+ packages/vite/src/shared/pretty-format.ts          | 157 +++++++++++++++++++++
+ .../__test__/forward-console.spec.ts               |   2 +-
+ 5 files changed, 243 insertions(+), 41 deletions(-)
+commit 39ddf7ccf7e7469ff6a3ba37bca38c32ea804d6e
+Author: github-actions[bot]
+Date: 2026-09-24 21:21:04 +0900
+
+    release: v8.3.1 (#23573)
+
+
+ packages/vite/CHANGELOG.md | 25 +++++++++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 26 insertions(+), 1 deletion(-)
+commit 931ad65735d73e7a765baec59a69501109d50f61
+Author: 翠
+Date: 2026-09-24 21:17:41 +0900
+
+    docs: update viteconf link on the sidebar to 2026 and add banner (#23569)
+
+
+ docs/.vitepress/config.ts                          |  15 +-
+ docs/.vitepress/theme/components/AsideSponsors.vue |  10 +-
+ docs/.vitepress/theme/components/TopBanner.vue     | 186 ---------------------
+ 3 files changed, 6 insertions(+), 205 deletions(-)
+commit f68c0d5a28c96555431413e3e2cbe644337b087f
+Author: Vijay Misal
+Date: 2026-09-24 17:00:50 +0530
+
+    fix: handle `server.ws: false` in mergeConfig (#23511)
+
+
+ packages/vite/src/node/__tests__/config.spec.ts | 25 +++++++++++++++++++++++++
+ packages/vite/src/node/utils.ts                 |  9 ++++-----
+ 2 files changed, 29 insertions(+), 5 deletions(-)
+commit 6f831f9b58ebda77638b514042ad8d160edfb928
+Author: 翠
+Date: 2026-09-24 20:19:39 +0900
+
+    fix(server): avoid reinitializing watcher when adding file after server close (#23572)
+
+
+ .../vite/src/node/server/__tests__/watcher.spec.ts | 89 +++++++++++++++++++++-
+ packages/vite/src/node/server/index.ts             | 29 +++----
+ packages/vite/src/node/watch.ts                    | 23 ++++++
+ 3 files changed, 125 insertions(+), 16 deletions(-)
+commit e5d9af29a3571f388c4bc2a8d4c3387e46ff1da0
+Author: btea
+Date: 2026-09-24 19:00:05 +0800
+
+    refactor(create-vite): use `tinyexec` instead of `cross-spawn` (#23541)
+
+
+ packages/create-vite/LICENSE          | 105 ++++++++--------------------------
+ packages/create-vite/package.json     |   2 +-
+ packages/create-vite/src/index.ts     |  22 +++----
+ packages/create-vite/tsconfig.json    |   2 +-
+ packages/create-vite/tsdown.config.ts |   5 ++
+ pnpm-lock.yaml                        |   6 +-
+ 6 files changed, 46 insertions(+), 96 deletions(-)
+commit 04fc30a4b91870e65a436b3420620a2e02a94a41
+Author: Murugappan M
+Date: 2026-09-24 15:41:36 +0530
+
+    fix(sourcemap): skip URL source roots when injecting sources content (#23519)
+
+
+ .../src/node/server/__tests__/sourcemap.spec.ts    | 68 +++++++++++++++++++++-
+ packages/vite/src/node/server/sourcemap.ts         |  8 ++-
+ 2 files changed, 73 insertions(+), 3 deletions(-)
+commit 5f894339d27882fedc86bf6b1076fa6d92e404f3
+Author: 翠
+Date: 2026-09-24 18:04:05 +0900
+
+    fix(optimizer): resolve pending discovered dep processing on close before init (#23567)
+
+
+ .../optimizer/discoverBeforeListen.spec.ts         | 69 ++++++++++++++++++++++
+ packages/vite/src/node/optimizer/optimizer.ts      | 12 ++--
+ 2 files changed, 77 insertions(+), 4 deletions(-)
+commit 6e09961181a1047ef78d37b1a23fb0e7488c8980
+Author: andrew
+Date: 2026-09-24 16:54:44 +0800
+
+    test(bundled-dev): enable passing cases in more playgrounds (#23552)
+
+
+ .../runtime-base/assets-runtime-base.spec.ts       |  52 ++++++-----
+ .../__tests__/backend-integration.spec.ts          |  63 +++++++------
+ playground/csp/__tests__/csp.spec.ts               |  12 +--
+ playground/extensions/__tests__/extensions.spec.ts |   4 +-
+ .../__test__/forward-console.spec.ts               |  21 +++--
+ .../tailwind-v3/__test__/tailwind-v3.spec.ts       | 102 +++++++++++---------
+ playground/tailwind/__test__/tailwind.spec.ts      | 104 ++++++++++++---------
+ .../tsconfig-json/__tests__/tsconfig-json.spec.ts  |  33 +++----
+ vitest.config.e2e.ts                               |  10 --
+ 9 files changed, 219 insertions(+), 182 deletions(-)
+commit 63567c73ac132e6384fef384e6b9f7e8d5a37fff
+Author: 翠
+Date: 2026-09-24 17:17:31 +0900
+
+    chore(optimizer): add debug log when waiting for dep before init (#23566)
+
+
+ packages/vite/src/node/optimizer/index.ts       |  1 +
+ packages/vite/src/node/optimizer/optimizer.ts   | 19 ++++++++++---------
+ packages/vite/src/node/plugins/optimizedDeps.ts |  5 +++++
+ 3 files changed, 16 insertions(+), 9 deletions(-)
+commit e8990c4d6101dfaca2654ed8ab4d0574ee920248
+Author: renovate[bot]
+Date: 2026-09-24 17:05:03 +0900
+
+    fix(deps): update all non-major dependencies (#23537)
+
+
+ .github/workflows/semgrep.yml                      |    4 +-
+ docs/package.json                                  |    4 +-
+ package.json                                       |   14 +-
+ packages/create-vite/src/index.ts                  |    4 +-
+ .../create-vite/template-preact-ts/package.json    |    2 +-
+ packages/create-vite/template-qwik-ts/package.json |    2 +-
+ .../create-vite/template-react-ts/package.json     |    4 +-
+ packages/create-vite/template-react/package.json   |    2 +-
+ .../create-vite/template-solid-ts/package.json     |    2 +-
+ .../create-vite/template-svelte-ts/package.json    |    4 +-
+ packages/create-vite/template-svelte/package.json  |    2 +-
+ packages/create-vite/template-vue-ts/package.json  |    4 +-
+ packages/create-vite/template-vue/package.json     |    2 +-
+ packages/vite/package.json                         |   10 +-
+ playground/alias/package.json                      |    4 +-
+ playground/backend-integration/package.json        |    2 +-
+ playground/css-sourcemap/package.json              |    2 +-
+ playground/css/package.json                        |    2 +-
+ playground/devtools/package.json                   |    2 +-
+ playground/extensions/package.json                 |    2 +-
+ playground/external/dep-that-imports/package.json  |    2 +-
+ playground/external/dep-that-requires/package.json |    2 +-
+ playground/external/package.json                   |    2 +-
+ playground/json/package.json                       |    2 +-
+ playground/multiple-entrypoints/package.json       |    2 +-
+ playground/optimize-deps-no-discovery/package.json |    2 +-
+ playground/optimize-deps/package.json              |    2 +-
+ playground/resolve-tsconfig-paths/package.json     |    2 +-
+ playground/tailwind-v3/package.json                |    2 +-
+ playground/tailwind/package.json                   |    2 +-
+ pnpm-lock.yaml                                     | 1044 ++++++++++----------
+ 31 files changed, 569 insertions(+), 569 deletions(-)
+commit f155b62ceabbaaf71abbf59933968787e3961c56
+Author: Ciarán Curley
+Date: 2026-09-23 07:52:57 +0100
+
+    fix(create-vite): add router only options for tanstack router/start (#23543)
+
+
+ packages/create-vite/src/index.ts | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
+commit af7cdf6964f124f58d66037e808fe687654948e2
+Author: btea
+Date: 2026-09-23 14:51:13 +0800
+
+    refactor: replace `find` with `some` (#23554)
+
+
+ packages/vite/src/node/plugins/preAlias.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 1544bb1b7ac92f775e9d0dea97954c99cc6cbd43
+Author: Rusty Raven
+Date: 2026-09-22 13:33:59 +0800
+
+    docs(config): correct the server.sourcemapIgnoreList default (#23462)
+
+
+ docs/config/server-options.md | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+commit 39330f489a0ae08923557f0ce10a307d6662a3f5
+Author: btea
+Date: 2026-09-22 13:31:11 +0800
+
+    fix(optimizer): don't skip imports whose binding starts with type (#23540)
+
+
+ packages/vite/src/node/__tests__/scan.spec.ts | 46 +++++++++++++++++----------
+ packages/vite/src/node/optimizer/scan.ts      |  2 +-
+ 2 files changed, 30 insertions(+), 18 deletions(-)
+commit bd97903e326c4caf022405f7c1d5f3eb624a931f
+Author: Parafee41
+Date: 2026-09-22 11:10:34 +0800
+
+    docs(config): document preserveEntrySignatures defaults (#23469)
+
+
+ docs/config/build-options.md | 2 ++
+ 1 file changed, 2 insertions(+)
+commit 15569ce343b51936cfa8fb6bbf948a57ba1ff4ad
+Author: Ghayth Ben Abid
+Date: 2026-09-22 03:55:57 +0100
+
+    docs: fix typo builtin -> built-in in plugins guide (#23525)
+
+
+ docs/plugins/index.md | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+commit 9abd99bfdd3117149d6faf87fc37bc9899b1c998
+Author: btea
+Date: 2026-09-21 20:15:51 +0800
+
+    refactor: remove duplicate configurations (#23532)
+
+
+ packages/vite/src/node/build.ts | 2 --
+ 1 file changed, 2 deletions(-)
+commit e9078f865cdff6bed77cd729214a7e2868f126b5
+Author: CSY54
+Date: 2026-09-18 23:21:04 +0800
+
+    docs: size the version check input to its content (#23505)
+
+
+ docs/.vitepress/theme/components/SupportedVersions.vue | 7 +++++++
+ 1 file changed, 7 insertions(+)
+commit 3c752c8932bc0599465ba4a6d8f44aaf1e934c3d
+Author: renovate[bot]
+Date: 2026-09-18 12:32:31 +0900
+
+    fix(deps): update all non-major dependencies (#23482)
+
+
+ .github/workflows/semgrep.yml                      |    4 +-
+ .github/workflows/zizmor.yml                       |    2 +-
+ docs/package.json                                  |    4 +-
+ package.json                                       |   10 +-
+ packages/create-vite/package.json                  |    2 +-
+ packages/create-vite/src/index.ts                  |    6 +-
+ .../create-vite/template-preact-ts/package.json    |    2 +-
+ packages/create-vite/template-qwik-ts/package.json |    2 +-
+ .../create-vite/template-react-ts/package.json     |   12 +-
+ packages/create-vite/template-react/package.json   |   10 +-
+ .../create-vite/template-solid-ts/package.json     |    2 +-
+ .../create-vite/template-svelte-ts/package.json    |    2 +-
+ packages/create-vite/template-vue-ts/package.json  |    4 +-
+ packages/create-vite/template-vue/package.json     |    2 +-
+ packages/plugin-legacy/package.json                |    4 +-
+ packages/vite/package.json                         |   10 +-
+ playground/backend-integration/package.json        |    2 +-
+ playground/css-sourcemap/package.json              |    4 +-
+ playground/css/package.json                        |    2 +-
+ playground/devtools/package.json                   |    6 +-
+ playground/environment-react-ssr/package.json      |   12 +-
+ playground/js-sourcemap/package.json               |    2 +-
+ playground/multiple-entrypoints/package.json       |    2 +-
+ .../optimize-deps/dep-linked-include/package.json  |    2 +-
+ playground/optimize-deps/package.json              |    6 +-
+ playground/resolve-tsconfig-paths/package.json     |    2 +-
+ playground/ssr-deps/package.json                   |    2 +-
+ playground/ssr-webworker/package.json              |    2 +-
+ playground/tailwind-v3/package.json                |    2 +-
+ pnpm-lock.yaml                                     | 1506 ++++++++++++--------
+ 30 files changed, 952 insertions(+), 678 deletions(-)
+commit f4b4431a2f9097fd9bbb7aaebbf1b63c4b54dea1
+Author: btea
+Date: 2026-09-18 10:49:47 +0800
+
+    refactor: assets regexp use non-capture (#23491)
+
+
+ packages/vite/src/node/constants.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 6a84c72100da4e4be4badb2d9a0026279b4df136
+Author: btea
+Date: 2026-09-18 10:49:09 +0800
+
+    chore: update `optimizeDeps.include` comment (#23489)
+
+
+ packages/vite/src/node/optimizer/index.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit 9aecbbfa5fb5da4b9981c099cb9746a9fd210806
+Author: renovate[bot]
+Date: 2026-09-18 11:47:05 +0900
+
+    fix(deps): update rolldown-related dependencies (#23483)
+
+
+ package.json                         |   2 +-
+ packages/create-vite/package.json    |   2 +-
+ packages/plugin-legacy/package.json  |   2 +-
+ packages/vite/package.json           |   4 +-
+ packages/vite/scripts/shims.d.ts     |   4 -
+ playground/js-sourcemap/package.json |   2 +-
+ playground/package.json              |   2 +-
+ pnpm-lock.yaml                       | 951 ++++++++++++-----------------------
+ pnpm-workspace.yaml                  |   9 +
+ 9 files changed, 346 insertions(+), 632 deletions(-)
+commit 4aba8d8720e82e4c5b694a4b7877755a3f84fc57
+Author: 翠
+Date: 2026-09-18 11:33:51 +0900
+
+    fix: merge `build.rolldownOptions.output.comments` correctly (#23514)
+
+
+ packages/vite/src/node/build.ts | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
+commit bd3a3a96552a900f31c56b0d8be229dcd20618f4
+Author: btea
+Date: 2026-09-15 09:31:29 +0800
+
+    chore: enable `trustPolicyExcludePrune` (#23476)
+
+
+ package.json        |   2 +-
+ pnpm-lock.yaml      | 131 +++++++++++++++++++++++++++++++++++++---------------
+ pnpm-workspace.yaml |   6 +--
+ 3 files changed, 97 insertions(+), 42 deletions(-)
+commit 99bd9d1d46153fa939f4a304cc0177db42e28776
+Author: 翠
+Date: 2026-09-10 20:49:32 +0900
+
+    chore: merge prereleases in changelog (#23466)
+
+
+ packages/plugin-legacy/CHANGELOG.md |   9 ++-
+ packages/vite/CHANGELOG.md          | 144 +++++++++++++++++-------------------
+ 2 files changed, 73 insertions(+), 80 deletions(-)
+commit 1aec41b32510681131c6fa6978ddc227fa6f3aa8
+Author: github-actions[bot]
+Date: 2026-09-10 20:37:00 +0900
+
+    release: create-vite@9.2.1 (#23465)
+
+
+ packages/create-vite/CHANGELOG.md                     | 6 ++++++
+ packages/create-vite/package.json                     | 2 +-
+ packages/create-vite/template-lit-ts/package.json     | 2 +-
+ packages/create-vite/template-lit/package.json        | 2 +-
+ packages/create-vite/template-preact-ts/package.json  | 2 +-
+ packages/create-vite/template-preact/package.json     | 2 +-
+ packages/create-vite/template-qwik-ts/package.json    | 2 +-
+ packages/create-vite/template-qwik/package.json       | 2 +-
+ packages/create-vite/template-react-ts/package.json   | 2 +-
+ packages/create-vite/template-react/package.json      | 2 +-
+ packages/create-vite/template-solid-ts/package.json   | 2 +-
+ packages/create-vite/template-solid/package.json      | 2 +-
+ packages/create-vite/template-svelte-ts/package.json  | 2 +-
+ packages/create-vite/template-svelte/package.json     | 2 +-
+ packages/create-vite/template-vanilla-ts/package.json | 2 +-
+ packages/create-vite/template-vanilla/package.json    | 2 +-
+ packages/create-vite/template-vue-ts/package.json     | 2 +-
+ packages/create-vite/template-vue/package.json        | 2 +-
+ 18 files changed, 23 insertions(+), 17 deletions(-)
+commit 434e8e9495436a60789f2b588a04a6a24a3d1661
+Author: github-actions[bot]
+Date: 2026-09-10 20:20:41 +0900
+
+    release: v8.3.0 (#23464)
+
+
+ packages/vite/CHANGELOG.md | 14 ++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+commit 9913672bee9c34a2df7fff4c2538783cd4f43b4e
+Author: nyxst4ck
+Date: 2026-09-10 00:01:44 -0300
+
+    fix: handle CRLF line endings in code frame positions (#23219)
+
+
+ .../__tests__/__snapshots__/utils.spec.ts.snap     | 13 ++++++++++++
+ packages/vite/src/node/__tests__/utils.spec.ts     | 23 ++++++++++++++++++++++
+ packages/vite/src/node/utils.ts                    | 15 +++++++++++---
+ 3 files changed, 48 insertions(+), 3 deletions(-)
+commit c8f7b280a2669733b84231c128c4926822b131d7
+Author: 徐天成
+Date: 2026-09-09 22:58:27 -0400
+
+    docs(ssr): explain server-only module reloads (fix #19114) (#23235)
+
+
+ docs/guide/ssr.md | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+commit 8abf700eeb2411d8402d08f8e2696effafdbe774
+Author: btea
+Date: 2026-09-10 10:52:45 +0800
+
+    perf(proxy): pre-compile context matchers at server creation (#23263)
+
+
+ packages/vite/src/node/server/middlewares/proxy.ts | 39 ++++++++++++++--------
+ 1 file changed, 26 insertions(+), 13 deletions(-)
+commit ef0dc17ada53d1169ae5a89cb8f6482831466755
+Author: Rusty Raven
+Date: 2026-09-10 10:50:00 +0800
+
+    fix: only treat whole `node_modules` path segments as dependencies (fix #17467) (#23437)
+
+
+ packages/vite/src/node/__tests__/utils.spec.ts | 24 ++++++++++++++++++++++++
+ packages/vite/src/node/utils.ts                |  4 +++-
+ 2 files changed, 27 insertions(+), 1 deletion(-)
+commit 42a4ea7cd01dee615891c2e5675456d4b8a2550c
+Author: btea
+Date: 2026-09-10 10:19:08 +0800
+
+    chore: avoid recompiling regex in mergeChangelog script (#23456)
+
+
+ scripts/mergeChangelog.ts | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+commit e6f6b3e3119256daa837b2dc399058c8aa45b470
+Author: StirStudios // Glyn
+Date: 2026-09-07 22:09:35 -0700
+
+    feat(build): avoid settling seen preload dependencies for performance (#23446)
+
+
+ .../vite/src/node/plugins/importAnalysisBuild.ts   | 77 +++++++++++-----------
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |  4 +-
+ 2 files changed, 42 insertions(+), 39 deletions(-)
+commit 5bce8ca0f19bfdd5206c98bfabc1f8453deb32c7
+Author: github-actions[bot]
+Date: 2026-09-07 20:27:08 +0900
+
+    release: v8.3.0-beta.1 (#23449)
+
+
+ packages/vite/CHANGELOG.md | 19 +++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+commit fc7c104e74d35a97fa313d5dd6f1b5e7d5b26159
+Author: renovate[bot]
+Date: 2026-09-07 20:15:52 +0900
+
+    fix(deps): update all non-major dependencies (#23445)
+
+
+ .github/workflows/ci.yml                           |    4 +-
+ .github/workflows/copilot-setup-steps.yml          |    2 +-
+ .github/workflows/prepare-release.yml              |    2 +-
+ .github/workflows/preview-release.yml              |    2 +-
+ .github/workflows/publish.yml                      |    4 +-
+ .github/workflows/semgrep.yml                      |    2 +-
+ docs/package.json                                  |    2 +-
+ package.json                                       |   14 +-
+ packages/create-vite/src/index.ts                  |    8 +-
+ .../create-vite/template-react-ts/package.json     |    4 +-
+ packages/create-vite/template-react/package.json   |    4 +-
+ packages/plugin-legacy/package.json                |    2 +-
+ packages/vite/package.json                         |    8 +-
+ playground/backend-integration/package.json        |    2 +-
+ playground/css-sourcemap/package.json              |    4 +-
+ playground/css/package.json                        |    4 +-
+ playground/environment-react-ssr/package.json      |    2 +-
+ playground/multiple-entrypoints/package.json       |    2 +-
+ playground/resolve-tsconfig-paths/package.json     |    4 +-
+ playground/tailwind-v3/package.json                |    2 +-
+ pnpm-lock.yaml                                     | 1214 +++++++++++---------
+ 21 files changed, 698 insertions(+), 594 deletions(-)
+commit b919a1a8b5a7c694667f993d677973f42d349458
+Author: 翠
+Date: 2026-09-07 19:22:19 +0900
+
+    chore: remove unnecessary comment (#23448)
+
+
+ packages/vite/types/customEvent.d.ts | 10 ++--------
+ packages/vite/types/hmrPayload.d.ts  | 10 ++--------
+ 2 files changed, 4 insertions(+), 16 deletions(-)
+commit 4ec58d159df4a1b4799356a1fda62db88ed14752
+Author: btea
+Date: 2026-09-07 15:15:35 +0800
+
+    fix: shortcuts extend error (#23447)
+
+
+ packages/vite/src/node/shortcuts.ts | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+commit 68aeb8a3b5a5a2ccd505288999bae1a5e6942ee1
+Author: Arlo
+Date: 2026-09-07 13:29:05 +0800
+
+    feat(devtools): enable dev server integration (#23333)
+
+
+ docs/config/shared-options.md                     |  18 +-
+ packages/vite/package.json                        |   4 +-
+ packages/vite/rolldown.config.ts                  |   1 -
+ packages/vite/src/node/__tests__/config.spec.ts   | 196 ++++++++++++-
+ packages/vite/src/node/build.ts                   |   2 +-
+ packages/vite/src/node/config.ts                  | 120 +++++---
+ packages/vite/src/node/index.ts                   |   1 +
+ packages/vite/src/node/plugins/index.ts           |  23 --
+ packages/vite/types/internal/devtoolsOptions.d.ts |   9 +
+ playground/devtools/package.json                  |   4 +-
+ playground/devtools/vite.config.ts                |   3 +-
+ pnpm-lock.yaml                                    | 337 +++++++++++++++-------
+ pnpm-workspace.yaml                               |   2 +
+ 13 files changed, 552 insertions(+), 168 deletions(-)
+commit f79413353995a2344879014410a9128b1b9f8e9a
+Author: btea
+Date: 2026-09-07 13:10:23 +0800
+
+    chore: introducing `@e18e/eslint-plugin` (#23357)
+
+
+ eslint.config.js                                   |  8 +++++++
+ package.json                                       |  1 +
+ packages/vite/rolldown.config.ts                   |  7 +++---
+ packages/vite/rolldown.dts.config.ts               |  2 +-
+ packages/vite/rollupLicensePlugin.ts               |  2 +-
+ packages/vite/src/client/bundledDevHmrClient.ts    |  4 ++--
+ packages/vite/src/module-runner/runner.ts          |  2 +-
+ packages/vite/src/module-runner/utils.ts           |  2 +-
+ packages/vite/src/node/cli.ts                      |  2 +-
+ .../vite/src/node/plugins/importAnalysisBuild.ts   |  8 +++----
+ packages/vite/src/node/plugins/importMetaGlob.ts   |  2 +-
+ packages/vite/src/node/plugins/resolve.ts          |  2 +-
+ packages/vite/src/node/server/bundledDev.ts        |  2 +-
+ .../server/environments/runnableEnvironment.ts     |  9 ++------
+ packages/vite/src/node/server/hmr.ts               |  6 ++---
+ .../vite/src/node/server/middlewares/indexHtml.ts  |  6 ++---
+ .../vite/src/node/server/middlewares/static.ts     |  2 +-
+ packages/vite/src/node/server/pluginContainer.ts   |  2 +-
+ packages/vite/src/node/server/ws.ts                |  2 +-
+ packages/vite/src/node/shortcuts.ts                |  9 ++++----
+ packages/vite/src/node/ssr/fetchModule.ts          |  5 ++--
+ packages/vite/src/node/utils.ts                    |  6 ++---
+ packages/vite/src/shared/ssrTransform.ts           |  2 +-
+ packages/vite/src/shared/utils.ts                  |  2 +-
+ playground/css/lightningcss-plugins.js             |  3 +--
+ .../dep-cjs-with-external-deps/index.js            |  3 +--
+ playground/ssr/src/circular-dep-init/module-b.js   |  2 +-
+ playground/test-utils.ts                           |  2 +-
+ pnpm-lock.yaml                                     | 27 ++++++++++++++++++++++
+ 29 files changed, 81 insertions(+), 51 deletions(-)
+commit d6b19ab8590c5b5960cf7afd6f8a52d841d564ad
+Author: btea
+Date: 2026-09-07 13:01:10 +0800
+
+    chore: fix ts-check comment ordering (#23386)
+
+
+ eslint.config.js | 1 +
+ 1 file changed, 1 insertion(+)
+commit ac6526ff408ae7452f0e4cbd7a881f62a27d35af
+Author: renovate[bot]
+Date: 2026-09-07 13:50:08 +0900
+
+    chore(deps): update actions/deploy-pages digest to 368f825 (#23444)
+
+
+ docs/guide/static-deploy-github-pages.yaml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 8492422b8f110625a90c702f42f30784e8cf19dc
+Author: btea
+Date: 2026-09-04 18:13:10 +0800
+
+    fix: resolve the actual package root in findNearestMainPackageData for nested package.json (#23356)
+
+
+ packages/vite/src/node/__tests__/packages.spec.ts  | 112 +++++++++++++++++++++
+ .../plugins/__snapshots__/license.spec.ts.snap     |  12 +++
+ .../build/devtools/index.js                        |   4 +
+ .../build/devtools/package.json                    |   6 ++
+ .../dep-license-type-marker/build/esm/index.js     |   5 +
+ .../dep-license-type-marker/build/esm/package.json |   4 +
+ .../license/dep-license-type-marker/license        |   3 +
+ .../license/dep-license-type-marker/package.json   |   9 ++
+ .../__tests__/plugins/fixtures/license/index.html  |   3 +-
+ .../plugins/fixtures/license/package.json          |   1 +
+ packages/vite/src/node/packages.ts                 |  38 +++++--
+ pnpm-lock.yaml                                     |  14 +++
+ 12 files changed, 201 insertions(+), 10 deletions(-)
+commit 12e709ca4df1059747db1cb7c5d1cd71aba79a24
+Author: Rusty Raven
+Date: 2026-09-04 18:12:06 +0800
+
+    fix(html): don't inline preload link targets (fix #13355) (#23387)
+
+
+ packages/vite/src/node/plugins/html.ts     |  32 +++++++++++++++++++----------
+ playground/assets/__tests__/assets.spec.ts |  30 +++++++++++++++++++++++++++
+ playground/assets/index.html               |  18 ++++++++++++++++
+ playground/assets/nested/preload-asset.png | Bin 0 -> 3395 bytes
+ playground/assets/preload-module.js        |   2 ++
+ 5 files changed, 71 insertions(+), 11 deletions(-)
+commit 3b8c45b0a07a29917b40d325912fbc55677b014b
+Author: btea
+Date: 2026-09-04 17:53:37 +0800
+
+    chore: enable `minimumReleaseAgeStrict` (#23424)
+
+
+ pnpm-workspace.yaml | 1 +
+ 1 file changed, 1 insertion(+)
+commit e8d6a4d3399c739772080d70c7f3c4d548a637c9
+Author: 翠
+Date: 2026-09-04 12:30:05 +0900
+
+    fix(build): keep hash placeholders as-is in `resolveFileUrl` hook (#23422)
+
+
+ packages/vite/src/node/plugins/asset.ts              |  9 ++++++++-
+ playground/assets/__tests__/assets.spec.ts           | 14 ++++++++++++++
+ .../encoded-base/assets-encoded-base.spec.ts         |  6 ++++++
+ .../relative-base/assets-relative-base.spec.ts       |  6 ++++++
+ .../runtime-base/assets-runtime-base.spec.ts         |  6 ++++++
+ .../__tests__/url-base/assets-url-base.spec.ts       |  6 ++++++
+ playground/assets/asset/emitted-worker.js            |  1 +
+ playground/assets/asset/main.js                      | 10 ++++++++++
+ playground/assets/index.html                         |  4 ++++
+ playground/assets/vite.config-runtime-base.js        |  1 +
+ playground/assets/vite.config.js                     | 20 ++++++++++++++++++++
+ 11 files changed, 82 insertions(+), 1 deletion(-)
+commit 07d65709f3802c4196ac7074b5b723c1dabf2e34
+Author: Bjorn Lu
+Date: 2026-09-03 22:31:09 +0800
+
+    docs(api-javascript): remove example file name (#23423)
+
+
+ docs/guide/api-javascript.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit a6d43bc9e3464faa4d49f090e75e1ab334ffb7b0
+Author: andrew
+Date: 2026-09-03 16:03:27 +0800
+
+    fix(bundled-dev): mark payload delivered on client report (#23373)
+
+
+ packages/vite/src/client/bundledDevClient.ts       |   8 ++
+ packages/vite/src/node/server/bundledDev.ts        |  30 +++++-
+ .../src/node/server/middlewares/memoryFiles.ts     |   1 -
+ .../node/server/middlewares/triggerLazyBundling.ts |   1 -
+ .../__tests__/lazy-compilation.spec.ts             | 114 +++++++++++++++++++++
+ playground/lazy-compilation/index.html             |  18 ++++
+ playground/lazy-compilation/main.js                |  21 ++++
+ playground/lazy-compilation/package.json           |  12 +++
+ playground/lazy-compilation/page-a.js              |   3 +
+ playground/lazy-compilation/page-b.js              |   3 +
+ playground/lazy-compilation/page-c.js              |   3 +
+ playground/lazy-compilation/shared.js              |   1 +
+ playground/lazy-compilation/vite.config.ts         |   9 ++
+ pnpm-lock.yaml                                     |   2 +
+ 14 files changed, 219 insertions(+), 7 deletions(-)
+commit 1c46db555d2927fc62686341911b03f6d365a36a
+Author: github-actions[bot]
+Date: 2026-09-02 17:38:39 +0900
+
+    release: v8.3.0-beta.0 (#23416)
+
+
+ packages/vite/CHANGELOG.md | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 46 insertions(+), 1 deletion(-)
+commit b120589f052fe8e0d5ea75bade1a0278c0bdfa7f
+Author: btea
+Date: 2026-09-02 11:35:38 +0800
+
+    chore: update debugging playwright tests section in contributing.md (#23412)
+
+
+ CONTRIBUTING.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit db45bb113d4c9ad894f5238c0d1343a4277d957f
+Author: btea
+Date: 2026-09-02 11:32:25 +0800
+
+    chore: enable `minimumReleaseAgeExcludePrune` (#23411)
+
+
+ pnpm-workspace.yaml | 1 +
+ 1 file changed, 1 insertion(+)
+commit 93164c3530a7b4fc7bbedfb986d6afa9546cdef3
+Author: 翠
+Date: 2026-09-02 12:03:54 +0900
+
+    feat: add top-level `tsconfig` option (#23310)
+
+
+ docs/config/shared-options.md                      | 14 +++++++++
+ docs/guide/features.md                             |  2 +-
+ packages/vite/src/node/__tests__/build.spec.ts     | 24 ++++++++++++++-
+ packages/vite/src/node/__tests__/config.spec.ts    | 25 ++++++++++++++++
+ .../vite/src/node/__tests__/plugins/oxc.spec.ts    | 34 ++++++++++++++++++++++
+ packages/vite/src/node/build.ts                    |  7 +++++
+ packages/vite/src/node/config.ts                   |  8 +++++
+ packages/vite/src/node/plugins/esbuild.ts          |  2 +-
+ packages/vite/src/node/plugins/oxc.ts              |  5 +++-
+ packages/vite/src/node/plugins/resolve.ts          |  1 +
+ 10 files changed, 118 insertions(+), 4 deletions(-)
+commit f40efefbb3630cdb7235286bc2b51673d9fbfc27
+Author: Ulrich Stark
+Date: 2026-09-01 10:39:44 +0200
+
+    refactor: delete unused `esbuildPlugin` (#23381)
+
+
+ packages/vite/src/node/plugins/esbuild.ts | 63 -------------------------------
+ 1 file changed, 63 deletions(-)
+commit 33d0e986f23ae4d923436511817a489a65d122da
+Author: 翠
+Date: 2026-09-01 17:38:41 +0900
+
+    ci: make backport releases possible (#23394)
+
+
+ .github/workflows/prepare-release.yml | 19 +++++++++++++++++--
+ .github/workflows/publish.yml         |  1 +
+ CONTRIBUTING.md                       | 11 ++++++-----
+ 3 files changed, 24 insertions(+), 7 deletions(-)
+commit 5a38afe1a0eb23c22cb814202c7930bf5d9b1457
+Author: 翠
+Date: 2026-09-01 17:18:14 +0900
+
+    chore(deps): update pnpm to v12 (#23410)
+
+
+ package.json        |   2 +-
+ pnpm-lock.yaml      | 144 +++++++++++++++++++++++++++++++++++++++++++++-------
+ pnpm-workspace.yaml |   4 +-
+ 3 files changed, 128 insertions(+), 22 deletions(-)
+commit b50e1b4a3d66128a4076e19769b2e29657985516
+Author: Ngo Quoc Viet
+Date: 2026-09-01 12:10:09 +0700
+
+    fix(utils): handle dot in srcset density descriptor (#23346)
+
+
+ packages/vite/src/node/__tests__/utils.spec.ts | 20 ++++++++++++++++++++
+ packages/vite/src/node/utils.ts                |  2 +-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+commit fdef04f112aadfea40ad3c448d96a49a04c168bd
+Author: 翠
+Date: 2026-09-01 13:55:00 +0900
+
+    feat: add warning for unsupported hooks in plugin returned from `applyToEnvironment` hook (#23191)
+
+
+ docs/guide/api-environment-plugins.md           |  2 ++
+ packages/vite/src/node/__tests__/config.spec.ts | 37 +++++++++++++++++++++++++
+ packages/vite/src/node/plugin.ts                | 26 +++++++++++++----
+ 3 files changed, 60 insertions(+), 5 deletions(-)
+commit 472385e6ec4b21e3167c7abf9769883d1c9675f8
+Author: btea
+Date: 2026-09-01 11:48:39 +0800
+
+    feat(config): warn on named imports from JSON modules (#23378)
+
+
+ .gitignore                                         |  2 +
+ packages/vite/src/node/__tests__/config.spec.ts    | 26 +++++++
+ .../node_modules/some-pkg/package.json             |  4 ++
+ .../json-named-import-bare/vite.config.js          |  3 +
+ .../native-compat/json-named-import-ok/data.json   |  1 +
+ .../node_modules/some-pkg/package.json             |  4 ++
+ .../json-named-import-ok/vite.config.js            |  8 +++
+ .../native-compat/json-named-import/data.json      |  1 +
+ .../native-compat/json-named-import/vite.config.js |  3 +
+ packages/vite/src/node/nativeConfigCompat.ts       | 80 +++++++++++++++++++---
+ 10 files changed, 124 insertions(+), 8 deletions(-)
+commit 238ad811c7fb9e4730cbd317d0657867ed3447b3
+Author: renovate[bot]
+Date: 2026-08-31 13:26:22 +0900
+
+    fix(deps): update all non-major dependencies (#23404)
+
+
+ .github/workflows/bot.yml                          |   2 +-
+ .github/workflows/prepare-release.yml              |   2 +-
+ .github/workflows/semgrep.yml                      |   4 +-
+ .github/workflows/zizmor.yml                       |   2 +-
+ docs/package.json                                  |   2 +-
+ package.json                                       |  12 +-
+ packages/create-vite/src/index.ts                  |   6 +-
+ .../create-vite/template-react-ts/package.json     |   6 +-
+ packages/create-vite/template-react/package.json   |   6 +-
+ .../create-vite/template-svelte-ts/package.json    |   2 +-
+ packages/create-vite/template-svelte/package.json  |   2 +-
+ packages/create-vite/template-vue-ts/package.json  |   2 +-
+ packages/create-vite/template-vue/package.json     |   2 +-
+ packages/plugin-legacy/package.json                |   2 +-
+ packages/vite/package.json                         |   8 +-
+ playground/alias/package.json                      |   4 +-
+ playground/css-sourcemap/package.json              |   2 +-
+ playground/devtools/package.json                   |   2 +-
+ playground/environment-react-ssr/package.json      |   2 +-
+ playground/extensions/package.json                 |   2 +-
+ playground/external/dep-that-imports/package.json  |   2 +-
+ playground/external/dep-that-requires/package.json |   2 +-
+ playground/external/package.json                   |   2 +-
+ playground/js-sourcemap/package.json               |   2 +-
+ playground/json/package.json                       |   2 +-
+ playground/legacy/package.json                     |   2 +-
+ playground/optimize-deps-no-discovery/package.json |   2 +-
+ playground/optimize-deps/package.json              |   4 +-
+ playground/preload/package.json                    |   2 +-
+ playground/tailwind-v3/package.json                |   2 +-
+ playground/tailwind/package.json                   |   2 +-
+ pnpm-lock.yaml                                     | 936 ++++++++++-----------
+ 32 files changed, 516 insertions(+), 516 deletions(-)
+commit b88256607e3a051b7bcb0b338b3c4665926b55a8
+Author: renovate[bot]
+Date: 2026-08-31 12:39:44 +0900
+
+    fix(deps): update rolldown-related dependencies (#23405)
+
+
+ package.json                         |   2 +-
+ packages/vite/package.json           |   4 +-
+ packages/vite/scripts/shims.d.ts     |   4 +
+ playground/js-sourcemap/package.json |   2 +-
+ playground/package.json              |   2 +-
+ pnpm-lock.yaml                       | 611 +++++++++++++++++++++++++----------
+ 6 files changed, 447 insertions(+), 178 deletions(-)
+commit e2b597de0ef14598901703f5aa52f8c962007d02
+Author: 多格
+Date: 2026-08-29 18:52:23 +0800
+
+    docs(config): fix wording and terminology (#23397)
+
+
+ docs/config/build-options.md | 4 ++--
+ docs/config/index.md         | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+commit ee644014aab61e546742b862a7d7b0d6c7d67a7b
+Author: Ulrich Stark
+Date: 2026-08-27 04:19:58 +0200
+
+    chore: delete unused `PluginContainerOptions` (#23382)
+
+
+ packages/vite/src/node/server/pluginContainer.ts | 8 --------
+ 1 file changed, 8 deletions(-)
+commit 493cc7d43269860fe499a30980d729b0adc93d2c
+Author: btea
+Date: 2026-08-26 16:13:26 +0800
+
+    chore: remove useless files (#23372)
+
+
+ docs/.vitepress/inlined-scripts/banner.d.ts        |   3 -
+ docs/.vitepress/inlined-scripts/banner.js          |  11 -
+ docs/.vitepress/theme/components/SponsorBanner.vue | 640 ---------------------
+ 3 files changed, 654 deletions(-)
+commit 90d08f0c068a024aa5051a40b1130fb9a46849e5
+Author: Bjorn Lu
+Date: 2026-08-26 16:11:41 +0800
+
+    docs: remove outdated locale links (#23368)
+
+
+ docs/.vitepress/config.ts | 2 --
+ 1 file changed, 2 deletions(-)
+commit bfdb22754f792e8f7e40b125659d79ab590d8a7b
+Author: btea
+Date: 2026-08-26 16:06:27 +0800
+
+    docs: update development tools list (#23363)
+
+
+ docs/_data/acknowledgements.data.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit cd810de10e32c670f0af5036b1ca6aca6c91cbd6
+Author: Bjorn Lu
+Date: 2026-08-26 15:10:40 +0800
+
+    revert: narrow semantic-pull-request triggers (#23370)
+
+
+ .github/workflows/semantic-pull-request.yml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 7370bc3cbe52ade78320e1dded028e9ca5b42b66
+Author: Bjorn Lu
+Date: 2026-08-26 15:10:23 +0800
+
+    ci: skip all bot handling if skip label exist (#23369)
+
+
+ .github/workflows/bot.yml | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+commit 41f3c6fff88ade015669cac5c42db946e0b6f5c9
+Author: Dương Ngọc Anh
+Date: 2026-08-26 12:37:38 +0700
+
+    fix(utils): match timestamp query parameter with proper delimiters (#23364)
+
+
+ packages/vite/src/node/__tests__/utils.spec.ts | 28 ++++++++++++++++++++++++++
+ packages/vite/src/node/utils.ts                |  4 ++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
+commit 57f0bf51a08dec0ec507258434cead9b72718e3f
+Author: 多格
+Date: 2026-08-25 16:04:23 +0800
+
+    docs(guide): fix API documentation grammar and casing (#23353)
+
+
+ docs/guide/api-hmr.md        | 2 +-
+ docs/guide/api-javascript.md | 2 +-
+ docs/guide/api-plugin.md     | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+commit c32e784c95b51f7969cebc7522a5037f14fb6606
+Author: github-actions[bot]
+Date: 2026-08-24 13:37:03 +0900
+
+    release: create-vite@9.2.0 (#23344)
+
+
+ packages/create-vite/CHANGELOG.md | 19 +++++++++++++++++++
+ packages/create-vite/package.json |  2 +-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+commit 2e8355d67c19c68e867ee633121fc91e007c846c
+Author: Bjorn Lu
+Date: 2026-08-24 12:13:10 +0800
+
+    chore(docs): remove markdown-it-image-size (#23342)
+
+
+ docs/.vitepress/config.ts |   4 --
+ docs/package.json         |   1 -
+ pnpm-lock.yaml            | 179 ----------------------------------------------
+ 3 files changed, 184 deletions(-)
+commit d55081581ddd4d55667fef38e85d02ab7f879f15
+Author: renovate[bot]
+Date: 2026-08-24 13:10:55 +0900
+
+    fix(deps): update all non-major dependencies (#23337)
+
+
+ .github/workflows/prepare-release.yml              |   2 +-
+ .github/workflows/publish.yml                      |   2 +-
+ .github/workflows/semgrep.yml                      |   4 +-
+ docs/package.json                                  |   2 +-
+ package.json                                       |   4 +-
+ packages/create-vite/src/index.ts                  |   2 +-
+ packages/create-vite/template-lit-ts/package.json  |   2 +-
+ packages/create-vite/template-lit/package.json     |   2 +-
+ .../create-vite/template-preact-ts/package.json    |   2 +-
+ packages/create-vite/template-preact/package.json  |   2 +-
+ packages/create-vite/template-qwik-ts/package.json |   2 +-
+ packages/create-vite/template-qwik/package.json    |   2 +-
+ .../create-vite/template-react-ts/package.json     |   6 +-
+ packages/create-vite/template-react/package.json   |   6 +-
+ .../create-vite/template-solid-ts/package.json     |   4 +-
+ packages/create-vite/template-solid/package.json   |   4 +-
+ .../create-vite/template-svelte-ts/package.json    |   4 +-
+ packages/create-vite/template-svelte/package.json  |   4 +-
+ .../create-vite/template-vanilla-ts/package.json   |   2 +-
+ packages/create-vite/template-vanilla/package.json |   2 +-
+ packages/create-vite/template-vue-ts/package.json  |   4 +-
+ packages/create-vite/template-vue/package.json     |   2 +-
+ packages/plugin-legacy/package.json                |   2 +-
+ packages/vite/package.json                         |  14 +-
+ playground/backend-integration/package.json        |   2 +-
+ playground/css-sourcemap/package.json              |   4 +-
+ playground/css/package.json                        |   2 +-
+ playground/devtools/package.json                   |   2 +-
+ playground/js-sourcemap/package.json               |   2 +-
+ playground/multiple-entrypoints/package.json       |   2 +-
+ playground/optimize-deps/package.json              |   2 +-
+ playground/resolve-tsconfig-paths/package.json     |   2 +-
+ pnpm-lock.yaml                                     | 846 +++++++++++----------
+ 33 files changed, 498 insertions(+), 448 deletions(-)
+commit 21a3ee9575702536568149dcfe18f409ea447bfc
+Author: btea
+Date: 2026-08-24 11:43:17 +0800
+
+    chore: remove outdated `minimumReleaseAgeExclude` config (#23340)
+
+
+ pnpm-workspace.yaml | 2 --
+ 1 file changed, 2 deletions(-)
+commit 8d1c9c74bc6206a8f7e7ac27bc2d43390805d0d4
+Author: 翠
+Date: 2026-08-24 12:42:42 +0900
+
+    chore(deps): remove `oxc-minify` from docs (#23341)
+
+
+ docs/package.json |   1 -
+ pnpm-lock.yaml    | 208 ------------------------------------------------------
+ 2 files changed, 209 deletions(-)
+commit c31c499ca04c7557d9093291b08b6e3087df0542
+Author: Colin McDonnell
+Date: 2026-08-23 20:42:27 -0700
+
+    feat(create-vite): add nub package manager support (#23019)
+
+
+ packages/create-vite/src/index.ts | 7 +++++++
+ 1 file changed, 7 insertions(+)
+commit 76e8082c56a2872dc8017c5672bc36cba8dcf75d
+Author: renovate[bot]
+Date: 2026-08-24 12:26:38 +0900
+
+    fix(deps): update rolldown-related dependencies (#23338)
+
+
+ docs/package.json                    |   2 +-
+ package.json                         |   2 +-
+ packages/vite/package.json           |   2 +-
+ playground/js-sourcemap/package.json |   2 +-
+ playground/package.json              |   2 +-
+ pnpm-lock.yaml                       | 508 ++++++++++++++++++-----------------
+ 6 files changed, 262 insertions(+), 256 deletions(-)
+commit 8b3b4894afd98a8807ef985b601410d40b795d79
+Author: 翠
+Date: 2026-08-24 11:38:43 +0900
+
+    test(css): fix css async order (#23339)
+
+
+ playground/css/async/async-3.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+commit 5fdfd26ed10ffd08928a8d13b71650f3444221ca
+Author: btea
+Date: 2026-08-24 08:01:37 +0800
+
+    chore: update contributing (#23332)
+
+
+ CONTRIBUTING.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit 3e34883afff1f4823a406dafa3c9e449e80074a5
+Author: Bjorn Lu
+Date: 2026-08-24 08:00:39 +0800
+
+    ci: narrow semantic-pull-request triggers (#23335)
+
+
+ .github/workflows/semantic-pull-request.yml | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+commit 4f9d2f4dadc83191200de7d2154c957a711e8c3d
+Author: Vijay Misal
+Date: 2026-08-23 15:37:51 +0530
+
+    fix(css): keep newline-separated srcset candidates intact (#23265)
+
+
+ packages/vite/src/node/__tests__/utils.spec.ts | 12 ++++++++++++
+ packages/vite/src/node/utils.ts                |  1 -
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+commit 7bdad37a4a772936d24e0116ac32a1f09fd8a055
+Author: Ulrich Stark
+Date: 2026-08-23 08:30:22 +0200
+
+    chore: add 97ad042 to .git-blame-ignore-revs (#23330)
+
+
+ .git-blame-ignore-revs | 2 ++
+ 1 file changed, 2 insertions(+)
+commit ea5ac7c73bd1a1ac9f5363ea09f98566d5d3b483
+Author: Bjorn Lu
+Date: 2026-08-23 12:21:35 +0800
+
+    ci: fix bot comment formatting (#23329)
+
+
+ .github/workflows/bot.yml | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+commit a98c8d95d552c6fa98ab66fb810f5b39ad5abf49
+Author: btea
+Date: 2026-08-22 15:25:55 +0800
+
+    chore: remove eslint comment (#23325)
+
+
+ playground/css/main.js | 1 -
+ 1 file changed, 1 deletion(-)
+commit 97ad042170f4c71b518239723b733dd98e8e3e76
+Author: 翠
+Date: 2026-08-22 15:36:54 +0900
+
+    chore: use oxfmt `sortImports` (#23319)
+
+
+ .oxfmtrc.json                                      |   5 +
+ docs/.vitepress/buildEnd.config.ts                 |   2 +-
+ docs/.vitepress/config.ts                          |  10 +-
+ docs/.vitepress/theme/components/AsideSponsors.vue |   2 +-
+ docs/.vitepress/theme/components/TopBanner.vue     |   4 +-
+ docs/.vitepress/theme/composables/sponsor.ts       |   2 +-
+ docs/.vitepress/theme/index.ts                     |  10 +-
+ docs/.vitepress/theme/landing/FeatureGrid1.vue     |   2 +-
+ docs/.vitepress/theme/landing/FeatureGrid2.vue     |   2 +-
+ docs/.vitepress/theme/landing/Hero.vue             |   2 +-
+ docs/.vitepress/theme/landing/Layout.vue           |  16 +--
+ docs/.vitepress/theme/live/Layout.vue              |   6 +-
+ docs/.vitepress/theme/live/VideoIframe.vue         |   2 +-
+ eslint.config.js                                   |  17 +--
+ packages/create-vite/src/index.ts                  |   6 +-
+ .../create-vite/template-lit-ts/src/my-element.ts  |   2 +-
+ .../create-vite/template-lit/src/my-element.js     |   2 +-
+ .../create-vite/template-preact-ts/src/app.tsx     |   2 +-
+ .../create-vite/template-preact-ts/vite.config.ts  |   2 +-
+ packages/create-vite/template-preact/src/app.jsx   |   2 +-
+ .../create-vite/template-preact/vite.config.js     |   2 +-
+ packages/create-vite/template-qwik-ts/src/app.tsx  |   2 +-
+ .../create-vite/template-qwik-ts/vite.config.ts    |   2 +-
+ packages/create-vite/template-qwik/src/app.jsx     |   2 +-
+ packages/create-vite/template-qwik/vite.config.js  |   2 +-
+ packages/create-vite/template-react-ts/src/App.tsx |   2 +-
+ .../create-vite/template-react-ts/vite.config.ts   |   2 +-
+ packages/create-vite/template-react/src/App.jsx    |   2 +-
+ packages/create-vite/template-react/vite.config.js |   2 +-
+ packages/create-vite/template-solid-ts/src/App.tsx |   2 +-
+ packages/create-vite/template-solid/src/App.jsx    |   2 +-
+ .../create-vite/template-svelte-ts/vite.config.ts  |   2 +-
+ .../create-vite/template-svelte/vite.config.js     |   2 +-
+ .../create-vite/template-vanilla-ts/src/main.ts    |   2 +-
+ packages/create-vite/template-vanilla/src/main.js  |   2 +-
+ .../template-vue-ts/src/components/HelloWorld.vue  |   2 +-
+ .../create-vite/template-vue-ts/vite.config.ts     |   2 +-
+ .../template-vue/src/components/HelloWorld.vue     |   2 +-
+ packages/create-vite/template-vue/vite.config.js   |   2 +-
+ .../plugin-legacy/src/__tests__/snippets.spec.ts   |   2 +-
+ packages/plugin-legacy/src/index.ts                |  18 +--
+ packages/vite/bin/vite.js                          |   2 +-
+ packages/vite/rolldown.config.ts                   |   4 +-
+ packages/vite/rolldown.dts.config.ts               |  10 +-
+ packages/vite/rollupLicensePlugin.ts               |   4 +-
+ packages/vite/src/client/client.ts                 |   6 +-
+ .../vite/src/module-runner/evaluatedModules.ts     |   4 +-
+ packages/vite/src/module-runner/hmrHandler.ts      |   2 +-
+ packages/vite/src/module-runner/runner.ts          |  32 ++---
+ .../src/module-runner/sourcemap/interceptor.ts     |   4 +-
+ packages/vite/src/module-runner/types.ts           |  10 +-
+ .../vite/src/node/__tests__/assetSource.spec.ts    |   2 +-
+ packages/vite/src/node/__tests__/build.spec.ts     |   6 +-
+ packages/vite/src/node/__tests__/config.spec.ts    |  10 +-
+ packages/vite/src/node/__tests__/dev.spec.ts       |   2 +-
+ .../vite/src/node/__tests__/environment.spec.ts    |   6 +-
+ packages/vite/src/node/__tests__/external.spec.ts  |   2 +-
+ .../__tests__/fixtures/config/entry/vite.config.ts |   2 +-
+ packages/vite/src/node/__tests__/html.spec.ts      |   2 +-
+ packages/vite/src/node/__tests__/http.spec.ts      |   2 +-
+ packages/vite/src/node/__tests__/oxc.spec.ts       |   2 +-
+ .../__tests__/plugins/assetImportMetaUrl.spec.ts   |   6 +-
+ .../vite/src/node/__tests__/plugins/css.spec.ts    |   6 +-
+ .../plugins/cssPreprocessorTeardown.spec.ts        |   2 +-
+ .../vite/src/node/__tests__/plugins/define.spec.ts |   6 +-
+ .../plugins/dynamicImportVar/parse.spec.ts         |   2 +-
+ .../vite/src/node/__tests__/plugins/hooks.spec.ts  |   8 +-
+ .../__tests__/plugins/importAnalysisBuild.spec.ts  |   2 +-
+ .../__tests__/plugins/importGlob/fixture.spec.ts   |   2 +-
+ .../modulePreloadPolyfill.spec.ts                  |   2 +-
+ .../node/__tests__/plugins/pluginFilter.spec.ts    |   4 +-
+ .../vite/src/node/__tests__/plugins/terser.spec.ts |   4 +-
+ .../vite/src/node/__tests__/plugins/worker.spec.ts |   2 +-
+ .../__tests__/plugins/workerImportMetaUrl.spec.ts  |   6 +-
+ packages/vite/src/node/__tests__/resolve.spec.ts   |   4 +-
+ .../vite/src/node/__tests__/runnerImport.spec.ts   |   4 +-
+ packages/vite/src/node/__tests__/scan.spec.ts      |   2 +-
+ packages/vite/src/node/__tests__/shortcuts.spec.ts |   2 +-
+ packages/vite/src/node/__tests__/utils.spec.ts     |  10 +-
+ packages/vite/src/node/__tests_dts__/plugin.ts     |   4 +-
+ packages/vite/src/node/baseEnvironment.ts          |   2 +-
+ packages/vite/src/node/build.ts                    |  64 +++++-----
+ packages/vite/src/node/cli.ts                      |  12 +-
+ packages/vite/src/node/config.ts                   | 140 ++++++++++-----------
+ packages/vite/src/node/env.ts                      |   2 +-
+ packages/vite/src/node/environment.ts              |   4 +-
+ packages/vite/src/node/external.ts                 |   4 +-
+ packages/vite/src/node/http.ts                     |   8 +-
+ packages/vite/src/node/idResolver.ts               |  10 +-
+ packages/vite/src/node/nativeConfigCompat.ts       |   4 +-
+ packages/vite/src/node/optimizer/index.ts          |  22 ++--
+ packages/vite/src/node/optimizer/optimizer.ts      |   2 +-
+ packages/vite/src/node/optimizer/resolve.ts        |   6 +-
+ .../vite/src/node/optimizer/rolldownDepPlugin.ts   |  16 +--
+ packages/vite/src/node/optimizer/scan.ts           |  24 ++--
+ packages/vite/src/node/packages.ts                 |   6 +-
+ packages/vite/src/node/plugin.ts                   |  18 +--
+ packages/vite/src/node/plugins/asset.ts            |  36 +++---
+ .../vite/src/node/plugins/assetImportMetaUrl.ts    |  14 +--
+ packages/vite/src/node/plugins/clientInjections.ts |   8 +-
+ packages/vite/src/node/plugins/css.ts              |  56 ++++-----
+ packages/vite/src/node/plugins/define.ts           |   2 +-
+ .../vite/src/node/plugins/dynamicImportVars.ts     |  14 +--
+ packages/vite/src/node/plugins/esbuild.ts          |  12 +-
+ .../plugins/esbuildBannerFooterCompatPlugin.ts     |   4 +-
+ packages/vite/src/node/plugins/forwardConsole.ts   |   2 +-
+ packages/vite/src/node/plugins/html.ts             |  36 +++---
+ packages/vite/src/node/plugins/importAnalysis.ts   |  48 +++----
+ .../vite/src/node/plugins/importAnalysisBuild.ts   |  16 +--
+ packages/vite/src/node/plugins/importMetaGlob.ts   |  20 +--
+ packages/vite/src/node/plugins/index.ts            |  32 ++---
+ packages/vite/src/node/plugins/license.ts          |   4 +-
+ packages/vite/src/node/plugins/manifest.ts         |   4 +-
+ .../vite/src/node/plugins/modulePreloadPolyfill.ts |   2 +-
+ packages/vite/src/node/plugins/optimizedDeps.ts    |   8 +-
+ packages/vite/src/node/plugins/oxc.ts              |  16 +--
+ packages/vite/src/node/plugins/pluginFilter.ts     |   2 +-
+ packages/vite/src/node/plugins/preAlias.ts         |   6 +-
+ packages/vite/src/node/plugins/prepareOutDir.ts    |   6 +-
+ packages/vite/src/node/plugins/reporter.ts         |   2 +-
+ packages/vite/src/node/plugins/resolve.ts          |  46 +++----
+ packages/vite/src/node/plugins/terser.ts           |   4 +-
+ packages/vite/src/node/plugins/wasm.ts             |   2 +-
+ packages/vite/src/node/plugins/worker.ts           |  24 ++--
+ .../vite/src/node/plugins/workerImportMetaUrl.ts   |  16 +--
+ packages/vite/src/node/preview.ts                  |  44 +++----
+ .../src/node/server/__tests__/moduleGraph.spec.ts  |   2 +-
+ .../node/server/__tests__/pluginContainer.spec.ts  |   2 +-
+ .../src/node/server/__tests__/sourcemap.spec.ts    |   2 +-
+ packages/vite/src/node/server/bundledDev.ts        |   8 +-
+ packages/vite/src/node/server/environment.ts       |  22 ++--
+ .../server/environments/fetchableEnvironments.ts   |   2 +-
+ .../server/environments/runnableEnvironment.ts     |   6 +-
+ packages/vite/src/node/server/hmr.ts               |  28 ++---
+ packages/vite/src/node/server/index.ts             | 106 ++++++++--------
+ .../server/middlewares/__tests__/indexHtml.spec.ts |   2 +-
+ packages/vite/src/node/server/middlewares/base.ts  |   2 +-
+ packages/vite/src/node/server/middlewares/error.ts |   2 +-
+ .../src/node/server/middlewares/htmlFallback.ts    |   4 +-
+ .../vite/src/node/server/middlewares/indexHtml.ts  |  18 +--
+ .../src/node/server/middlewares/memoryFiles.ts     |   2 +-
+ packages/vite/src/node/server/middlewares/proxy.ts |   4 +-
+ .../vite/src/node/server/middlewares/static.ts     |  18 +--
+ .../vite/src/node/server/middlewares/transform.ts  |  34 ++---
+ packages/vite/src/node/server/mixedModuleGraph.ts  |   2 +-
+ packages/vite/src/node/server/moduleGraph.ts       |   4 +-
+ packages/vite/src/node/server/openBrowser.ts       |   6 +-
+ packages/vite/src/node/server/pluginContainer.ts   |  40 +++---
+ packages/vite/src/node/server/send.ts              |   2 +-
+ packages/vite/src/node/server/sourcemap.ts         |   6 +-
+ packages/vite/src/node/server/transformRequest.ts  |  18 +--
+ packages/vite/src/node/server/warmup.ts            |   2 +-
+ packages/vite/src/node/server/ws.ts                |   8 +-
+ packages/vite/src/node/shortcuts.ts                |   4 +-
+ .../src/node/ssr/__tests__/ssrLoadModule.spec.ts   |   4 +-
+ .../src/node/ssr/__tests__/ssrTransform.spec.ts    |   6 +-
+ packages/vite/src/node/ssr/fetchModule.ts          |   8 +-
+ .../runtime/__tests__/fixtures/dynamic-import.js   |   2 +-
+ .../runtime/__tests__/fixtures/worker.invoke.mjs   |   2 +-
+ .../ssr/runtime/__tests__/server-runtime.spec.ts   |   6 +-
+ .../runtime/__tests__/server-source-maps.spec.ts   |   2 +-
+ .../__tests__/server-worker-runner.invoke.spec.ts  |   4 +-
+ .../runtime/__tests__/server-worker-runner.spec.ts |   4 +-
+ .../vite/src/node/ssr/runtime/__tests__/utils.ts   |   8 +-
+ .../src/node/ssr/runtime/serverModuleRunner.ts     |   2 +-
+ packages/vite/src/node/ssr/ssrManifestPlugin.ts    |   2 +-
+ packages/vite/src/node/ssr/ssrModuleLoader.ts      |   6 +-
+ packages/vite/src/node/ssr/ssrTransform.ts         |  12 +-
+ packages/vite/src/node/utils.ts                    |  36 +++---
+ packages/vite/src/node/watch.ts                    |   4 +-
+ packages/vite/src/shared/hmr.ts                    |   2 +-
+ packages/vite/src/shared/moduleRunnerTransport.ts  |   2 +-
+ packages/vite/src/types/chokidar.d.ts              |   2 +-
+ .../types/internal/cssPreprocessorOptions.d.ts     |   4 +-
+ playground/alias/vite.config.js                    |   2 +-
+ playground/backend-integration/vite.config.js      |   2 +-
+ .../__tests__/chunk-importmap.spec.ts              |   2 +-
+ playground/cli-module/__tests__/cli-module.spec.ts |   2 +-
+ playground/cli/__tests__/cli.spec.ts               |   2 +-
+ playground/csp/vite.config.js                      |   2 +-
+ .../__tests__/css-lightningcss-proxy.spec.ts       |   2 +-
+ playground/css-sourcemap/vite.config.js            |   2 +-
+ playground/css/__tests__/tests.ts                  |   2 +-
+ playground/css/async/async-3.js                    |   2 +-
+ playground/css/lightningcss-plugins.js             |   2 +-
+ playground/css/postcss.config.js                   |   2 +-
+ playground/css/vite.config-lightningcss.js         |   4 +-
+ playground/data-uri/main.js                        |   4 +-
+ playground/define/__tests__/define.spec.ts         |   2 +-
+ .../environment-react-ssr/src/entry-client.tsx     |   2 +-
+ playground/external/dep-that-imports/index.js      |   4 +-
+ playground/external/src/require-polyfill.js        |   2 +-
+ playground/fs-serve/__tests__/commonTests.ts       |  10 +-
+ playground/fs-serve/root/matrixTestResultPlugin.ts |   2 +-
+ playground/fs-serve/root/vite.config-base.js       |   2 +-
+ playground/fs-serve/root/vite.config.js            |   2 +-
+ .../glob-import/__tests__/glob-import.spec.ts      |   2 +-
+ playground/hmr-ssr/__tests__/hmr-ssr.spec.ts       |  18 +--
+ .../accept-exports/main-accepted/main-accepted.ts  |   2 +-
+ .../main-non-accepted/main-non-accepted.ts         |   2 +-
+ playground/hmr-ssr/file-delete-restore/index.js    |   2 +-
+ playground/hmr-ssr/hmr.ts                          |   2 +-
+ playground/hmr/__tests__/hmr.spec.ts               |   2 +-
+ .../accept-exports/main-accepted/main-accepted.ts  |   2 +-
+ .../main-non-accepted/main-non-accepted.ts         |   2 +-
+ playground/hmr/file-delete-restore/index.js        |   2 +-
+ playground/hmr/hmr.ts                              |   2 +-
+ .../js-sourcemap/__tests__/js-sourcemap.spec.ts    |   8 +-
+ playground/json/__tests__/csr/json-csr.spec.ts     |   4 +-
+ ...acy-client-legacy-ssr-sequential-builds.spec.ts |   2 +-
+ playground/legacy/__tests__/ssr/legacy-ssr.spec.ts |   2 +-
+ playground/legacy/vite.config-custom-filename.js   |   2 +-
+ playground/legacy/vite.config-multiple-output.js   |   2 +-
+ playground/lib/__tests__/serve.ts                  |   2 +-
+ playground/optimize-deps/cjs.js                    |  12 +-
+ .../__test__/optimize-missing-deps.spec.ts         |   2 +-
+ playground/resolve/browser-field/relative.js       |   9 +-
+ playground/resolve/ts-extension/index-js.js        |   4 +-
+ playground/resolve/ts-extension/index.ts           |   4 +-
+ playground/ssr-alias/src/main.js                   |   2 +-
+ .../__tests__/ssr-conditions.spec.ts               |   2 +-
+ playground/ssr-conditions/src/app.js               |   2 +-
+ playground/ssr-deps/__tests__/ssr-deps.spec.ts     |   2 +-
+ playground/ssr-deps/src/app.js                     |  26 ++--
+ playground/ssr-html/__tests__/ssr-html.spec.ts     |   6 +-
+ playground/ssr-html/test-stacktrace-runtime.js     |   2 +-
+ .../__tests__/ssr-noexternal.spec.ts               |   2 +-
+ playground/ssr-pug/__tests__/ssr-pug.spec.ts       |   2 +-
+ playground/ssr-pug/server.js                       |   2 +-
+ playground/ssr-resolve/main.js                     |   6 +-
+ playground/ssr-wasm/__tests__/ssr-wasm.spec.ts     |   2 +-
+ playground/ssr-wasm/src/direct-light.js            |   2 +-
+ .../ssr-webworker/__tests__/ssr-webworker.spec.ts  |   2 +-
+ playground/ssr-webworker/src/entry-worker.jsx      |   2 +-
+ playground/ssr/__tests__/ssr.spec.ts               |   2 +-
+ .../ssr/src/forked-deadlock/common-module.js       |   2 +-
+ playground/tailwind/vite.config.ts                 |   2 +-
+ playground/test-utils.ts                           |  12 +-
+ .../__tests__/transform-plugin.spec.ts             |   2 +-
+ .../__tests__/tsconfig-json-load-error.spec.ts     |   2 +-
+ .../tsconfig-json/__tests__/tsconfig-json.spec.ts  |   2 +-
+ playground/vitestGlobalSetup.ts                    |   4 +-
+ playground/vitestSetup.ts                          |  14 +--
+ .../worker/__tests__/iife/worker-iife.spec.ts      |   4 +-
+ playground/worker/my-worker.ts                     |   2 +-
+ playground/worker/worker/main-module.js            |  10 +-
+ 246 files changed, 957 insertions(+), 964 deletions(-)
+commit dd1a8fbea34b0a830011c2113e08f4781d711f48
+Author: Bjorn Lu
+Date: 2026-08-21 23:31:30 +0800
+
+    ci: set up bot workflow and ai policy (#23311)
+
+
+ .github/PULL_REQUEST_TEMPLATE.md         |   8 +-
+ .github/actions/issues-helper/action.yml |  19 +++-
+ .github/workflows/bot.yml                | 146 +++++++++++++++++++++++++++++++
+ CONTRIBUTING.md                          |  11 +++
+ 4 files changed, 181 insertions(+), 3 deletions(-)
+commit 75196079fcbbd432887e01844371f2c238a7ed85
+Author: 翠
+Date: 2026-08-21 20:31:19 +0900
+
+    test: add asset path replacement in `typeof` test (#23157)
+
+
+ playground/assets/__tests__/assets.spec.ts              |   4 ++++
+ .../__tests__/encoded-base/assets-encoded-base.spec.ts  |   4 ++++
+ .../relative-base/assets-relative-base.spec.ts          |   4 ++++
+ .../__tests__/runtime-base/assets-runtime-base.spec.ts  |   4 ++++
+ .../assets/__tests__/url-base/assets-url-base.spec.ts   |   4 ++++
+ playground/assets/index.html                            |   6 ++++++
+ playground/assets/nested/asset2.png                     | Bin 0 -> 19165 bytes
+ 7 files changed, 26 insertions(+)
+commit 92bd2a7f325ed102349cdc6c1ad4b5cd25e1d72f
+Author: 翠
+Date: 2026-08-21 20:25:45 +0900
+
+    refactor: use `urlId` of `import.meta.ROLLDOWN_FILE_URL` in wasm plugin (#22962)
+
+
+ .../vite/src/node/__tests__/plugins/wasm.spec.ts   | 42 ------------
+ packages/vite/src/node/plugins/asset.ts            | 54 ++++++++++++++--
+ packages/vite/src/node/plugins/wasm.ts             | 74 +---------------------
+ 3 files changed, 53 insertions(+), 117 deletions(-)
+commit 0291408b8443129ce6f6d1d440be8facabe9683b
+Author: 翠
+Date: 2026-08-21 20:25:24 +0900
+
+    test: add `renderBuiltUrl` change changes hash (#23118)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts     | 66 ++++++++++++++++++++++
+ .../__tests__/packages/build-project/asset.txt     |  1 +
+ 2 files changed, 67 insertions(+)
+commit ce69ea67dc1483dd5df4e94b2c7fa6dab8bf6125
+Author: 翠
+Date: 2026-08-21 20:17:53 +0900
+
+    docs: plugin asset emitting (#22898)
+
+
+ docs/guide/api-plugin.md | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+commit e38f29ee48bea5ea3178faec5b78708e86f38afb
+Author: 翠
+Date: 2026-08-21 20:14:28 +0900
+
+    feat: use `import.meta.ROLLDOWN_FILE_URL_*` for other plugins (#22894)
+
+
+ packages/vite/src/node/plugins/asset.ts            |   6 +-
+ .../vite/src/node/plugins/assetImportMetaUrl.ts    |  12 +-
+ packages/vite/src/node/plugins/css.ts              |   2 +-
+ packages/vite/src/node/plugins/wasm.ts             |  23 ++-
+ packages/vite/src/node/plugins/worker.ts           | 211 +++++++++++----------
+ .../vite/src/node/plugins/workerImportMetaUrl.ts   |  22 ++-
+ .../relative-base/worker-relative-base.spec.ts     |   4 +-
+ 7 files changed, 153 insertions(+), 127 deletions(-)
+commit 4366ac468343252df6d5706361a6348afa66f9cc
+Author: 翠
+Date: 2026-08-21 19:18:21 +0900
+
+    feat: use `import.meta.ROLLDOWN_FILE_URL_*` for assets in JS (#22888)
+
+
+ packages/vite/src/node/constants.ts     |   2 +-
+ packages/vite/src/node/plugins/asset.ts | 163 +++++++++++++++++++++++++++++---
+ 2 files changed, 149 insertions(+), 16 deletions(-)
+commit a6c08e10a624bd89b78683ff1b0e8cfa1d89aa45
+Author: 翠
+Date: 2026-08-21 19:11:28 +0900
+
+    refactor: exclude postfix from `__VITE_ASSET__` (#22886)
+
+
+ packages/vite/src/node/plugins/asset.ts |  9 ++++-----
+ packages/vite/src/node/plugins/css.ts   | 31 ++++++++++++++-----------------
+ packages/vite/src/node/plugins/html.ts  |  4 ++--
+ 3 files changed, 20 insertions(+), 24 deletions(-)
+commit 517b97f57ab9473e7417da856eb641d76870a56e
+Author: Jure Rotar
+Date: 2026-08-21 12:10:36 +0200
+
+    feat: searched params attached to workers are now preserved (#22280)
+
+
+ .../vite/src/node/__tests__/plugins/worker.spec.ts | 25 ++++++++++++++++++-
+ .../__tests__/plugins/workerImportMetaUrl.spec.ts  | 10 ++++++++
+ packages/vite/src/node/plugins/worker.ts           | 29 +++++++++++++++++++---
+ .../vite/src/node/plugins/workerImportMetaUrl.ts   | 18 ++++++++------
+ packages/vite/src/node/utils.ts                    |  2 +-
+ 5 files changed, 71 insertions(+), 13 deletions(-)
+commit 1b5cfe3d3777d4ceb7f35fcee9d3c4279316a084
+Author: Jerry Zhao
+Date: 2026-08-21 17:34:52 +0800
+
+    feat: accept Rolldown watch options in `server.watch` (#23133)
+
+
+ docs/config/server-options.md               |  2 ++
+ packages/vite/src/node/index.ts             |  1 +
+ packages/vite/src/node/server/bundledDev.ts |  2 ++
+ packages/vite/src/node/server/index.ts      | 13 ++++++---
+ packages/vite/src/node/watch.ts             | 43 +++++++++++++++++++++++++++--
+ 5 files changed, 55 insertions(+), 6 deletions(-)
+commit 5164b6a979da2f0889fbb2fcb6ea07ac5add9b7a
+Author: 翠
+Date: 2026-08-21 18:27:56 +0900
+
+    test(hmr): skip virtual module `import.meta.hot.invalidate` test in bundled-dev (#23321)
+
+
+ playground/hmr/__tests__/hmr.spec.ts | 28 ++++++++++++++++------------
+ 1 file changed, 16 insertions(+), 12 deletions(-)
+commit e17d2d565b0288f169c7995adb2b192f917548e7
+Author: James Opstad
+Date: 2026-08-21 10:15:18 +0100
+
+    feat: add closeServer and closePreviewServer hooks (#23110)
+
+
+ docs/guide/api-plugin.md                           |  52 +++++++
+ .../vite/src/node/__tests__/plugins/hooks.spec.ts  | 166 +++++++++++++++++++++
+ packages/vite/src/node/plugin.ts                   |  18 ++-
+ packages/vite/src/node/preview.ts                  |  16 ++
+ packages/vite/src/node/server/index.ts             |  49 +++++-
+ 5 files changed, 293 insertions(+), 8 deletions(-)
+commit 924997a4bdda9115faee9bdb622fcec4fc8357f0
+Author: 翠
+Date: 2026-08-21 18:13:28 +0900
+
+    feat(worker): remove worker chunk if it's detected that it's not referenced (#22473)
+
+
+ packages/vite/src/node/plugins/worker.ts           | 136 ++++++++++++++++++++-
+ .../vite/src/node/plugins/workerImportMetaUrl.ts   |   7 ++
+ playground/worker/__tests__/es/worker-es.spec.ts   |  23 ++++
+ playground/worker/dce-test-importer.js             |   3 +
+ playground/worker/dce-test-live-nested-worker.js   |   1 +
+ playground/worker/dce-test-live-worker-importer.js |   3 +
+ playground/worker/dce-test-live-worker.js          |   3 +
+ playground/worker/dce-test-nested-worker.js        |   1 +
+ playground/worker/dce-test-worker.js               |   4 +
+ playground/worker/worker/main-module.js            |   7 ++
+ 10 files changed, 186 insertions(+), 2 deletions(-)
+commit 8156684572bdcf73e9d8568ed67971f0467fab60
+Author: 翠
+Date: 2026-08-21 18:12:00 +0900
+
+    feat(css): minify style tag (#23183)
+
+
+ packages/vite/src/node/plugins/css.ts                        |  8 +++++++-
+ .../css-lightningcss/__tests__/css-lightningcss.spec.ts      | 12 ++++++++++++
+ playground/css-lightningcss/index.html                       | 12 ++++++++++++
+ playground/minify/__tests__/minify.spec.ts                   | 12 ++++++++++++
+ playground/minify/index.html                                 | 12 ++++++++++++
+ 5 files changed, 55 insertions(+), 1 deletion(-)
+commit b78e2f1bc1cba404c4bd9faf518d26ec85e89fc7
+Author: Rich Harris
+Date: 2026-08-21 05:08:53 -0400
+
+    feat: support subpath imports in dynamic import statements (#23185)
+
+
+ docs/guide/features.md                             |  2 +-
+ .../vite/src/node/plugins/dynamicImportVars.ts     | 24 +++++++++++++++++++---
+ packages/vite/src/node/plugins/resolve.ts          | 21 +++++++++++++------
+ .../__tests__/dynamic-import.spec.ts               |  6 ++++++
+ playground/dynamic-import/index.html               |  3 +++
+ playground/dynamic-import/nested/index.js          |  4 ++++
+ playground/dynamic-import/package.json             |  3 +++
+ 7 files changed, 53 insertions(+), 10 deletions(-)
+commit a500deeb6f52d93ca501a0fc612a5392b939f2f5
+Author: Jerry Zhao
+Date: 2026-08-21 17:07:57 +0800
+
+    feat(cli): support naming the CPU profile via --profile [name] (#23042)
+
+
+ docs/guide/cli.md                  |  4 ++--
+ docs/guide/troubleshooting.md      |  2 +-
+ packages/vite/bin/vite.js          | 21 ++++++++++++++++-----
+ packages/vite/src/node/cli.ts      | 17 ++++++++++++++---
+ packages/vite/src/types/shims.d.ts |  2 ++
+ 5 files changed, 35 insertions(+), 11 deletions(-)
+commit 67a680767317f8e2cb28b6b0500192f993a567cf
+Author: 翠
+Date: 2026-08-21 18:07:38 +0900
+
+    refactor: remove HmrUrl concept (#23172)
+
+
+ packages/vite/src/client/client.ts                |  8 +++++++-
+ packages/vite/src/module-runner/hmrHandler.ts     |  5 +----
+ packages/vite/src/node/plugins/importAnalysis.ts  | 15 +++++++--------
+ packages/vite/src/node/server/hmr.ts              | 16 ++++------------
+ packages/vite/src/node/server/transformRequest.ts |  8 ++++----
+ packages/vite/types/customEvent.d.ts              |  8 ++++++++
+ packages/vite/types/hmrPayload.d.ts               |  8 ++++++++
+ 7 files changed, 39 insertions(+), 29 deletions(-)
+commit 616296895bd135386d35069a479a5f188c7de298
+Author: 翠
+Date: 2026-08-21 18:06:20 +0900
+
+    fix(hmr): handle `import.meta.hot.invalidate` in virtual module (#23171)
+
+
+ packages/vite/src/node/server/environment.ts  |  4 ++--
+ playground/hmr/__tests__/hmr.spec.ts          | 14 ++++++++++++++
+ playground/hmr/index.html                     |  2 ++
+ playground/hmr/virtual-invalidation/dep.js    |  1 +
+ playground/hmr/virtual-invalidation/parent.js |  7 +++++++
+ playground/hmr/vite.config.ts                 | 28 +++++++++++++++++++++++++++
+ 6 files changed, 54 insertions(+), 2 deletions(-)
+commit 8cb872e7fb65b03f6068923c6aa7fcf3e71baf21
+Author: Leo
+Date: 2026-08-21 17:03:52 +0800
+
+    fix(dev): run closeBundle after buildEnd failure (#23165)
+
+
+ .../node/server/__tests__/pluginContainer.spec.ts  | 56 ++++++++++++++++++++++
+ packages/vite/src/node/server/pluginContainer.ts   | 28 +++++++----
+ 2 files changed, 74 insertions(+), 10 deletions(-)
+commit 91ae134699f78fddc1a05dd974f85e6d5c875a96
+Author: 翠
+Date: 2026-08-21 13:18:47 +0900
+
+    ci: setup PR-driven release (#23116)
+
+
+ .github/workflows/prepare-release.yml |  85 +++++++++++++++++++++++++++
+ .github/workflows/publish.yml         |  85 ++++++++++++++++++++++++---
+ .github/workflows/release-tag.yml     |  52 -----------------
+ CONTRIBUTING.md                       |  39 ++++++++-----
+ package.json                          |   3 +-
+ pnpm-lock.yaml                        | 104 ++++++++++++++++++----------------
+ pnpm-workspace.yaml                   |   1 +
+ scripts/detect-release.ts             |  19 +++++++
+ scripts/extract-changelog.ts          |   9 +++
+ scripts/prepare-release.ts            |  50 ++++++++++++++++
+ scripts/release.ts                    |  21 -------
+ scripts/releaseUtils.ts               |  49 +---------------
+ scripts/tsconfig.json                 |   1 +
+ 13 files changed, 323 insertions(+), 195 deletions(-)
+commit 6bacc956df5a76cc5653b9de4493453b953439fd
+Author: Ngo Quoc Viet
+Date: 2026-08-21 11:02:44 +0700
+
+    fix(config): close bundles when generation fails (#23256)
+
+
+ packages/vite/src/node/config.ts | 25 +++++++++++++++----------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
+commit e79c4711181712321bd8c918a66332be0fe2c3ec
+Author: btea
+Date: 2026-08-21 10:20:59 +0800
+
+    chore: replace prettier comment with oxfmt (#23318)
+
+
+ packages/create-vite/src/index.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 1f5b5392cbfa0c222fd5006be34b3b18a78f604e
+Author: btea
+Date: 2026-08-21 10:20:40 +0800
+
+    test: eliminate eslint warnings (#23315)
+
+
+ playground/test-utils.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit de1111ab0be00879b404e7ed3b2a80e264edddc1
+Author: sapphi-red
+Date: 2026-08-20 13:07:58 +0900
+
+    release: v8.2.2
+
+
+ packages/vite/CHANGELOG.md | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ packages/vite/package.json |  2 +-
+ 2 files changed, 46 insertions(+), 1 deletion(-)
+commit cb77e2a93bad2a8ece00b4aa0ef507c092582c45
+Author: 翠
+Date: 2026-08-20 12:53:42 +0900
+
+    test(ssr): add destructing assignment case for moduleRunnerTransform (#23308)
+
+
+ .../src/node/ssr/__tests__/ssrTransform.spec.ts    | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+commit 9db0b61d4c9c7caad7ea1d9670b637faf2bb6c93
+Author: 翠
+Date: 2026-08-20 12:53:30 +0900
+
+    fix(ssr): rewrite computed key of destructing parameter (#23307)
+
+
+ .../src/node/ssr/__tests__/ssrTransform.spec.ts    | 57 ++++++++++++++++++++++
+ packages/vite/src/node/ssr/ssrTransform.ts         | 34 +------------
+ 2 files changed, 59 insertions(+), 32 deletions(-)
+commit 1fb8afe2b3a386f9c879f80841bf5aefc732f807
+Author: 翠
+Date: 2026-08-20 11:46:50 +0900
+
+    chore(create-vite): mention experimental react compiler support (#23306)
+
+
+ packages/create-vite/src/index.ts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+commit bdfadefb207039bdb06d547da67dc81a92fe8750
+Author: andrew
+Date: 2026-08-19 19:55:56 +0800
+
+    test(bundled-dev): run hmr-ssr spec in bundled dev mode under test-serve-bundled (#23247)
+
+
+ playground/hmr-ssr/__tests__/hmr-ssr.spec.ts | 4 ++++
+ vitest.config.e2e.ts                         | 1 +
+ 2 files changed, 5 insertions(+)
+commit 8413052731836d4aaf3eb94a0f25788dd35d2888
+Author: Lazizbek Ergashev
+Date: 2026-08-19 16:50:18 +0500
+
+    fix: respect `resolve.preserveSymlinks` when resolving root (fix #23197) (#23198)
+
+
+ packages/vite/src/node/__tests__/config.spec.ts    | 22 ++++++++++++++++++++++
+ .../__tests__/fixtures/config/root-resolution/link |  1 +
+ .../fixtures/config/root-resolution/real/.gitkeep  |  1 +
+ packages/vite/src/node/config.ts                   |  8 +++++---
+ 4 files changed, 29 insertions(+), 3 deletions(-)
+commit 7ec81e23008a8134a2ae326fe8f240375a799221
+Author: Bjorn Lu
+Date: 2026-08-19 18:18:29 +0800
+
+    ci: use `$/` syntax to reference local action and remove actionlint (#23305)
+
+
+ .github/workflows/ci.yml                  |  6 ------
+ .github/workflows/issue-close-require.yml |  6 +-----
+ .github/workflows/issue-labeled.yml       | 11 +++--------
+ .github/workflows/lock-closed-issues.yml  |  7 +------
+ 4 files changed, 5 insertions(+), 25 deletions(-)
+commit 05a003e6a17a84d75f907ea0f1598bc39b8dce6c
+Author: Lazizbek Ergashev
+Date: 2026-08-19 14:19:25 +0500
+
+    fix(config): resolve sourcemap paths against sourcemap location (#23239)
+
+
+ packages/vite/src/node/__tests__/config.spec.ts    | 22 +++++++++++++++++++++-
+ .../fixtures/config/nested/.nested/vite.config.mts |  1 +
+ packages/vite/src/node/config.ts                   |  6 +++---
+ 3 files changed, 25 insertions(+), 4 deletions(-)
+commit 495d9ff5a7d843ca876a9e49799947a5deb704c7
+Author: Anthony Fu
+Date: 2026-08-19 17:20:06 +0900
+
+    feat(deps): widen `@vitejs/devtools` peer range to v0.5.0 (#23302)
+
+
+ packages/vite/package.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 16048483f6fb98c237767d26f7bd6028fc6c53b0
+Author: 翠
+Date: 2026-08-19 16:13:42 +0900
+
+    docs: clarify about `server.proxy` WebSocket origin check (#23293)
+
+
+ docs/config/server-options.md | 6 ++++++
+ 1 file changed, 6 insertions(+)
+commit 4417cbfc9e8f4bf42b3c785ca32d05dbbbbfb9b5
+Author: 서울민트초코
+Date: 2026-08-19 16:11:19 +0900
+
+    docs: fix formatting inconsistencies for better clarity (#23270)
+
+
+ docs/guide/api-environment-plugins.md | 2 +-
+ docs/guide/build.md                   | 2 +-
+ docs/guide/cli.md                     | 6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+commit 1d9fa392a43229241f80630236f8552ce8f7cd0f
+Author: btea
+Date: 2026-08-19 13:47:55 +0800
+
+    refactor: use JSON import attributes instead of readFileSync in constants (#23258)
+
+
+ packages/vite/src/node/constants.ts | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+commit 2804636ff608d105928009d274ffba7cfbe55340
+Author: Lazizbek Ergashev
+Date: 2026-08-19 10:39:43 +0500
+
+    fix(css): don't pass empty targets to lightningcss (#23295)
+
+
+ packages/vite/src/node/__tests__/plugins/css.spec.ts |  9 +++++++++
+ packages/vite/src/node/plugins/css.ts                | 13 ++++++++-----
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+commit 599b44b6600ec426e10cd556908d53b027b0c4fb
+Author: 翠
+Date: 2026-08-19 13:46:36 +0900
+
+    test(module-runner): simplify server-hmr tests (#23300)
+
+
+ .../node/ssr/runtime/__tests__/server-hmr.spec.ts  | 142 +++++++++------------
+ 1 file changed, 59 insertions(+), 83 deletions(-)
+commit 4a261f242831bef92afd2f1aacfb81eab9dec371
+Author: 翠
+Date: 2026-08-19 13:46:15 +0900
+
+    test(module-runner): add TLA circular import case (#23299)
+
+
+ .../src/node/ssr/runtime/__tests__/fixtures/tla-circular/a.js |  6 ++++++
+ .../src/node/ssr/runtime/__tests__/fixtures/tla-circular/b.js |  6 ++++++
+ .../node/ssr/runtime/__tests__/fixtures/tla-circular/index.js |  4 ++++
+ .../src/node/ssr/runtime/__tests__/server-runtime.spec.ts     | 11 +++++++++++
+ 4 files changed, 27 insertions(+)
+commit d9b10a98db1c293ee64300bd75d568b44c8ae931
+Author: DaZuiZui
+Date: 2026-08-19 10:11:18 +0800
+
+    fix(module-runner): exclude completed modules from in-flight cycle detection (fix #22999) (#23009)
+
+
+ packages/vite/src/module-runner/runner.ts          | 14 ++--
+ .../hmr-evaluated-import-race/evaluated.js         |  7 ++
+ .../fixtures/hmr-evaluated-import-race/shared.js   |  5 ++
+ .../node/ssr/runtime/__tests__/server-hmr.spec.ts  | 97 ++++++++++++++++++++++
+ 4 files changed, 116 insertions(+), 7 deletions(-)
+commit c0f2fc607ee97ee4499337b04826420c00654065
+Author: MoonsvnLyn
+Date: 2026-08-18 16:24:25 +0800
+
+    fix(vite): update outdated upstream file links in license comments (#23285)
+
+
+ packages/vite/rollupLicensePlugin.ts      | 2 +-
+ packages/vite/src/node/optimizer/index.ts | 2 +-
+ packages/vite/src/types/alias.d.ts        | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+commit 3dbddefaafc091a879b06f9279296f776691e455
+Author: andrew
+Date: 2026-08-18 15:26:15 +0800
+
+    fix(bundled-dev): hot update through circular imports instead of reloading (#23259)
+
+
+ packages/vite/src/client/bundledDevHmrClient.ts | 188 +++++++++++++++++++-----
+ playground/hmr/__tests__/hmr.spec.ts            |  65 ++++----
+ 2 files changed, 178 insertions(+), 75 deletions(-)
+commit 7822e148733bca9b31d8b4fc035ee7ba256ae5d7
+Author: andrew
+Date: 2026-08-18 15:26:15 +0800
+
+    test(bundled-dev): enable hmr playground (#23254)
+
+
+ playground/hmr/__tests__/hmr.spec.ts | 724 ++++++++++++++++++++---------------
+ vitest.config.e2e.ts                 |   1 -
+ 2 files changed, 411 insertions(+), 314 deletions(-)
+commit 354adfecaee79bf23c60ba782d7ea3dec3a995d5
+Author: Dami Oyeniyi
+Date: 2026-08-18 08:01:08 +0100
+
+    docs(cli): add experimentalBundle option (#22392)
+
+
+ docs/guide/cli.md | 1 +
+ 1 file changed, 1 insertion(+)
+commit 3ba026dade4af56df08815310d3458fa110f5c5c
+Author: 翠
+Date: 2026-08-18 15:51:12 +0900
+
+    fix(bundled-dev): handle lazy request error (#23291)
+
+
+ .../vite/src/node/server/middlewares/triggerLazyBundling.ts  | 12 +++++++++++-
+ .../__tests__/hmr-full-bundle-mode.spec.ts                   |  7 +++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+commit 02cffa9e2d38d5d8f12e4043ee9d0f7abb1471e2
+Author: Harsh Mathur
+Date: 2026-08-18 10:26:25 +0530
+
+    fix: reduce Windows 8.3-short-name detection false-positives (#23066)
+
+
+ .../server/middlewares/__tests__/static.spec.ts    | 37 +++++++++++++++++++++-
+ .../vite/src/node/server/middlewares/static.ts     | 27 ++++++++++++++--
+ 2 files changed, 60 insertions(+), 4 deletions(-)
+commit ba958bddfc9cabe302c6b34269dcf5c9634531e0
+Author: renovate[bot]
+Date: 2026-08-18 12:58:28 +0900
+
+    fix(deps): update all non-major dependencies (#23217)
+
+
+ .github/workflows/ci.yml                           |    4 +-
+ .github/workflows/copilot-setup-steps.yml          |    2 +-
+ .github/workflows/preview-release.yml              |    2 +-
+ .github/workflows/publish.yml                      |    2 +-
+ .github/workflows/semgrep.yml                      |    4 +-
+ docs/package.json                                  |    8 +-
+ package.json                                       |   14 +-
+ packages/create-vite/package.json                  |    2 +-
+ packages/create-vite/src/index.ts                  |    8 +-
+ packages/create-vite/template-lit-ts/package.json  |    2 +-
+ packages/create-vite/template-lit/package.json     |    2 +-
+ .../create-vite/template-preact-ts/package.json    |    2 +-
+ packages/create-vite/template-preact/package.json  |    2 +-
+ packages/create-vite/template-qwik-ts/package.json |    2 +-
+ packages/create-vite/template-qwik/package.json    |    2 +-
+ .../create-vite/template-react-ts/package.json     |    4 +-
+ packages/create-vite/template-react/package.json   |    4 +-
+ .../create-vite/template-solid-ts/package.json     |    2 +-
+ packages/create-vite/template-solid/package.json   |    2 +-
+ .../create-vite/template-svelte-ts/package.json    |    8 +-
+ packages/create-vite/template-svelte/package.json  |    6 +-
+ .../create-vite/template-vanilla-ts/package.json   |    2 +-
+ packages/create-vite/template-vanilla/package.json |    2 +-
+ packages/create-vite/template-vue-ts/package.json  |    6 +-
+ packages/create-vite/template-vue/package.json     |    4 +-
+ packages/plugin-legacy/package.json                |    6 +-
+ packages/vite/package.json                         |   20 +-
+ packages/vite/src/node/__tests_dts__/plugin.ts     |    4 +-
+ playground/alias/package.json                      |    4 +-
+ .../css-sourcemap/__tests__/css-sourcemap.spec.ts  |   12 +-
+ playground/css-sourcemap/package.json              |    4 +-
+ playground/css/package.json                        |    2 +-
+ playground/devtools/package.json                   |    4 +-
+ playground/extensions/package.json                 |    2 +-
+ playground/external/dep-that-imports/package.json  |    2 +-
+ playground/external/dep-that-requires/package.json |    2 +-
+ playground/external/package.json                   |    2 +-
+ playground/fs-serve/package.json                   |    2 +-
+ playground/js-sourcemap/package.json               |    2 +-
+ playground/json/package.json                       |    2 +-
+ playground/legacy/package.json                     |    2 +-
+ playground/optimize-deps-no-discovery/package.json |    2 +-
+ playground/optimize-deps/package.json              |    4 +-
+ playground/preload/package.json                    |    2 +-
+ playground/resolve-tsconfig-paths/package.json     |    2 +-
+ playground/ssr-deps/package.json                   |    2 +-
+ playground/tailwind-v3/package.json                |    2 +-
+ playground/tailwind/package.json                   |    2 +-
+ pnpm-lock.yaml                                     | 1834 ++++++++++----------
+ 49 files changed, 1010 insertions(+), 1010 deletions(-)
+commit 1cbf7d63e14845541dcbbc8e393cfd82a0cb25b6
+Author: MoonsvnLyn
+Date: 2026-08-18 10:30:29 +0800
+
+    fix(create-vite): update moved eslint-react plugin links in generated README (#23284)
+
+
+ packages/create-vite/src/index.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 83ecb2c8059e8ce946a7cc835d4c14ef78aef4fd
+Author: renovate[bot]
+Date: 2026-08-17 15:57:22 +0900
+
+    fix(deps): update rolldown-related dependencies (#23218)
+
+
+ docs/package.json                    |   2 +-
+ package.json                         |   2 +-
+ packages/vite/package.json           |   4 +-
+ playground/js-sourcemap/package.json |   2 +-
+ playground/package.json              |   2 +-
+ pnpm-lock.yaml                       | 822 ++++++++++++++++-------------------
+ 6 files changed, 384 insertions(+), 450 deletions(-)
+commit 5c1c6c609718303202832f706884192e1f1e9223
+Author: btea
+Date: 2026-08-17 14:51:24 +0800
+
+    refactor: use named regex constants over inline literals (#22964)
+
+
+ packages/vite/src/node/config.ts             | 3 ++-
+ packages/vite/src/node/nativeConfigCompat.ts | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+commit 56f75f68d403b9c8d1860572c12c5f5c08332add
+Author: 翠
+Date: 2026-08-17 12:35:52 +0900
+
+    docs(deps): update vitepress to 1.0.0-alpha.19 and theme to 5.0.6 (#23280)
+
+
+ docs/package.json   |  4 ++--
+ pnpm-lock.yaml      | 28 ++++++++++++++--------------
+ pnpm-workspace.yaml |  1 +
+ 3 files changed, 17 insertions(+), 16 deletions(-)
+commit 904072cd403974e83bff5c05bd3f9aef5c3ce0a4
+Author: dependabot[bot]
+Date: 2026-08-17 10:21:07 +0900
+
+    chore(deps): bump nanoid from 3.3.16 to 6.0.1 (#23226)
+
+
+ pnpm-lock.yaml | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+commit dcf88bd2ad2b1a8845f9029587cc8c825e382d42
+Author: Jawad Ali
+Date: 2026-08-13 22:42:42 +0500
+
+    fix(define): fix match escaped dots to support $-prefixed define keys (#23249)
+
+
+ packages/vite/src/node/__tests__/plugins/define.spec.ts | 9 +++++++++
+ packages/vite/src/node/plugins/define.ts                | 2 +-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+commit a20a35ec0685e374519864d0f41dd5f6e9ba0271
+Author: Santhi Prakash
+Date: 2026-08-13 23:01:22 +0530
+
+    docs(build): note cssTarget precedence (#23200)
+
+
+ docs/config/build-options.md    | 2 ++
+ docs/guide/features.md          | 2 +-
+ packages/vite/src/node/build.ts | 3 +++
+ 3 files changed, 6 insertions(+), 1 deletion(-)
+commit d615bcdb23d96c1ca5ce1ee45e21d8d87381106f
+Author: btea
+Date: 2026-08-13 12:27:32 +0800
+
+    build: use JSON import attributes instead of readFIleSync in rolldown configs (#23251)
+
+
+ packages/vite/rolldown.config.ts     | 7 +++----
+ packages/vite/rolldown.dts.config.ts | 6 +-----
+ 2 files changed, 4 insertions(+), 9 deletions(-)
+commit 74a25c324e4f1cd4a73ec594594f6944911fd6ed
+Author: 多格
+Date: 2026-08-13 11:05:41 +0800
+
+    docs(server-options): update sourcemapIgnoreList Rolldown references (#23248)
+
+
+ docs/config/server-options.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit 5e7efa0087806738f2737fb2b0982569a8444dee
+Author: 多格
+Date: 2026-08-13 10:49:36 +0800
+
+    chore: upgrade markdown-it-image-size (#23241)
+
+
+ docs/package.json |  2 +-
+ pnpm-lock.yaml    | 12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+commit b4d66fee14d970f45b8a6f3d7d6aee73ca9b88ab
+Author: btea
+Date: 2026-08-11 18:27:53 +0800
+
+    test(define): close rolldown bundler after generate (#23231)
+
+
+ packages/vite/src/node/__tests__/plugins/define.spec.ts | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+commit 9c75eb1ff075455e91d43729827213a159216c4f
+Author: btea
+Date: 2026-08-11 15:46:32 +0800
+
+    docs: correct the type of `server.middlewareMode` (#23222)
+
+
+ docs/config/server-options.md | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+commit 2c485d6fd41c15909a5d37407cd2cf001bd8ea59
+Author: jeongchanpark
+Date: 2026-08-11 16:45:44 +0900
+
+    docs: fix grammar in Vite 5.1 blog post (#23228)
+
+
+ docs/blog/announcing-vite5-1.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+commit 8fb76752836f61224d3095b502fa237b478a06b2
+Author: Leo
+Date: 2026-08-11 10:50:06 +0800
+
+    fix(optimizer): close custom extension analysis bundles (#23207)
+
+
+ .../optimizer/customExtensionBundleClose.spec.ts   | 87 ++++++++++++++++++++++
+ packages/vite/src/node/optimizer/index.ts          | 22 +++---
+ 2 files changed, 100 insertions(+), 9 deletions(-)
+commit a0cfcf72f8ef8bf0f2f11d553333b9bb31f1d316
+Author: btea
+Date: 2026-08-11 10:45:36 +0800
+
+    chore: fix ts errors in build test cases (#23209)
+
+
+ packages/vite/src/node/__tests__/build.spec.ts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+commit 0cba7fe9f0b7eef456bcf48ca22d8e14b01ccb26
+Author: 多格
+Date: 2026-08-11 10:16:30 +0800
+
+    docs: fix highlight lines (#23206)
+
+
+ docs/guide/ssr.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit 4f1411d2c82dd98cd725cea436cc0becd095cc2b
+Author: enkdevur
+Date: 2026-08-10 18:13:27 +0700
+
+    docs: pin vitepress to 2.0.0-alpha.18 to fix language switcher  (#23223)
+
+
+ docs/package.json |  2 +-
+ pnpm-lock.yaml    | 22 +++++++++++-----------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
+commit 6452703914bb44e4f428864f15dac7df8e31c9b9
+Author: 多格
+Date: 2026-08-10 14:17:17 +0800
+
+    docs(build): correct 'rollup' to 'Rolldown' (#23202)
+
+
+ docs/config/build-options.md | 2 +-
+ docs/guide/build.md          | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+commit 57fea001d154e7dd8d5d74d3082731f1dcfd31be
+Author: Bjorn Lu
+Date: 2026-08-07 15:37:01 +0800
+
+    docs(static-deploy): update new platform rules (#23190)
+
+
+ docs/guide/static-deploy.md | 2 ++
+ 1 file changed, 2 insertions(+)
+commit 6a3339811d0f9cd5baed22a34571dff2596be1a1
+Author: 多格
+Date: 2026-08-07 11:03:23 +0800
+
+    docs(api-javascript): fix typo and update configuration reference (#23187)
+
+
+ docs/guide/api-javascript.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)

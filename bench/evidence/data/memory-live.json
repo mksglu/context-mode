@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-21",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "cases": [
+    {
+      "id": "memory-r6-eval-local",
+      "result": "PASS",
+      "usd": 0
+    },
+    {
+      "id": "memory-retrieval-local",
+      "result": "PASS",
+      "usd": 0,
+      "recallAt5": 1.0,
+      "mrr": 0.653,
+      "queries": 6
+    },
+    {
+      "id": "memory-r6-resume-quality",
+      "result": "PASS",
+      "usd": 0.0075
+    },
+    {
+      "id": "decision-q3-applied",
+      "result": "PASS",
+      "usd": 0.0435
+    }
+  ],
+  "totalUsd": 0.051
+}

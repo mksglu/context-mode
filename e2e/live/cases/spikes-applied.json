@@ -1,0 +1,3 @@
+{ "id": "spikes-applied", "covers": ["docs/architecture/"], "kind": "local",
+  "run": ["node", "-e", "const f=require('fs');const has=(p,s)=>f.readFileSync(p,'utf8').includes(s)||(console.error('missing in '+p+': '+s),process.exit(1));has('docs/architecture/TECH-SPEC.md','Node 24.15.0');has('docs/architecture/TECH-SPEC.md','600,000 ms');has('docs/architecture/adr/0002-single-db-git-distribution.md','24.15.0');has('docs/architecture/adr/0006-claude-code-tool-loading.md','Status: Accepted (2026-10-15)');has('docs/architecture/PRD.md','600,000 ms');"],
+  "expect": {} }

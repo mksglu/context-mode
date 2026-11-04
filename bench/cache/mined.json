@@ -1,0 +1,1900 @@
+{
+  "definition": {
+    "breakTokens": 1024,
+    "rule": "rewritten = (cc+cr at n-1) - cr at n; break when > 1024; compact turns counted apart"
+  },
+  "arms": {
+    "unknown": {
+      "total": {
+        "sessions": 11,
+        "turns": 31,
+        "resumeTurns": 0,
+        "breaks": 0,
+        "breakRate": 0,
+        "hitTurn": {
+          "median": 0.8465379665379665,
+          "p90": 0.9802846541507448
+        },
+        "hitSession": {
+          "median": 0.8157938436919733,
+          "p90": 0.8697342026078235
+        },
+        "compactTurns": {
+          "count": 0,
+          "hitMedian": null,
+          "rewrittenMedian": null
+        }
+      },
+      "byWorkload": {
+        "bench/replace-proof2": {
+          "sessions": 1,
+          "turns": 2,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.43772176227084564,
+            "p90": 0.4655285007929844
+          },
+          "hitSession": {
+            "median": 0.45282285984496645,
+            "p90": 0.45282285984496645
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/b-shape": {
+          "sessions": 3,
+          "turns": 9,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.7848294379691219,
+            "p90": 0.9893850512789816
+          },
+          "hitSession": {
+            "median": 0.8157938436919733,
+            "p90": 0.8157938436919733
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r2-m2": {
+          "sessions": 7,
+          "turns": 20,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9058058830009915,
+            "p90": 0.9488533333333333
+          },
+          "hitSession": {
+            "median": 0.843820677805635,
+            "p90": 0.8701393315727165
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        }
+      },
+      "breakList": []
+    },
+    "off": {
+      "total": {
+        "sessions": 636,
+        "turns": 2101,
+        "resumeTurns": 9,
+        "breaks": 0,
+        "breakRate": 0,
+        "hitTurn": {
+          "median": 0.9057622774497689,
+          "p90": 0.9848008655778248
+        },
+        "hitSession": {
+          "median": 0.8834870270144712,
+          "p90": 0.9195549069682598
+        },
+        "compactTurns": {
+          "count": 73,
+          "hitMedian": 0.6847117140620923,
+          "rewrittenMedian": 42692
+        }
+      },
+      "byWorkload": {
+        "bench": {
+          "sessions": 5,
+          "turns": 12,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8061903705347238,
+            "p90": 0.9891310314541363
+          },
+          "hitSession": {
+            "median": 0.8981540420114577,
+            "p90": 0.9284642961662277
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/b-shape": {
+          "sessions": 57,
+          "turns": 156,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8057706232941569,
+            "p90": 0.9850696931298552
+          },
+          "hitSession": {
+            "median": 0.8868491165747406,
+            "p90": 0.9189066059225512
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/compact-diag": {
+          "sessions": 37,
+          "turns": 229,
+          "resumeTurns": 5,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9369326325848065,
+            "p90": 0.9721756290083868
+          },
+          "hitSession": {
+            "median": 0.513431201122149,
+            "p90": 0.9250682281868525
+          },
+          "compactTurns": {
+            "count": 37,
+            "hitMedian": 0.685248041775457,
+            "rewrittenMedian": 42649
+          }
+        },
+        "compact-m2/du-deny": {
+          "sessions": 57,
+          "turns": 159,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8059052924791086,
+            "p90": 0.9850672250385717
+          },
+          "hitSession": {
+            "median": 0.8796560809873804,
+            "p90": 0.9194004267036233
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/du-merge": {
+          "sessions": 24,
+          "turns": 72,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9064773645917542,
+            "p90": 0.9851766132143054
+          },
+          "hitSession": {
+            "median": 0.8999051642382964,
+            "p90": 0.9219727169659511
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/du-review": {
+          "sessions": 12,
+          "turns": 38,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.90642683912692,
+            "p90": 0.9852835804442485
+          },
+          "hitSession": {
+            "median": 0.9079945661716461,
+            "p90": 0.9203651300775901
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/du-units": {
+          "sessions": 36,
+          "turns": 220,
+          "resumeTurns": 4,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9354325699745547,
+            "p90": 0.9685286261758216
+          },
+          "hitSession": {
+            "median": 0.5337771300271793,
+            "p90": 0.9262059993761744
+          },
+          "compactTurns": {
+            "count": 36,
+            "hitMedian": 0.6793063284586515,
+            "rewrittenMedian": 42692
+          }
+        },
+        "compact-m2/m2-diag": {
+          "sessions": 35,
+          "turns": 91,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8051969823973177,
+            "p90": 0.9862679406047069
+          },
+          "hitSession": {
+            "median": 0.6857414530838052,
+            "p90": 0.9119372043163173
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r2-ckm2": {
+          "sessions": 30,
+          "turns": 83,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8056948623648724,
+            "p90": 0.9866412213740458
+          },
+          "hitSession": {
+            "median": 0.811151680509302,
+            "p90": 0.9126010494965253
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r2-m2": {
+          "sessions": 78,
+          "turns": 200,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8053695021210091,
+            "p90": 0.985097829000268
+          },
+          "hitSession": {
+            "median": 0.7807415632694443,
+            "p90": 0.9121249180269758
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r3-check": {
+          "sessions": 24,
+          "turns": 78,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9067886569276652,
+            "p90": 0.9853370817485254
+          },
+          "hitSession": {
+            "median": 0.910172737583905,
+            "p90": 0.9197058984510409
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r3-ledger": {
+          "sessions": 12,
+          "turns": 40,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9060385741694436,
+            "p90": 0.9850162507574506
+          },
+          "hitSession": {
+            "median": 0.9006961543230652,
+            "p90": 0.9201350241766262
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r3-merge": {
+          "sessions": 36,
+          "turns": 112,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9059880844188629,
+            "p90": 0.9850696931298552
+          },
+          "hitSession": {
+            "median": 0.8996231222464037,
+            "p90": 0.9201934483073273
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r4-check": {
+          "sessions": 24,
+          "turns": 74,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9059013579686002,
+            "p90": 0.9850162507574506
+          },
+          "hitSession": {
+            "median": 0.9097059178351692,
+            "p90": 0.9197993616051071
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r4-json": {
+          "sessions": 45,
+          "turns": 118,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8057846633972359,
+            "p90": 0.9850977785164257
+          },
+          "hitSession": {
+            "median": 0.8476721912217873,
+            "p90": 0.9119549231886883
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r4-meas": {
+          "sessions": 72,
+          "turns": 215,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9062989341819467,
+            "p90": 0.9851766132143054
+          },
+          "hitSession": {
+            "median": 0.9097592900309126,
+            "p90": 0.9201865957214184
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "m2": {
+          "sessions": 3,
+          "turns": 10,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9075799546713674,
+            "p90": 0.9846465975763558
+          },
+          "hitSession": {
+            "median": 0.9113662821462588,
+            "p90": 0.9207641830112883
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "m2-text/off": {
+          "sessions": 2,
+          "turns": 6,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8059593829763623,
+            "p90": 0.982723264636522
+          },
+          "hitSession": {
+            "median": 0.8539192217970024,
+            "p90": 0.9116956897616401
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a1/priv": {
+          "sessions": 2,
+          "turns": 8,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8791512483020282,
+            "p90": 0.9915398388540734
+          },
+          "hitSession": {
+            "median": 0.8881417116570297,
+            "p90": 0.9261072195497041
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a1b/priv": {
+          "sessions": 2,
+          "turns": 7,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9430225727951665,
+            "p90": 0.9602066390465961
+          },
+          "hitSession": {
+            "median": 0.9033269324202392,
+            "p90": 0.9116924484505515
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a2/priv": {
+          "sessions": 1,
+          "turns": 3,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8790972092152088,
+            "p90": 0.9489378721891387
+          },
+          "hitSession": {
+            "median": 0.8879220882892951,
+            "p90": 0.8879220882892951
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search": {
+          "sessions": 5,
+          "turns": 26,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8908916972962087,
+            "p90": 0.981720496510838
+          },
+          "hitSession": {
+            "median": 0.8707355879523422,
+            "p90": 0.9134514539227606
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search-a1": {
+          "sessions": 5,
+          "turns": 26,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9142181695373185,
+            "p90": 0.973835283727092
+          },
+          "hitSession": {
+            "median": 0.8686438545095789,
+            "p90": 0.9008460758258547
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/git-history": {
+          "sessions": 5,
+          "turns": 23,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9300672613652626,
+            "p90": 0.9853232598464207
+          },
+          "hitSession": {
+            "median": 0.9122747964352119,
+            "p90": 0.9152552062066149
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json": {
+          "sessions": 5,
+          "turns": 19,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9412181721510013,
+            "p90": 0.9743020617539706
+          },
+          "hitSession": {
+            "median": 0.8782769416468635,
+            "p90": 0.9359035737418683
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json-a1": {
+          "sessions": 5,
+          "turns": 16,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9154006726197379,
+            "p90": 0.9534764588087365
+          },
+          "hitSession": {
+            "median": 0.8537556349159885,
+            "p90": 0.8922515052808212
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/repo-research": {
+          "sessions": 5,
+          "turns": 20,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.7692307692307693,
+            "p90": 0.9278573089314778
+          },
+          "hitSession": {
+            "median": 0.8098212385613961,
+            "p90": 0.8247063787889444
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/session-continuity": {
+          "sessions": 2,
+          "turns": 13,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9010177883733724,
+            "p90": 0.9833121343169677
+          },
+          "hitSession": {
+            "median": 0.895597631291881,
+            "p90": 0.9172519636490363
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape": {
+          "sessions": 5,
+          "turns": 14,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8256061471367011,
+            "p90": 0.9182758785104659
+          },
+          "hitSession": {
+            "median": 0.8406197922206857,
+            "p90": 0.8870314692323111
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape-a1": {
+          "sessions": 5,
+          "turns": 13,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8245113795427446,
+            "p90": 0.9106957424714434
+          },
+          "hitSession": {
+            "median": 0.8368931461208948,
+            "p90": 0.8411934894123076
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        }
+      },
+      "breakList": []
+    },
+    "v2": {
+      "total": {
+        "sessions": 1738,
+        "turns": 8786,
+        "resumeTurns": 109,
+        "breaks": 0,
+        "breakRate": 0,
+        "hitTurn": {
+          "median": 0.9662492039906602,
+          "p90": 0.9845433668963081
+        },
+        "hitSession": {
+          "median": 0.9303808455236361,
+          "p90": 0.9632674853176721
+        },
+        "compactTurns": {
+          "count": 1164,
+          "hitMedian": 0.7384717356310956,
+          "rewrittenMedian": 3141
+        }
+      },
+      "byWorkload": {
+        "compact-m2/a-ledger": {
+          "sessions": 54,
+          "turns": 260,
+          "resumeTurns": 3,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9730625334045965,
+            "p90": 0.9829518696430254
+          },
+          "hitSession": {
+            "median": 0.9575252874030141,
+            "p90": 0.9703093395683721
+          },
+          "compactTurns": {
+            "count": 54,
+            "hitMedian": 0.7445346062052506,
+            "rewrittenMedian": 1530
+          }
+        },
+        "compact-m2/a-push": {
+          "sessions": 54,
+          "turns": 233,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9749739311783108,
+            "p90": 0.9837519688303076
+          },
+          "hitSession": {
+            "median": 0.9667557509303893,
+            "p90": 0.9712899312575819
+          },
+          "compactTurns": {
+            "count": 54,
+            "hitMedian": 0.7316135084427767,
+            "rewrittenMedian": 1542
+          }
+        },
+        "compact-m2/b-shape": {
+          "sessions": 57,
+          "turns": 147,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9696658097686375,
+            "p90": 0.9885606338878102
+          },
+          "hitSession": {
+            "median": 0.8897068524235467,
+            "p90": 0.9368274859494049
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/compact-diag": {
+          "sessions": 75,
+          "turns": 348,
+          "resumeTurns": 7,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9649390243902439,
+            "p90": 0.9820515205059053
+          },
+          "hitSession": {
+            "median": 0.9580731800899926,
+            "p90": 0.967600456331601
+          },
+          "compactTurns": {
+            "count": 75,
+            "hitMedian": 0.7066505115778137,
+            "rewrittenMedian": 1502
+          }
+        },
+        "compact-m2/du-deny": {
+          "sessions": 57,
+          "turns": 146,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9834926605025336,
+            "p90": 0.9902735878497867
+          },
+          "hitSession": {
+            "median": 0.8888771717065197,
+            "p90": 0.9409582043141405
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/du-merge": {
+          "sessions": 114,
+          "turns": 437,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9737910043963477,
+            "p90": 0.9841843414506415
+          },
+          "hitSession": {
+            "median": 0.9409582043141405,
+            "p90": 0.9670299523655136
+          },
+          "compactTurns": {
+            "count": 90,
+            "hitMedian": 0.7168198529411764,
+            "rewrittenMedian": 2285
+          }
+        },
+        "compact-m2/du-review": {
+          "sessions": 12,
+          "turns": 32,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9862496063818621,
+            "p90": 0.9901281243436253
+          },
+          "hitSession": {
+            "median": 0.8903947056186885,
+            "p90": 0.940890624795893
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/du-units": {
+          "sessions": 36,
+          "turns": 159,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9731736122827738,
+            "p90": 0.9817981713511683
+          },
+          "hitSession": {
+            "median": 0.9264807400248516,
+            "p90": 0.9662783721627837
+          },
+          "compactTurns": {
+            "count": 36,
+            "hitMedian": 0.7158986598127409,
+            "rewrittenMedian": 2533
+          }
+        },
+        "compact-m2/m2-diag": {
+          "sessions": 35,
+          "turns": 104,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9734369444867692,
+            "p90": 0.9880858657429277
+          },
+          "hitSession": {
+            "median": 0.8872267579668159,
+            "p90": 0.9259440374778722
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r2-ckcmp": {
+          "sessions": 36,
+          "turns": 303,
+          "resumeTurns": 6,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9632467244059516,
+            "p90": 0.9830176355323318
+          },
+          "hitSession": {
+            "median": 0.93524577393472,
+            "p90": 0.9559431081500351
+          },
+          "compactTurns": {
+            "count": 36,
+            "hitMedian": 0.7446767879308699,
+            "rewrittenMedian": 3565
+          }
+        },
+        "compact-m2/r2-ckm2": {
+          "sessions": 30,
+          "turns": 80,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.978546677537709,
+            "p90": 0.9879827875734677
+          },
+          "hitSession": {
+            "median": 0.8897068524235467,
+            "p90": 0.9294745569489066
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r2-cmp": {
+          "sessions": 154,
+          "turns": 1077,
+          "resumeTurns": 15,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9660297239915074,
+            "p90": 0.9830685817559213
+          },
+          "hitSession": {
+            "median": 0.946660791326358,
+            "p90": 0.968310104287047
+          },
+          "compactTurns": {
+            "count": 154,
+            "hitMedian": 0.7543282715929974,
+            "rewrittenMedian": 2296
+          }
+        },
+        "compact-m2/r2-m2": {
+          "sessions": 78,
+          "turns": 201,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9778448628735161,
+            "p90": 0.9884044283540584
+          },
+          "hitSession": {
+            "median": 0.889680466503074,
+            "p90": 0.9229867152083735
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r3-check": {
+          "sessions": 124,
+          "turns": 661,
+          "resumeTurns": 5,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9597922181709205,
+            "p90": 0.9838056680161943
+          },
+          "hitSession": {
+            "median": 0.9263234177652012,
+            "p90": 0.9506356457381635
+          },
+          "compactTurns": {
+            "count": 100,
+            "hitMedian": 0.7304142941291969,
+            "rewrittenMedian": 3526
+          }
+        },
+        "compact-m2/r3-ledger": {
+          "sessions": 91,
+          "turns": 498,
+          "resumeTurns": 1,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9639589377371123,
+            "p90": 0.9837051237364935
+          },
+          "hitSession": {
+            "median": 0.9302538708842985,
+            "p90": 0.9528635697315877
+          },
+          "compactTurns": {
+            "count": 79,
+            "hitMedian": 0.7309278350515463,
+            "rewrittenMedian": 3486
+          }
+        },
+        "compact-m2/r3-merge": {
+          "sessions": 306,
+          "turns": 2041,
+          "resumeTurns": 44,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.966309053265575,
+            "p90": 0.983397648748093
+          },
+          "hitSession": {
+            "median": 0.9394666300089354,
+            "p90": 0.9575306850474635
+          },
+          "compactTurns": {
+            "count": 270,
+            "hitMedian": 0.744605690280695,
+            "rewrittenMedian": 3681
+          }
+        },
+        "compact-m2/r4-check": {
+          "sessions": 66,
+          "turns": 283,
+          "resumeTurns": 3,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9706368140943292,
+            "p90": 0.9855543517515348
+          },
+          "hitSession": {
+            "median": 0.9237121915969857,
+            "p90": 0.9531644073139974
+          },
+          "compactTurns": {
+            "count": 42,
+            "hitMedian": 0.7171494252873564,
+            "rewrittenMedian": 3224
+          }
+        },
+        "compact-m2/r4-fin": {
+          "sessions": 12,
+          "turns": 55,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9575825227236485,
+            "p90": 0.9832570905763952
+          },
+          "hitSession": {
+            "median": 0.8224666503487945,
+            "p90": 0.9251998524166769
+          },
+          "compactTurns": {
+            "count": 12,
+            "hitMedian": 0.7126930457826921,
+            "rewrittenMedian": 3160
+          }
+        },
+        "compact-m2/r4-json": {
+          "sessions": 45,
+          "turns": 108,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9719560770804176,
+            "p90": 0.9870994808327652
+          },
+          "hitSession": {
+            "median": 0.8870411787922642,
+            "p90": 0.9177955932733944
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "compact-m2/r4-meas": {
+          "sessions": 234,
+          "turns": 1274,
+          "resumeTurns": 24,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9633658286300667,
+            "p90": 0.9844795150501672
+          },
+          "hitSession": {
+            "median": 0.9287782416074606,
+            "p90": 0.950736126840317
+          },
+          "compactTurns": {
+            "count": 162,
+            "hitMedian": 0.7334022945269889,
+            "rewrittenMedian": 3444
+          }
+        },
+        "m2": {
+          "sessions": 15,
+          "turns": 65,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9835900870730073,
+            "p90": 0.9887202411893128
+          },
+          "hitSession": {
+            "median": 0.9329987412710757,
+            "p90": 0.9573950395296401
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "m2-text/before": {
+          "sessions": 6,
+          "turns": 26,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9790860981070629,
+            "p90": 0.9906245422139753
+          },
+          "hitSession": {
+            "median": 0.9356872311741671,
+            "p90": 0.9581282193970007
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a1/priv": {
+          "sessions": 2,
+          "turns": 17,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9629143530203601,
+            "p90": 0.9857826261903697
+          },
+          "hitSession": {
+            "median": 0.6470624912318987,
+            "p90": 0.9058085863269839
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a1b/priv": {
+          "sessions": 2,
+          "turns": 7,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8797636219812945,
+            "p90": 0.9545131485429993
+          },
+          "hitSession": {
+            "median": 0.8788155184072717,
+            "p90": 0.8992153803799211
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a2/priv": {
+          "sessions": 1,
+          "turns": 6,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9499624276179109,
+            "p90": 0.9846638956571593
+          },
+          "hitSession": {
+            "median": 0.8108558953307812,
+            "p90": 0.8108558953307812
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search": {
+          "sessions": 5,
+          "turns": 45,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9432270358123634,
+            "p90": 0.9906642393689026
+          },
+          "hitSession": {
+            "median": 0.9165884556117705,
+            "p90": 0.9299155821315512
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search-a1": {
+          "sessions": 5,
+          "turns": 34,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8657197466551737,
+            "p90": 0.9905441823081651
+          },
+          "hitSession": {
+            "median": 0.8741843321223237,
+            "p90": 0.905230864993442
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/git-history": {
+          "sessions": 5,
+          "turns": 18,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8277471987418911,
+            "p90": 0.982263367364596
+          },
+          "hitSession": {
+            "median": 0.8391287541385859,
+            "p90": 0.9017085522267972
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json": {
+          "sessions": 5,
+          "turns": 25,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9681213387221289,
+            "p90": 0.984757999821731
+          },
+          "hitSession": {
+            "median": 0.9039741377675812,
+            "p90": 0.9297133013682097
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json-a1": {
+          "sessions": 5,
+          "turns": 32,
+          "resumeTurns": 1,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9607510058113545,
+            "p90": 0.9796382067639605
+          },
+          "hitSession": {
+            "median": 0.9227281409079963,
+            "p90": 0.9376211493155996
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/repo-research": {
+          "sessions": 5,
+          "turns": 15,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.7563075096467795,
+            "p90": 0.8676396030998769
+          },
+          "hitSession": {
+            "median": 0.7825489622917275,
+            "p90": 0.812351846254196
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/session-continuity": {
+          "sessions": 2,
+          "turns": 18,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9594831451514287,
+            "p90": 0.9934599988724137
+          },
+          "hitSession": {
+            "median": 0.9258765197475818,
+            "p90": 0.9313205257836198
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape": {
+          "sessions": 5,
+          "turns": 15,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.7560729346083032,
+            "p90": 0.9305837932036015
+          },
+          "hitSession": {
+            "median": 0.8199443794836141,
+            "p90": 0.8207383313332912
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape-a1": {
+          "sessions": 5,
+          "turns": 16,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.7560280318327592,
+            "p90": 0.9281396372953281
+          },
+          "hitSession": {
+            "median": 0.8276425935371599,
+            "p90": 0.8597023468803664
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        }
+      },
+      "breakList": []
+    },
+    "gateway": {
+      "total": {
+        "sessions": 47,
+        "turns": 96,
+        "resumeTurns": 0,
+        "breaks": 0,
+        "breakRate": 0,
+        "hitTurn": {
+          "median": 0.9333841851004322,
+          "p90": 0.9535728180521333
+        },
+        "hitSession": {
+          "median": 0.9079762073935728,
+          "p90": 0.9534022226554884
+        },
+        "compactTurns": {
+          "count": 0,
+          "hitMedian": null,
+          "rewrittenMedian": null
+        }
+      },
+      "byWorkload": {
+        "tryit-smoke-a1/priv": {
+          "sessions": 2,
+          "turns": 7,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9136155893727086,
+            "p90": 0.9550873123268252
+          },
+          "hitSession": {
+            "median": 0.6510629691222077,
+            "p90": 0.8944466211019692
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a1b/priv": {
+          "sessions": 2,
+          "turns": 7,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8949900934050382,
+            "p90": 0.9394570849290381
+          },
+          "hitSession": {
+            "median": 0.8947130033764309,
+            "p90": 0.8990511448935271
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit-smoke-a2/priv": {
+          "sessions": 1,
+          "turns": 3,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8949267671407345,
+            "p90": 0.9422164482602802
+          },
+          "hitSession": {
+            "median": 0.8956740380453824,
+            "p90": 0.8956740380453824
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search": {
+          "sessions": 5,
+          "turns": 5,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": null,
+          "hitTurn": {
+            "median": 0.9534022226554884,
+            "p90": 0.9534022226554884
+          },
+          "hitSession": {
+            "median": 0.9534022226554884,
+            "p90": 0.9534022226554884
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search-a1": {
+          "sessions": 5,
+          "turns": 5,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": null,
+          "hitTurn": {
+            "median": 0.9534022226554884,
+            "p90": 0.9534022226554884
+          },
+          "hitSession": {
+            "median": 0.9534022226554884,
+            "p90": 0.9534022226554884
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/git-history": {
+          "sessions": 5,
+          "turns": 15,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9363631906652939,
+            "p90": 0.9535064935064935
+          },
+          "hitSession": {
+            "median": 0.8906818599522147,
+            "p90": 0.9387729679227655
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json": {
+          "sessions": 5,
+          "turns": 12,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8984604105571847,
+            "p90": 0.9535728180521333
+          },
+          "hitSession": {
+            "median": 0.8424369146163321,
+            "p90": 0.9079762073935728
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json-a1": {
+          "sessions": 5,
+          "turns": 11,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8875611080934275,
+            "p90": 0.953510990079751
+          },
+          "hitSession": {
+            "median": 0.8792502101629434,
+            "p90": 0.9193548387096774
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/repo-research": {
+          "sessions": 5,
+          "turns": 13,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9075546719681908,
+            "p90": 0.9535064935064935
+          },
+          "hitSession": {
+            "median": 0.890660966787241,
+            "p90": 0.9535064935064935
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/session-continuity": {
+          "sessions": 2,
+          "turns": 8,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8874447621523265,
+            "p90": 0.9822090050607816
+          },
+          "hitSession": {
+            "median": 0.8748565322357225,
+            "p90": 0.9187211035978374
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape": {
+          "sessions": 5,
+          "turns": 5,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": null,
+          "hitTurn": {
+            "median": 0.9533523908523909,
+            "p90": 0.9533523908523909
+          },
+          "hitSession": {
+            "median": 0.9533523908523909,
+            "p90": 0.9533523908523909
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape-a1": {
+          "sessions": 5,
+          "turns": 5,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": null,
+          "hitTurn": {
+            "median": 0.9532904567010979,
+            "p90": 0.9532904567010979
+          },
+          "hitSession": {
+            "median": 0.9532904567010979,
+            "p90": 0.9532904567010979
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        }
+      },
+      "breakList": []
+    },
+    "v1": {
+      "total": {
+        "sessions": 42,
+        "turns": 190,
+        "resumeTurns": 0,
+        "breaks": 0,
+        "breakRate": 0,
+        "hitTurn": {
+          "median": 0.9112252080659186,
+          "p90": 0.9767265716449769
+        },
+        "hitSession": {
+          "median": 0.8254961610893814,
+          "p90": 0.9152620881977596
+        },
+        "compactTurns": {
+          "count": 0,
+          "hitMedian": null,
+          "rewrittenMedian": null
+        }
+      },
+      "byWorkload": {
+        "tryit/docs-search": {
+          "sessions": 5,
+          "turns": 20,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8384588966249337,
+            "p90": 0.945088104906307
+          },
+          "hitSession": {
+            "median": 0.8133051046812515,
+            "p90": 0.8137468108942676
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/docs-search-a1": {
+          "sessions": 5,
+          "turns": 20,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8385192127460168,
+            "p90": 0.945088104906307
+          },
+          "hitSession": {
+            "median": 0.813647231583109,
+            "p90": 0.8222613897345511
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/git-history": {
+          "sessions": 5,
+          "turns": 16,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9246414923778609,
+            "p90": 0.9781826260830927
+          },
+          "hitSession": {
+            "median": 0.8476808998543762,
+            "p90": 0.8636556179180345
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json": {
+          "sessions": 5,
+          "turns": 36,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.961191903105486,
+            "p90": 0.9813816220942942
+          },
+          "hitSession": {
+            "median": 0.9094969070481987,
+            "p90": 0.9238997453956287
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/large-json-a1": {
+          "sessions": 5,
+          "turns": 31,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9505394824787549,
+            "p90": 0.9783895205798258
+          },
+          "hitSession": {
+            "median": 0.8895923888009514,
+            "p90": 0.9257513553125755
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/repo-research": {
+          "sessions": 5,
+          "turns": 22,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.7359057391440053,
+            "p90": 0.9586867615873977
+          },
+          "hitSession": {
+            "median": 0.792893098782138,
+            "p90": 0.8576353240057255
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/session-continuity": {
+          "sessions": 2,
+          "turns": 17,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.9695987654320988,
+            "p90": 0.9822637370948833
+          },
+          "hitSession": {
+            "median": 0.9156859524276321,
+            "p90": 0.921030050000825
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape": {
+          "sessions": 5,
+          "turns": 13,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8221979938944614,
+            "p90": 0.9284056870438341
+          },
+          "hitSession": {
+            "median": 0.7845874245904536,
+            "p90": 0.8412701790978068
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        },
+        "tryit/web-scrape-a1": {
+          "sessions": 5,
+          "turns": 15,
+          "resumeTurns": 0,
+          "breaks": 0,
+          "breakRate": 0,
+          "hitTurn": {
+            "median": 0.8995187759634763,
+            "p90": 0.9391421611275448
+          },
+          "hitSession": {
+            "median": 0.8042037988457459,
+            "p90": 0.857435994197908
+          },
+          "compactTurns": {
+            "count": 0,
+            "hitMedian": null,
+            "rewrittenMedian": null
+          }
+        }
+      },
+      "breakList": []
+    }
+  },
+  "source": {
+    "files": 2474,
+    "duplicatesSkipped": 0,
+    "claudeCodeVersions": {
+      "2.1.303": 2474
+    }
+  }
+}

@@ -1,0 +1,34 @@
+name: Feature request
+description: File an idea for context-mode v2.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        context-mode does not accept pull requests. File the idea; the owner implements it.
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - claude-code
+        - codex
+        - gemini
+        - qwen
+        - copilot-cli
+        - vscode
+        - kiro
+        - zcode
+        - pi
+        - opencode
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence links

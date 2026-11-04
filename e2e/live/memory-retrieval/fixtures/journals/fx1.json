@@ -1,0 +1,33 @@
+{
+  "projectKey": "fx1",
+  "worktree": "/fixture/wt",
+  "agent": "claude-code",
+  "rows": [
+    { "seq": 1, "session_id": "s1", "turn": 1, "kind": "prompt", "body": "We should pick a database for the project before building further.", "ts": 1001 },
+    { "seq": 2, "session_id": "s1", "turn": 1, "kind": "decision", "key": "Which database should we use?", "body": "Q: Which database should we use? -> A: Postgres", "ts": 1002 },
+    { "seq": 3, "session_id": "s1", "turn": 2, "kind": "edit", "path": "src/db/config.ts", "key": "Edit:src/db/config.ts", "body": "configure postgres connection pool", "ts": 1003 },
+    { "seq": 4, "session_id": "s1", "turn": 3, "kind": "toolerr", "tool": "Bash", "key": "npm run build", "body": "Error: Cannot find module 'pg'", "ok": false, "ts": 1004 },
+    { "seq": 5, "session_id": "s1", "turn": 4, "kind": "cmd", "tool": "Bash", "key": "npm install pg", "body": "installed pg dependency successfully", "ok": true, "ts": 1005 },
+    { "seq": 6, "session_id": "s1", "turn": 5, "kind": "decision", "key": "Should we enable strict typescript mode?", "body": "Q: Should we enable strict typescript mode? -> A: Yes", "ts": 1006 },
+    { "seq": 7, "session_id": "s1", "turn": 6, "kind": "edit", "path": "tsconfig.json", "key": "Edit:tsconfig.json", "body": "enabled strict mode in tsconfig", "ts": 1007 },
+    { "seq": 8, "session_id": "s1", "turn": 7, "kind": "toolerr", "tool": "Bash", "key": "npm run typecheck", "body": "Error: Cannot find module 'tslib'", "ok": false, "ts": 1008 },
+    { "seq": 9, "session_id": "s1", "turn": 8, "kind": "cmd", "tool": "Bash", "key": "npm install tslib", "body": "installed tslib dependency successfully", "ok": true, "ts": 1009 },
+    { "seq": 10, "session_id": "s1", "turn": 9, "kind": "prompt", "body": "Let's add redis caching next session.", "ts": 1010 },
+
+    { "seq": 11, "session_id": "s2", "turn": 1, "kind": "prompt", "body": "What did we decide about the database earlier?", "ts": 2011 },
+    { "seq": 12, "session_id": "s2", "turn": 2, "kind": "prompt", "body": "Remind me what we decided about strict typescript mode.", "ts": 2012 },
+    { "seq": 13, "session_id": "s2", "turn": 3, "kind": "toolerr", "tool": "Bash", "key": "npm run build", "body": "Error: Cannot find module 'pg'", "ok": false, "ts": 2013 },
+    { "seq": 14, "session_id": "s2", "turn": 4, "kind": "prompt", "body": "The build fails again, missing module pg, what fixed this last time?", "ts": 2014 },
+    { "seq": 15, "session_id": "s2", "turn": 5, "kind": "toolerr", "tool": "Bash", "key": "npm run typecheck", "body": "Error: Cannot find module 'tslib'", "ok": false, "ts": 2015 },
+    { "seq": 16, "session_id": "s2", "turn": 6, "kind": "prompt", "body": "Typecheck is failing on tslib again, how did we solve it before?", "ts": 2016 },
+    { "seq": 17, "session_id": "s2", "turn": 7, "kind": "edit", "path": "src/cache/redis.ts", "key": "Edit:src/cache/redis.ts", "body": "added redis cache client wrapper", "ts": 2017 },
+    { "seq": 18, "session_id": "s2", "turn": 8, "kind": "prompt", "body": "Which file did we change for the redis caching work?", "ts": 2018 },
+    { "seq": 19, "session_id": "s2", "turn": 9, "kind": "edit", "path": "src/db/config.ts", "key": "Edit:src/db/config.ts", "body": "tuned postgres pool size settings", "ts": 2019 },
+    { "seq": 20, "session_id": "s2", "turn": 10, "kind": "prompt", "body": "Which file holds the database connection configuration?", "ts": 2020 },
+    { "seq": 21, "session_id": "s2", "turn": 11, "kind": "cmd", "tool": "Bash", "key": "git commit", "body": "committed caching and db changes", "ok": true, "ts": 2021 },
+    { "seq": 22, "session_id": "s2", "turn": 12, "kind": "index", "path": "README.md", "body": "reindexed readme after updates", "ts": 2022 },
+    { "seq": 23, "session_id": "s2", "turn": 13, "kind": "prompt", "body": "Summarize what we did right before this point.", "ts": 2023 },
+    { "seq": 24, "session_id": "s2", "turn": 14, "kind": "prompt", "body": "One more unrelated chat turn about lunch plans.", "ts": 2024 },
+    { "seq": 25, "session_id": "s2", "turn": 15, "kind": "prompt", "body": "What happened earlier in this project overall?", "ts": 2025 }
+  ]
+}

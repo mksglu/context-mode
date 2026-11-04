@@ -1,0 +1,7 @@
+{
+  "id": "repo-github-files",
+  "kind": "local",
+  "covers": [".github/ISSUE_TEMPLATE/", ".github/workflows/openclaw-e2e.yml"],
+  "run": ["node", "e2e/checks/repo-github-files.mjs"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

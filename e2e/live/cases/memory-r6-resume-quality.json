@@ -1,0 +1,5 @@
+{ "id": "memory-r6-resume-quality", "kind": "agent",
+  "covers": ["src/core/compaction/", "src/core/tools/search.ts", "e2e/live/memory-r6/"],
+  "prompt": "Compacted state: a build failed with 'module not found: ./widget'; then src/widget.ts was created; the last user request was 'run the tests'. What is the next action? Reply with exactly one word: TESTS if it is running the test suite, otherwise OTHER.",
+  "tools": [],
+  "expect": { "firstLineStartsWith": "TESTS" } }

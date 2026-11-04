@@ -1,0 +1,7 @@
+[
+  { "seq": 1, "turn": 1, "kind": "prompt", "body": "set up the build" },
+  { "seq": 2, "turn": 1, "kind": "cmd", "body": "npm run build" },
+  { "seq": 3, "turn": 1, "kind": "toolerr", "body": "build: module not found: ./widget" },
+  { "seq": 4, "turn": 2, "kind": "edit", "body": "src/widget.ts created" },
+  { "seq": 5, "turn": 2, "kind": "prompt", "body": "run the tests now" }
+]

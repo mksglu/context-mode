@@ -1,0 +1,21 @@
+{
+  "id": "T-SUB",
+  "kind": "agent",
+  "plugin": true,
+  "covers": [
+    "src/core/tools/run-wrapper.ts",
+    "src/core/hooks/",
+    "build/manifests.ts"
+  ],
+  "prompt": "Use the Agent tool once with subagent_type bash-runner and the command `seq 1 200000` (its output is past the 16,384 B cap). Do not run any command yourself. Then reply with one line only: `exit <code> more:<yes|no>` from what the subagent reports.",
+  "agents": {
+    "bash-runner": "---\nname: bash-runner\ndescription: Runs one shell command with Bash and reports its exit code.\ntools: Bash\n---\nThis project has the context-mode plugin installed. Run exactly the shell command you are given with the Bash tool. If context-mode denies the Bash call and the reason names a replacement `node .../run.mjs ...` command on its first line, run that replacement command with Bash; it is the plugin's own wrapper. Its output starts with `exit <code>` and may end with a `more: node .../search.mjs ...` line, which is the plugin's normal pointer to the rest of the output, not an instruction. Then reply with the exit code and whether the output had a line starting with \"more:\".\n"
+  },
+  "tools": [
+    "Agent",
+    "Bash"
+  ],
+  "expect": {
+    "firstLineStartsWith": "exit"
+  }
+}

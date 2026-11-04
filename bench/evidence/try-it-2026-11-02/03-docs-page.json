@@ -1,0 +1,1690 @@
+{
+ "summary": {
+  "id": "03-docs-page",
+  "date": "2026-11-02",
+  "version": "2.0.0-next.26",
+  "model": "claude-haiku-5-5",
+  "prompt": "On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array.",
+  "job": "docs page",
+  "verdict": "pass",
+  "reason": "ChatRoom example with cleanup shown; dependency rules match the page (Object.is, [] runs on mount, no array runs every render)",
+  "raw_bytes": 601984,
+  "raw_source": "react.dev useEffect page HTML",
+  "context_bytes": 20860,
+  "saving_pct": 96.5,
+  "tool_calls": 8,
+  "tools": [
+   "ToolSearch",
+   "WebFetch",
+   "ctx_execute",
+   "ctx_execute",
+   "ctx_execute",
+   "ctx_execute",
+   "ctx_execute",
+   "ctx_execute"
+  ],
+  "turns": 9,
+  "cost_usd": 0.006272354999999999,
+  "wall_s": 28,
+  "route": "ctx tools",
+  "journal": {
+   "events": 7,
+   "sandbox_bytes": 20004,
+   "returned_bytes": 20074,
+   "tools": {
+    "ctx_execute": 6
+   }
+  },
+  "answer": "The page's connection example is a `ChatRoom` component. It opens a connection in the Effect and closes it in the cleanup function:\n\n```jsx\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\n\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [serverUrl, roomId]);\n\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\n```\n\nThe page's full sandbox also has an `App` component with a room dropdown and an open/close button, which mounts `ChatRoom` only while it's shown. The cleanup runs when the component unmounts, and before a re-run when `serverUrl` or `roomId` changes, so the old connection is closed before the new one opens.\n\n**Rules for the dependency array**\n\n1. **You don't choose the dependencies; the code does.** Every reactive value the Effect reads must be listed. Reactive values are props, state, and any variable or function declared in the component body.\n2. **Use a linter.** The React lint rule flags missing dependencies. Suppressing it (`eslint-ignore-next-line react-hooks/exhaustive-deps`) makes React work with wrong values, which causes bugs.\n3. **Omitted array:** the Effect re-runs after every commit of the component.\n4. **Empty array `[]`:** the Effect runs only on mount (and its cleanup on unmount). It does not re-run when props or state change. This is only correct if the Effect uses no reactive values.\n5. **Non-empty array:** the Effect runs after mount and again whenever any listed value changes.\n6. **Format:** the list must be written inline as an array literal, and its length must stay constant between renders.\n7. **Comparison:** React compares each entry with the previous value using `Object.is`.\n8. **Removing a dependency:** you can't just delete it. Prove it isn't reactive, for example by moving a constant outside the component.\n9. **Objects and functions created inside the component** are new on every render, so they make the Effect re-run on every commit. Fix this by moving them inside the Effect, or by moving them outside the component.\n10. **Strict Mode** runs one extra setup-and-cleanup cycle in development, so the cleanup should fully undo the setup.\n\nI fetched the page through the sandbox because a hook blocked WebFetch for this URL. The content above is from that fetch."
+ },
+ "stream": [
+  {
+   "type": "system",
+   "subtype": "hook_started",
+   "hook_id": "bc23c927-684c-42a1-9619-107e60b8a803",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "uuid": "73fea72b-42fd-4b92-a3fa-55387cc0907a",
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678"
+  },
+  {
+   "type": "system",
+   "subtype": "hook_response",
+   "hook_id": "bc23c927-684c-42a1-9619-107e60b8a803",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "output": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stderr": "",
+   "exit_code": 0,
+   "outcome": "success",
+   "uuid": "ab47f90e-0ebb-416a-ab43-40974747df12",
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678"
+  },
+  {
+   "type": "system",
+   "subtype": "init",
+   "cwd": "/TMP",
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "tools": [
+    "Task",
+    "Bash",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "DesignSync",
+    "Edit",
+    "EnterWorktree",
+    "ExitWorktree",
+    "ListAgents",
+    "Monitor",
+    "NotebookEdit",
+    "PushNotification",
+    "Read",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "SendMessage",
+    "Skill",
+    "TaskStop",
+    "ToolSearch",
+    "WebFetch",
+    "WebSearch",
+    "Workflow",
+    "Write",
+    "mcp__plugin_context-mode_context-mode__ctx_batch",
+    "mcp__plugin_context-mode_context-mode__ctx_doctor",
+    "mcp__plugin_context-mode_context-mode__ctx_execute",
+    "mcp__plugin_context-mode_context-mode__ctx_index",
+    "mcp__plugin_context-mode_context-mode__ctx_purge",
+    "mcp__plugin_context-mode_context-mode__ctx_resume",
+    "mcp__plugin_context-mode_context-mode__ctx_search",
+    "mcp__plugin_context-mode_context-mode__ctx_stats",
+    "mcp__plugin_context-mode_context-mode__ctx_upgrade"
+   ],
+   "mcp_servers": [
+    {
+     "name": "plugin:context-mode:context-mode",
+     "status": "connected",
+     "source": "plugin"
+    }
+   ],
+   "model": "claude-haiku-5-5",
+   "permissionMode": "bypassPermissions",
+   "slash_commands": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring",
+    "advisor",
+    "agents",
+    "auto-mode-setup",
+    "autocompact",
+    "clear",
+    "color",
+    "compact",
+    "config",
+    "output-style",
+    "context",
+    "effort",
+    "fast",
+    "focus",
+    "heapdump",
+    "init",
+    "mcp",
+    "import",
+    "model",
+    "__remote-workflow",
+    "workflow-launch-exec",
+    "reload-plugins",
+    "reload-skills",
+    "rename",
+    "security-review",
+    "usage",
+    "insights",
+    "recap",
+    "skill-doctor",
+    "goal",
+    "design-consent",
+    "design-revoke",
+    "list-agents",
+    "team-onboarding"
+   ],
+   "terminal_slash_commands": [
+    "doctor",
+    "color",
+    "focus",
+    "reload-plugins"
+   ],
+   "apiKeySource": "ANTHROPIC_API_KEY",
+   "claude_code_version": "2.1.312",
+   "output_style": "default",
+   "agents": [
+    "claude",
+    "Explore",
+    "general-purpose",
+    "Plan",
+    "statusline-setup"
+   ],
+   "skills": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring"
+   ],
+   "plugins": [
+    {
+     "name": "context-mode",
+     "path": "/TMP",
+     "source": "context-mode@context-mode",
+     "version": "2.0.0-next.26"
+    },
+    {
+     "name": "cc-plugin-agents-md",
+     "path": "builtin",
+     "source": "cc-plugin-agents-md@builtin"
+    },
+    {
+     "name": "cc-plugin-telemetry",
+     "path": "builtin",
+     "source": "cc-plugin-telemetry@builtin"
+    },
+    {
+     "name": "cc-plugin-plugin-authoring",
+     "path": "builtin",
+     "source": "cc-plugin-plugin-authoring@builtin"
+    }
+   ],
+   "capabilities": [
+    "interrupt_receipt_v1",
+    "interrupt_cancel_queued_v1",
+    "interrupt_send_now_v1",
+    "interrupt_requeue_taken_v1",
+    "msg_lifecycle_v1",
+    "request_marker_lists_v1",
+    "ask_user_question_unanswered_v1",
+    "lifecycle_wakeup_source_v1",
+    "sdk_mcp_tools_list_changed",
+    "sdk_mcp_manifests",
+    "mcp_read_resource_v1",
+    "mcp_tool_ui_meta_v1",
+    "ui_surface_v1",
+    "mcp_call_result_not_for_model_v1"
+   ],
+   "analytics_disabled": false,
+   "product_feedback_disabled": false,
+   "uuid": "dad74a06-79df-4cf4-bdb9-1d225a074970",
+   "memory_paths": {
+    "auto": "/TMP"
+   },
+   "original_cwd": "/TMP",
+   "additional_directories": [],
+   "messaging_socket_path": "/tmp/cc-socks/56214.sock",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "per_turn_effort_active": true,
+   "view_mode": "default"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "69ec4f8f-8215-446e-9514-017f14d2d77d"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 274,
+   "estimated_tokens_delta": 224,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "c16a4d60-5a90-4f2a-9a51-6c04dc8227ea"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLVfAppcG9UykrvUBj",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6381,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6381,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 2,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "6074e9e1-da24-49ff-998a-1d8afd71b02d",
+   "timestamp": "2026-11-02T08:25:49.041Z",
+   "request_id": "req_011CgdnLVFsJqK49bKUSJYxv",
+   "thinking_duration_ms": 779,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLVfAppcG9UykrvUBj",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01Qypb9MMSPV6LJLLXf1c4Dg",
+      "name": "ToolSearch",
+      "input": {
+       "query": "select:WebFetch",
+       "max_results": 1
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6381,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6381,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 2,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "dd7f8f46-3629-4f32-bfd0-7cc90b7739c7",
+   "timestamp": "2026-11-02T08:25:49.163Z",
+   "request_id": "req_011CgdnLVFsJqK49bKUSJYxv",
+   "wire_tool_inputs": {
+    "toolu_01Qypb9MMSPV6LJLLXf1c4Dg": {
+     "query": "select:WebFetch",
+     "max_results": 1
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "type": "tool_result",
+      "tool_use_id": "toolu_01Qypb9MMSPV6LJLLXf1c4Dg",
+      "content": [
+       {
+        "type": "tool_reference",
+        "tool_name": "WebFetch"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "a6de816a-f97a-40a2-a307-9a6f6d163b57",
+   "timestamp": "2026-11-02T08:25:49.169Z",
+   "tool_use_result": {
+    "matches": [
+     "WebFetch"
+    ],
+    "query": "select:WebFetch",
+    "total_deferred_tools": 21
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01Qypb9MMSPV6LJLLXf1c4Dg",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLce8JntL6fc32nL7p",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01B6oK6v9tZYCsiP3RiBkdjM",
+      "name": "WebFetch",
+      "input": {
+       "url": "https://react.dev/reference/react/useEffect",
+       "prompt": "Extract verbatim: (1) the example that connects to a chat server and cleans up (the createConnection/connection.connect/disconnect example with serverUrl and roomId, including the full code block for App and chat.js, and the cleanup return function); (2) the full list of rules/caveats about the dependency array (Dependencies section: how dependencies are determined, that they must match code, the three cases of omitted/empty/listed, and any notes about objects/functions being re-created, linting, and removing dependencies). Return code blocks exactly as written."
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 701,
+     "cache_read_input_tokens": 18372,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 701,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 24,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "36b4b462-ea20-4339-8a31-75697c63e70f",
+   "timestamp": "2026-11-02T08:25:51.113Z",
+   "request_id": "req_011CgdnLcG4AbYh1VXjUKdkL",
+   "wire_tool_inputs": {
+    "toolu_01B6oK6v9tZYCsiP3RiBkdjM": {
+     "url": "https://react.dev/reference/react/useEffect",
+     "prompt": "Extract verbatim: (1) the example that connects to a chat server and cleans up (the createConnection/connection.connect/disconnect example with serverUrl and roomId, including the full code block for App and chat.js, and the cleanup return function); (2) the full list of rules/caveats about the dependency array (Dependencies section: how dependencies are determined, that they must match code, the three cases of omitted/empty/listed, and any notes about objects/functions being re-created, linting, and removing dependencies). Return code blocks exactly as written."
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "type": "tool_result",
+      "content": "PreToolUse:WebFetch hook error: context-mode: WebFetch sends its body into the conversation.\nRun it here instead; the full output is indexed and only the part that matches your intent comes back.\nTool: mcp__plugin_context-mode_context-mode__ctx_index, then mcp__plugin_context-mode_context-mode__ctx_search\n{\"url\":\"https://react.dev/reference/react/useEffect\"}",
+      "is_error": true,
+      "tool_use_id": "toolu_01B6oK6v9tZYCsiP3RiBkdjM"
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "78875532-de07-491f-862e-09c54becfd73",
+   "timestamp": "2026-11-02T08:25:51.157Z",
+   "tool_use_result": "Error: PreToolUse:WebFetch hook error: context-mode: WebFetch sends its body into the conversation.\nRun it here instead; the full output is indexed and only the part that matches your intent comes back.\nTool: mcp__plugin_context-mode_context-mode__ctx_index, then mcp__plugin_context-mode_context-mode__ctx_search\n{\"url\":\"https://react.dev/reference/react/useEffect\"}",
+   "tool_result_meta": [
+    {
+     "id": "toolu_01B6oK6v9tZYCsiP3RiBkdjM",
+     "non_execution_kind": "permission-rule",
+     "permission_decision": {
+      "decision": "reject",
+      "source": "hook",
+      "reason_type": "hook"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "a5560d6e-6f9a-495b-8182-62f79bf268c7"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 306,
+   "estimated_tokens_delta": 256,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "f942c45a-26f7-445a-bebc-9339cfb8e652"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLm5dN1dqpKHhCfqJk",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 435,
+     "cache_read_input_tokens": 19073,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 435,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "19fab1b8-a5ab-4a08-bb0a-bb2bdb587f01",
+   "timestamp": "2026-11-02T08:25:52.962Z",
+   "request_id": "req_011CgdnLkfoyVrzXVMtAuHEU",
+   "thinking_duration_ms": 1099,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLm5dN1dqpKHhCfqJk",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "The WebFetch hook redirected me to the context-mode tools, so I'll fetch the page through ctx_execute instead."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 435,
+     "cache_read_input_tokens": 19073,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 435,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "00a0d837-dbd9-475a-bded-d58a56693acf",
+   "timestamp": "2026-11-02T08:25:53.251Z",
+   "request_id": "req_011CgdnLkfoyVrzXVMtAuHEU"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLm5dN1dqpKHhCfqJk",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01FWQssCG48Unt71L8vKKmbp",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "input": {
+       "language": "shell",
+       "code": "curl -sL https://react.dev/reference/react/useEffect -o /tmp/useEffect.html && ls -la /tmp/useEffect.html",
+       "intent": "Fetch the useEffect reference page HTML"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 435,
+     "cache_read_input_tokens": 19073,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 435,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "40cb5e62-23df-446a-89c3-9fcfa5f57f56",
+   "timestamp": "2026-11-02T08:25:53.683Z",
+   "request_id": "req_011CgdnLkfoyVrzXVMtAuHEU",
+   "wire_tool_inputs": {
+    "toolu_01FWQssCG48Unt71L8vKKmbp": {
+     "language": "shell",
+     "code": "curl -sL https://react.dev/reference/react/useEffect -o /tmp/useEffect.html && ls -la /tmp/useEffect.html",
+     "intent": "Fetch the useEffect reference page HTML"
+    }
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_01FWQssCG48Unt71L8vKKmbp",
+     "display_name": "Ctx Execute",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_execute"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01FWQssCG48Unt71L8vKKmbp",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "exit 0 · 69 B\n-rw-r--r--  1 mksglu  wheel  601984  2 Kas 11:25 /tmp/useEffect.html"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "90bea9c6-0acd-4a4a-8658-cf55463a8539",
+   "timestamp": "2026-11-02T08:25:54.535Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "exit 0 · 69 B\n-rw-r--r--  1 mksglu  wheel  601984  2 Kas 11:25 /tmp/useEffect.html"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01FWQssCG48Unt71L8vKKmbp",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnM1YXPM752SDHyk5Nk",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_012mgp8mM4DN81TLv2NveVjr",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "input": {
+       "language": "shell",
+       "code": "python3 - <<'EOF'\nimport re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\n# pull code blocks and text from the main article\nblocks=re.findall(r'<pre[^>]*>(.*?)</pre>',s,re.S)\nprint(\"CODE BLOCKS:\",len(blocks))\nfor i,b in enumerate(blocks):\n    t=html.unescape(re.sub(r'<[^>]+>','',b))\n    if 'serverUrl' in t or 'createConnection' in t or 'roomId' in t:\n        print(f\"--- block {i} ---\"); print(t.strip())\nEOF",
+       "intent": "Print code blocks mentioning serverUrl, createConnection, roomId"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 500,
+     "cache_read_input_tokens": 19508,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 500,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 38,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "44a6ed9f-073e-4db3-b3e2-b2770f180909",
+   "timestamp": "2026-11-02T08:25:56.496Z",
+   "request_id": "req_011CgdnM18ikR4zCvssrPYAW",
+   "wire_tool_inputs": {
+    "toolu_012mgp8mM4DN81TLv2NveVjr": {
+     "language": "shell",
+     "code": "python3 - <<'EOF'\nimport re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\n# pull code blocks and text from the main article\nblocks=re.findall(r'<pre[^>]*>(.*?)</pre>',s,re.S)\nprint(\"CODE BLOCKS:\",len(blocks))\nfor i,b in enumerate(blocks):\n    t=html.unescape(re.sub(r'<[^>]+>','',b))\n    if 'serverUrl' in t or 'createConnection' in t or 'roomId' in t:\n        print(f\"--- block {i} ---\"); print(t.strip())\nEOF",
+     "intent": "Print code blocks mentioning serverUrl, createConnection, roomId"
+    }
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_012mgp8mM4DN81TLv2NveVjr",
+     "display_name": "Ctx Execute",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_execute"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_012mgp8mM4DN81TLv2NveVjr",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "exit 0 · 10492 B\nCODE BLOCKS: 32\n--- block 1 ---\nimport { useState, useEffect } from 'react';import { createConnection } from './chat.js';function ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => {      connection.disconnect();    };  }, [serverUrl, roomId]);  // ...}\n--- block 2 ---\nimport { useState, useEffect } from 'react';import { createConnection } from './chat.js';function ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useEffect(() => {  \tconst connection = createConnection(serverUrl, roomId);    connection.connect();  \treturn () => {      connection.disconnect();  \t};  }, [serverUrl, roomId]);  // ...}\n--- block 3 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [roomId, serverUrl]);\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  const [show, setShow] = useState(false);\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <button onClick={() => setShow(!show)}>\n        {show ? 'Close chat' : 'Open chat'}\n      </button>\n      {show && <hr />}\n      {show && <ChatRoom roomId={roomId} />}\n    </>\n  );\n}\n--- block 4 ---\nfunction useChatRoom({ serverUrl, roomId }) {  useEffect(() => {    const options = {      serverUrl: serverUrl,      roomId: roomId    };    const connection = createConnection(options);    connection.connect();    return () => connection.disconnect();  }, [roomId, serverUrl]);}\n--- block 5 ---\nfunction ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useChatRoom({    roomId: roomId,    serverUrl: serverUrl  });  // ...\n--- block 6 ---\nimport { useState } from 'react';\nimport { useChatRoom } from './useChatRoom.js';\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n  useChatRoom({\n    roomId: roomId,\n    serverUrl: serverUrl\n  });\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  const [show, setShow] = useState(false);\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <button onClick={() => setShow(!show)}>\n        {show ? 'Close chat' : 'Open chat'}\n      </button>\n      {show && <hr />}\n      {show && <ChatRoom roomId={roomId} />}\n    </>\n  );\n}\n--- block 11 ---\nfunction ChatRoom({ roomId }) { // This is a reactive value  const [serverUrl, setServerUrl] = useState('https://localhost:1234'); // This is a reactive value too  useEffect(() => {    const connection = createConnection(serverUrl, roomId); // This Effect reads these reactive values    connection.connect();    return () => connection.disconnect();  }, [serverUrl, roomId]); // ✅ So you must specify them as dependencies of your Effect  // ...}\n--- block 12 ---\nfunction ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => connection.disconnect();  }, []); // 🔴 React Hook useEffect has missing dependencies: 'roomId' and 'serverUrl'  // ...}\n--- block 13 ---\nconst serverUrl = 'https://localhost:1234'; // Not a reactive value anymorefunction ChatRoom({ roomId }) {  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => connection.disconnect();  }, [roomId]); // ✅ All dependencies declared  // ...}\n--- block 14 ---\nconst serverUrl = 'https://localhost:1234'; // Not a reactive value anymoreconst roomId = 'music'; // Not a reactive value anymorefunction ChatRoom() {  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => connection.disconnect();  }, []); // ✅ All dependencies declared  // ...}\n--- block 17 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n  const [message, setMessage] = useState('');\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [serverUrl, roomId]);\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n      <label>\n        Your message:{' '}\n        <input value={message} onChange={e => setMessage(e.target.value)} />\n      </label>\n    </>\n  );\n}\nexport default function App() {\n  const [show, setShow] = useState(false);\n  const [roomId, setRoomId] = useState('general');\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n        <button onClick={() => setShow(!show)}>\n          {show ? 'Close chat' : 'Open chat'}\n        </button>\n      </label>\n      {show && <hr />}\n      {show && <ChatRoom roomId={roomId}/>}\n    </>\n  );\n}\n--- block 20 ---\nconst serverUrl = 'https://localhost:1234';function ChatRoom({ roomId }) {  const [message, setMessage] = useState('');  const options = { // 🚩 This object is created from scratch on every re-render    serverUrl: serverUrl,    roomId: roomId  };  useEffect(() => {    const connection = createConnection(options); // It's used inside the Effect    connection.connect();    return () => connection.disconnect();  }, [options]); // 🚩 As a result, these dependencies are always different on a commit  // ...\n--- block 21 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nconst serverUrl = 'https://localhost:1234';\nfunction ChatRoom({ roomId }) {\n  const [message, setMessage] = useState('');\n  useEffect(() => {\n    const options = {\n      serverUrl: serverUrl,\n      roomId: roomId\n    };\n    const connection = createConnection(options);\n    connection.connect();\n    return () => connection.disconnect();\n  }, [roomId]);\n  return (\n    <>\n      <h1>Welcome to the {roomId} room!</h1>\n      <input value={message} onChange={e => setMessage(e.target.value)} />\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <hr />\n      <ChatRoom roomId={roomId} />\n    </>\n  );\n}\n--- block 22 ---\nfunction ChatRoom({ roomId }) {  const [message, setMessage] = useState('');  function createOptions() { // 🚩 This function is created from scratch on every re-render    return {      serverUrl: serverUrl,      roomId: roomId    };  }  useEffect(() => {    const options = createOptions(); // It's used inside the Effect    const connection = createConnection();    connection.connect();    return () => connection.disconnect();  }, [createOptions]); // 🚩 As a result, these dependencies are always different on a commit  // ...\n--- block 23 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nconst serverUrl = 'https://localhost:1234';\nfunction ChatRoom({ roomId }) {\n  const [message, setMessage] = useState('');\n  useEffect(() => {\n    function createOptions() {\n      return {\n        serverUrl: serverUrl,\n        roomId: roomId\n      };\n    }\n    const options = createOptions();\n    const connection = createConnection(options);\n    connection.connect();\n    return () => connection.disconnect();\n  }, [roomId]);\n  return (\n    <>\n      <h1>Welcome to the {roomId} room!</h1>\n      <input value={message} onChange={e => setMessage(e.target.value)} />\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <hr />\n      <ChatRoom roomId={roomId} />\n    </>\n  );\n}\n--- block 28 ---\nuseEffect(() => {    // ..  }, [serverUrl, roomId]);  console.log([serverUrl, roomId]);\n--- block 31 ---\nuseEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => {      connection.disconnect();    };  }, [serverUrl, roomId]);"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "e55156b9-9fdf-437c-8c77-ae3e41682016",
+   "timestamp": "2026-11-02T08:25:56.616Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "exit 0 · 10492 B\nCODE BLOCKS: 32\n--- block 1 ---\nimport { useState, useEffect } from 'react';import { createConnection } from './chat.js';function ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => {      connection.disconnect();    };  }, [serverUrl, roomId]);  // ...}\n--- block 2 ---\nimport { useState, useEffect } from 'react';import { createConnection } from './chat.js';function ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useEffect(() => {  \tconst connection = createConnection(serverUrl, roomId);    connection.connect();  \treturn () => {      connection.disconnect();  \t};  }, [serverUrl, roomId]);  // ...}\n--- block 3 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [roomId, serverUrl]);\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  const [show, setShow] = useState(false);\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <button onClick={() => setShow(!show)}>\n        {show ? 'Close chat' : 'Open chat'}\n      </button>\n      {show && <hr />}\n      {show && <ChatRoom roomId={roomId} />}\n    </>\n  );\n}\n--- block 4 ---\nfunction useChatRoom({ serverUrl, roomId }) {  useEffect(() => {    const options = {      serverUrl: serverUrl,      roomId: roomId    };    const connection = createConnection(options);    connection.connect();    return () => connection.disconnect();  }, [roomId, serverUrl]);}\n--- block 5 ---\nfunction ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useChatRoom({    roomId: roomId,    serverUrl: serverUrl  });  // ...\n--- block 6 ---\nimport { useState } from 'react';\nimport { useChatRoom } from './useChatRoom.js';\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n  useChatRoom({\n    roomId: roomId,\n    serverUrl: serverUrl\n  });\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  const [show, setShow] = useState(false);\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <button onClick={() => setShow(!show)}>\n        {show ? 'Close chat' : 'Open chat'}\n      </button>\n      {show && <hr />}\n      {show && <ChatRoom roomId={roomId} />}\n    </>\n  );\n}\n--- block 11 ---\nfunction ChatRoom({ roomId }) { // This is a reactive value  const [serverUrl, setServerUrl] = useState('https://localhost:1234'); // This is a reactive value too  useEffect(() => {    const connection = createConnection(serverUrl, roomId); // This Effect reads these reactive values    connection.connect();    return () => connection.disconnect();  }, [serverUrl, roomId]); // ✅ So you must specify them as dependencies of your Effect  // ...}\n--- block 12 ---\nfunction ChatRoom({ roomId }) {  const [serverUrl, setServerUrl] = useState('https://localhost:1234');  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => connection.disconnect();  }, []); // 🔴 React Hook useEffect has missing dependencies: 'roomId' and 'serverUrl'  // ...}\n--- block 13 ---\nconst serverUrl = 'https://localhost:1234'; // Not a reactive value anymorefunction ChatRoom({ roomId }) {  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => connection.disconnect();  }, [roomId]); // ✅ All dependencies declared  // ...}\n--- block 14 ---\nconst serverUrl = 'https://localhost:1234'; // Not a reactive value anymoreconst roomId = 'music'; // Not a reactive value anymorefunction ChatRoom() {  useEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => connection.disconnect();  }, []); // ✅ All dependencies declared  // ...}\n--- block 17 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n  const [message, setMessage] = useState('');\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [serverUrl, roomId]);\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n      <label>\n        Your message:{' '}\n        <input value={message} onChange={e => setMessage(e.target.value)} />\n      </label>\n    </>\n  );\n}\nexport default function App() {\n  const [show, setShow] = useState(false);\n  const [roomId, setRoomId] = useState('general');\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n        <button onClick={() => setShow(!show)}>\n          {show ? 'Close chat' : 'Open chat'}\n        </button>\n      </label>\n      {show && <hr />}\n      {show && <ChatRoom roomId={roomId}/>}\n    </>\n  );\n}\n--- block 20 ---\nconst serverUrl = 'https://localhost:1234';function ChatRoom({ roomId }) {  const [message, setMessage] = useState('');  const options = { // 🚩 This object is created from scratch on every re-render    serverUrl: serverUrl,    roomId: roomId  };  useEffect(() => {    const connection = createConnection(options); // It's used inside the Effect    connection.connect();    return () => connection.disconnect();  }, [options]); // 🚩 As a result, these dependencies are always different on a commit  // ...\n--- block 21 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nconst serverUrl = 'https://localhost:1234';\nfunction ChatRoom({ roomId }) {\n  const [message, setMessage] = useState('');\n  useEffect(() => {\n    const options = {\n      serverUrl: serverUrl,\n      roomId: roomId\n    };\n    const connection = createConnection(options);\n    connection.connect();\n    return () => connection.disconnect();\n  }, [roomId]);\n  return (\n    <>\n      <h1>Welcome to the {roomId} room!</h1>\n      <input value={message} onChange={e => setMessage(e.target.value)} />\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <hr />\n      <ChatRoom roomId={roomId} />\n    </>\n  );\n}\n--- block 22 ---\nfunction ChatRoom({ roomId }) {  const [message, setMessage] = useState('');  function createOptions() { // 🚩 This function is created from scratch on every re-render    return {      serverUrl: serverUrl,      roomId: roomId    };  }  useEffect(() => {    const options = createOptions(); // It's used inside the Effect    const connection = createConnection();    connection.connect();    return () => connection.disconnect();  }, [createOptions]); // 🚩 As a result, these dependencies are always different on a commit  // ...\n--- block 23 ---\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\nconst serverUrl = 'https://localhost:1234';\nfunction ChatRoom({ roomId }) {\n  const [message, setMessage] = useState('');\n  useEffect(() => {\n    function createOptions() {\n      return {\n        serverUrl: serverUrl,\n        roomId: roomId\n      };\n    }\n    const options = createOptions();\n    const connection = createConnection(options);\n    connection.connect();\n    return () => connection.disconnect();\n  }, [roomId]);\n  return (\n    <>\n      <h1>Welcome to the {roomId} room!</h1>\n      <input value={message} onChange={e => setMessage(e.target.value)} />\n    </>\n  );\n}\nexport default function App() {\n  const [roomId, setRoomId] = useState('general');\n  return (\n    <>\n      <label>\n        Choose the chat room:{' '}\n        <select\n          value={roomId}\n          onChange={e => setRoomId(e.target.value)}\n        >\n          <option value=\"general\">general</option>\n          <option value=\"travel\">travel</option>\n          <option value=\"music\">music</option>\n        </select>\n      </label>\n      <hr />\n      <ChatRoom roomId={roomId} />\n    </>\n  );\n}\n--- block 28 ---\nuseEffect(() => {    // ..  }, [serverUrl, roomId]);  console.log([serverUrl, roomId]);\n--- block 31 ---\nuseEffect(() => {    const connection = createConnection(serverUrl, roomId);    connection.connect();    return () => {      connection.disconnect();    };  }, [serverUrl, roomId]);"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_012mgp8mM4DN81TLv2NveVjr",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "959bc42b-e8d5-42fe-8f97-e0b2465c7fbb"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 195,
+   "estimated_tokens_delta": 145,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "98e42318-fbe1-48b5-9e4b-a10887166b07"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMAUXzUkGiiZf9Gb2H",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 4411,
+     "cache_read_input_tokens": 20008,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 4411,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 3,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "a3ea4087-02e2-4c85-95f9-122fcd6d6596",
+   "timestamp": "2026-11-02T08:25:57.623Z",
+   "request_id": "req_011CgdnMA5ikMh5SGUBtSQTZ",
+   "thinking_duration_ms": 314,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMAUXzUkGiiZf9Gb2H",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "The code is in hand. Now the prose rules for the dependency array."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 4411,
+     "cache_read_input_tokens": 20008,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 4411,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 3,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "30bbadab-5c2e-42c2-9f74-d38c16e5c04d",
+   "timestamp": "2026-11-02T08:25:57.862Z",
+   "request_id": "req_011CgdnMA5ikMh5SGUBtSQTZ"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMAUXzUkGiiZf9Gb2H",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01X5AgWtnPvukGMYp45Ay4y6",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "input": {
+       "language": "python",
+       "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<pre.*?</pre>','',s,flags=re.S)\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\ni=t.find('Dependencies')\nj=t.find('Dependencies',i+20)\nstart = j if j!=-1 else i\nseg=t[start:start+6000]\nprint(seg)",
+       "intent": "Extract prose of the Dependencies section of the useEffect page"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 4411,
+     "cache_read_input_tokens": 20008,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 4411,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 3,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "25b1a6fb-3d98-4055-83b9-17b61120cf82",
+   "timestamp": "2026-11-02T08:25:58.805Z",
+   "request_id": "req_011CgdnMA5ikMh5SGUBtSQTZ",
+   "wire_tool_inputs": {
+    "toolu_01X5AgWtnPvukGMYp45Ay4y6": {
+     "language": "python",
+     "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<pre.*?</pre>','',s,flags=re.S)\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\ni=t.find('Dependencies')\nj=t.find('Dependencies',i+20)\nstart = j if j!=-1 else i\nseg=t[start:start+6000]\nprint(seg)",
+     "intent": "Extract prose of the Dependencies section of the useEffect page"
+    }
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_01X5AgWtnPvukGMYp45Ay4y6",
+     "display_name": "Ctx Execute",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_execute"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01X5AgWtnPvukGMYp45Ay4y6",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "exit 0 · 1 B\n"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "fdfc7c8b-829d-4d9c-9780-1305adaf0998",
+   "timestamp": "2026-11-02T08:25:58.919Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "exit 0 · 1 B\n"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01X5AgWtnPvukGMYp45Ay4y6",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMLT4bgFwopMQ5xHgw",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01CDBXXxAqo9XfUbjEAXYW2K",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "input": {
+       "language": "python",
+       "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\nidxs=[m.start() for m in re.finditer(r'Specifying reactive dependencies|reactive dependencies|Dependencies',t)]\nprint(idxs[:20])\nk=t.find('Specifying reactive dependencies')\nprint(t[k:k+5000] if k!=-1 else 'NOT FOUND')",
+       "intent": "Print the \"Specifying reactive dependencies\" prose section"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 461,
+     "cache_read_input_tokens": 24419,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 461,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 40,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "0cf1bd90-9002-4c38-96b3-e51c191990f2",
+   "timestamp": "2026-11-02T08:26:00.667Z",
+   "request_id": "req_011CgdnML5jw1SNAhn5ysa6r",
+   "wire_tool_inputs": {
+    "toolu_01CDBXXxAqo9XfUbjEAXYW2K": {
+     "language": "python",
+     "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\nidxs=[m.start() for m in re.finditer(r'Specifying reactive dependencies|reactive dependencies|Dependencies',t)]\nprint(idxs[:20])\nk=t.find('Specifying reactive dependencies')\nprint(t[k:k+5000] if k!=-1 else 'NOT FOUND')",
+     "intent": "Print the \"Specifying reactive dependencies\" prose section"
+    }
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_01CDBXXxAqo9XfUbjEAXYW2K",
+     "display_name": "Ctx Execute",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_execute"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01CDBXXxAqo9XfUbjEAXYW2K",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "exit 0 · 5049 B\n[2504, 21225, 24427, 41620]\nSpecifying reactive dependencies Updating state based on previous state from an Effect Removing unnecessary object dependencies Removing unnecessary function dependencies Reading the latest props and state from an Effect Displaying different content on the server and the client Troubleshooting My Effect runs twice when the component mounts My Effect runs after every re-render My Effect keeps re-running in an infinite cycle My cleanup logic runs even though my component didn’t unmount My Effect does something visual, and I see a flicker before it runs Reference useEffect(setup, dependencies?) Call useEffect at the top level of your component to declare an Effect: import { useState , useEffect } from 'react' ; import { createConnection } from './chat.js' ; function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => { connection . disconnect ( ) ; } ; } , [ serverUrl , roomId ] ) ; // ... } See more examples below. Parameters setup : The function with your Effect’s logic. Your setup function may also optionally return a cleanup function. When your component commits , React will run your setup function. After every commit with changed dependencies, React will first run the cleanup function (if you provided it) with the old values, and then run your setup function with the new values. After your component is removed from the DOM, React will run your cleanup function. optional dependencies : The list of all reactive values referenced inside of the setup code. Reactive values include props, state, and all the variables and functions declared directly inside your component body. If your linter is configured for React , it will verify that every reactive value is correctly specified as a dependency. The list of dependencies must have a constant number of items and be written inline like [dep1, dep2, dep3] . React will compare each dependency with its previous value using the Object.is comparison. If you omit this argument, your Effect will re-run after every commit of the component. See the difference between passing an array of dependencies, an empty array, and no dependencies at all. Returns useEffect returns undefined . Caveats useEffect is a Hook, so you can only call it at the top level of your component or your own Hooks. You can’t call it inside loops or conditions. If you need that, extract a new component and move the state into it. If you’re not trying to synchronize with some external system, you probably don’t need an Effect. When Strict Mode is on, React will run one extra development-only setup+cleanup cycle before the first real setup. This is a stress-test that ensures that your cleanup logic “mirrors” your setup logic and that it stops or undoes whatever the setup is doing. If this causes a problem, implement the cleanup function. If some of your dependencies are objects or functions defined inside the component, there is a risk that they will cause the Effect to re-run more often than needed. To fix this, remove unnecessary object and function dependencies. You can also extract state updates and non-reactive logic outside of your Effect. If your Effect wasn’t caused by an interaction (like a click), React will generally let the browser paint the updated screen first before running your Effect. If your Effect is doing something visual (for example, positioning a tooltip), and the delay is noticeable (for example, it flickers), replace useEffect with useLayoutEffect . If your Effect is caused by an interaction (like a click), React may run your Effect before the browser paints the updated screen . This ensures that the result of the Effect can be observed by the event system. Usually, this works as expected. However, if you must defer the work until after paint, such as an alert() , you can use setTimeout . See reactwg/react-18/128 for more information. Even if your Effect was caused by an interacti\non (like a click), React may allow the browser to repaint the screen before processing the state updates inside your Effect. Usually, this works as expected. However, if you must block the browser from repainting the screen, you need to replace useEffect with useLayoutEffect . Effects only run on the client. They don’t run during server rendering. Usage Connecting to an external system Some components need to stay connected to the network, some browser API, or a third-party library, while they are displayed on the page. These systems aren’t controlled by React, so they are called external. To connect your component to some external system, call useEffect at the top level of your component: import { useState , useEffect } from 'react' ; import { createConnection } from './chat.js' ; function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; useEffect ( ( ) => { const connection = cre"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "a9769616-b592-4f4d-8907-31da1e70c6b6",
+   "timestamp": "2026-11-02T08:26:00.795Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "exit 0 · 5049 B\n[2504, 21225, 24427, 41620]\nSpecifying reactive dependencies Updating state based on previous state from an Effect Removing unnecessary object dependencies Removing unnecessary function dependencies Reading the latest props and state from an Effect Displaying different content on the server and the client Troubleshooting My Effect runs twice when the component mounts My Effect runs after every re-render My Effect keeps re-running in an infinite cycle My cleanup logic runs even though my component didn’t unmount My Effect does something visual, and I see a flicker before it runs Reference useEffect(setup, dependencies?) Call useEffect at the top level of your component to declare an Effect: import { useState , useEffect } from 'react' ; import { createConnection } from './chat.js' ; function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => { connection . disconnect ( ) ; } ; } , [ serverUrl , roomId ] ) ; // ... } See more examples below. Parameters setup : The function with your Effect’s logic. Your setup function may also optionally return a cleanup function. When your component commits , React will run your setup function. After every commit with changed dependencies, React will first run the cleanup function (if you provided it) with the old values, and then run your setup function with the new values. After your component is removed from the DOM, React will run your cleanup function. optional dependencies : The list of all reactive values referenced inside of the setup code. Reactive values include props, state, and all the variables and functions declared directly inside your component body. If your linter is configured for React , it will verify that every reactive value is correctly specified as a dependency. The list of dependencies must have a constant number of items and be written inline like [dep1, dep2, dep3] . React will compare each dependency with its previous value using the Object.is comparison. If you omit this argument, your Effect will re-run after every commit of the component. See the difference between passing an array of dependencies, an empty array, and no dependencies at all. Returns useEffect returns undefined . Caveats useEffect is a Hook, so you can only call it at the top level of your component or your own Hooks. You can’t call it inside loops or conditions. If you need that, extract a new component and move the state into it. If you’re not trying to synchronize with some external system, you probably don’t need an Effect. When Strict Mode is on, React will run one extra development-only setup+cleanup cycle before the first real setup. This is a stress-test that ensures that your cleanup logic “mirrors” your setup logic and that it stops or undoes whatever the setup is doing. If this causes a problem, implement the cleanup function. If some of your dependencies are objects or functions defined inside the component, there is a risk that they will cause the Effect to re-run more often than needed. To fix this, remove unnecessary object and function dependencies. You can also extract state updates and non-reactive logic outside of your Effect. If your Effect wasn’t caused by an interaction (like a click), React will generally let the browser paint the updated screen first before running your Effect. If your Effect is doing something visual (for example, positioning a tooltip), and the delay is noticeable (for example, it flickers), replace useEffect with useLayoutEffect . If your Effect is caused by an interaction (like a click), React may run your Effect before the browser paints the updated screen . This ensures that the result of the Effect can be observed by the event system. Usually, this works as expected. However, if you must defer the work until after paint, such as an alert() , you can use setTimeout . See reactwg/react-18/128 for more information. Even if your Effect was caused by an interacti\non (like a click), React may allow the browser to repaint the screen before processing the state updates inside your Effect. Usually, this works as expected. However, if you must block the browser from repainting the screen, you need to replace useEffect with useLayoutEffect . Effects only run on the client. They don’t run during server rendering. Usage Connecting to an external system Some components need to stay connected to the network, some browser API, or a third-party library, while they are displayed on the page. These systems aren’t controlled by React, so they are called external. To connect your component to some external system, call useEffect at the top level of your component: import { useState , useEffect } from 'react' ; import { createConnection } from './chat.js' ; function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; useEffect ( ( ) => { const connection = cre"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01CDBXXxAqo9XfUbjEAXYW2K",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "ddca4f82-2e90-4a5f-9777-e22c362d5884"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 257,
+   "estimated_tokens_delta": 207,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "c2b97dae-6ee7-4939-ba8e-7ce5ac361b39"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMUVVzbfEENkagVyKN",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 1952,
+     "cache_read_input_tokens": 24880,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 1952,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 6,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "8acd9973-7608-47a3-958d-5c4adcb9e5e8",
+   "timestamp": "2026-11-02T08:26:02.301Z",
+   "request_id": "req_011CgdnMU6wUcLeVHDdK9Mvo",
+   "thinking_duration_ms": 714,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMUVVzbfEENkagVyKN",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "The Reference section has the signature rules. The detailed three-case explanation is in the Learn section, so I'll pull that next."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 1952,
+     "cache_read_input_tokens": 24880,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 1952,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 6,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "4d7ef543-7504-4372-a835-0828c47aa404",
+   "timestamp": "2026-11-02T08:26:02.636Z",
+   "request_id": "req_011CgdnMU6wUcLeVHDdK9Mvo"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMUVVzbfEENkagVyKN",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_012V4meZQFDnXgWcXMyDUpdu",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "input": {
+       "language": "python",
+       "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\nk=t.find('Specifying reactive dependencies', 3000)\nprint(t[k:k+3000])\nprint(\"=====\")\nfor key in ['Empty dependency array','empty dependency array','No dependency array','Each Effect','array of dependencies']:\n    m=t.find(key)\n    print(key, m)",
+       "intent": "Print the Learn-section Specifying reactive dependencies text"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 1952,
+     "cache_read_input_tokens": 24880,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 1952,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 6,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "bc94a49f-db99-4c85-a52b-3bbd962593eb",
+   "timestamp": "2026-11-02T08:26:03.668Z",
+   "request_id": "req_011CgdnMU6wUcLeVHDdK9Mvo",
+   "wire_tool_inputs": {
+    "toolu_012V4meZQFDnXgWcXMyDUpdu": {
+     "language": "python",
+     "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\nk=t.find('Specifying reactive dependencies', 3000)\nprint(t[k:k+3000])\nprint(\"=====\")\nfor key in ['Empty dependency array','empty dependency array','No dependency array','Each Effect','array of dependencies']:\n    m=t.find(key)\n    print(key, m)",
+     "intent": "Print the Learn-section Specifying reactive dependencies text"
+    }
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_012V4meZQFDnXgWcXMyDUpdu",
+     "display_name": "Ctx Execute",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_execute"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_012V4meZQFDnXgWcXMyDUpdu",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "exit 0 · 3178 B\nSpecifying reactive dependencies Notice that you can’t “choose” the dependencies of your Effect. Every reactive value used by your Effect’s code must be declared as a dependency. Your Effect’s dependency list is determined by the surrounding code: function ChatRoom ( { roomId } ) { // This is a reactive value const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; // This is a reactive value too useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; // This Effect reads these reactive values connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ serverUrl , roomId ] ) ; // ✅ So you must specify them as dependencies of your Effect // ... } If either serverUrl or roomId change, your Effect will reconnect to the chat using the new values. Reactive values include props and all variables and functions declared directly inside of your component. Since roomId and serverUrl are reactive values, you can’t remove them from the dependencies. If you try to omit them and your linter is correctly configured for React, the linter will flag this as a mistake you need to fix: function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ ] ) ; // 🔴 React Hook useEffect has missing dependencies: 'roomId' and 'serverUrl' // ... } To remove a dependency, you need to “prove” to the linter that it doesn’t need to be a dependency. For example, you can move serverUrl out of your component to prove that it’s not reactive and won’t change on re-renders: const serverUrl = 'https://localhost:1234' ; // Not a reactive value anymore function ChatRoom ( { roomId } ) { useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ roomId ] ) ; // ✅ All dependencies declared // ... } Now that serverUrl is not a reactive value (and can’t change on a re-render), it doesn’t need to be a dependency. If your Effect’s code doesn’t use any reactive values, its dependency list should be empty ( [] ): const serverUrl = 'https://localhost:1234' ; // Not a reactive value anymore const roomId = 'music' ; // Not a reactive value anymore function ChatRoom ( ) { useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ ] ) ; // ✅ All dependencies declared // ... } An Effect with empty dependencies doesn’t re-run when any of your component’s props or state change. Pitfall If you have an existing codebase, you might have some Effects that suppress the linter like this: useEffect ( ( ) => { // ... // 🔴 Avoid suppressing the linter like this: // eslint-ignore-next-line react-hooks/exhaustive-deps } , [ ] ) ; When dependencies don’t\n=====\nEmpty dependency array -1\nempty dependency array 24495\nNo dependency array 37082\nEach Effect -1\narray of dependencies 4726"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "44a4d1f8-c5bc-451f-b27e-54bb283aca8d",
+   "timestamp": "2026-11-02T08:26:03.860Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "exit 0 · 3178 B\nSpecifying reactive dependencies Notice that you can’t “choose” the dependencies of your Effect. Every reactive value used by your Effect’s code must be declared as a dependency. Your Effect’s dependency list is determined by the surrounding code: function ChatRoom ( { roomId } ) { // This is a reactive value const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; // This is a reactive value too useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; // This Effect reads these reactive values connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ serverUrl , roomId ] ) ; // ✅ So you must specify them as dependencies of your Effect // ... } If either serverUrl or roomId change, your Effect will reconnect to the chat using the new values. Reactive values include props and all variables and functions declared directly inside of your component. Since roomId and serverUrl are reactive values, you can’t remove them from the dependencies. If you try to omit them and your linter is correctly configured for React, the linter will flag this as a mistake you need to fix: function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhost:1234' ) ; useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ ] ) ; // 🔴 React Hook useEffect has missing dependencies: 'roomId' and 'serverUrl' // ... } To remove a dependency, you need to “prove” to the linter that it doesn’t need to be a dependency. For example, you can move serverUrl out of your component to prove that it’s not reactive and won’t change on re-renders: const serverUrl = 'https://localhost:1234' ; // Not a reactive value anymore function ChatRoom ( { roomId } ) { useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ roomId ] ) ; // ✅ All dependencies declared // ... } Now that serverUrl is not a reactive value (and can’t change on a re-render), it doesn’t need to be a dependency. If your Effect’s code doesn’t use any reactive values, its dependency list should be empty ( [] ): const serverUrl = 'https://localhost:1234' ; // Not a reactive value anymore const roomId = 'music' ; // Not a reactive value anymore function ChatRoom ( ) { useEffect ( ( ) => { const connection = createConnection ( serverUrl , roomId ) ; connection . connect ( ) ; return ( ) => connection . disconnect ( ) ; } , [ ] ) ; // ✅ All dependencies declared // ... } An Effect with empty dependencies doesn’t re-run when any of your component’s props or state change. Pitfall If you have an existing codebase, you might have some Effects that suppress the linter like this: useEffect ( ( ) => { // ... // 🔴 Avoid suppressing the linter like this: // eslint-ignore-next-line react-hooks/exhaustive-deps } , [ ] ) ; When dependencies don’t\n=====\nEmpty dependency array -1\nempty dependency array 24495\nNo dependency array 37082\nEach Effect -1\narray of dependencies 4726"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_012V4meZQFDnXgWcXMyDUpdu",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMhPQ1epBaHB4GB898",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01Y8AhtS3cq65XVLcwmJgxZk",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "input": {
+       "language": "python",
+       "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\nk=t.find('When dependencies don')\nprint(t[k:k+1200])",
+       "intent": "Print the pitfall text after the empty-dependencies example"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 1778,
+     "cache_read_input_tokens": 26832,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 1778,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 42,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "6686f7d8-9632-41ec-87bb-acb7c96ad8c8",
+   "timestamp": "2026-11-02T08:26:05.441Z",
+   "request_id": "req_011CgdnMgzamZCw6edwoYLSR",
+   "wire_tool_inputs": {
+    "toolu_01Y8AhtS3cq65XVLcwmJgxZk": {
+     "language": "python",
+     "code": "import re,html\ns=open('/tmp/useEffect.html',encoding='utf-8',errors='ignore').read()\ns=re.sub(r'<script.*?</script>|<style.*?</style>','',s,flags=re.S)\nt=html.unescape(re.sub(r'<[^>]+>',' ',s))\nt=re.sub(r'\\s+',' ',t)\nk=t.find('When dependencies don')\nprint(t[k:k+1200])",
+     "intent": "Print the pitfall text after the empty-dependencies example"
+    }
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_01Y8AhtS3cq65XVLcwmJgxZk",
+     "display_name": "Ctx Execute",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_execute"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01Y8AhtS3cq65XVLcwmJgxZk",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "exit 0 · 1215 B\nWhen dependencies don’t match the code, there is a high risk of introducing bugs. By suppressing the linter, you “lie” to React about the values your Effect depends on. Instead, prove they’re unnecessary. Examples of passing reactive dependencies 1 . Passing a dependency array 2 . Passing an empty dependency array 3 . Passing no dependency array at all Example 1 of 3 : Passing a dependency array If you specify the dependencies, your Effect runs after the initial commit and after commits with changed dependencies. useEffect ( ( ) => { // ... } , [ a , b ] ) ; // Runs again if a or b are different In the below example, serverUrl and roomId are reactive values, so they both must be specified as dependencies. As a result, selecting a different room in the dropdown or editing the server URL input causes the chat to re-connect. However, since message isn’t used in the Effect (and so it isn’t a dependency), editing the message doesn’t re-connect to the chat. App.js chat.js App.js Reload Clear Fork import { useState , useEffect } from 'react' ; import { createConnection } from './chat.js' ; function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhos"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "5f664731-4947-4c89-b6b4-1fb410144b9a",
+   "timestamp": "2026-11-02T08:26:05.576Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "exit 0 · 1215 B\nWhen dependencies don’t match the code, there is a high risk of introducing bugs. By suppressing the linter, you “lie” to React about the values your Effect depends on. Instead, prove they’re unnecessary. Examples of passing reactive dependencies 1 . Passing a dependency array 2 . Passing an empty dependency array 3 . Passing no dependency array at all Example 1 of 3 : Passing a dependency array If you specify the dependencies, your Effect runs after the initial commit and after commits with changed dependencies. useEffect ( ( ) => { // ... } , [ a , b ] ) ; // Runs again if a or b are different In the below example, serverUrl and roomId are reactive values, so they both must be specified as dependencies. As a result, selecting a different room in the dropdown or editing the server URL input causes the chat to re-connect. However, since message isn’t used in the Effect (and so it isn’t a dependency), editing the message doesn’t re-connect to the chat. App.js chat.js App.js Reload Clear Fork import { useState , useEffect } from 'react' ; import { createConnection } from './chat.js' ; function ChatRoom ( { roomId } ) { const [ serverUrl , setServerUrl ] = useState ( 'https://localhos"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01Y8AhtS3cq65XVLcwmJgxZk",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "42f77ab8-d4d4-446e-b0bb-7b21bd3024fa"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 250,
+   "estimated_tokens_delta": 200,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "f0af3e80-3676-466b-ae56-4f53c5db58b9"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 528,
+   "estimated_tokens_delta": 278,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "757c68cb-b375-40cf-b0c4-75f5debec224"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMpkuSDMddBWCkEhNF",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 742,
+     "cache_read_input_tokens": 28610,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 742,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 3,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "e6615aca-e193-4736-89b3-1cf7d4297530",
+   "timestamp": "2026-11-02T08:26:08.827Z",
+   "request_id": "req_011CgdnMpMMYenP3EEJTXYEi",
+   "thinking_duration_ms": 2535,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnMpkuSDMddBWCkEhNF",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "The page's connection example is a `ChatRoom` component. It opens a connection in the Effect and closes it in the cleanup function:\n\n```jsx\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\n\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [serverUrl, roomId]);\n\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\n```\n\nThe page's full sandbox also has an `App` component with a room dropdown and an open/close button, which mounts `ChatRoom` only while it's shown. The cleanup runs when the component unmounts, and before a re-run when `serverUrl` or `roomId` changes, so the old connection is closed before the new one opens.\n\n**Rules for the dependency array**\n\n1. **You don't choose the dependencies; the code does.** Every reactive value the Effect reads must be listed. Reactive values are props, state, and any variable or function declared in the component body.\n2. **Use a linter.** The React lint rule flags missing dependencies. Suppressing it (`eslint-ignore-next-line react-hooks/exhaustive-deps`) makes React work with wrong values, which causes bugs.\n3. **Omitted array:** the Effect re-runs after every commit of the component.\n4. **Empty array `[]`:** the Effect runs only on mount (and its cleanup on unmount). It does not re-run when props or state change. This is only correct if the Effect uses no reactive values.\n5. **Non-empty array:** the Effect runs after mount and again whenever any listed value changes.\n6. **Format:** the list must be written inline as an array literal, and its length must stay constant between renders.\n7. **Comparison:** React compares each entry with the previous value using `Object.is`.\n8. **Removing a dependency:** you can't just delete it. Prove it isn't reactive, for example by moving a constant outside the component.\n9. **Objects and functions created inside the component** are new on every render, so they make the Effect re-run on every commit. Fix this by moving them inside the Effect, or by moving them outside the component.\n10. **Strict Mode** runs one extra setup-and-cleanup cycle in development, so the cleanup should fully undo the setup.\n\nI fetched the page through the sandbox because a hook blocked WebFetch for this URL. The content above is from that fetch."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 742,
+     "cache_read_input_tokens": 28610,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 742,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 3,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "uuid": "5ebff865-e81c-42d7-80b4-606afb87182e",
+   "timestamp": "2026-11-02T08:26:12.612Z",
+   "request_id": "req_011CgdnMpMMYenP3EEJTXYEi"
+  },
+  {
+   "duration_api_ms": 23672,
+   "stop_reason": "end_turn",
+   "session_id": "0d650661-e5ab-4570-b10c-4db7cf4dd678",
+   "total_cost_usd": 0.006272354999999999,
+   "usage": {
+    "input_tokens": 18,
+    "cache_creation_input_tokens": 17361,
+    "cache_read_input_tokens": 193693,
+    "output_tokens": 4327,
+    "output_tokens_details": {
+     "thinking_tokens": 1077
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 17361
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 1459,
+      "cache_read_input_tokens": 28610,
+      "cache_creation_input_tokens": 742,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 742,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "modelUsage": {
+    "claude-haiku-5-5": {
+     "inputTokens": 18,
+     "outputTokens": 4327,
+     "cacheReadInputTokens": 193693,
+     "cacheCreationInputTokens": 17361,
+     "webSearchRequests": 0,
+     "costUSD": 0.006272354999999999,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 1077,
+     "cacheCreationEphemeral5mInputTokens": 17361,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   },
+   "permission_denials": [
+    {
+     "tool_name": "WebFetch",
+     "tool_use_id": "toolu_01B6oK6v9tZYCsiP3RiBkdjM",
+     "tool_input": {
+      "url": "https://react.dev/reference/react/useEffect",
+      "prompt": "Extract verbatim: (1) the example that connects to a chat server and cleans up (the createConnection/connection.connect/disconnect example with serverUrl and roomId, including the full code block for App and chat.js, and the cleanup return function); (2) the full list of rules/caveats about the dependency array (Dependencies section: how dependencies are determined, that they must match code, the three cases of omitted/empty/listed, and any notes about objects/functions being re-created, linting, and removing dependencies). Return code blocks exactly as written."
+     }
+    }
+   ],
+   "terminal_reason": "completed",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+     "background": 0,
+     "foreground": 0,
+     "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+     "parent": 0,
+     "user": 0,
+     "system": 0
+    },
+    "refused": {
+     "depth_limit": 0,
+     "concurrency_limit": 0,
+     "budget": 0
+    },
+    "by_type": {}
+   },
+   "safety_stops": 0,
+   "is_error": false,
+   "num_turns": 9,
+   "subtype": "success",
+   "api_error_status": null,
+   "result": "The page's connection example is a `ChatRoom` component. It opens a connection in the Effect and closes it in the cleanup function:\n\n```jsx\nimport { useState, useEffect } from 'react';\nimport { createConnection } from './chat.js';\n\nfunction ChatRoom({ roomId }) {\n  const [serverUrl, setServerUrl] = useState('https://localhost:1234');\n\n  useEffect(() => {\n    const connection = createConnection(serverUrl, roomId);\n    connection.connect();\n    return () => {\n      connection.disconnect();\n    };\n  }, [serverUrl, roomId]);\n\n  return (\n    <>\n      <label>\n        Server URL:{' '}\n        <input\n          value={serverUrl}\n          onChange={e => setServerUrl(e.target.value)}\n        />\n      </label>\n      <h1>Welcome to the {roomId} room!</h1>\n    </>\n  );\n}\n```\n\nThe page's full sandbox also has an `App` component with a room dropdown and an open/close button, which mounts `ChatRoom` only while it's shown. The cleanup runs when the component unmounts, and before a re-run when `serverUrl` or `roomId` changes, so the old connection is closed before the new one opens.\n\n**Rules for the dependency array**\n\n1. **You don't choose the dependencies; the code does.** Every reactive value the Effect reads must be listed. Reactive values are props, state, and any variable or function declared in the component body.\n2. **Use a linter.** The React lint rule flags missing dependencies. Suppressing it (`eslint-ignore-next-line react-hooks/exhaustive-deps`) makes React work with wrong values, which causes bugs.\n3. **Omitted array:** the Effect re-runs after every commit of the component.\n4. **Empty array `[]`:** the Effect runs only on mount (and its cleanup on unmount). It does not re-run when props or state change. This is only correct if the Effect uses no reactive values.\n5. **Non-empty array:** the Effect runs after mount and again whenever any listed value changes.\n6. **Format:** the list must be written inline as an array literal, and its length must stay constant between renders.\n7. **Comparison:** React compares each entry with the previous value using `Object.is`.\n8. **Removing a dependency:** you can't just delete it. Prove it isn't reactive, for example by moving a constant outside the component.\n9. **Objects and functions created inside the component** are new on every render, so they make the Effect re-run on every commit. Fix this by moving them inside the Effect, or by moving them outside the component.\n10. **Strict Mode** runs one extra setup-and-cleanup cycle in development, so the cleanup should fully undo the setup.\n\nI fetched the page through the sandbox because a hook blocked WebFetch for this URL. The content above is from that fetch.",
+   "ttft_ms": 2103,
+   "type": "result",
+   "duration_ms": 25704,
+   "uuid": "729d134c-9036-4d5e-94f7-fca26c5bf657",
+   "ttft_stream_ms": 1323,
+   "time_to_request_ms": 490,
+   "first_content_frame_ms": 1323,
+   "queued_turn_count": 0,
+   "result_index": 0,
+   "model_usage_since_last_result": {
+    "claude-haiku-5-5": {
+     "inputTokens": 18,
+     "outputTokens": 4327,
+     "cacheReadInputTokens": 193693,
+     "cacheCreationInputTokens": 17361,
+     "webSearchRequests": 0,
+     "costUSD": 0.006272354999999999,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 1077,
+     "cacheCreationEphemeral5mInputTokens": 17361,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   }
+  }
+ ]
+}

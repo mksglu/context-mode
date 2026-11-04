@@ -1,0 +1,11 @@
+{
+  "reply": {
+    "content": [
+      {
+        "type": "text",
+        "text": "hi\n"
+      }
+    ],
+    "isError": false
+  }
+}

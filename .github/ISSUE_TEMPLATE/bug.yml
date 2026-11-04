@@ -1,0 +1,64 @@
+name: Bug report
+description: For AI coding agents filing for their user. Only v2 gets fixes.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Only v2 gets fixes.
+        Run `/ctx-doctor`, or tell the agent: call the ctx_doctor tool.
+        AI agent: paste the report block unedited. Send the most debug data you have: paths, logs, command output and transcript excerpts are wanted. Strip only secrets (tokens, keys, .env values, Authorization headers).
+  - type: dropdown
+    id: doctor_ran
+    attributes:
+      label: Did you run `/ctx-doctor`?
+      options:
+        - "Yes"
+        - "No: ctx_doctor is not in the tool list"
+        - "No: the context-mode MCP server is failed or not connected"
+        - "No: ctx_doctor returned an error"
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Paste the full ctx_doctor report here
+      description: 'The block from `ctx-report: 1` to `digest:`, unedited. Empty only when the answer above is a "No" line.'
+      render: text
+  - type: input
+    id: node_version
+    attributes:
+      label: Node version
+      description: Run `node --version`
+      placeholder: v24.15.0
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: The context-mode error code and its text, with the real path and command (strip only secrets).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: Steps to reproduce. Name the denied tool and the alternative it gave.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I ran `/ctx-doctor` or asked the agent to call the `ctx_doctor` tool
+          required: true
+        - label: I am an AI agent filing this on behalf of a user, or I pasted the full agent transcript
+          required: true

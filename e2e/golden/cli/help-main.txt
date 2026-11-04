@@ -1,0 +1,24 @@
+Usage: context-mode <command> [options]
+
+Commands:
+  setup                       Find your agents, show the plan, apply it, verify each agent
+  doctor                      Check every agent; changes nothing
+  upgrade                     Install the newest context-mode from npm, then repair each agent
+  server [--agent <id>]       Run the MCP server on stdio (alias: mcp)
+  hook --agent <id>           Run one hook call: JSON on stdin, answer on stdout
+  hook <platform> <event>     Old form of hook; still works, run context-mode setup to update it
+
+Options:
+  -h, --help                  Show this help (context-mode <command> --help for a command)
+  -v, --version               Show the version
+
+Exit codes:
+  0    success
+  1    a check or step failed
+  2    usage error (unknown command, option or agent; an answer is needed but there is no TTY)
+  130  stopped with Ctrl-C (the agent in progress is rolled back)
+
+Examples:
+  context-mode setup
+  context-mode doctor --agents codex
+  context-mode server --agent codex

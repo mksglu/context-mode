@@ -1,0 +1,14 @@
+{
+  "session_id": "<sid:0>",
+  "turn_id": "<sid:1>",
+  "transcript_path": "<transcript_path>",
+  "cwd": "<proj>",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo gp3-fixture-probe"
+  },
+  "tool_use_id": "exec-<sid:2>"
+}

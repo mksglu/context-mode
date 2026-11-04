@@ -1,0 +1,890 @@
+{
+ "schema": "context-mode.benchmark-evidence/2",
+ "analysis_method": "Every valid measured cycle, no outlier dropped, failures included. For each arm against plain in the same cycle: % = mean(arm - plain) / mean(plain), with the 95% t interval. Verdict: \"less\" when the whole interval is below zero, \"more\" when above, else \"same\". Wins: cycles where the arm cost less than plain. v2_vs_v1 is secondary.",
+ "arms": {
+  "plain": "Claude Code talks to Anthropic direct, no plugin.",
+  "v1": "Claude Code with the OSS context-mode plugin v1.",
+  "v2": "Claude Code with the OSS context-mode plugin v2.",
+  "gateway": "Claude Code talks to Anthropic through Context Mode."
+ },
+ "client": "Claude Code 2.1.303",
+ "model": "claude-haiku-4-5-20251001",
+ "cost_basis": "Cost in US dollars at API list price: list price applied to the token counts in each session's result event, per model (modelUsage). Cache writes whose lifetime the event does not split are priced at the 1 hour rate (usd) and the 5 minute rate (usd_recomputed_low). Claude Code's own total is usd_client; a gap above 1% is flagged. Gateway arm: the gateway's per-call record for the session, hidden calls included. The runs used a claude.ai login, which has no per-token invoice: a list-price equivalent.",
+ "coverage": {
+  "arms": 4
+ },
+ "date": "2026-10-21",
+ "harness": "start-cost-ab --arms",
+ "harness_commit": "f7a22f4bbc90594256b1adeec865444283fedda6",
+ "workload_source": "scripts/e2e/short-workloads.mjs at gateway commit 408333a48d082830f5813b3f539ec03993830a89, unchanged",
+ "plugins": {
+  "v1": {
+   "server": "context-mode",
+   "tool_prefix": "mcp__context-mode__",
+   "git_head": "a92cf6a77ac02971fb5fafe2155e5ee229491884",
+   "manifest_version": "1.0.169",
+   "dirty": false,
+   "build_sha256sums": null
+  },
+  "v2": {
+   "server": "context-mode",
+   "tool_prefix": "mcp__context-mode__",
+   "git_head": "8f38bdbca6d2be974d90492e683b1b3073f1b63c",
+   "manifest_version": "0.0.0-dev",
+   "dirty": false,
+   "build_sha256sums": "b71f94b0eb470cc60a3490133125a9c519af5fb9ebe1f5b9a733f3048c09965a"
+  }
+ },
+ "legend": {
+  "calls_from.result_event_model_usage": "the session's result event, one entry per model (modelUsage), not per call",
+  "col.cr": "cache read tokens",
+  "col.cw1h": "cache write tokens, 1 hour lifetime",
+  "col.cw5": "cache write tokens, 5 minute lifetime",
+  "col.cwx": "cache write tokens whose lifetime the event did not split: usd prices them at 1 hour, usd_recomputed_low at 5 minutes",
+  "col.in": "input tokens not read from or written to the cache",
+  "col.out": "output tokens",
+  "resolution": "what the run's own init event showed: MCP servers, mcp__ tools, non-builtin plugins, main and helper models; the gateway arm adds the gateway's per-call record for the session"
+ },
+ "prices": {
+  "aliases": {
+   "claude-haiku-4-5-20251001": "claude-haiku-4-5"
+  },
+  "as_of": "2026-09-29",
+  "models": {
+   "claude-haiku-4-5": {
+    "in": 1,
+    "out": 5,
+    "cr": 0.1,
+    "cw5": 1.25,
+    "cw1h": 2
+   },
+   "claude-opus-5-5": {
+    "in": 4,
+    "out": 20,
+    "cr": 0.2,
+    "cw5": 5,
+    "cw1h": 8
+   }
+  },
+  "source_url": "https://www.anthropic.com/pricing",
+  "unit": "USD per million tokens"
+ },
+ "warmup_pairs": 0,
+ "withheld": "prompt and answer text, session ids, tenant ids, gateway host, local paths, credentials, raw transcripts",
+ "workloads": [
+  {
+   "id": "edit",
+   "label": "One-line edit",
+   "pairs_planned": 1,
+   "invalid_attempts": 0,
+   "analysis": {
+    "n": 1,
+    "plain_usd_mean": 0.0184553,
+    "success_plain": "1/1",
+    "v1_usd_mean": 0.0189282,
+    "success_v1": "1/1",
+    "v1": {
+     "n": 1,
+     "pct": 2.562407546883542,
+     "pct_ci95": null,
+     "verdict": "too-few-pairs",
+     "mean_diff": 0.0004728999999999983,
+     "median_diff": 0.0004728999999999983,
+     "wins": 0,
+     "losses": 1,
+     "ties": 0
+    },
+    "v2_usd_mean": 0.0156273,
+    "success_v2": "1/1",
+    "v2": {
+     "n": 1,
+     "pct": -15.323511403228343,
+     "pct_ci95": null,
+     "verdict": "too-few-pairs",
+     "mean_diff": -0.0028280000000000007,
+     "median_diff": -0.0028280000000000007,
+     "wins": 1,
+     "losses": 0,
+     "ties": 0
+    },
+    "gateway_usd_mean": 0.037663,
+    "success_gateway": "1/1",
+    "gateway": {
+     "n": 1,
+     "pct": 104.07687764490417,
+     "pct_ci95": null,
+     "verdict": "too-few-pairs",
+     "mean_diff": 0.0192077,
+     "median_diff": 0.0192077,
+     "wins": 0,
+     "losses": 1,
+     "ties": 0
+    },
+    "v2_vs_v1": {
+     "secondary": true,
+     "n": 1,
+     "pct": -17.439059181538653,
+     "pct_ci95": null,
+     "verdict": "too-few-pairs",
+     "mean_diff": -0.003300899999999999,
+     "median_diff": -0.003300899999999999,
+     "wins": 1,
+     "losses": 0,
+     "ties": 0
+    }
+   },
+   "pairs": [
+    {
+     "pair": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0184553,
+      "usd_client": 0.0184553,
+      "usd_recomputed": 0.0184553,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        13
+       ],
+       "cr": [
+        55113
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5693
+       ],
+       "out": [
+        309
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-haiku-4-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "coverage": {
+       "calls": 1,
+       "of": 1,
+       "sum_complete": true
+      },
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "resolution": {
+       "ok": true,
+       "why": [],
+       "client_version": "2.1.303",
+       "tools_total": 29,
+       "mcp_servers": [],
+       "mcp_tools": [],
+       "plugins": [],
+       "main_models": [
+        "claude-haiku-4-5-20251001"
+       ],
+       "helper_models": []
+      },
+      "result_subtype": "success"
+     },
+     "v1": {
+      "usd": 0.0189282,
+      "usd_client": 0.018928200000000003,
+      "usd_recomputed": 0.0189282,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        11
+       ],
+       "cr": [
+        57012
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5798
+       ],
+       "out": [
+        324
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-haiku-4-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "coverage": {
+       "calls": 1,
+       "of": 1,
+       "sum_complete": true
+      },
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "resolution": {
+       "ok": true,
+       "why": [],
+       "client_version": "2.1.303",
+       "tools_total": 43,
+       "mcp_servers": [
+        {
+         "name": "context-mode",
+         "status": "connected"
+        }
+       ],
+       "mcp_tools": [
+        "mcp__context-mode__ctx_batch_execute",
+        "mcp__context-mode__ctx_doctor",
+        "mcp__context-mode__ctx_execute",
+        "mcp__context-mode__ctx_execute_file",
+        "mcp__context-mode__ctx_fetch_and_index",
+        "mcp__context-mode__ctx_index",
+        "mcp__context-mode__ctx_insight",
+        "mcp__context-mode__ctx_purge",
+        "mcp__context-mode__ctx_search",
+        "mcp__context-mode__ctx_stats",
+        "mcp__context-mode__ctx_upgrade"
+       ],
+       "plugins": [
+        {
+         "name": "context-mode",
+         "version": "1.0.169",
+         "source": "context-mode@inline",
+         "at_arm_dir": true
+        }
+       ],
+       "main_models": [
+        "claude-haiku-4-5-20251001"
+       ],
+       "helper_models": [],
+       "plugin_tools": [
+        "mcp__context-mode__ctx_batch_execute",
+        "mcp__context-mode__ctx_doctor",
+        "mcp__context-mode__ctx_execute",
+        "mcp__context-mode__ctx_execute_file",
+        "mcp__context-mode__ctx_fetch_and_index",
+        "mcp__context-mode__ctx_index",
+        "mcp__context-mode__ctx_insight",
+        "mcp__context-mode__ctx_purge",
+        "mcp__context-mode__ctx_search",
+        "mcp__context-mode__ctx_stats",
+        "mcp__context-mode__ctx_upgrade"
+       ]
+      },
+      "plugin": {
+       "arm": "v1",
+       "git_head": "a92cf6a77ac02971fb5fafe2155e5ee229491884",
+       "manifest_version": "1.0.169",
+       "dirty": false,
+       "build_sha256sums": null
+      },
+      "plugin_tool_calls": 0,
+      "result_subtype": "success"
+     },
+     "v2": {
+      "usd": 0.0156273,
+      "usd_client": 0.0156273,
+      "usd_recomputed": 0.0156273,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        13
+       ],
+       "cr": [
+        55103
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4227
+       ],
+       "out": [
+        330
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-haiku-4-5"
+       ]
+      },
+      "calls_from": "result_event_model_usage",
+      "coverage": {
+       "calls": 1,
+       "of": 1,
+       "sum_complete": true
+      },
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "resolution": {
+       "ok": true,
+       "why": [],
+       "client_version": "2.1.303",
+       "tools_total": 38,
+       "mcp_servers": [
+        {
+         "name": "context-mode",
+         "status": "connected"
+        }
+       ],
+       "mcp_tools": [
+        "mcp__context-mode__ctx_batch",
+        "mcp__context-mode__ctx_doctor",
+        "mcp__context-mode__ctx_execute",
+        "mcp__context-mode__ctx_index",
+        "mcp__context-mode__ctx_purge",
+        "mcp__context-mode__ctx_resume",
+        "mcp__context-mode__ctx_search",
+        "mcp__context-mode__ctx_stats",
+        "mcp__context-mode__ctx_upgrade"
+       ],
+       "plugins": [
+        {
+         "name": "context-mode",
+         "version": "0.0.0-dev",
+         "source": "context-mode@inline",
+         "at_arm_dir": true
+        }
+       ],
+       "main_models": [
+        "claude-haiku-4-5-20251001"
+       ],
+       "helper_models": [],
+       "plugin_tools": [
+        "mcp__context-mode__ctx_batch",
+        "mcp__context-mode__ctx_doctor",
+        "mcp__context-mode__ctx_execute",
+        "mcp__context-mode__ctx_index",
+        "mcp__context-mode__ctx_purge",
+        "mcp__context-mode__ctx_resume",
+        "mcp__context-mode__ctx_search",
+        "mcp__context-mode__ctx_stats",
+        "mcp__context-mode__ctx_upgrade"
+       ]
+      },
+      "plugin": {
+       "arm": "v2",
+       "git_head": "8f38bdbca6d2be974d90492e683b1b3073f1b63c",
+       "manifest_version": "0.0.0-dev",
+       "dirty": false,
+       "build_sha256sums": "b71f94b0eb470cc60a3490133125a9c519af5fb9ebe1f5b9a733f3048c09965a"
+      },
+      "plugin_tool_calls": 0,
+      "result_subtype": "success"
+     },
+     "gateway": {
+      "usd": 0.037663,
+      "usd_client": 0.0376628,
+      "usd_recomputed": 0.037663,
+      "success": true,
+      "turns": 3,
+      "calls": {
+       "in": [
+        13
+       ],
+       "cr": [
+        30318
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        16489
+       ],
+       "out": [
+        328
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-haiku-4-5"
+       ]
+      },
+      "calls_from": "gateway_record_session",
+      "coverage": {
+       "calls": 1,
+       "of": 1,
+       "sum_complete": true
+      },
+      "tools": {
+       "Read": 1,
+       "Edit": 1
+      },
+      "resolution": {
+       "ok": true,
+       "why": [],
+       "client_version": "2.1.303",
+       "tools_total": 29,
+       "mcp_servers": [],
+       "mcp_tools": [],
+       "plugins": [],
+       "main_models": [
+        "claude-haiku-4-5-20251001"
+       ],
+       "helper_models": [],
+       "gateway_record_found": true
+      },
+      "gateway_record": {
+       "found": true,
+       "complete": true,
+       "requests": 3,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 46820,
+        "output": 328,
+        "cache_read": 30318,
+        "cache_write": 16489
+       },
+       "anthropic_usd": 0.037663,
+       "coverage": {
+        "covered": true,
+        "short": {},
+        "unseen_by_client": {
+         "input": 0,
+         "output": 0,
+         "cache_read": 0,
+         "cache_write": 0
+        }
+       }
+      },
+      "result_subtype": "success"
+     }
+    }
+   ]
+  }
+ ],
+ "public_runs": [
+  {
+   "w": "edit",
+   "cycle": 1,
+   "arm": "v1",
+   "role": "measured",
+   "attempt": 1,
+   "order": [
+    "v1",
+    "v2",
+    "gateway",
+    "plain"
+   ],
+   "position": 0,
+   "usd": 0.0189282,
+   "usd_low": 0.0189282,
+   "usd_client": 0.018928200000000003,
+   "client_gap_pct": -1.832951338190432e-14,
+   "client_gap_flag": false,
+   "calls": {
+    "in": [
+     11
+    ],
+    "cr": [
+     57012
+    ],
+    "cw5": [
+     0
+    ],
+    "cw1h": [
+     5798
+    ],
+    "out": [
+     324
+    ],
+    "model": [
+     0
+    ],
+    "models": [
+     "claude-haiku-4-5"
+    ]
+   },
+   "calls_from": "result_event_model_usage",
+   "success": true,
+   "turns": 3,
+   "exit": 0,
+   "timed_out": false,
+   "rate_limited": false,
+   "result_subtype": "success",
+   "budget_hit": false,
+   "tools": {
+    "Read": 1,
+    "Edit": 1
+   },
+   "plugin_tool_calls": 0,
+   "resolution": {
+    "ok": true,
+    "why": [],
+    "client_version": "2.1.303",
+    "tools_total": 43,
+    "mcp_servers": [
+     {
+      "name": "context-mode",
+      "status": "connected"
+     }
+    ],
+    "mcp_tools": [
+     "mcp__context-mode__ctx_batch_execute",
+     "mcp__context-mode__ctx_doctor",
+     "mcp__context-mode__ctx_execute",
+     "mcp__context-mode__ctx_execute_file",
+     "mcp__context-mode__ctx_fetch_and_index",
+     "mcp__context-mode__ctx_index",
+     "mcp__context-mode__ctx_insight",
+     "mcp__context-mode__ctx_purge",
+     "mcp__context-mode__ctx_search",
+     "mcp__context-mode__ctx_stats",
+     "mcp__context-mode__ctx_upgrade"
+    ],
+    "plugins": [
+     {
+      "name": "context-mode",
+      "version": "1.0.169",
+      "source": "context-mode@inline",
+      "at_arm_dir": true
+     }
+    ],
+    "main_models": [
+     "claude-haiku-4-5-20251001"
+    ],
+    "helper_models": [],
+    "plugin_tools": [
+     "mcp__context-mode__ctx_batch_execute",
+     "mcp__context-mode__ctx_doctor",
+     "mcp__context-mode__ctx_execute",
+     "mcp__context-mode__ctx_execute_file",
+     "mcp__context-mode__ctx_fetch_and_index",
+     "mcp__context-mode__ctx_index",
+     "mcp__context-mode__ctx_insight",
+     "mcp__context-mode__ctx_purge",
+     "mcp__context-mode__ctx_search",
+     "mcp__context-mode__ctx_stats",
+     "mcp__context-mode__ctx_upgrade"
+    ]
+   },
+   "plugin": {
+    "arm": "v1",
+    "git_head": "a92cf6a77ac02971fb5fafe2155e5ee229491884",
+    "manifest_version": "1.0.169",
+    "dirty": false,
+    "build_sha256sums": null
+   },
+   "client_version": "2.1.303",
+   "model": "claude-haiku-4-5-20251001",
+   "harness_commit": "f7a22f4bbc90594256b1adeec865444283fedda6",
+   "ms": 12268,
+   "gw_version_before": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner",
+   "gw_version_after": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner"
+  },
+  {
+   "w": "edit",
+   "cycle": 1,
+   "arm": "v2",
+   "role": "measured",
+   "attempt": 1,
+   "order": [
+    "v1",
+    "v2",
+    "gateway",
+    "plain"
+   ],
+   "position": 1,
+   "usd": 0.0156273,
+   "usd_low": 0.0156273,
+   "usd_client": 0.0156273,
+   "client_gap_pct": 0,
+   "client_gap_flag": false,
+   "calls": {
+    "in": [
+     13
+    ],
+    "cr": [
+     55103
+    ],
+    "cw5": [
+     0
+    ],
+    "cw1h": [
+     4227
+    ],
+    "out": [
+     330
+    ],
+    "model": [
+     0
+    ],
+    "models": [
+     "claude-haiku-4-5"
+    ]
+   },
+   "calls_from": "result_event_model_usage",
+   "success": true,
+   "turns": 3,
+   "exit": 0,
+   "timed_out": false,
+   "rate_limited": false,
+   "result_subtype": "success",
+   "budget_hit": false,
+   "tools": {
+    "Read": 1,
+    "Edit": 1
+   },
+   "plugin_tool_calls": 0,
+   "resolution": {
+    "ok": true,
+    "why": [],
+    "client_version": "2.1.303",
+    "tools_total": 38,
+    "mcp_servers": [
+     {
+      "name": "context-mode",
+      "status": "connected"
+     }
+    ],
+    "mcp_tools": [
+     "mcp__context-mode__ctx_batch",
+     "mcp__context-mode__ctx_doctor",
+     "mcp__context-mode__ctx_execute",
+     "mcp__context-mode__ctx_index",
+     "mcp__context-mode__ctx_purge",
+     "mcp__context-mode__ctx_resume",
+     "mcp__context-mode__ctx_search",
+     "mcp__context-mode__ctx_stats",
+     "mcp__context-mode__ctx_upgrade"
+    ],
+    "plugins": [
+     {
+      "name": "context-mode",
+      "version": "0.0.0-dev",
+      "source": "context-mode@inline",
+      "at_arm_dir": true
+     }
+    ],
+    "main_models": [
+     "claude-haiku-4-5-20251001"
+    ],
+    "helper_models": [],
+    "plugin_tools": [
+     "mcp__context-mode__ctx_batch",
+     "mcp__context-mode__ctx_doctor",
+     "mcp__context-mode__ctx_execute",
+     "mcp__context-mode__ctx_index",
+     "mcp__context-mode__ctx_purge",
+     "mcp__context-mode__ctx_resume",
+     "mcp__context-mode__ctx_search",
+     "mcp__context-mode__ctx_stats",
+     "mcp__context-mode__ctx_upgrade"
+    ]
+   },
+   "plugin": {
+    "arm": "v2",
+    "git_head": "8f38bdbca6d2be974d90492e683b1b3073f1b63c",
+    "manifest_version": "0.0.0-dev",
+    "dirty": false,
+    "build_sha256sums": "b71f94b0eb470cc60a3490133125a9c519af5fb9ebe1f5b9a733f3048c09965a"
+   },
+   "client_version": "2.1.303",
+   "model": "claude-haiku-4-5-20251001",
+   "harness_commit": "f7a22f4bbc90594256b1adeec865444283fedda6",
+   "ms": 9253,
+   "gw_version_before": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner",
+   "gw_version_after": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner"
+  },
+  {
+   "w": "edit",
+   "cycle": 1,
+   "arm": "gateway",
+   "role": "measured",
+   "attempt": 1,
+   "order": [
+    "v1",
+    "v2",
+    "gateway",
+    "plain"
+   ],
+   "position": 2,
+   "usd": 0.037663,
+   "usd_low": 0.037663,
+   "usd_client": 0.0376628,
+   "client_gap_pct": 0.0005310279639294269,
+   "client_gap_flag": false,
+   "calls": {
+    "in": [
+     13
+    ],
+    "cr": [
+     30318
+    ],
+    "cw5": [
+     0
+    ],
+    "cw1h": [
+     16489
+    ],
+    "out": [
+     328
+    ],
+    "model": [
+     0
+    ],
+    "models": [
+     "claude-haiku-4-5"
+    ]
+   },
+   "calls_from": "gateway_record_session",
+   "success": true,
+   "turns": 3,
+   "exit": 0,
+   "timed_out": false,
+   "rate_limited": false,
+   "result_subtype": "success",
+   "budget_hit": false,
+   "tools": {
+    "Read": 1,
+    "Edit": 1
+   },
+   "resolution": {
+    "ok": true,
+    "why": [],
+    "client_version": "2.1.303",
+    "tools_total": 29,
+    "mcp_servers": [],
+    "mcp_tools": [],
+    "plugins": [],
+    "main_models": [
+     "claude-haiku-4-5-20251001"
+    ],
+    "helper_models": [],
+    "gateway_record_found": true
+   },
+   "client_version": "2.1.303",
+   "model": "claude-haiku-4-5-20251001",
+   "harness_commit": "f7a22f4bbc90594256b1adeec865444283fedda6",
+   "ms": 12859,
+   "gateway_record": {
+    "found": true,
+    "complete": true,
+    "requests": 3,
+    "edge_calls": 0,
+    "tokens": {
+     "prompt": 46820,
+     "output": 328,
+     "cache_read": 30318,
+     "cache_write": 16489
+    },
+    "anthropic_usd": 0.037663,
+    "coverage": {
+     "covered": true,
+     "short": {},
+     "unseen_by_client": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+     }
+    }
+   },
+   "flags_before": {
+    "memory": true,
+    "skills": true
+   },
+   "flags_after": {
+    "memory": true,
+    "skills": true
+   },
+   "gw_version_before": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner",
+   "gw_version_after": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner"
+  },
+  {
+   "w": "edit",
+   "cycle": 1,
+   "arm": "plain",
+   "role": "measured",
+   "attempt": 1,
+   "order": [
+    "v1",
+    "v2",
+    "gateway",
+    "plain"
+   ],
+   "position": 3,
+   "usd": 0.0184553,
+   "usd_low": 0.0184553,
+   "usd_client": 0.0184553,
+   "client_gap_pct": 0,
+   "client_gap_flag": false,
+   "calls": {
+    "in": [
+     13
+    ],
+    "cr": [
+     55113
+    ],
+    "cw5": [
+     0
+    ],
+    "cw1h": [
+     5693
+    ],
+    "out": [
+     309
+    ],
+    "model": [
+     0
+    ],
+    "models": [
+     "claude-haiku-4-5"
+    ]
+   },
+   "calls_from": "result_event_model_usage",
+   "success": true,
+   "turns": 3,
+   "exit": 0,
+   "timed_out": false,
+   "rate_limited": false,
+   "result_subtype": "success",
+   "budget_hit": false,
+   "tools": {
+    "Read": 1,
+    "Edit": 1
+   },
+   "resolution": {
+    "ok": true,
+    "why": [],
+    "client_version": "2.1.303",
+    "tools_total": 29,
+    "mcp_servers": [],
+    "mcp_tools": [],
+    "plugins": [],
+    "main_models": [
+     "claude-haiku-4-5-20251001"
+    ],
+    "helper_models": []
+   },
+   "client_version": "2.1.303",
+   "model": "claude-haiku-4-5-20251001",
+   "harness_commit": "f7a22f4bbc90594256b1adeec865444283fedda6",
+   "ms": 7550,
+   "gw_version_before": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner",
+   "gw_version_after": "context-mode-s166-query-aware-inject-s167-hotpath-perf-s168-backlog-wave-s169-skill-name-priority-s170-tenant-link-picker-s171-devmode-s172-resume-richness-s173-capture-quality-s174denoise-s175-twin-s176twinfix-s177-twin-session-s178regfix-s178b-devgate-s179-auth-unify-s180-strict-resume-s179b-unwrap-s179c-d2-s181-twin-replay-s182-wm-gate-s185-resume-copy-s186-stripb-s187-twin-fullhistory-s188-twin-search-s189-twin-search-archive-s189b-twin-did-s189c-ops-effort-s190-diagwave-s191-twin-backfill-s192-twin-import-s193-ring-livemax-s194-realtime-ws-s195-cmimport-fix-s196-ws-client-fix-s197-ws-multiscope-s198-purge-throttle-s199-socket-data-s200-purge-sessions-s201-sessions-docs-s202-infinite-skill-s203-infinite-noexact-s204-true-ttft-s213-thinking-integrity-s214-interleaved-thinking-banner"
+  }
+ ],
+ "spent_usd": 0.0906738,
+ "cap_usd": 3,
+ "stopped": null
+}

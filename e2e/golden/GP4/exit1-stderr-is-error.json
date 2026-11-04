@@ -1,0 +1,20 @@
+{
+  "bad": {
+    "content": [
+      {
+        "type": "text",
+        "text": "exit 1 · 5 B\nboom\n"
+      }
+    ],
+    "isError": true
+  },
+  "grep": {
+    "content": [
+      {
+        "type": "text",
+        "text": "exit 1 · 0 B\n"
+      }
+    ],
+    "isError": false
+  }
+}

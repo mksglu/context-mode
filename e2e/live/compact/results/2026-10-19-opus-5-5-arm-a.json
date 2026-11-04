@@ -1,0 +1,479 @@
+{
+  "id": "T-CMP",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "runsPerArm": 10,
+  "arms": [
+    "a"
+  ],
+  "complete": true,
+  "costUsd": 2.1133,
+  "stats": {
+    "a": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 4,
+      "correctRate": 0.4,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "b": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    },
+    "c": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    },
+    "d": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    },
+    "e": {
+      "runs": 0,
+      "missing": 0,
+      "called": 0,
+      "callRate": null,
+      "correct": 0,
+      "correctRate": null,
+      "resumeRuns": 0,
+      "resumeOk": 0
+    }
+  },
+  "checks": [
+    {
+      "name": "runs_per_arm",
+      "pass": false,
+      "want": ">= 10 each"
+    },
+    {
+      "name": "a_call_rate",
+      "pass": false,
+      "got": 0,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "a_correct",
+      "pass": false,
+      "got": 0.4,
+      "want": ">= 0.8"
+    },
+    {
+      "name": "a_correct_ge_c",
+      "pass": false,
+      "got": 0.4,
+      "want": ">= c null"
+    },
+    {
+      "name": "d_correct",
+      "pass": false,
+      "got": null,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "resume_seq",
+      "pass": true,
+      "got": "10/10",
+      "want": "all, >= 10"
+    }
+  ],
+  "info": {
+    "a_correct_minus_b": null
+  },
+  "runs": {
+    "a": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.2185546,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_016T89gzajh8HbWJBGXfZy5q",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "D=/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-o1-cm-t-cmp-EfhcAz-arm-a-bqj42z-project/memory\ncat > $D/journal-writer-queue.md <<'EOF'\n---\nname: journal-writer-queue\ndescription: Decision (2026-10-19) - two processes write the journal via one shared writer queue, not a lock file\nmetadata:\n  type: project\n---\n\nJournal writes from the two processes go through one shared writer queue. A lock file was considered and rejected.\n\n**Why:** User decided this on 2026-10-19 when choosing between (1) a lock file and (2) a shared writer queue.\n**How to apply:** Send all journal writes through the single queue/writer. Don't add lock-file coordination or let processes append to the journal directly.\nEOF\necho \"- [Journal writer queue](journal-writer-queue.md) — journal writes use one shared writer queue, not a lock file\" >> $D/MEMORY.md\necho ok"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01Q6VwSpatxeBT3R7aA3ZjKG",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src/store 2>/dev/null; cat package.json 2>/dev/null | head -30"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01HnV5oKJQQUwbjWbCDhex9R",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>/dev/null | head -30"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": true,
+        "costUsd": 0.256312,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01CRUWwYvzQALwHYQA5nu3DQ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\nconst SUPPORTED_SCHEMA = 4;\nconst SCHEMA_PATTERN = /^cfg-schema-v(\\d+)$/;\n\nfunction readLayerFile(path) {\n  let text;\n  try {\n    text = readFileSync(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  return JSON.parse(text);\n}\n\nfunction checkSchemaVersion(data, layer, path) {\n  const declared = data.schemaVersion;\n  if (declared === undefined) return;\n  const match = SCHEMA_PATTERN.exec(String(declared));\n  if (!match) {\n    throw new Error(`config ${layer} (${path}): unrecognised schemaVersion \"${declared}\"`);\n  }\n  if (Number(match[1]) > SUPPORTED_SCHEMA) {\n    throw new Error(\n      `config ${layer} (${path}): declares ${declared}, newer than supported cfg-schema-v${SUPPORTED_SCHEMA}`,\n    );\n  }\n}\n\n/**\n * Load config in three layers: defaults, project file, user file.\n * The merged result is checked against `schema` (key -> typeof name).\n * Unknown keys warn and are dropped; files declaring a schema newer than\n * cfg-schema-v4 are refused.\n *\n * @returns {{ values: object, sources: object, warnings: string[] }}\n *   `sources[key]` names the layer that set each value.\n */\nexport function loadConfig({ defaults, schema, projectFile, userFile, warn = console.warn }) {\n  const values = {};\n  const sources = {};\n  const warnings = [];\n\n  const layers = [{ name: \"defaults\", data: defaults }];\n  for (const [name, path] of [[\"project\", projectFile], [\"user\", userFile]]) {\n    if (!path) continue;\n    const data = readLayerFile(path);\n    if (data === null) continue;\n    checkSchemaVersion(data, name, path);\n    layers.push({ name, data, path });\n  }\n\n  for (const { name, data, path } of layers) {\n    for (const [key, value] of Object.entries(data)) {\n      if (key === \"schemaVersion\") continue;\n      if (!Object.hasOwn(schema, key)) {\n        const where = path ? `${name} (${path})` : name;\n        const message = `config: unknown key \"${key}\" in ${where}, ignored`;\n        warnings.push(message);\n        warn(message);\n        continue;\n      }\n      values[key] = value;\n      sources[key] = name;\n    }\n  }\n\n  for (const [key, type] of Object.entries(schema)) {\n    if (!(key in values)) continue;\n    const actual = Array.isArray(values[key]) ? \"array\" : typeof values[key];\n    if (actual !== type) {\n      throw new Error(`config: \"${key}\" from ${sources[key]} must be ${type}, got ${actual}`);\n    }\n  }\n\n  return { values, sources, warnings };\n}\nEOF\ncd packages/cli/lib/config && T=$(mktemp -d) && echo '{\"schemaVersion\":\"cfg-schema-v4\",\"port\":9,\"oldKey\":1}' > $T/p.json && echo '{\"schemaVersion\":\"cfg-schema-v5\"}' > $T/u.json && node -e '\nimport(\"./layered-loader.mjs\").then(({loadConfig})=>{\nconst o={defaults:{port:1,name:\"x\"},schema:{port:\"number\",name:\"string\"},projectFile:process.argv[1],warn:()=>{}};\nconsole.log(JSON.stringify(loadConfig(o)));\ntry{loadConfig({...o,userFile:process.argv[2]})}catch(e){console.log(\"refused:\",e.message)}})' $T/p.json $T/u.json"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "",
+        "exitCode": 1
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1831632,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_019sse5dQSaqc4TsKey1LjvR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -R services 2>&1 | head -20; wc -l services/reports/export/paginate.ts 2>&1"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.24029699999999998,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01RD7EseLJ7k6R5p1PtUD8K7",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "D=\"/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-o1-cm-t-cmp-EfhcAz-arm-a-7JMWbC-project/memory\"\ncat > \"$D/journal-shared-writer-queue.md\" <<'EOF'\n---\nname: journal-shared-writer-queue\ndescription: Decision (2026-10-19) - two processes write the journal through one shared writer queue, not a lock file\nmetadata:\n  type: project\n---\n\nConcurrent journal writes from the two processes go through one shared writer queue. A lock file was considered and rejected.\n\n**Why:** User decision on 2026-10-19. The two options were (1) a lock file and (2) a shared writer queue.\n\n**How to apply:** When implementing or changing journal writes, send them all through the single queue. Don't add lock-file coordination.\nEOF\necho \"- [Journal shared writer queue](journal-shared-writer-queue.md) — journal writes use one shared queue, not a lock file\" >> \"$D/MEMORY.md\"\necho ok"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_014GFhRZF5ZYTD8BLURPUBig",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -la; ls -la src src/store 2>&1; cat package.json tsconfig.json 2>&1 | head -40; git log --oneline | head -5"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01N8Vz3w9NL5XRVf85PVZEA9",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; echo ---; ls src/store 2>&1; echo ---; cat README.md 2>&1 | head -60"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": true,
+        "costUsd": 0.2528434,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01PtKyY4TpS3JwLANwHb8VP5",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "D=/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-o1-cm-t-cmp-EfhcAz-arm-a-fwSm2K-project/memory\ncat > $D/config-loader-design.md <<'EOF'\n---\nname: config-loader-design\ndescription: Decided config loader design (option C, layered, cfg-schema-v4) and why A/B were rejected\nmetadata:\n  type: project\n---\n\nConfig loader = option C, layered (decided 2026-10-19):\n- Layers in order: built-in defaults -> project file -> user file; merged result validated against ONE schema.\n- Unknown keys: warning naming key + layer, never an error (old configs must keep working).\n- Every value records which layer set it, so `doctor` can print each value's source.\n- Schema version for the merged result: cfg-schema-v4. Refuse any file declaring a NEWER schema version.\n- Cost: one extra file read at startup, measured <2 ms.\n\n**Why:** Option A (single JSON, hard-fail on unknown keys) broke users with leftover old keys. Option B (env vars over file, no schema) let typo'd variable names silently do nothing, which cost a full afternoon in the last release.\n\n**How to apply:** Don't add hard errors for unknown keys, schema-less env overrides, or drop layer provenance. Version check: reject only versions > v4.\nEOF\necho \"- [Config loader design](config-loader-design.md) — option C layered loader, cfg-schema-v4, warn on unknown keys\" >> $D/MEMORY.md\necho ok"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01FDiaFXRomcj8QsiGFdQBM7",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFile } from \"node:fs/promises\";\n\nexport const SCHEMA_VERSION = 4;\nconst VERSION_RE = /^cfg-schema-v(\\d+)$/;\n\nasync function readLayer(path) {\n  if (!path) return null;\n  try {\n    return JSON.parse(await readFile(path, \"utf8\"));\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw new Error(`config: cannot read ${path}: ${err.message}`);\n  }\n}\n\nfunction checkVersion(data, layer, path) {\n  const declared = data.$schema;\n  if (declared === undefined) return;\n  const m = VERSION_RE.exec(String(declared));\n  if (!m) throw new Error(`config: ${layer} file ${path} declares unknown schema \"${declared}\"`);\n  if (Number(m[1]) > SCHEMA_VERSION) {\n    throw new Error(\n      `config: ${layer} file ${path} declares ${declared}, newer than cfg-schema-v${SCHEMA_VERSION}`,\n    );\n  }\n}\n\n/**\n * Loads config in three layers: defaults, then project file, then user file.\n * The merged result is checked against `schema` ({ key: { type } }).\n * Unknown keys warn (naming key and layer) and never fail.\n * Returns { values, sources, warnings }; sources[key] names the layer that set it.\n */\nexport async function loadConfig({ defaults = {}, schema, projectPath, userPath, warn = console.warn } = {}) {\n  if (!schema) throw new Error(\"config: schema is required\");\n  const values = {};\n  const sources = {};\n  const warnings = [];\n\n  const layers = [\n    [\"defaults\", null, defaults],\n    [\"project\", projectPath, await readLayer(projectPath)],\n    [\"user\", userPath, await readLayer(userPath)],\n  ];\n\n  for (const [layer, path, data] of layers) {\n    if (!data) continue;\n    if (path) checkVersion(data, layer, path);\n    for (const [key, value] of Object.entries(data)) {\n      if (key === \"$schema\") continue;\n      if (!Object.hasOwn(schema, key)) {\n        const msg = `config: unknown key \"${key}\" in ${layer} layer${path ? ` (${path})` : \"\"}`;\n        warnings.push(msg);\n        warn(msg);\n        continue;\n      }\n      values[key] = value;\n      sources[key] = layer;\n    }\n  }\n\n  for (const [key, value] of Object.entries(values)) {\n    const { type } = schema[key];\n    const actual = Array.isArray(value) ? \"array\" : typeof value;\n    if (type && actual !== type) {\n      throw new Error(`config: \"${key}\" from ${sources[key]} layer must be ${type}, got ${actual}`);\n    }\n  }\n\n  return { values, sources, warnings };\n}\nEOF\nnode --input-type=module -e '\nimport {writeFileSync} from \"fs\";\nimport {loadConfig} from \"./packages/cli/lib/config/layered-loader.mjs\";\nwriteFileSync(\"/tmp/p.json\",JSON.stringify({$schema:\"cfg-schema-v4\",port:2,old:1}));\nwriteFileSync(\"/tmp/u.json\",JSON.stringify({port:3}));\nconst r=await loadConfig({defaults:{port:1,host:\"x\"},schema:{port:{type:\"number\"},host:{type:\"string\"}},projectPath:\"/tmp/p.json\",userPath:\"/tmp/u.json\",warn:()=>{}});\nconsole.log(JSON.stringify(r));\nwriteFileSync(\"/tmp/u.json\",JSON.stringify({$schema:\"cfg-schema-v5\"}));\ntry{await loadConfig({schema:{},userPath:\"/tmp/u.json\"})}catch(e){console.log(e.message)}'"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "",
+        "exitCode": 1
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1750024,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01ATUA4kUbUnVav2hSyz9GbF",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -la services/reports/export/ 2>&1 | head; wc -l services/reports/export/paginate.ts 2>&1"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON).",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.20095979999999997,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01QZ1YHPDf8tvTHMmjcBmJSJ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -a; ls -R src 2>/dev/null | head -50; cat package.json tsconfig.json 2>/dev/null | head -40"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01D41KjBmec3P7GYh3Bc2Hyi",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_index",
+            "input": {
+              "source": "fix: SQLITE_BUSY in journal writer tests",
+              "content": "SQLITE_BUSY \"database is locked\" flaky test fix (journal writer).\nRoot cause: two writer handles on same file (hook process + server); hook handle held write transaction across an await; server handle had no busy_timeout so failed immediately.\n1. Exactly one writer handle per process, passed down; never open a second handle in a helper.\n2. Each batch insert in one BEGIN IMMEDIATE ... COMMIT; never await inside the block.\n3. Pragmas right after open, in order: journal_mode = WAL, synchronous = NORMAL, busy_timeout.\n4. Test helper closes the handle in an after hook, else next test inherits the lock.\nExact value: PRAGMA busy_timeout = 7350 -> green 50/50. Lower values failed ~1 in 20 on slow CI runner."
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": true,
+        "costUsd": 0.254881,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01Dq42PDBFJgV2rRaSdW7pA6",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "D=/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-o1-cm-t-cmp-EfhcAz-arm-a-iy3Rn3-project/memory\ncat > \"$D/config-loader-design.md\" <<'EOF'\n---\nname: config-loader-design\ndescription: Decided design for the config loader (option C, layered, cfg-schema-v4) and why A/B were rejected\nmetadata:\n  type: project\n---\n\nConfig loader uses option C, a layered loader (decided 2026-10-19):\n- Layers in order: built-in defaults, then project file, then user file. The merged result is checked against one schema.\n- Unknown keys cause a WARNING that names the key and the layer. They never cause an error, so old configs keep working.\n- Each value records which layer set it, so the `doctor` command can print where a value came from.\n- Schema version for the merged result: cfg-schema-v4. Refuse any file that declares a newer schema version.\n- Cost: one extra file read at startup, measured at under 2 ms.\n\n**Why:** Option A (one JSON file, hard fail on unknown keys) broke every user who still had an old key. Option B (env vars merged over the file, no schema) let a typo in a variable name do nothing without any warning, which cost a full afternoon in the last release.\n\n**How to apply:** Don't add hard errors for unknown keys. Don't add schema-less env-var overrides. Keep tracking which layer set each value. Bump the max accepted schema only when the team agrees on a new version.\nEOF\necho \"- [Config loader design](config-loader-design.md) — option C layered loader, cfg-schema-v4, warn on unknown keys\" >> \"$D/MEMORY.md\"\ncat \"$D/MEMORY.md\""
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_017xbM35DpwfyWTCACAsnKur",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib 2>&1 | head; cat packages/cli/package.json 2>&1 | head -20\nmkdir -p packages/cli/lib/config\ncat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\nconst SCHEMA_ID = \"cfg-schema-v4\";\nconst MAX_SCHEMA_VERSION = 4;\n\nfunction readLayer(path, layer) {\n  let text;\n  try {\n    text = readFileSync(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return {};\n    throw err;\n  }\n  const data = JSON.parse(text);\n  const declared = data.$schema;\n  if (declared !== undefined) {\n    const match = /^cfg-schema-v(\\d+)$/.exec(declared);\n    if (!match) throw new Error(`${layer} config ${path}: unrecognized schema \"${declared}\"`);\n    if (Number(match[1]) > MAX_SCHEMA_VERSION) {\n      throw new Error(`${layer} config ${path} declares ${declared}, newer than supported ${SCHEMA_ID}`);\n    }\n  }\n  delete data.$schema;\n  return data;\n}\n\n/**\n * Load config in three layers: built-in defaults, then the project file, then the user file.\n * Returns { values, sources, warnings }; sources[key] names the layer that set the value.\n * `schema` maps each known key to its expected typeof string.\n */\nexport function loadConfig({ defaults = {}, schema = {}, projectPath, userPath, warn = console.warn } = {}) {\n  const layers = [\n    [\"defaults\", defaults],\n    [\"project\", projectPath ? readLayer(projectPath, \"project\") : {}],\n    [\"user\", userPath ? readLayer(userPath, \"user\") : {}],\n  ];\n\n  const values = {};\n  const sources = {};\n  const warnings = [];\n  for (const [layer, data] of layers) {\n    for (const [key, value] of Object.entries(data)) {\n      if (!Object.hasOwn(schema, key)) {\n        const msg = `unknown config key \"${key}\" in ${layer} layer (ignored)`;\n        warnings.push(msg);\n        warn(msg);\n        continue;\n      }\n      values[key] = value;\n      sources[key] = layer;\n    }\n  }\n\n  for (const [key, type] of Object.entries(schema)) {\n    if (key in values && typeof values[key] !== type) {\n      throw new Error(`config key \"${key}\" from ${sources[key]} layer must be ${type}, got ${typeof values[key]}`);\n    }\n  }\n\n  return { values, sources, warnings };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo SYNTAX_OK"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "",
+        "exitCode": 1
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.136844,
+        "toolCalls": [
+          {
+            "turn": 2,
+            "id": "toolu_01PARp4bu1bXXpgp9F34wJsi",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts 2>&1 | head -80; ls services/reports/export 2>&1"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.19443319999999997,
+        "toolCalls": [
+          {
+            "turn": 0,
+            "id": "toolu_01Gy7dne1LaCS2vTBDf1raNs",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "D=/Users/USER/.claude/projects/-private-tmp-cm-v2-fu-tcmp-out-scratch-o1-cm-t-cmp-EfhcAz-arm-a-nsb9tl-project/memory\ncat > $D/journal-writer-queue.md <<'EOF'\n---\nname: journal-writer-queue\ndescription: Decision (2026-10-19) - two processes write the journal via one shared writer queue, not a lock file\nmetadata:\n  type: project\n---\n\nConcurrent journal writes from the two processes go through one shared writer queue. A lock file was considered and rejected.\n\n**Why:** User decision on 2026-10-19, chosen over option (1), the lock file.\n**How to apply:** Route every journal write through the single queue/writer. Don't add lock-file coordination around the journal.\nEOF\necho \"- [Journal writer queue](journal-writer-queue.md) — journal writes use one shared writer queue, not a lock file\" >> $D/MEMORY.md\necho ok"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01NAUBZezFpn4VQuSx4SeiwP",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src src/store 2>&1 | head"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01UFmzkVPMSmxcTGcEjX4cTd",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>/dev/null | head -30"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ]
+  }
+}

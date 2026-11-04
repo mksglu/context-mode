@@ -1,0 +1,36 @@
+/* Context Mode README figures. Tokens from contextmode.ai/brand (tokens.json, 2026-10-08), inlined here.
+   Geist and Geist Mono for text, IBM Plex Sans 600 for the wordmark only. No shadow. One thin border. */
+@font-face{font-family:'Geist';src:url(fonts/geist-sans-variable.woff2) format('woff2');font-weight:100 900;font-display:block}
+@font-face{font-family:'Geist Mono';src:url(fonts/geist-mono-variable.woff2) format('woff2');font-weight:100 900;font-display:block}
+@font-face{font-family:'IBM Plex Sans';src:url(fonts/ibm-plex-sans-latin-600-normal.woff2) format('woff2');font-weight:600;font-display:block}
+:root{--sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace}
+html.light{--bg:#ffffff;--fg:#0a0a0a;--fg2:#6b6b74;--body:#3f3f46;--muted:#6b6b74;--card:#fafafa;--card-b:#e4e4e7;--inner:#efeff1;
+  --dot:rgb(10 10 10 / .09);--save:#0e9f6e;--raw:#a1a1aa;--accent:#1a56db;--emph:#0a0a0a}
+html.dark{--bg:#0a0a0a;--fg:#fafafa;--fg2:#8b8b93;--body:#a1a1aa;--muted:#a1a1aa;--card:#111113;--card-b:#232326;--inner:#26262a;
+  --dot:rgb(255 255 255 / .07);--save:#0e9f6e;--raw:#71717a;--accent:#93c5fd;--emph:#fafafa}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:var(--bg);overflow:hidden}
+body{font-family:var(--sans);-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","cv11";letter-spacing:-.003em;color:var(--body)}
+.art{position:relative;overflow:hidden;background:var(--bg);width:var(--w);height:var(--h)}
+.dots{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 1px 1px,var(--dot) 1px,transparent 0) 0 0/22px 22px;
+  -webkit-mask-image:radial-gradient(ellipse 80% 70% at 75% 35%,#0a0a0a 20%,transparent 75%);mask-image:radial-gradient(ellipse 80% 70% at 75% 35%,#0a0a0a 20%,transparent 75%)}
+.abs{position:absolute}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);line-height:1}
+.h{font-weight:600;letter-spacing:-.035em;line-height:1.08;color:var(--fg)}
+.h em{font-style:normal;color:var(--fg2)}
+.mono{font-family:var(--mono)}
+.box{position:absolute;background:var(--card);border:1px solid var(--card-b);border-radius:10px;padding:16px 18px}
+.box.gw{border:1.5px solid var(--emph)}
+.t{font-weight:600;font-size:19px;letter-spacing:-.01em;color:var(--fg);line-height:1.2}
+.s{font-family:var(--mono);font-size:13px;line-height:1.5;color:var(--body);margin-top:8px}
+.s b{font-weight:500;color:var(--fg)}
+.cap{position:absolute;left:64px;right:64px;bottom:0;border-top:1px solid var(--card-b);padding:14px 0 18px;font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--muted)}
+.cap b{font-weight:500;color:var(--fg)}
+svg{position:absolute;left:0;top:0;overflow:visible}
+svg .ln{stroke:var(--fg2);stroke-width:1.5;fill:none}
+svg .dash{stroke:var(--fg2);stroke-width:1.5;fill:none;stroke-dasharray:5 5}
+svg .sv{stroke:var(--save);stroke-width:2;fill:none}
+svg .ah{fill:var(--fg2)}
+svg .ahs{fill:var(--save)}
+svg text{font-family:var(--mono);font-size:12.5px;fill:var(--muted)}
+.wm{height:34px;display:block}

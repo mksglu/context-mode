@@ -1,0 +1,93 @@
+{
+  "hasNodeModules": false,
+  "keys": [
+    "bin",
+    "bugs",
+    "description",
+    "engines",
+    "exports",
+    "files",
+    "homepage",
+    "keywords",
+    "license",
+    "main",
+    "name",
+    "pi",
+    "repository",
+    "type",
+    "version"
+  ],
+  "packageJson": {
+    "bin": {
+      "context-mode": "cli.mjs"
+    },
+    "bugs": {
+      "url": "https://github.com/mksglu/context-mode/issues"
+    },
+    "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
+    "engines": {
+      "node": ">=24.15.0"
+    },
+    "exports": {
+      ".": "./opencode/plugin.js",
+      "./server": "./opencode/plugin.js"
+    },
+    "files": [
+      ".claude-plugin",
+      ".codex-plugin",
+      "LICENSE",
+      "README.md",
+      "SHA256SUMS",
+      "claude-code",
+      "cli.mjs",
+      "codex",
+      "copilot",
+      "fixtures",
+      "gemini-extension.json",
+      "hook.mjs",
+      "hooks",
+      "opencode",
+      "pi",
+      "qwen-extension.json",
+      "run.mjs",
+      "search.mjs",
+      "server.mjs",
+      "skills"
+    ],
+    "homepage": "https://github.com/mksglu/context-mode#readme",
+    "keywords": [
+      "claude-code",
+      "codex",
+      "gemini-cli",
+      "qwen-code",
+      "copilot-cli",
+      "vscode",
+      "opencode",
+      "pi",
+      "kiro",
+      "zcode",
+      "mcp",
+      "context-window",
+      "sandbox",
+      "fts5",
+      "pi-package"
+    ],
+    "license": "Elastic-2.0",
+    "main": "./opencode/plugin.js",
+    "name": "context-mode",
+    "pi": {
+      "extensions": [
+        "./pi/index.js"
+      ],
+      "skills": [
+        "./pi/skills"
+      ]
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/mksglu/context-mode.git"
+    },
+    "type": "module"
+  },
+  "topLevelEqualsFiles": true
+}

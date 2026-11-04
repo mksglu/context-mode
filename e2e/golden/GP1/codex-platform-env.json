@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "node hook.mjs --agent codex"
+  ]
+}

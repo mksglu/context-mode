@@ -1,0 +1,7 @@
+{
+  "id": "gate-layers",
+  "kind": "local",
+  "covers": ["scripts/gate.mjs"],
+  "run": ["node", "e2e/checks/gate-layers.mjs"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

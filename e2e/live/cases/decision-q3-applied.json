@@ -1,0 +1,4 @@
+{ "id": "decision-q3-applied", "covers": ["docs/architecture/adr/0016"], "kind": "model",
+  "prompt": "Read only docs/architecture/adr/0016-subagent-context-protection.md. Does it say that case B never uses allow + updatedInput and instead denies with the rewritten command? Reply with one line: PASS or FAIL.",
+  "tools": ["Read"],
+  "expect": { "firstLineStartsWith": "PASS" } }

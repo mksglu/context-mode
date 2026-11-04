@@ -1,9 +1,0 @@
-{"type":"summary","summary":"A legacy/summary line that carries no usage — must be skipped without throwing.","leafUuid":"abc"}
-{"type":"user","message":{"role":"user","content":"Build the cost capture"},"uuid":"u1","parentUuid":null}
-{"type":"assistant","uuid":"a1","parentUuid":"u1","message":{"id":"msg_1","model":"claude-sonnet-4-6","role":"assistant","usage":{"input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
-{"type":"assistant","uuid":"a2","parentUuid":"a1","message":{"id":"msg_2","model":"claude-sonnet-4-6","role":"assistant","usage":{"input_tokens":2000,"output_tokens":800,"cache_creation_input_tokens":1000,"cache_read_input_tokens":1500}}}
-{"type":"assistant","uuid":"a3","parentUuid":"a2","message":{"id":"msg_3","model":"claude-opus-4-8","role":"assistant","usage":{"input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
-{"this":"is","not":"valid json for our purposes but still parseable — no type field"}
-this line is not even json and must be skipped without throwing
-{"type":"assistant","uuid":"sc1","parentUuid":"a3","isSidechain":true,"agentId":"sub-1","message":{"id":"msg_sc","model":"claude-sonnet-4-6","role":"assistant","usage":{"input_tokens":9999,"output_tokens":9999,"cache_creation_input_tokens":9999,"cache_read_input_tokens":9999}}}
-{"type":"assistant","uuid":"a4","parentUuid":"a3","message":{"id":"msg_4","model":"claude-sonnet-4-6","role":"assistant","usage":{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}

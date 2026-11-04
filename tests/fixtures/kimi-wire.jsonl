@@ -1,6 +1,0 @@
-{"type":"session.start","sessionId":"kimi-sess-1"}
-{"type":"usage.record","model":"kimi-k2","usage":{"inputOther":1000,"output":500,"inputCacheRead":0,"inputCacheCreation":0},"usageScope":"turn"}
-{"type":"tool.call","name":"Bash"}
-{"type":"usage.record","model":"kimi-k2","usage":{"inputOther":2000,"output":800,"inputCacheRead":1500,"inputCacheCreation":1000},"usageScope":"turn"}
-{"type":"usage.record","model":"kimi-k2-thinking","usage":{"inputOther":300,"output":120,"inputCacheRead":0,"inputCacheCreation":0},"usageScope":"turn"}
-{"type":"usage.record","model":"kimi-k2","usage":{"inputOther":0,"output":0,"inputCacheRead":0,"inputCacheCreation":0},"usageScope":"turn"}

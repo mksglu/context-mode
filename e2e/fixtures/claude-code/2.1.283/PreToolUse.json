@@ -1,0 +1,17 @@
+{
+  "session_id": "<sid:0>",
+  "transcript_path": "<transcript_path>",
+  "cwd": "<proj>",
+  "prompt_id": "<sid:1>",
+  "permission_mode": "default",
+  "effort": {
+    "level": "low"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo gp3-fixture-probe",
+    "description": "Echo probe string"
+  },
+  "tool_use_id": "toolu_01KiGwzUtjjgbHVTtADJu5a9"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "T-F3",
+  "kind": "agent",
+  "covers": ["src/core/tools/ops.ts"],
+  "prompt": "Use ctx_execute to run `seq 1 200000` (output past the cap), then use ctx_search to find one line in the output. Do not call ctx_stats. Reply with only the reply's summary line (exit code and byte count), verbatim, and do not mention any byte or token savings number in your reply.",
+  "tools": [
+    "mcp__context-mode__ctx_execute",
+    "mcp__context-mode__ctx_search"
+  ],
+  "expect": {
+    "firstLineStartsWith": "exit"
+  }
+}

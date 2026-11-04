@@ -1,0 +1,1318 @@
+{
+ "summary": {
+  "id": "05-test-suite",
+  "date": "2026-11-02",
+  "version": "2.0.0-next.26",
+  "model": "claude-haiku-5-5",
+  "prompt": "Clone https://github.com/expressjs/express, install it and run its test suite. How many tests passed, failed and were skipped?",
+  "job": "test suite run",
+  "verdict": "pass",
+  "reason": "1290 passing, 0 failing, 0 pending; equal npm test on a fresh clone",
+  "raw_bytes": 71119,
+  "raw_source": "full npm test output",
+  "context_bytes": 1495,
+  "saving_pct": 97.9,
+  "tool_calls": 6,
+  "tools": [
+   "ctx_resume",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "turns": 7,
+  "cost_usd": 0.003214965,
+  "wall_s": 42,
+  "route": "Bash",
+  "journal": {
+   "events": 7,
+   "sandbox_bytes": 1140,
+   "returned_bytes": 1416,
+   "tools": {
+    "ctx_resume": 1,
+    "Bash": 5
+   }
+  },
+  "answer": "Express's test suite passed on this machine: **1290 passing, 0 failing, 0 skipped (pending)**. Mocha exited with code 0.\n\n- **Repo:** cloned at `/TMP (commit `bcc0551`, version 5.3.0).\n- **Install:** `npm install` succeeded. npm reported 21 audit vulnerabilities in the dependency tree, which I did not address.\n- **Test command:** `npm test`, which runs `mocha --require test/support/env --reporter spec --check-leaks test/ test/acceptance/`. Node v26.8.1.\n- **Full log:** `/TMP\n\nOn skips: the log has no \"pending\" line, so zero tests were skipped in this run. The source has four conditional `this.skip()` calls (`test/res.send.js:409`, `test/req.fresh.js:53` and `:72`, `test/app.router.js:45`). None of them fired here. I did not check what conditions guard them."
+ },
+ "stream": [
+  {
+   "type": "system",
+   "subtype": "hook_started",
+   "hook_id": "f2538f21-9bdb-49ee-b586-7be2e721009a",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "uuid": "54d71430-fea3-47c8-a4d4-595d7c61ac1a",
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae"
+  },
+  {
+   "type": "system",
+   "subtype": "hook_response",
+   "hook_id": "f2538f21-9bdb-49ee-b586-7be2e721009a",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "output": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stderr": "",
+   "exit_code": 0,
+   "outcome": "success",
+   "uuid": "2660ad43-7fca-42fc-97e6-6f7cb8f5e1ae",
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae"
+  },
+  {
+   "type": "system",
+   "subtype": "init",
+   "cwd": "/TMP",
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "tools": [
+    "Task",
+    "Bash",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "DesignSync",
+    "Edit",
+    "EnterWorktree",
+    "ExitWorktree",
+    "ListAgents",
+    "Monitor",
+    "NotebookEdit",
+    "PushNotification",
+    "Read",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "SendMessage",
+    "Skill",
+    "TaskStop",
+    "ToolSearch",
+    "WebFetch",
+    "WebSearch",
+    "Workflow",
+    "Write",
+    "mcp__plugin_context-mode_context-mode__ctx_batch",
+    "mcp__plugin_context-mode_context-mode__ctx_doctor",
+    "mcp__plugin_context-mode_context-mode__ctx_execute",
+    "mcp__plugin_context-mode_context-mode__ctx_index",
+    "mcp__plugin_context-mode_context-mode__ctx_purge",
+    "mcp__plugin_context-mode_context-mode__ctx_resume",
+    "mcp__plugin_context-mode_context-mode__ctx_search",
+    "mcp__plugin_context-mode_context-mode__ctx_stats",
+    "mcp__plugin_context-mode_context-mode__ctx_upgrade"
+   ],
+   "mcp_servers": [
+    {
+     "name": "plugin:context-mode:context-mode",
+     "status": "connected",
+     "source": "plugin"
+    }
+   ],
+   "model": "claude-haiku-5-5",
+   "permissionMode": "bypassPermissions",
+   "slash_commands": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring",
+    "advisor",
+    "agents",
+    "auto-mode-setup",
+    "autocompact",
+    "clear",
+    "color",
+    "compact",
+    "config",
+    "output-style",
+    "context",
+    "effort",
+    "fast",
+    "focus",
+    "heapdump",
+    "init",
+    "mcp",
+    "import",
+    "model",
+    "__remote-workflow",
+    "workflow-launch-exec",
+    "reload-plugins",
+    "reload-skills",
+    "rename",
+    "security-review",
+    "usage",
+    "insights",
+    "recap",
+    "skill-doctor",
+    "goal",
+    "design-consent",
+    "design-revoke",
+    "list-agents",
+    "team-onboarding"
+   ],
+   "terminal_slash_commands": [
+    "doctor",
+    "color",
+    "focus",
+    "reload-plugins"
+   ],
+   "apiKeySource": "ANTHROPIC_API_KEY",
+   "claude_code_version": "2.1.312",
+   "output_style": "default",
+   "agents": [
+    "claude",
+    "Explore",
+    "general-purpose",
+    "Plan",
+    "statusline-setup"
+   ],
+   "skills": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring"
+   ],
+   "plugins": [
+    {
+     "name": "context-mode",
+     "path": "/TMP",
+     "source": "context-mode@context-mode",
+     "version": "2.0.0-next.26"
+    },
+    {
+     "name": "cc-plugin-agents-md",
+     "path": "builtin",
+     "source": "cc-plugin-agents-md@builtin"
+    },
+    {
+     "name": "cc-plugin-telemetry",
+     "path": "builtin",
+     "source": "cc-plugin-telemetry@builtin"
+    },
+    {
+     "name": "cc-plugin-plugin-authoring",
+     "path": "builtin",
+     "source": "cc-plugin-plugin-authoring@builtin"
+    }
+   ],
+   "capabilities": [
+    "interrupt_receipt_v1",
+    "interrupt_cancel_queued_v1",
+    "interrupt_send_now_v1",
+    "interrupt_requeue_taken_v1",
+    "msg_lifecycle_v1",
+    "request_marker_lists_v1",
+    "ask_user_question_unanswered_v1",
+    "lifecycle_wakeup_source_v1",
+    "sdk_mcp_tools_list_changed",
+    "sdk_mcp_manifests",
+    "mcp_read_resource_v1",
+    "mcp_tool_ui_meta_v1",
+    "ui_surface_v1",
+    "mcp_call_result_not_for_model_v1"
+   ],
+   "analytics_disabled": false,
+   "product_feedback_disabled": false,
+   "uuid": "bb984a6b-e6f4-4407-98bd-73aebda56bed",
+   "memory_paths": {
+    "auto": "/TMP"
+   },
+   "original_cwd": "/TMP",
+   "additional_directories": [],
+   "messaging_socket_path": "/tmp/cc-socks/55811.sock",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "per_turn_effort_active": true,
+   "view_mode": "default"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "ea9285df-05cd-499d-993d-abc2a2ee0e32"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 228,
+   "estimated_tokens_delta": 178,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "730c12a7-ff09-43c4-bd57-5cb6e81255d9"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJNjuMda5MjJasyan1",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6373,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6373,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "757e4b0b-565a-40e9-9f8c-0e4fbd25db42",
+   "timestamp": "2026-11-02T08:25:20.212Z",
+   "request_id": "req_011CgdnJNKbvi5YPpv7QhRJY",
+   "thinking_duration_ms": 468,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJNjuMda5MjJasyan1",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_0178o2QT3KRTVQ1KCdYMkRwh",
+      "name": "mcp__plugin_context-mode_context-mode__ctx_resume",
+      "input": {},
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6373,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6373,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "93a1e131-ec83-496f-a7c2-e96dc08bcf71",
+   "timestamp": "2026-11-02T08:25:20.281Z",
+   "request_id": "req_011CgdnJNKbvi5YPpv7QhRJY",
+   "wire_tool_inputs": {
+    "toolu_0178o2QT3KRTVQ1KCdYMkRwh": {}
+   },
+   "tool_use_meta": [
+    {
+     "id": "toolu_0178o2QT3KRTVQ1KCdYMkRwh",
+     "display_name": "Ctx Resume",
+     "server_display_name": "context-mode",
+     "tool_name": "ctx_resume"
+    }
+   ]
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_0178o2QT3KRTVQ1KCdYMkRwh",
+      "type": "tool_result",
+      "content": [
+       {
+        "type": "text",
+        "text": "<context_mode_state session=\"4d284902-fbb2-47ad-a2eb-25e63df95eae\" upto=\"1\">\nnow: Clone https://github.com/expressjs/express, install it and run its test suite. How many tests passed, failed and were skipped?\nmore: ctx_search(queries:[], scope:\"session\")\n</context_mode_state>"
+       }
+      ]
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "4863247b-360e-4352-ac80-0a7ef204a818",
+   "timestamp": "2026-11-02T08:25:20.375Z",
+   "tool_use_result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "<context_mode_state session=\"4d284902-fbb2-47ad-a2eb-25e63df95eae\" upto=\"1\">\nnow: Clone https://github.com/expressjs/express, install it and run its test suite. How many tests passed, failed and were skipped?\nmore: ctx_search(queries:[], scope:\"session\")\n</context_mode_state>"
+     }
+    ],
+    "_meta": {
+     "io.modelcontextprotocol/serverInfo": {
+      "name": "context-mode",
+      "version": "dev"
+     }
+    }
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_0178o2QT3KRTVQ1KCdYMkRwh",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJNjuMda5MjJasyan1",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01MAgc6tVpGAhtraxFBHs4SD",
+      "name": "Bash",
+      "input": {
+       "command": "ls -la /TMP node --version; npm --version; git --version",
+       "description": "List project dir and check toolchain versions"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6373,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6373,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "4af42ebc-cf31-4df5-9a6b-231a86804bfc",
+   "timestamp": "2026-11-02T08:25:20.603Z",
+   "request_id": "req_011CgdnJNKbvi5YPpv7QhRJY",
+   "wire_tool_inputs": {
+    "toolu_01MAgc6tVpGAhtraxFBHs4SD": {
+     "command": "ls -la /TMP node --version; npm --version; git --version",
+     "description": "List project dir and check toolchain versions"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01MAgc6tVpGAhtraxFBHs4SD",
+      "type": "tool_result",
+      "content": "total 0\ndrwxr-xr-x  2 mksglu  wheel   64  2 Kas 11:25 .\ndrwxr-xr-x  4 mksglu  wheel  128  2 Kas 11:25 ..\nv26.8.1\n11.19.0\ngit version 2.39.5 (Apple Git-154)",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "25bf60b6-6408-4509-8a23-d72e3ef2fc97",
+   "timestamp": "2026-11-02T08:25:20.914Z",
+   "tool_use_result": {
+    "stdout": "total 0\ndrwxr-xr-x  2 mksglu  wheel   64  2 Kas 11:25 .\ndrwxr-xr-x  4 mksglu  wheel  128  2 Kas 11:25 ..\nv26.8.1\n11.19.0\ngit version 2.39.5 (Apple Git-154)",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01MAgc6tVpGAhtraxFBHs4SD",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "d1d515e7-d3c3-47d2-89ee-f565819e6ba9"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 193,
+   "estimated_tokens_delta": 143,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "54ab5d8b-aeb7-4dd3-8ef4-ed65cf8c1ab5"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJYFtWasr5cRk3Dw6n",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 574,
+     "cache_read_input_tokens": 18364,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 574,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 8,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "724381fb-25d6-4389-bf27-55ca5e76848f",
+   "timestamp": "2026-11-02T08:25:21.917Z",
+   "request_id": "req_011CgdnJXUWakLhuKS9kYkiv",
+   "thinking_duration_ms": 239,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJYFtWasr5cRk3Dw6n",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01VJWjN6BVYt3WXrKfDEXBZQ",
+      "name": "Bash",
+      "input": {
+       "command": "git clone --depth 1 https://github.com/expressjs/express express 2>&1 | tail -5 && cd express && git log -1 --format='%H %s' && node -p \"require('./package.json').version\"",
+       "description": "Shallow clone express repository"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 574,
+     "cache_read_input_tokens": 18364,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 574,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 8,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "f2c192ad-88db-4480-947b-e322c557c383",
+   "timestamp": "2026-11-02T08:25:22.449Z",
+   "request_id": "req_011CgdnJXUWakLhuKS9kYkiv",
+   "wire_tool_inputs": {
+    "toolu_01VJWjN6BVYt3WXrKfDEXBZQ": {
+     "command": "cd /TMP && git clone --depth 1 https://github.com/expressjs/express express 2>&1 | tail -5 && cd express && git log -1 --format='%H %s' && node -p \"require('./package.json').version\"",
+     "description": "Shallow clone express repository"
+    }
+   },
+   "wire_ingest_context": {
+    "toolu_01VJWjN6BVYt3WXrKfDEXBZQ": {
+     "cwd": "/TMP"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01VJWjN6BVYt3WXrKfDEXBZQ",
+      "type": "tool_result",
+      "content": "Cloning into 'express'...\nbcc0551cb7a785b7772f77cb59ce55a2bc94975a build(deps-dev): bump hbs from 4.3.1 to 4.4.0 (#7580)\n5.3.0",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "ea1a5823-082c-4c72-97cd-bd4ac57a573f",
+   "timestamp": "2026-11-02T08:25:24.074Z",
+   "tool_use_result": {
+    "stdout": "Cloning into 'express'...\nbcc0551cb7a785b7772f77cb59ce55a2bc94975a build(deps-dev): bump hbs from 4.3.1 to 4.4.0 (#7580)\n5.3.0",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01VJWjN6BVYt3WXrKfDEXBZQ",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnJmMS5UBspodfxoJvv",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01H7SuVWrShvPyJxE1292FHR",
+      "name": "Bash",
+      "input": {
+       "command": "npm install 2>&1 | tail -15; echo \"EXIT=$?\"; node -p \"require('./package.json').scripts.test\"",
+       "description": "Install express dependencies and show test script",
+       "timeout": 600000
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 406,
+     "cache_read_input_tokens": 18938,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 406,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 16,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "c700add0-4482-4497-97e8-8305514f16b3",
+   "timestamp": "2026-11-02T08:25:25.318Z",
+   "request_id": "req_011CgdnJkxsJQiTeggzpd8Mi",
+   "wire_tool_inputs": {
+    "toolu_01H7SuVWrShvPyJxE1292FHR": {
+     "command": "cd /TMP && npm install 2>&1 | tail -15; echo \"EXIT=$?\"; node -p \"require('./package.json').scripts.test\"",
+     "description": "Install express dependencies and show test script",
+     "timeout": 600000
+    }
+   },
+   "wire_ingest_context": {
+    "toolu_01H7SuVWrShvPyJxE1292FHR": {
+     "cwd": "/TMP"
+    }
+   }
+  },
+  {
+   "type": "system",
+   "subtype": "task_started",
+   "task_id": "btad7427b",
+   "run_id": "0mvyzumut-f3a47e7b",
+   "tool_use_id": "toolu_01H7SuVWrShvPyJxE1292FHR",
+   "description": "Install express dependencies and show test script",
+   "is_backgrounded": false,
+   "task_type": "local_bash",
+   "uuid": "810a8fc0-dc87-46e3-a9da-128382a48afe",
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae"
+  },
+  {
+   "type": "system",
+   "subtype": "task_notification",
+   "task_id": "btad7427b",
+   "run_id": "0mvyzumut-f3a47e7b",
+   "tool_use_id": "toolu_01H7SuVWrShvPyJxE1292FHR",
+   "status": "completed",
+   "output_file": "",
+   "summary": "Install express dependencies and show test script",
+   "uuid": "aebc4147-9b13-41c4-abe4-f1aa70dab004",
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae"
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01H7SuVWrShvPyJxE1292FHR",
+      "type": "tool_result",
+      "content": "21 vulnerabilities (1 low, 19 moderate, 1 high)\n\nTo address all issues possible (including breaking changes), run:\n  npm audit fix --force\n\nSome issues need review, and may require choosing\na different dependency.\n\nRun `npm audit` for details.\nnpm notice\nnpm notice New major version of npm available! 11.19.0 -> 12.2.1\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1\nnpm notice To update run: npm install -g npm@12.2.1\nnpm notice\nEXIT=0\nmocha --require test/support/env --reporter spec --check-leaks test/ test/acceptance/",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "30c317c9-a9d5-4496-a4ed-2e52812dbb91",
+   "timestamp": "2026-11-02T08:25:48.608Z",
+   "tool_use_result": {
+    "stdout": "21 vulnerabilities (1 low, 19 moderate, 1 high)\n\nTo address all issues possible (including breaking changes), run:\n  npm audit fix --force\n\nSome issues need review, and may require choosing\na different dependency.\n\nRun `npm audit` for details.\nnpm notice\nnpm notice New major version of npm available! 11.19.0 -> 12.2.1\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1\nnpm notice To update run: npm install -g npm@12.2.1\nnpm notice\nEXIT=0\nmocha --require test/support/env --reporter spec --check-leaks test/ test/acceptance/",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01H7SuVWrShvPyJxE1292FHR",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "74f377b2-adf6-4814-b784-11b497d80063"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 216,
+   "estimated_tokens_delta": 166,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "41b0665b-25ea-4f80-9775-e393c6fa360d"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLaHjpKJnouqDueM98",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 423,
+     "cache_read_input_tokens": 19344,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 423,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 4,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "09151bdf-c10b-4fc5-bd08-d738f8f0cb8b",
+   "timestamp": "2026-11-02T08:25:49.897Z",
+   "request_id": "req_011CgdnLZsfwwJgsAeM2XD7K",
+   "thinking_duration_ms": 509,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLaHjpKJnouqDueM98",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_018CdD4kvVydzJV96fMqhQyp",
+      "name": "Bash",
+      "input": {
+       "command": "mkdir -p /TMP && npm test > /TMP 2>&1; echo \"EXIT=$?\"; wc -l /TMP grep -nE '^\\s+[0-9]+ (passing|failing|pending)' /TMP",
+       "description": "Run express test suite and capture summary counts",
+       "timeout": 600000
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 423,
+     "cache_read_input_tokens": 19344,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 423,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 4,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "aff21f55-7fea-464f-a3bb-1a07de9cba49",
+   "timestamp": "2026-11-02T08:25:50.638Z",
+   "request_id": "req_011CgdnLZsfwwJgsAeM2XD7K",
+   "wire_tool_inputs": {
+    "toolu_018CdD4kvVydzJV96fMqhQyp": {
+     "command": "cd /TMP && mkdir -p /TMP && npm test > /TMP 2>&1; echo \"EXIT=$?\"; wc -l /TMP grep -nE '^\\s+[0-9]+ (passing|failing|pending)' /TMP",
+     "description": "Run express test suite and capture summary counts",
+     "timeout": 600000
+    }
+   },
+   "wire_ingest_context": {
+    "toolu_018CdD4kvVydzJV96fMqhQyp": {
+     "cwd": "/TMP"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_018CdD4kvVydzJV96fMqhQyp",
+      "type": "tool_result",
+      "content": "EXIT=0\n    1972 /TMP\n1971:  1290 passing (2s)",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "c2c46c19-d3e8-45d3-a42b-3ed38d32bc3c",
+   "timestamp": "2026-11-02T08:25:52.953Z",
+   "tool_use_result": {
+    "stdout": "EXIT=0\n    1972 /TMP\n1971:  1290 passing (2s)",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_018CdD4kvVydzJV96fMqhQyp",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "0f06e80e-0e20-491b-b4da-142a04524661"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 222,
+   "estimated_tokens_delta": 172,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "1e6de690-d1e0-4b33-9716-ccd80fea3063"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLu8ZL7PyYuoCAobhm",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 443,
+     "cache_read_input_tokens": 19767,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 443,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "42d2c7f3-4b22-436d-87e0-e96f21e9b5f8",
+   "timestamp": "2026-11-02T08:25:54.283Z",
+   "request_id": "req_011CgdnLtmUsb8pLpVEsd4f3",
+   "thinking_duration_ms": 588,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnLu8ZL7PyYuoCAobhm",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01D4PZLQuXx6kRHmiqbHnWB9",
+      "name": "Bash",
+      "input": {
+       "command": "grep -ciE 'pending|failing' /TMP tail -3 /TMP echo \"--- skip markers in test/:\"; grep -rnE '\\b(it|describe|test|context)\\.skip\\(|\\bxit\\(|\\bxdescribe\\(|this\\.skip\\(\\)|\\.only\\(' test/ | wc -l; grep -rnE '\\b(it|describe|test|context)\\.skip\\(|\\bxit\\(|\\bxdescribe\\(|this\\.skip\\(\\)|\\.only\\(' test/ | head",
+       "description": "Confirm no failing or pending tests and check for skip markers"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 443,
+     "cache_read_input_tokens": 19767,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 443,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 5,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "012072df-e044-4ac8-8be9-843f4db589f6",
+   "timestamp": "2026-11-02T08:25:55.282Z",
+   "request_id": "req_011CgdnLtmUsb8pLpVEsd4f3",
+   "wire_tool_inputs": {
+    "toolu_01D4PZLQuXx6kRHmiqbHnWB9": {
+     "command": "cd /TMP && grep -ciE 'pending|failing' /TMP tail -3 /TMP echo \"--- skip markers in test/:\"; grep -rnE '\\b(it|describe|test|context)\\.skip\\(|\\bxit\\(|\\bxdescribe\\(|this\\.skip\\(\\)|\\.only\\(' test/ | wc -l; grep -rnE '\\b(it|describe|test|context)\\.skip\\(|\\bxit\\(|\\bxdescribe\\(|this\\.skip\\(\\)|\\.only\\(' test/ | head",
+     "description": "Confirm no failing or pending tests and check for skip markers"
+    }
+   },
+   "wire_ingest_context": {
+    "toolu_01D4PZLQuXx6kRHmiqbHnWB9": {
+     "cwd": "/TMP"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_01D4PZLQuXx6kRHmiqbHnWB9",
+      "type": "tool_result",
+      "content": "0\n\n  1290 passing (2s)\n\n--- skip markers in test/:\n       4\ntest/res.send.js:409:            this.skip()\ntest/req.fresh.js:53:        this.skip()\ntest/req.fresh.js:72:        this.skip()\ntest/app.router.js:45:          this.skip()",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "355d9364-f9c9-4405-8874-ba0a7522c7b7",
+   "timestamp": "2026-11-02T08:25:55.400Z",
+   "tool_use_result": {
+    "stdout": "0\n\n  1290 passing (2s)\n\n--- skip markers in test/:\n       4\ntest/res.send.js:409:            this.skip()\ntest/req.fresh.js:53:        this.skip()\ntest/req.fresh.js:72:        this.skip()\ntest/app.router.js:45:          this.skip()",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_01D4PZLQuXx6kRHmiqbHnWB9",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "41be4248-adb5-4537-a863-35bf12ef315f"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 250,
+   "estimated_tokens_delta": 200,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "5f7cbfae-d5af-48b9-bb64-a4ea8a2cacac"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 333,
+   "estimated_tokens_delta": 83,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "a33b614c-2c70-445e-b31a-5614e521e4e0"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnM5CHyFBpYgCycED9m",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 554,
+     "cache_read_input_tokens": 20210,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 554,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 2,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "d8da51f8-1b15-448b-912b-18679cb72d57",
+   "timestamp": "2026-11-02T08:25:57.477Z",
+   "request_id": "req_011CgdnM4pxaBNV3yNAfN6Le",
+   "thinking_duration_ms": 1384,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnM5CHyFBpYgCycED9m",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "Express's test suite passed on this machine: **1290 passing, 0 failing, 0 skipped (pending)**. Mocha exited with code 0.\n\n- **Repo:** cloned at `/TMP (commit `bcc0551`, version 5.3.0).\n- **Install:** `npm install` succeeded. npm reported 21 audit vulnerabilities in the dependency tree, which I did not address.\n- **Test command:** `npm test`, which runs `mocha --require test/support/env --reporter spec --check-leaks test/ test/acceptance/`. Node v26.8.1.\n- **Full log:** `/TMP\n\nOn skips: the log has no \"pending\" line, so zero tests were skipped in this run. The source has four conditional `this.skip()` calls (`test/res.send.js:409`, `test/req.fresh.js:53` and `:72`, `test/app.router.js:45`). None of them fired here. I did not check what conditions guard them."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 554,
+     "cache_read_input_tokens": 20210,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 554,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 2,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "uuid": "b40290dd-1340-4538-bac3-d6fa05f6624a",
+   "timestamp": "2026-11-02T08:25:58.706Z",
+   "request_id": "req_011CgdnM4pxaBNV3yNAfN6Le"
+  },
+  {
+   "duration_api_ms": 12357,
+   "stop_reason": "end_turn",
+   "session_id": "4d284902-fbb2-47ad-a2eb-25e63df95eae",
+   "total_cost_usd": 0.003214965,
+   "usage": {
+    "input_tokens": 12,
+    "cache_creation_input_tokens": 8773,
+    "cache_read_input_tokens": 108614,
+    "output_tokens": 2062,
+    "output_tokens_details": {
+     "thinking_tokens": 599
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 8773
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 608,
+      "cache_read_input_tokens": 20210,
+      "cache_creation_input_tokens": 554,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 554,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "modelUsage": {
+    "claude-haiku-5-5": {
+     "inputTokens": 12,
+     "outputTokens": 2062,
+     "cacheReadInputTokens": 108614,
+     "cacheCreationInputTokens": 8773,
+     "webSearchRequests": 0,
+     "costUSD": 0.003214965,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 599,
+     "cacheCreationEphemeral5mInputTokens": 8773,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   },
+   "permission_denials": [],
+   "terminal_reason": "completed",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+     "background": 0,
+     "foreground": 0,
+     "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+     "parent": 0,
+     "user": 0,
+     "system": 0
+    },
+    "refused": {
+     "depth_limit": 0,
+     "concurrency_limit": 0,
+     "budget": 0
+    },
+    "by_type": {}
+   },
+   "safety_stops": 0,
+   "is_error": false,
+   "num_turns": 7,
+   "subtype": "success",
+   "api_error_status": null,
+   "result": "Express's test suite passed on this machine: **1290 passing, 0 failing, 0 skipped (pending)**. Mocha exited with code 0.\n\n- **Repo:** cloned at `/TMP (commit `bcc0551`, version 5.3.0).\n- **Install:** `npm install` succeeded. npm reported 21 audit vulnerabilities in the dependency tree, which I did not address.\n- **Test command:** `npm test`, which runs `mocha --require test/support/env --reporter spec --check-leaks test/ test/acceptance/`. Node v26.8.1.\n- **Full log:** `/TMP\n\nOn skips: the log has no \"pending\" line, so zero tests were skipped in this run. The source has four conditional `this.skip()` calls (`test/res.send.js:409`, `test/req.fresh.js:53` and `:72`, `test/app.router.js:45`). None of them fired here. I did not check what conditions guard them.",
+   "ttft_ms": 1618,
+   "type": "result",
+   "duration_ms": 40137,
+   "uuid": "4712258c-5e50-4df2-8eaa-c122be0ec735",
+   "ttft_stream_ms": 1150,
+   "time_to_request_ms": 144,
+   "first_content_frame_ms": 1150,
+   "queued_turn_count": 0,
+   "result_index": 0,
+   "model_usage_since_last_result": {
+    "claude-haiku-5-5": {
+     "inputTokens": 12,
+     "outputTokens": 2062,
+     "cacheReadInputTokens": 108614,
+     "cacheCreationInputTokens": 8773,
+     "webSearchRequests": 0,
+     "costUSD": 0.003214965,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 599,
+     "cacheCreationEphemeral5mInputTokens": 8773,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   }
+  }
+ ]
+}

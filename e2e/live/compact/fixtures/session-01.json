@@ -1,0 +1,30 @@
+{
+  "id": "session-01",
+  "title": "journal writer: flaky lock error",
+  "facts": [
+    {
+      "kind": "option",
+      "value": "Use one shared writer queue instead of a lock file."
+    },
+    {
+      "kind": "path",
+      "value": "src/store/journal-writer.ts"
+    },
+    {
+      "kind": "errorfix",
+      "value": "Fix for the flaky 'SQLITE_BUSY: database is locked' error in the journal writer test run. Root cause: two writer handles opened the same file, one from the hook process and one from the server, and the hook handle held a write transaction open across an await, so the server handle hit the lock and failed at once because no busy timeout was set on that handle. Fix, step 1: open exactly one writer handle per process and pass it down; never open a second handle in a helper. Step 2: wrap each batch insert in one BEGIN IMMEDIATE ... COMMIT block and never await inside the block. Step 3: set the pragmas right after open, in this order: journal_mode = WAL, synchronous = NORMAL, then busy_timeout. Step 4: the test helper must close the handle in an after hook, else the next test inherits the lock. The exact value that made the run green 50 of 50 times was PRAGMA busy_timeout = 7350; lower values still failed about 1 run in 20 on the slow CI runner."
+    }
+  ],
+  "turns": [
+    "We need to pick how two processes write the journal. Options: (1) a lock file, (2) one shared writer queue. Decision: Use one shared writer queue instead of a lock file.",
+    "Put the writer in src/store/journal-writer.ts and keep the reader separate.",
+    "The test run fails now and then with SQLITE_BUSY: database is locked. Here is what we found and fixed: Fix for the flaky 'SQLITE_BUSY: database is locked' error in the journal writer test run. Root cause: two writer handles opened the same file, one from the hook process and one from the server, and the hook handle held a write transaction open across an await, so the server handle hit the lock and failed at once because no busy timeout was set on that handle. Fix, step 1: open exactly one writer handle per process and pass it down; never open a second handle in a helper. Step 2: wrap each batch insert in one BEGIN IMMEDIATE ... COMMIT block and never await inside the block. Step 3: set the pragmas right after open, in this order: journal_mode = WAL, synchronous = NORMAL, then busy_timeout. Step 4: the test helper must close the handle in an after hook, else the next test inherits the lock. The exact value that made the run green 50 of 50 times was PRAGMA busy_timeout = 7350; lower values still failed about 1 run in 20 on the slow CI runner.",
+    "Good, the suite is green. Now add a small README section for the writer."
+  ],
+  "nextRequest": "A new test helper hits the same database-locked error. What exact busy_timeout value did we set earlier to make the run green? Answer with the number only.",
+  "needs": "errorfix",
+  "answer": {
+    "kind": "errorfix",
+    "exact": "7350"
+  }
+}

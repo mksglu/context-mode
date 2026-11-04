@@ -1,0 +1,8 @@
+{
+  "qwen": [
+    "^(run_shell_command|Shell|read_file|grep_search|web_fetch|mcp__context-mode__ctx_.*)$"
+  ],
+  "zcode": [
+    "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
+  ]
+}

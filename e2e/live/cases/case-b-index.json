@@ -1,0 +1,7 @@
+{
+  "id": "T-F1",
+  "kind": "local",
+  "covers": ["src/core/tools/execute.ts", "src/core/sandbox/", "src/core/tools/index.ts"],
+  "run": ["node", "e2e/checks/case-b-index.mjs"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

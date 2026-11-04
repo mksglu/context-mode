@@ -1,0 +1,5 @@
+[
+  { "seq": 1, "turn": 1, "kind": "prompt", "body": "paste the long log" },
+  { "seq": 2, "turn": 1, "kind": "cmd", "body": "cat build.log", "bytes": 5400 },
+  { "seq": 3, "turn": 2, "kind": "prompt", "body": "what caused the failure in that log" }
+]

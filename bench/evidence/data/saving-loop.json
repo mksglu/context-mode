@@ -1,0 +1,103 @@
+{
+  "source": "bench/RESULTS.md, sections Saving loop and Re-measure after the final push",
+  "score": "bench/saving-score.mjs",
+  "target": 90,
+  "rounds": [
+    {
+      "round": "baseline",
+      "m1": 12.03,
+      "m2": 2.69,
+      "merged": null
+    },
+    {
+      "round": 1,
+      "m1": 85.72,
+      "m2": 69.22,
+      "merged": true
+    },
+    {
+      "round": 2,
+      "m1": 90.88,
+      "m2": 79.65,
+      "merged": true
+    },
+    {
+      "round": 3,
+      "m1": 94.76,
+      "m2": 86.41,
+      "merged": true
+    },
+    {
+      "round": 4,
+      "m1": 94.74,
+      "m2": 85.78,
+      "merged": false
+    },
+    {
+      "round": 5,
+      "m1": 94.12,
+      "m2": 88.9,
+      "merged": true
+    },
+    {
+      "round": 6,
+      "m1": 94.1,
+      "m2": 89.52,
+      "note": "round notes say 88.8",
+      "merged": false
+    },
+    {
+      "round": 7,
+      "m1": 94.12,
+      "m2": 89.09,
+      "note": "round notes say 87.98",
+      "merged": false
+    }
+  ],
+  "remeasure_2026_10_21": {
+    "commit": "980272a5",
+    "runs": [
+      {
+        "m1": 94.21,
+        "m2": 89.32
+      },
+      {
+        "m1": 94.21,
+        "m2": 85.83
+      },
+      {
+        "m1": 94.21,
+        "m2": 87.23
+      }
+    ],
+    "median": {
+      "m1": 94.21,
+      "m2": 87.23
+    },
+    "guardsOk": false,
+    "failedGuard": "gate (layer check-removed)",
+    "m2PerTask": {
+      "json-1": [
+        83.48,
+        81.07,
+        71.78
+      ],
+      "multi-1": [
+        92.05,
+        90.6,
+        92.03
+      ],
+      "big-tests": [
+        99.23,
+        99.23,
+        99.23
+      ],
+      "big-json": [
+        86.6,
+        74.51,
+        82.44
+      ]
+    },
+    "runsPerArm": 2
+  }
+}

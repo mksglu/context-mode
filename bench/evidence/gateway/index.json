@@ -1,0 +1,146 @@
+{
+ "title": "Direct vs OSS v1 vs OSS v2 vs the Context Mode gateway: evidence index",
+ "source": "bench/evidence/gateway/analyze.mjs",
+ "files": [
+  {
+   "date": "2026-10-21",
+   "file": "ab.json",
+   "model": "claude-opus-5-5",
+   "client": "Claude Code 2.1.303",
+   "prereg": "bench/evidence/gateway/prereg.md",
+   "workloads": [
+    {
+     "id": "tests",
+     "label": "npm test fix loop, short",
+     "v1": {
+      "pct": 27.3,
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 4.3,
+      "verdict": "same"
+     },
+     "gateway_published": {
+      "pct": -21.8,
+      "verdict": "less"
+     },
+     "bridge": "2 of 2 inside the published range"
+    },
+    {
+     "id": "json",
+     "label": "One large JSON file",
+     "v1": {
+      "pct": 30.5,
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 5,
+      "verdict": "same"
+     },
+     "gateway_published": {
+      "pct": -21.4,
+      "verdict": "less"
+     },
+     "bridge": "2 of 2 inside the published range"
+    },
+    {
+     "id": "log",
+     "label": "One large log",
+     "v1": {
+      "pct": 33.7,
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": -3.4,
+      "verdict": "same"
+     },
+     "gateway_published": {
+      "pct": -22.4,
+      "verdict": "less"
+     },
+     "bridge": "0 of 2 inside the published range"
+    },
+    {
+     "id": "git",
+     "label": "Repo history question (git log, 320 commits)",
+     "v1": {
+      "pct": 66.2,
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 19.3,
+      "verdict": "same"
+     },
+     "gateway_published": {
+      "pct": -25.2,
+      "verdict": "less"
+     },
+     "bridge": "1 of 2 inside the published range"
+    },
+    {
+     "id": "grep",
+     "label": "Code search (grep over 150 files)",
+     "v1": {
+      "pct": 7.4,
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": -17,
+      "verdict": "less"
+     },
+     "gateway_published": {
+      "pct": -28.7,
+      "verdict": "less"
+     },
+     "bridge": "0 of 2 inside the published range"
+    },
+    {
+     "id": "edit",
+     "label": "One-line edit",
+     "v1": {
+      "pct": 65.5,
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 18.7,
+      "verdict": "same"
+     },
+     "gateway_published": {
+      "pct": -27.8,
+      "verdict": "less"
+     },
+     "bridge": "1 of 2 inside the published range"
+    }
+   ]
+  },
+  {
+   "date": "2026-09-29",
+   "file": "published/v3-opus55-short.json",
+   "model": "claude-opus-5-5",
+   "client": "Claude Code 2.1.283",
+   "sha256": "3298b1b2aa1af9b56abb4ecce660bb0c2ccb9ecc64de664557c03a7e6579cfce",
+   "url": "/benchmarks/data/v3-opus55-short.json",
+   "prereg": "published/v3-opus55-short-prereg.md"
+  }
+ ],
+ "preregistrations": [
+  {
+   "file": "prereg.md",
+   "commit": "bcc45e33b521bb23fc5c6409a40d4f7c5ee2e536",
+   "committed": "2026-10-21T19:47:18Z"
+  },
+  {
+   "file": "published/v3-opus55-short-prereg.md",
+   "commit": "6e2b65d565aa68f3eacdcece77fe72721c18573f",
+   "committed": "2026-09-29T11:44:26Z"
+  }
+ ],
+ "runs": [
+  "runs/tests.jsonl",
+  "runs/json.jsonl",
+  "runs/log.jsonl",
+  "runs/git.jsonl",
+  "runs/grep.jsonl",
+  "runs/edit.jsonl"
+ ]
+}

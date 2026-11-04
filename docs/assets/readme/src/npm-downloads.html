@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README npm downloads 1280x640</title>
+<script>var Q=new URLSearchParams(location.search),T=Q.get('theme')||'dark',VIEW=Q.get('view')||'grid';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<script src="npm-data.js"></script>
+<style>:root{--w:1280px;--h:640px}.h2{position:absolute;left:64px;top:84px;font-size:40px}
+svg .tl{font-family:var(--mono);font-size:12px;fill:var(--muted)}svg .end{font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--fg)}
+svg .ev{font-family:var(--mono);font-size:12px;fill:var(--fg)}svg .ct{font-family:var(--mono);font-size:13px;font-weight:600;fill:var(--fg)}</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="abs eyebrow" style="left:64px;top:52px" id="eb"></div>
+<div class="h h2"><span id="hs"></span> <em id="hsub"></em></div>
+<svg id="sv" class="abs" style="left:64px;top:150px" width="1152" height="400"></svg>
+<div class="cap" id="cap"></div>
+</main>
+<script>
+// D-README-NPM-1, D-README-ADOPT-1: one page, drawn from npm-data.js (build/npm-downloads.mjs). ?view=grid (default) draws
+// Daily, Weekly, Monthly and Yearly as a 2x2 grid, the README image; ?view=daily|weekly|monthly|yearly draws one view full size.
+// Same frame as star-history.html; window.__drawn tells render.mjs that the chart is drawn.
+var sv=document.getElementById("sv"),NS="http://www.w3.org/2000/svg",G=sv;
+var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function K(n){if(n<1000)return String(n);if(n<999500)return Math.round(n/1000)+"K";var m=(Math.round(n/1e5)/10).toFixed(1);return (m.slice(-2)===".0"?m.slice(0,-2):m)+"M"}
+function el(n,a,txt){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);if(txt!==undefined)e.textContent=txt;G.appendChild(e);return e}
+function monthEnd(m){return new Date(Date.UTC(+m.slice(0,4),+m.slice(5,7),0)).toISOString().slice(0,10)}
+function mlab(ym,small){return small?MON[+ym.slice(5,7)-1]:ym}
+var SRC="api.npmjs.org/downloads/range, package context-mode, read "+NPM.read_at;
+var VIEWS={
+  daily:{eb:"npm downloads per day, last 90 days",hs:"Daily npm downloads",sub:"from "+NPM.daily[0][0]+" to "+NPM.last+".",kind:"line",ct:"Daily, last 90 days",
+    pts:NPM.daily,cap:"Downloads per day from "+SRC+". The last point is "+NPM.last+", the last full day in the API."},
+  weekly:{eb:"npm downloads per ISO week, since the first publish",hs:"Weekly npm downloads",sub:"since "+NPM.first+".",kind:"line",ct:"Weekly, full ISO weeks",
+    pts:NPM.weekly,cap:"Downloads per full ISO week (Monday to Sunday) from "+SRC+". Each point sits on the Monday of its week."},
+  monthly:{eb:"npm downloads per month, since the first publish",hs:"Monthly npm downloads",sub:"since "+NPM.first+".",kind:"bar",ct:"Monthly, full months",
+    pts:NPM.monthly,cap:"Downloads per full month from "+SRC+". The first month starts on the first publish day, "+NPM.first+"."},
+  yearly:{eb:"npm downloads per year, and the running total",hs:K(NPM.total)+" npm downloads",sub:"since "+NPM.first+".",kind:"run",ct:"Yearly, running total",
+    pts:NPM.running.map(function(r){var d=monthEnd(r[0]);return [d<NPM.last?d:NPM.last,r[1]]}),
+    cap:"Running total at each month end, and the total per calendar year, from "+SRC+". The last point is the total up to "+NPM.last+"."}
+};
+/** Draws one view into the box (ox, oy, W, H) of the svg; small = a grid cell with its own title. Returns { points, ink }. */
+function chart(V,ox,oy,W,H,small){
+  G=el("g",{transform:"translate("+ox+" "+oy+")"});
+  var D=V.pts,L=small?48:64,R=small?60:96,TOP=small?30:12,B=small?24:30;
+  if(small)el("text",{x:0,y:14,class:"ct"},V.ct);
+  var hi=0;D.forEach(function(d){if(d[1]>hi)hi=d[1]});
+  var mag=Math.pow(10,Math.floor(Math.log10(hi/4))),STEP=[1,2,2.5,5,10,20,25,50].map(function(f){return f*mag}).filter(function(s){return hi/s<=(small?3:5)})[0],max=Math.ceil(hi/STEP)*STEP;
+  function Y(v){return H-B-(H-B-TOP)*v/max}
+  for(var v=0;v<=max;v+=STEP){el("line",{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:"var(--card-b)","stroke-width":1,"stroke-dasharray":v?"3 4":""});el("text",{x:L-10,y:Y(v)+4,"text-anchor":"end",class:"tl"},K(v))}
+  var last=D[D.length-1],xe,ye=Y(last[1]),ink;
+  if(V.kind==="bar"){
+    var slot=(W-L-R)/D.length,bw=Math.min(56,slot*0.62);
+    D.forEach(function(d,i){var x=L+slot*(i+0.5),h=H-B-Y(d[1]);
+      el("rect",{x:(x-bw/2).toFixed(1),y:Y(d[1]).toFixed(1),width:bw.toFixed(1),height:h.toFixed(1),rx:2,fill:"var(--accent)","fill-opacity":i===D.length-1?"1":"0.55"});
+      el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tl"},mlab(d[0],small))});
+    xe=L+slot*(D.length-0.5)+bw/2;ink=D.length*bw;
+  }else{
+    var t0=Date.parse(V.kind==="run"?NPM.first:D[0][0]),t1=Date.parse(last[0]);
+    var X=function(d){return L+(W-L-R)*(Date.parse(d)-t0)/(t1-t0)};
+    if(V.kind==="run")D=[[NPM.first,0]].concat(D);
+    for(var m=new Date(Date.UTC(+D[0][0].slice(0,4),+D[0][0].slice(5,7),1));m.toISOString().slice(0,10)<=last[0];m=new Date(Date.UTC(m.getUTCFullYear(),m.getUTCMonth()+1,1))){
+      var d=m.toISOString().slice(0,10);if(d<D[0][0])continue;if(V.kind!=="run"&&X(d)>X(last[0])-(small?36:70))continue;
+      el("line",{x1:X(d),x2:X(d),y1:H-B,y2:H-B+5,stroke:"var(--muted)","stroke-width":1});el("text",{x:X(d),y:H-6,"text-anchor":"middle",class:"tl"},mlab(d.slice(0,7),small))}
+    if(V.kind==="run")NPM.yearly.forEach(function(y,i){
+      var a=y[0]+"-01-01",x0=X(a<NPM.first?NPM.first:a);
+      if(i)el("line",{x1:x0,x2:x0,y1:TOP,y2:H-B,stroke:"var(--fg2)","stroke-width":1,"stroke-dasharray":"3 3"});
+      el("text",{x:x0+8,y:TOP+16,class:"ev"},y[0]+" total: "+K(y[1]))});
+    var p=D.map(function(d,i){return (i?"L":"M")+X(d[0]).toFixed(1)+" "+Y(d[1]).toFixed(1)}).join(" ");
+    xe=X(last[0]);
+    el("path",{d:p+" L"+xe.toFixed(1)+" "+Y(0)+" L"+X(D[0][0]).toFixed(1)+" "+Y(0)+" Z",fill:"var(--accent)","fill-opacity":"0.14"});
+    var line=el("path",{d:p,fill:"none",stroke:"var(--accent)","stroke-width":small?"2":"2.5","stroke-linejoin":"round"});ink=line.getTotalLength();
+    el("circle",{cx:xe,cy:ye,r:small?4:5,fill:"var(--accent)",stroke:"var(--bg)","stroke-width":2});
+  }
+  el("text",{x:xe+10,y:ye+5,class:"end"},K(last[1]));
+  if(!small)el("text",{x:xe+12,y:ye+23,class:"tl"},last[0]);
+  G=sv;return {points:D.length,ink:ink};
+}
+var S={hs:"",sub:""},out;
+if(VIEW==="grid"){
+  S={eb:"npm downloads by day, week, month and year",hs:K(NPM.total)+" npm downloads",sub:"since "+NPM.first+".",
+    cap:"From "+SRC+". Daily: the last 90 days. Weekly: full ISO weeks. Monthly: full months. Yearly: the running total. The last full day is "+NPM.last+"."};
+  var CW=560,CH=188,GX=32,GY=24,n=0,len=0;
+  ["daily","weekly","monthly","yearly"].forEach(function(k,i){var r=chart(VIEWS[k],(i%2)*(CW+GX),Math.floor(i/2)*(CH+GY),CW,CH,true);n+=r.points;len+=r.ink});
+  out={points:n,pathLength:len};
+}else{
+  S=VIEWS[VIEW];var r=chart(S,0,0,1152,400,false);out={points:r.points,pathLength:r.ink};
+}
+document.getElementById("eb").textContent=S.eb;document.getElementById("hs").textContent=S.hs;document.getElementById("hsub").textContent=S.sub;document.getElementById("cap").textContent=S.cap;
+window.__drawn=out;
+</script></body></html>

@@ -1,0 +1,716 @@
+From f7a22f4bbc90594256b1adeec865444283fedda6 Mon Sep 17 00:00:00 2001
+From: mksglu <mksglu@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 23:05:29 +0300
+Subject: [PATCH] bench: start-cost-ab --arms (plain/direct, v1, v2, gateway)
+ with per-run arm resolution
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ scripts/e2e/oss-arms-lib.mjs       | 292 +++++++++++++++++++++++++++++
+ scripts/e2e/oss-arms-lib.test.mjs  | 101 ++++++++++
+ scripts/e2e/start-cost-ab-arms.mjs | 271 ++++++++++++++++++++++++++
+ scripts/e2e/start-cost-ab.mjs      |   3 +
+ 4 files changed, 667 insertions(+)
+ create mode 100644 scripts/e2e/oss-arms-lib.mjs
+ create mode 100644 scripts/e2e/oss-arms-lib.test.mjs
+ create mode 100644 scripts/e2e/start-cost-ab-arms.mjs
+
+diff --git a/scripts/e2e/oss-arms-lib.mjs b/scripts/e2e/oss-arms-lib.mjs
+new file mode 100644
+index 00000000..ecbd3532
+--- /dev/null
++++ b/scripts/e2e/oss-arms-lib.mjs
+@@ -0,0 +1,292 @@
++// scripts/e2e/oss-arms-lib.mjs — the pure half of the OSS-plugin arms of start-cost-ab (--arms mode).
++//
++// Arms: `plain` (Claude Code alone, "direct" is an alias), `v1` and `v2` (Claude Code with an OSS context-mode plugin
++// tree loaded by --plugin-dir and its own MCP server declared in a strict map), and `gateway` (Claude Code through the
++// deployed gateway, one disposable tenant per workload). An arm counts only when the run's own stream-json `init`
++// event (and, for the gateway, the gateway's per-call record) shows that arm, never from model prose.
++// Cost: list price on the token counts of the session's `result` event, per model (`usdFromResult`); the client's
++// total_cost_usd is kept beside it. Output: the evidence file, schema context-mode.benchmark-evidence/2.
++// NO REGEX. NO TRUNCATION. Nothing here reads the network or the disk.
++import { pairedPct, pairedExtras } from "./start-cost-ab-lib.mjs";
++
++export const SCHEMA = "context-mode.benchmark-evidence/2";
++export const ARM_IDS = Object.freeze(["plain", "v1", "v2", "gateway"]);
++export const PLUGIN_ARMS = Object.freeze(["v1", "v2"]);
++
++/** The price table of the published evidence file (USD per million tokens, as of 2026-09-29). */
++export const PRICES = Object.freeze({
++  aliases: Object.freeze({ "claude-haiku-4-5-20251001": "claude-haiku-4-5" }),
++  as_of: "2026-09-29",
++  models: Object.freeze({
++    "claude-haiku-4-5": Object.freeze({ in: 1, out: 5, cr: 0.1, cw5: 1.25, cw1h: 2 }),
++    "claude-opus-5-5": Object.freeze({ in: 4, out: 20, cr: 0.2, cw5: 5, cw1h: 8 }),
++  }),
++  source_url: "https://www.anthropic.com/pricing",
++  unit: "USD per million tokens",
++});
++
++export class FailClosed extends Error {
++  constructor(code, msg) { super(code + ": " + msg); this.code = code; }
++}
++
++/** "direct,v1,v2" → ["plain","v1","v2"]. Unknown or repeated ids throw. */
++export function parseArms(spec) {
++  const out = [];
++  for (const raw of String(spec || "").split(",")) {
++    const s = raw.trim();
++    if (!s) continue;
++    const id = s === "direct" ? "plain" : s;
++    if (ARM_IDS.indexOf(id) < 0) throw new FailClosed("unknown-arm", s);
++    if (out.indexOf(id) >= 0) throw new FailClosed("repeated-arm", s);
++    out.push(id);
++  }
++  if (out.indexOf("plain") < 0) throw new FailClosed("no-baseline", "the arms must include plain (direct): every arm is compared with it");
++  if (out.length < 2) throw new FailClosed("too-few-arms", String(spec));
++  return out;
++}
++
++/** Arm order of cycle c: the arm list rotated left by c mod k (k arms). For direct,v1,v2: c%3=0 direct,v1,v2;
++ *  =1 v1,v2,direct; =2 v2,direct,v1 — the order the pre-registration fixes. */
++export function cycleOrder(arms, c) {
++  const k = arms.length, s = ((c % k) + k) % k;
++  return arms.slice(s).concat(arms.slice(0, s));
++}
++
++/** Bridge pair order: pair 1 plain first, pair 2 gateway first, alternating after that. */
++export function bridgeOrder(i) { return i % 2 === 1 ? ["plain", "gateway"] : ["gateway", "plain"]; }
++
++/** The canonical price key of a model id, or null when the table does not hold it. */
++export function priceKey(model, prices = PRICES) {
++  const m = String(model || "");
++  if (prices.models[m]) return m;
++  const a = prices.aliases[m];
++  return a && prices.models[a] ? a : null;
++}
++
++/** The strict MCP map for a plugin arm, from the plugin's OWN manifest (.claude-plugin/plugin.json): its one declared
++ *  server with ${CLAUDE_PLUGIN_ROOT} filled in. More or fewer than one server throws. */
++export function pluginMcpMap(manifest, dir) {
++  const servers = manifest && manifest.mcpServers;
++  const names = servers && typeof servers === "object" ? Object.keys(servers) : [];
++  if (names.length !== 1) throw new FailClosed("plugin-manifest", "expected exactly one MCP server in the plugin manifest, found " + names.length);
++  const name = names[0], s = servers[name];
++  if (!s || typeof s.command !== "string" || !Array.isArray(s.args)) throw new FailClosed("plugin-manifest", "server " + name + " has no command/args");
++  const fill = (x) => String(x).split("${CLAUDE_PLUGIN_ROOT}").join(dir);
++  const entry = { command: fill(s.command), args: s.args.map(fill) };
++  if (s.env && typeof s.env === "object") entry.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, fill(v)]));
++  return { server: name, prefix: "mcp__" + name + "__", map: { mcpServers: { [name]: entry } } };
++}
++
++/** Parse a stream-json stdout into the parts the harness uses. Assistant messages are de-duplicated by message.id:
++ *  content takes the LAST sighting, usage the FIRST. */
++export function parseStream(stdout) {
++  let init = null, result = null; const results = [];
++  const byId = new Map(); const order = []; const rate = [];
++  for (const line of String(stdout || "").split("\n")) {
++    let j = null; try { j = JSON.parse(line); } catch { continue; }
++    if (!j || typeof j !== "object") continue;
++    rate.push(j);
++    if (j.type === "system" && j.subtype === "init" && !init) init = j;
++    if (j.type === "result") { result = j; results.push(j); }
++    if (j.type === "assistant" && j.message && j.message.id) {
++      const id = j.message.id;
++      if (!byId.has(id)) { byId.set(id, { id, model: j.message.model || null, main: !j.parent_tool_use_id, usage: j.message.usage || null, content: j.message.content || [] }); order.push(id); }
++      else byId.get(id).content = j.message.content || byId.get(id).content;
++    }
++  }
++  const messages = order.map((id) => byId.get(id));
++  const tools = {};
++  for (const m of messages) for (const b of m.content || []) if (b && b.type === "tool_use") tools[b.name] = (tools[b.name] || 0) + 1;
++  return { init, result, results, messages, tools, events: rate };
++}
++
++/** List-price USD of a session from its result event: per model in modelUsage, each at its own price. A cache write
++ *  is split 5m/1h only when the event has a single model and its usage.cache_creation split adds up; otherwise it is
++ *  `cwx`, priced at 1h (usd) and at 5m (usd_low). A model outside the table throws (fail closed). */
++export function usdFromResult(result, prices = PRICES) {
++  if (!result || result.type !== "result") return null;
++  const mu = result.modelUsage;
++  if (!mu || typeof mu !== "object" || Object.keys(mu).length === 0) return { usd: null, usd_low: null, calls: null, why: "no_model_usage" };
++  const names = Object.keys(mu);
++  const calls = { in: [], cr: [], cw5: [], cw1h: [], cwx: [], out: [], model: [], models: [] };
++  let usd = 0, low = 0;
++  for (const name of names) {
++    const u = mu[name] || {};
++    const key = priceKey(u.canonicalModel, prices) || priceKey(name, prices);
++    if (!key) throw new FailClosed("unknown-model", "a call ran on " + name + ", which is not in the price table");
++    const p = prices.models[key];
++    const n = (x) => { const v = Number(x); if (!Number.isFinite(v)) throw new FailClosed("bad-usage", name + " has a non-numeric token field"); return v; };
++    const tin = n(u.inputTokens), tout = n(u.outputTokens), tcr = n(u.cacheReadInputTokens), tcw = n(u.cacheCreationInputTokens);
++    let w5 = 0, w1 = 0, wx = tcw;
++    const cc = result.usage && result.usage.cache_creation;
++    if (names.length === 1 && cc && typeof cc === "object") {
++      const a = Number(cc.ephemeral_5m_input_tokens), b = Number(cc.ephemeral_1h_input_tokens);
++      if (Number.isFinite(a) && Number.isFinite(b) && a + b === tcw) { w5 = a; w1 = b; wx = 0; }
++    }
++    if (calls.models.indexOf(key) < 0) calls.models.push(key);
++    calls.model.push(calls.models.indexOf(key));
++    calls.in.push(tin); calls.cr.push(tcr); calls.cw5.push(w5); calls.cw1h.push(w1); calls.cwx.push(wx); calls.out.push(tout);
++    const base = tin * p.in + tout * p.out + tcr * p.cr + w5 * p.cw5 + w1 * p.cw1h;
++    usd += (base + wx * p.cw1h) / 1e6;
++    low += (base + wx * p.cw5) / 1e6;
++  }
++  if (calls.cwx.every((x) => x === 0)) delete calls.cwx;
++  return { usd, usd_low: low, calls, why: null };
++}
++
++const isBuiltin = (p) => p && p.path === "builtin";
++
++/**
++ * ARM RESOLUTION from the run's own init event and assistant messages. Returns { ok, why: [...], evidence }.
++ *   plain, gateway: no MCP server, no mcp__ tool, no plugin other than the client's builtins;
++ *   v1, v2: exactly the declared server, connected, at least one tool with its prefix, no other mcp__ tool, and the
++ *           one non-builtin plugin is context-mode at the arm's dir with the manifest's version;
++ *   every arm: the client version as pinned, every main-thread assistant message on the pinned model, and not logged
++ *           out (a $0 client total with tokens). The gateway's per-call record is checked by the runner (async).
++ */
++export function resolveArm({ arm, spec, parsed, clientVersion, model }) {
++  const why = [];
++  const init = parsed && parsed.init;
++  if (!init) return { ok: false, why: ["no-init-event"], evidence: null };
++  const tools = Array.isArray(init.tools) ? init.tools : [];
++  const mcp = Array.isArray(init.mcp_servers) ? init.mcp_servers : [];
++  const plugins = Array.isArray(init.plugins) ? init.plugins.filter((p) => !isBuiltin(p)) : [];
++  const mcpTools = tools.filter((t) => String(t).indexOf("mcp__") === 0);
++  const mains = (parsed.messages || []).filter((m) => m.main);
++  const mainModels = [...new Set(mains.map((m) => m.model))];
++  const helperModels = [...new Set((parsed.messages || []).filter((m) => !m.main).map((m) => m.model))];
++  const evidence = {
++    client_version: init.claude_code_version || null,
++    tools_total: tools.length,
++    mcp_servers: mcp.map((s) => ({ name: s.name, status: s.status })),
++    mcp_tools: mcpTools,
++    plugins: plugins.map((p) => ({ name: p.name, version: p.version || null, source: p.source || null, at_arm_dir: !!(spec && spec.dir && p.path === spec.dir) })),
++    main_models: mainModels,
++    helper_models: helperModels,
++  };
++  if (String(init.claude_code_version || "") !== String(clientVersion)) why.push("client-version " + init.claude_code_version + " != " + clientVersion);
++  if (mainModels.length === 0) why.push("no-main-model-message");
++  for (const m of mainModels) if (m !== model && !(priceKey(m) && priceKey(m) === priceKey(model))) why.push("model-drift " + m);
++  const r = parsed.result;
++  if (r && Number(r.total_cost_usd) === 0) {
++    const mu = r.modelUsage || {};
++    const tok = Object.values(mu).reduce((s, u) => s + Number(u.inputTokens || 0) + Number(u.outputTokens || 0) + Number(u.cacheReadInputTokens || 0) + Number(u.cacheCreationInputTokens || 0), 0);
++    if (tok > 0) why.push("logged-out (client total 0 with tokens)");
++  }
++  if (arm === "plain" || arm === "gateway") {
++    if (mcp.length !== 0) why.push("mcp-server-present");
++    if (mcpTools.length !== 0) why.push("mcp-tool-present");
++    if (plugins.length !== 0) why.push("plugin-present");
++  } else if (PLUGIN_ARMS.indexOf(arm) >= 0) {
++    if (!spec || !spec.server || !spec.prefix || !spec.dir) why.push("no-arm-spec");
++    else {
++      if (mcp.length !== 1 || mcp[0].name !== spec.server) why.push("mcp-servers " + JSON.stringify(evidence.mcp_servers) + " != [" + spec.server + "]");
++      else if (mcp[0].status !== "connected") why.push("mcp-server-status " + mcp[0].status);
++      const own = mcpTools.filter((t) => t.indexOf(spec.prefix) === 0);
++      if (own.length === 0) why.push("no-plugin-tool");
++      if (own.length !== mcpTools.length) why.push("foreign-mcp-tool");
++      evidence.plugin_tools = own;
++      if (plugins.length !== 1) why.push("plugins " + plugins.length + " != 1");
++      else {
++        const p = plugins[0];
++        if (p.name !== "context-mode") why.push("plugin-name " + p.name);
++        if (p.path !== spec.dir) why.push("plugin-path-not-arm-dir");
++        if (String(p.version || "") !== String(spec.version || "")) why.push("plugin-version " + p.version + " != " + spec.version);
++      }
++    }
++  } else why.push("unknown-arm " + arm);
++  return { ok: why.length === 0, why, evidence };
++}
++
++/** True when a run hit a rate limit (status fields only; never the answer text). */
++export function rateLimited(events) {
++  for (const j of events || []) if (j && (Number(j.api_error_status) === 429 || Number(j.error_status) === 429)) return true;
++  return false;
++}
++
++/** The fields of a run record that may be published: no tenant, session, prompt, answer, path, or argv. */
++export const PUBLIC_FIELDS = Object.freeze(["w", "cycle", "arm", "role", "attempt", "order", "position", "usd", "usd_low", "usd_client", "client_gap_pct", "client_gap_flag",
++  "calls", "calls_from", "success", "turns", "exit", "timed_out", "rate_limited", "result_subtype", "budget_hit", "tools", "plugin_tool_calls", "resolution", "plugin",
++  "client_version", "model", "harness_commit", "void_reason", "error", "ms", "gateway_record", "flags_before", "flags_after", "gw_version_before", "gw_version_after"]);
++export function publicRecord(r) {
++  const o = {};
++  for (const k of PUBLIC_FIELDS) if (r[k] !== undefined) o[k] = r[k];
++  return o;
++}
++
++const fin = (x) => x !== null && x !== undefined && Number.isFinite(Number(x));
++const mean = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
++
++function armBlock(r) {
++  if (!r) return null;
++  const b = { usd: r.usd, usd_client: r.usd_client, usd_recomputed: r.usd, success: r.success, turns: r.turns, calls: r.calls, calls_from: r.calls_from,
++    coverage: r.calls ? { calls: r.calls.in.length, of: r.calls.in.length, sum_complete: true } : null, tools: r.tools, resolution: r.resolution };
++  if (r.usd_low !== undefined && r.usd_low !== r.usd) b.usd_recomputed_low = r.usd_low;
++  if (r.client_gap_flag) b.client_gap_pct = r.client_gap_pct;
++  if (r.plugin) b.plugin = r.plugin;
++  if (r.plugin_tool_calls !== undefined) b.plugin_tool_calls = r.plugin_tool_calls;
++  if (r.gateway_record) b.gateway_record = r.gateway_record;
++  for (const k of ["timed_out", "rate_limited", "budget_hit", "result_subtype"]) if (r[k]) b[k] = r[k];
++  return b;
++}
++
++function contrast(base, arm) {
++  const t = pairedPct(base, arm), x = pairedExtras(base, arm);
++  return { n: t.n, pct: t.pct, pct_ci95: t.pct_ci95, verdict: t.verdict, mean_diff: t.mean_diff, median_diff: x.median_diff, wins: x.gw_wins, losses: x.plain_wins, ties: x.ties };
++}
++
++/** The evidence document. `runs` are the harness's full records; only measured, non-void runs enter `pairs`. */
++export function buildEvidence({ runs, workloads, arms, labels, meta }) {
++  const out = [];
++  for (const w of workloads) {
++    const measured = runs.filter((r) => r.w === w && r.role === "measured");
++    const cycles = [...new Set(measured.map((r) => r.cycle))].sort((a, b) => a - b);
++    const pairs = cycles.map((c) => {
++      const p = { pair: c, order: (measured.find((r) => r.cycle === c) || {}).order || null };
++      for (const a of arms) p[a] = armBlock(measured.find((r) => r.cycle === c && r.arm === a));
++      return p;
++    });
++    const col = (a) => pairs.map((p) => (p[a] && fin(p[a].usd) ? Number(p[a].usd) : null));
++    const analysis = { n: pairs.length };
++    for (const a of arms) {
++      const rs = pairs.map((p) => p[a]).filter(Boolean);
++      analysis[a + "_usd_mean"] = mean(rs.filter((b) => fin(b.usd)).map((b) => Number(b.usd)));
++      analysis["success_" + a] = rs.filter((b) => b.success === true).length + "/" + rs.length;
++      if (a !== "plain") analysis[a] = contrast(col("plain"), col(a));
++    }
++    if (arms.indexOf("v1") >= 0 && arms.indexOf("v2") >= 0) analysis.v2_vs_v1 = { secondary: true, ...contrast(col("v1"), col("v2")) };
++    const voids = runs.filter((r) => r.w === w && r.role === "void").length;
++    const bridge = runs.filter((r) => r.w === w && r.role === "bridge");
++    const doc = { id: w, label: labels[w] || w, pairs_planned: meta.pairs_planned, invalid_attempts: voids, analysis, pairs };
++    if (bridge.length) {
++      const bi = [...new Set(bridge.map((r) => r.cycle))].sort((a, b) => a - b);
++      doc.bridge = bi.map((c) => ({ pair: c, plain: armBlock(bridge.find((r) => r.cycle === c && r.arm === "plain")), gateway: armBlock(bridge.find((r) => r.cycle === c && r.arm === "gateway")) }));
++    }
++    out.push(doc);
++  }
++  return {
++    schema: SCHEMA,
++    analysis_method: "Every valid measured cycle, no outlier dropped, failures included. For each arm against plain in the same cycle: % = mean(arm - plain) / mean(plain), with the 95% t interval. Verdict: \"less\" when the whole interval is below zero, \"more\" when above, else \"same\". Wins: cycles where the arm cost less than plain. v2_vs_v1 is secondary.",
++    arms: Object.fromEntries(arms.map((a) => [a, meta.arm_text[a]])),
++    client: "Claude Code " + meta.client_version,
++    model: meta.model,
++    cost_basis: "Cost in US dollars at API list price: list price applied to the token counts in each session's result event, per model (modelUsage). Cache writes whose lifetime the event does not split are priced at the 1 hour rate (usd) and the 5 minute rate (usd_recomputed_low). Claude Code's own total is usd_client; a gap above 1% is flagged. Gateway arm: the gateway's per-call record for the session, hidden calls included. The runs used a claude.ai login, which has no per-token invoice: a list-price equivalent.",
++    coverage: { arms: runs.filter((r) => r.role === "measured").length },
++    date: meta.date,
++    harness: "start-cost-ab --arms",
++    harness_commit: meta.harness_commit,
++    workload_source: meta.workload_source,
++    plugins: meta.plugins,
++    legend: {
++      "calls_from.result_event_model_usage": "the session's result event, one entry per model (modelUsage), not per call",
++      "col.cr": "cache read tokens", "col.cw1h": "cache write tokens, 1 hour lifetime", "col.cw5": "cache write tokens, 5 minute lifetime",
++      "col.cwx": "cache write tokens whose lifetime the event did not split: usd prices them at 1 hour, usd_recomputed_low at 5 minutes",
++      "col.in": "input tokens not read from or written to the cache", "col.out": "output tokens",
++      "resolution": "what the run's own init event showed: MCP servers, mcp__ tools, non-builtin plugins, main and helper models; the gateway arm adds the gateway's per-call record for the session",
++    },
++    prices: PRICES,
++    warmup_pairs: meta.warmup,
++    withheld: "prompt and answer text, session ids, tenant ids, gateway host, local paths, credentials, raw transcripts",
++    workloads: out,
++  };
++}
+diff --git a/scripts/e2e/oss-arms-lib.test.mjs b/scripts/e2e/oss-arms-lib.test.mjs
+new file mode 100644
+index 00000000..f88eccff
+--- /dev/null
++++ b/scripts/e2e/oss-arms-lib.test.mjs
+@@ -0,0 +1,101 @@
++// scripts/e2e/oss-arms-lib.test.mjs — the pure half of the OSS-plugin arms. No regex, no truncation.
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, publicRecord, buildEvidence, FailClosed } from "./oss-arms-lib.mjs";
++
++test("arms: direct is plain, plain is required, unknown and repeated ids throw", () => {
++  assert.deepEqual(parseArms("direct,v1,v2"), ["plain", "v1", "v2"]);
++  assert.throws(() => parseArms("v1,v2"), FailClosed);
++  assert.throws(() => parseArms("direct,v3"), FailClosed);
++  assert.throws(() => parseArms("direct,plain"), FailClosed);
++});
++
++test("cycle order is the pre-registered rotation", () => {
++  const a = ["plain", "v1", "v2"];
++  assert.deepEqual(cycleOrder(a, 0), ["plain", "v1", "v2"]);
++  assert.deepEqual(cycleOrder(a, 1), ["v1", "v2", "plain"]);
++  assert.deepEqual(cycleOrder(a, 2), ["v2", "plain", "v1"]);
++  assert.deepEqual(cycleOrder(a, 3), ["plain", "v1", "v2"]);
++  assert.deepEqual(bridgeOrder(1), ["plain", "gateway"]);
++  assert.deepEqual(bridgeOrder(2), ["gateway", "plain"]);
++});
++
++test("the strict MCP map comes from the plugin's own manifest with the root filled in", () => {
++  const m = pluginMcpMap({ mcpServers: { "context-mode": { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/server.mjs", "--agent", "claude-code"] } } }, "/p");
++  assert.equal(m.server, "context-mode");
++  assert.equal(m.prefix, "mcp__context-mode__");
++  assert.deepEqual(m.map, { mcpServers: { "context-mode": { command: "node", args: ["/p/server.mjs", "--agent", "claude-code"] } } });
++  assert.throws(() => pluginMcpMap({ mcpServers: {} }, "/p"), FailClosed);
++});
++
++test("stream parse: duplicate assistant events keep the first usage and the last content", () => {
++  const lines = [
++    { type: "system", subtype: "init", session_id: "s" },
++    { type: "assistant", message: { id: "m1", model: "x", usage: { output_tokens: 1 }, content: [] } },
++    { type: "assistant", message: { id: "m1", model: "x", usage: { output_tokens: 99 }, content: [{ type: "tool_use", name: "Bash" }] } },
++    { type: "result", total_cost_usd: 1 },
++  ].map((j) => JSON.stringify(j)).join("\n");
++  const p = parseStream(lines + "\nnot json\n");
++  assert.equal(p.messages.length, 1);
++  assert.equal(p.messages[0].usage.output_tokens, 1);
++  assert.deepEqual(p.tools, { Bash: 1 });
++});
++
++const result = (mu, cc) => ({ type: "result", total_cost_usd: 0.0081378, usage: { cache_creation: cc }, modelUsage: mu });
++
++test("list price from the result event: a split write is priced by lifetime and matches the client", () => {
++  const r = result({ "claude-haiku-4-5-20251001": { inputTokens: 3, outputTokens: 6, cacheReadInputTokens: 15488, cacheCreationInputTokens: 3278, canonicalModel: "claude-haiku-4-5" } },
++    { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 3278 });
++  const c = usdFromResult(r);
++  assert.ok(Math.abs(c.usd - 0.0081378) < 1e-12);
++  assert.equal(c.usd_low, c.usd);
++  assert.equal(c.calls.cwx, undefined);
++});
++
++test("two models: the write is not split, priced 1h high and 5m low; unknown model fails closed", () => {
++  const r = result({ "claude-opus-5-5": { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 1e6 }, "claude-haiku-4-5-20251001": { inputTokens: 1e6, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } }, null);
++  const c = usdFromResult(r);
++  assert.ok(Math.abs(c.usd - 9) < 1e-9);
++  assert.ok(Math.abs(c.usd_low - 6) < 1e-9);
++  assert.throws(() => usdFromResult(result({ "gpt-x": { inputTokens: 1, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } }, null)), FailClosed);
++});
++
++const initOf = (o) => ({ type: "system", subtype: "init", claude_code_version: "2.1.303", tools: ["Bash"], mcp_servers: [], plugins: [{ name: "cc-plugin-telemetry", path: "builtin" }], ...o });
++const parsed = (init) => ({ init, messages: [{ id: "m", model: "claude-haiku-4-5-20251001", main: true }], result: { total_cost_usd: 0.01, modelUsage: {} } });
++const spec = { dir: "/v2", server: "context-mode", prefix: "mcp__context-mode__", version: "0.0.0-dev" };
++
++test("resolution: plain resolves with no MCP and no plugin; a plugin in the plain arm voids it", () => {
++  assert.equal(resolveArm({ arm: "plain", parsed: parsed(initOf({})), clientVersion: "2.1.303", model: "claude-haiku-4-5-20251001" }).ok, true);
++  const bad = resolveArm({ arm: "plain", parsed: parsed(initOf({ plugins: [{ name: "context-mode", path: "/v2" }] })), clientVersion: "2.1.303", model: "claude-haiku-4-5-20251001" });
++  assert.equal(bad.ok, false);
++});
++
++test("resolution: a plugin arm needs its server connected, its tools, its dir and its version", () => {
++  const good = initOf({ tools: ["Bash", "mcp__context-mode__ctx_search"], mcp_servers: [{ name: "context-mode", status: "connected" }], plugins: [{ name: "context-mode", path: "/v2", version: "0.0.0-dev" }] });
++  assert.equal(resolveArm({ arm: "v2", spec, parsed: parsed(good), clientVersion: "2.1.303", model: "claude-haiku-4-5-20251001" }).ok, true);
++  const noTools = { ...good, tools: ["Bash"] };
++  assert.equal(resolveArm({ arm: "v2", spec, parsed: parsed(noTools), clientVersion: "2.1.303", model: "claude-haiku-4-5-20251001" }).ok, false);
++  const otherDir = { ...good, plugins: [{ name: "context-mode", path: "/v1", version: "1.0.169" }] };
++  assert.equal(resolveArm({ arm: "v2", spec, parsed: parsed(otherDir), clientVersion: "2.1.303", model: "claude-haiku-4-5-20251001" }).ok, false);
++  const failed = { ...good, mcp_servers: [{ name: "context-mode", status: "failed" }] };
++  assert.equal(resolveArm({ arm: "v2", spec, parsed: parsed(failed), clientVersion: "2.1.303", model: "claude-haiku-4-5-20251001" }).ok, false);
++  assert.equal(resolveArm({ arm: "v2", spec, parsed: parsed(good), clientVersion: "2.1.283", model: "claude-haiku-4-5-20251001" }).ok, false);
++  assert.equal(resolveArm({ arm: "v2", spec, parsed: parsed(good), clientVersion: "2.1.303", model: "claude-opus-5-5" }).ok, false);
++});
++
++test("public records hold no tenant, session, answer or path", () => {
++  const p = publicRecord({ w: "edit", arm: "gateway", tenant: "t_x", session: "s", answer: "a", cwd: "/tmp", usd: 1 });
++  assert.deepEqual(p, { w: "edit", arm: "gateway", usd: 1 });
++});
++
++test("evidence: arms against plain per cycle, voids counted not paired", () => {
++  const r = (cycle, arm, usd, role = "measured") => ({ w: "edit", cycle, arm, usd, usd_client: usd, success: true, role, calls: { in: [1] } });
++  const runs = [r(1, "plain", 1), r(1, "v1", 2), r(2, "plain", 1), r(2, "v1", 2.2), r(3, "plain", 1), r(3, "v1", 1.8), r(4, "v1", 9, "void")];
++  const d = buildEvidence({ runs, workloads: ["edit"], arms: ["plain", "v1"], labels: {}, meta: { pairs_planned: 3, arm_text: {} } });
++  assert.equal(d.schema, "context-mode.benchmark-evidence/2");
++  const w = d.workloads[0];
++  assert.equal(w.analysis.n, 3);
++  assert.equal(w.invalid_attempts, 1);
++  assert.equal(w.analysis.v1.verdict, "more");
++  assert.equal(w.analysis.success_v1, "3/3");
++});
+diff --git a/scripts/e2e/start-cost-ab-arms.mjs b/scripts/e2e/start-cost-ab-arms.mjs
+new file mode 100644
+index 00000000..fab9fa44
+--- /dev/null
++++ b/scripts/e2e/start-cost-ab-arms.mjs
+@@ -0,0 +1,271 @@
++// scripts/e2e/start-cost-ab-arms.mjs — start-cost-ab with arms beyond plain/gw: the OSS plugin v1 and v2, and the
++// gateway, on the same six short workloads (scripts/e2e/short-workloads.mjs, unchanged).
++//
++//   node scripts/e2e/start-cost-ab.mjs --arms direct,v1,v2 --v1-dir <v1 clone> --v2-dir <v2 release-out> \
++//        --model claude-opus-5-5 --only tests --n 8 --warmup 1 --budget-usd 1.5 --cap 50 --bridge 2 \
++//        --client-version 2.1.303 --claude <absolute claude binary> --out <evidence.json> --private <dir> [--resume]
++//
++// Arms (scripts/e2e/oss-arms-lib.mjs): plain (alias direct), v1, v2, gateway. One cycle runs every arm back to back,
++// order rotated by cycle (cycleOrder). --bridge N adds N plain-vs-gateway pairs per workload after its cycles, one new
++// disposable tenant per workload; they are reported apart and never enter a row.
++// Arm resolution is read from each run's own init event (and, for the gateway, the gateway's per-call record of the
++// session). A run whose arm does not resolve is void; the cycle runs once more. Everything else counts.
++// Private files (--private): full run records with tenant and session ids, and raw stream-json transcripts. Public
++// file (--out): the evidence document, no tenant, session, path, prompt or answer text. Prints no secrets.
++// NO REGEX. NO TRUNCATION. Fail closed: a non-200 or an unknown shape is an error.
++import { spawn, spawnSync, execFileSync } from "node:child_process";
++import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync, mkdtempSync, rmSync, realpathSync } from "node:fs";
++import { createHash } from "node:crypto";
++import { tmpdir } from "node:os";
++import { join, dirname } from "node:path";
++import { fileURLToPath } from "node:url";
++import { tenantPreflight, disposableHeaders, headerLines, adminKeyFromEnv, isOwnerTenant, claudeLoginCredential } from "./tenant-preflight.mjs";
++import { seedCredentials } from "../../tests/fourarm/runner.mjs";
++import { readOpsSession, gatewayBilled } from "./billed-basis.mjs";
++import { WORK } from "./short-workloads.mjs";
++import { FailClosed, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, rateLimited, publicRecord, buildEvidence, PLUGIN_ARMS } from "./oss-arms-lib.mjs";
++
++const HERE = dirname(fileURLToPath(import.meta.url));
++const REPO = dirname(dirname(HERE));
++const argv = process.argv;
++const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : d; };
++const flag = (n) => argv.indexOf(n) >= 0;
++const need = (n) => { const v = arg(n, ""); if (!v) throw new FailClosed("missing-flag", n); return v; };
++
++const ARMS = parseArms(need("--arms"));
++const MODEL = need("--model");
++const CLAUDE = need("--claude");
++const CLIENT_VERSION = need("--client-version");
++const OUT = need("--out");
++const PRIV = need("--private");
++const N = Number(arg("--n", "8"));
++const WARMUP = Number(arg("--warmup", "1"));
++const BRIDGE = Number(arg("--bridge", "0"));
++const BUDGET = arg("--budget-usd", "1.5");
++const CAP = Number(arg("--cap", "50"));
++const CONC = Number(arg("--conc", "6"));
++const MAX_TURNS = arg("--max-turns", "30");
++const TIMEOUT_MS = Number(arg("--timeout-ms", "420000"));
++const ONLY = arg("--only", "").split(",").filter(Boolean);
++const RESUME = flag("--resume");
++const STAMP = arg("--stamp", new Date().toISOString().split("-").join("").split(":").join("").split(".")[0].split("T").join(""));
++if (!(N >= 1) || !(WARMUP >= 0) || !(BRIDGE >= 0) || !(CAP > 0)) throw new FailClosed("bad-numbers", "n, warmup, bridge, cap");
++if (!CLAUDE.startsWith("/")) throw new FailClosed("claude-not-absolute", "pass the absolute real binary, not a PATH shim");
++const WLS = Object.keys(WORK).filter((w) => ONLY.length === 0 || ONLY.indexOf(w) >= 0);
++if (WLS.length === 0) throw new FailClosed("no-workloads", ONLY.join(","));
++const LABELS = { tests: "npm test fix loop, short", json: "One large JSON file", log: "One large log", git: "Repo history question (git log, 320 commits)", grep: "Code search (grep over 150 files)", edit: "One-line edit" };
++const NEEDS_GW = ARMS.indexOf("gateway") >= 0 || BRIDGE > 0;
++
++// ── freeze checks ───────────────────────────────────────────────────────────────────────────────────────────
++function clientVersion() {
++  const s = String(execFileSync(CLAUDE, ["--version"], { encoding: "utf8" })).trim();
++  return s.split(" ")[0];
++}
++function gitOut(dir, args) { const r = spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" }); if (r.status !== 0) throw new FailClosed("git", dir + " " + args.join(" ") + ": " + r.stderr); return String(r.stdout).trim(); }
++function sha256File(p) { return createHash("sha256").update(readFileSync(p)).digest("hex"); }
++/** One plugin arm: its dir, manifest, strict MCP map, and revision. A dirty tree stops the run. */
++function pluginSpec(arm, dirArg) {
++  if (!dirArg) throw new FailClosed("missing-flag", "--" + arm + "-dir");
++  const dir = realpathSync(dirArg);
++  const manifestPath = join(dir, ".claude-plugin", "plugin.json");
++  if (!existsSync(manifestPath)) throw new FailClosed("plugin-manifest", arm + ": no .claude-plugin/plugin.json");
++  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++  const m = pluginMcpMap(manifest, dir);
++  const head = gitOut(dir, ["rev-parse", "HEAD"]);
++  const dirty = gitOut(dir, ["status", "--porcelain"]);
++  if (dirty) throw new FailClosed("plugin-dirty", arm + " plugin tree has uncommitted changes");
++  const sums = join(dir, "SHA256SUMS");
++  return { arm, dir, server: m.server, prefix: m.prefix, map: m.map, version: manifest.version || null,
++    revision: { git_head: head, manifest_version: manifest.version || null, dirty: false, build_sha256sums: existsSync(sums) ? sha256File(sums) : null } };
++}
++const SPECS = {};
++for (const a of PLUGIN_ARMS) if (ARMS.indexOf(a) >= 0) SPECS[a] = pluginSpec(a, arg("--" + a + "-dir", ""));
++const CV0 = clientVersion();
++if (CV0 !== CLIENT_VERSION) throw new FailClosed("client-version", CV0 + " != pinned " + CLIENT_VERSION);
++const HARNESS_COMMIT = gitOut(REPO, ["rev-parse", "HEAD"]);
++const HARNESS_DIRTY = gitOut(REPO, ["status", "--porcelain", "--", "scripts/e2e"]);
++if (HARNESS_DIRTY) throw new FailClosed("harness-dirty", "commit scripts/e2e before a run: the record cites the harness commit");
++
++// ── gateway (only when an arm needs it) ─────────────────────────────────────────────────────────────────────
++let GW = null, ADMIN = null;
++const TENANTS = {};
++if (NEEDS_GW) {
++  const { CONFIG } = await import("../../tests/scenarios.mjs");
++  GW = arg("--gw", process.env.CM_GW_URL || CONFIG.GW);
++  ADMIN = await adminKeyFromEnv();
++  if (!ADMIN) throw new FailClosed("no-admin-key", "without the admin key x-cm-tenant is ignored and traffic lands on the owner tenant");
++  for (const w of WLS) {
++    const t = "t_ossab_" + STAMP + "_" + w;
++    if (isOwnerTenant(t)) throw new FailClosed("owner-tenant", "refused");
++    TENANTS[w] = t;
++  }
++}
++async function getJson(path, withKey) {
++  const r = await fetch(GW + path, { headers: withKey ? { "x-context-mode-key": ADMIN } : {} });
++  if (r.status !== 200) throw new FailClosed("gw-status", path.split("?")[0] + " answered " + r.status);
++  let j; try { j = await r.json(); } catch { throw new FailClosed("gw-shape", path.split("?")[0] + " answered non-JSON"); }
++  return j;
++}
++async function gwVersion() {
++  const j = await getJson("/__version", false);
++  if (!j || j.version === undefined) throw new FailClosed("gw-shape", "/__version has no version field");
++  return String(j.version);
++}
++/** Tenant flags, read back (the harness changes none). The tenant id is checked and then dropped from the record. */
++async function readFlags(tenant) {
++  const j = await getJson("/__flags?tenant=" + encodeURIComponent(tenant), true);
++  if (!j || j.tenant !== tenant || typeof j.memory !== "boolean" || typeof j.skills !== "boolean") throw new FailClosed("gw-shape", "/__flags answer is not {tenant, memory, skills} for the run's tenant");
++  return { memory: j.memory, skills: j.skills };
++}
++
++// ── files ───────────────────────────────────────────────────────────────────────────────────────────────────
++mkdirSync(PRIV, { recursive: true });
++mkdirSync(join(PRIV, "transcripts"), { recursive: true });
++const LEDGER = join(PRIV, "runs.jsonl");
++const runs = [];
++if (RESUME && existsSync(LEDGER)) for (const l of readFileSync(LEDGER, "utf8").split("\n")) { if (!l) continue; try { runs.push(JSON.parse(l)); } catch {} }
++else if (existsSync(LEDGER)) throw new FailClosed("ledger-exists", "pass --resume to continue a run, or a new --private dir");
++const ROOT = mkdtempSync(join(tmpdir(), "cm-ossab-"));
++const META = {};
++for (const w of WLS) META[w] = WORK[w].fx(join(ROOT, "tpl-" + w));
++let spent = runs.reduce((s, r) => s + Math.max(Number(r.usd) || 0, Number(r.usd_client) || 0), 0);
++let perRun = 0.05, stopped = null;
++
++// ── one session ─────────────────────────────────────────────────────────────────────────────────────────────
++async function runOne({ w, arm, cycle, role, attempt, order, position }) {
++  const dir = join(ROOT, w + "-" + role + "-" + cycle + "-" + attempt + "-" + arm);
++  const cp = spawnSync("cp", ["-R", join(ROOT, "tpl-" + w), dir]);
++  if (cp.status !== 0) throw new FailClosed("fixture-copy", w);
++  const cfg = mkdtempSync(join(tmpdir(), "cm-ossab-cfg-"));
++  const cred = seedCredentials(cfg);
++  if (cred.credentialMode !== "subscription-oauth" && cred.credentialMode !== "api-key") throw new FailClosed("no-credential", String(cred.credentialMode));
++  const env = { ...process.env, CLAUDE_CONFIG_DIR: cfg, MAX_THINKING_TOKENS: "0" };
++  for (const k of Object.keys(env)) if (k.indexOf("CLAUDE_CODE_") === 0 || k === "CLAUDECODE" || k === "CLAUDE_PID" || k === "AI_AGENT" || k === "CLAUDE_EFFORT") delete env[k];
++  delete env.ANTHROPIC_BASE_URL; delete env.ANTHROPIC_CUSTOM_HEADERS;
++  env.ENABLE_CLAUDEAI_MCP_SERVERS = "false"; env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1"; env.CLAUDE_CODE_DISABLE_CLAUDE_MDS = "1";
++  if (arm === "gateway") { env.ANTHROPIC_BASE_URL = GW; env.ANTHROPIC_CUSTOM_HEADERS = headerLines(disposableHeaders({ adminKey: ADMIN, tenant: TENANTS[w] })); }
++  const spec = SPECS[arm] || null;
++  const args = ["-p", WORK[w].prompt, "--model", MODEL, "--output-format", "stream-json", "--verbose", "--max-turns", MAX_TURNS,
++    "--permission-mode", "bypassPermissions", "--max-budget-usd", BUDGET, "--strict-mcp-config"];
++  if (spec) args.push("--plugin-dir", spec.dir, "--mcp-config", JSON.stringify(spec.map));
++  else args.push("--mcp-config", JSON.stringify({ mcpServers: {} }));
++  const flagsBefore = arm === "gateway" ? await readFlags(TENANTS[w]) : undefined;
++  const t0 = Date.now();
++  const out = await new Promise((res) => {
++    const c = spawn(CLAUDE, args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
++    let s = "", e = ""; c.stdout.on("data", (d) => { s += d; }); c.stderr.on("data", (d) => { e += d; });
++    let timedOut = false;
++    const kill = setTimeout(() => { timedOut = true; c.kill("SIGTERM"); }, TIMEOUT_MS);
++    c.on("close", (code) => { clearTimeout(kill); res({ s, e, code, timedOut }); });
++  });
++  try { rmSync(cfg, { recursive: true, force: true }); } catch {}
++  const key = [w, role, cycle, attempt, arm].join("-");
++  writeFileSync(join(PRIV, "transcripts", key + ".jsonl"), out.s);
++  if (out.e) writeFileSync(join(PRIV, "transcripts", key + ".stderr"), out.e);
++  const p = parseStream(out.s);
++  const answer = String((p.result && p.result.result) || "");
++  const rec = { w, cycle, arm, role, attempt, order, position, ms: Date.now() - t0, exit: out.code, timed_out: out.timedOut, model: MODEL, client_version: CLIENT_VERSION,
++    harness_commit: HARNESS_COMMIT, credential: cred.credentialMode, session: p.init ? p.init.session_id : null, tools: p.tools,
++    rate_limited: rateLimited(p.events), turns: p.result ? p.result.num_turns : null, result_subtype: p.result ? p.result.subtype : null };
++  rec.budget_hit = !!(rec.result_subtype && String(rec.result_subtype).indexOf("budget") >= 0);
++  rec.success = p.result ? WORK[w].ok(dir, META[w], answer) === true : false;
++  if (spec) {
++    rec.plugin = { arm, ...spec.revision };
++    rec.plugin_tool_calls = Object.keys(p.tools).filter((t) => t.indexOf(spec.prefix) === 0).reduce((s, t) => s + p.tools[t], 0);
++  }
++  const res = resolveArm({ arm, spec, parsed: p, clientVersion: CLIENT_VERSION, model: MODEL });
++  rec.resolution = { ok: res.ok, why: res.why, ...res.evidence };
++  const cost = p.result ? usdFromResult(p.result) : null;
++  rec.usd_client = p.result ? Number(p.result.total_cost_usd) : null;
++  if (cost && cost.usd !== null) { rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage"; }
++  else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
++  if (arm === "gateway") {
++    rec.flags_before = flagsBefore;
++    rec.tenant = TENANTS[w];
++    if (rec.session) {
++      const o = await readOpsSession({ gw: GW, adminKey: ADMIN, tenant: TENANTS[w], session: rec.session, hours: 6 });
++      const billed = gatewayBilled([o], p.results);
++      rec.gateway_record = o && o.found ? { found: true, complete: !!o.complete, requests: o.requests, edge_calls: o.edge_calls, tokens: o.tokens, anthropic_usd: o.anthropic_usd, coverage: billed.coverage } : { found: false };
++      if (billed.usd === null) { rec.resolution.ok = false; rec.resolution.why.push("gateway-record " + billed.why); }
++      else { rec.usd = billed.usd; rec.usd_low = billed.usd; rec.calls_from = "gateway_record_session"; }
++    } else { rec.resolution.ok = false; rec.resolution.why.push("gateway-no-session"); }
++    rec.resolution.gateway_record_found = !!(rec.gateway_record && rec.gateway_record.found);
++    rec.flags_after = await readFlags(TENANTS[w]);
++  }
++  if (rec.usd !== null && rec.usd_client > 0) {
++    rec.client_gap_pct = 100 * (rec.usd - rec.usd_client) / rec.usd_client;
++    rec.client_gap_flag = Math.abs(rec.client_gap_pct) > 1;
++  }
++  try { rmSync(dir, { recursive: true, force: true }); } catch {}
++  return rec;
++}
++
++function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"); }
++function writeEvidence() {
++  const doc = buildEvidence({ runs, workloads: WLS, arms: ARMS, labels: LABELS, meta: {
++    pairs_planned: N, warmup: WARMUP, model: MODEL, client_version: CLIENT_VERSION, date: new Date().toISOString().split("T")[0], harness_commit: HARNESS_COMMIT,
++    workload_source: "scripts/e2e/short-workloads.mjs at gateway commit 408333a48d082830f5813b3f539ec03993830a89, unchanged",
++    plugins: Object.fromEntries(Object.values(SPECS).map((s) => [s.arm, { server: s.server, tool_prefix: s.prefix, ...s.revision }])),
++    arm_text: { plain: "Claude Code talks to Anthropic direct, no plugin.", v1: "Claude Code with the OSS context-mode plugin v1.", v2: "Claude Code with the OSS context-mode plugin v2.", gateway: "Claude Code talks to Anthropic through Context Mode." } } });
++  doc.public_runs = runs.map(publicRecord);
++  doc.spent_usd = spent; doc.cap_usd = CAP; doc.stopped = stopped;
++  mkdirSync(dirname(OUT), { recursive: true });
++  writeFileSync(OUT, JSON.stringify(doc, null, 1) + "\n");
++}
++const done = (w, role, cycle) => runs.some((r) => r.w === w && r.role === role && r.cycle === cycle && r.cycle_done === true);
++
++async function runCycle(w, role, cycle, order) {
++  for (let attempt = 1; attempt <= 2; attempt++) {
++    const recs = [];
++    let gvb = null;
++    if (order.indexOf("gateway") >= 0) gvb = await gwVersion();
++    for (let k = 0; k < order.length; k++) {
++      if (spent + perRun > CAP) { stopped = stopped || "cap reached before " + w + " " + role + " " + cycle; return; }
++      let r;
++      try { r = await runOne({ w, arm: order[k], cycle, role, attempt, order, position: k }); }
++      catch (e) { if (e instanceof FailClosed) throw e; r = { w, cycle, arm: order[k], role, attempt, order, position: k, error: String(e && e.message || e), resolution: { ok: false, why: ["harness-exception"] } }; }
++      spent += Math.max(Number(r.usd) || 0, Number(r.usd_client) || 0);
++      perRun = Math.max(perRun, Math.max(Number(r.usd) || 0, Number(r.usd_client) || 0));
++      recs.push(r);
++      process.stderr.write([w, role, cycle, "a" + attempt, order[k], "resolved=" + r.resolution.ok, r.resolution.ok ? "" : JSON.stringify(r.resolution.why), "ok=" + r.success, "usd=" + r.usd, "client=" + r.usd_client].join(" ") + "\n");
++    }
++    if (gvb !== null) { const gva = await gwVersion(); for (const r of recs) { r.gw_version_before = gvb; r.gw_version_after = gva; } if (gva !== gvb) for (const r of recs) { r.resolution.ok = false; r.resolution.why.push("gateway-version-changed"); } }
++    const ok = recs.every((r) => r.resolution && r.resolution.ok);
++    for (const r of recs) {
++      if (!ok) { r.void_reason = recs.filter((x) => !x.resolution.ok).map((x) => x.arm + ": " + x.resolution.why.join("; ")).join(" | "); r.measured_role = role; r.role = "void"; }
++      r.cycle_done = ok;
++      save(r);
++    }
++    writeEvidence();
++    if (ok) return;
++  }
++}
++
++// ── the grid ────────────────────────────────────────────────────────────────────────────────────────────────
++const preflights = {};
++if (NEEDS_GW) {
++  const cred = claudeLoginCredential();
++  for (const w of WLS) {
++    const pre = await tenantPreflight({ gw: GW, headers: disposableHeaders({ adminKey: ADMIN, tenant: TENANTS[w] }), dialect: "anthropic", expect: TENANTS[w], credential: cred });
++    if (!pre || pre.tenant !== TENANTS[w]) throw new FailClosed("preflight", w);
++    preflights[w] = true;
++  }
++}
++const lanes = WLS.slice();
++await Promise.all(Array.from({ length: Math.max(1, Math.min(CONC, WLS.length)) }, async () => {
++  while (lanes.length && !stopped) {
++    const w = lanes.shift();
++    for (let c = 0; c < WARMUP + N && !stopped; c++) {
++      const role = c < WARMUP ? "warmup" : "measured";
++      const cycle = c < WARMUP ? c : c - WARMUP + 1;
++      if (done(w, role, cycle)) continue;
++      await runCycle(w, role, cycle, cycleOrder(ARMS, cycle));
++    }
++    for (let b = 1; b <= BRIDGE && !stopped; b++) if (!done(w, "bridge", b)) await runCycle(w, "bridge", b, bridgeOrder(b));
++  }
++}));
++const CV1 = clientVersion();
++if (CV1 !== CLIENT_VERSION) { stopped = stopped || "client version moved to " + CV1; }
++writeEvidence();
++process.stderr.write("spent " + spent.toFixed(4) + " stopped=" + stopped + " -> " + OUT + "\n");
++if (CV1 !== CLIENT_VERSION) process.exitCode = 2;
+diff --git a/scripts/e2e/start-cost-ab.mjs b/scripts/e2e/start-cost-ab.mjs
+index 28c85c27..c275f8d4 100644
+--- a/scripts/e2e/start-cost-ab.mjs
++++ b/scripts/e2e/start-cost-ab.mjs
+@@ -39,6 +39,9 @@ import { WORK } from "./short-workloads.mjs";
+ import { startMitm } from "./mitm-forward.mjs";
+ import { BILLED_BASIS, gatewayBilled } from "./billed-basis.mjs";
+ 
++// --arms selects the multi-arm mode (plain/direct, v1, v2, gateway): scripts/e2e/start-cost-ab-arms.mjs. The
++// two-arm plain/gw grid below is unchanged and runs only without --arms.
++if (process.argv.indexOf("--arms") >= 0) { await import("./start-cost-ab-arms.mjs"); process.exit(process.exitCode || 0); }
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const REPO = dirname(dirname(HERE));
+ const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : d; };
+-- 
+2.39.5 (Apple Git-154)
+

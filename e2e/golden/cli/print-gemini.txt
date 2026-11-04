@@ -1,0 +1,5 @@
+Manual setup for gemini. Run:
+
+gemini extensions link <PKG> --consent
+
+Then restart the agent and check it: context-mode doctor --agents gemini

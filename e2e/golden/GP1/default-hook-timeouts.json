@@ -1,0 +1,50 @@
+{
+  "claude-code": {
+    "key": "timeout",
+    "values": [
+      5
+    ]
+  },
+  "codex": {
+    "key": "timeout",
+    "values": [
+      5
+    ]
+  },
+  "gemini": {
+    "key": "timeout",
+    "values": [
+      5000
+    ]
+  },
+  "qwen": {
+    "key": "timeout",
+    "values": [
+      5
+    ]
+  },
+  "copilot-cli": {
+    "key": "timeoutSec",
+    "values": [
+      5
+    ]
+  },
+  "vscode": {
+    "key": "timeout",
+    "values": [
+      5
+    ]
+  },
+  "kiro": {
+    "key": "timeout",
+    "values": [
+      5
+    ]
+  },
+  "zcode": {
+    "key": "timeoutMs",
+    "values": [
+      5000
+    ]
+  }
+}

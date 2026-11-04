@@ -1,0 +1,19 @@
+# Scheduled checks (impl/13 §14.2). Written on v2-design; adding it to main is the owner's step (D-M6-arch-7).
+name: weekly
+on:
+  schedule: [{ cron: "0 4 * * 1" }]
+  workflow_dispatch: {}
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node scripts/release/smoke.mjs --ref release --agent claude-code
+      - run: node scripts/release/smoke.mjs --ref release --agent codex
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release/check-branch-protection.mjs   # diff against branch-protection-settings.json, §12 step 3
+      - uses: actions/setup-node@v4
+        with: { node-version: "24.15.0" }
+      # D-M6-arch-1: dev tree, runtime deps only.
+      - run: npm install && npm audit --omit=dev --audit-level=high

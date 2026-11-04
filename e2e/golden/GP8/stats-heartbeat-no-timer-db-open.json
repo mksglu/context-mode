@@ -1,0 +1,14 @@
+{
+  "after": {
+    "content": [
+      {
+        "type": "text",
+        "text": "ctx_stats: 0% kept out all-time, 0% this session.\n\n```text\ncontext-mode stats\n────────────────────────────────────────────────────────────────────────────────\n\nReady. Your savings show up here after the first tool call.\nLarge outputs from ctx_execute, ctx_batch and ctx_index stay in the\nsandbox, and only the short answer goes to the chat.\n```\n\n| Scope | Produced | Returned | Saved | Reduction % |\n|---|---|---|---|---|\n| session | 0 B | 0 B | 0 B | no data — no tool calls recorded yet |\n| project | 0 B | 0 B | 0 B | no data — no tool calls recorded yet |\n| all-time | 0 B | 0 B | 0 B | no data — no tool calls recorded yet |\n| agent claude-code | 0 B | 0 B | 0 B | no data — no tool calls recorded yet |"
+      }
+    ],
+    "isError": false
+  },
+  "rowsBefore": 1,
+  "rowsAfterIdle": 1,
+  "projectCount": 1
+}

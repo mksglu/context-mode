@@ -1,0 +1,9 @@
+{
+  "session_id": "<sid:0>",
+  "transcript_path": "<transcript_path>",
+  "cwd": "<proj>",
+  "prompt_id": "<sid:1>",
+  "permission_mode": "default",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "Run exactly one Bash command: echo gp3-fixture-probe. Then stop."
+}

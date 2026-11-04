@@ -1,0 +1,156 @@
+{
+  "note": "v1 numbers measured today by running v1 own scripts (npx tsx tests/ecosystem-benchmark.ts and npx tsx tests/live-benchmark.ts) on a clean checkout of origin/main. run.mjs reads this file; it does not install v1.",
+  "v1_commit": "90af14e34bf35120c3310f7a75f54fa99d2cabba",
+  "v1_version": "1.0.169",
+  "date": "2026-10-22",
+  "node": "v26.8.1",
+  "rows": [
+    {
+      "part": 1,
+      "scenario": "React useEffect docs",
+      "v1_ms": 73,
+      "v1_context_bytes": 261
+    },
+    {
+      "part": 1,
+      "scenario": "Next.js App Router docs",
+      "v1_ms": 60,
+      "v1_context_bytes": 249
+    },
+    {
+      "part": 1,
+      "scenario": "Tailwind CSS docs",
+      "v1_ms": 63,
+      "v1_context_bytes": 186
+    },
+    {
+      "part": 1,
+      "scenario": "Page snapshot (HN)",
+      "v1_ms": 62,
+      "v1_context_bytes": 299
+    },
+    {
+      "part": 1,
+      "scenario": "Network requests",
+      "v1_ms": 63,
+      "v1_context_bytes": 349
+    },
+    {
+      "part": 1,
+      "scenario": "PR list (Next.js)",
+      "v1_ms": 61,
+      "v1_context_bytes": 719
+    },
+    {
+      "part": 1,
+      "scenario": "Issues (React)",
+      "v1_ms": 62,
+      "v1_context_bytes": 1139
+    },
+    {
+      "part": 1,
+      "scenario": "Test output (30 suites)",
+      "v1_ms": 63,
+      "v1_context_bytes": 337
+    },
+    {
+      "part": 1,
+      "scenario": "TypeScript errors (50)",
+      "v1_ms": 64,
+      "v1_context_bytes": 347
+    },
+    {
+      "part": 1,
+      "scenario": "Build output (100+ lines)",
+      "v1_ms": 61,
+      "v1_context_bytes": 405
+    },
+    {
+      "part": 1,
+      "scenario": "MCP tools (40 tools)",
+      "v1_ms": 62,
+      "v1_context_bytes": 742
+    },
+    {
+      "part": 1,
+      "scenario": "Access log (500 req)",
+      "v1_ms": 60,
+      "v1_context_bytes": 155
+    },
+    {
+      "part": 1,
+      "scenario": "Git log (150+ commits)",
+      "v1_ms": 61,
+      "v1_context_bytes": 107
+    },
+    {
+      "part": 1,
+      "scenario": "Analytics CSV (500 rows)",
+      "v1_ms": 22,
+      "v1_context_bytes": 222
+    },
+    {
+      "part": 2,
+      "scenario": "Supabase Edge Functions (5 examples)",
+      "raw_bytes": 3988,
+      "v1_context_bytes": 2246,
+      "chunks": 5,
+      "code_chunks": 4,
+      "exact_code_preserved": true
+    },
+    {
+      "part": 2,
+      "scenario": "React useEffect docs",
+      "raw_bytes": 6075,
+      "v1_context_bytes": 1494,
+      "chunks": 16,
+      "code_chunks": 4,
+      "exact_code_preserved": true
+    },
+    {
+      "part": 2,
+      "scenario": "Next.js App Router docs",
+      "raw_bytes": 6658,
+      "v1_context_bytes": 3311,
+      "chunks": 5,
+      "code_chunks": 5,
+      "exact_code_preserved": true
+    },
+    {
+      "part": 2,
+      "scenario": "Tailwind CSS docs",
+      "raw_bytes": 4102,
+      "v1_context_bytes": 620,
+      "chunks": 5,
+      "code_chunks": 5,
+      "exact_code_preserved": true
+    },
+    {
+      "part": 2,
+      "scenario": "Skill: context-mode (main prompt)",
+      "raw_bytes": 16683,
+      "v1_context_bytes": 0,
+      "chunks": 25,
+      "code_chunks": 8,
+      "exact_code_preserved": true
+    },
+    {
+      "part": 2,
+      "scenario": "Skill references (4 files combined)",
+      "raw_bytes": 36090,
+      "v1_context_bytes": 2412,
+      "chunks": 52,
+      "code_chunks": 33,
+      "exact_code_preserved": true
+    },
+    {
+      "part": 2,
+      "scenario": "MCP tools/list (40 tools)",
+      "raw_bytes": 2509,
+      "v1_context_bytes": 1016,
+      "chunks": 40,
+      "code_chunks": 0,
+      "exact_code_preserved": true
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-20",
+  "agent": "2.1.303 (Claude Code)",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "wallSeconds": 57,
+  "v1Skipped": false,
+  "arms": {
+    "off": {
+      "sessions": 6,
+      "pass": 6,
+      "medianTokens": 36219.5,
+      "medianSavingPct": null,
+      "ctxCalls": 0,
+      "costUsd": 0.191
+    },
+    "v1": {
+      "sessions": 6,
+      "pass": 6,
+      "medianTokens": 42573,
+      "medianSavingPct": -17.5,
+      "ctxCalls": 1,
+      "costUsd": 0.2696
+    },
+    "v2": {
+      "sessions": 6,
+      "pass": 6,
+      "medianTokens": 38261.5,
+      "medianSavingPct": -5.7,
+      "ctxCalls": 2,
+      "costUsd": 0.3883
+    }
+  },
+  "perTask": [
+    {
+      "task": "log-1",
+      "off": {
+        "tokens": 36191,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0264,
+        "subtype": "success"
+      },
+      "v1": {
+        "tokens": 42483,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0397,
+        "subtype": "success"
+      },
+      "v2": {
+        "tokens": 38122,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.079,
+        "subtype": "success"
+      }
+    },
+    {
+      "task": "json-1",
+      "off": {
+        "tokens": 54976,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0323,
+        "subtype": "success"
+      },
+      "v1": {
+        "tokens": 88800,
+        "ok": true,
+        "ctxCalls": 1,
+        "cost": 0.0556,
+        "subtype": "success"
+      },
+      "v2": {
+        "tokens": 58103,
+        "ok": true,
+        "ctxCalls": 1,
+        "cost": 0.0865,
+        "subtype": "success"
+      }
+    },
+    {
+      "task": "tests-1",
+      "off": {
+        "tokens": 36122,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0253,
+        "subtype": "success"
+      },
+      "v1": {
+        "tokens": 42495,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0389,
+        "subtype": "success"
+      },
+      "v2": {
+        "tokens": 38227,
+        "ok": true,
+        "ctxCalls": 1,
+        "cost": 0.0799,
+        "subtype": "success"
+      }
+    },
+    {
+      "task": "file-1",
+      "off": {
+        "tokens": 36163,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0259,
+        "subtype": "success"
+      },
+      "v1": {
+        "tokens": 42453,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0392,
+        "subtype": "success"
+      },
+      "v2": {
+        "tokens": 38207,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0799,
+        "subtype": "success"
+      }
+    },
+    {
+      "task": "git-1",
+      "off": {
+        "tokens": 36248,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0213,
+        "subtype": "success"
+      },
+      "v1": {
+        "tokens": 42651,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.035,
+        "subtype": "success"
+      },
+      "v2": {
+        "tokens": 38296,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0235,
+        "subtype": "success"
+      }
+    },
+    {
+      "task": "multi-1",
+      "off": {
+        "tokens": 108250,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0598,
+        "subtype": "success"
+      },
+      "v1": {
+        "tokens": 74866,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0613,
+        "subtype": "success"
+      },
+      "v2": {
+        "tokens": 82354,
+        "ok": true,
+        "ctxCalls": 0,
+        "cost": 0.0396,
+        "subtype": "success"
+      }
+    }
+  ],
+  "totalCostUsd": 0.8489
+}

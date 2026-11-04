@@ -1,0 +1,7 @@
+{
+  "id": "T-F5",
+  "kind": "local",
+  "covers": ["src/core/sandbox/"],
+  "run": ["node", "e2e/checks/windows-grandchild-kill.mjs"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

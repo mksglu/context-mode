@@ -1,0 +1,6 @@
+{
+  "mustKeep": ["last_request", "pointer_for_oversize_row"],
+  "pointerSeq": 2,
+  "lastRequestSeq": 3,
+  "note": "synthetic fixture; row 2 exceeds 640 B and must render as a ctx_resume pointer line"
+}

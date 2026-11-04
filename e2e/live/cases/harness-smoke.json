@@ -1,0 +1,7 @@
+{
+  "id": "harness-smoke",
+  "kind": "local",
+  "covers": ["e2e/harness/"],
+  "run": ["node", "e2e/cases/run.mjs", "--milestone", "M0"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

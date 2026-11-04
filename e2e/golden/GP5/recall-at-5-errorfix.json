@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Query \"errorfix\":\nerrorfix-row-2 #0: errorfix: ValidationError on negative offset is a zod isError, never a thrown exception.\nerrorfix-row #0: errorfix: ENOTFOUND on fetch now returns a one-line cause, no raw stack."
+    }
+  ],
+  "isError": false
+}

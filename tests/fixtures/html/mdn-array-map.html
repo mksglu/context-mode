@@ -1,0 +1,2522 @@
+
+      <!doctype html>
+      <html
+        lang="en-US"
+        data-theme="light dark"
+        data-renderer="Doc"
+        
+        
+      >
+        <head>
+          <meta charset="UTF-8" />
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          />
+          <title>Array.prototype.map() - JavaScript | MDN</title>
+          
+          <script>try {
+  document.documentElement.dataset.theme =
+    localStorage.getItem("theme") || "light dark";
+} catch (error) {
+  console.warn("Unable to set theme", error);
+}
+
+try {
+  if (localStorage.getItem("nop") === "yes") {
+    document.documentElement.dataset["nop"] = "yes";
+  }
+} catch (error) {
+  console.warn("Unable to set nop", error);
+}
+</script>
+          <link rel="stylesheet" href="/static/client/styles-global.4266b4030ccd8847.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/270.c4deb27edf934078.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-reference-layout.632d2f3884f10ca3.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/9228.c46ef79d5582674d.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-content-section.ee79aa021892f35a.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-heading-anchor.0eec5185ab9425b7.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-baseline-indicator.dcd17e42ea043f53.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-reference-toc.9b9bd019efd16b86.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-article-footer.81ae18c89fc527dc.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-left-sidebar.46e37af4d0b5c883.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-page-layout.5a4354f33e894319.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-a11y-menu.5796ee87cb69f93f.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-navigation.c3ebf384e65df345.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-logo.aea5ff6edf1b9cfb.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-menu.e2c5c8a53a8854c2.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-breadcrumbs-bar.2d1bed1ab424b6b3.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-breadcrumbs.87eb742f4e711dc3.css" fetchpriority="high" /><link rel="stylesheet" href="/static/client/styles-footer.66072dd619a4ef50.css" fetchpriority="high" />
+          <link
+                rel="preload"
+                href="/static/client/jetbrains-mono-latin.119994ed445212c7.woff2"
+                as="font"
+                type="font/woff2"
+                crossorigin="anonymous"
+                fetchpriority="low"
+              /><link
+                rel="preload"
+                href="/static/client/inter-latin.9a3b1bc220d426ef.woff2"
+                as="font"
+                type="font/woff2"
+                crossorigin="anonymous"
+                fetchpriority="low"
+              />
+          
+          <script src="/static/client/runtime.5df19022d1b28328.js" type="module"></script><script src="/static/client/5909.489e266d049aa182.js" type="module"></script><script src="/static/client/4585.e30f706b333273cd.js" type="module"></script><script src="/static/client/1216.2fdb44f0bb574bc2.js" type="module"></script><script src="/static/client/index.016ac320c2222096.js" type="module"></script>
+          
+    <link
+      rel="icon"
+      sizes="32x32"
+      href="https://developer.mozilla.org/favicon.ico"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://developer.mozilla.org/favicon.svg"
+    />
+   <meta name="description" content="The map() method of Array instances creates
+a new array populated with the results of calling a provided function on
+every element in the calling array." /><meta name="og:url" content="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map" /><meta name="og:title" content="Array.prototype.map() - JavaScript | MDN" /><meta name="og:locale" content="en_US" /><meta name="og:description" content="The map() method of Array instances creates
+a new array populated with the results of calling a provided function on
+every element in the calling array." /><meta name="og:image" content="https://developer.mozilla.org/mdn-social-image.46ac2375.png" /><meta name="og:image:type" content="image/png" /><meta name="og:image:height" content="1024" /><meta name="og:image:width" content="1024" /><meta name="og:image:alt" content="The MDN logo" /><meta name="og:site_name" content="MDN Web Docs" /><meta name="twitter:card" content="summary" /><meta name="twitter:creator" content="MozDevNet" />
+          <link
+            rel="canonical"
+            href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+          />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/manifest.json" />
+          <link
+            rel="search"
+            type="application/opensearchdescription+xml"
+            href="/opensearch.xml?locale=en-US"
+            title="MDN"
+          />
+          <link
+            rel="alternate"
+            type="application/rss+xml"
+            title="MDN Blog RSS Feed"
+            href="https://developer.mozilla.org/en-US/blog/rss.xml"
+          />
+        </head>
+        
+      <body class="page-layout">
+        <ul class="a11y-menu">
+      <li>
+        <a href="#content" data-glean-id="a11y_menu: click #content"
+          >Skip to main content</a
+        >
+      </li>
+      <li>
+        <a href="#mdn-search" data-glean-id="a11y_menu: click #search"
+          >Skip to search</a
+        >
+      </li>
+    </ul>
+        <div class="page-layout__banner" data-scheme="">
+          <mdn-placement-top></mdn-placement-top>
+        </div>
+        <header class="page-layout__header">
+          
+      <nav class="navigation" data-scheme="" data-open="false">
+        <div class="navigation__logo">
+      <a href="/en-US/" class="logo">
+        <svg
+          class="logo__image"
+          width="83"
+          height="24"
+          viewBox="0 0 83 24"
+          role="img"
+        >
+          <title>MDN</title>
+          <path
+            class="logo__letter"
+            d="M9.4 0 2.81 21.17H.12L6.69 0H9.4Zm2.38 0v21.17H9.4V0h2.4Zm9.27 0-6.56 21.17H11.8L18.36 0h2.69Zm2.39 0v21.17h-2.4V0h2.4Z"
+          />
+          <path
+            class="logo__text"
+            d="M45.55 16.83h-3.93v-1.27h.87v-3.63c0-.85-.16-1.45-.48-1.82a1.65 1.65 0 0 0-1.3-.52c-.74 0-1.3.25-1.66.78a2.98 2.98 0 0 0-.58 1.58v3.59h1.38v1.26h-3.93v-1.26h.87v-3.6c0-.88-.16-1.48-.48-1.83a1.7 1.7 0 0 0-1.29-.52 1.93 1.93 0 0 0-1.65.75 2.85 2.85 0 0 0-.58 1.6v3.62h1.59v1.27h-4.64v-1.27h1.37V9.75h-1.4V8.46h3.08v1.47c.28-.48.62-.87 1.08-1.2a3 3 0 0 1 1.68-.45c.67 0 1.22.16 1.73.48.5.32.85.8 1.03 1.47.25-.57.62-1.03 1.13-1.4.5-.37 1.1-.55 1.81-.55.8 0 1.5.25 2.05.75.55.51.85 1.3.85 2.35v4.18h1.4v1.27Zm9.77 0H52.3v-1.66c-.27.51-.66.95-1.13 1.29-.56.4-1.23.59-1.9.55-1.11 0-2-.37-2.67-1.12a4.41 4.41 0 0 1-1-3.06c0-1.15.3-2.2.93-3.15.6-.94 1.58-1.43 2.94-1.43 1.36 0 2.25.5 2.83 1.5V5.22h-2V3.93h3.63v11.63h1.38v1.27Zm-3.06-3.86v-1.02a2.28 2.28 0 0 0-.73-1.67 2.4 2.4 0 0 0-1.66-.65 2.18 2.18 0 0 0-1.88.9 3.63 3.63 0 0 0-.65 2.2c0 .95.23 1.68.7 2.19.45.5 1.03.76 1.7.76.73 0 1.33-.3 1.79-.88.48-.6.71-1.21.73-1.83Zm14.14 3.86h-4.43v-1.27h1.37v-3.63c0-.85-.16-1.45-.5-1.82a1.68 1.68 0 0 0-1.31-.52c-.71 0-1.29.23-1.7.69a2.52 2.52 0 0 0-.67 1.6v3.66h1.38v1.26H56.1v-1.26h1.38v-5.8h-1.42V8.47h3.12V9.9c.6-1.06 1.57-1.6 2.92-1.6.83 0 1.54.26 2.12.77.57.5.85 1.28.85 2.34v4.19h1.38v1.24h-.05Z"
+          />
+          <path class="logo__cursor" d="M67.71 21.98H83V24H67.71v-2.02Z" />
+        </svg>
+      </a>
+    </div>
+        <div class="navigation__search" data-view="mobile">
+          <mdn-search-button><template shadowroot="open" shadowrootmode="open"><style>.mdn-search-button{align-items:center;background-color:var(--color-background-page);border:1px solid var(--color-border-primary);border-radius:var(--radius-full);color:var(--color-text-primary);cursor:pointer;display:flex;justify-content:space-between;margin:0;padding:.25rem .25rem .25rem .75rem;width:5rem}.mdn-search-button:hover{background-color:var(--color-background-secondary)}.mdn-search-button:before{content:"";height:18px;width:15px;--csstools-light-dark-toggle-95231fd5-0:var(--csstools-color-scheme--light) var(--color-blue-80);border-bottom:2px solid var(--csstools-light-dark-toggle-95231fd5-0,var(--color-blue-50))}@supports (color:light-dark(red,red)){.mdn-search-button:before{border-bottom:2px solid light-dark(var(--color-blue-50),var(--color-blue-80))}}</style><!--lit-part PwhADO+m7/M=--><!--lit-node 0--><button
+      class="mdn-search-button"
+      title="Search the site"
+      
+      data-glean-id="quick-search-open: menu"
+    >
+      <!--lit-part ijtgkDNyZhc=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><!--/lit-part-->
+    </button><!--/lit-part--></template></mdn-search-button>
+        </div>
+        <button
+          class="navigation__button"
+          type="button"
+          aria-expanded="false"
+          aria-controls="navigation__popup"
+          aria-label="Toggle navigation"
+        ></button>
+        <div class="navigation__popup" id="navigation__popup">
+          <div class="navigation__menu">
+      <nav class="menu">
+        <div class="menu__tab" data-section="html">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: html"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >HTML</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        <a
+        
+        href="/en-US/docs/Web/HTML"
+        
+        
+        data-glean-id="menu_click_menu: html -&gt; /en-US/docs/Web/HTML"
+        >HTML: Markup language</a
+      >
+                      </p>
+                      <div class="menu__panel-content">
+                        <dl>
+                                <dt>HTML reference</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Reference/Elements"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Reference/Elements"
+        >Elements</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Reference/Global_attributes"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Reference/Global_attributes"
+        >Global attributes</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Reference/Attributes"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Reference/Attributes"
+        >Attributes</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Reference"
+        aria-label="See all HTML references"
+        title="See all HTML references"
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Reference"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>HTML guides</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Guides/Responsive_images"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Guides/Responsive_images"
+        >Responsive images</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Guides/Cheatsheet"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Guides/Cheatsheet"
+        >HTML cheatsheet</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Guides/Date_and_time_formats"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Guides/Date_and_time_formats"
+        >Date &amp; time formats</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTML/Guides"
+        aria-label="See all HTML guides"
+        title="See all HTML guides"
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/HTML/Guides"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Markup languages</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/SVG"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/SVG"
+        >SVG</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/MathML"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/MathML"
+        >MathML</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/XML"
+        
+        
+        data-glean-id="menu_click_submenu: html -&gt; /en-US/docs/Web/XML"
+        >XML</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="css">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: css"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >CSS</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        <a
+        
+        href="/en-US/docs/Web/CSS"
+        
+        
+        data-glean-id="menu_click_menu: css -&gt; /en-US/docs/Web/CSS"
+        >CSS: Styling language</a
+      >
+                      </p>
+                      <div class="menu__panel-content">
+                        <dl>
+                                <dt>CSS reference</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Reference/Properties"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Reference/Properties"
+        >Properties</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Reference/Selectors"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Reference/Selectors"
+        >Selectors</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Reference/At-rules"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Reference/At-rules"
+        >At-rules</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Reference/Values"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Reference/Values"
+        >Values</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Reference"
+        aria-label="See all CSS references"
+        title="See all CSS references"
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Reference"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>CSS guides</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Box_model/Introduction"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Guides/Box_model/Introduction"
+        >Box model</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Animations/Using"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Guides/Animations/Using"
+        >Animations</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Flexible_box_layout/Basic_concepts"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Guides/Flexible_box_layout/Basic_concepts"
+        >Flexbox</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Colors/Applying_color"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Guides/Colors/Applying_color"
+        >Colors</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides"
+        aria-label="See all CSS guides"
+        title="See all CSS guides"
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/Guides"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Layout cookbook</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/How_to/Layout_cookbook/Column_layouts"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/How_to/Layout_cookbook/Column_layouts"
+        >Column layouts</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/How_to/Layout_cookbook/Center_an_element"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/How_to/Layout_cookbook/Center_an_element"
+        >Centering an element</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/How_to/Layout_cookbook/Card"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/How_to/Layout_cookbook/Card"
+        >Card component</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/How_to/Layout_cookbook"
+        
+        
+        data-glean-id="menu_click_submenu: css -&gt; /en-US/docs/Web/CSS/How_to/Layout_cookbook"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="javascript">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: javascript"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label" data-type="long"
+                                >JavaScript</span
+                              ><span class="menu__tab-label" data-type="short"
+                                >JS</span
+                              >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        <a
+        
+        href="/en-US/docs/Web/JavaScript"
+        
+        
+        data-glean-id="menu_click_menu: javascript -&gt; /en-US/docs/Web/JavaScript"
+        >JavaScript: Scripting language</a
+      >
+                      </p>
+                      <div class="menu__panel-content">
+                        <dl>
+                                <dt>JS reference</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Reference/Global_Objects"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Reference/Global_Objects"
+        >Standard built-in objects</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Reference/Operators"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Reference/Operators"
+        >Expressions &amp; operators</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Reference/Statements"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Reference/Statements"
+        >Statements &amp; declarations</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Reference/Functions"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Reference/Functions"
+        >Functions</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Reference"
+        aria-label="See all JavaScript references"
+        title="See all JavaScript references"
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Reference"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>JS guides</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Guide/Control_flow_and_error_handling"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Guide/Control_flow_and_error_handling"
+        >Control flow &amp; error handling</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Guide/Loops_and_iteration"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Guide/Loops_and_iteration"
+        >Loops and iteration</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Guide/Working_with_objects"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Guide/Working_with_objects"
+        >Working with objects</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Guide/Using_classes"
+        
+        
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Guide/Using_classes"
+        >Using classes</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/JavaScript/Guide"
+        aria-label="See all JavaScript guides"
+        title="See all JavaScript guides"
+        data-glean-id="menu_click_submenu: javascript -&gt; /en-US/docs/Web/JavaScript/Guide"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="webapis">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: webapis"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >Web APIs</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        <a
+        
+        href="/en-US/docs/Web/API"
+        
+        
+        data-glean-id="menu_click_menu: webapis -&gt; /en-US/docs/Web/API"
+        >Web APIs: Programming interfaces</a
+      >
+                      </p>
+                      <div class="menu__panel-content">
+                        <dl>
+                                <dt>Web API reference</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/File_System_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/File_System_API"
+        >File system API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Fetch_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Fetch_API"
+        >Fetch API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Geolocation_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Geolocation_API"
+        >Geolocation API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/HTML_DOM_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/HTML_DOM_API"
+        >HTML DOM API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Push_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Push_API"
+        >Push API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Service_Worker_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Service_Worker_API"
+        >Service worker API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API"
+        aria-label="See all Web API guides"
+        title="See all Web API guides"
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Web API guides</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Web_Animations_API/Using_the_Web_Animations_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Web_Animations_API/Using_the_Web_Animations_API"
+        >Using the Web animation API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Fetch_API/Using_Fetch"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Fetch_API/Using_Fetch"
+        >Using the Fetch API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/History_API/Working_with_the_History_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/History_API/Working_with_the_History_API"
+        >Working with the History API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Web_Speech_API/Using_the_Web_Speech_API"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Web_Speech_API/Using_the_Web_Speech_API"
+        >Using the Web speech API</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/API/Web_Workers_API/Using_web_workers"
+        
+        
+        data-glean-id="menu_click_submenu: webapis -&gt; /en-US/docs/Web/API/Web_Workers_API/Using_web_workers"
+        >Using web workers</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="all">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: all"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >All</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        <a
+        
+        href="/en-US/docs/Web"
+        
+        
+        data-glean-id="menu_click_menu: all -&gt; /en-US/docs/Web"
+        >All web technology</a
+      >
+                      </p>
+                      <div class="menu__panel-content">
+                        <dl>
+                                <dt>Technologies</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/Accessibility"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/Accessibility"
+        >Accessibility</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/HTTP"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/HTTP"
+        >HTTP</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/URI"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/URI"
+        >URI</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Mozilla/Add-ons/WebExtensions"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Mozilla/Add-ons/WebExtensions"
+        >Web extensions</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/WebAssembly"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/WebAssembly"
+        >WebAssembly</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/WebDriver"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/WebDriver"
+        >WebDriver</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web"
+        aria-label="See all web technology references"
+        title="See all web technology references"
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web"
+        >See all…</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Topics</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/Media"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/Media"
+        >Media</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/Performance"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/Performance"
+        >Performance</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/Privacy"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/Privacy"
+        >Privacy</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/Security"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/Security"
+        >Security</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/Progressive_web_apps"
+        
+        
+        data-glean-id="menu_click_submenu: all -&gt; /en-US/docs/Web/Progressive_web_apps"
+        >Progressive web apps</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="learn">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: learn"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >Learn</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        <a
+        
+        href="/en-US/docs/Learn_web_development"
+        
+        
+        data-glean-id="menu_click_menu: learn -&gt; /en-US/docs/Learn_web_development"
+        >Learn web development</a
+      >
+                      </p>
+                      <div class="menu__panel-content">
+                        <dl>
+                                <dt>Frontend developer course</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Learn_web_development/Getting_started"
+        
+        
+        data-glean-id="menu_click_submenu: learn -&gt; /en-US/docs/Learn_web_development/Getting_started"
+        >Getting started modules</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Learn_web_development/Core"
+        
+        
+        data-glean-id="menu_click_submenu: learn -&gt; /en-US/docs/Learn_web_development/Core"
+        >Core modules</a
+      >
+                                </li><li>
+                                  <a
+                                            class=""
+                                            
+                                            href="/en-US/curriculum/"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: learn -&gt; /en-US/curriculum/"
+                                            >MDN Curriculum</a
+                                          >
+                                </li><li>
+                                  <a
+                                            class="external"
+                                            
+                                            href="https://scrimba.com/frontend-path-c0j?via=mdn-learn-navbar"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: learn -&gt; https://scrimba.com/frontend-path-c0j?via=mdn-learn-navbar"
+                                            >Check out the video course from Scrimba, our partner</a
+                                          >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Learn HTML</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Learn_web_development/Core/Structuring_content"
+        
+        
+        data-glean-id="menu_click_submenu: learn -&gt; /en-US/docs/Learn_web_development/Core/Structuring_content"
+        >Structuring content with HTML module</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Learn CSS</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Learn_web_development/Core/Styling_basics"
+        
+        
+        data-glean-id="menu_click_submenu: learn -&gt; /en-US/docs/Learn_web_development/Core/Styling_basics"
+        >CSS styling basics module</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Learn_web_development/Core/CSS_layout"
+        
+        
+        data-glean-id="menu_click_submenu: learn -&gt; /en-US/docs/Learn_web_development/Core/CSS_layout"
+        >CSS layout module</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl><dl>
+                                <dt>Learn JavaScript</dt>
+                                <dd><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Learn_web_development/Core/Scripting"
+        
+        
+        data-glean-id="menu_click_submenu: learn -&gt; /en-US/docs/Learn_web_development/Core/Scripting"
+        >Dynamic scripting with JavaScript module</a
+      >
+                                </li>
+                          </ul></dd>
+                              </dl>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="tools">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: tools"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >Tools</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        Discover our tools
+                      </p>
+                      <div class="menu__panel-content">
+                        <ul>
+                            <li>
+                                  <a
+                                            class="menu__panel-icon"
+                                            data-icon="circle-play"
+                                            href="/en-US/play"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: tools -&gt; /en-US/play"
+                                            >Playground</a
+                                          >
+                                </li><li>
+                                  <a
+                                            class="menu__panel-icon"
+                                            data-icon="shield-check"
+                                            href="/en-US/observatory"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: tools -&gt; /en-US/observatory"
+                                            >HTTP Observatory</a
+                                          >
+                                </li>
+                          </ul><ul>
+                            <li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Backgrounds_and_borders/Border-image_generator"
+        
+        
+        data-glean-id="menu_click_submenu: tools -&gt; /en-US/docs/Web/CSS/Guides/Backgrounds_and_borders/Border-image_generator"
+        >Border-image generator</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Backgrounds_and_borders/Border-radius_generator"
+        
+        
+        data-glean-id="menu_click_submenu: tools -&gt; /en-US/docs/Web/CSS/Guides/Backgrounds_and_borders/Border-radius_generator"
+        >Border-radius generator</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Backgrounds_and_borders/Box-shadow_generator"
+        
+        
+        data-glean-id="menu_click_submenu: tools -&gt; /en-US/docs/Web/CSS/Guides/Backgrounds_and_borders/Box-shadow_generator"
+        >Box-shadow generator</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Colors/Color_format_converter"
+        
+        
+        data-glean-id="menu_click_submenu: tools -&gt; /en-US/docs/Web/CSS/Guides/Colors/Color_format_converter"
+        >Color format converter</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Colors/Color_mixer"
+        
+        
+        data-glean-id="menu_click_submenu: tools -&gt; /en-US/docs/Web/CSS/Guides/Colors/Color_mixer"
+        >Color mixer</a
+      >
+                                </li><li>
+                                  <a
+        
+        href="/en-US/docs/Web/CSS/Guides/Shapes/Shape_generator"
+        
+        
+        data-glean-id="menu_click_submenu: tools -&gt; /en-US/docs/Web/CSS/Guides/Shapes/Shape_generator"
+        >Shape generator</a
+      >
+                                </li>
+                          </ul>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="about">
+            <mdn-dropdown
+                    
+                   data-glean-toggle-open="menu_toggle: about"><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+                    <button
+                      class="menu__tab-button"
+                      type="button"
+                      slot="button"
+                    >
+                      <span class="menu__tab-label"
+                              >About</span
+                            >
+                    </button>
+                    <div class="menu__panel" slot="dropdown">
+                      <p class="menu__panel-title">
+                        Get to know MDN better
+                      </p>
+                      <div class="menu__panel-content">
+                        <ul>
+                            <li>
+                                  <a
+                                            class="menu__panel-icon"
+                                            data-icon="mdn-m"
+                                            href="/en-US/about"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: about -&gt; /en-US/about"
+                                            >About MDN</a
+                                          >
+                                </li><li>
+                                  <a
+                                            class="menu__panel-icon"
+                                            data-icon="chart-no-axes-combined"
+                                            href="/en-US/advertising"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: about -&gt; /en-US/advertising"
+                                            >Advertise with us</a
+                                          >
+                                </li>
+                          </ul><ul>
+                            <li>
+                                  <a
+                                            class="menu__panel-icon"
+                                            data-icon="users"
+                                            href="/en-US/community"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: about -&gt; /en-US/community"
+                                            >Community</a
+                                          >
+                                </li><li>
+                                  <a
+                                            class="menu__panel-icon external"
+                                            data-icon="github"
+                                            href="https://github.com/mdn"
+                                            
+                                            
+                                            data-glean-id="menu_click_submenu: about -&gt; https://github.com/mdn"
+                                            >MDN on GitHub</a
+                                          >
+                                </li>
+                          </ul>
+                      </div>
+                    </div>
+                  </mdn-dropdown>
+          </div><div class="menu__tab" data-section="blog">
+            <a
+                    class="menu__tab-link"
+                    href="/en-US/blog/"
+                    data-glean-id="menu_click_link: top-level -&gt; /en-US/blog/"
+                    >Blog</a
+                  >
+          </div>
+      </nav>
+    </div>
+          <div class="navigation__search" data-view="desktop">
+            <mdn-search-button><template shadowroot="open" shadowrootmode="open"><style>.mdn-search-button{align-items:center;background-color:var(--color-background-page);border:1px solid var(--color-border-primary);border-radius:var(--radius-full);color:var(--color-text-primary);cursor:pointer;display:flex;justify-content:space-between;margin:0;padding:.25rem .25rem .25rem .75rem;width:5rem}.mdn-search-button:hover{background-color:var(--color-background-secondary)}.mdn-search-button:before{content:"";height:18px;width:15px;--csstools-light-dark-toggle-95231fd5-0:var(--csstools-color-scheme--light) var(--color-blue-80);border-bottom:2px solid var(--csstools-light-dark-toggle-95231fd5-0,var(--color-blue-50))}@supports (color:light-dark(red,red)){.mdn-search-button:before{border-bottom:2px solid light-dark(var(--color-blue-50),var(--color-blue-80))}}</style><!--lit-part PwhADO+m7/M=--><!--lit-node 0--><button
+      class="mdn-search-button"
+      title="Search the site"
+      
+      data-glean-id="quick-search-open: menu"
+    >
+      <!--lit-part ijtgkDNyZhc=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><!--/lit-part-->
+    </button><!--/lit-part--></template></mdn-search-button>
+          </div>
+          <mdn-user-menu></mdn-user-menu>
+        </div>
+      </nav>
+      <mdn-search-modal id="mdn-search"></mdn-search-modal>
+     
+      <div class="breadcrumbs-bar" data-scheme="">
+        <mdn-toggle-sidebar><template shadowroot="open" shadowrootmode="open"><style>:host{border-right:1px solid var(--color-border-primary);display:block;height:100%}mdn-button{height:100%}</style><!--lit-part gv6WcfvvaIc=--><!--lit-node 0--><mdn-button
+      
+      
+      
+      
+      
+     icon-only variant="plain" aria-controls="main-sidebar" defer-hydration><template shadowroot="open" shadowrootmode="open"><style>.button{align-items:center;background-color:initial;border:1px solid #0000;border-radius:.25rem;color:var(--color-text-primary);column-gap:.3125em;cursor:pointer;display:inline-flex;font-family:var(--font-family-text);font-size:.875em;font-weight:450;justify-content:center;line-height:var(--font-line-ui);margin:0;padding:.5em;-webkit-text-decoration:none;text-decoration:none;vertical-align:middle}.button[data-variant=primary]{--csstools-light-dark-toggle-33eaa513-0:var(--csstools-color-scheme--light) var(--color-black);color:var(--csstools-light-dark-toggle-33eaa513-0,var(--color-white));--csstools-light-dark-toggle-33eaa513-1:var(--csstools-color-scheme--light) var(--color-white);background-color:var(--csstools-light-dark-toggle-33eaa513-1,var(--color-black))}@supports (color:light-dark(red,red)){.button[data-variant=primary]{background-color:light-dark(var(--color-black),var(--color-white));color:light-dark(var(--color-white),var(--color-black))}}.button[data-variant=primary]:hover{--csstools-light-dark-toggle-33eaa513-2:var(--csstools-color-scheme--light) var(--color-gray-60);background-color:var(--csstools-light-dark-toggle-33eaa513-2,var(--color-gray-40))}@supports (color:light-dark(red,red)){.button[data-variant=primary]:hover{background-color:light-dark(var(--color-gray-40),var(--color-gray-60))}}.button[data-variant=primary][data-action=positive]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-3:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-3,var(--color-green-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]{background-color:light-dark(var(--color-green-50),var(--color-green-20))}}.button[data-variant=primary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-4:var(--csstools-color-scheme--light) var(--color-green-50);background-color:var(--csstools-light-dark-toggle-33eaa513-4,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]:hover{background-color:light-dark(var(--color-green-20),var(--color-green-50))}}.button[data-variant=primary][data-action=negative]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-5:var(--csstools-color-scheme--light) var(--color-red-20);background-color:var(--csstools-light-dark-toggle-33eaa513-5,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]{background-color:light-dark(var(--color-red-50),var(--color-red-20))}}.button[data-variant=primary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-6:var(--csstools-color-scheme--light) var(--color-red-50);background-color:var(--csstools-light-dark-toggle-33eaa513-6,var(--color-red-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]:hover{background-color:light-dark(var(--color-red-20),var(--color-red-50))}}.button[data-variant=secondary]{border-color:currentcolor}.button[data-variant=secondary]:hover{--csstools-light-dark-toggle-33eaa513-7:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-7,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=secondary]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=secondary][data-action=positive]{--csstools-light-dark-toggle-33eaa513-8:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-8,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=secondary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-9:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-9,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=secondary][data-action=negative]{--csstools-light-dark-toggle-33eaa513-10:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-10,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=secondary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-11:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-11,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-12:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-12,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[data-variant=plain]:hover{--csstools-light-dark-toggle-33eaa513-13:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-13,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=plain]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=plain][data-action=positive]{--csstools-light-dark-toggle-33eaa513-14:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-14,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=plain][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-15:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-15,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=plain][data-action=negative]{--csstools-light-dark-toggle-33eaa513-16:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-16,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=plain][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-17:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-17,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-18:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-18,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[aria-disabled=true],.button[disabled]{--csstools-light-dark-toggle-33eaa513-19:var(--csstools-color-scheme--light) var(--color-gray-60)!important;color:var(--csstools-light-dark-toggle-33eaa513-19,var(--color-gray-40))!important;cursor:not-allowed;--csstools-light-dark-toggle-33eaa513-20:var(--csstools-color-scheme--light) var(--color-gray-20)!important;background-color:var(--csstools-light-dark-toggle-33eaa513-20,var(--color-gray-80))!important;border-color:#0000}@supports (color:light-dark(red,red)){.button[aria-disabled=true],.button[disabled]{background-color:light-dark(var(--color-gray-80),var(--color-gray-20))!important;color:light-dark(var(--color-gray-40),var(--color-gray-60))!important}}.button .icon{display:flex}.button svg{height:1.25em;width:1.25em}.button .label{padding-block:.125em;padding-inline:.0625em}:host{display:inline-flex;vertical-align:middle}.button{box-sizing:border-box;height:100%;width:100%}</style><!--lit-part O1S+ZMb7umU=-->
+        <!--lit-node 0--><button
+          class="button"
+          aria-labelledby="label-a2argjge9l"
+          
+          
+          
+          
+          data-variant="plain"
+          
+          part="button"
+        >
+          <!--lit-part--><!--lit-part bRP2a5ux/uw=--><span class="icon" part="icon"><!--lit-part 6ks+zZ9KZSc=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg><!--/lit-part--></span><!--/lit-part--><!--lit-part rI2hX8LXYZM=-->
+    <!--lit-node 0--><span id="label-a2argjge9l" class="label" hidden part="label"
+      ><!--lit-part Pz0gobCCM4E=--><slot></slot><!--/lit-part--></span
+    >
+  <!--/lit-part--><!--/lit-part-->
+        </button>
+      <!--/lit-part--></template>
+      <!--lit-part-->Toggle sidebar<!--/lit-part-->
+    </mdn-button><!--/lit-part--></template></mdn-toggle-sidebar> 
+      <ol
+        class="breadcrumbs"
+        vocab="https://schema.org/"
+        typeof="BreadcrumbList"
+      >
+        
+            <li property="itemListElement" typeof="ListItem">
+              <a
+                href="/en-US/docs/Web"
+                property="item"
+                typeof="WebPage"
+                data-glean-id="breadcrumb_click: 6/6"
+                ><span property="name">Web</span></a
+              >
+              <meta property="position" content="1" />
+            </li>
+          
+            <li property="itemListElement" typeof="ListItem">
+              <a
+                href="/en-US/docs/Web/JavaScript"
+                property="item"
+                typeof="WebPage"
+                data-glean-id="breadcrumb_click: 5/6"
+                ><span property="name">JavaScript</span></a
+              >
+              <meta property="position" content="2" />
+            </li>
+          
+            <li property="itemListElement" typeof="ListItem">
+              <a
+                href="/en-US/docs/Web/JavaScript/Reference"
+                property="item"
+                typeof="WebPage"
+                data-glean-id="breadcrumb_click: 4/6"
+                ><span property="name">Reference</span></a
+              >
+              <meta property="position" content="3" />
+            </li>
+          
+            <li property="itemListElement" typeof="ListItem">
+              <a
+                href="/en-US/docs/Web/JavaScript/Reference/Global_Objects"
+                property="item"
+                typeof="WebPage"
+                data-glean-id="breadcrumb_click: 3/6"
+                ><span property="name">Standard built-in objects</span></a
+              >
+              <meta property="position" content="4" />
+            </li>
+          
+            <li property="itemListElement" typeof="ListItem">
+              <a
+                href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array"
+                property="item"
+                typeof="WebPage"
+                data-glean-id="breadcrumb_click: 2/6"
+                ><span property="name">Array</span></a
+              >
+              <meta property="position" content="5" />
+            </li>
+          
+            <li property="itemListElement" typeof="ListItem">
+              <a
+                href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+                property="item"
+                typeof="WebPage"
+                data-glean-id="breadcrumb_click: 1/6"
+                ><span property="name">map()</span></a
+              >
+              <meta property="position" content="6" />
+            </li>
+          
+      </ol>
+    
+        <mdn-collection-save-button
+                doc-url="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+                doc-title="Array.prototype.map()"
+              ></mdn-collection-save-button>
+        <mdn-color-theme><template shadowroot="open" shadowrootmode="open"><style>.color-theme{--color-theme-light-dark:url(/static/ssr/contrast.d86e85c43de8dee8.svg);--color-theme-light:url(/static/ssr/sun.1d7c3ad7bf6fc390.svg);--color-theme-dark:url(/static/ssr/moon.74026b9da82b0694.svg);position:relative}.color-theme__button{align-items:center;background-color:initial;border:none;color:inherit;column-gap:.25rem;cursor:pointer;display:flex;font:inherit;margin:0;padding:0 .5rem}.color-theme__button:is(:hover,:focus,[aria-expanded=true]){background-color:var(--color-background-secondary)}@media (width <= 769px){.color-theme__button>span{display:none}}.color-theme__button:before{background-color:currentcolor;content:"";height:1.25rem;mask-size:cover;width:1.25rem}.color-theme__button[data-mode="light dark"]:before{mask-image:var(--color-theme-light-dark)}.color-theme__button[data-mode=light]:before{mask-image:var(--color-theme-light)}.color-theme__button[data-mode=dark]:before{mask-image:var(--color-theme-dark)}.color-theme__dropdown{border:1px solid var(--color-border-primary);padding:.75rem;position:absolute;right:0;z-index:1}.color-theme__dropdown,.color-theme__list{background-color:var(--color-background-primary);margin:0;width:max-content}.color-theme__list{list-style:none;padding:0}.color-theme__option{align-items:center;background-color:initial;border:none;color:var(--color-text-primary);column-gap:.25rem;cursor:pointer;display:flex;font:inherit;margin:0;padding:.25rem;width:100%}.color-theme__option:hover{background-color:var(--color-background-secondary)}.color-theme__option:before{background-color:currentcolor;content:"";height:1.25rem;mask-size:cover;width:1.25rem}.color-theme__option[data-mode="light dark"]:before{mask-image:var(--color-theme-light-dark)}.color-theme__option[data-mode=light]:before{mask-image:var(--color-theme-light)}.color-theme__option[data-mode=dark]:before{mask-image:var(--color-theme-dark)}.color-theme__option[data-current]{background:var(--color-background-secondary)}</style><!--lit-part qfulPQ/1soM=--><div class="color-theme">
+      <!--lit-node 1--><mdn-dropdown  defer-hydration><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+        <!--lit-node 2--><button
+          part="button"
+          slot="button"
+          class="color-theme__button"
+          data-mode="light dark"
+          type="button"
+          aria-label="Switch color theme"
+        >
+          <span><!--lit-part-->Theme<!--/lit-part--></span>
+        </button>
+        <div
+          slot="dropdown"
+          class="color-theme__dropdown"
+          id="color-theme__dropdown"
+        >
+          <ul class="color-theme__list">
+            <!--lit-part--><!--lit-part oXzlp8XhpzI=--><li>
+                  <!--lit-node 1--><button
+                    class="color-theme__option"
+                    data-mode="light dark"
+                    data-current
+                    type="button"
+                    
+                  >
+                    <!--lit-part-->OS default<!--/lit-part-->
+                  </button>
+                </li><!--/lit-part--><!--lit-part oXzlp8XhpzI=--><li>
+                  <!--lit-node 1--><button
+                    class="color-theme__option"
+                    data-mode="light"
+                    
+                    type="button"
+                    
+                  >
+                    <!--lit-part-->Light<!--/lit-part-->
+                  </button>
+                </li><!--/lit-part--><!--lit-part oXzlp8XhpzI=--><li>
+                  <!--lit-node 1--><button
+                    class="color-theme__option"
+                    data-mode="dark"
+                    
+                    type="button"
+                    
+                  >
+                    <!--lit-part-->Dark<!--/lit-part-->
+                  </button>
+                </li><!--/lit-part--><!--/lit-part-->
+          </ul>
+        </div>
+      </mdn-dropdown>
+    </div><!--/lit-part--></template></mdn-color-theme>
+        <mdn-language-switcher
+      
+      
+      
+      
+      
+     locale="en-US" native="English (US)" translations="[{&quot;locale&quot;:&quot;en-US&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;English (US)&quot;},{&quot;locale&quot;:&quot;de&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;Deutsch&quot;},{&quot;locale&quot;:&quot;es&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;Español&quot;},{&quot;locale&quot;:&quot;fr&quot;,&quot;title&quot;:&quot;Array : méthode map()&quot;,&quot;native&quot;:&quot;Français&quot;},{&quot;locale&quot;:&quot;ja&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;日本語&quot;},{&quot;locale&quot;:&quot;ko&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;한국어&quot;},{&quot;locale&quot;:&quot;pt-BR&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;Português (do Brasil)&quot;},{&quot;locale&quot;:&quot;ru&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;Русский&quot;},{&quot;locale&quot;:&quot;zh-CN&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;中文 (简体)&quot;},{&quot;locale&quot;:&quot;zh-TW&quot;,&quot;title&quot;:&quot;Array.prototype.map()&quot;,&quot;native&quot;:&quot;正體中文 (繁體)&quot;}]" url="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map"><template shadowroot="open" shadowrootmode="open"><style>*,:after,:before{box-sizing:border-box}button,input,select,textarea{font:inherit}button{color:inherit;cursor:pointer}img{height:auto;max-width:100%}a{color:var(--color-link-normal)}[hidden]{display:none!important}#content{scroll-margin-block-start:var(--sticky-header-height)}.language-switcher{position:relative}.language-switcher__button{align-items:center;background-color:initial;border:none;color:inherit;column-gap:.25rem;cursor:pointer;display:flex;font:inherit;margin:0;padding:0 .5rem}.language-switcher__button:is(:hover,:focus,[aria-expanded=true]){background-color:var(--color-background-secondary)}@media screen and (width <= 480px){.language-switcher__button>span{display:none}}.language-switcher__button:before{background-color:currentcolor;content:"";height:1.25rem;mask-image:url(/static/ssr/languages.dcba936080e5be86.svg);mask-size:cover;width:1.25rem}.language-switcher__dropdown{background-color:var(--color-background-primary);border:1px solid var(--color-border-primary);margin:0;padding:.75rem;position:absolute;right:0;width:max-content;z-index:1}.language_switcher__remember{border-bottom:1px solid var(--color-border-primary);display:flex;font-size:var(--font-size-small);place-items:center;width:100%}.language_switcher__remember mdn-switch{padding:.25rem}:is(.language_switcher__remember mdn-switch):hover{background-color:var(--color-background-secondary)}.language-switcher__list{background-color:var(--color-background-primary);list-style:none;margin:0;padding:0;width:100%}.language-switcher__option{align-items:center;background-color:initial;border:none;color:var(--color-text-primary);column-gap:.25rem;display:flex;font:inherit;margin:0;padding:.25rem;-webkit-text-decoration:none;text-decoration:none;width:100%}.language-switcher__option:hover,.language-switcher__option[data-current]{background-color:var(--color-background-secondary)}</style><!--lit-part chc5lPcfcrc=--><div class="language-switcher">
+      <!--lit-node 1--><mdn-dropdown defer-hydration><template shadowroot="open" shadowrootmode="open"><style>:host{display:contents}:host(:not([loaded],:focus-within)) slot[name=dropdown]{display:none}</style><!--lit-part NrjKVwpqTpA=-->
+      <!--lit-node 0--><slot name="button" ></slot>
+      <!--lit-node 1--><slot name="dropdown" ></slot>
+    <!--/lit-part--></template>
+        <button
+          part="button"
+          slot="button"
+          class="language-switcher__button"
+          type="button"
+          aria-labelledby="current-locale"
+        >
+          <span id="current-locale"><!--lit-part-->English (US)<!--/lit-part--></span>
+        </button>
+        <div
+          slot="dropdown"
+          class="language-switcher__dropdown"
+          id="language-switcher__dropdown"
+        >
+          <div class="language_switcher__remember">
+            <!--lit-node 7--><mdn-switch
+              
+              
+               defer-hydration><template shadowroot="open" shadowrootmode="open"><style>@property --switch-position{syntax:"<percentage>";inherits:false;initial-value:0}.switch{cursor:pointer;display:flex;gap:.5em;place-items:center}.switch__input{--switch-size:1.25em;appearance:none;background-color:var(--color-text-secondary);background-image:radial-gradient(circle at calc(var(--switch-size)/2),var(--color-background-primary) calc((var(--switch-size)/2)*.8),#0000 calc((var(--switch-size)/2)*.8 + 1px));background-position:var(--switch-position) 0;background-repeat:no-repeat;background-size:var(--switch-size);border-radius:var(--radius-full);display:inline-block;height:var(--switch-size);margin:0;transition:--switch-position .2s;width:calc(var(--switch-size)*1.6)}.switch__input:checked{--switch-position:100%;background-color:var(--color-link-normal)}.switch__input:focus-visible{outline:2px solid var(--color-link-normal);outline-offset:2px}.switch__input:active:not(:disabled){filter:brightness(1.2)}.switch__input:disabled{opacity:.7}</style><!--lit-part 5r9QLJvcF6A=--> <label class="switch">
+      <!--lit-node 1--><input
+        class="switch__input"
+        type="checkbox"
+        
+        
+        
+      />
+      <slot></slot>
+    </label><!--/lit-part--></template><!--lit-part-->Remember language<!--/lit-part--></mdn-switch
+            >
+            <!--lit-node 9--><mdn-button
+              
+              
+              
+              
+              
+              
+               variant="plain" icon-only href="https://github.com/orgs/mdn/discussions/739" target="_blank" title="Enable this setting to always switch to the current language when available. (Click to learn more.)" defer-hydration><template shadowroot="open" shadowrootmode="open"><style>.button{align-items:center;background-color:initial;border:1px solid #0000;border-radius:.25rem;color:var(--color-text-primary);column-gap:.3125em;cursor:pointer;display:inline-flex;font-family:var(--font-family-text);font-size:.875em;font-weight:450;justify-content:center;line-height:var(--font-line-ui);margin:0;padding:.5em;-webkit-text-decoration:none;text-decoration:none;vertical-align:middle}.button[data-variant=primary]{--csstools-light-dark-toggle-33eaa513-0:var(--csstools-color-scheme--light) var(--color-black);color:var(--csstools-light-dark-toggle-33eaa513-0,var(--color-white));--csstools-light-dark-toggle-33eaa513-1:var(--csstools-color-scheme--light) var(--color-white);background-color:var(--csstools-light-dark-toggle-33eaa513-1,var(--color-black))}@supports (color:light-dark(red,red)){.button[data-variant=primary]{background-color:light-dark(var(--color-black),var(--color-white));color:light-dark(var(--color-white),var(--color-black))}}.button[data-variant=primary]:hover{--csstools-light-dark-toggle-33eaa513-2:var(--csstools-color-scheme--light) var(--color-gray-60);background-color:var(--csstools-light-dark-toggle-33eaa513-2,var(--color-gray-40))}@supports (color:light-dark(red,red)){.button[data-variant=primary]:hover{background-color:light-dark(var(--color-gray-40),var(--color-gray-60))}}.button[data-variant=primary][data-action=positive]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-3:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-3,var(--color-green-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]{background-color:light-dark(var(--color-green-50),var(--color-green-20))}}.button[data-variant=primary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-4:var(--csstools-color-scheme--light) var(--color-green-50);background-color:var(--csstools-light-dark-toggle-33eaa513-4,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]:hover{background-color:light-dark(var(--color-green-20),var(--color-green-50))}}.button[data-variant=primary][data-action=negative]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-5:var(--csstools-color-scheme--light) var(--color-red-20);background-color:var(--csstools-light-dark-toggle-33eaa513-5,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]{background-color:light-dark(var(--color-red-50),var(--color-red-20))}}.button[data-variant=primary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-6:var(--csstools-color-scheme--light) var(--color-red-50);background-color:var(--csstools-light-dark-toggle-33eaa513-6,var(--color-red-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]:hover{background-color:light-dark(var(--color-red-20),var(--color-red-50))}}.button[data-variant=secondary]{border-color:currentcolor}.button[data-variant=secondary]:hover{--csstools-light-dark-toggle-33eaa513-7:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-7,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=secondary]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=secondary][data-action=positive]{--csstools-light-dark-toggle-33eaa513-8:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-8,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=secondary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-9:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-9,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=secondary][data-action=negative]{--csstools-light-dark-toggle-33eaa513-10:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-10,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=secondary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-11:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-11,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-12:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-12,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[data-variant=plain]:hover{--csstools-light-dark-toggle-33eaa513-13:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-13,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=plain]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=plain][data-action=positive]{--csstools-light-dark-toggle-33eaa513-14:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-14,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=plain][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-15:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-15,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=plain][data-action=negative]{--csstools-light-dark-toggle-33eaa513-16:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-16,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=plain][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-17:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-17,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-18:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-18,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[aria-disabled=true],.button[disabled]{--csstools-light-dark-toggle-33eaa513-19:var(--csstools-color-scheme--light) var(--color-gray-60)!important;color:var(--csstools-light-dark-toggle-33eaa513-19,var(--color-gray-40))!important;cursor:not-allowed;--csstools-light-dark-toggle-33eaa513-20:var(--csstools-color-scheme--light) var(--color-gray-20)!important;background-color:var(--csstools-light-dark-toggle-33eaa513-20,var(--color-gray-80))!important;border-color:#0000}@supports (color:light-dark(red,red)){.button[aria-disabled=true],.button[disabled]{background-color:light-dark(var(--color-gray-80),var(--color-gray-20))!important;color:light-dark(var(--color-gray-40),var(--color-gray-60))!important}}.button .icon{display:flex}.button svg{height:1.25em;width:1.25em}.button .label{padding-block:.125em;padding-inline:.0625em}:host{display:inline-flex;vertical-align:middle}.button{box-sizing:border-box;height:100%;width:100%}</style><!--lit-part QWlwWBHAx44=-->
+        <!--lit-node 0--><a
+          class="button"
+          href="https://github.com/orgs/mdn/discussions/739"
+          target="_blank"
+          
+          aria-labelledby="label-vk9i3p0z4rc"
+          
+          
+          data-variant="plain"
+          
+          part="button"
+        >
+          <!--lit-part--><!--lit-part bRP2a5ux/uw=--><span class="icon" part="icon"><!--lit-part quQU0uIDm5U=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg><!--/lit-part--></span><!--/lit-part--><!--lit-part rI2hX8LXYZM=-->
+    <!--lit-node 0--><span id="label-vk9i3p0z4rc" class="label" hidden part="label"
+      ><!--lit-part Pz0gobCCM4E=--><slot></slot><!--/lit-part--></span
+    >
+  <!--/lit-part--><!--/lit-part-->
+        </a>
+      <!--/lit-part--></template><!--lit-part-->Learn more<!--/lit-part--></mdn-button
+            >
+          </div>
+          <ul class="language-switcher__list">
+            <!--lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/de/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; de"
+              ><!--lit-part-->Deutsch<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              data-current
+              
+              href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; en-US"
+              ><!--lit-part-->English (US)<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/es/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; es"
+              ><!--lit-part-->Español<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/fr/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; fr"
+              ><!--lit-part-->Français<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/ja/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; ja"
+              ><!--lit-part-->日本語<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/ko/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; ko"
+              ><!--lit-part-->한국어<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/pt-BR/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; pt-BR"
+              ><!--lit-part-->Português (do Brasil)<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/ru/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; ru"
+              ><!--lit-part-->Русский<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; zh-CN"
+              ><!--lit-part-->中文 (简体)<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--lit-part hnlaESZfzGU=-->
+          <li>
+            <!--lit-node 1--><a
+              class="language-switcher__option"
+              
+              
+              href="/zh-TW/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+              data-glean-id="language: en-US -&gt; zh-TW"
+              ><!--lit-part-->正體中文 (繁體)<!--/lit-part--></a
+            >
+          </li>
+        <!--/lit-part--><!--/lit-part-->
+          </ul>
+        </div>
+      </mdn-dropdown>
+    </div><!--/lit-part--></template></mdn-language-switcher>
+      </div>
+    
+        </header>
+        <div class="page-layout__main">
+      <div class="layout__2-sidebars-inline reference-layout">
+        <main id="content" class="layout__content">
+          <div class="layout__header reference-layout__header">
+            
+            
+            <mdn-survey></mdn-survey>
+            <h1>Array.prototype.map()</h1>
+            <details
+      class="baseline-indicator high"
+      data-glean-toggle-open="baseline_toggle_open"
+      
+      
+    >
+      <summary>
+        <span
+          class="indicator"
+          role="img"
+          aria-label="Baseline Check"
+        ></span>
+        <div class="status-title">
+          Baseline
+        </div>
+        <div class="pill">Widely available</div>
+        
+        <div class="browsers">
+                <span class="engine" title="Supported in Chrome and Edge">
+                      <span
+                            class="browser chrome supported"
+                            role="img"
+                            aria-label="Chrome check"
+                          ></span><span
+                            class="browser edge supported"
+                            role="img"
+                            aria-label="Edge check"
+                          ></span>
+                    </span><span class="engine" title="Supported in Firefox">
+                      <span
+                            class="browser firefox supported"
+                            role="img"
+                            aria-label="Firefox check"
+                          ></span>
+                    </span><span class="engine" title="Supported in Safari">
+                      <span
+                            class="browser safari supported"
+                            role="img"
+                            aria-label="Safari check"
+                          ></span>
+                    </span>
+              </div>
+        <span class="icon icon-chevron"></span>
+      </summary>
+      <div class="extra">
+        <p>This feature is well established and works across many devices and browser versions. It’s been available across browsers since July 2015.</p>
+        
+        <ul>
+          <li>
+            <a href="#browser_compatibility" data-glean-id="baseline_link_bcd_table">
+              See full compatibility
+            </a>
+          </li>
+          <li>
+            <a
+              href="/en-US/docs/Glossary/Baseline/Compatibility"
+              data-glean-id="baseline_link_learn_more"
+              target="_blank"
+            >
+              Learn more
+            </a>
+          </li>
+        </ul>
+      </div>
+    </details><script>if (localStorage.getItem("baseline-indicator") === "open") {
+  const indicator = document.querySelector(".baseline-indicator");
+  if (indicator instanceof HTMLDetailsElement) {
+    indicator.open = true;
+  }
+}
+</script><?> <section
+    class="content-section"
+    
+  >
+    
+    <p>The <strong><code>map()</code></strong> method of <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array"><code>Array</code></a> instances creates
+a new array populated with the results of calling a provided function on
+every element in the calling array.</p>
+  </section>
+          </div>
+          <aside class="layout__right-sidebar reference-layout__toc">
+            <nav class="reference-toc">
+      <h2>In this article</h2>
+      <ul>
+        <li>
+              <a href="#try_it" data-glean-id="toc_click: #try_it"
+                >Try it</a
+              >
+            </li><li>
+              <a href="#syntax" data-glean-id="toc_click: #syntax"
+                >Syntax</a
+              >
+            </li><li>
+              <a href="#description" data-glean-id="toc_click: #description"
+                >Description</a
+              >
+            </li><li>
+              <a href="#examples" data-glean-id="toc_click: #examples"
+                >Examples</a
+              >
+            </li><li>
+              <a href="#specifications" data-glean-id="toc_click: #specifications"
+                >Specifications</a
+              >
+            </li><li>
+              <a href="#browser_compatibility" data-glean-id="toc_click: #browser_compatibility"
+                >Browser compatibility</a
+              >
+            </li><li>
+              <a href="#see_also" data-glean-id="toc_click: #see_also"
+                >See also</a
+              >
+            </li>
+      </ul>
+    </nav>
+            <mdn-placement-sidebar></mdn-placement-sidebar>
+          </aside>
+          <div class="layout__body reference-layout__body">
+            <section
+    class="content-section"
+    aria-labelledby="try_it"
+  >
+    <!--lit-part J1rEYwaybRw=--><!--lit-node 0--><h2 id="try_it" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#try_it">Try it</a></h2><!--/lit-part-->
+    <interactive-example name="JavaScript Demo: Array.prototype.map()"></interactive-example>
+<div class="code-example"><pre class="brush: js interactive-example notranslate"><code>const array = [1, 4, 9, 16];
+
+// Pass a function to map
+const mapped = array.map((x) =&gt; x * 2);
+
+console.log(mapped);
+// Expected output: Array [2, 8, 18, 32]
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="syntax"
+  >
+    <!--lit-part X3RKttXoaxo=--><!--lit-node 0--><h2 id="syntax" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#syntax">Syntax</a></h2><!--/lit-part-->
+    <div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>map(callbackFn)
+map(callbackFn, thisArg)
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="parameters"
+  >
+    <!--lit-part q+C3FhLECJw=--><!--lit-node 0--><h3 id="parameters" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#parameters">Parameters</a></h3><!--/lit-part-->
+    <dl>
+<dt id="callbackfn"><a href="#callbackfn"><code>callbackFn</code></a></dt>
+<dd>
+<p>A function to execute for each element in the array. Its return value is added as a single element in the new array. The function is called with the following arguments:</p>
+<dl>
+<dt id="element"><a href="#element"><code>element</code></a></dt>
+<dd>
+<p>The current element being processed in the array.</p>
+</dd>
+<dt id="index"><a href="#index"><code>index</code></a></dt>
+<dd>
+<p>The index of the current element being processed in the array.</p>
+</dd>
+<dt id="array"><a href="#array"><code>array</code></a></dt>
+<dd>
+<p>The array <code>map()</code> was called upon.</p>
+</dd>
+</dl>
+</dd>
+<dt id="thisarg"><a href="#thisarg"><code>thisArg</code> <span class="badge inline optional">Optional</span></a></dt>
+<dd>
+<p>A value to use as <code>this</code> when executing <code>callbackFn</code>. See <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array#iterative_methods">iterative methods</a>.</p>
+</dd>
+</dl>
+  </section><section
+    class="content-section"
+    aria-labelledby="return_value"
+  >
+    <!--lit-part ot97hcBGzM0=--><!--lit-node 0--><h3 id="return_value" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#return_value">Return value</a></h3><!--/lit-part-->
+    <p>A new array with each element being the result of the callback function.</p>
+  </section><section
+    class="content-section"
+    aria-labelledby="description"
+  >
+    <!--lit-part Srkl5+9Rtas=--><!--lit-node 0--><h2 id="description" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#description">Description</a></h2><!--/lit-part-->
+    <p>The <code>map()</code> method is an <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array#iterative_methods">iterative method</a>. It calls a provided <code>callbackFn</code> function once for each element in an array and constructs a new array from the results. Read the <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array#iterative_methods">iterative methods</a> section for more information about how these methods work in general.</p>
+<p><code>callbackFn</code> is invoked only for array indexes which have assigned values. It is not invoked for empty slots in <a href="/en-US/docs/Web/JavaScript/Guide/Indexed_collections#sparse_arrays">sparse arrays</a>.</p>
+<p>The <code>map()</code> method is <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array#generic_array_methods">generic</a>. It only expects the <code>this</code> value to have a <code>length</code> property and integer-keyed properties.</p>
+<p>Since <code>map</code> builds a new array, calling it without using the returned array is an anti-pattern; use <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach"><code>forEach</code></a> or <a href="/en-US/docs/Web/JavaScript/Reference/Statements/for...of"><code>for...of</code></a> instead.</p>
+  </section><section
+    class="content-section"
+    aria-labelledby="examples"
+  >
+    <!--lit-part cjTOnCoGGWc=--><!--lit-node 0--><h2 id="examples" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#examples">Examples</a></h2><!--/lit-part-->
+    <?>
+  </section><section
+    class="content-section"
+    aria-labelledby="mapping_an_array_of_numbers_to_an_array_of_square_roots"
+  >
+    <!--lit-part Lr8dQp5N1CI=--><!--lit-node 0--><h3 id="mapping_an_array_of_numbers_to_an_array_of_square_roots" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#mapping_an_array_of_numbers_to_an_array_of_square_roots">Mapping an array of numbers to an array of square roots</a></h3><!--/lit-part-->
+    <p>The following code takes an array of numbers and creates a new array containing the square roots of the numbers in the first array.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const numbers = [1, 4, 9];
+const roots = numbers.map((num) =&gt; Math.sqrt(num));
+
+// roots is now     [1, 2, 3]
+// numbers is still [1, 4, 9]
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="using_map_to_reformat_objects_in_an_array"
+  >
+    <!--lit-part weacZ6DEY2I=--><!--lit-node 0--><h3 id="using_map_to_reformat_objects_in_an_array" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#using_map_to_reformat_objects_in_an_array">Using map to reformat objects in an array</a></h3><!--/lit-part-->
+    <p>The following code takes an array of objects and creates a new array containing the newly reformatted objects.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const kvArray = [
+  { key: 1, value: 10 },
+  { key: 2, value: 20 },
+  { key: 3, value: 30 },
+];
+
+const reformattedArray = kvArray.map(({ key, value }) =&gt; ({ [key]: value }));
+
+console.log(reformattedArray); // [{ 1: 10 }, { 2: 20 }, { 3: 30 }]
+console.log(kvArray);
+// [
+//   { key: 1, value: 10 },
+//   { key: 2, value: 20 },
+//   { key: 3, value: 30 }
+// ]
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="using_parseint_with_map"
+  >
+    <!--lit-part 9/Mg2orm5LM=--><!--lit-node 0--><h3 id="using_parseint_with_map" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#using_parseint_with_map">Using parseInt() with map()</a></h3><!--/lit-part-->
+    <p>It is common to use the callback with one argument (the element being traversed). Certain functions are also commonly used with one argument, even though they take additional optional arguments. These habits may lead to confusing behaviors. Consider:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>["1", "2", "3"].map(parseInt);
+</code></pre></div>
+<p>While one might expect <code>[1, 2, 3]</code>, the actual result is <code>[1, NaN, NaN]</code>.</p>
+<p><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/parseInt"><code>parseInt</code></a> is often used with one argument, but takes two. The first is an expression and the second is the radix to the callback function, <code>Array.prototype.map</code> passes 3 arguments: the element, the index, and the array. The third argument is ignored by <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/parseInt"><code>parseInt</code></a> — but <em>not</em> the second one! This is the source of possible confusion.</p>
+<p>Here is a concise example of the iteration steps:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>/* first iteration  (index is 0): */ parseInt("1", 0); // 1
+/* second iteration (index is 1): */ parseInt("2", 1); // NaN
+/* third iteration  (index is 2): */ parseInt("3", 2); // NaN
+</code></pre></div>
+<p>To solve this, define another function that only takes one argument:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>["1", "2", "3"].map((str) =&gt; parseInt(str, 10)); // [1, 2, 3]
+</code></pre></div>
+<p>You can also use the <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number"><code>Number</code></a> function, which only takes one argument:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>["1", "2", "3"].map(Number); // [1, 2, 3]
+
+// But unlike parseInt(), Number() will also return a float or (resolved) exponential notation:
+["1.1", "2.2e2", "3e300"].map(Number); // [1.1, 220, 3e+300]
+
+// For comparison, if we use parseInt() on the array above:
+["1.1", "2.2e2", "3e300"].map((str) =&gt; parseInt(str, 10)); // [1, 2, 3]
+</code></pre></div>
+<p>See <a href="https://wirfs-brock.com/allen/posts/166" class="external" target="_blank" title="External link (opens in new tab)">A JavaScript optional argument hazard</a> by Allen Wirfs-Brock for more discussions.</p>
+  </section><section
+    class="content-section"
+    aria-labelledby="mapped_array_contains_undefined"
+  >
+    <!--lit-part T+VgkyG5lbs=--><!--lit-node 0--><h3 id="mapped_array_contains_undefined" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#mapped_array_contains_undefined">Mapped array contains undefined</a></h3><!--/lit-part-->
+    <p>When <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/undefined"><code>undefined</code></a> or nothing is returned, the resulting array contains <code>undefined</code>. If you want to delete the element instead, chain a <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter"><code>filter()</code></a> method, or use the <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap"><code>flatMap()</code></a> method and return an empty array to signify deletion.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const numbers = [1, 2, 3, 4];
+const filteredNumbers = numbers.map((num, index) =&gt; {
+  if (index &lt; 3) {
+    return num;
+  }
+});
+
+// index goes from 0, so the filteredNumbers are 1,2,3 and undefined.
+// filteredNumbers is [1, 2, 3, undefined]
+// numbers is still [1, 2, 3, 4]
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="side-effectful_mapping"
+  >
+    <!--lit-part 5anrVnSL8bE=--><!--lit-node 0--><h3 id="side-effectful_mapping" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#side-effectful_mapping">Side-effectful mapping</a></h3><!--/lit-part-->
+    <p>The callback can have side effects.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const cart = [5, 15, 25];
+let total = 0;
+const withTax = cart.map((cost) =&gt; {
+  total += cost;
+  return cost * 1.2;
+});
+console.log(withTax); // [6, 18, 30]
+console.log(total); // 45
+</code></pre></div>
+<p>This is not recommended, because copying methods are best used with pure functions. In this case, we can choose to iterate the array twice.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const cart = [5, 15, 25];
+const total = cart.reduce((acc, cost) =&gt; acc + cost, 0);
+const withTax = cart.map((cost) =&gt; cost * 1.2);
+</code></pre></div>
+<p>Sometimes this pattern goes to its extreme and the <em>only</em> useful thing that <code>map()</code> does is causing side effects.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const products = [
+  { name: "sports car" },
+  { name: "laptop" },
+  { name: "phone" },
+];
+
+products.map((product) =&gt; {
+  product.price = 100;
+});
+</code></pre></div>
+<p>As mentioned previously, this is an anti-pattern. If you don't use the return value of <code>map()</code>, use <code>forEach()</code> or a <code>for...of</code> loop instead.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>products.forEach((product) =&gt; {
+  product.price = 100;
+});
+</code></pre></div>
+<p>Or, if you want to create a new array instead:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const productsWithPrice = products.map((product) =&gt; ({
+  ...product,
+  price: 100,
+}));
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="using_the_third_argument_of_callbackfn"
+  >
+    <!--lit-part 2rfK3N7vU2Y=--><!--lit-node 0--><h3 id="using_the_third_argument_of_callbackfn" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#using_the_third_argument_of_callbackfn">Using the third argument of callbackFn</a></h3><!--/lit-part-->
+    <p>The <code>array</code> argument is useful if you want to access another element in the array, especially when you don't have an existing variable that refers to the array. The following example first uses <code>filter()</code> to extract the positive values and then uses <code>map()</code> to create a new array where each element is the average of its neighbors and itself.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const numbers = [3, -1, 1, 4, 1, 5, 9, 2, 6];
+const averaged = numbers
+  .filter((num) =&gt; num &gt; 0)
+  .map((num, idx, arr) =&gt; {
+    // Without the arr argument, there's no way to easily access the
+    // intermediate array without saving it to a variable.
+    const prev = arr[idx - 1];
+    const next = arr[idx + 1];
+    let count = 1;
+    let total = num;
+    if (prev !== undefined) {
+      count++;
+      total += prev;
+    }
+    if (next !== undefined) {
+      count++;
+      total += next;
+    }
+    const average = total / count;
+    // Keep two decimal places
+    return Math.round(average * 100) / 100;
+  });
+console.log(averaged); // [2, 2.67, 2, 3.33, 5, 5.33, 5.67, 4]
+</code></pre></div>
+<p>The <code>array</code> argument is <em>not</em> the array that is being built — there is no way to access the array being built from the callback function.</p>
+  </section><section
+    class="content-section"
+    aria-labelledby="using_map_on_sparse_arrays"
+  >
+    <!--lit-part b3FEvFp5mzk=--><!--lit-node 0--><h3 id="using_map_on_sparse_arrays" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#using_map_on_sparse_arrays">Using map() on sparse arrays</a></h3><!--/lit-part-->
+    <p>A sparse array remains sparse after <code>map()</code>. The indices of empty slots are still empty in the returned array, and the callback function won't be called on them.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>console.log(
+  [1, , 3].map((x, index) =&gt; {
+    console.log(`Visit ${index}`);
+    return x * 2;
+  }),
+);
+// Visit 0
+// Visit 2
+// [2, empty, 6]
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="calling_map_on_non-array_objects"
+  >
+    <!--lit-part mo6FDtpRYrI=--><!--lit-node 0--><h3 id="calling_map_on_non-array_objects" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#calling_map_on_non-array_objects">Calling map() on non-array objects</a></h3><!--/lit-part-->
+    <p>The <code>map()</code> method reads the <code>length</code> property of <code>this</code> and then accesses each property whose key is a nonnegative integer less than <code>length</code>.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const arrayLike = {
+  length: 3,
+  0: 2,
+  1: 3,
+  2: 4,
+  3: 5, // ignored by map() since length is 3
+};
+console.log(Array.prototype.map.call(arrayLike, (x) =&gt; x ** 2));
+// [ 4, 9, 16 ]
+</code></pre></div>
+<p>This example shows how to iterate through a collection of objects collected by <code>querySelectorAll()</code>, returning an array containing the values of all the selected <code>option</code> elements. Because <code>querySelectorAll()</code> returns a <code>NodeList</code>, which is an array-like object without the <code>map()</code> method, we use <code>Array.prototype.map.call()</code>, passing <code>elems</code> as the <code>this</code> value and the callback as the second argument.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>const elems = document.querySelectorAll("select option:checked");
+const values = Array.prototype.map.call(elems, ({ value }) =&gt; value);
+</code></pre></div>
+<p>You can also use <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from"><code>Array.from()</code></a> to transform <code>elems</code> to an array, and then access the <code>map()</code> method.</p>
+  </section><section
+    class="content-section"
+    aria-labelledby="specifications"
+  >
+    <!--lit-part s915xX5HiM4=--><!--lit-node 0--><h2 id="specifications" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#specifications">Specifications</a></h2><!--/lit-part-->
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">
+            Specification
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+              <td><a class="external" href="https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.map" rel="noopener" target="_blank"
+      >ECMAScript® 2027 Language Specification<?><br /># sec-array.prototype.map<?></a
+    ></td>
+            </tr>
+      </tbody>
+    </table>
+  </section><section
+      class="content-section"
+      aria-labelledby="browser_compatibility"
+    >
+      <!--lit-part y0+5SMr/T3s=--><!--lit-node 0--><h2 id="browser_compatibility" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#browser_compatibility">Browser compatibility</a></h2><!--/lit-part-->
+      <mdn-compat-table-lazy
+        
+        
+       locale="en-US" query="javascript.builtins.Array.map"><template shadowroot="open" shadowrootmode="open"><style>*,:after,:before{box-sizing:border-box}button,input,select,textarea{font:inherit}button{color:inherit;cursor:pointer}img{height:auto;max-width:100%}a{color:var(--color-link-normal)}[hidden]{display:none!important}#content{scroll-margin-block-start:var(--sticky-header-height)}</style><!--lit-part y6RVfKR7hws=--><p><!--lit-part hRoZS/r0nwc=--><noscript>Enable JavaScript to view this browser compatibility table.</noscript><!--/lit-part--></p><!--/lit-part--></template></mdn-compat-table-lazy>
+    </section><section
+    class="content-section"
+    aria-labelledby="see_also"
+  >
+    <!--lit-part p88DAUaBJzA=--><!--lit-node 0--><h2 id="see_also" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#see_also">See also</a></h2><!--/lit-part-->
+    <ul>
+<li><a href="https://core-js.io/docs/features/ecmascript/array" class="external" target="_blank" title="External link (opens in new tab)">Polyfill of <code>Array.prototype.map</code> in <code>core-js</code></a></li>
+<li><a href="https://www.npmjs.com/package/array.prototype.map" class="external" target="_blank" title="External link (opens in new tab)">es-shims polyfill of <code>Array.prototype.map</code></a></li>
+<li><a href="/en-US/docs/Web/JavaScript/Guide/Indexed_collections">Indexed collections</a> guide</li>
+<li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array"><code>Array</code></a></li>
+<li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach"><code>Array.prototype.forEach()</code></a></li>
+<li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from"><code>Array.from()</code></a></li>
+<li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/map"><code>TypedArray.prototype.map()</code></a></li>
+<li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map"><code>Map</code></a></li>
+</ul>
+  </section> 
+      <section
+        class="content-section article-footer"
+        aria-labelledby="feedback"
+      >
+        <div class="article-footer__inner">
+          <div class="article-footer__svg-container"><!--lit-part OWLzZqRMsCU=--><svg xmlns="http://www.w3.org/2000/svg" width="162" height="162" fill="none" viewBox="0 0 162 162"><mask id="b" fill="#fff"><path d="M97.203 47.04c8.113-7.886 18.004-13.871 28.906-17.492a78 78 0 0 1 33.969-3.39c11.443 1.39 22.401 5.295 32.024 11.411s17.656 14.28 23.476 23.86c5.819 9.579 9.269 20.318 10.083 31.385a69.85 69.85 0 0 1-5.387 32.44c-4.358 10.272-11.115 19.443-19.747 26.801-8.632 7.359-18.908 12.709-30.034 15.637l-6.17-21.698c7.666-2.017 14.746-5.703 20.694-10.773 5.948-5.071 10.603-11.389 13.606-18.467a48.14 48.14 0 0 0 3.712-22.352c-.561-7.625-2.938-15.025-6.948-21.625s-9.544-12.226-16.175-16.44-14.181-6.904-22.065-7.863a53.75 53.75 0 0 0-23.405 2.336c-7.513 2.495-14.327 6.62-19.918 12.053z"/></mask><path stroke="url(#a)" stroke-dasharray="6, 6" stroke-width="2" d="M97.203 47.04c8.113-7.886 18.004-13.871 28.906-17.492a78 78 0 0 1 33.969-3.39c11.443 1.39 22.401 5.295 32.024 11.411s17.656 14.28 23.476 23.86c5.819 9.579 9.269 20.318 10.083 31.385a69.85 69.85 0 0 1-5.387 32.44c-4.358 10.272-11.115 19.443-19.747 26.801-8.632 7.359-18.908 12.709-30.034 15.637l-6.17-21.698c7.666-2.017 14.746-5.703 20.694-10.773 5.948-5.071 10.603-11.389 13.606-18.467a48.14 48.14 0 0 0 3.712-22.352c-.561-7.625-2.938-15.025-6.948-21.625s-9.544-12.226-16.175-16.44-14.181-6.904-22.065-7.863a53.75 53.75 0 0 0-23.405 2.336c-7.513 2.495-14.327 6.62-19.918 12.053z" mask="url(#b)" style="stroke:url(#a)" transform="translate(-63.992 -25.587)"/><ellipse cx="8.066" cy="111.597" fill="currentColor" rx="53.677" ry="53.699" transform="matrix(.71707 -.697 .7243 .6895 0 0)"/><g clip-path="url(#c)" transform="translate(-63.992 -25.587)"><path fill="#9abff5" d="m144.256 137.379 32.906 12.434a4.41 4.41 0 0 1 2.559 5.667l-9.326 24.679a4.41 4.41 0 0 1-5.667 2.559l-8.226-3.108-2.332 6.17c-.466 1.233-.375 1.883-1.609 1.417l-2.253-.527c-.411-.155-.95-.594-1.206-1.161l-4.734-10.484-12.545-4.741a4.41 4.41 0 0 1-2.559-5.667l9.325-24.679a4.41 4.41 0 0 1 5.667-2.559m9.961 29.617 8.227 3.108 3.264-8.638-.498-6.768-4.113-1.555.548 7.258-4.319-1.632zm-12.339-4.663 8.226 3.108 3.264-8.637-.498-6.769-4.113-1.554.548 7.257-4.319-1.632z"/></g><g clip-path="url(#d)" transform="translate(-63.992 -25.587)"><path fill="#81b0f3" d="M135.35 60.136 86.67 41.654c-3.346-1.27-7.124.428-8.394 3.775L64.414 81.938c-1.27 3.347.428 7.125 3.774 8.395l12.17 4.62-3.465 9.128c-.693 1.826-1.432 2.457.394 3.15l3.014 1.625c.609.231 1.637.274 2.477-.104l15.53-6.983 18.56 7.047c3.346 1.27 7.124-.428 8.395-3.775l13.862-36.51c1.27-3.346-.428-7.124-3.775-8.395M95.261 83.207l-12.17-4.62 4.852-12.779 7.19-7.017 6.085 2.31-7.725 7.51 6.389 2.426zm18.255 6.93-12.17-4.62 4.852-12.778 7.189-7.017 6.085 2.31-7.725 7.51 6.39 2.426z"/></g><defs><clipPath id="c"><path fill="#fff" d="m198.638 146.586-65.056-24.583-24.583 65.057 65.056 24.582z"/></clipPath><clipPath id="d"><path fill="#fff" d="m66.438 14.055 96.242 36.54-36.54 96.243-96.243-36.54z"/></clipPath><linearGradient id="a" x1="97.203" x2="199.995" y1="47.04" y2="152.793" gradientUnits="userSpaceOnUse"><stop stop-color="#086dfc"/><stop offset=".246" stop-color="#2c81fa"/><stop offset=".516" stop-color="#5497f8"/><stop offset=".821" stop-color="#80b0f6"/><stop offset="1" stop-color="#9abff5"/></linearGradient></defs></svg><!--/lit-part--></div>
+          <h2 id="feedback">
+            Help improve MDN
+          </h2>
+          <mdn-content-feedback  locale="en-US"><template shadowroot="open" shadowrootmode="open"><style>.content-feedback{border:none;margin:0 0 .25rem;padding:0}.content-feedback>label{display:block;margin-bottom:.25rem}.content-feedback .thank-you{display:block;margin-bottom:calc(2.75rem + 2px)}.content-feedback mdn-button{flex:1;min-width:0}.content-feedback--buttons{display:inline-flex;gap:.75rem;margin:.25rem 0}.content-feedback--radios{align-items:center;display:flex;gap:.25rem;margin:.25rem 0}</style><!--lit-part wnhNI9MhleE=--><fieldset class="content-feedback">
+      <!--lit-part abqF9JTZmM8=--><label
+        ><!--lit-part-->Was this page helpful to you?<!--/lit-part-->
+      </label>
+      <div class="content-feedback--buttons">
+        <!--lit-node 3--><mdn-button
+          
+          
+          
+          
+          
+         data-vote="yes" variant="secondary" action="positive" defer-hydration><template shadowroot="open" shadowrootmode="open"><style>.button{align-items:center;background-color:initial;border:1px solid #0000;border-radius:.25rem;color:var(--color-text-primary);column-gap:.3125em;cursor:pointer;display:inline-flex;font-family:var(--font-family-text);font-size:.875em;font-weight:450;justify-content:center;line-height:var(--font-line-ui);margin:0;padding:.5em;-webkit-text-decoration:none;text-decoration:none;vertical-align:middle}.button[data-variant=primary]{--csstools-light-dark-toggle-33eaa513-0:var(--csstools-color-scheme--light) var(--color-black);color:var(--csstools-light-dark-toggle-33eaa513-0,var(--color-white));--csstools-light-dark-toggle-33eaa513-1:var(--csstools-color-scheme--light) var(--color-white);background-color:var(--csstools-light-dark-toggle-33eaa513-1,var(--color-black))}@supports (color:light-dark(red,red)){.button[data-variant=primary]{background-color:light-dark(var(--color-black),var(--color-white));color:light-dark(var(--color-white),var(--color-black))}}.button[data-variant=primary]:hover{--csstools-light-dark-toggle-33eaa513-2:var(--csstools-color-scheme--light) var(--color-gray-60);background-color:var(--csstools-light-dark-toggle-33eaa513-2,var(--color-gray-40))}@supports (color:light-dark(red,red)){.button[data-variant=primary]:hover{background-color:light-dark(var(--color-gray-40),var(--color-gray-60))}}.button[data-variant=primary][data-action=positive]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-3:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-3,var(--color-green-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]{background-color:light-dark(var(--color-green-50),var(--color-green-20))}}.button[data-variant=primary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-4:var(--csstools-color-scheme--light) var(--color-green-50);background-color:var(--csstools-light-dark-toggle-33eaa513-4,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]:hover{background-color:light-dark(var(--color-green-20),var(--color-green-50))}}.button[data-variant=primary][data-action=negative]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-5:var(--csstools-color-scheme--light) var(--color-red-20);background-color:var(--csstools-light-dark-toggle-33eaa513-5,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]{background-color:light-dark(var(--color-red-50),var(--color-red-20))}}.button[data-variant=primary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-6:var(--csstools-color-scheme--light) var(--color-red-50);background-color:var(--csstools-light-dark-toggle-33eaa513-6,var(--color-red-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]:hover{background-color:light-dark(var(--color-red-20),var(--color-red-50))}}.button[data-variant=secondary]{border-color:currentcolor}.button[data-variant=secondary]:hover{--csstools-light-dark-toggle-33eaa513-7:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-7,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=secondary]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=secondary][data-action=positive]{--csstools-light-dark-toggle-33eaa513-8:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-8,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=secondary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-9:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-9,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=secondary][data-action=negative]{--csstools-light-dark-toggle-33eaa513-10:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-10,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=secondary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-11:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-11,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-12:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-12,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[data-variant=plain]:hover{--csstools-light-dark-toggle-33eaa513-13:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-13,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=plain]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=plain][data-action=positive]{--csstools-light-dark-toggle-33eaa513-14:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-14,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=plain][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-15:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-15,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=plain][data-action=negative]{--csstools-light-dark-toggle-33eaa513-16:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-16,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=plain][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-17:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-17,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-18:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-18,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[aria-disabled=true],.button[disabled]{--csstools-light-dark-toggle-33eaa513-19:var(--csstools-color-scheme--light) var(--color-gray-60)!important;color:var(--csstools-light-dark-toggle-33eaa513-19,var(--color-gray-40))!important;cursor:not-allowed;--csstools-light-dark-toggle-33eaa513-20:var(--csstools-color-scheme--light) var(--color-gray-20)!important;background-color:var(--csstools-light-dark-toggle-33eaa513-20,var(--color-gray-80))!important;border-color:#0000}@supports (color:light-dark(red,red)){.button[aria-disabled=true],.button[disabled]{background-color:light-dark(var(--color-gray-80),var(--color-gray-20))!important;color:light-dark(var(--color-gray-40),var(--color-gray-60))!important}}.button .icon{display:flex}.button svg{height:1.25em;width:1.25em}.button .label{padding-block:.125em;padding-inline:.0625em}:host{display:inline-flex;vertical-align:middle}.button{box-sizing:border-box;height:100%;width:100%}</style><!--lit-part O1S+ZMb7umU=-->
+        <!--lit-node 0--><button
+          class="button"
+          aria-labelledby="label-ewwpdiava2n"
+          
+          
+          
+          
+          data-variant="secondary"
+          data-action="positive"
+          part="button"
+        >
+          <!--lit-part--><!--lit-part bRP2a5ux/uw=--><span class="icon" part="icon"><!--lit-part GjE5cW6UBoM=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M7 10v12m8-16.12L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88"/></svg><!--/lit-part--></span><!--/lit-part--><!--lit-part rI2hX8LXYZM=-->
+    <!--lit-node 0--><span id="label-ewwpdiava2n" class="label"  part="label"
+      ><!--lit-part Pz0gobCCM4E=--><slot></slot><!--/lit-part--></span
+    >
+  <!--/lit-part--><!--/lit-part-->
+        </button>
+      <!--/lit-part--></template>
+          <!--lit-part-->Yes<!--/lit-part-->
+        </mdn-button>
+        <!--lit-node 5--><mdn-button
+          
+          
+          
+          
+          
+         data-vote="no" variant="secondary" action="negative" defer-hydration><template shadowroot="open" shadowrootmode="open"><style>.button{align-items:center;background-color:initial;border:1px solid #0000;border-radius:.25rem;color:var(--color-text-primary);column-gap:.3125em;cursor:pointer;display:inline-flex;font-family:var(--font-family-text);font-size:.875em;font-weight:450;justify-content:center;line-height:var(--font-line-ui);margin:0;padding:.5em;-webkit-text-decoration:none;text-decoration:none;vertical-align:middle}.button[data-variant=primary]{--csstools-light-dark-toggle-33eaa513-0:var(--csstools-color-scheme--light) var(--color-black);color:var(--csstools-light-dark-toggle-33eaa513-0,var(--color-white));--csstools-light-dark-toggle-33eaa513-1:var(--csstools-color-scheme--light) var(--color-white);background-color:var(--csstools-light-dark-toggle-33eaa513-1,var(--color-black))}@supports (color:light-dark(red,red)){.button[data-variant=primary]{background-color:light-dark(var(--color-black),var(--color-white));color:light-dark(var(--color-white),var(--color-black))}}.button[data-variant=primary]:hover{--csstools-light-dark-toggle-33eaa513-2:var(--csstools-color-scheme--light) var(--color-gray-60);background-color:var(--csstools-light-dark-toggle-33eaa513-2,var(--color-gray-40))}@supports (color:light-dark(red,red)){.button[data-variant=primary]:hover{background-color:light-dark(var(--color-gray-40),var(--color-gray-60))}}.button[data-variant=primary][data-action=positive]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-3:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-3,var(--color-green-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]{background-color:light-dark(var(--color-green-50),var(--color-green-20))}}.button[data-variant=primary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-4:var(--csstools-color-scheme--light) var(--color-green-50);background-color:var(--csstools-light-dark-toggle-33eaa513-4,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]:hover{background-color:light-dark(var(--color-green-20),var(--color-green-50))}}.button[data-variant=primary][data-action=negative]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-5:var(--csstools-color-scheme--light) var(--color-red-20);background-color:var(--csstools-light-dark-toggle-33eaa513-5,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]{background-color:light-dark(var(--color-red-50),var(--color-red-20))}}.button[data-variant=primary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-6:var(--csstools-color-scheme--light) var(--color-red-50);background-color:var(--csstools-light-dark-toggle-33eaa513-6,var(--color-red-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]:hover{background-color:light-dark(var(--color-red-20),var(--color-red-50))}}.button[data-variant=secondary]{border-color:currentcolor}.button[data-variant=secondary]:hover{--csstools-light-dark-toggle-33eaa513-7:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-7,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=secondary]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=secondary][data-action=positive]{--csstools-light-dark-toggle-33eaa513-8:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-8,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=secondary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-9:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-9,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=secondary][data-action=negative]{--csstools-light-dark-toggle-33eaa513-10:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-10,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=secondary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-11:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-11,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-12:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-12,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[data-variant=plain]:hover{--csstools-light-dark-toggle-33eaa513-13:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-13,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=plain]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=plain][data-action=positive]{--csstools-light-dark-toggle-33eaa513-14:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-14,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=plain][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-15:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-15,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=plain][data-action=negative]{--csstools-light-dark-toggle-33eaa513-16:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-16,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=plain][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-17:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-17,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-18:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-18,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[aria-disabled=true],.button[disabled]{--csstools-light-dark-toggle-33eaa513-19:var(--csstools-color-scheme--light) var(--color-gray-60)!important;color:var(--csstools-light-dark-toggle-33eaa513-19,var(--color-gray-40))!important;cursor:not-allowed;--csstools-light-dark-toggle-33eaa513-20:var(--csstools-color-scheme--light) var(--color-gray-20)!important;background-color:var(--csstools-light-dark-toggle-33eaa513-20,var(--color-gray-80))!important;border-color:#0000}@supports (color:light-dark(red,red)){.button[aria-disabled=true],.button[disabled]{background-color:light-dark(var(--color-gray-80),var(--color-gray-20))!important;color:light-dark(var(--color-gray-40),var(--color-gray-60))!important}}.button .icon{display:flex}.button svg{height:1.25em;width:1.25em}.button .label{padding-block:.125em;padding-inline:.0625em}:host{display:inline-flex;vertical-align:middle}.button{box-sizing:border-box;height:100%;width:100%}</style><!--lit-part O1S+ZMb7umU=-->
+        <!--lit-node 0--><button
+          class="button"
+          aria-labelledby="label-e1r193yeq5g"
+          
+          
+          
+          
+          data-variant="secondary"
+          data-action="negative"
+          part="button"
+        >
+          <!--lit-part--><!--lit-part bRP2a5ux/uw=--><span class="icon" part="icon"><!--lit-part IggRHjbPj/Q=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88"/></svg><!--/lit-part--></span><!--/lit-part--><!--lit-part rI2hX8LXYZM=-->
+    <!--lit-node 0--><span id="label-e1r193yeq5g" class="label"  part="label"
+      ><!--lit-part Pz0gobCCM4E=--><slot></slot><!--/lit-part--></span
+    >
+  <!--/lit-part--><!--/lit-part-->
+        </button>
+      <!--/lit-part--></template>
+          <!--lit-part-->No<!--/lit-part-->
+        </mdn-button>
+      </div><!--/lit-part-->
+    </fieldset><!--/lit-part--></template></mdn-content-feedback>
+          <a
+    class="article-footer__contribute"
+    href="/en-US/docs/MDN/Community/Getting_started"
+    >Learn how to contribute</a
+  > <p class="article-footer__last-modified">
+    This page was last modified on <time datetime="2026-10-26T04:56:01.000Z">Oct 26, 2026</time> by <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map/contributors.txt">MDN contributors</a>.
+  </p> <div class="article-footer__links">
+    <a
+    class="external"
+    href="https://github.com/mdn/content/blob/main/files/en-us/web/javascript/reference/global_objects/array/map/index.md?plain=1"
+    title="Folder: en-us/web/javascript/reference/global_objects/array/map (Opens in a new tab)"
+    target="_blank"
+    rel="noopener"
+    >View this page on GitHub</a
+  > • <a
+    class="external"
+    href="https://github.com/mdn/content/issues/new?template=page-report.yml&amp;mdn-url=https%3A%2F%2Fdeveloper.mozilla.org%2Fen-US%2Fdocs%2FWeb%2FJavaScript%2FReference%2FGlobal_Objects%2FArray%2Fmap&amp;metadata=%3C%21--+Do+not+make+changes+below+this+line+--%3E%0A%3Cdetails%3E%0A%3Csummary%3EPage+report+details%3C%2Fsummary%3E%0A%0A*+Folder%3A+%60en-us%2Fweb%2Fjavascript%2Freference%2Fglobal_objects%2Farray%2Fmap%60%0A*+MDN+URL%3A+https%3A%2F%2Fdeveloper.mozilla.org%2Fen-US%2Fdocs%2FWeb%2FJavaScript%2FReference%2FGlobal_Objects%2FArray%2Fmap%0A*+GitHub+URL%3A+https%3A%2F%2Fgithub.com%2Fmdn%2Fcontent%2Fblob%2Fmain%2Ffiles%2Fen-us%2Fweb%2Fjavascript%2Freference%2Fglobal_objects%2Farray%2Fmap%2Findex.md%0A*+Last+commit%3A+https%3A%2F%2Fgithub.com%2Fmdn%2Fcontent%2Fcommit%2F9de14917b151f7db567a65d44c2685cea754b12a%0A*+Document+last+modified%3A+2026-10-26T04%3A56%3A01.000Z%0A%0A%3C%2Fdetails%3E"
+    title="This will take you to GitHub to file a new issue."
+    target="_blank"
+    rel="noopener"
+    >Report a problem with this content</a
+  >
+  </div>
+        </div>
+      </section>
+    
+          </div>
+        </main>
+        <aside class="layout__left-sidebar" id="main-sidebar">
+          <nav class="left-sidebar">
+      <div class="left-sidebar__header">
+        <mdn-sidebar-filter><template shadowroot="open" shadowrootmode="open"><style>.visually-hidden{border:0!important;clip-path:inset(50%)!important;height:1px!important;margin:-1px!important;overflow:hidden!important;padding:0!important;position:absolute!important;white-space:nowrap!important;width:1px!important}*,:after,:before{box-sizing:border-box}button,input,select,textarea{font:inherit}button{color:inherit;cursor:pointer}img{height:auto;max-width:100%}a{color:var(--color-link-normal)}[hidden]{display:none!important}#content{scroll-margin-block-start:var(--sticky-header-height)}:host{align-items:center;display:grid;grid-template-areas:"icon input button";grid-template-columns:2.2rem 1fr min-content}.icon{background-color:var(--color-text-secondary);content:"";grid-area:icon;height:1.25rem;justify-self:center;margin-left:.4rem;mask-image:url(/static/ssr/filter.b77a4ccbfb57e2ef.svg);mask-size:cover;width:1.25rem}.input{background-color:initial;border:1px solid var(--color-border-primary);border-radius:var(--radius-full);grid-area:1/1/-1/-1;margin:0;padding:.3rem 4.2rem .3rem 2.2rem;width:100%}.input::placeholder{color:var(--color-text-secondary)}.input:focus{border-color:#0000}.counter{background-color:var(--color-background-yellow);border-radius:var(--radius-normal);font-size:var(--font-size-small);grid-area:input;justify-self:end;line-height:var(--font-line-ui);padding:.25rem;white-space:nowrap}.button{grid-area:button}.button::part(button){border-radius:50%}.button::part(button):hover{background-color:initial}:placeholder-shown~.button{visibility:hidden}</style><!--lit-part VUPWU8nR4ho=-->
+      <label class="icon" for="input">
+        <span class="visually-hidden"
+          ><!--lit-part-->Filter sidebar<!--/lit-part--></span
+        >
+      </label>
+      <!--lit-node 3--><input
+        id="input"
+        autocomplete="off"
+        class="input"
+        type="text"
+        placeholder="Filter"
+        value=""
+        
+        
+      />
+      <!--lit-part--><!--/lit-part-->
+      <!--lit-node 5--><mdn-button
+        
+        
+        
+        
+        
+         class="button" variant="plain" icon-only defer-hydration><template shadowroot="open" shadowrootmode="open"><style>.button{align-items:center;background-color:initial;border:1px solid #0000;border-radius:.25rem;color:var(--color-text-primary);column-gap:.3125em;cursor:pointer;display:inline-flex;font-family:var(--font-family-text);font-size:.875em;font-weight:450;justify-content:center;line-height:var(--font-line-ui);margin:0;padding:.5em;-webkit-text-decoration:none;text-decoration:none;vertical-align:middle}.button[data-variant=primary]{--csstools-light-dark-toggle-33eaa513-0:var(--csstools-color-scheme--light) var(--color-black);color:var(--csstools-light-dark-toggle-33eaa513-0,var(--color-white));--csstools-light-dark-toggle-33eaa513-1:var(--csstools-color-scheme--light) var(--color-white);background-color:var(--csstools-light-dark-toggle-33eaa513-1,var(--color-black))}@supports (color:light-dark(red,red)){.button[data-variant=primary]{background-color:light-dark(var(--color-black),var(--color-white));color:light-dark(var(--color-white),var(--color-black))}}.button[data-variant=primary]:hover{--csstools-light-dark-toggle-33eaa513-2:var(--csstools-color-scheme--light) var(--color-gray-60);background-color:var(--csstools-light-dark-toggle-33eaa513-2,var(--color-gray-40))}@supports (color:light-dark(red,red)){.button[data-variant=primary]:hover{background-color:light-dark(var(--color-gray-40),var(--color-gray-60))}}.button[data-variant=primary][data-action=positive]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-3:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-3,var(--color-green-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]{background-color:light-dark(var(--color-green-50),var(--color-green-20))}}.button[data-variant=primary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-4:var(--csstools-color-scheme--light) var(--color-green-50);background-color:var(--csstools-light-dark-toggle-33eaa513-4,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=positive]:hover{background-color:light-dark(var(--color-green-20),var(--color-green-50))}}.button[data-variant=primary][data-action=negative]{color:var(--color-white);--csstools-light-dark-toggle-33eaa513-5:var(--csstools-color-scheme--light) var(--color-red-20);background-color:var(--csstools-light-dark-toggle-33eaa513-5,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]{background-color:light-dark(var(--color-red-50),var(--color-red-20))}}.button[data-variant=primary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-6:var(--csstools-color-scheme--light) var(--color-red-50);background-color:var(--csstools-light-dark-toggle-33eaa513-6,var(--color-red-20))}@supports (color:light-dark(red,red)){.button[data-variant=primary][data-action=negative]:hover{background-color:light-dark(var(--color-red-20),var(--color-red-50))}}.button[data-variant=secondary]{border-color:currentcolor}.button[data-variant=secondary]:hover{--csstools-light-dark-toggle-33eaa513-7:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-7,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=secondary]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=secondary][data-action=positive]{--csstools-light-dark-toggle-33eaa513-8:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-8,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=secondary][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-9:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-9,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=secondary][data-action=negative]{--csstools-light-dark-toggle-33eaa513-10:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-10,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=secondary][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-11:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-11,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-12:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-12,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=secondary][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[data-variant=plain]:hover{--csstools-light-dark-toggle-33eaa513-13:var(--csstools-color-scheme--light) var(--color-gray-40);background-color:var(--csstools-light-dark-toggle-33eaa513-13,var(--color-gray-80))}@supports (color:light-dark(red,red)){.button[data-variant=plain]:hover{background-color:light-dark(var(--color-gray-80),var(--color-gray-40))}}.button[data-variant=plain][data-action=positive]{--csstools-light-dark-toggle-33eaa513-14:var(--csstools-color-scheme--light) var(--color-green-80);color:var(--csstools-light-dark-toggle-33eaa513-14,var(--color-green-20))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]{color:light-dark(var(--color-green-20),var(--color-green-80))}}.button[data-variant=plain][data-action=positive]:hover{--csstools-light-dark-toggle-33eaa513-15:var(--csstools-color-scheme--light) var(--color-green-20);background-color:var(--csstools-light-dark-toggle-33eaa513-15,var(--color-green-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=positive]:hover{background-color:light-dark(var(--color-green-90),var(--color-green-20))}}.button[data-variant=plain][data-action=negative]{--csstools-light-dark-toggle-33eaa513-16:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-16,var(--color-red-50))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]{color:light-dark(var(--color-red-50),var(--color-red-80))}}.button[data-variant=plain][data-action=negative]:hover{--csstools-light-dark-toggle-33eaa513-17:var(--csstools-color-scheme--light) var(--color-red-80);color:var(--csstools-light-dark-toggle-33eaa513-17,var(--color-red-20));--csstools-light-dark-toggle-33eaa513-18:var(--csstools-color-scheme--light) var(--color-red-10);background-color:var(--csstools-light-dark-toggle-33eaa513-18,var(--color-red-90))}@supports (color:light-dark(red,red)){.button[data-variant=plain][data-action=negative]:hover{background-color:light-dark(var(--color-red-90),var(--color-red-10));color:light-dark(var(--color-red-20),var(--color-red-80))}}.button[aria-disabled=true],.button[disabled]{--csstools-light-dark-toggle-33eaa513-19:var(--csstools-color-scheme--light) var(--color-gray-60)!important;color:var(--csstools-light-dark-toggle-33eaa513-19,var(--color-gray-40))!important;cursor:not-allowed;--csstools-light-dark-toggle-33eaa513-20:var(--csstools-color-scheme--light) var(--color-gray-20)!important;background-color:var(--csstools-light-dark-toggle-33eaa513-20,var(--color-gray-80))!important;border-color:#0000}@supports (color:light-dark(red,red)){.button[aria-disabled=true],.button[disabled]{background-color:light-dark(var(--color-gray-80),var(--color-gray-20))!important;color:light-dark(var(--color-gray-40),var(--color-gray-60))!important}}.button .icon{display:flex}.button svg{height:1.25em;width:1.25em}.button .label{padding-block:.125em;padding-inline:.0625em}:host{display:inline-flex;vertical-align:middle}.button{box-sizing:border-box;height:100%;width:100%}</style><!--lit-part O1S+ZMb7umU=-->
+        <!--lit-node 0--><button
+          class="button"
+          aria-labelledby="label-2auebdmhf7r"
+          
+          
+          
+          
+          data-variant="plain"
+          
+          part="button"
+        >
+          <!--lit-part--><!--lit-part bRP2a5ux/uw=--><span class="icon" part="icon"><!--lit-part 67EVkvpPdvk=--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg><!--/lit-part--></span><!--/lit-part--><!--lit-part rI2hX8LXYZM=-->
+    <!--lit-node 0--><span id="label-2auebdmhf7r" class="label" hidden part="label"
+      ><!--lit-part Pz0gobCCM4E=--><slot></slot><!--/lit-part--></span
+    >
+  <!--/lit-part--><!--/lit-part-->
+        </button>
+      <!--/lit-part--></template><!--lit-part-->Clear filter input<!--/lit-part--></mdn-button
+      >
+    <!--/lit-part--></template></mdn-sidebar-filter>
+      </div>
+      <div class="left-sidebar__content"><ol><li class="section"><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects">Standard built-in objects</a></li><li class="section"><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array"><code>Array</code></a></li><li><details open=""><summary><span>Constructor</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Array"><code>Array()</code></a></li></ol></details></li><li><details open=""><summary><span>Static methods</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from"><code>from()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/fromAsync"><code>fromAsync()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray"><code>isArray()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/of"><code>of()</code></a></li></ol></details></li><li><details open=""><summary><span>Static properties</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Symbol.species"><code>[Symbol<wbr>.species]</code></a></li></ol></details></li><li><details open=""><summary><span>Instance methods</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/at"><code>at()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/concat"><code>concat()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/copyWithin"><code>copyWithin()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/entries"><code>entries()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/every"><code>every()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/fill"><code>fill()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter"><code>filter()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find"><code>find()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findIndex"><code>findIndex()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLast"><code>findLast()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLastIndex"><code>findLastIndex()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flat"><code>flat()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap"><code>flatMap()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach"><code>forEach()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/includes"><code>includes()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf"><code>indexOf()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join"><code>join()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/keys"><code>keys()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/lastIndexOf"><code>lastIndexOf()</code></a></li><li><em><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map" aria-current="page"><code>map()</code></a></em></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/pop"><code>pop()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push"><code>push()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce"><code>reduce()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduceRight"><code>reduceRight()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse"><code>reverse()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/shift"><code>shift()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/slice"><code>slice()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/some"><code>some()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort"><code>sort()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/splice"><code>splice()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toLocaleString"><code>toLocaleString()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toReversed"><code>toReversed()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toSorted"><code>toSorted()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toSpliced"><code>toSpliced()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toString"><code>toString()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/unshift"><code>unshift()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values"><code>values()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/with"><code>with()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Symbol.iterator"><code>[Symbol<wbr>.iterator]()</code></a></li></ol></details></li><li><details open=""><summary><span>Instance properties</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/length"><code>length</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Symbol.unscopables"><code>[Symbol<wbr>.unscopables]</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li></ol></details></li><li class="section"><span>Inheritance</span></li><li class="section"><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object"><code>Object/Function</code></a></li><li><details><summary><span>Static methods</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/apply"><code>apply()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind"><code>bind()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call"><code>call()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/toString"><code>toString()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/Symbol.hasInstance"><code>[Symbol<wbr>.hasInstance]()</code></a></li></ol></details></li><li><details><summary><span>Static properties</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/displayName"><code>displayName</code><span role="img" class="icon icon-nonstandard" title="Non-standard. Check cross-browser support before using." aria-label="Non-standard"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/length"><code>length</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name"><code>name</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/prototype"><code>prototype</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/arguments"><code>arguments</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span><span role="img" class="icon icon-nonstandard" title="Non-standard. Check cross-browser support before using." aria-label="Non-standard"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/caller"><code>caller</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span><span role="img" class="icon icon-nonstandard" title="Non-standard. Check cross-browser support before using." aria-label="Non-standard"></span></a></li></ol></details></li><li><details><summary><span>Instance methods</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/__defineGetter__"><code>__defineGetter__()</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/__defineSetter__"><code>__defineSetter__()</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/__lookupGetter__"><code>__lookupGetter__()</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/__lookupSetter__"><code>__lookupSetter__()</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwnProperty"><code>hasOwnProperty()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/isPrototypeOf"><code>isPrototypeOf()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/propertyIsEnumerable"><code>propertyIsEnumerable()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toLocaleString"><code>toLocaleString()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toString"><code>toString()</code></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/valueOf"><code>valueOf()</code></a></li></ol></details></li><li><details><summary><span>Instance properties</span></summary><ol><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/proto"><code>__proto__</code><span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li><li><a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor"><code>constructor</code></a></li></ol></details></li></ol></div>
+    </nav>
+        </aside>
+      </div>
+    </div>
+        <div class="page-layout__footer">
+      <mdn-placement-bottom></mdn-placement-bottom>
+      <footer class="footer">
+        <div class="footer__mdn">
+          <div class="footer__intro">
+            <a
+              class="footer__logo"
+              href="/"
+              aria-label="MDN logo"
+              ><!--lit-part anjj6IBmI8g=--><svg xmlns="http://www.w3.org/2000/svg" width="83" height="24" viewBox="0 0 83 24"><title>MDN</title><path d="M9.4 0 2.81 21.17H.12L6.69 0zm2.38 0v21.17H9.4V0h2.4Zm9.27 0-6.56 21.17H11.8L18.36 0zm2.39 0v21.17h-2.4V0zm22.11 16.83h-3.93v-1.27h.87v-3.63c0-.85-.16-1.45-.48-1.82a1.65 1.65 0 0 0-1.3-.52c-.74 0-1.3.25-1.66.78a3 3 0 0 0-.58 1.58v3.59h1.38v1.26h-3.93v-1.26h.87v-3.6c0-.88-.16-1.48-.48-1.83a1.7 1.7 0 0 0-1.29-.52 1.93 1.93 0 0 0-1.65.75 2.85 2.85 0 0 0-.58 1.6v3.62h1.59v1.27h-4.64v-1.27h1.37V9.75h-1.4V8.46h3.08v1.47c.28-.48.62-.87 1.08-1.2a3 3 0 0 1 1.68-.45c.67 0 1.22.16 1.73.48.5.32.85.8 1.03 1.47.25-.57.62-1.03 1.13-1.4.5-.37 1.1-.55 1.81-.55.8 0 1.5.25 2.05.75.55.51.85 1.3.85 2.35v4.18h1.4zm9.77 0H52.3v-1.66c-.27.51-.66.95-1.13 1.29-.56.4-1.23.59-1.9.55-1.11 0-2-.37-2.67-1.12a4.4 4.4 0 0 1-1-3.06c0-1.15.3-2.2.93-3.15.6-.94 1.58-1.43 2.94-1.43s2.25.5 2.83 1.5V5.22h-2V3.93h3.63v11.63h1.38v1.27Zm-3.06-3.86v-1.02a2.28 2.28 0 0 0-.73-1.67 2.4 2.4 0 0 0-1.66-.65 2.18 2.18 0 0 0-1.88.9 3.63 3.63 0 0 0-.65 2.2c0 .95.23 1.68.7 2.19.45.5 1.03.76 1.7.76.73 0 1.33-.3 1.79-.88.48-.6.71-1.21.73-1.83m14.14 3.86h-4.43v-1.27h1.37v-3.63c0-.85-.16-1.45-.5-1.82a1.68 1.68 0 0 0-1.31-.52c-.71 0-1.29.23-1.7.69a2.52 2.52 0 0 0-.67 1.6v3.66h1.38v1.26H56.1v-1.26h1.38v-5.8h-1.42V8.47h3.12V9.9c.6-1.06 1.57-1.6 2.92-1.6.83 0 1.54.26 2.12.77.57.5.85 1.28.85 2.34v4.19h1.38v1.24h-.05Zm1.31 5.15H83V24H67.71z"/></svg><!--/lit-part--></a
+            >
+            <p>
+              Your blueprint for a better internet.
+            </p>
+          </div>
+
+          <ul class="footer__socials">
+            
+                <li>
+                  <a
+                    href="https://github.com/mdn/"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="MDN on GitHub"
+                    data-icon="github"
+                    data-glean-id="footer: social -&gt; github"
+                  ></a>
+                </li>
+              
+                <li>
+                  <a
+                    href="https://bsky.app/profile/developer.mozilla.org"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="MDN on Bluesky"
+                    data-icon="bluesky"
+                    data-glean-id="footer: social -&gt; bluesky"
+                  ></a>
+                </li>
+              
+                <li>
+                  <a
+                    href="https://x.com/mozdevnet"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="MDN on X"
+                    data-icon="x"
+                    data-glean-id="footer: social -&gt; x"
+                  ></a>
+                </li>
+              
+                <li>
+                  <a
+                    href="https://mastodon.social/@mdn"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="MDN on Mastodon"
+                    data-icon="mastodon"
+                    data-glean-id="footer: social -&gt; mastodon"
+                  ></a>
+                </li>
+              
+                <li>
+                  <a
+                    href="/en-US/blog/rss.xml"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="MDN blog RSS feed"
+                    data-icon="rss"
+                    data-glean-id="footer: social -&gt; rss"
+                  ></a>
+                </li>
+              
+          </ul>
+
+          
+              <dl class="footer__links">
+                <dt>MDN</dt>
+                <dd>
+                  <ul>
+                    
+                        <li>
+                          <a
+                            href="/en-US/about"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/about"
+                          >
+                            About
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/blog/"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/blog/"
+                          >
+                            Blog
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="https://www.mozilla.org/en-US/careers/listings/"
+                            class="external"
+                            target="_blank"
+                            rel="noopener"
+                            data-glean-id="footer: link -&gt; https://www.mozilla.org/en-US/careers/listings/"
+                          >
+                            Mozilla careers
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/advertising"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/advertising"
+                          >
+                            Advertise with us
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/plus"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/plus"
+                          >
+                            MDN Plus
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="https://support.mozilla.org/products/mdn-plus"
+                            class="external"
+                            target="_blank"
+                            rel="noopener"
+                            data-glean-id="footer: link -&gt; https://support.mozilla.org/products/mdn-plus"
+                          >
+                            Product help
+                          </a>
+                        </li>
+                      
+                  </ul>
+                </dd>
+              </dl>
+            
+              <dl class="footer__links">
+                <dt>Contribute</dt>
+                <dd>
+                  <ul>
+                    
+                        <li>
+                          <a
+                            href="/en-US/community"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/community"
+                          >
+                            MDN Community
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/docs/MDN/Community"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/MDN/Community"
+                          >
+                            Community resources
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/docs/MDN/Writing_guidelines"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/MDN/Writing_guidelines"
+                          >
+                            Writing guidelines
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/discord"
+                            class="external"
+                            target="_blank"
+                            rel="noopener"
+                            data-glean-id="footer: link -&gt; /discord"
+                          >
+                            MDN Discord
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="https://github.com/mdn"
+                            class="external"
+                            target="_blank"
+                            rel="noopener"
+                            data-glean-id="footer: link -&gt; https://github.com/mdn"
+                          >
+                            MDN on GitHub
+                          </a>
+                        </li>
+                      
+                  </ul>
+                </dd>
+              </dl>
+            
+              <dl class="footer__links">
+                <dt>Developers</dt>
+                <dd>
+                  <ul>
+                    
+                        <li>
+                          <a
+                            href="/en-US/docs/Web"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/Web"
+                          >
+                            Web technologies
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/docs/Learn_web_development"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/Learn_web_development"
+                          >
+                            Learn web development
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/docs/MDN/Guides"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/MDN/Guides"
+                          >
+                            Guides
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/docs/MDN/Tutorials"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/MDN/Tutorials"
+                          >
+                            Tutorials
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="/en-US/docs/Glossary"
+                            class=""
+                            target=""
+                            rel=""
+                            data-glean-id="footer: link -&gt; /en-US/docs/Glossary"
+                          >
+                            Glossary
+                          </a>
+                        </li>
+                      
+                        <li>
+                          <a
+                            href="https://hacks.mozilla.org/"
+                            class="external"
+                            target="_blank"
+                            rel="noopener"
+                            data-glean-id="footer: link -&gt; https://hacks.mozilla.org/"
+                          >
+                            Hacks blog
+                          </a>
+                        </li>
+                      
+                  </ul>
+                </dd>
+              </dl>
+            
+        </div>
+
+        <div class="footer__mozilla">
+          <a
+            class="footer__logo"
+            href="https://www.mozilla.org/"
+            aria-label="Mozilla logo"
+            ><!--lit-part lm0Fgmo9xYQ=--><svg xmlns="http://www.w3.org/2000/svg" width="128" height="30" viewBox="0 0 256 60"><title>Mozilla</title><path d="m13.32 22.1 5.1 24.3h2.1l5.1-24.3H39.3v37.34h-7.26V28.46h-2.1l-6.96 30.98h-7.02L9.02 28.46h-2.1v31H-.35V22.1h13.66Zm45.12 8.74c8.73 0 13.8 5.15 13.8 14.57S67.14 60 58.44 60c-8.73 0-13.8-5.17-13.8-14.59 0-9.43 5.07-14.57 13.8-14.57m0 23.34c4.1 0 6.16-2.1 6.16-6.73v-4.12c0-4.62-2.06-6.73-6.16-6.73s-6.15 2.1-6.15 6.73v4.12c0 4.63 2.05 6.73 6.15 6.73m17.68-.14 14.82-17.26H76.32v-5.41h23.31v5.4L84.84 54.05h15.03v5.4H76.13v-5.41Zm28.07-22.67h10.7v28.07h-7.25V36.77h-3.48v-5.4zm3.44-9.27h7.26v5.4h-7.25v-5.4Zm12.62 0h10.72v37.34h-7.24V27.5h-3.48zm16.08 0h10.7v37.34h-7.25V27.5h-3.48v-5.4zm27.8 8.74c4.24 0 7.08 2.05 7.87 5.63h2.1v-5.1h8.88v5.4h-3.47v17.28h3.47v5.4h-4.25c-3 0-4.63-1.63-4.63-4.62v-.48H172c-.78 3.58-3.63 5.63-7.88 5.63-6.68 0-11.4-5.59-11.4-14.58 0-9 4.72-14.55 11.4-14.55m2.2 23.34c4.1 0 5.93-2.1 5.93-6.73v-4.12c0-4.62-1.82-6.73-5.94-6.73-3.99 0-5.92 2.1-5.92 6.73v4.13c0 4.62 1.92 6.72 5.93 6.72m46.28 5.27h-7.26V0h7.26zm6.3-28.41h30.8v-2.1l-20.4-7.32v-5.88l20.4-7.33v-2.1h-24.27V0h30.79v12l-16.62 5.63v2.11l16.61 5.64v12H218.9zm0-24.73h6.5v6.52h-6.5z"/></svg><!--/lit-part--></a
+          >
+          <ul>
+            
+                <li>
+                  <a
+                    href="https://www.mozilla.org/privacy/websites/"
+                    class="external"
+                    data-glean-id="footer: mozilla -&gt; https://www.mozilla.org/privacy/websites/"
+                    >Website Privacy Notice</a
+                  >
+                </li>
+              
+                <li>
+                  <a
+                    href="https://www.mozilla.org/en-US/privacy/websites/data-preferences/"
+                    class="external"
+                    data-glean-id="footer: mozilla -&gt; https://www.mozilla.org/en-US/privacy/websites/data-preferences/"
+                    >Telemetry Settings</a
+                  >
+                </li>
+              
+                <li>
+                  <a
+                    href="https://www.mozilla.org/about/legal/terms/mozilla"
+                    class="external"
+                    data-glean-id="footer: mozilla -&gt; https://www.mozilla.org/about/legal/terms/mozilla"
+                    >Legal</a
+                  >
+                </li>
+              
+                <li>
+                  <a
+                    href="https://www.mozilla.org/about/governance/policies/participation/"
+                    class="external"
+                    data-glean-id="footer: mozilla -&gt; https://www.mozilla.org/about/governance/policies/participation/"
+                    >Community Participation Guidelines</a
+                  >
+                </li>
+              
+          </ul>
+          <p>
+            Portions of this content are ©1998–2026 by individual mozilla.org contributors. Content available under <a href="/docs/MDN/Writing_guidelines/Attrib_copyright_license">a Creative Commons license</a>.
+          </p>
+        </div>
+      </footer>
+    </div>
+      </body>
+    
+      </html>
+    

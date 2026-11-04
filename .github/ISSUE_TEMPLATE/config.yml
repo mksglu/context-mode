@@ -1,5 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Open a PR instead
-    url: https://github.com/mksglu/context-mode/blob/main/CONTRIBUTING.md
-    about: PRs with TDD (red-green-refactor) are strongly preferred over issues. See CONTRIBUTING.md.
+  - name: Security vulnerability
+    url: https://github.com/mksglu/context-mode/security/advisories/new
+    about: Report security issues privately.
+  - name: Doctor checks and fixes
+    url: https://contextmode.ai/docs/engine/doctor?utm_source=github&utm_medium=issue_template&utm_content=config#checks
+    about: What each ctx_doctor row means and the command that fixes it.
+  - name: Discord
+    url: https://discord.gg/DCN9jUgN5v
+    about: Ask a question and talk with other users.
+  - name: Install guide
+    url: https://github.com/mksglu/context-mode/blob/main/README.md#install
+    about: Install and setup steps.

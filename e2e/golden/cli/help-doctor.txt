@@ -1,0 +1,26 @@
+Usage: context-mode doctor [options]
+
+Check each agent: config entry, old context-mode entries, MCP handshake, one hook call. Changes nothing.
+On a TTY, a failed agent gets one question: fix now (runs context-mode setup for that agent).
+
+Options:
+  --agents <ids>     Only these agents, comma-separated (ids: context-mode setup --list)
+  -y, --yes          Do not ask; apply
+  --no-input         Never prompt; exit 2 if an answer is needed
+  --json             Write only JSON to stdout
+  -q, --quiet        Results only; no progress lines
+  --verbose          Show every check
+  --debug            Print the full debug report on failure
+  --no-color         No colour (also NO_COLOR, TERM=dumb, or no TTY)
+  -h, --help         Show this help
+
+Exit codes:
+  0    success
+  1    a check or step failed
+  2    usage error (unknown command, option or agent; an answer is needed but there is no TTY)
+  130  stopped with Ctrl-C (the agent in progress is rolled back)
+
+Examples:
+  context-mode doctor
+  context-mode doctor --agents codex --json
+  context-mode doctor --no-input

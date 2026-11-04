@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "[<ts>] decision-row decision: ship BM25+RRF ranking for ctx_search, no MMR step, k=60.\n[<ts>] index #1 Indexed 1 source(s), 1 chunk(s) from s1. Label: decision-row\n[<ts>] errorfix-row errorfix: ENOTFOUND on fetch now returns a one-line cause, no raw stack.\n[<ts>] index #2 Indexed 1 source(s), 1 chunk(s) from s2. Label: errorfix-row\n[<ts>] timeline-row timeline: sort merges content, session and auto-memory rows oldest first.\n[<ts>] index #3 Indexed 1 source(s), 1 chunk(s) from s3. Label: timeline-row\n[<ts>] cmd #4 Query \"decision\":\n[<ts>] errorfix-row-2 errorfix: ValidationError on negative offset is a zod isError, never a thrown exception.\n[<ts>] index #5 Indexed 1 source(s), 1 chunk(s) from s4. Label: errorfix-row-2\n[<ts>] decision-row-2 decision: index.ts owns chunking, search.ts owns ranking, no cross-import.\n[<ts>] index #6 Indexed 1 source(s), 1 chunk(s) from s5. Label: decision-row-2\n[<ts>] timeline-row-2 timeline: after cursor drops rows at or before the given epoch-ms timestamp.\n[<ts>] index #7 Indexed 1 source(s), 1 chunk(s) from s6. Label: timeline-row-2\n[<ts>] cmd #8 Query \"errorfix\":\n[<ts>] timeline-row-3 timeline cmd #1 ran first\n[<ts>] index #9 Indexed 1 source(s), 1 chunk(s) from s7. Label: timeline-row-3\n[<ts>] timeline-row-4 timeline cmd #2 ran second\n[<ts>] index #10 Indexed 1 source(s), 1 chunk(s) from s8. Label: timeline-row-4"
+    }
+  ],
+  "isError": false
+}

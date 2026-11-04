@@ -1,0 +1,31 @@
+{
+  "id": "session-03",
+  "title": "report export: paginator fix",
+  "facts": [
+    {
+      "kind": "option",
+      "value": "Export reports as newline-delimited JSON, not CSV."
+    },
+    {
+      "kind": "path",
+      "value": "services/reports/export/paginate.ts"
+    },
+    {
+      "kind": "errorfix",
+      "value": "Fix for 'TypeError: Cannot read properties of undefined (reading \"rows\")' in the report export. Root cause: the paginator returned undefined instead of an empty page when the last page was exactly full, because the loop checked for a short page to stop and a full last page made it request one page past the end. The API answers that extra request with HTTP 204 and no body, and the parser turned the empty body into undefined. Fix, step 1: stop the loop when the response carries no next cursor, not when the page is short. Step 2: treat HTTP 204 as an empty page with rows set to an empty array. Step 3: add a test with exactly 2 full pages and one with 0 rows. Step 4: keep the page size fixed in the test so the edge case stays covered. The cursor field the API really uses is named next_page_token, not cursor; the old code read the wrong field, so the stop check never fired."
+    }
+  ],
+  "turns": [
+    "Which format should the report export write? Options: CSV, one JSON array, or newline-delimited JSON. Decision: Export reports as newline-delimited JSON, not CSV.",
+    "The paging code lives in services/reports/export/paginate.ts.",
+    "Export crashed on large reports. Here is the cause and the fix: Fix for 'TypeError: Cannot read properties of undefined (reading \"rows\")' in the report export. Root cause: the paginator returned undefined instead of an empty page when the last page was exactly full, because the loop checked for a short page to stop and a full last page made it request one page past the end. The API answers that extra request with HTTP 204 and no body, and the parser turned the empty body into undefined. Fix, step 1: stop the loop when the response carries no next cursor, not when the page is short. Step 2: treat HTTP 204 as an empty page with rows set to an empty array. Step 3: add a test with exactly 2 full pages and one with 0 rows. Step 4: keep the page size fixed in the test so the edge case stays covered. The cursor field the API really uses is named next_page_token, not cursor; the old code read the wrong field, so the stop check never fired.",
+    "The export works now. Please tidy the log lines in the exporter."
+  ],
+  "nextRequest": "A user asks which output format the report export writes, as we decided earlier. Name the format in three words or fewer.",
+  "needs": "option",
+  "answer": {
+    "kind": "option",
+    "exact": "newline-delimited JSON",
+    "caseSensitive": false
+  }
+}

@@ -1,0 +1,84 @@
+# readme-stats (D-README-STATS-1, D-README-NPM-1, D-README-HISTORY-1). Two jobs.
+# capture: reads GitHub traffic (clones, views, referrers), stars and npm counts once a day and merges them into
+#   docs/assets/readme/data/adoption-history.json. GitHub keeps traffic for 14 days only, so each day it saves stays saved.
+#   Reads use TRAFFIC_TOKEN (traffic needs push access); the commit uses the job token, so it starts no new run.
+# readme-stats: keeps the README counts, the star chart and the npm downloads charts current (main only).
+# Scheduled jobs run only on the default branch (main); until the merge, each push to v2-design and workflow_dispatch run the capture.
+name: readme-stats
+on:
+  schedule: [{ cron: "17 3 * * *" }]
+  push:
+    branches: [v2-design]
+    paths-ignore:
+      - docs/assets/readme/data/adoption-history.json
+      - stats.json
+      - docs/assets/readme/src/star-data.js
+      - docs/assets/readme/src/npm-data.js
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: readme-stats-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: read traffic, stars and npm counts; merge them by day into the history file (once a day)
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+        run: node build/readme-stats.mjs --history
+      - name: commit the history file only if it changed
+        run: |
+          F=docs/assets/readme/data/adoption-history.json
+          if git diff --quiet -- "$F"; then
+            echo "No change"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$F"
+            git commit -m "data: adoption history for $(date -u +%F)"
+            for i in 1 2 3; do git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
+          fi
+  readme-stats:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: read stars, stargazer dates and npm downloads; write stats.json and star-data.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node build/readme-stats.mjs
+      - name: read npm downloads per day since the first publish; write npm-data.js
+        run: node build/npm-downloads.mjs
+      - name: install Playwright and sharp (outside the repo; sharp writes palette PNGs like the other figures)
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw"
+          npm install --prefix "$RUNNER_TEMP/pw" playwright sharp
+          npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
+      - name: render the star chart and the npm downloads grid (day, week, month, year in one image)
+        env:
+          PLAYWRIGHT_DIR: ${{ runner.temp }}/pw/node_modules
+        run: node docs/assets/readme/src/render.mjs star-history npm-downloads
+      - name: commit only if a file changed
+        run: |
+          if git diff --quiet -- stats.json docs/assets/readme; then
+            echo "No change"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add stats.json docs/assets/readme
+            git commit -m "docs(readme): update stats, star chart and npm downloads grid"
+            git push
+          fi

@@ -1,0 +1,5 @@
+Manual setup for pi. Run:
+
+pi install <PKG>
+
+Then restart the agent and check it: context-mode doctor --agents pi

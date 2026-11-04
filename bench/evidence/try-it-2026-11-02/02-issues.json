@@ -1,0 +1,856 @@
+{
+ "summary": {
+  "id": "02-issues",
+  "date": "2026-11-02",
+  "version": "2.0.0-next.26",
+  "model": "claude-haiku-5-5",
+  "prompt": "Which 10 open issues in vercel/next.js have the most comments? Give me the issue number, title and comment count for each.",
+  "job": "issues",
+  "verdict": "pass",
+  "reason": "10 issue numbers, comment counts and order equal the GitHub search API result",
+  "raw_bytes": 68984,
+  "raw_source": "GitHub search API response, 10 issues",
+  "context_bytes": 1639,
+  "saving_pct": 97.6,
+  "tool_calls": 3,
+  "tools": [
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "turns": 4,
+  "cost_usd": 0.00263749,
+  "wall_s": 13,
+  "route": "Bash",
+  "journal": {
+   "events": 2,
+   "sandbox_bytes": 999,
+   "returned_bytes": 999,
+   "tools": {
+    "Bash": 1
+   }
+  },
+  "answer": "Here are the 10 open issues in vercel/next.js with the most comments, from the GitHub search API:\n\n| # | Comments | Title |\n|---|---|---|\n| 49279 | 145 | [NEXT-1151] App router issue with Framer Motion shared layout animations |\n| 64921 | 109 | Inconsistent CSS resolution order with App Router |\n| 62008 | 88 | Debugger not binding breakpoints in VSCode in server components, using official Next.js debugger setup |\n| 65335 | 83 | RSC and CDN interaction makes next.js inefficient for highload projects |\n| 86577 | 81 | [cacheComponents] Activity component route preservation causes significant breakage in application logic, UI behavior and E2E tests |\n| 53473 | 80 | `@next/next/no-html-link-for-pages` rule does not work with `pageExtensions` |\n| 56025 | 65 | Image warning issue - If you use CSS to change the size of your image, also include the styles 'width: \"auto\" or 'height: \"auto\"' to maintain the aspect ratio |\n| 42846 | 65 | Parameter on `AppType` is used incorrectly |\n| 74343 | 59 | Boundary Serialization - `Props must be serializable for components in \"use client\" file` warning |\n| 86122 | 58 | proxy.ts does not execute in production when behind Cloudflare Proxy (middleware.ts works) |\n\nThe `gh` CLI isn't authenticated in this environment, so I queried the public GitHub search API directly without a token. Search only returns issues (not PRs), and the counts are the current values from that call."
+ },
+ "stream": [
+  {
+   "type": "system",
+   "subtype": "hook_started",
+   "hook_id": "fa382a75-b7c1-4a9e-b22b-f3b18a6a4fca",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "uuid": "8f023155-b601-40b8-bf5c-85c8b8829ef0",
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11"
+  },
+  {
+   "type": "system",
+   "subtype": "hook_response",
+   "hook_id": "fa382a75-b7c1-4a9e-b22b-f3b18a6a4fca",
+   "hook_name": "SessionStart:startup",
+   "hook_event": "SessionStart",
+   "output": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+   "stderr": "",
+   "exit_code": 0,
+   "outcome": "success",
+   "uuid": "e48d70a5-09c5-422a-ac54-f2373c10bf74",
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11"
+  },
+  {
+   "type": "system",
+   "subtype": "init",
+   "cwd": "/TMP",
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "tools": [
+    "Task",
+    "Bash",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "DesignSync",
+    "Edit",
+    "EnterWorktree",
+    "ExitWorktree",
+    "ListAgents",
+    "Monitor",
+    "NotebookEdit",
+    "PushNotification",
+    "Read",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "SendMessage",
+    "Skill",
+    "TaskStop",
+    "ToolSearch",
+    "WebFetch",
+    "WebSearch",
+    "Workflow",
+    "Write",
+    "mcp__plugin_context-mode_context-mode__ctx_batch",
+    "mcp__plugin_context-mode_context-mode__ctx_doctor",
+    "mcp__plugin_context-mode_context-mode__ctx_execute",
+    "mcp__plugin_context-mode_context-mode__ctx_index",
+    "mcp__plugin_context-mode_context-mode__ctx_purge",
+    "mcp__plugin_context-mode_context-mode__ctx_resume",
+    "mcp__plugin_context-mode_context-mode__ctx_search",
+    "mcp__plugin_context-mode_context-mode__ctx_stats",
+    "mcp__plugin_context-mode_context-mode__ctx_upgrade"
+   ],
+   "mcp_servers": [
+    {
+     "name": "plugin:context-mode:context-mode",
+     "status": "connected",
+     "source": "plugin"
+    }
+   ],
+   "model": "claude-haiku-5-5",
+   "permissionMode": "bypassPermissions",
+   "slash_commands": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring",
+    "advisor",
+    "agents",
+    "auto-mode-setup",
+    "autocompact",
+    "clear",
+    "color",
+    "compact",
+    "config",
+    "output-style",
+    "context",
+    "effort",
+    "fast",
+    "focus",
+    "heapdump",
+    "init",
+    "mcp",
+    "import",
+    "model",
+    "__remote-workflow",
+    "workflow-launch-exec",
+    "reload-plugins",
+    "reload-skills",
+    "rename",
+    "security-review",
+    "usage",
+    "insights",
+    "recap",
+    "skill-doctor",
+    "goal",
+    "design-consent",
+    "design-revoke",
+    "list-agents",
+    "team-onboarding"
+   ],
+   "terminal_slash_commands": [
+    "doctor",
+    "color",
+    "focus",
+    "reload-plugins"
+   ],
+   "apiKeySource": "ANTHROPIC_API_KEY",
+   "claude_code_version": "2.1.312",
+   "output_style": "default",
+   "agents": [
+    "claude",
+    "Explore",
+    "general-purpose",
+    "Plan",
+    "statusline-setup"
+   ],
+   "skills": [
+    "deep-research",
+    "context-mode:ctx-doctor",
+    "context-mode:ctx-stats",
+    "context-mode:ctx-upgrade",
+    "design",
+    "design-sync",
+    "dataviz",
+    "update-config",
+    "verify",
+    "debug",
+    "code-review",
+    "simplify",
+    "batch",
+    "fewer-permission-prompts",
+    "doctor",
+    "loop",
+    "claude-api",
+    "workflow-authoring",
+    "run",
+    "run-skill-generator",
+    "plugin-authoring"
+   ],
+   "plugins": [
+    {
+     "name": "context-mode",
+     "path": "/TMP",
+     "source": "context-mode@context-mode",
+     "version": "2.0.0-next.26"
+    },
+    {
+     "name": "cc-plugin-agents-md",
+     "path": "builtin",
+     "source": "cc-plugin-agents-md@builtin"
+    },
+    {
+     "name": "cc-plugin-telemetry",
+     "path": "builtin",
+     "source": "cc-plugin-telemetry@builtin"
+    },
+    {
+     "name": "cc-plugin-plugin-authoring",
+     "path": "builtin",
+     "source": "cc-plugin-plugin-authoring@builtin"
+    }
+   ],
+   "capabilities": [
+    "interrupt_receipt_v1",
+    "interrupt_cancel_queued_v1",
+    "interrupt_send_now_v1",
+    "interrupt_requeue_taken_v1",
+    "msg_lifecycle_v1",
+    "request_marker_lists_v1",
+    "ask_user_question_unanswered_v1",
+    "lifecycle_wakeup_source_v1",
+    "sdk_mcp_tools_list_changed",
+    "sdk_mcp_manifests",
+    "mcp_read_resource_v1",
+    "mcp_tool_ui_meta_v1",
+    "ui_surface_v1",
+    "mcp_call_result_not_for_model_v1"
+   ],
+   "analytics_disabled": false,
+   "product_feedback_disabled": false,
+   "uuid": "f0a63cea-ef6e-4551-ba29-dbdf81600c61",
+   "memory_paths": {
+    "auto": "/TMP"
+   },
+   "original_cwd": "/TMP",
+   "additional_directories": [],
+   "messaging_socket_path": "/tmp/cc-socks/56070.sock",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "per_turn_effort_active": true,
+   "view_mode": "default"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "ea0ab0ec-f690-4821-9b60-31a879bbd2e1"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 250,
+   "estimated_tokens_delta": 200,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "a9e7f3e4-1e34-47b0-8577-4d52088c802a"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 493,
+   "estimated_tokens_delta": 243,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "e49b1737-3465-488e-a456-e37390af108d"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnKVk7XqhV8VWMZaKjJ",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6367,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6367,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 2,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "affa4542-599f-4f54-aad7-927651772780",
+   "timestamp": "2026-11-02T08:25:36.907Z",
+   "request_id": "req_011CgdnKVPmq9cs3DuVYtjbJ",
+   "thinking_duration_ms": 2256,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnKVk7XqhV8VWMZaKjJ",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01QXjG5H4iTHmiMBzoPKsMKY",
+      "name": "Bash",
+      "input": {
+       "command": "gh search issues --repo vercel/next.js --state open --sort comments --order desc --limit 10 --json number,title,commentsCount",
+       "description": "Search open vercel/next.js issues sorted by comment count"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 6367,
+     "cache_read_input_tokens": 11991,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 6367,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 2,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "7cb602fa-f34c-4b4c-a808-ec2a4c00a8fe",
+   "timestamp": "2026-11-02T08:25:37.273Z",
+   "request_id": "req_011CgdnKVPmq9cs3DuVYtjbJ",
+   "wire_tool_inputs": {
+    "toolu_01QXjG5H4iTHmiMBzoPKsMKY": {
+     "command": "gh search issues --repo vercel/next.js --state open --sort comments --order desc --limit 10 --json number,title,commentsCount",
+     "description": "Search open vercel/next.js issues sorted by comment count"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "type": "tool_result",
+      "content": "Exit code 4\nTo get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.",
+      "is_error": true,
+      "tool_use_id": "toolu_01QXjG5H4iTHmiMBzoPKsMKY"
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "38a413e2-2135-4423-a466-f818133013c2",
+   "timestamp": "2026-11-02T08:25:37.461Z",
+   "tool_use_result": "Error: Exit code 4\nTo get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.",
+   "tool_result_meta": [
+    {
+     "id": "toolu_01QXjG5H4iTHmiMBzoPKsMKY",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "6773286b-8f9a-41ec-84df-f0e7fba5e22b"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 224,
+   "estimated_tokens_delta": 174,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "6b35e86e-3655-4e3b-ab84-06ab04d992a5"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnKkWcQNSVXg2XdW2mp",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 695,
+     "cache_read_input_tokens": 18358,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 695,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 8,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "fd79d8e6-b22b-49fd-b07e-c4b67a98b771",
+   "timestamp": "2026-11-02T08:25:38.701Z",
+   "request_id": "req_011CgdnKk8YhrqpSkj5Tz6Rd",
+   "thinking_duration_ms": 501,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnKkWcQNSVXg2XdW2mp",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_01CNn9dHipkCbD9U2ZYq8gDq",
+      "name": "Bash",
+      "input": {
+       "command": "curl -s -H \"Accept: application/vnd.github+json\" \"https://api.github.com/search/issues?q=repo:vercel/next.js+is:issue+is:open&sort=comments&order=desc&per_page=10\" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get(\"message\") or \"\\n\".join(f\"#{i[\\\"number\\\"]}\\t{i[\\\"comments\\\"]}\\t{i[\\\"title\\\"]}\" for i in d[\"items\"]))'",
+       "description": "Query GitHub search API unauthenticated for top commented issues"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 695,
+     "cache_read_input_tokens": 18358,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 695,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 8,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "b084cc12-a868-4353-9a1f-5dc67b9f1e6d",
+   "timestamp": "2026-11-02T08:25:39.419Z",
+   "request_id": "req_011CgdnKk8YhrqpSkj5Tz6Rd",
+   "wire_tool_inputs": {
+    "toolu_01CNn9dHipkCbD9U2ZYq8gDq": {
+     "command": "curl -s -H \"Accept: application/vnd.github+json\" \"https://api.github.com/search/issues?q=repo:vercel/next.js+is:issue+is:open&sort=comments&order=desc&per_page=10\" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get(\"message\") or \"\\n\".join(f\"#{i[\\\"number\\\"]}\\t{i[\\\"comments\\\"]}\\t{i[\\\"title\\\"]}\" for i in d[\"items\"]))'",
+     "description": "Query GitHub search API unauthenticated for top commented issues"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "type": "tool_result",
+      "content": "Exit code 1\n  File \"<string>\", line 1\n    import json,sys; d=json.load(sys.stdin); print(d.get(\"message\") or \"\\n\".join(f\"#{i[\\\"number\\\"]}\\t{i[\\\"comments\\\"]}\\t{i[\\\"title\\\"]}\" for i in d[\"items\"]))\n                                                                                                                                        ^^^\nSyntaxError: f-string expression part cannot include a backslash",
+      "is_error": true,
+      "tool_use_id": "toolu_01CNn9dHipkCbD9U2ZYq8gDq"
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "ed8e83f6-6ab2-428d-8bb5-e7e3c1de9148",
+   "timestamp": "2026-11-02T08:25:40.260Z",
+   "tool_use_result": "Error: Exit code 1\n  File \"<string>\", line 1\n    import json,sys; d=json.load(sys.stdin); print(d.get(\"message\") or \"\\n\".join(f\"#{i[\\\"number\\\"]}\\t{i[\\\"comments\\\"]}\\t{i[\\\"title\\\"]}\" for i in d[\"items\"]))\n                                                                                                                                        ^^^\nSyntaxError: f-string expression part cannot include a backslash",
+   "tool_result_meta": [
+    {
+     "id": "toolu_01CNn9dHipkCbD9U2ZYq8gDq",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnKxXgJKrA8WLbwhzcy",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_017dKScCPqVa3rUjq8jbM3qc",
+      "name": "Bash",
+      "input": {
+       "command": "curl -s -H \"Accept: application/vnd.github+json\" \"https://api.github.com/search/issues?q=repo:vercel/next.js+is:issue+is:open&sort=comments&order=desc&per_page=10\" > /tmp/r3_nextjs_top.json; python3 -c '\nimport json\nd=json.load(open(\"/tmp/r3_nextjs_top.json\"))\nif \"items\" not in d:\n    print(d.get(\"message\"))\nelse:\n    for i in d[\"items\"]:\n        print(\"#%s\\t%s\\t%s\" % (i[\"number\"], i[\"comments\"], i[\"title\"]))\n'",
+       "description": "Parse top commented open issues from saved API response"
+      },
+      "caller": {
+       "type": "direct"
+      }
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 514,
+     "cache_read_input_tokens": 19053,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 514,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 16,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "9947334d-1223-4815-9578-78c55e0490a7",
+   "timestamp": "2026-11-02T08:25:41.701Z",
+   "request_id": "req_011CgdnKxAbX7BGY3gkj2aFA",
+   "wire_tool_inputs": {
+    "toolu_017dKScCPqVa3rUjq8jbM3qc": {
+     "command": "curl -s -H \"Accept: application/vnd.github+json\" \"https://api.github.com/search/issues?q=repo:vercel/next.js+is:issue+is:open&sort=comments&order=desc&per_page=10\" > /tmp/r3_nextjs_top.json; python3 -c '\nimport json\nd=json.load(open(\"/tmp/r3_nextjs_top.json\"))\nif \"items\" not in d:\n    print(d.get(\"message\"))\nelse:\n    for i in d[\"items\"]:\n        print(\"#%s\\t%s\\t%s\" % (i[\"number\"], i[\"comments\"], i[\"title\"]))\n'",
+     "description": "Parse top commented open issues from saved API response"
+    }
+   }
+  },
+  {
+   "type": "user",
+   "message": {
+    "role": "user",
+    "content": [
+     {
+      "tool_use_id": "toolu_017dKScCPqVa3rUjq8jbM3qc",
+      "type": "tool_result",
+      "content": "#49279\t145\t[NEXT-1151] App router issue with Framer Motion shared layout animations\n#64921\t109\tInconsistent CSS resolution order with App Router\n#62008\t88\tDebugger not binding breakpoints in VSCode in server components, using official Next.js debugger setup\n#65335\t83\tRSC and CDN interaction makes next.js inefficient for highload projects\n#86577\t81\t[cacheComponents] Activity component route preservation causes significant breakage in application logic, UI behavior and E2E tests\n#53473\t80\t`@next/next/no-html-link-for-pages` rule does not work with `pageExtensions`\n#56025\t65\tImage warning issue - If you use CSS to change the size of your image, also include the styles 'width: \"auto\" or 'height: \"auto\"' to maintain the aspect ratio\n#42846\t65\tParameter on `AppType` is used incorrectly\n#74343\t59\tBoundary Serialization - `Props must be serializable for components in \"use client\" file` warning\n#86122\t58\tproxy.ts does not execute in production when behind Cloudflare Proxy (middleware.ts works)",
+      "is_error": false
+     }
+    ]
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "4a343f4d-cbd0-4e4d-af54-f06b374e6366",
+   "timestamp": "2026-11-02T08:25:42.241Z",
+   "tool_use_result": {
+    "stdout": "#49279\t145\t[NEXT-1151] App router issue with Framer Motion shared layout animations\n#64921\t109\tInconsistent CSS resolution order with App Router\n#62008\t88\tDebugger not binding breakpoints in VSCode in server components, using official Next.js debugger setup\n#65335\t83\tRSC and CDN interaction makes next.js inefficient for highload projects\n#86577\t81\t[cacheComponents] Activity component route preservation causes significant breakage in application logic, UI behavior and E2E tests\n#53473\t80\t`@next/next/no-html-link-for-pages` rule does not work with `pageExtensions`\n#56025\t65\tImage warning issue - If you use CSS to change the size of your image, also include the styles 'width: \"auto\" or 'height: \"auto\"' to maintain the aspect ratio\n#42846\t65\tParameter on `AppType` is used incorrectly\n#74343\t59\tBoundary Serialization - `Props must be serializable for components in \"use client\" file` warning\n#86122\t58\tproxy.ts does not execute in production when behind Cloudflare Proxy (middleware.ts works)",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+   },
+   "tool_result_meta": [
+    {
+     "id": "toolu_017dKScCPqVa3rUjq8jbM3qc",
+     "permission_decision": {
+      "decision": "accept",
+      "source": "config",
+      "reason_type": "mode"
+     }
+    }
+   ]
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 50,
+   "estimated_tokens_delta": 50,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "b86ad70d-d132-4546-9f98-462b431ae65a"
+  },
+  {
+   "type": "system",
+   "subtype": "thinking_tokens",
+   "estimated_tokens": 206,
+   "estimated_tokens_delta": 156,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "ff888d4e-7423-48b7-a534-5d49800310d1"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnL6zfBzaivdj8zZTiM",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "[removed]"
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 680,
+     "cache_read_input_tokens": 19567,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 680,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 4,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "598f21ae-5dc6-4dd2-b121-decde5af63fd",
+   "timestamp": "2026-11-02T08:25:43.166Z",
+   "request_id": "req_011CgdnL6c6spw1WFAtpJrKH",
+   "thinking_duration_ms": 233,
+   "thinking_display": "updates"
+  },
+  {
+   "type": "assistant",
+   "message": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgdnL6zfBzaivdj8zZTiM",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "Here are the 10 open issues in vercel/next.js with the most comments, from the GitHub search API:\n\n| # | Comments | Title |\n|---|---|---|\n| 49279 | 145 | [NEXT-1151] App router issue with Framer Motion shared layout animations |\n| 64921 | 109 | Inconsistent CSS resolution order with App Router |\n| 62008 | 88 | Debugger not binding breakpoints in VSCode in server components, using official Next.js debugger setup |\n| 65335 | 83 | RSC and CDN interaction makes next.js inefficient for highload projects |\n| 86577 | 81 | [cacheComponents] Activity component route preservation causes significant breakage in application logic, UI behavior and E2E tests |\n| 53473 | 80 | `@next/next/no-html-link-for-pages` rule does not work with `pageExtensions` |\n| 56025 | 65 | Image warning issue - If you use CSS to change the size of your image, also include the styles 'width: \"auto\" or 'height: \"auto\"' to maintain the aspect ratio |\n| 42846 | 65 | Parameter on `AppType` is used incorrectly |\n| 74343 | 59 | Boundary Serialization - `Props must be serializable for components in \"use client\" file` warning |\n| 86122 | 58 | proxy.ts does not execute in production when behind Cloudflare Proxy (middleware.ts works) |\n\nThe `gh` CLI isn't authenticated in this environment, so I queried the public GitHub search API directly without a token. Search only returns issues (not PRs), and the counts are the current values from that call."
+     }
+    ],
+    "container": null,
+    "stop_reason": null,
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+     "input_tokens": 2,
+     "cache_creation_input_tokens": 680,
+     "cache_read_input_tokens": 19567,
+     "cache_creation": {
+      "ephemeral_5m_input_tokens": 680,
+      "ephemeral_1h_input_tokens": 0
+     },
+     "output_tokens": 4,
+     "service_tier": "standard",
+     "inference_geo": "global",
+     "speed": "standard"
+    },
+    "input_transformations": [],
+    "diagnostics": null,
+    "context_management": null
+   },
+   "parent_tool_use_id": null,
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "uuid": "7c9ceee5-390e-4f8b-9697-2213b2952c57",
+   "timestamp": "2026-11-02T08:25:44.826Z",
+   "request_id": "req_011CgdnL6c6spw1WFAtpJrKH"
+  },
+  {
+   "duration_api_ms": 9391,
+   "stop_reason": "end_turn",
+   "session_id": "4e94749e-47a2-4b18-8372-94926dd60f11",
+   "total_cost_usd": 0.00263749,
+   "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 8256,
+    "cache_read_input_tokens": 68969,
+    "output_tokens": 1830,
+    "output_tokens_details": {
+     "thinking_tokens": 628
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 8256
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 611,
+      "cache_read_input_tokens": 19567,
+      "cache_creation_input_tokens": 680,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 680,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "modelUsage": {
+    "claude-haiku-5-5": {
+     "inputTokens": 8,
+     "outputTokens": 1830,
+     "cacheReadInputTokens": 68969,
+     "cacheCreationInputTokens": 8256,
+     "webSearchRequests": 0,
+     "costUSD": 0.00263749,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 628,
+     "cacheCreationEphemeral5mInputTokens": 8256,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   },
+   "permission_denials": [],
+   "terminal_reason": "completed",
+   "fast_mode_state": "off",
+   "fast_mode_disabled_reason": "sdk_opt_in_required",
+   "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+     "background": 0,
+     "foreground": 0,
+     "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+     "parent": 0,
+     "user": 0,
+     "system": 0
+    },
+    "refused": {
+     "depth_limit": 0,
+     "concurrency_limit": 0,
+     "budget": 0
+    },
+    "by_type": {}
+   },
+   "safety_stops": 0,
+   "is_error": false,
+   "num_turns": 4,
+   "subtype": "success",
+   "api_error_status": null,
+   "result": "Here are the 10 open issues in vercel/next.js with the most comments, from the GitHub search API:\n\n| # | Comments | Title |\n|---|---|---|\n| 49279 | 145 | [NEXT-1151] App router issue with Framer Motion shared layout animations |\n| 64921 | 109 | Inconsistent CSS resolution order with App Router |\n| 62008 | 88 | Debugger not binding breakpoints in VSCode in server components, using official Next.js debugger setup |\n| 65335 | 83 | RSC and CDN interaction makes next.js inefficient for highload projects |\n| 86577 | 81 | [cacheComponents] Activity component route preservation causes significant breakage in application logic, UI behavior and E2E tests |\n| 53473 | 80 | `@next/next/no-html-link-for-pages` rule does not work with `pageExtensions` |\n| 56025 | 65 | Image warning issue - If you use CSS to change the size of your image, also include the styles 'width: \"auto\" or 'height: \"auto\"' to maintain the aspect ratio |\n| 42846 | 65 | Parameter on `AppType` is used incorrectly |\n| 74343 | 59 | Boundary Serialization - `Props must be serializable for components in \"use client\" file` warning |\n| 86122 | 58 | proxy.ts does not execute in production when behind Cloudflare Proxy (middleware.ts works) |\n\nThe `gh` CLI isn't authenticated in this environment, so I queried the public GitHub search API directly without a token. Search only returns issues (not PRs), and the counts are the current values from that call.",
+   "ttft_ms": 3415,
+   "type": "result",
+   "duration_ms": 11339,
+   "uuid": "97929d9e-7e98-423e-89f9-1534268e36c6",
+   "ttft_stream_ms": 1158,
+   "time_to_request_ms": 447,
+   "first_content_frame_ms": 1158,
+   "queued_turn_count": 0,
+   "result_index": 0,
+   "model_usage_since_last_result": {
+    "claude-haiku-5-5": {
+     "inputTokens": 8,
+     "outputTokens": 1830,
+     "cacheReadInputTokens": 68969,
+     "cacheCreationInputTokens": 8256,
+     "webSearchRequests": 0,
+     "costUSD": 0.00263749,
+     "contextWindow": 1000000,
+     "maxOutputTokens": 128000,
+     "thinkingTokens": 628,
+     "cacheCreationEphemeral5mInputTokens": 8256,
+     "cacheCreationEphemeral1hInputTokens": 0,
+     "canonicalModel": "claude-haiku-5-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   }
+  }
+ ]
+}

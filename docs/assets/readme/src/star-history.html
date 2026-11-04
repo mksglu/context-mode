@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README star-history 1280x640</title>
+<script>var T=new URLSearchParams(location.search).get('theme')||'dark';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<script src="star-data.js"></script>
+<style>:root{--w:1280px;--h:640px}.h2{position:absolute;left:64px;top:84px;font-size:40px}
+svg .tl{font-family:var(--mono);font-size:12px;fill:var(--muted)}svg .end{font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--fg)}
+svg .ev{font-family:var(--mono);font-size:12px;fill:var(--fg)}</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="abs eyebrow" style="left:64px;top:52px">GitHub stars, mksglu/context-mode</div>
+<div class="h h2"><span id="hs"></span> stars <em id="hsince"></em></div>
+<svg id="sv" class="abs" style="left:64px;top:150px" width="1152" height="400"></svg>
+<div class="cap">Cumulative stars per day from the GitHub stargazers API (starredAt), read <span id="hread"></span>; the last point is the total on that day.
+Hacker News front page 2026-02-28 (item 47193064). Green ticks: days on GitHub Trending, logged by uibm/trending-watcher.</div>
+</main>
+<script>
+// D-README-STAR-1: sv and NS are set here, before any drawing; window.__drawn tells render.mjs that the chart is drawn.
+var sv=document.getElementById("sv"),NS="http://www.w3.org/2000/svg";
+// Days on GitHub Trending: the 14 issues "Check trending repo: mksglu/context-mode" in github.com/uibm/trending-watcher (read 2026-11-01).
+var TRENDING=["2026-04-24","2026-05-06","2026-09-08","2026-09-09","2026-10-01","2026-10-02","2026-10-03","2026-10-04","2026-10-11","2026-10-13","2026-10-14","2026-10-15","2026-10-16","2026-10-17"];
+var HN="2026-02-28";
+document.getElementById("hs").textContent=STARS.toLocaleString("en-US");document.getElementById("hsince").textContent="since "+D[0][0]+".";document.getElementById("hread").textContent=READ_AT;
+var W=1152,H=400,L=64,R=96,TOP=12,B=30,STEP=5000,max=Math.ceil(STARS/STEP)*STEP;
+function el(n,a,txt){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);if(txt!==undefined)e.textContent=txt;sv.appendChild(e);return e}
+var t0=Date.parse(D[0][0]),t1=Date.parse(D[D.length-1][0]);
+function X(d){return L+(W-L-R)*(Date.parse(d)-t0)/(t1-t0)}function Y(v){return H-B-(H-B-TOP)*v/max}
+function at(d){var v=0;for(var i=0;i<D.length&&D[i][0]<=d;i++)v=D[i][1];return v}
+for(var v=0;v<=max;v+=STEP){el("line",{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:"var(--card-b)","stroke-width":1,"stroke-dasharray":v?"3 4":""});el("text",{x:L-12,y:Y(v)+4,"text-anchor":"end",class:"tl"},v.toLocaleString("en-US"))}
+for(var m=new Date(Date.UTC(+D[0][0].slice(0,4),+D[0][0].slice(5,7),1));m.toISOString().slice(0,10)<=READ_AT;m=new Date(Date.UTC(m.getUTCFullYear(),m.getUTCMonth()+1,1))){
+  var d=m.toISOString().slice(0,10);el("line",{x1:X(d),x2:X(d),y1:H-B,y2:H-B+5,stroke:"var(--muted)","stroke-width":1});el("text",{x:X(d),y:H-8,"text-anchor":"middle",class:"tl"},d.slice(0,7))}
+var p=D.map(function(d,i){return (i?"L":"M")+X(d[0]).toFixed(1)+" "+Y(d[1]).toFixed(1)}).join(" ");
+var xe=X(D[D.length-1][0]),ye=Y(STARS);
+el("path",{d:p+" L"+xe.toFixed(1)+" "+Y(0)+" L"+X(D[0][0]).toFixed(1)+" "+Y(0)+" Z",fill:"var(--accent)","fill-opacity":"0.14"});
+TRENDING.forEach(function(d){if(d>=D[0][0]&&d<=READ_AT)el("rect",{x:(X(d)-1.5).toFixed(1),y:H-B-10,width:3,height:10,fill:"var(--save)"})});
+var line=el("path",{d:p,fill:"none",stroke:"var(--accent)","stroke-width":"2.5","stroke-linejoin":"round"});
+var xh=X(HN),yh=Y(at(HN));
+el("line",{x1:xh,x2:xh,y1:yh-6,y2:Y(max*0.72),stroke:"var(--fg2)","stroke-width":1,"stroke-dasharray":"3 3"});
+el("circle",{cx:xh,cy:yh,r:4.5,fill:"var(--bg)",stroke:"var(--fg)","stroke-width":2});
+el("text",{x:xh+8,y:Y(max*0.72)+4,class:"ev"},"Hacker News front page, "+HN+": "+at(HN).toLocaleString("en-US")+" stars");
+el("circle",{cx:xe,cy:ye,r:5,fill:"var(--accent)",stroke:"var(--bg)","stroke-width":2});
+el("text",{x:xe+12,y:ye+5,class:"end"},STARS.toLocaleString("en-US"));
+el("text",{x:xe+12,y:ye+23,class:"tl"},READ_AT);
+window.__drawn={points:D.length,pathLength:line.getTotalLength()};
+</script></body></html>

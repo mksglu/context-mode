@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-21",
+  "agent": "2.1.303 (Claude Code)",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "runs": 3,
+  "wallSeconds": 112,
+  "v1Skipped": false,
+  "arms": {
+    "off": {
+      "sessions": 15,
+      "pass": 15,
+      "medianTokens": 36184,
+      "medianToolResultBytes": 31,
+      "savingVsOffPct": null,
+      "savingVsV1Pct": null,
+      "ctxCalls": 0,
+      "costUsd": 0.3298
+    },
+    "v1": {
+      "sessions": 15,
+      "pass": 15,
+      "medianTokens": 42493,
+      "medianToolResultBytes": 31,
+      "savingVsOffPct": {
+        "median": -17.4,
+        "min": -17.6,
+        "max": -17.2
+      },
+      "savingVsV1Pct": null,
+      "ctxCalls": 0,
+      "costUsd": 0.537
+    },
+    "v2": {
+      "sessions": 15,
+      "pass": 15,
+      "medianTokens": 38210,
+      "medianToolResultBytes": 8,
+      "savingVsOffPct": {
+        "median": -5.7,
+        "min": -9.7,
+        "max": -5.3
+      },
+      "savingVsV1Pct": {
+        "median": 10.2,
+        "min": 6.4,
+        "max": 10.2
+      },
+      "ctxCalls": 0,
+      "costUsd": 0.3594
+    }
+  },
+  "perTask": [
+    {
+      "task": "log-1",
+      "off": {
+        "medianTokens": 36184,
+        "medianToolResultBytes": 62,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0638
+      },
+      "v1": {
+        "medianTokens": 42424,
+        "medianToolResultBytes": 62,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.1116
+      },
+      "v2": {
+        "medianTokens": 38114,
+        "medianToolResultBytes": 2,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.064
+      }
+    },
+    {
+      "task": "json-1",
+      "off": {
+        "medianTokens": 55024,
+        "medianToolResultBytes": 900,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0793
+      },
+      "v1": {
+        "medianTokens": 64541,
+        "medianToolResultBytes": 498,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.1247
+      },
+      "v2": {
+        "medianTokens": 60386,
+        "medianToolResultBytes": 3012,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0938
+      }
+    },
+    {
+      "task": "tests-1",
+      "off": {
+        "medianTokens": 36121,
+        "medianToolResultBytes": 2,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0605
+      },
+      "v1": {
+        "medianTokens": 42493,
+        "medianToolResultBytes": 2,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0988
+      },
+      "v2": {
+        "medianTokens": 38166,
+        "medianToolResultBytes": 2,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0646
+      }
+    },
+    {
+      "task": "file-1",
+      "off": {
+        "medianTokens": 36159,
+        "medianToolResultBytes": 31,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0624
+      },
+      "v1": {
+        "medianTokens": 42453,
+        "medianToolResultBytes": 31,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0973
+      },
+      "v2": {
+        "medianTokens": 38210,
+        "medianToolResultBytes": 31,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0666
+      }
+    },
+    {
+      "task": "git-1",
+      "off": {
+        "medianTokens": 36248,
+        "medianToolResultBytes": 8,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0638
+      },
+      "v1": {
+        "medianTokens": 42629,
+        "medianToolResultBytes": 8,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.1047
+      },
+      "v2": {
+        "medianTokens": 38296,
+        "medianToolResultBytes": 8,
+        "pass": "3/3",
+        "ctxCalls": 0,
+        "cost": 0.0704
+      }
+    }
+  ],
+  "totalCostUsd": 1.2262
+}

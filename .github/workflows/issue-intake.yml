@@ -1,0 +1,36 @@
+# Must live on the default branch: GitHub runs `issues` workflows only from there.
+name: issue-intake
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: issue-intake-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: ${{ !github.event.issue.pull_request && !contains(github.event.issue.labels.*.name, 'v1-frozen') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: Check body and act
+        env:
+          BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_STATE: ${{ github.event.issue.state }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node .github/scripts/issue-intake.mjs > "$RUNNER_TEMP/result.json"
+          cat "$RUNNER_TEMP/result.json"
+          node .github/scripts/issue-intake-act.mjs "$RUNNER_TEMP/result.json"

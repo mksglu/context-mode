@@ -1,0 +1,479 @@
+diff --git a/scripts/e2e/oss-arms-lib.mjs b/scripts/e2e/oss-arms-lib.mjs
+index ecbd3532..79ccf424 100644
+--- a/scripts/e2e/oss-arms-lib.mjs
++++ b/scripts/e2e/oss-arms-lib.mjs
+@@ -20,7 +20,13 @@ export const PRICES = Object.freeze({
+   models: Object.freeze({
+     "claude-haiku-4-5": Object.freeze({ in: 1, out: 5, cr: 0.1, cw5: 1.25, cw1h: 2 }),
+     "claude-opus-5-5": Object.freeze({ in: 4, out: 20, cr: 0.2, cw5: 5, cw1h: 8 }),
++    // Amendment 1 addendum: the WebFetch helper model. Read 2026-10-22 from
++    // https://platform.claude.com/docs/en/about-claude/pricing (Model pricing table). Priced by prompt length: a
++    // request whose prompt (input + cache reads + cache writes) is over 100,000 tokens pays the `long` prices.
++    "claude-haiku-5-5": Object.freeze({ in: 0.1, out: 0.5, cr: 0.01, cw5: 0.125, cw1h: 0.2,
++      long: Object.freeze({ prompt_over: 100000, in: 0.5, out: 2.5, cr: 0.05, cw5: 0.625, cw1h: 1 }) }),
+   }),
++  model_sources: Object.freeze({ "claude-haiku-5-5": Object.freeze({ as_of: "2026-10-22", source_url: "https://platform.claude.com/docs/en/about-claude/pricing" }) }),
+   source_url: "https://www.anthropic.com/pricing",
+   unit: "USD per million tokens",
+ });
+@@ -100,6 +106,14 @@ export function parseStream(stdout) {
+   return { init, result, results, messages, tools, events: rate };
+ }
+ 
++/** The price row for ONE request of model `key`, chosen by that request's own prompt length (input + cache reads +
++ *  cache writes). Models without a `long` row have one price. */
++export function requestPrices(key, promptTokens, prices = PRICES) {
++  const p = prices.models[key];
++  if (!p) throw new FailClosed("unknown-model", String(key));
++  return p.long && Number(promptTokens) > p.long.prompt_over ? { row: p.long, tier: "long" } : { row: p, tier: p.long ? "base" : null };
++}
++
+ /** List-price USD of a session from its result event: per model in modelUsage, each at its own price. A cache write
+  *  is split 5m/1h only when the event has a single model and its usage.cache_creation split adds up; otherwise it is
+  *  `cwx`, priced at 1h (usd) and at 5m (usd_low). A model outside the table throws (fail closed). */
+@@ -110,13 +124,21 @@ export function usdFromResult(result, prices = PRICES) {
+   const names = Object.keys(mu);
+   const calls = { in: [], cr: [], cw5: [], cw1h: [], cwx: [], out: [], model: [], models: [] };
+   let usd = 0, low = 0;
++  const tiers = {};
+   for (const name of names) {
+     const u = mu[name] || {};
+     const key = priceKey(u.canonicalModel, prices) || priceKey(name, prices);
+     if (!key) throw new FailClosed("unknown-model", "a call ran on " + name + ", which is not in the price table");
+-    const p = prices.models[key];
++    let p = prices.models[key];
+     const n = (x) => { const v = Number(x); if (!Number.isFinite(v)) throw new FailClosed("bad-usage", name + " has a non-numeric token field"); return v; };
+     const tin = n(u.inputTokens), tout = n(u.outputTokens), tcr = n(u.cacheReadInputTokens), tcw = n(u.cacheCreationInputTokens);
++    // A tiered model: modelUsage is a per-model TOTAL over its requests. If the total prompt is at or under the
++    // threshold, no single request can be over it: the base tier is proven. Over it, the per-request split is unknown:
++    // base tier, and the run is flagged price_tier_assumed.
++    if (p.long) {
++      const total = tin + tcr + tcw;
++      tiers[key] = total <= p.long.prompt_over ? "base_proven" : "base_assumed";
++    }
+     let w5 = 0, w1 = 0, wx = tcw;
+     const cc = result.usage && result.usage.cache_creation;
+     if (names.length === 1 && cc && typeof cc === "object") {
+@@ -131,7 +153,9 @@ export function usdFromResult(result, prices = PRICES) {
+     low += (base + wx * p.cw5) / 1e6;
+   }
+   if (calls.cwx.every((x) => x === 0)) delete calls.cwx;
+-  return { usd, usd_low: low, calls, why: null };
++  const out = { usd, usd_low: low, calls, why: null };
++  if (Object.keys(tiers).length) { out.price_tiers = tiers; out.price_tier_assumed = Object.values(tiers).indexOf("base_assumed") >= 0; }
++  return out;
+ }
+ 
+ const isBuiltin = (p) => p && p.path === "builtin";
+@@ -207,7 +231,7 @@ export function rateLimited(events) {
+ /** The fields of a run record that may be published: no tenant, session, prompt, answer, path, or argv. */
+ export const PUBLIC_FIELDS = Object.freeze(["w", "cycle", "arm", "role", "attempt", "order", "position", "usd", "usd_low", "usd_client", "client_gap_pct", "client_gap_flag",
+   "calls", "calls_from", "success", "turns", "exit", "timed_out", "rate_limited", "result_subtype", "budget_hit", "tools", "plugin_tool_calls", "resolution", "plugin",
+-  "client_version", "model", "harness_commit", "void_reason", "error", "ms", "gateway_record", "flags_before", "flags_after", "gw_version_before", "gw_version_after"]);
++  "client_version", "model", "harness_commit", "void_reason", "error", "ms", "gateway_record", "flags_before", "flags_after", "gw_version_before", "gw_version_after", "price_tiers", "price_tier_assumed"]);
+ export function publicRecord(r) {
+   const o = {};
+   for (const k of PUBLIC_FIELDS) if (r[k] !== undefined) o[k] = r[k];
+@@ -226,6 +250,7 @@ function armBlock(r) {
+   if (r.plugin) b.plugin = r.plugin;
+   if (r.plugin_tool_calls !== undefined) b.plugin_tool_calls = r.plugin_tool_calls;
+   if (r.gateway_record) b.gateway_record = r.gateway_record;
++  if (r.price_tiers) { b.price_tiers = r.price_tiers; b.price_tier_assumed = !!r.price_tier_assumed; }
+   for (const k of ["timed_out", "rate_limited", "budget_hit", "result_subtype"]) if (r[k]) b[k] = r[k];
+   return b;
+ }
+@@ -282,6 +307,7 @@ export function buildEvidence({ runs, workloads, arms, labels, meta }) {
+       "col.cr": "cache read tokens", "col.cw1h": "cache write tokens, 1 hour lifetime", "col.cw5": "cache write tokens, 5 minute lifetime",
+       "col.cwx": "cache write tokens whose lifetime the event did not split: usd prices them at 1 hour, usd_recomputed_low at 5 minutes",
+       "col.in": "input tokens not read from or written to the cache", "col.out": "output tokens",
++      "price_tiers": "per tiered model (claude-haiku-5-5): base_proven = the model's total prompt (input + cache reads + cache writes) over the session is at or under 100,000 tokens, so every request paid the base price; base_assumed = the total is over it, the per-request split is not in the result event, base price used and the run flagged price_tier_assumed",
+       "resolution": "what the run's own init event showed: MCP servers, mcp__ tools, non-builtin plugins, main and helper models; the gateway arm adds the gateway's per-call record for the session",
+     },
+     prices: PRICES,
+@@ -290,3 +316,85 @@ export function buildEvidence({ runs, workloads, arms, labels, meta }) {
+     workloads: out,
+   };
+ }
++
++// ── prereg amendment 1 (docs/benchmarks/try-it/prereg-amendment-1.md on OSS v2-design) ──────────────────────────
++/** One NEW disposable tenant per gateway SESSION (not per prompt): the cycle's role, number and attempt are in the id,
++ *  so no session can read memory, skills or archive written by an earlier session. Owner tenants throw. */
++export function sessionTenant({ stamp, w, role, cycle, attempt }, isOwner = () => false) {
++  if (!stamp || !w || !role || !(cycle >= 0) || !(attempt >= 1)) throw new FailClosed("session-tenant", "stamp, w, role, cycle, attempt are required");
++  const t = "t_ossab_" + stamp + "_" + w + "_" + role.charAt(0) + cycle + "a" + attempt;
++  if (isOwner(t)) throw new FailClosed("owner-tenant", "refused");
++  return t;
++}
++
++/** The text of every tool_result block the client saw, in transcript order (string content or its text blocks). */
++export function toolResultTexts(events) {
++  const out = [];
++  for (const e of events || []) {
++    if (!e || e.type !== "user" || !e.message || !Array.isArray(e.message.content)) continue;
++    for (const b of e.message.content) {
++      if (!b || b.type !== "tool_result") continue;
++      if (typeof b.content === "string") out.push(b.content);
++      else if (Array.isArray(b.content)) out.push(b.content.filter((c) => c && c.type === "text").map((c) => String(c.text || "")).join("\n"));
++    }
++  }
++  return out;
++}
++
++/** Every top-level JSON object embedded in a text, found by brace matching (JSON string state aware) and JSON.parse.
++ *  No regex. Text that does not parse is skipped. */
++export function jsonObjectsIn(text) {
++  const s = String(text || ""), out = [];
++  let i = 0;
++  while (i < s.length) {
++    if (s.charAt(i) !== "{") { i++; continue; }
++    let depth = 0, inStr = false, esc = false, end = -1;
++    for (let k = i; k < s.length; k++) {
++      const ch = s.charAt(k);
++      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === "\"") inStr = false; continue; }
++      if (ch === "\"") inStr = true;
++      else if (ch === "{") depth++;
++      else if (ch === "}") { depth--; if (depth === 0) { end = k; break; } }
++    }
++    if (end < 0) { i++; continue; }
++    let j = null; try { j = JSON.parse(s.slice(i, end + 1)); } catch { j = null; }
++    if (j && typeof j === "object") { out.push(j); i = end + 1; } else i++;
++  }
++  return out;
++}
++
++/** The record a tool_result served or generated at `index`: an object (at any depth of a JSON object parsed from a
++ *  tool_result) whose own `id` or `index` key equals the index (number, or the same digits as a string). The LAST such
++ *  object in transcript order wins (the final fetch). null when no tool_result holds one (fail closed). */
++export function recordFromToolResults(texts, index) {
++  let found = null;
++  const want = String(index);
++  const hit = (o) => ["id", "index"].some((k) => Object.prototype.hasOwnProperty.call(o, k) && (o[k] === index || o[k] === want));
++  const walk = (v) => {
++    if (!v || typeof v !== "object") return;
++    if (!Array.isArray(v) && hit(v)) found = v;
++    for (const x of Object.values(v)) walk(x);
++  };
++  for (const t of texts || []) for (const o of jsonObjectsIn(t)) walk(o);
++  return found;
++}
++
++/** Scalar leaves of a record, as the strings that must appear whole in the answer. */
++export function recordLeaves(v, out = []) {
++  if (v === null || v === undefined) return out;
++  if (typeof v === "object") { for (const x of Object.values(v)) recordLeaves(x, out); return out; }
++  out.push(String(v));
++  return out;
++}
++
++/** large-json oracle (amendment 1): the reference is the record the session's own tool_result showed at index 13000;
++ *  pass when every leaf value appears whole in the final answer. No such tool_result: "no-record-in-tool-result". */
++export function largeJsonTranscriptWhy(events, answer, index = 13000) {
++  const rec = recordFromToolResults(toolResultTexts(events), index);
++  if (rec === null) return "no-record-in-tool-result";
++  const need = recordLeaves(rec);
++  if (need.length === 0) return "empty-reference-record";
++  const s = String(answer || "");
++  const miss = need.filter((x) => s.indexOf(x) < 0);
++  return miss.length === 0 ? "ok" : "answer-missing-" + miss.length + "-of-" + need.length + "-values";
++}
+diff --git a/scripts/e2e/oss-arms-lib.test.mjs b/scripts/e2e/oss-arms-lib.test.mjs
+index f88eccff..63edba82 100644
+--- a/scripts/e2e/oss-arms-lib.test.mjs
++++ b/scripts/e2e/oss-arms-lib.test.mjs
+@@ -1,7 +1,7 @@
+ // scripts/e2e/oss-arms-lib.test.mjs — the pure half of the OSS-plugin arms. No regex, no truncation.
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+-import { parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, publicRecord, buildEvidence, FailClosed } from "./oss-arms-lib.mjs";
++import { requestPrices, PRICES, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, publicRecord, buildEvidence, FailClosed } from "./oss-arms-lib.mjs";
+ 
+ test("arms: direct is plain, plain is required, unknown and repeated ids throw", () => {
+   assert.deepEqual(parseArms("direct,v1,v2"), ["plain", "v1", "v2"]);
+@@ -99,3 +99,69 @@ test("evidence: arms against plain per cycle, voids counted not paired", () => {
+   assert.equal(w.analysis.v1.verdict, "more");
+   assert.equal(w.analysis.success_v1, "3/3");
+ });
++
++import { sessionTenant, toolResultTexts, jsonObjectsIn, recordFromToolResults, largeJsonTranscriptWhy } from "./oss-arms-lib.mjs";
++import { completionWhy } from "./tryit-workloads.mjs";
++
++test("amendment 1: one new tenant per gateway session; owner tenants and missing parts throw", () => {
++  const a = sessionTenant({ stamp: "S", w: "web-scrape", role: "measured", cycle: 1, attempt: 1 });
++  const b = sessionTenant({ stamp: "S", w: "web-scrape", role: "measured", cycle: 2, attempt: 1 });
++  const c = sessionTenant({ stamp: "S", w: "web-scrape", role: "measured", cycle: 1, attempt: 2 });
++  const d = sessionTenant({ stamp: "S", w: "web-scrape", role: "warmup", cycle: 1, attempt: 1 });
++  assert.equal(new Set([a, b, c, d]).size, 4);
++  assert.equal(a.indexOf("t_ossab_S_web-scrape_"), 0);
++  assert.throws(() => sessionTenant({ stamp: "S", w: "x", role: "measured", cycle: 1, attempt: 1 }, () => true), FailClosed);
++  assert.throws(() => sessionTenant({ stamp: "", w: "x", role: "measured", cycle: 1, attempt: 1 }), FailClosed);
++});
++
++const tr = (content) => ({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "u", content }] } });
++const said = (text) => ({ type: "assistant", message: { content: [{ type: "text", text }] } });
++
++test("amendment 1: JSON objects in tool_result text are found by brace matching, strings with braces included", () => {
++  assert.deepEqual(jsonObjectsIn('count: 2\n{"id": 1, "s": "a } b"} tail {bad} {"x": {"y": 2}}'), [{ id: 1, s: "a } b" }, { x: { y: 2 } }]);
++  assert.deepEqual(toolResultTexts([tr("plain"), tr([{ type: "text", text: "t1" }, { type: "image" }]), said("no")]), ["plain", "t1"]);
++});
++
++test("amendment 1: large-json reference is the index-13000 record from the tool_result; pass needs every leaf", () => {
++  const rec = { id: 13000, name: "user_13000", secret: true, message: "The eagle lands at midnight", tags: ["a", "b"] };
++  const ev = [tr("payload: 7.5 MB\n" + JSON.stringify({ status: 200, record: rec }, null, 2))];
++  assert.equal(largeJsonTranscriptWhy(ev, "id 13000 user_13000 secret true: The eagle lands at midnight, tags a b"), "ok");
++  assert.equal(largeJsonTranscriptWhy(ev, "id 13000 user_13000 true The eagle lands"), "answer-missing-2-of-6-values");
++  // string index, nested array, last tool_result wins
++  const ev2 = [tr(JSON.stringify([{ index: "13000", v: "old" }])), tr(JSON.stringify({ records: [{ index: 13000, v: "new" }] }))];
++  assert.deepEqual(recordFromToolResults(toolResultTexts(ev2), 13000), { index: 13000, v: "new" });
++  // record only in model prose or nowhere: fail closed
++  assert.equal(largeJsonTranscriptWhy([said(JSON.stringify(rec))], JSON.stringify(rec)), "no-record-in-tool-result");
++  assert.equal(largeJsonTranscriptWhy([tr("index 13000 looked fine")], "x"), "no-record-in-tool-result");
++});
++
++test("amendment 1: the gateway's edge calls count for the completion check; none still fails", () => {
++  const p = { result: { subtype: "success", stop_reason: "end_turn" }, tools: {} };
++  assert.equal(completionWhy("", {}, "answer", p), "no-tool-call");
++  assert.equal(completionWhy("", {}, "answer", { ...p, edge_calls: 1 }), "ok");
++});
++
++test("addendum: claude-haiku-5-5 has both page tiers; a request is priced by its own prompt length", () => {
++  const m = PRICES.models["claude-haiku-5-5"];
++  assert.deepEqual([m.in, m.cw5, m.cw1h, m.cr, m.out], [0.1, 0.125, 0.2, 0.01, 0.5]);
++  assert.deepEqual([m.long.in, m.long.cw5, m.long.cw1h, m.long.cr, m.long.out], [0.5, 0.625, 1, 0.05, 2.5]);
++  assert.equal(requestPrices("claude-haiku-5-5", 100000).tier, "base");
++  assert.equal(requestPrices("claude-haiku-5-5", 100001).tier, "long");
++  assert.equal(requestPrices("claude-haiku-5-5", 100001).row.out, 2.5);
++  assert.equal(requestPrices("claude-haiku-4-5", 500000).tier, null);
++});
++
++test("addendum: WebFetch helper total from the result event is priced; base tier proven at <=100k, assumed and flagged above", () => {
++  const h45 = { inputTokens: 11, outputTokens: 1128, cacheReadInputTokens: 55603, cacheCreationInputTokens: 6992, canonicalModel: "claude-haiku-4-5" };
++  const small = usdFromResult(result({ "claude-haiku-4-5-20251001": h45, "claude-haiku-5-5": { inputTokens: 5605, outputTokens: 2451, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, canonicalModel: "claude-haiku-5-5" } }, null));
++  assert.equal(small.price_tiers["claude-haiku-5-5"], "base_proven");
++  assert.equal(small.price_tier_assumed, false);
++  const helper = (5605 * 0.1 + 2451 * 0.5) / 1e6;
++  assert.ok(Math.abs(helper - 0.001786) < 1e-12);
++  const big = usdFromResult(result({ "claude-haiku-5-5": { inputTokens: 60000, outputTokens: 10, cacheReadInputTokens: 50000, cacheCreationInputTokens: 0, canonicalModel: "claude-haiku-5-5" } }, null));
++  assert.equal(big.price_tiers["claude-haiku-5-5"], "base_assumed");
++  assert.equal(big.price_tier_assumed, true);
++  assert.ok(Math.abs(big.usd - (60000 * 0.1 + 10 * 0.5 + 50000 * 0.01) / 1e6) < 1e-12);
++  const none = usdFromResult(result({ "claude-haiku-4-5-20251001": h45 }, null));
++  assert.equal(none.price_tiers, undefined);
++});
+diff --git a/scripts/e2e/start-cost-ab-arms.mjs b/scripts/e2e/start-cost-ab-arms.mjs
+index f2488020..7d38d6c1 100644
+--- a/scripts/e2e/start-cost-ab-arms.mjs
++++ b/scripts/e2e/start-cost-ab-arms.mjs
+@@ -22,8 +22,9 @@ import { fileURLToPath } from "node:url";
+ import { tenantPreflight, disposableHeaders, headerLines, adminKeyFromEnv, isOwnerTenant, claudeLoginCredential } from "./tenant-preflight.mjs";
+ import { seedCredentials } from "../../tests/fourarm/runner.mjs";
+ import { readOpsSession, gatewayBilled } from "./billed-basis.mjs";
+-import { WORK } from "./short-workloads.mjs";
+-import { FailClosed, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, rateLimited, publicRecord, buildEvidence, PLUGIN_ARMS } from "./oss-arms-lib.mjs";
++import { WORK as SHORT_WORK } from "./short-workloads.mjs";
++import { TRYIT_WORK, TRYIT_LABELS } from "./tryit-workloads.mjs";
++import { FailClosed, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, rateLimited, publicRecord, buildEvidence, PLUGIN_ARMS, sessionTenant } from "./oss-arms-lib.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const REPO = dirname(dirname(HERE));
+@@ -31,6 +32,10 @@ const argv = process.argv;
+ const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : d; };
+ const flag = (n) => argv.indexOf(n) >= 0;
+ const need = (n) => { const v = arg(n, ""); if (!v) throw new FailClosed("missing-flag", n); return v; };
++// --workloads short (default: the six short workloads) | tryit (the README try-it prompts, scripts/e2e/tryit-workloads.mjs).
++const WSET = arg("--workloads", "short");
++if (WSET !== "short" && WSET !== "tryit") throw new FailClosed("bad-workloads", WSET);
++const WORK = WSET === "tryit" ? TRYIT_WORK : SHORT_WORK;
+ 
+ const ARMS = parseArms(need("--arms"));
+ const MODEL = need("--model");
+@@ -53,7 +58,7 @@ if (!(N >= (BRIDGE > 0 ? 0 : 1)) || !(WARMUP >= 0) || !(BRIDGE >= 0) || !(CAP >
+ if (!CLAUDE.startsWith("/")) throw new FailClosed("claude-not-absolute", "pass the absolute real binary, not a PATH shim");
+ const WLS = Object.keys(WORK).filter((w) => ONLY.length === 0 || ONLY.indexOf(w) >= 0);
+ if (WLS.length === 0) throw new FailClosed("no-workloads", ONLY.join(","));
+-const LABELS = { tests: "npm test fix loop, short", json: "One large JSON file", log: "One large log", git: "Repo history question (git log, 320 commits)", grep: "Code search (grep over 150 files)", edit: "One-line edit" };
++const LABELS = WSET === "tryit" ? TRYIT_LABELS : { tests: "npm test fix loop, short", json: "One large JSON file", log: "One large log", git: "Repo history question (git log, 320 commits)", grep: "Code search (grep over 150 files)", edit: "One-line edit" };
+ const NEEDS_GW = ARMS.indexOf("gateway") >= 0 || BRIDGE > 0;
+ 
+ // ── freeze checks ───────────────────────────────────────────────────────────────────────────────────────────
+@@ -88,17 +93,11 @@ if (HARNESS_DIRTY) throw new FailClosed("harness-dirty", "commit scripts/e2e bef
+ 
+ // ── gateway (only when an arm needs it) ─────────────────────────────────────────────────────────────────────
+ let GW = null, ADMIN = null;
+-const TENANTS = {};
+ if (NEEDS_GW) {
+   const { CONFIG } = await import("../../tests/scenarios.mjs");
+   GW = arg("--gw", process.env.CM_GW_URL || CONFIG.GW);
+   ADMIN = await adminKeyFromEnv();
+   if (!ADMIN) throw new FailClosed("no-admin-key", "without the admin key x-cm-tenant is ignored and traffic lands on the owner tenant");
+-  for (const w of WLS) {
+-    const t = "t_ossab_" + STAMP + "_" + w;
+-    if (isOwnerTenant(t)) throw new FailClosed("owner-tenant", "refused");
+-    TENANTS[w] = t;
+-  }
+ }
+ async function getJson(path, withKey) {
+   const r = await fetch(GW + path, { headers: withKey ? { "x-context-mode-key": ADMIN } : {} });
+@@ -143,13 +142,19 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+   for (const k of Object.keys(env)) if (k.indexOf("CLAUDE_CODE_") === 0 || k === "CLAUDECODE" || k === "CLAUDE_PID" || k === "AI_AGENT" || k === "CLAUDE_EFFORT") delete env[k];
+   delete env.ANTHROPIC_BASE_URL; delete env.ANTHROPIC_CUSTOM_HEADERS;
+   env.ENABLE_CLAUDEAI_MCP_SERVERS = "false"; env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1"; env.CLAUDE_CODE_DISABLE_CLAUDE_MDS = "1";
+-  if (arm === "gateway") { env.ANTHROPIC_BASE_URL = GW; env.ANTHROPIC_CUSTOM_HEADERS = headerLines(disposableHeaders({ adminKey: ADMIN, tenant: TENANTS[w] })); }
++  // Amendment 1: a NEW disposable tenant per gateway SESSION, proved by a dry-run preflight before the session.
++  const tenant = arm === "gateway" ? sessionTenant({ stamp: STAMP, w, role, cycle, attempt }, isOwnerTenant) : null;
++  if (arm === "gateway") {
++    const pre = await tenantPreflight({ gw: GW, headers: disposableHeaders({ adminKey: ADMIN, tenant }), dialect: "anthropic", expect: tenant, credential: claudeLoginCredential() });
++    if (!pre || pre.tenant !== tenant) throw new FailClosed("preflight", w + " " + role + " " + cycle);
++    env.ANTHROPIC_BASE_URL = GW; env.ANTHROPIC_CUSTOM_HEADERS = headerLines(disposableHeaders({ adminKey: ADMIN, tenant }));
++  }
+   const spec = SPECS[arm] || null;
+   const args = ["-p", WORK[w].prompt, "--model", MODEL, "--output-format", "stream-json", "--verbose", "--max-turns", MAX_TURNS,
+     "--permission-mode", "bypassPermissions", "--max-budget-usd", BUDGET, "--strict-mcp-config"];
+   if (spec) args.push("--plugin-dir", spec.dir, "--mcp-config", JSON.stringify(spec.map));
+   else args.push("--mcp-config", JSON.stringify({ mcpServers: {} }));
+-  const flagsBefore = arm === "gateway" ? await readFlags(TENANTS[w]) : undefined;
++  const flagsBefore = arm === "gateway" ? await readFlags(tenant) : undefined;
+   const t0 = Date.now();
+   const out = await new Promise((res) => {
+     const c = spawn(CLAUDE, args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+@@ -168,7 +173,6 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+     harness_commit: HARNESS_COMMIT, credential: cred.credentialMode, session: p.init ? p.init.session_id : null, tools: p.tools,
+     rate_limited: rateLimited(p.events), turns: p.result ? p.result.num_turns : null, result_subtype: p.result ? p.result.subtype : null };
+   rec.budget_hit = !!(rec.result_subtype && String(rec.result_subtype).indexOf("budget") >= 0);
+-  rec.success = p.result ? WORK[w].ok(dir, META[w], answer) === true : false;
+   if (spec) {
+     rec.plugin = { arm, ...spec.revision };
+     rec.plugin_tool_calls = Object.keys(p.tools).filter((t) => t.indexOf(spec.prefix) === 0).reduce((s, t) => s + p.tools[t], 0);
+@@ -177,21 +181,29 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+   rec.resolution = { ok: res.ok, why: res.why, ...res.evidence };
+   const cost = p.result ? usdFromResult(p.result) : null;
+   rec.usd_client = p.result ? Number(p.result.total_cost_usd) : null;
+-  if (cost && cost.usd !== null) { rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage"; }
+-  else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
++  if (cost && cost.usd !== null) {
++    rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage";
++    if (cost.price_tiers) { rec.price_tiers = cost.price_tiers; rec.price_tier_assumed = cost.price_tier_assumed; }
++  } else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
+   if (arm === "gateway") {
+     rec.flags_before = flagsBefore;
+-    rec.tenant = TENANTS[w];
++    rec.tenant = tenant;
++    rec.tenant_scope = "session";
+     if (rec.session) {
+-      const o = await readOpsSession({ gw: GW, adminKey: ADMIN, tenant: TENANTS[w], session: rec.session, hours: 6 });
++      const o = await readOpsSession({ gw: GW, adminKey: ADMIN, tenant, session: rec.session, hours: 6 });
+       const billed = gatewayBilled([o], p.results);
+       rec.gateway_record = o && o.found ? { found: true, complete: !!o.complete, requests: o.requests, edge_calls: o.edge_calls, tokens: o.tokens, anthropic_usd: o.anthropic_usd, coverage: billed.coverage } : { found: false };
+       if (billed.usd === null) { rec.resolution.ok = false; rec.resolution.why.push("gateway-record " + billed.why); }
+       else { rec.usd = billed.usd; rec.usd_low = billed.usd; rec.calls_from = "gateway_record_session"; }
+     } else { rec.resolution.ok = false; rec.resolution.why.push("gateway-no-session"); }
+     rec.resolution.gateway_record_found = !!(rec.gateway_record && rec.gateway_record.found);
+-    rec.flags_after = await readFlags(TENANTS[w]);
++    rec.flags_after = await readFlags(tenant);
+   }
++  // Amendment 1: the gateway arm's tool calls that ran at the edge (gateway per-call record, edge_calls) count as tool
++  // calls for the completion check; the client transcript never shows them.
++  if (arm === "gateway") p.edge_calls = rec.gateway_record && rec.gateway_record.found ? Number(rec.gateway_record.edge_calls) || 0 : 0;
++  rec.success = p.result ? WORK[w].ok(dir, META[w], answer, p) === true : false;
++  if (WORK[w].why) rec.oracle = WORK[w].why(dir, META[w], answer, p);
+   if (rec.usd !== null && rec.usd_client > 0) {
+     rec.client_gap_pct = 100 * (rec.usd - rec.usd_client) / rec.usd_client;
+     rec.client_gap_flag = Math.abs(rec.client_gap_pct) > 1;
+@@ -204,7 +216,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
+ function writeEvidence() {
+   const doc = buildEvidence({ runs, workloads: WLS, arms: ARMS, labels: LABELS, meta: {
+     pairs_planned: N, warmup: WARMUP, model: MODEL, client_version: CLIENT_VERSION, date: new Date().toISOString().split("T")[0], harness_commit: HARNESS_COMMIT,
+-    workload_source: "scripts/e2e/short-workloads.mjs at gateway commit 408333a48d082830f5813b3f539ec03993830a89, unchanged",
++    workload_source: WSET === "tryit" ? "scripts/e2e/tryit-workloads.mjs (prompts verbatim from docs/benchmarks/try-it/prereg.md, OSS v2-design f924eda2)" : "scripts/e2e/short-workloads.mjs at gateway commit 408333a48d082830f5813b3f539ec03993830a89, unchanged",
++    workload_meta: WSET === "tryit" && META["git-history"] ? { "git-history": { pinned: META["git-history"].pinned, top_commits: META["git-history"].top_commits } } : undefined,
+     plugins: Object.fromEntries(Object.values(SPECS).map((s) => [s.arm, { server: s.server, tool_prefix: s.prefix, ...s.revision }])),
+     arm_text: { plain: "Claude Code talks to Anthropic direct, no plugin.", v1: "Claude Code with the OSS context-mode plugin v1.", v2: "Claude Code with the OSS context-mode plugin v2.", gateway: "Claude Code talks to Anthropic through Context Mode." } } });
+   doc.public_runs = runs.map(publicRecord);
+@@ -242,15 +255,6 @@ async function runCycle(w, role, cycle, order) {
+ }
+ 
+ // ── the grid ────────────────────────────────────────────────────────────────────────────────────────────────
+-const preflights = {};
+-if (NEEDS_GW) {
+-  const cred = claudeLoginCredential();
+-  for (const w of WLS) {
+-    const pre = await tenantPreflight({ gw: GW, headers: disposableHeaders({ adminKey: ADMIN, tenant: TENANTS[w] }), dialect: "anthropic", expect: TENANTS[w], credential: cred });
+-    if (!pre || pre.tenant !== TENANTS[w]) throw new FailClosed("preflight", w);
+-    preflights[w] = true;
+-  }
+-}
+ const lanes = WLS.slice();
+ await Promise.all(Array.from({ length: Math.max(1, Math.min(CONC, WLS.length)) }, async () => {
+   while (lanes.length && !stopped) {
+diff --git a/scripts/e2e/tryit-workloads.mjs b/scripts/e2e/tryit-workloads.mjs
+new file mode 100644
+index 00000000..bd9fffca
+--- /dev/null
++++ b/scripts/e2e/tryit-workloads.mjs
+@@ -0,0 +1,67 @@
++// scripts/e2e/tryit-workloads.mjs — THE SIX README "TRY IT" PROMPTS (docs/benchmarks/try-it/prereg.md on the OSS repo,
++// branch v2-design, commit f924eda2). Same shape as short-workloads.mjs: a fixture builder, the verbatim prompt, and a
++// task oracle `ok(dir, meta, answer, parsed)`. Every fixture is an EMPTY cwd: the prompts fetch, clone or build what
++// they need. `why(...)` returns the oracle's reason, so a fail is explained in the private record.
++// NO REGEX. NO TRUNCATION. Fail closed: an oracle that cannot find its reference answers false.
++import { spawnSync } from "node:child_process";
++import { mkdirSync } from "node:fs";
++import { join } from "node:path";
++import { largeJsonTranscriptWhy } from "./oss-arms-lib.mjs";
++
++const empty = (dir) => { mkdirSync(dir, { recursive: true }); return {}; };
++// Client-visible tool_use blocks plus (gateway arm, amendment 1) the edge calls in the gateway per-call record.
++export const toolCalls = (p) => Object.values((p && p.tools) || {}).reduce((s, n) => s + n, 0) + (Number(p && p.edge_calls) || 0);
++
++/** Completion check (prereg): end_turn, at least one tool call, a non-empty final answer. Not a quality check. */
++export function completionWhy(dir, m, answer, p) {
++  if (!p || !p.result) return "no-result-event";
++  if (p.result.is_error === true || p.result.subtype !== "success") return "result-" + p.result.subtype;
++  if (p.result.stop_reason !== undefined && p.result.stop_reason !== null && p.result.stop_reason !== "end_turn") return "stop-" + p.result.stop_reason;
++  if (toolCalls(p) < 1) return "no-tool-call";
++  if (String(answer || "").trim().length === 0) return "empty-answer";
++  return "ok";
++}
++
++// ── large-json (prereg amendment 1): the hidden record as the session's OWN tool_result showed it ─────────────
++// The first run read the record back from disk and failed every arm that built the data in memory
++// ("no-served-data-on-disk"). The reference is now the record object JSON-parsed from the tool_result that served or
++// generated index 13000 (oss-arms-lib.mjs largeJsonTranscriptWhy). Success = every scalar leaf of that record appears
++// whole in the final answer. No such tool_result: "no-record-in-tool-result" (fail closed), never a guess.
++function largeJsonWhy(dir, m, answer, p) {
++  const c = completionWhy(dir, m, answer, p);
++  if (c !== "ok" && c !== "no-tool-call") return c;
++  return largeJsonTranscriptWhy(p && p.events, answer, 13000);
++}
++
++// ── git-history: the top author of the last 500 commits, from a reference clone pinned at harness start ──────
++function fxReact(dir) {
++  mkdirSync(dir, { recursive: true });
++  const ref = dir + "-ref";
++  const c = spawnSync("git", ["clone", "-q", "--bare", "--filter=blob:none", "--depth", "600", "https://github.com/facebook/react", ref], { encoding: "utf8" });
++  if (c.status !== 0) throw new Error("reference clone: " + c.stderr);
++  const head = String(spawnSync("git", ["-C", ref, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout).trim();
++  const sl = spawnSync("git", ["-C", ref, "shortlog", "-sn", "--max-count=500", "HEAD"], { encoding: "utf8" });
++  if (sl.status !== 0) throw new Error("shortlog: " + sl.stderr);
++  const rows = String(sl.stdout).split("\n").filter(Boolean).map((l) => { const t = l.trim(); const k = t.indexOf("\t"); return { n: Number(t.slice(0, k)), name: t.slice(k + 1).trim() }; });
++  if (rows.length === 0 || !(rows[0].n > 0)) throw new Error("shortlog empty");
++  const top = rows.filter((r) => r.n === rows[0].n).map((r) => r.name);
++  return { pinned: head, top, top_commits: rows[0].n };
++}
++function gitHistoryWhy(dir, m, answer, p) {
++  const c = completionWhy(dir, m, answer, p);
++  if (c !== "ok") return c;
++  const s = String(answer || "");
++  return m.top.some((n) => s.indexOf(n) >= 0) ? "ok" : "top-author-not-named";
++}
++
++const W = (prompt, why, fx = empty) => ({ fx, prompt, why, ok: (dir, m, a, p) => why(dir, m, a, p) === "ok" });
++export const TRYIT_WORK = {
++  "repo-research": W("Research https://github.com/modelcontextprotocol/servers — architecture, tech stack, top contributors, open issues, and recent activity.", completionWhy),
++  "git-history": W("Clone https://github.com/facebook/react and analyze the last 500 commits: top contributors, commit frequency by month, and most changed files.", gitHistoryWhy, fxReact),
++  "web-scrape": W("Fetch the Hacker News front page, extract all posts with titles, scores, and domains. Group by domain.", completionWhy),
++  "large-json": W("Create a local server that returns a 7.5 MB JSON with 20,000 records and a secret hidden at index 13000. Fetch the endpoint, find the hidden record, and show me exactly what's in it.", largeJsonWhy),
++  "docs-search": W("Fetch the React useEffect docs, index them, and find the cleanup pattern with code examples.", completionWhy),
++  "session-continuity": W("Start a multi-step task: Create a REST API with Express — add routes, tests, and error handling.", completionWhy),
++};
++export const TRYIT_LABELS = { "repo-research": "Repo research (MCP servers)", "git-history": "Git history (react, 500 commits)", "web-scrape": "Web scrape (Hacker News)",
++  "large-json": "Large JSON (7.5 MB, 20,000 records)", "docs-search": "Docs search (useEffect cleanup)", "session-continuity": "Session continuity (Express API), demonstration only" };

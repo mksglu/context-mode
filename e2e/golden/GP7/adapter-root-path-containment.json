@@ -1,0 +1,11 @@
+{
+  "reply": {
+    "content": [
+      {
+        "type": "text",
+        "text": "hello agents\n"
+      }
+    ],
+    "isError": false
+  }
+}

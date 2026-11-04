@@ -1,0 +1,1075 @@
+
+ RUN  v5.0.5 /work/vite
+
+ ❯ packages/create-vite/__tests__/cli.spec.ts (25 tests | 25 failed) 1138ms
+   × prompts for the project name if none supplied 44ms
+   × prompts for the framework if none supplied when target dir is current directory 46ms
+   × prompts for the framework if none supplied 42ms
+   × prompts for the framework on not supplying a value for --template 38ms
+   × prompts for the framework on supplying an invalid template 42ms
+   × prompts to use ESLint for React templates in interactive mode 64ms
+   × asks to overwrite non-empty target directory 45ms
+   × asks to overwrite non-empty target directory with subfolder 44ms
+   × asks to overwrite non-empty current directory 55ms
+   × successfully scaffolds a project based on vue starter template 40ms
+   × successfully scaffolds a project with subfolder based on react starter template 45ms
+   × successfully scaffolds a project based on react-compiler-ts starter template 39ms
+   × scaffolds react-ts with Oxlint by default 44ms
+   × scaffolds React template with ESLint when --eslint is passed 50ms
+   × keeps TypeScript 6 for react-ts when --eslint is passed 47ms
+   × keeps TypeScript 6 for react-compiler-ts when --eslint is passed 44ms
+   × ignores --eslint with a warning for non-React templates 38ms
+   × works with the -t alias 37ms
+   × accepts command line override for --overwrite 44ms
+   × skip prompts when --no-interactive is passed 49ms
+   × return help usage how to use create-vite 44ms
+   × return help usage how to use create-vite with -h alias 38ms
+   × sets index.html title to project name 43ms
+   × accepts immediate flag 49ms
+   × accepts immediate flag and skips install prompt 64ms
+transforming...
+✓ 4 modules transformed.
+rendering chunks...
+transforming...
+✓ 4 modules transformed.
+rendering chunks...
+transforming...
+✓ 4 modules transformed.
+rendering chunks...
+transforming...
+✓ 4 modules transformed.
+rendering chunks...
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 25 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > prompts for the project name if none supplied
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite --interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:66:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > prompts for the framework if none supplied when target dir is current directory
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite . --interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:72:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > prompts for the framework if none supplied
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:77:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > prompts for the framework on not supplying a value for --template
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive --template
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:82:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > prompts for the framework on supplying an invalid template
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive --template unknown
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:87:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > prompts to use ESLint for React templates in interactive mode
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive --template react-ts
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:99:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > asks to overwrite non-empty target directory
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:110:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > asks to overwrite non-empty target directory with subfolder
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite subfolder/test-app --interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:118:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > asks to overwrite non-empty current directory
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite . --interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:128:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > successfully scaffolds a project based on vue starter template
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive --no-immediate --template vue --no-rolldown
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:133:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > successfully scaffolds a project with subfolder based on react starter template
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite subfolder/test-app --interactive --no-immediate --template react --no-eslint --no-rolldown
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:154:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > successfully scaffolds a project based on react-compiler-ts starter template
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template react-compiler-ts
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:176:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > scaffolds react-ts with Oxlint by default
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template react-ts
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:197:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > scaffolds React template with ESLint when --eslint is passed
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template react --eslint
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:225:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > keeps TypeScript 6 for react-ts when --eslint is passed
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template react-ts --eslint
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:243:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > keeps TypeScript 6 for react-compiler-ts when --eslint is passed
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template react-compiler-ts --eslint
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:243:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > ignores --eslint with a warning for non-React templates
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template vue --eslint
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:257:30
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > works with the -t alias
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --interactive --no-immediate -t vue --no-rolldown
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:274:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > accepts command line override for --overwrite
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite . --interactive --overwrite ignore
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:296:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > skip prompts when --no-interactive is passed
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --no-interactive
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:304:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > return help usage how to use create-vite
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite --help
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:310:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > return help usage how to use create-vite with -h alias
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite -h
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:320:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > sets index.html title to project name
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template react
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:326:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > accepts immediate flag
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template vue --immediate
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:338:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/25]⎯
+
+ FAIL  packages/create-vite/__tests__/cli.spec.ts > accepts immediate flag and skips install prompt
+ExecaSyncError: Command failed with exit code 1: node /work/vite/packages/create-vite test-app --template vue --no-immediate
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/work/vite/packages/create-vite/dist/index.js' imported from /work/vite/packages/create-vite/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///work/vite/packages/create-vite/dist/index.js'
+}
+
+Node.js v26.8.1
+ ❯ getFinalError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/final-error.js:6:9
+ ❯ makeError node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/return/result.js:108:16
+ ❯ getSyncResult node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:146:4
+ ❯ spawnSubprocessSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:100:9
+ ❯ execaCoreSync node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/main-sync.js:18:17
+ ❯ callBoundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:43:5
+ ❯ boundExeca node_modules/.pnpm/execa@9.6.1/node_modules/execa/lib/methods/create.js:15:44
+ ❯ run packages/create-vite/__tests__/cli.spec.ts:18:10
+     16|
+     17| const run = (args: string[], options?: SyncOptions) => {
+     18|   return execaCommandSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+       |          ^
+     19|     env: { ...process.env, _VITE_TEST_CLI: 'true' },
+     20|     ...options,
+ ❯ packages/create-vite/__tests__/cli.spec.ts:347:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/25]⎯
+
+
+ Test Files  1 failed | 73 passed (74)
+      Tests  25 failed | 1078 passed | 3 skipped (1106)
+   Start at  11:17:49
+   Duration  1.99s (tests 70%, import 18%, transform 11%)
+

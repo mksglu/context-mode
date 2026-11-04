@@ -1,0 +1,40 @@
+{
+  "perTool": [
+    {
+      "name": "ctx_execute",
+      "len": 639
+    },
+    {
+      "name": "ctx_batch",
+      "len": 437
+    },
+    {
+      "name": "ctx_index",
+      "len": 439
+    },
+    {
+      "name": "ctx_search",
+      "len": 838
+    },
+    {
+      "name": "ctx_resume",
+      "len": 466
+    },
+    {
+      "name": "ctx_stats",
+      "len": 259
+    },
+    {
+      "name": "ctx_doctor",
+      "len": 618
+    },
+    {
+      "name": "ctx_upgrade",
+      "len": 377
+    },
+    {
+      "name": "ctx_purge",
+      "len": 257
+    }
+  ]
+}

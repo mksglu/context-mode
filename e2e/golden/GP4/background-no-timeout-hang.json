@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "started in background, pid <pid>"
+    }
+  ],
+  "isError": false
+}

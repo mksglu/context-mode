@@ -1,0 +1,1255 @@
+{
+  "read_at": "2026-11-01T08:06:19Z",
+  "method": "GitHub GraphQL API, repository(owner:mksglu,name:context-mode).stargazers, all pages, field user.company. Each value was trimmed, lower-cased and a leading @ was dropped. Only the verified GitHub org handle aws was joined to Amazon Web Services; other org handles are already the same string as the company name after this step, or the org is not verified (facebook, bytedance) and was not joined. Companies with fewer than 2 stargazers were dropped. Values that are not a company name (placeholders such as freelance or student, places) and schools were moved to excluded by an explicit name list. No logins or personal data are stored.",
+  "total_stargazers": 33065,
+  "with_company": 6942,
+  "companies": [
+    {
+      "name": "Microsoft",
+      "count": 32
+    },
+    {
+      "name": "Tencent",
+      "count": 22
+    },
+    {
+      "name": "Alibaba",
+      "count": 19
+    },
+    {
+      "name": "ByteDance",
+      "count": 15
+    },
+    {
+      "name": "Google",
+      "count": 12
+    },
+    {
+      "name": "IBM",
+      "count": 12
+    },
+    {
+      "name": "Trendyol",
+      "count": 11
+    },
+    {
+      "name": "Amazon",
+      "count": 8
+    },
+    {
+      "name": "Red Hat",
+      "count": 8
+    },
+    {
+      "name": "Amazon Web Services",
+      "count": 7
+    },
+    {
+      "name": "EPAM Systems",
+      "count": 7
+    },
+    {
+      "name": "Baidu",
+      "count": 6
+    },
+    {
+      "name": "meituan",
+      "count": 6
+    },
+    {
+      "name": "Accenture",
+      "count": 5
+    },
+    {
+      "name": "Apple",
+      "count": 5
+    },
+    {
+      "name": "Capgemini",
+      "count": 5
+    },
+    {
+      "name": "Getir",
+      "count": 5
+    },
+    {
+      "name": "iFood",
+      "count": 5
+    },
+    {
+      "name": "NAVER",
+      "count": 5
+    },
+    {
+      "name": "NVIDIA",
+      "count": 5
+    },
+    {
+      "name": "SAP",
+      "count": 5
+    },
+    {
+      "name": "Alibaba Cloud",
+      "count": 4
+    },
+    {
+      "name": "Bekk",
+      "count": 4
+    },
+    {
+      "name": "Bosch",
+      "count": 4
+    },
+    {
+      "name": "DataDog",
+      "count": 4
+    },
+    {
+      "name": "Globant",
+      "count": 4
+    },
+    {
+      "name": "Huawei",
+      "count": 4
+    },
+    {
+      "name": "Intuit",
+      "count": 4
+    },
+    {
+      "name": "LINE",
+      "count": 4
+    },
+    {
+      "name": "Meta",
+      "count": 4
+    },
+    {
+      "name": "Nubank",
+      "count": 4
+    },
+    {
+      "name": "Shopee",
+      "count": 4
+    },
+    {
+      "name": "Shopify",
+      "count": 4
+    },
+    {
+      "name": "tarfin-labs",
+      "count": 4
+    },
+    {
+      "name": "Turkish Technology",
+      "count": 4
+    },
+    {
+      "name": "Yandex",
+      "count": 4
+    },
+    {
+      "name": "acquia",
+      "count": 3
+    },
+    {
+      "name": "Adobe",
+      "count": 3
+    },
+    {
+      "name": "Adyen",
+      "count": 3
+    },
+    {
+      "name": "Atlan",
+      "count": 3
+    },
+    {
+      "name": "binalyze",
+      "count": 3
+    },
+    {
+      "name": "Canva",
+      "count": 3
+    },
+    {
+      "name": "CI&T",
+      "count": 3
+    },
+    {
+      "name": "daangn",
+      "count": 3
+    },
+    {
+      "name": "Deloitte",
+      "count": 3
+    },
+    {
+      "name": "Deutsche Telekom",
+      "count": 3
+    },
+    {
+      "name": "doordash",
+      "count": 3
+    },
+    {
+      "name": "elastic",
+      "count": 3
+    },
+    {
+      "name": "EpicGames",
+      "count": 3
+    },
+    {
+      "name": "facebook",
+      "count": 3
+    },
+    {
+      "name": "GitHub",
+      "count": 3
+    },
+    {
+      "name": "Globo",
+      "count": 3
+    },
+    {
+      "name": "itau",
+      "count": 3
+    },
+    {
+      "name": "Oracle",
+      "count": 3
+    },
+    {
+      "name": "railsware",
+      "count": 3
+    },
+    {
+      "name": "Revvity",
+      "count": 3
+    },
+    {
+      "name": "Salesforce",
+      "count": 3
+    },
+    {
+      "name": "Samsung Electronics",
+      "count": 3
+    },
+    {
+      "name": "SK Telecom",
+      "count": 3
+    },
+    {
+      "name": "tajawal",
+      "count": 3
+    },
+    {
+      "name": "Tata Consultancy Services",
+      "count": 3
+    },
+    {
+      "name": "Thoughtworks",
+      "count": 3
+    },
+    {
+      "name": "Turkcell",
+      "count": 3
+    },
+    {
+      "name": "Walmart",
+      "count": 3
+    },
+    {
+      "name": "Zenaida Orn Company",
+      "count": 3
+    },
+    {
+      "name": "42dot",
+      "count": 2
+    },
+    {
+      "name": "Abbon-Corporation",
+      "count": 2
+    },
+    {
+      "name": "AfterShip",
+      "count": 2
+    },
+    {
+      "name": "Akinon",
+      "count": 2
+    },
+    {
+      "name": "Alipay",
+      "count": 2
+    },
+    {
+      "name": "AmadeusITGroup",
+      "count": 2
+    },
+    {
+      "name": "AMD",
+      "count": 2
+    },
+    {
+      "name": "Ant Group",
+      "count": 2
+    },
+    {
+      "name": "apache",
+      "count": 2
+    },
+    {
+      "name": "Apsiyon",
+      "count": 2
+    },
+    {
+      "name": "astronautsid",
+      "count": 2
+    },
+    {
+      "name": "Aviasales",
+      "count": 2
+    },
+    {
+      "name": "AVRillo R&D",
+      "count": 2
+    },
+    {
+      "name": "Bytedance Inc.",
+      "count": 2
+    },
+    {
+      "name": "Canonical",
+      "count": 2
+    },
+    {
+      "name": "Capital One",
+      "count": 2
+    },
+    {
+      "name": "Carbonfact",
+      "count": 2
+    },
+    {
+      "name": "Cargill",
+      "count": 2
+    },
+    {
+      "name": "clerk",
+      "count": 2
+    },
+    {
+      "name": "Cloudflare",
+      "count": 2
+    },
+    {
+      "name": "Comcast",
+      "count": 2
+    },
+    {
+      "name": "Constant Contact",
+      "count": 2
+    },
+    {
+      "name": "Countly",
+      "count": 2
+    },
+    {
+      "name": "creditornot",
+      "count": 2
+    },
+    {
+      "name": "Data.be",
+      "count": 2
+    },
+    {
+      "name": "Dayforce",
+      "count": 2
+    },
+    {
+      "name": "Delivery Hero",
+      "count": 2
+    },
+    {
+      "name": "didi",
+      "count": 2
+    },
+    {
+      "name": "DIDWW",
+      "count": 2
+    },
+    {
+      "name": "DigIO",
+      "count": 2
+    },
+    {
+      "name": "digitalocean",
+      "count": 2
+    },
+    {
+      "name": "EcimTech",
+      "count": 2
+    },
+    {
+      "name": "EnterpriseDB",
+      "count": 2
+    },
+    {
+      "name": "EPAM",
+      "count": 2
+    },
+    {
+      "name": "Epinova",
+      "count": 2
+    },
+    {
+      "name": "Episerver",
+      "count": 2
+    },
+    {
+      "name": "FUTU",
+      "count": 2
+    },
+    {
+      "name": "GliaCloud",
+      "count": 2
+    },
+    {
+      "name": "globalmsq",
+      "count": 2
+    },
+    {
+      "name": "Gojek",
+      "count": 2
+    },
+    {
+      "name": "GoodNotes",
+      "count": 2
+    },
+    {
+      "name": "Grab",
+      "count": 2
+    },
+    {
+      "name": "grafana",
+      "count": 2
+    },
+    {
+      "name": "gravitee-io",
+      "count": 2
+    },
+    {
+      "name": "hashicorp",
+      "count": 2
+    },
+    {
+      "name": "HelloFresh",
+      "count": 2
+    },
+    {
+      "name": "HubSpot",
+      "count": 2
+    },
+    {
+      "name": "IFLYTEK",
+      "count": 2
+    },
+    {
+      "name": "inohom-dev",
+      "count": 2
+    },
+    {
+      "name": "InStrategy",
+      "count": 2
+    },
+    {
+      "name": "Intel",
+      "count": 2
+    },
+    {
+      "name": "Invicti-Security",
+      "count": 2
+    },
+    {
+      "name": "Jet HR",
+      "count": 2
+    },
+    {
+      "name": "JetBrains",
+      "count": 2
+    },
+    {
+      "name": "JPMorganChase",
+      "count": 2
+    },
+    {
+      "name": "Jusbrasil",
+      "count": 2
+    },
+    {
+      "name": "Kainos",
+      "count": 2
+    },
+    {
+      "name": "kakao",
+      "count": 2
+    },
+    {
+      "name": "kms-technology",
+      "count": 2
+    },
+    {
+      "name": "KPMG",
+      "count": 2
+    },
+    {
+      "name": "Kwai",
+      "count": 2
+    },
+    {
+      "name": "lablup",
+      "count": 2
+    },
+    {
+      "name": "looptech-ai",
+      "count": 2
+    },
+    {
+      "name": "M.academy",
+      "count": 2
+    },
+    {
+      "name": "Manulife",
+      "count": 2
+    },
+    {
+      "name": "Mapbox",
+      "count": 2
+    },
+    {
+      "name": "Mastercard",
+      "count": 2
+    },
+    {
+      "name": "mAy-I",
+      "count": 2
+    },
+    {
+      "name": "MERCADOLIBRE",
+      "count": 2
+    },
+    {
+      "name": "Mercury",
+      "count": 2
+    },
+    {
+      "name": "Metro Markets GmbH",
+      "count": 2
+    },
+    {
+      "name": "Microsoft Corporation",
+      "count": 2
+    },
+    {
+      "name": "Mistral AI",
+      "count": 2
+    },
+    {
+      "name": "Moneo",
+      "count": 2
+    },
+    {
+      "name": "MongoDB",
+      "count": 2
+    },
+    {
+      "name": "NAVER LABS",
+      "count": 2
+    },
+    {
+      "name": "nearform",
+      "count": 2
+    },
+    {
+      "name": "Neon",
+      "count": 2
+    },
+    {
+      "name": "Netcompany",
+      "count": 2
+    },
+    {
+      "name": "newrelic",
+      "count": 2
+    },
+    {
+      "name": "nex-health",
+      "count": 2
+    },
+    {
+      "name": "nexcar-ai",
+      "count": 2
+    },
+    {
+      "name": "Nexthink",
+      "count": 2
+    },
+    {
+      "name": "NHN Cloud",
+      "count": 2
+    },
+    {
+      "name": "phantom",
+      "count": 2
+    },
+    {
+      "name": "Placer.ai",
+      "count": 2
+    },
+    {
+      "name": "Playtag",
+      "count": 2
+    },
+    {
+      "name": "Polarsteps",
+      "count": 2
+    },
+    {
+      "name": "Qlik",
+      "count": 2
+    },
+    {
+      "name": "RackN",
+      "count": 2
+    },
+    {
+      "name": "radarlabs",
+      "count": 2
+    },
+    {
+      "name": "rastmob",
+      "count": 2
+    },
+    {
+      "name": "RefikAnadolStudio",
+      "count": 2
+    },
+    {
+      "name": "Resend",
+      "count": 2
+    },
+    {
+      "name": "Reshopper",
+      "count": 2
+    },
+    {
+      "name": "RingCentral",
+      "count": 2
+    },
+    {
+      "name": "Riot Games",
+      "count": 2
+    },
+    {
+      "name": "Rippling",
+      "count": 2
+    },
+    {
+      "name": "Roche",
+      "count": 2
+    },
+    {
+      "name": "RoyalAholdDelhaize",
+      "count": 2
+    },
+    {
+      "name": "Salesforce.com",
+      "count": 2
+    },
+    {
+      "name": "shftco",
+      "count": 2
+    },
+    {
+      "name": "Siemens",
+      "count": 2
+    },
+    {
+      "name": "simplifi",
+      "count": 2
+    },
+    {
+      "name": "Softplan",
+      "count": 2
+    },
+    {
+      "name": "Solita",
+      "count": 2
+    },
+    {
+      "name": "sparkfabrik",
+      "count": 2
+    },
+    {
+      "name": "Spotify",
+      "count": 2
+    },
+    {
+      "name": "stablyai",
+      "count": 2
+    },
+    {
+      "name": "Syngenta",
+      "count": 2
+    },
+    {
+      "name": "Tailscale",
+      "count": 2
+    },
+    {
+      "name": "Talabat-dhme",
+      "count": 2
+    },
+    {
+      "name": "TCS",
+      "count": 2
+    },
+    {
+      "name": "Teya",
+      "count": 2
+    },
+    {
+      "name": "The LEGO Group",
+      "count": 2
+    },
+    {
+      "name": "thunisoft",
+      "count": 2
+    },
+    {
+      "name": "TikTok",
+      "count": 2
+    },
+    {
+      "name": "TRA-Tech",
+      "count": 2
+    },
+    {
+      "name": "Trade Republic",
+      "count": 2
+    },
+    {
+      "name": "TRANZACT",
+      "count": 2
+    },
+    {
+      "name": "twelvelabs-io",
+      "count": 2
+    },
+    {
+      "name": "Two Hour Lunch",
+      "count": 2
+    },
+    {
+      "name": "Universidad Nacional de Colombia",
+      "count": 2
+    },
+    {
+      "name": "VML",
+      "count": 2
+    },
+    {
+      "name": "Wikando GmbH",
+      "count": 2
+    },
+    {
+      "name": "Workday",
+      "count": 2
+    },
+    {
+      "name": "World Wide Technology",
+      "count": 2
+    },
+    {
+      "name": "youtouchcl",
+      "count": 2
+    },
+    {
+      "name": "youzan",
+      "count": 2
+    },
+    {
+      "name": "ZOOM",
+      "count": 2
+    }
+  ],
+  "excluded": [
+    {
+      "name": "freelance",
+      "count": 26,
+      "reason": "not a company name"
+    },
+    {
+      "name": "freelancer",
+      "count": 18,
+      "reason": "not a company name"
+    },
+    {
+      "name": "student",
+      "count": 11,
+      "reason": "not a company name"
+    },
+    {
+      "name": "home",
+      "count": 10,
+      "reason": "not a company name"
+    },
+    {
+      "name": "none",
+      "count": 9,
+      "reason": "not a company name"
+    },
+    {
+      "name": "self",
+      "count": 8,
+      "reason": "not a company name"
+    },
+    {
+      "name": "self-employed",
+      "count": 8,
+      "reason": "not a company name"
+    },
+    {
+      "name": "zhejiang university",
+      "count": 8,
+      "reason": "school"
+    },
+    {
+      "name": "nanjing university",
+      "count": 7,
+      "reason": "school"
+    },
+    {
+      "name": "sun yat-sen university",
+      "count": 7,
+      "reason": "school"
+    },
+    {
+      "name": "china",
+      "count": 6,
+      "reason": "not a company name"
+    },
+    {
+      "name": "beihang university",
+      "count": 5,
+      "reason": "school"
+    },
+    {
+      "name": "independent",
+      "count": 5,
+      "reason": "not a company name"
+    },
+    {
+      "name": "personal",
+      "count": 5,
+      "reason": "not a company name"
+    },
+    {
+      "name": "shanghai jiao tong university",
+      "count": 5,
+      "reason": "school"
+    },
+    {
+      "name": "sichuan university",
+      "count": 5,
+      "reason": "school"
+    },
+    {
+      "name": "technical university of munich",
+      "count": 5,
+      "reason": "school"
+    },
+    {
+      "name": "-",
+      "count": 4,
+      "reason": "not a company name"
+    },
+    {
+      "name": "dalian university of technology",
+      "count": 4,
+      "reason": "school"
+    },
+    {
+      "name": "fudan university",
+      "count": 4,
+      "reason": "school"
+    },
+    {
+      "name": "null",
+      "count": 4,
+      "reason": "not a company name"
+    },
+    {
+      "name": "remote",
+      "count": 4,
+      "reason": "not a company name"
+    },
+    {
+      "name": "self employed",
+      "count": 4,
+      "reason": "not a company name"
+    },
+    {
+      "name": "software engineer",
+      "count": 4,
+      "reason": "not a company name"
+    },
+    {
+      "name": "university of chinese academy of sciences",
+      "count": 4,
+      "reason": "school"
+    },
+    {
+      "name": "xidian university",
+      "count": 4,
+      "reason": "school"
+    },
+    {
+      "name": "beijing normal university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "bupt",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "carnegie mellon university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "columbia university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "cornell university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "independent developer",
+      "count": 3,
+      "reason": "not a company name"
+    },
+    {
+      "name": "istanbul technical university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "jilin university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "national university of singapore",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "scut",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "stealth startup",
+      "count": 3,
+      "reason": "not a company name"
+    },
+    {
+      "name": "tsinghua university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "university of electronic science and technology of china",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "university of michigan",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "university of queensland",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "ustc",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "xi'an jiaotong university",
+      "count": 3,
+      "reason": "school"
+    },
+    {
+      "name": "arizona state university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "beijing",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "beijing information science and technology university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "boğaziçi university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "china university of geosciences (wuhan)",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "chongqing university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "confidential",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "ege university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "eth zürich",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "freelance full stack developer",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "georgia institute of technology",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "georgia tech",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "hust",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "imperial college london",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "independent researcher",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "indian institute of technology, kharagpur",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "it",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "japan",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "kyung hee university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "no",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "northwestern polytechnical university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "other",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "peking university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "politeknik elektronika negeri surabaya",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "private",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "purdue university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "seoul national university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "soochow university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "southeast university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "taiwan",
+      "count": 2,
+      "reason": "not a company name"
+    },
+    {
+      "name": "telkom university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "the ohio state university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "thu",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "ton duc thang university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "tongji university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "ucla",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "uestc",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "universitas amikom yogyakarta",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "universitat pompeu fabra",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "university of celal bayar",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "university of geneva",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "university of information technology",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "university of science and technology of china",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "university of toronto",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "unsw",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "ustb",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "wuhan university",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "zju",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "东北大学",
+      "count": 2,
+      "reason": "school"
+    },
+    {
+      "name": "东南大学",
+      "count": 2,
+      "reason": "school"
+    }
+  ]
+}

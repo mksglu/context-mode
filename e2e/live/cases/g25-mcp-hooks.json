@@ -1,0 +1,5 @@
+{ "id": "g25-mcp-hooks", "kind": "agent",
+  "covers": ["src/core/hooks/", "src/adapters/"],
+  "prompt": "This case checks G25: do PreToolUse/PostToolUse hooks fire for MCP tool calls on Copilot CLI, ZCode, Pi and OpenCode 2 (TECH-SPEC.md section 9, GS3). src/core/hooks/ and src/adapters/ do not exist yet (milestone M0); the real check lands in M3. Do not call any tool. Reply with exactly one word: SKIPPED",
+  "tools": [],
+  "expect": { "firstLineStartsWith": "SKIPPED" } }

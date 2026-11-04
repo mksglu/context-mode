@@ -1,0 +1,5 @@
+{
+  "hook_event_name": "SessionStart",
+  "cwd": "<proj>",
+  "session_id": "<sid:0>"
+}

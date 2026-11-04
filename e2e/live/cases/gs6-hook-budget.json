@@ -1,0 +1,7 @@
+{
+  "id": "T-GS6",
+  "kind": "local",
+  "covers": ["src/core/hooks/", "e2e/harness/hook-runner.mjs"],
+  "run": ["node", "e2e/checks/hook-budget.mjs"],
+  "expect": {}
+}

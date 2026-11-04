@@ -1,0 +1,7 @@
+{
+  "agent": "claude-code",
+  "event": "PostToolUse-Bash-large",
+  "exitCode": 0,
+  "stdout": "",
+  "stderr": "hooks: no project: NO_GIT_DIR No git repository at /tmp/cm-fixture. Fix: run context-mode inside a git repository.\n"
+}

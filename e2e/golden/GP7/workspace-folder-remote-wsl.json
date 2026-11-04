@@ -1,0 +1,11 @@
+{
+  "reply": {
+    "content": [
+      {
+        "type": "text",
+        "text": "remote wsl note\n"
+      }
+    ],
+    "isError": false
+  }
+}

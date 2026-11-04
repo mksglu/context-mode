@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Context Mode README fig-oss 1280x720</title>
+<script>var T=new URLSearchParams(location.search).get('theme')||'dark';document.documentElement.className=T;</script>
+<link rel="stylesheet" href="cm.css">
+<style>
+:root{--w:1280px;--h:720px}
+.h2{position:absolute;left:64px;top:36px;font-size:34px}
+.box{width:220px;height:132px;padding:15px 17px}
+.s{font-size:12.5px;margin-top:8px;line-height:1.5}
+.n{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em;position:absolute;left:64px}
+.db{left:872px;top:116px;width:344px;height:362px;padding:20px 22px}
+.db{display:flex;flex-direction:column}
+.db .s{font-size:13px}
+.db .row{flex:1;display:flex;align-items:center;margin-top:14px;padding:10px 12px;border:1px solid var(--card-b);border-radius:8px;background:var(--bg);font-family:var(--mono);font-size:12.5px;line-height:1.45;color:var(--body)}
+.db .row b{font-weight:500;color:var(--fg)}
+.lb{position:absolute;font-family:var(--mono);font-size:12.5px;color:var(--save);transform:translateX(-50%);white-space:nowrap;background:var(--bg);padding:0 8px}
+.st{position:absolute;top:510px;width:368px;height:112px;padding:14px 18px}
+.st .v{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--fg);letter-spacing:-.02em;white-space:nowrap}
+.st .v i{font-style:normal;color:var(--raw)}
+.st .v em{font-style:normal;color:var(--save)}
+.st .s{margin-top:6px}
+</style></head><body>
+<main class="art" id="art"><div class="dots"></div>
+<div class="h h2">A session grows. <em>The context stays small.</em></div>
+
+<div class="n" style="top:94px">Every tool call</div>
+<div class="box" data-box style="left:64px;top:116px"><div class="t">Tool call</div><div class="s">The agent runs Read, Bash, WebFetch or an MCP tool.</div></div>
+<div class="box" data-box style="left:332px;top:116px"><div class="t">PreToolUse hook</div><div class="s">Sends a big call to <b>ctx_execute</b> or <b>ctx_index</b>.</div></div>
+<div class="box" data-box style="left:600px;top:116px"><div class="t">Sandbox / index</div><div class="s"><b>ctx_execute</b> runs the code; <b>ctx_index</b> keeps the full output.</div></div>
+
+<div class="n" style="top:324px">When the host compacts</div>
+<div class="box" data-box style="left:64px;top:346px"><div class="t">Compaction</div><div class="s">The host fires PreCompact, or its own event.</div></div>
+<div class="box" data-box style="left:332px;top:346px"><div class="t">Snapshot</div><div class="s">The task, files and last steps, in 2,048 B at most.</div></div>
+<div class="box" data-box style="left:600px;top:346px"><div class="t">Resume / search</div><div class="s"><b>ctx_resume</b> reads a full row; <b>ctx_search</b> finds the rest.</div></div>
+
+<div class="box gw db" data-box><div class="t">context.db</div><div class="s">One SQLite FTS5 file per project, on your disk. BM25 and trigram search.</div>
+<div class="row"><span><b>Index</b>: every full output, searchable</span></div>
+<div class="row"><span><b>Journal</b>: each step of the session</span></div>
+<div class="row"><span><b>Snapshot</b>: the state at each compaction</span></div>
+</div>
+
+<svg width="1280" height="720" id="sv"></svg>
+<div class="lb" style="left:466px;top:283px">small reply</div>
+
+<div class="box st" data-box style="left:64px"><div class="v"><i>274.7 KB</i> → <em>3.4 KB</em></div><div class="s">Debugging session, 8 outputs and 3 searches. Row <b>g-session-total</b>.</div></div>
+<div class="box st" data-box style="left:456px"><div class="v"><i>432.5 KB</i> → <em>2.0 KB</em></div><div class="s">Long session, 40 outputs, then compaction. <b>ctx_resume</b> block. Row <b>e-long-session</b>.</div></div>
+<div class="box st" data-box style="left:848px"><div class="v"><i>651.2 KB</i> → <em>15.3 KB</em></div><div class="s">One large log. The full copy stays searchable. Row <b>d-synth-1m</b>.</div></div>
+
+<div class="cap"><b>Reading the figure.</b> Top: the hook sends a tool call to the sandbox or the index; the full output goes into <b>context.db</b> and a small reply returns. Bottom: at compaction a snapshot keeps the state, and the agent reads it back. Numbers: raw output against bytes in the context, median of 5 runs, bench/results/2026-10-31-darwin-arm64.json (context-mode 2.0.0-next.8).</div>
+</main>
+<script>
+var sv=document.getElementById('sv'),NS='http://www.w3.org/2000/svg';
+function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);sv.appendChild(e);return e}
+function arrow(x1,y1,x2,y2,cls,ah){el('line',{x1:x1,y1:y1,x2:x2-6,y2:y2,class:cls||'ln'});el('polygon',{points:x2+','+y2+' '+(x2-8)+','+(y2-4.5)+' '+(x2-8)+','+(y2+4.5),class:ah||'ah'})}
+[[284,332],[552,600]].forEach(function(a){arrow(a[0],182,a[1],182)});
+[[284,332],[552,600]].forEach(function(a){arrow(a[0],412,a[1],412)});
+/* sandbox and resume to context.db */
+arrow(820,182,872,182);
+arrow(820,412,872,412);
+/* small reply: sandbox bottom back to the tool call bottom */
+el('path',{d:'M710 248 L710 290 L174 290 L174 258',class:'sv'});
+el('polygon',{points:'174,250 169.5,260 178.5,260',class:'ahs'});
+</script></body></html>

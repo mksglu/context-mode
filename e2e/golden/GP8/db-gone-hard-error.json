@@ -1,0 +1,12 @@
+{
+  "reply": {
+    "content": [
+      {
+        "type": "text",
+        "text": "context.db is gone and its WAL file is still in place. Fix: run ctx_doctor once; it keeps the WAL file in a dated folder and starts a new index."
+      }
+    ],
+    "isError": true
+  },
+  "recreated": false
+}

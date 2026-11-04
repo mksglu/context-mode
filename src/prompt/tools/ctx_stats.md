@@ -1,0 +1,2 @@
+Example: `ctx_stats({})`. Required: none.
+Reports the bytes context-mode kept out of the chat: a text report (bars, per tool, per agent) and a Markdown table. Show the text block to the user unchanged, in a code block. Use it when the user asks what it saved.

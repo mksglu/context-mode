@@ -1,0 +1,10 @@
+[
+  { "id": "fx1-q1", "project": "fx1", "type": "decision", "session": "s2", "askedAtSeq": 11, "query": "What did we decide about the database earlier?", "gold": [2], "goldRule": "D3 AskUserQuestion answer" },
+  { "id": "fx1-q2", "project": "fx1", "type": "decision", "session": "s2", "askedAtSeq": 12, "query": "Remind me what we decided about strict typescript mode.", "gold": [6], "goldRule": "D3 AskUserQuestion answer" },
+  { "id": "fx1-q3", "project": "fx1", "type": "errorfix", "session": "s2", "askedAtSeq": 14, "query": "The build fails again, missing module pg, what fixed this last time?", "gold": [5], "goldRule": "repeated toolerr key; earlier success row" },
+  { "id": "fx1-q4", "project": "fx1", "type": "errorfix", "session": "s2", "askedAtSeq": 16, "query": "Typecheck is failing on tslib again, how did we solve it before?", "gold": [9], "goldRule": "repeated toolerr key; earlier success row" },
+  { "id": "fx1-q5", "project": "fx1", "type": "file", "session": "s2", "askedAtSeq": 18, "query": "Which file did we change for the redis caching work?", "gold": [17], "goldRule": "edit path touched; topic query" },
+  { "id": "fx1-q6", "project": "fx1", "type": "file", "session": "s2", "askedAtSeq": 20, "query": "Which file holds the database connection configuration?", "gold": [3], "goldRule": "edit path touched again later session" },
+  { "id": "fx1-q7", "project": "fx1", "type": "timeline", "session": "s2", "askedAtSeq": 23, "after": 12, "query": "", "gold": [13, 14, 15, 16, 17, 18, 19, 20, 21, 22], "goldRule": "oldest-first page of 10 rows before the compaction point" },
+  { "id": "fx1-q8", "project": "fx1", "type": "timeline", "session": "s2", "askedAtSeq": 25, "after": 22, "query": "", "gold": [23, 24], "goldRule": "second timeline page after the first cursor" }
+]

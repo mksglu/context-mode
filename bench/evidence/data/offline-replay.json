@@ -1,0 +1,1261 @@
+{
+  "date": "2026-10-20",
+  "node": "v26.8.1",
+  "outputCap": 16384,
+  "mcpHintEvery": 10,
+  "corpus": {
+    "files": 2988,
+    "skippedOver200MB": 2,
+    "sessions": 821,
+    "calls": 23203,
+    "imageBlocksNotCounted": 244,
+    "unpairedResults": 1,
+    "decideErrors": 0,
+    "firstTs": "2026-05-10T10:37:32.467Z",
+    "lastTs": "2026-10-20T10:31:59.559Z",
+    "claudeCodeVersions": [
+      [
+        "2.1.283",
+        5693
+      ],
+      [
+        "2.1.198",
+        5103
+      ],
+      [
+        "2.1.220",
+        2796
+      ],
+      [
+        "2.1.150",
+        2643
+      ],
+      [
+        "2.1.149",
+        2108
+      ],
+      [
+        "2.1.178",
+        1519
+      ],
+      [
+        "2.1.218",
+        1320
+      ],
+      [
+        "2.1.282",
+        1147
+      ]
+    ],
+    "modelsOnToolUseTurns": [
+      [
+        "claude-opus-5-5",
+        6205
+      ],
+      [
+        "claude-opus-4-8",
+        5374
+      ],
+      [
+        "claude-opus-4-7",
+        5342
+      ],
+      [
+        "claude-opus-5",
+        3541
+      ],
+      [
+        "claude-fable-5",
+        2047
+      ],
+      [
+        "claude-haiku-4-5-20251001",
+        1204
+      ],
+      [
+        "claude-sonnet-5",
+        80
+      ],
+      [
+        "claude-fable-5-1",
+        49
+      ]
+    ]
+  },
+  "total": {
+    "calls": 23203,
+    "before": 30837401,
+    "after": 28726463,
+    "afterBound": 29241802,
+    "savingPct": 6.845382332966388,
+    "savingPctWithRerunBound": 5.17423306847422,
+    "deny": 95,
+    "hint": 0,
+    "replace": 152,
+    "sessions": 821,
+    "medianPct": 0,
+    "p90Pct": 0,
+    "perSessionWithRerunBound": {
+      "medianPct": 0,
+      "p90Pct": 0
+    }
+  },
+  "tools": {
+    "Bash": {
+      "calls": 13917,
+      "before": 19690450,
+      "after": 19034971,
+      "afterBound": 19034971,
+      "deny": 0,
+      "hint": 0,
+      "replace": 103,
+      "savingPct": 3.328918333506852,
+      "savingPctWithRerunBound": 3.328918333506852,
+      "sessions": 638,
+      "medianPct": 0,
+      "p90Pct": 2.0493054879706287,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 2.0493054879706287
+      }
+    },
+    "Read": {
+      "calls": 1506,
+      "before": 4236952,
+      "after": 3233077,
+      "afterBound": 3691829,
+      "deny": 28,
+      "hint": 0,
+      "replace": 8,
+      "savingPct": 23.6933295444461,
+      "savingPctWithRerunBound": 12.865923427973694,
+      "sessions": 181,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "mcp:other": {
+      "calls": 708,
+      "before": 1908466,
+      "after": 1565208,
+      "afterBound": 1565208,
+      "deny": 0,
+      "hint": 0,
+      "replace": 35,
+      "savingPct": 17.986068392101302,
+      "savingPctWithRerunBound": 17.986068392101302,
+      "sessions": 13,
+      "medianPct": 0,
+      "p90Pct": 4.86372110030151,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 4.86372110030151
+      }
+    },
+    "ctx_execute": {
+      "calls": 1027,
+      "before": 1655378,
+      "after": 1655378,
+      "afterBound": 1655378,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 29,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Agent": {
+      "calls": 978,
+      "before": 1592135,
+      "after": 1583380,
+      "afterBound": 1583380,
+      "deny": 0,
+      "hint": 0,
+      "replace": 2,
+      "savingPct": 0.5498905557631734,
+      "savingPctWithRerunBound": 0.5498905557631734,
+      "sessions": 27,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Edit": {
+      "calls": 2423,
+      "before": 493991,
+      "after": 493991,
+      "afterBound": 493991,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 76,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ctx_search": {
+      "calls": 41,
+      "before": 323987,
+      "after": 323987,
+      "afterBound": 323987,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 3,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Workflow": {
+      "calls": 183,
+      "before": 254858,
+      "after": 254858,
+      "afterBound": 254858,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 8,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Write": {
+      "calls": 857,
+      "before": 165941,
+      "after": 165941,
+      "afterBound": 165941,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 75,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "WebSearch": {
+      "calls": 66,
+      "before": 158807,
+      "after": 158807,
+      "afterBound": 158807,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 11,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "TaskOutput": {
+      "calls": 10,
+      "before": 129838,
+      "after": 64514,
+      "afterBound": 64514,
+      "deny": 0,
+      "hint": 0,
+      "replace": 4,
+      "savingPct": 50.311927170782056,
+      "savingPctWithRerunBound": 50.311927170782056,
+      "sessions": 3,
+      "medianPct": 49.779010577011,
+      "p90Pct": 50.71319145412389,
+      "perSessionWithRerunBound": {
+        "medianPct": 49.779010577011,
+        "p90Pct": 50.71319145412389
+      }
+    },
+    "WebFetch": {
+      "calls": 67,
+      "before": 56587,
+      "after": 22340,
+      "afterBound": 78927,
+      "deny": 67,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 60.52096771343242,
+      "savingPctWithRerunBound": -39.47903228656758,
+      "sessions": 43,
+      "medianPct": -42.05607476635514,
+      "p90Pct": 30.87071240105541,
+      "perSessionWithRerunBound": {
+        "medianPct": -142.05607476635512,
+        "p90Pct": -69.12928759894459
+      }
+    },
+    "AskUserQuestion": {
+      "calls": 109,
+      "before": 40785,
+      "after": 40785,
+      "afterBound": 40785,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 8,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "TaskStop": {
+      "calls": 53,
+      "before": 30353,
+      "after": 30353,
+      "afterBound": 30353,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 8,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "TaskCreate": {
+      "calls": 312,
+      "before": 27485,
+      "after": 27485,
+      "afterBound": 27485,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 3,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ctx_stats": {
+      "calls": 5,
+      "before": 19668,
+      "after": 19668,
+      "afterBound": 19668,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 2,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "SendMessage": {
+      "calls": 74,
+      "before": 13701,
+      "after": 13701,
+      "afterBound": 13701,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 6,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "TaskUpdate": {
+      "calls": 499,
+      "before": 11939,
+      "after": 11939,
+      "afterBound": 11939,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 3,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ctx_upgrade": {
+      "calls": 10,
+      "before": 6579,
+      "after": 6579,
+      "afterBound": 6579,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 2,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ctx_index": {
+      "calls": 23,
+      "before": 3941,
+      "after": 3941,
+      "afterBound": 3941,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Monitor": {
+      "calls": 14,
+      "before": 3388,
+      "after": 3388,
+      "afterBound": 3388,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 3,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "context-mode-run-local": {
+      "calls": 33,
+      "before": 2838,
+      "after": 2838,
+      "afterBound": 2838,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 33,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ScheduleWakeup": {
+      "calls": 17,
+      "before": 2609,
+      "after": 2609,
+      "afterBound": 2609,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 2,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "TaskList": {
+      "calls": 6,
+      "before": 1790,
+      "after": 1790,
+      "afterBound": 1790,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ToolSearch": {
+      "calls": 204,
+      "before": 1361,
+      "after": 1361,
+      "afterBound": 1361,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 12,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Skill": {
+      "calls": 43,
+      "before": 1248,
+      "after": 1248,
+      "afterBound": 1248,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 15,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ctx_doctor": {
+      "calls": 1,
+      "before": 1151,
+      "after": 1151,
+      "afterBound": 1151,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "ListAgents": {
+      "calls": 1,
+      "before": 578,
+      "after": 578,
+      "afterBound": 578,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "CronList": {
+      "calls": 13,
+      "before": 234,
+      "after": 234,
+      "afterBound": 234,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 13,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Grep": {
+      "calls": 1,
+      "before": 171,
+      "after": 171,
+      "afterBound": 171,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "Glob": {
+      "calls": 1,
+      "before": 104,
+      "after": 104,
+      "afterBound": 104,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    },
+    "WaitForMcpServers": {
+      "calls": 1,
+      "before": 88,
+      "after": 88,
+      "afterBound": 88,
+      "deny": 0,
+      "hint": 0,
+      "replace": 0,
+      "savingPct": 0,
+      "savingPctWithRerunBound": 0,
+      "sessions": 1,
+      "medianPct": 0,
+      "p90Pct": 0,
+      "perSessionWithRerunBound": {
+        "medianPct": 0,
+        "p90Pct": 0
+      }
+    }
+  },
+  "buckets": {
+    "Bash": {
+      "<=1K": {
+        "calls": 9527,
+        "before": 3513362,
+        "after": 3513362,
+        "afterBound": 3513362,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 103,
+        "before": 2163189,
+        "after": 1507710,
+        "afterBound": 1507710,
+        "deny": 0,
+        "replace": 103
+      },
+      "1-4K": {
+        "calls": 3306,
+        "before": 6725025,
+        "after": 6725025,
+        "afterBound": 6725025,
+        "deny": 0,
+        "replace": 0
+      },
+      "4-16K": {
+        "calls": 981,
+        "before": 7288874,
+        "after": 7288874,
+        "afterBound": 7288874,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ALL": {
+      "<=1K": {
+        "calls": 16508,
+        "before": 5424702,
+        "after": 5427614,
+        "afterBound": 5442078,
+        "deny": 53,
+        "replace": 0
+      },
+      "1-4K": {
+        "calls": 5101,
+        "before": 10482240,
+        "after": 10466270,
+        "afterBound": 10486511,
+        "deny": 12,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 184,
+        "before": 4464574,
+        "after": 2387883,
+        "afterBound": 2846635,
+        "deny": 28,
+        "replace": 152
+      },
+      "4-16K": {
+        "calls": 1410,
+        "before": 10465885,
+        "after": 10444696,
+        "afterBound": 10466578,
+        "deny": 2,
+        "replace": 0
+      }
+    },
+    "ToolSearch": {
+      "<=1K": {
+        "calls": 204,
+        "before": 1361,
+        "after": 1361,
+        "afterBound": 1361,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "WebSearch": {
+      "1-4K": {
+        "calls": 56,
+        "before": 142704,
+        "after": 142704,
+        "afterBound": 142704,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 8,
+        "before": 6652,
+        "after": 6652,
+        "afterBound": 6652,
+        "deny": 0,
+        "replace": 0
+      },
+      "4-16K": {
+        "calls": 2,
+        "before": 9451,
+        "after": 9451,
+        "afterBound": 9451,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Agent": {
+      "1-4K": {
+        "calls": 335,
+        "before": 662118,
+        "after": 662118,
+        "afterBound": 662118,
+        "deny": 0,
+        "replace": 0
+      },
+      "4-16K": {
+        "calls": 53,
+        "before": 380604,
+        "after": 380604,
+        "afterBound": 380604,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 588,
+        "before": 507798,
+        "after": 507798,
+        "afterBound": 507798,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 2,
+        "before": 41615,
+        "after": 32860,
+        "afterBound": 32860,
+        "deny": 0,
+        "replace": 2
+      }
+    },
+    "Edit": {
+      "<=1K": {
+        "calls": 2421,
+        "before": 490453,
+        "after": 490453,
+        "afterBound": 490453,
+        "deny": 0,
+        "replace": 0
+      },
+      "1-4K": {
+        "calls": 2,
+        "before": 3538,
+        "after": 3538,
+        "afterBound": 3538,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Read": {
+      "1-4K": {
+        "calls": 649,
+        "before": 1456027,
+        "after": 1456027,
+        "afterBound": 1456027,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 36,
+        "before": 1128906,
+        "after": 125031,
+        "afterBound": 583783,
+        "deny": 28,
+        "replace": 8
+      },
+      "4-16K": {
+        "calls": 204,
+        "before": 1431991,
+        "after": 1431991,
+        "afterBound": 1431991,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 617,
+        "before": 220028,
+        "after": 220028,
+        "afterBound": 220028,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Write": {
+      "<=1K": {
+        "calls": 857,
+        "before": 165941,
+        "after": 165941,
+        "afterBound": 165941,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "mcp:other": {
+      "1-4K": {
+        "calls": 102,
+        "before": 237330,
+        "after": 237330,
+        "afterBound": 237330,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 504,
+        "before": 139194,
+        "after": 139194,
+        "afterBound": 139194,
+        "deny": 0,
+        "replace": 0
+      },
+      "4-16K": {
+        "calls": 67,
+        "before": 632397,
+        "after": 632397,
+        "afterBound": 632397,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 35,
+        "before": 899545,
+        "after": 556287,
+        "afterBound": 556287,
+        "deny": 0,
+        "replace": 35
+      }
+    },
+    "SendMessage": {
+      "<=1K": {
+        "calls": 74,
+        "before": 13701,
+        "after": 13701,
+        "afterBound": 13701,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "TaskStop": {
+      "<=1K": {
+        "calls": 46,
+        "before": 20028,
+        "after": 20028,
+        "afterBound": 20028,
+        "deny": 0,
+        "replace": 0
+      },
+      "1-4K": {
+        "calls": 7,
+        "before": 10325,
+        "after": 10325,
+        "afterBound": 10325,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "AskUserQuestion": {
+      "<=1K": {
+        "calls": 106,
+        "before": 37144,
+        "after": 37144,
+        "afterBound": 37144,
+        "deny": 0,
+        "replace": 0
+      },
+      "1-4K": {
+        "calls": 3,
+        "before": 3641,
+        "after": 3641,
+        "afterBound": 3641,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "context-mode-run-local": {
+      "<=1K": {
+        "calls": 33,
+        "before": 2838,
+        "after": 2838,
+        "afterBound": 2838,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Workflow": {
+      "1-4K": {
+        "calls": 179,
+        "before": 253941,
+        "after": 253941,
+        "afterBound": 253941,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 4,
+        "before": 917,
+        "after": 917,
+        "afterBound": 917,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ScheduleWakeup": {
+      "<=1K": {
+        "calls": 17,
+        "before": 2609,
+        "after": 2609,
+        "afterBound": 2609,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Skill": {
+      "<=1K": {
+        "calls": 43,
+        "before": 1248,
+        "after": 1248,
+        "afterBound": 1248,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "WebFetch": {
+      "1-4K": {
+        "calls": 12,
+        "before": 20241,
+        "after": 4271,
+        "afterBound": 24512,
+        "deny": 12,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 53,
+        "before": 14464,
+        "after": 17376,
+        "afterBound": 31840,
+        "deny": 53,
+        "replace": 0
+      },
+      "4-16K": {
+        "calls": 2,
+        "before": 21882,
+        "after": 693,
+        "afterBound": 22575,
+        "deny": 2,
+        "replace": 0
+      }
+    },
+    "ListAgents": {
+      "<=1K": {
+        "calls": 1,
+        "before": 578,
+        "after": 578,
+        "afterBound": 578,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "TaskCreate": {
+      "<=1K": {
+        "calls": 312,
+        "before": 27485,
+        "after": 27485,
+        "afterBound": 27485,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "TaskUpdate": {
+      "<=1K": {
+        "calls": 499,
+        "before": 11939,
+        "after": 11939,
+        "afterBound": 11939,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "TaskOutput": {
+      "<=1K": {
+        "calls": 6,
+        "before": 893,
+        "after": 893,
+        "afterBound": 893,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 4,
+        "before": 128945,
+        "after": 63621,
+        "afterBound": 63621,
+        "deny": 0,
+        "replace": 4
+      }
+    },
+    "Monitor": {
+      "<=1K": {
+        "calls": 14,
+        "before": 3388,
+        "after": 3388,
+        "afterBound": 3388,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ctx_execute": {
+      "1-4K": {
+        "calls": 436,
+        "before": 925770,
+        "after": 925770,
+        "afterBound": 925770,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 516,
+        "before": 227384,
+        "after": 227384,
+        "afterBound": 227384,
+        "deny": 0,
+        "replace": 0
+      },
+      "4-16K": {
+        "calls": 73,
+        "before": 442382,
+        "after": 442382,
+        "afterBound": 442382,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 2,
+        "before": 59842,
+        "after": 59842,
+        "afterBound": 59842,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ctx_search": {
+      "4-16K": {
+        "calls": 27,
+        "before": 253952,
+        "after": 253952,
+        "afterBound": 253952,
+        "deny": 0,
+        "replace": 0
+      },
+      "16-64K": {
+        "calls": 2,
+        "before": 42532,
+        "after": 42532,
+        "afterBound": 42532,
+        "deny": 0,
+        "replace": 0
+      },
+      "1-4K": {
+        "calls": 9,
+        "before": 25113,
+        "after": 25113,
+        "afterBound": 25113,
+        "deny": 0,
+        "replace": 0
+      },
+      "<=1K": {
+        "calls": 3,
+        "before": 2390,
+        "after": 2390,
+        "afterBound": 2390,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ctx_index": {
+      "<=1K": {
+        "calls": 23,
+        "before": 3941,
+        "after": 3941,
+        "afterBound": 3941,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "TaskList": {
+      "<=1K": {
+        "calls": 6,
+        "before": 1790,
+        "after": 1790,
+        "afterBound": 1790,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ctx_upgrade": {
+      "<=1K": {
+        "calls": 10,
+        "before": 6579,
+        "after": 6579,
+        "afterBound": 6579,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ctx_doctor": {
+      "1-4K": {
+        "calls": 1,
+        "before": 1151,
+        "after": 1151,
+        "afterBound": 1151,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "ctx_stats": {
+      "4-16K": {
+        "calls": 1,
+        "before": 4352,
+        "after": 4352,
+        "afterBound": 4352,
+        "deny": 0,
+        "replace": 0
+      },
+      "1-4K": {
+        "calls": 4,
+        "before": 15316,
+        "after": 15316,
+        "afterBound": 15316,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "WaitForMcpServers": {
+      "<=1K": {
+        "calls": 1,
+        "before": 88,
+        "after": 88,
+        "afterBound": 88,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Grep": {
+      "<=1K": {
+        "calls": 1,
+        "before": 171,
+        "after": 171,
+        "afterBound": 171,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "Glob": {
+      "<=1K": {
+        "calls": 1,
+        "before": 104,
+        "after": 104,
+        "afterBound": 104,
+        "deny": 0,
+        "replace": 0
+      }
+    },
+    "CronList": {
+      "<=1K": {
+        "calls": 13,
+        "before": 234,
+        "after": 234,
+        "afterBound": 234,
+        "deny": 0,
+        "replace": 0
+      }
+    }
+  }
+}

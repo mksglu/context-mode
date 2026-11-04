@@ -1,0 +1,38 @@
+{
+  "indexed": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Indexed 1 source(s), 1 chunk(s) from s1. Label: decision (user)"
+      }
+    ],
+    "isError": false
+  },
+  "reserved": {
+    "content": [
+      {
+        "type": "text",
+        "text": "No hits in scope \"worktree\" across 0 source(s)."
+      }
+    ],
+    "isError": false
+  },
+  "user": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Query \"notes\":\ndecision (user) #0: my decision notes"
+      }
+    ],
+    "isError": false
+  },
+  "listed": {
+    "content": [
+      {
+        "type": "text",
+        "text": "No hits in scope \"worktree\" across 0 source(s)."
+      }
+    ],
+    "isError": false
+  }
+}

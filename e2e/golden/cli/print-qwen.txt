@@ -1,0 +1,6 @@
+Manual setup for qwen. Run:
+
+qwen extensions link <PKG>
+qwen asks to confirm: answer y.
+
+Then restart the agent and check it: context-mode doctor --agents qwen

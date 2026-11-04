@@ -1,0 +1,2000 @@
+efe519b1 2026-10-31 ci: remove the temporary D5 proof workflow
+3afc09ed 2026-10-31 ci: temporary D5 proof 3, hard stop of the load loop, 40x (removed after the run)
+b49b870c 2026-10-31 ci: temporary D5 proof, print quiet-loop failures (removed after the run)
+9c84763a 2026-10-31 ci: temporary D5 proof loop (removed after the run)
+37a48049 2026-10-31 fix(doctor): D5 runs 3 to 9 hook/bare pairs, more only while over the bound (D-D5-MORE-PAIRS-1)
+0fed73b1 2026-10-31 ci: temporary D5 probe 3, estimators from raw walls (removed after the run)
+773f8b11 2026-10-31 ci: temporary D5 probe 2, pair count under load (removed after the run)
+1691b4cc 2026-10-31 ci: temporary D5 probe workflow (removed after the run)
+ecf32676 2026-10-31 test(e2e): GP cases use the OpenCode 2 ctx shape and the exports key (D-OC2-SETUP-1)
+2600c92b 2026-10-31 fix(opencode): load on OpenCode 2 (setup(ctx), exports ./server, dir entry, version-aware doctor)
+9d858e02 2026-10-31 docs: next.18 status, resume line, reply for Viet
+ea4179fd 2026-10-31 fix(doctor): shipped D5 fixtures are the recorded native payloads; D5 labels old hook errors as past (D-D5-FIXTURE-1, D-D5-PAST-1)
+04e05b34 2026-10-31 fix(types): tsc --noEmit green; run typecheck in CI and gate (D-TSC-GATE-1)
+c988ff43 2026-10-31 fix(codex): native plugin MCP resolves the host workspace, not the plugin cache dir; D3 reads the native plugin entries
+765be33d 2026-10-31 fix(policy): deny unbounded PowerShell file dumps (Get-Content, gc, type, [IO.File]::ReadAllText) like cat (D-PWSH-DUMP-1)
+7b68b5b8 2026-10-31 fix(doctor): D5 measures hook cost over bare node, not node.exe start (D-D5-BARE-1)
+97045768 2026-10-31 ci: fix workflow YAML (colon in step name)
+52f0c7a3 2026-10-31 ci: hook phase profile, info only (Viet D5 72 ms on Windows)
+92f6e4f9 2026-10-31 docs(v2): viet-next17 workflow (5 tester findings on next.17)
+1c8dfc68 2026-10-30 docs(release): next.17 status, resume line, reply for Viet
+d526f1e5 2026-10-30 test(setup): BOM/CRLF codex hook line is bare node on Windows (D-C166-WIN-FIRE-2)
+9210b0ae 2026-10-30 test(setup): codex expected hook line is bare node on Windows (D-C166-WIN-FIRE-2)
+2b6dc6f2 2026-10-30 test(codex): fire test logging hook uses bare node on Windows (D-C166-WIN-FIRE-2)
+31bb89dc 2026-10-30 fix(setup): hook check runs the absolute node; fire test writes bare node on Windows (D-C166-WIN-FIRE-2)
+135120eb 2026-10-30 fix(setup): codex hook command starts with bare node on Windows; 0.166 runs hooks in PowerShell (D-C166-WIN-FIRE-2)
+cff4806f 2026-10-30 test(codex): show the codex output tail when no hook event arrives (D-C166-WIN-FIRE-1)
+1ec01844 2026-10-30 test(codex): a failed temp-dir cleanup on Windows no longer hides the assertions (D-C166-WIN-FIRE-1)
+d355df80 2026-10-30 test(codex): retry temp-dir cleanup on Windows (EPERM while codex exits) (D-C166-WIN-FIRE-1)
+47711426 2026-10-30 ci: codex 0.166.0 global install is not a dev install (D-C166-WIN-FIRE-1)
+ffee4f03 2026-10-30 test(codex): fire test runs on Windows and logs hook events; CI installs codex 0.166.0 (D-C166-WIN-FIRE-1)
+bbd7cefd 2026-10-30 fix(setup): trust only the hook hash of a Codex 0.166 composite currentHash (D-NI-CODEX-TRUST-2)
+24c0aa41 2026-10-30 docs(v2): codex-0166-win workflow (tester report on next.15)
+5b4f6636 2026-10-30 test-layout: run blocks of merged files in order on Windows (CONC helper), tests only
+90872f01 2026-10-30 test-layout: restore live-local names, serial Copilot block, TEST-LAYOUT guard, ADR-0024 accepted (tests and docs only)
+3f077899 2026-10-30 docs(v2): test-layout-verify workflow
+30f07999 2026-10-30 test(layout): e2e-gp1, six GP1 case files in one (29 tests, same names)
+c5b02a22 2026-10-30 test(layout): prd9-sandbox, sandbox and execute/batch tests in one file (91 tests, same names)
+306d9657 2026-10-30 test(layout): 0007-identity, project identity tests in one file (86 tests, same names)
+b5c47a63 2026-10-30 test(layout): 0017-v1-retention, v1 diff and ported v1 cases in one file (37 tests, same names)
+2b210da2 2026-10-30 test-layout(w0): adapters, fire, cli, plugins into ADR area files (tests only)
+b097146a 2026-10-30 test(layout): prd10-hook-fuzz, one file on purpose (22 tests, same names)
+ebc619cd 2026-10-30 test-layout: merge ctx_stats and ctx_purge tests into prd12-stats-purge (tests only)
+e81f750a 2026-10-30 test-layout: merge ADR-0012 live harness tests into 0012-live-harness and 0012-m2-bench (tests only)
+4313ed0f 2026-10-30 test-layout: merge ADR-0018 contracts tests into 0018-contracts (tests only)
+4db78d5e 2026-10-30 test-layout: merge PRD-v2 section 8 index/search/fetch tests into prd8-index-search (tests only)
+d115daf8 2026-10-30 test-layout: merge GP11 pi-agy and release-audit into GP11-doctor-upgrade, 18 tests, same names
+27ce19d8 2026-10-30 test-layout: merge tests/v2/release plan/smoke/rollback/publish-npm into 0013-release-plan, 60 tests, same names
+f3fba179 2026-10-30 test-layout: merge tests/v2/repo files into 0014-repo-hygiene (ADR-0013/0014/0015), 80 tests, same names
+1b3b29bd 2026-10-30 test-layout: merge tests/v2/build into 0018-build (ADR-0018/0019/0023), 79 tests, same names
+705d5082 2026-10-30 test(layout): prd10-hooks-runtime, one file for the hook process tests (280 tests, same names)
+1bf17132 2026-10-30 test(layout): 0011-v1-transition, one file for v1 detect, remove, migration setup and merge-traffic (44 tests, same names)
+208aa514 2026-10-30 test(layout): 0016-subagent, one file for subagent policy, run wrapper and vscode tests (56 tests, same names)
+e6036ad8 2026-10-30 test(layout): 0020-gates-zcode, one file for the zcode gate and shape tests (23 tests, same names)
+d59ce7dd 2026-10-30 test-layout: merge 0020-gates-vscode-gemini-kiro area files into one ADR file (tests only)
+71e77fc5 2026-10-30 test-layout: merge 0023-install-docs area files into one ADR file (tests only)
+580a0aa9 2026-10-30 test-layout: merge 0019-host-config area files into one ADR file (tests only)
+1da14687 2026-10-30 test(layout): 0009-compaction-memory, 0002-store, 0013-release-main, e2e GP3 grouped by ADR (tests only)
+4928b22c 2026-10-30 test-layout: merge server and call-shape tests into 0007-mcp-server (65 tests, names equal)
+38f56233 2026-10-30 test-layout: merge cache tests into 0021-cache-safety (37 tests, names equal)
+0dac1985 2026-10-30 test-layout: merge hook tests into 0020-hooks-all (26 tests, names equal)
+da25ca58 2026-10-30 test-layout: merge setup engine tests into 0019-setup-engine (73 tests, names equal)
+d277f04a 2026-10-30 test-layout: merge doctor, upgrade and ops tests into 0010-doctor-upgrade (124 tests, names equal)
+492cc0b9 2026-10-30 test-layout: baseline, area map, ADR-0024 and shared _lib (tests only)
+f3c958c3 2026-10-30 docs(v2): NEXT-STATUS and RESUME for v2.0.0-next.16
+144e3495 2026-10-30 docs(v2): D-SEARCH-REPLY-1 measured reply bytes, page-size sweep, one-call proposal
+c312684e 2026-10-30 feat(search): a ctx_search relevance reply holds 5 hits; More: pages the rest (D-SEARCH-REPLY-1)
+e138e6f0 2026-10-30 test(v2): call-shape cleanup tolerates the Windows EPERM on an open DB file (D-CALL-SHAPE-1)
+b66edb3c 2026-10-30 fix(v2): every tool description leads with an exact example call; a bad call gets one line with the correct call on all hosts (D-CALL-SHAPE-1)
+ea01e299 2026-10-30 docs(v2): D-HTML-READABLE-1 states only measured parser numbers
+7b47de82 2026-10-30 feat(index): convert fetched HTML to readable markdown before chunking (D-HTML-READABLE-1)
+0f333591 2026-10-30 docs(release): HOOKS-FIRE per-host proof, NEXT-STATUS and RESUME for 2.0.0-next.15
+e00e6fb2 2026-10-30 test(e2e): parity test passes the net shim to node as a file URL (Windows ESM loader)
+bc1569a7 2026-10-30 docs(v2): owner rule tests grouped by ADR/PRD; test-layout-by-adr workflow
+15474b68 2026-10-30 test(e2e): fetch-index-search parity on all 10 hosts (react.dev useEffect fixture, local server)
+9365f1d2 2026-10-30 docs(v2): search-quality-all workflow (raw HTML in search replies, all hosts)
+5ef1f189 2026-10-30 fix(setup): doctor FAILs when zcode would drop config.json and run no hook; live zcode fire test (D-NI-ZCODE-GATE-1)
+807ae9a5 2026-10-30 fix(setup): doctor and setup fail when VS Code would run no hook (chat.useHooks, hookFilesLocations, managed policy) (D-NI-VSCODE-GATE-1)
+90bf6007 2026-10-30 test(cli): print-same-source ignores the read-only copilot hooks.discover query (D-HF-COPILOT-ENABLED-1)
+238e9c32 2026-10-30 fix(setup): copilot-cli hook-enabled check and disabledHooks cleanup (D-HF-COPILOT-ENABLED-1)
+da5120dd 2026-10-30 fix(setup): doctor FAILs when kiro would skip a disabled context-mode hook (D-NI-KIRO-GATE-1)
+22501180 2026-10-30 fix(setup): claude-code hooks run: enable a disabled plugin, doctor fails on disableAllHooks (D-CC-HOOKS-RUN-1)
+56f72846 2026-10-30 fix(setup): doctor and setup fail when qwen would run no hook (disableAllHooks, workspace-disabled extension); live qwen fire test (D-NI-QWEN-GATE-1)
+2600dbf7 2026-10-30 fix(opencode): one working plugin entry, doctor FAILs on double or stale entry; live-fire test (D-HF-OPENCODE-GATE-1)
+6cba095b 2026-10-30 fix(setup): doctor and setup FAIL when pi lists context-mode but loads none of its hooks (D-NI-PI-GATE-1)
+6cd19e83 2026-10-30 fix(setup): doctor and setup FAIL when gemini would not run the installed hooks (D-NI-GEMINI-GATE-1)
+bf65ec55 2026-10-30 docs(v2): hooks-fire-all workflow (prove hooks fire live on every host)
+72aacb9e 2026-10-29 docs(v2): NEXT-STATUS and RESUME for v2.0.0-next.14
+a66617dc 2026-10-29 fix(setup): trust own Codex plugin hooks after native install; doctor fails on untrusted (D-NI-CODEX-TRUST-1)
+30742751 2026-10-29 docs(v2): codex-plugin-trust workflow (native Codex plugin hooks untrusted)
+fef7750a 2026-10-29 fix(readme): agent table shows hooks, MCP, skills and install per host (D-README-2)
+685d293f 2026-10-29 docs(v2): readme-hooks-table workflow (README says MCP only for hosts that have hooks)
+5bd65e41 2026-10-29 docs(v2): NEXT-STATUS and RESUME for v2.0.0-next.13
+c340dae8 2026-10-29 fix(e2e): live run.mjs root uses fileURLToPath so it runs on Windows (D-LEF-2)
+ff4714f5 2026-10-29 fix(e2e): six local live cases follow the current contracts; CI runs four keyless ones (D-LEF-1)
+f17e600a 2026-10-29 docs(v2): release-next13 workflow (Codex doctor D3/D4 fix)
+9dd44149 2026-10-29 fix(doctor): D3/D4 agree with setup for Codex and MCP hosts, one ownMcpValue source, D4 reads CODEX_HOME (D-DOC-RT-1)
+19715f34 2026-10-29 docs(v2): NEXT-STATUS and RESUME for v2.0.0-next.12
+c8f6a68d 2026-10-29 fix(check-removed): allow scripts/ci-install.mjs and scripts/v1-cases/ in the target tree (D-CR-SCRIPTS-1)
+174fc2ac 2026-10-29 docs(v2): live e2e result on Haiku, live-e2e-fails workflow
+9fba2c52 2026-10-29 fix(v2): shell-dump deny checks every command in a chain, follows cd, unwraps zsh -c (D-CDX-CAT-1)
+cf5bfcf5 2026-10-29 test(v2): GP3 goldens for claude-code and codex PreToolUse record the failure deny (D-HNE-GUARD-1)
+6de98259 2026-10-29 feat(v2): the hook never errors, one fallback decision for all 10 hosts (D-HNE-GUARD-1)
+e2e7a26d 2026-10-29 docs(v2): codex-doctor-next11 workflow (tester report)
+f78f26c1 2026-10-29 test(v2): v1 executor TMPDIR port pins the real property (D-V1DIFF-TMPDIR-1)
+6587d567 2026-10-29 test(v2): hook fuzz fallback check, a flooding call denied when healthy must stay denied when the project cannot be resolved (todo until the guard lands the fallback)
+18a90191 2026-10-29 test(v2): v1 executor TMPDIR port is a named skip on Windows (TMPDIR is POSIX)
+2e4622d8 2026-10-29 test(v2): port v1 store/search cases (10 tests); D-V1DIFF-REINDEX-1 records append-on-reindex
+6b1d67f1 2026-10-29 docs(v2): Copilot CLI 1.0.104 tester reply, D-HNE-CLI-ENTRY-1 and D-HNE-OLDNODE-1 rows
+be4c7951 2026-10-29 refactor(entries): isEntry test imports is-entry.ts, cli.ts no longer re-exports it
+15f1e7a4 2026-10-29 test(v2): hook fuzz, 10 hosts x 500 seeded payloads against the built hook, invariants exit 0 / valid shape / ctx_* never denied / under the hook timeout
+d93053f1 2026-10-29 test(v2): port v1 executor language cases to ctx_execute (20 tests)
+7b0df434 2026-10-29 fix(server): server.mjs starts on Node 22 too, isEntry shared (D-HNE-CLI-ENTRY-1)
+80fabdb4 2026-10-29 fix(build): getBuiltinModule shim so the hook loads on Node below 22.3 instead of exiting 1 (D-HNE-OLDNODE-1)
+1d343957 2026-10-29 test(v2): v1 differential harness, 371 recorded v1 router calls, V1-TESTS inventory (D-V1DIFF-*)
+257a5190 2026-10-29 fix(cli): cli.mjs runs on Node 22 where import.meta.main is undefined (D-HNE-CLI-ENTRY-1)
+f1c881fb 2026-10-29 docs(v2): hook never errors (owner decision), hook-never-errors workflow
+1bef4f9c 2026-10-29 docs(v2): D-TF5-TIMING-1 records the measured taskkill and teardown times
+5f19e62f 2026-10-29 fix(ci): dev install retries, proves every package on disk, repo checks skip after a failed install (D-CI-INSTALL-1); T-F5 kill timing probe (D-TF5-TIMING-1)
+178fe8f6 2026-10-29 docs(v2): win-module-flake workflow states the owner's push approval for v2-design
+4f90f79f 2026-10-29 docs(v2): win-module-flake workflow
+44e33852 2026-10-29 docs(v2): next.11 shipped, next.10 is an unpublished tag
+92438edb 2026-10-29 docs(v2): docs sync 2026-10-28 (D1-D11, Git for Windows, Gemini/Qwen update Y/n, try-it numbers from ab.json, DEVIATIONS split) + docs-facts test
+b3610d95 2026-10-28 docs(v2): docs-sync-night workflow
+c3982498 2026-10-28 test(v2): report-server-closes-stdin is deterministic on Windows (D-CLI-EPIPE-1)
+249f03bf 2026-10-28 fix(v2): EPIPE on the MCP verify write no longer kills setup before the report (D-CLI-EPIPE-1)
+7ca0d47e 2026-10-28 docs(v2): next.10 unpublished, release-next10-fix workflow
+42750b15 2026-10-28 fix(v2): no lossy cut: doctor report stored whole, long echoes named by id (D-NO-LOSSY-CUT-1/2)
+a79fde9d 2026-10-28 docs(deviations): D-CKPT-LAT-1 records the measured Windows numbers after the fix
+03097ff5 2026-10-28 docs(v2): TRUNCATE rule scope, no-lossy-cut workflow
+5dbe4c3f 2026-10-28 docs(deviations): D-CKPT-LAT-1 checkpoint on the read path (Viet report 1)
+086bde8b 2026-10-28 fix(store): closeDb skips the checkpoint on a read-only handle; ctx_stats/ctx_search no longer pay it (D-CKPT-LAT-1)
+5bde33c2 2026-10-28 test(store): read tools and read-only closeDb issue no wal_checkpoint (red before fix, D-CKPT-LAT-1)
+881c7ad6 2026-10-28 test(e2e): checkpoint-latency trace prints the checkpoint result row (busy/log/checkpointed) and the caller
+45145b88 2026-10-28 fix(store): TRUNCATE is forbidden (owner main rule); closeDb checkpoints PASSIVE; guard test (D-NO-TRUNCATE-1)
+4653f730 2026-10-28 fix(doctor): D3 reads the plugin root from installed_plugins.json installPath under the versioned Claude cache (D-DOC-D3-ROOT-1)
+d907a99a 2026-10-28 docs(v2): Codex context7 style on main (local subfolder entry), live proof, D-MO-3
+52d6199e 2026-10-28 test(e2e): checkpoint-latency trace records WAL size and file, trace step runs before the gate so a red gate still shows the checkpoint ms
+c961fdaa 2026-10-28 feat(release): Codex marketplace on main points at the built plugins/claude-code subfolder (local source, no npm); smoke codex leg runs the native commands
+993d4481 2026-10-28 test(e2e): checkpoint-latency check, Viet report 1 repro (per-call timing, --trace, --crash) and CI step on all 3 OS (measure before the fix)
+4b227926 2026-10-28 docs(ticket): Codex also context7 style (owner decision); viet-next8-codex7 workflow
+3ae821f0 2026-10-28 docs(v2): tester reports on next.8 (Windows checkpoint latency, doctor D3 under versioned plugin cache)
+abc03cd0 2026-10-28 docs(v2): NEXT-STATUS and RESUME for v2.0.0-next.9
+b808edb0 2026-10-28 docs(v2): D-CI-IDENT-1, test identity for the commit-main race test and the T-F5 diagnostic
+e2865520 2026-10-28 test(e2e): T-F5 check polls a surviving grandchild to tell a slow tree kill from a missed one (diagnosis only, pass rule unchanged)
+106cdda3 2026-10-28 test(release): commit-main race test gives its racer clone its own git identity (CI has none)
+f6dbcfc5 2026-10-28 docs(v2): ci-commit-main workflow
+85683b1c 2026-10-28 docs(v2): D-HOOK-SYNC-1 reverted until the owner decides on data-loss risk
+32a14198 2026-10-28 Revert "fix(store): writable connections run synchronous=NORMAL, a COMMIT is no fsync (D-HOOK-SYNC-1)"
+a5299104 2026-10-28 docs(v2): owner questions from the main-only release work
+7cf81cb5 2026-10-28 chore(h5): remove the throwaway hosts printer
+79e8d8d5 2026-10-28 docs(tickets): local main proof per host, ready for merge day, merge-day checklist
+2e27cd3b 2026-10-28 docs(v2): release-next9-wait workflow (ship next.9 when the other jobs finish)
+3d6619f8 2026-10-28 chore(h5): throwaway hosts failure printer x4
+ff9f119d 2026-10-28 chore(h5): remove the throwaway failure printer
+941c93cd 2026-10-28 docs(v2): D-MO-1, D-MO-2 deviations, merge-day checklist, ticket state
+4aab9952 2026-10-28 feat(release): one-click main path in release.yml (route job, channel next|latest, confirm_latest, npm, release commit and tag on main, GitHub release)
+fcad48ee 2026-10-28 chore(d3): remove the throwaway windows profile
+545f1ce4 2026-10-28 docs(v2): resume note, next.9 blocked until win-flaky and main-only jobs finish
+7933f6f4 2026-10-28 chore(h5): throwaway printer mirrors ci.yml steps, x3
+ebd0a746 2026-10-28 feat(release): smoke --layout main (subfolder plugin, root clone marketplace) and a qwen leg that checks --agent qwen
+d335cd79 2026-10-28 chore(h5): throwaway failure printer, node 26 unit x2
+2d6ab773 2026-10-28 feat(release): commit-main.mjs, release commit and tag on main in one push, rollback as a forward commit
+ace68cec 2026-10-28 feat(build): main tree writes root gemini and qwen manifests pointing into plugins/claude-code
+7d75314c 2026-10-28 perf(hook): resolveProject computes projectKey, projectDir and dbPath on first read (D-CI-PERF-8)
+b3db26cc 2026-10-28 feat(release): plan --main --channel next|latest, version from tags and commits on main (no release branch)
+6a7e2264 2026-10-28 chore(h5): remove the throwaway failure printer
+6bf3252b 2026-10-28 chore(h5): throwaway failure printer for the two windows jobs
+1e1fd119 2026-10-28 docs(v2): release-next9 workflow (package meta, install docs ref, CI test fixes)
+77c8ecef 2026-10-28 chore(d3): throwaway windows profile 4, script-load vs hook cost
+54e07924 2026-10-28 chore(h5): remove the throwaway windows profile
+bd1c87e8 2026-10-28 chore(h5): throwaway profile, after-fix run
+fbb923d9 2026-10-28 fix(store): writable connections run synchronous=NORMAL, a COMMIT is no fsync (D-HOOK-SYNC-1)
+cc5fa90f 2026-10-28 fix(e2e): GP11 allows the release package.json meta keys and checks them against package.json
+77bd7ae7 2026-10-28 chore(h5): throwaway profile, fix probe file names
+782f4ef8 2026-10-28 docs(release): main-only release decision per host with probe evidence, plan in the ticket
+ea08f2ea 2026-10-28 chore(d3): throwaway profile 2, inclusive time and module format variants
+499f5d05 2026-10-28 chore(d3): throwaway windows profile of the hook path (removed before done)
+36ade1fe 2026-10-28 chore(h5): throwaway profile times each sqlite exec and the commit mode
+77f50934 2026-10-28 chore(h5): throwaway profile prints its lines as grouped notices
+28cd9f4e 2026-10-28 chore(h5): throwaway windows profile of the doctor hook sample (removed before done)
+7aed1958 2026-10-28 docs(v2): win-flaky workflow (H5 doctor hook-runs 10 s, D3 hook overhead p95 on Windows)
+322aadc2 2026-10-28 fix(manifests): plugin manifests carry the v2 version and description (D-PKG-META-1)
+1e2f68fa 2026-10-28 fix(build): v2 package.json is the source of release fields, drop v1 and unused deps
+c78b1213 2026-10-28 test(build): package-meta test, one source for package.json and manifests
+892dece8 2026-10-28 docs(ticket): v1 is finished, no v1 changes on main before the merge
+366c258e 2026-10-28 docs(ticket): context7 style is final: marketplace on main points at a built plugin subfolder (owner decision 2026-10-28)
+d3fc41a9 2026-10-28 docs(ticket): merge target about 2026-11-11, then one-click release
+f5f07a34 2026-10-28 docs(ticket): only main, one-click automatic release (owner decision 2026-10-28); main-only-release workflow
+6a4c0faf 2026-10-28 fix(ci): ctx_batch deadline test has no wall-clock budget; heldout search p95 takes the lowest of 3 passes (D-CI-BATCH-DEADLINE-1, D-CI-PERF-2)
+b9b3c3d4 2026-10-28 docs(install): every GitHub-source command names the release ref, plus a switch step per host (D-NI-DOCS-REF-2)
+910bf740 2026-10-28 docs(v2): pkg-meta workflow; owner manual review list for docs
+2e12adcc 2026-10-28 docs(v2): readme-ref-ci workflow (README GitHub-source commands installed v1; ctx_batch deadline test red on node 26)
+c8589cf5 2026-10-28 docs(release): NEXT-STATUS for 2.0.0-next.8
+4fb62aa6 2026-10-28 fix(setup): codex trust key survives an empty app-server reply and a symlinked default HOME (D-TRUST-KEYDIR-2)
+f471631e 2026-10-28 docs(v2): resume point and all workflow scripts before the usage limit
+8f2c6b08 2026-10-28 docs(v2): release-next8 workflow (ship Windows, Git Bash, TOML, VS Code fixes)
+d7437e56 2026-10-28 docs(win): per-host Windows paths, native install, matrix result and open items (WINDOWS.md)
+c3039618 2026-10-28 fix(setup): accept the Windows exit-time crash 0xC0000409 of gemini extensions link when the host lists the extension (D-WIN-EXITCRASH-1)
+c69dbec3 2026-10-28 test(win): windows host matrix gives codex a CODEX_HOME inside the test HOME; Codex ignores HOME on Windows (openai/codex home-dir)
+dcd5fe24 2026-10-28 test(win): readlink of a Windows junction is the absolute <dir>/<sha>; compare it that way (D-WIN-JUNCTION-1)
+4e2e0419 2026-10-28 docs(zcode): name the Windows config and skills paths; pin zcode home rule (Z-WIN-6, D-WIN-ZCODE-HOME-1)
+b9b1a58e 2026-10-28 fix(setup): find own hook entries by hook.mjs --agent <id>, so a node or package path change replaces them (Z-WIN-4, D-WIN-HOOKMERGE-1)
+0a931bda 2026-10-28 test(zcode): record ZCode hook shell on Windows is ComSpec via Node spawn (cmd /d /s /c); pin plain command string (Z-WIN-3, D-WIN-ZCODE-SHELL-1)
+0454b3d7 2026-10-28 test(vscode): correct the docs fetch date in the hook-file test comment (VS-WIN-6)
+edc6f346 2026-10-28 test(zcode): BOM + CRLF config.json is read, kept and restored by setup, doctor, remove (Z-WIN-1, D-WIN-BOM-5)
+6f648ee9 2026-10-27 test(kiro): record Kiro hook shell on Windows is cmd /C, not PowerShell; pin plain command string (KIRO-WIN-4, D-WIN-KIRO-SHELL-1)
+663aa666 2026-10-27 fix(win): Kiro hooks, MCP entry, skills and detection follow KIRO_HOME (KIRO-WIN-1, D-WIN-KIRO-HOME-1)
+db09aee6 2026-10-27 fix(vscode): doctor D3 reads the user hook file setup writes, one source for table.ts and HOOK_HOST_FILE (VS-WIN-6, D-WIN-VSCODE-HOOKFILE-1)
+493ccb93 2026-10-27 test(kiro): BOM + CRLF hook file and mcp.json are read, kept and restored by setup, doctor, remove (KIRO-WIN-2)
+f866c04f 2026-10-27 test(vscode): VS-WIN-5 jsonc test plants the user-profile mcp.json (D-WIN-VSCODE-MCP-1)
+38c191ee 2026-10-27 fix(vscode): MCP entry goes to the user-profile mcp.json (Code/User), not ~/.vscode (VS-WIN-2, D-WIN-VSCODE-MCP-1)
+14710eb5 2026-10-27 fix(setup): opencode.json is read as JSONC by setup and readHostConfig; planJsonKeys uses the shared host-config parser (VS-WIN-5, D-WIN-JSONC-1)
+e6325092 2026-10-27 test(win): opencode entry test compares with path.join so it holds on Windows (OC-WIN-4)
+f98750f4 2026-10-27 fix(pi): empty PI_CODING_AGENT_DIR counts as unset in one helper piAgentDirOf (PI-WIN-5, D-WIN-PIDIR-1)
+ee95ebb9 2026-10-27 fix(win): failed write removes its tmp file through the retrying unlink, so a held tmp never hides the rename error (PI-WIN-3, D-WIN-ATOMIC-6)
+6c7f8724 2026-10-27 test(e2e): host homes clear XDG_CONFIG_HOME and OPENCODE_CONFIG_DIR; the Linux runner sets XDG_CONFIG_HOME (OC-WIN-3, D-WIN-OPENCODE-DIR-1)
+e019ccdc 2026-10-27 test(win): pi settings.json with a BOM and CRLF is read by readHostConfig, doctor, uninstall (PI-WIN-2, D-WIN-BOM-4)
+726c7d19 2026-10-27 test(win): opencode plugin entry stays a bare absolute path; OpenCode 1.19.4 resolver read (OC-WIN-4, D-WIN-OCENTRY-1)
+488341a5 2026-10-27 fix(win): e2e matrix keeps its own spawn form (GS4: no src import), now with /v:off (Q-WIN-7, D-WIN-CMDBANG-1)
+941ea210 2026-10-27 fix(upgrade): current link is a junction on win32, dir symlink elsewhere (PI-WIN-1, D-WIN-JUNCTION-1)
+b3a3256d 2026-10-27 fix(win): hostLayout picks the dominant line end; CRLF insert test (OC-WIN-5, D-WIN-EOL-1)
+7ce8d4dc 2026-10-27 fix(setup): OpenCode dir follows OPENCODE_CONFIG_DIR and XDG_CONFIG_HOME via one helper (OC-WIN-3, D-WIN-OPENCODE-DIR-1)
+943da0a6 2026-10-27 test(win): opencode.json with a BOM and CRLF is read by setup, doctor, remove (OC-WIN-1, D-WIN-BOM-3)
+805650a7 2026-10-27 fix(setup): no regex in src/setup; shellWord and run id use char loops, parser test guards it (CP-WIN-6, D-NOREGEX-SETUP-1)
+37db76fe 2026-10-27 fix(win): cmd.exe runs shims with /v:off; e2e matrix shares spawnForm (Q-WIN-7, D-WIN-CMDBANG-1)
+5d00c189 2026-10-27 test(win): qwen cmd.exe hook spawn is a confirmed defect, marked todo with OPEN-ITEMS entry (Q-WIN-5, D-WIN-QWEN-SHELL-1)
+87a44c97 2026-10-27 fix(setup): rewrite v1 hook commands in flat hook files (CP-WIN-5, D-HOOKFLAT-1)
+5094c639 2026-10-27 fix(win): Copilot CLI hooks, skills and detection follow COPILOT_HOME (CP-WIN-2, D-WIN-COPILOT-HOME-1)
+49db0498 2026-10-27 fix(win): host-write restore rename names the held file and keeps the original; trash removal retries (CP-WIN-3, D-WIN-ATOMIC-5)
+bf511986 2026-10-27 fix(setup): read and edit any valid TOML 1.0 Codex config with toml-eslint-parser (D-TOML-PARSER-1)
+76452ae3 2026-10-27 test(win): shipped copilot-cli and vscode hook commands start with bare node (CP-WIN-1, VS-WIN-1, D-WIN-FLATPKG-1)
+c38d4a2c 2026-10-27 fix(win): cmd.exe shim line refuses only a %NAME% cmd.exe would expand; file URL with %7E/%20 passes (GEM-WIN-7, D-WIN-CMDPCT-1)
+b27cb325 2026-10-27 docs(win): DEVIATIONS row for the qwen hook shell finding (Q-WIN-5, D-WIN-QWEN-SHELL-1)
+d880324c 2026-10-27 test(win): qwen hook command through bash -c and the exact cmd.exe /d /s /c spawn qwen uses (Q-WIN-5)
+8c9d87ad 2026-10-27 fix(win): one requireHomeDir helper; doctor NO_HOME names USERPROFILE on win32 (Q-WIN-3, D-WIN-HOME-3)
+aeb2fd1f 2026-10-27 test(win): package hook commands start with bare node, hydrated with Windows values (Q-WIN-4, D-WIN-PKGHOOK-1)
+c2929393 2026-10-27 test(win): qwen settings.json with BOM and CRLF loses its v1 hook entry and keeps both (Q-WIN-2)
+4e1c0bd1 2026-10-27 test(win): every test env that sets HOME also sets USERPROFILE, so win32 does not reach the runner profile (D-WIN-HOME-2)
+3874f2cf 2026-10-27 fix(win): rollback unlink retries a busy file and names it (Q-WIN-1, D-WIN-ATOMIC-4)
+bb4045e8 2026-10-27 fix(win): every child_process call under src sets windowsHide (GEM-WIN-8, D-WIN-HIDE-1)
+2c1b1667 2026-10-27 fix(win): cmd.exe shim line refuses % and quotes with a char loop; one spawnShim helper for setup, codex probe and smoke (GEM-WIN-7, D-WIN-CMDPCT-1)
+75ceb4d0 2026-10-27 test(win): gemini hook command is hydrated and run through PowerShell as Gemini does (GEM-WIN-5, D-WIN-GEMINI-SHELL-1)
+7b54a2ed 2026-10-27 fix(win): homeDirOf reads USERPROFILE first on win32, HOME first on POSIX (GEM-WIN-3, PI-WIN-4, D-WIN-HOME-2)
+8a369307 2026-10-27 fix(doctor): D3 reads the gemini and qwen extension hook file and accepts the ${/} separator (GEM-WIN-4, D-WIN-DOCTOR-GEM-1)
+567970c2 2026-10-27 fix(win): host-write tmp name carries the pid, busy rename retries and the error names the file (GEM-WIN-2, D-WIN-ATOMIC-3)
+5a6ebcc6 2026-10-27 test(codex): prove ${PLUGIN_ROOT} hook form and relative MCP entry with a spaced root (W-CODEX-7)
+37e30f49 2026-10-27 test(setup): BOM + CRLF fixtures for the gemini and copilot-cli hook files (GEM-WIN-1, CP-WIN-4, D-WIN-BOM-2)
+2f3bc32b 2026-10-27 fix(setup): codex trust key uses the codexHome spelling Codex reports (D-WIN-CODEX-KEY-1, W-CODEX-4)
+334df8fa 2026-10-27 test(setup): end-to-end BOM and CRLF coverage for codex hooks.json + config.toml and kiro mcp.json (W-CODEX-3, VS-WIN-4, D-WIN-BOM-1)
+cf1abd1b 2026-10-27 fix(win): findRuntime cuts double quotes from Windows PATH entries, one shared pathEntries helper (W-CODEX-6, D-WCODEX6-PATHQ-1)
+6e9d40ad 2026-10-27 test(setup): pin the codex hook command to cmd.exe /C the way codex-rs runs it (W-CODEX-5, no product change)
+cf6a3439 2026-10-27 fix(setup): read host config files with a BOM and CRLF, keep their layout on write (CC-WIN-3, D-WIN-BOM-1)
+31c21f76 2026-10-27 fix(win): retry rename in plugin link swap and release dir rename (W-CODEX-2, VS-WIN-3, D-WIN-ATOMIC-2)
+7aaaf89e 2026-10-27 fix(setup): copilot-cli and vscode hook entries get an explicit powershell field so Windows PowerShell can parse the quoted node path (D-HW-PS-1)
+01e06543 2026-10-27 fix(claude-code): honour CLAUDE_CONFIG_DIR in setup, doctor, plugin-root (CC-WIN-1)
+d7886972 2026-10-27 fix(win): retry rename on EPERM/EBUSY/EACCES, remove tmp file on failure (CC-WIN-2, D-WIN-ATOMIC-1)
+d6a0648d 2026-10-27 fix(cli): setup and doctor use the HOME then USERPROFILE home rule (D-WIN-HOME-1)
+0ba37287 2026-10-27 fix(setup): cut double quotes from Windows PATH entries (CC-WIN-4)
+3d8c4914 2026-10-27 fix(doctor): D3 owns the quoted absolute-path hook command setup writes (W-CODEX-1, D-VT-DOCTOR-CMD-1)
+a531951a 2026-10-27 fix(vscode): map every documented terminal, read and fetch tool name (D-N7-VSCODE-TOOLS-1)
+f04b3963 2026-10-27 ci: windows hosts matrix prints the host mcp list and config on a setup failure
+9a5a6764 2026-10-27 ci: windows hosts matrix (10 agents x setup, doctor, hook, MCP) on 3 OS
+cb038354 2026-10-27 docs(v2): vscode-terminal workflow (runTerminalCommand not mapped)
+95d2557d 2026-10-27 docs(v2): NEXT-STATUS for 2.0.0-next.7
+5857931a 2026-10-27 fix(ci): D11 in issue-intake CHECK_KEYS; Git Bash tests use the platform PATH delimiter (D-VT-WINBASH-1)
+bc903580 2026-10-27 docs(v2): windows-all workflow (audit 10 hosts on Windows, CI host matrix, fix, release next.N)
+46cb4ca7 2026-10-27 fix(sandbox): Windows shell is Git Bash from the installed Git, never a bash.exe on PATH (D-VT-WINBASH-1)
+f61b6973 2026-10-27 docs(v2): workflow for tester reports on next.6 (Windows WindowsApps bash EACCES, Codex valid TOML rejected)
+397cc04b 2026-10-27 fix(kiro): decode camelCase tool events, shell matcher names agree with Kiro docs (D-N7-KIRO-1)
+16fa82b0 2026-10-27 fix(v2): vscode decoder reads the camelCase hook payload and never drops silently (D-HF-VSCODE-DECODE-1)
+aa5ffbef 2026-10-27 docs(v2): zcode tool name is documented as mcp__<server>__<tool>, drop the unverified mark (D-N7-ZCODE-NAMES-1)
+205991b9 2026-10-27 test(v2): zcode prefix, skills, deny texts, compact pointer and matcher use the documented mcp__<server>__<tool> name (D-N7-ZCODE-NAMES-1)
+efdedf4c 2026-10-27 fix(setup): codex MCP entry sets default_tools_approval_mode approve (D-N7-CODEX-APPROVE-1)
+d4a8bc1d 2026-10-27 docs(v2): next7 workflow (vscode/kiro/zcode/codex-approval fixes, release next.7, re-test)
+d9da48cc 2026-10-27 docs(v2): fix agent count and flaky-test note in NEXT-STATUS
+2c2da8ad 2026-10-27 docs(v2): rewrite NEXT-STATUS for next.6 run
+b195b992 2026-10-27 fix(v2): copilot-cli skills name only context-mode-ctx_*; vscode skills move to ~/.agents/skills (D-HQ-COPILOT-NAMES-3)
+f951201c 2026-10-27 test(v2): copilot-cli names context-mode-ctx_* once in skills and hook texts; vscode owns its own skills dir (D-HQ-COPILOT-NAMES-3, red)
+5d5e7502 2026-10-27 docs(v2): copilot-names workflow on Sonnet (Opus fixer stopped by safeguards)
+b20637f0 2026-10-27 fix(v2): qwen skills channel is the package skills/ dir; build renders it with gemini and qwen tool names (D-HQ-SKILLS-3)
+3b4afc1d 2026-10-27 test(v2): gemini and qwen share <extension>/skills, so that dir names both hosts' tools (D-HQ-SKILLS-3, red)
+3374b3ce 2026-10-27 test(e2e): childEnv config dir expected via path.join so Windows CI matches
+803c8e68 2026-10-27 docs(v2): qwen-skills workflow, no template interpolation in prompt
+2ac942c2 2026-10-27 docs(v2): qwen-skills on Sonnet with first-attempt findings (shared <extension>/skills)
+872511b4 2026-10-27 docs(v2): DEVIATIONS rows and gemini page for D-HA-GEMINI-DUMP-1, D-HA-GEMINI-HINT-1
+7e4d3975 2026-10-27 fix(v2): replace handle line adds the prompt words the output holds as a second query (D-HA-GEMINI-HINT-1)
+5aaf4562 2026-10-27 fix(v2): gemini BeforeTool denies a one-file shell dump over the cap before it runs (D-HA-GEMINI-DUMP-1)
+e4b246ca 2026-10-27 docs(v2): qwen-skills workflow (native qwen extension loads Gemini skill names)
+17878322 2026-10-27 test(v2): red - gemini BeforeTool stops a large shell cat; AfterTool hint returns the FATAL line
+bb856ea8 2026-10-27 docs(v2): codex page notes release next.5 has no .codex-plugin; DEVIATIONS row D-NI-DOCS-REF-1
+b4d0d26d 2026-10-27 docs(install): vscode Known limits names the hook file setup writes (D-NI-VSCODE-DOC-1)
+ead46dd0 2026-10-27 test(v2): red - vscode.md names the hook file setup writes, not 'Setup writes no hook file' (D-NI-VSCODE-DOC-1)
+518f4065 2026-10-27 fix(v2): doctor and setup verify a native qwen/gemini extension install, a disabled one names the enable command (D-NI-EXT-DOCTOR-1)
+53b45bbd 2026-10-27 docs(v2): install pages for claude-code, codex, gemini, qwen name the release-ref test command and the main command (D-NI-DOCS-REF-1)
+7d04bbaf 2026-10-27 test(v2): red - 4 GitHub-source install pages name the release-ref test command and the main command (D-NI-DOCS-REF-1)
+b7e286d4 2026-10-27 test(v2): red - doctor and setup accept a native qwen/gemini extension install, a disabled one names the enable command (D-NI-EXT-DOCTOR-1)
+4c8d10f5 2026-10-27 docs(v2): native-gaps workflow (qwen/gemini doctor after native install, release-ref install commands)
+bed1ea5c 2026-10-27 docs(v2): NATIVE-INSTALL.md - per-host native command, update command, verified state, sources
+ff4cf578 2026-10-27 docs(v2): codex native plugin install verified, doctor note; claude-code hooks list matches hooks/claude-code.json
+9781e1c9 2026-10-27 fix(v2): doctor and setup verify a native codex plugin install instead of 'not set up' (D-NI-CODEX-DOCTOR-1)
+8d42204c 2026-10-27 test(v2): red - doctor passes a native codex plugin install with no ~/.codex setup files (D-NI-CODEX-DOCTOR-1)
+b2dfd818 2026-10-27 test(v2): gate checks know the ADR-0023 package shape (main, .codex-plugin, codex/skills) (D-NI-GATE-1)
+6d8f5bea 2026-10-27 test(v2): claude-code guide test expects the native marketplace command (ADR-0023)
+2567b616 2026-10-27 docs(v2): DEVIATIONS row D-NI-DOCS-1 for native install docs (ADR-0023)
+138baa90 2026-10-27 test(v2): gemini and qwen guide tests expect the native install command, no --ref release (ADR-0023)
+0c3bc74e 2026-10-27 docs(readme): install section lists the native command and update command per agent (ADR-0023)
+f20a465f 2026-10-27 docs(install): install README lists the native command and update command per agent (ADR-0023)
+86d9b814 2026-10-27 docs(install): zcode page opens with its install command, update and doctor (ADR-0023)
+69131521 2026-10-27 docs(install): kiro page opens with its install command, update and doctor (ADR-0023)
+5d3dbe86 2026-10-27 docs(install): vscode page opens with its install command, update and doctor (ADR-0023)
+d459c9bc 2026-10-27 docs(install): copilot-cli page opens with its install command, update and doctor (ADR-0023)
+147ae2dc 2026-10-27 docs(install): opencode page opens with its install command, update and doctor (ADR-0023)
+5a9ecdf6 2026-10-27 docs(install): pi page opens with its install command, update and doctor (ADR-0023)
+f5db13f0 2026-10-27 docs(install): qwen page opens with its install command, update and doctor (ADR-0023)
+b14c0d51 2026-10-27 docs(install): gemini page opens with its install command, update and doctor (ADR-0023)
+c9794f02 2026-10-27 docs(install): codex page opens with its install command, update and doctor (ADR-0023)
+87b04383 2026-10-27 docs(install): Claude Code page opens with the native plugin command, update and doctor (ADR-0023)
+2e64a6b2 2026-10-27 feat(build): check-install-docs checkNativePages - native command first, update block, check and next lines (ADR-0023)
+a3198be3 2026-10-27 test(v2): red - install pages open with the native command, update command and doctor check (ADR-0023)
+a90d29d0 2026-10-27 Merge remote-tracking branch 'origin/v2-design' into exp/native-install
+52ac900c 2026-10-27 docs(v2): DEVIATIONS rows for codex plugin, package main and main-tree (ADR-0023)
+4e55ff7b 2026-10-27 test(v2): package shape tests expect .codex-plugin, codex/skills and main (ADR-0023)
+a3642a39 2026-10-27 feat(build): main-tree.mjs writes plugins/claude-code and both marketplaces from the packed package (ADR-0023)
+d6f964fe 2026-10-27 feat(build): codex plugin skills rendered with codex tool names (ADR-0023)
+861d607b 2026-10-27 feat(build): codex plugin manifests and package main for OpenCode in the npm package (ADR-0023)
+cf4f6884 2026-10-27 test(v2): red - native manifests in the packed npm package and the main-tree Claude Code plugin subfolder (ADR-0023)
+675a636f 2026-10-27 test(v2): print-codex golden carries omit_tools_from = ["deferred"] (D-N6-CODEX-DIRECT-1)
+9693ce41 2026-10-27 docs(v2): NEXT-STATUS codex live check after D-N6-CODEX-DIRECT-1 (off 16,611 B, v2 1,246 B, no tool_search)
+056ef921 2026-10-27 fix(setup): codex MCP entry omit_tools_from = ["deferred"] so ctx tools are direct, no tool_search dump (D-N6-CODEX-DIRECT-1)
+b8a37633 2026-10-27 docs(v2): DEVIATIONS row for the Claude Code published-package live runner and its next.5 result
+990c56c3 2026-10-27 Merge remote-tracking branch 'origin/v2-design' into exp/native-install
+da6f91ea 2026-10-27 fix(doctor): read codex config.toml and hooks.json under CODEX_HOME when set (D-N6-CODEX-HOME-2)
+fb83ff88 2026-10-27 docs(v2): ADR-0023 native install per agent (supersedes ADR-0019 install parts; Claude Code plugin subfolder on main)
+431a6b5a 2026-10-27 feat(e2e): Claude Code published-package live runner (npm prefix, setup, off/v2 arms, keychain login)
+9d1b840a 2026-10-27 test(e2e): red test for the Claude Code published-package live runner (fixture, scorer, login env)
+5db4f860 2026-10-27 docs(v2): native-install workflow split build into 3 small pushed steps
+e0d0b916 2026-10-27 docs(v2): next6 workflow (next.5 findings, release next.6, npm package test on 10 agents)
+3bf1bb97 2026-10-27 docs(v2): NEXT-STATUS for 2.0.0-next.5, per-agent results, fixes after next.5, open items
+c2ce0844 2026-10-27 tickets: Claude Code marketplace on main like vercel-plugin/context7, no release branch after v2 is on main
+952e2fc2 2026-10-27 fix(setup): write codex config, hooks and skills under CODEX_HOME when set (D-N5-CODEX-HOME-1)
+a7e38076 2026-10-27 fix(setup): render home-dir skills from the bare-name skill dir, no doubled tool prefix (D-N5-SKILL-1)
+55ea8e19 2026-10-27 docs(v2): P2 search profile numbers and D-HQ-PERF-2 deviation row
+d36b505e 2026-10-27 perf(v2): typo correction reads chunks_vocab once per pass (D-HQ-PERF-2)
+220c16d3 2026-10-27 docs(v2): D-RN-ORDER-1 row, impl/13 --github-release, open item N5-1 (v2.0.0-next.4 GitHub prerelease without npm)
+6136a9c0 2026-10-27 fix(release): github-release job runs after publish-npm; publish-promote makes no GitHub release (D-RN-ORDER-1)
+c3a1ae26 2026-10-27 fix(release): publish.mjs --promote makes no GitHub release; new --github-release mode (D-RN-ORDER-1)
+54da41be 2026-10-27 test(release): GitHub release only after npm publish (red, D-RN-ORDER-1)
+65843cd2 2026-10-27 docs(v2): next5-verify workflow (npm package on 10 agents, release order, search profile)
+0c732aa1 2026-10-27 docs(v2): NEXT-STATUS, state of the next channel
+0bf57342 2026-10-27 test(v2): npm-d1-shape expects the repository key of the D1 package (D-RN-REPO-1)
+496670bf 2026-10-27 fix(build): out package.json carries repository.url so npm provenance publish is accepted (D-RN-REPO-1)
+320c32f1 2026-10-27 test(v2): red: out package.json has no repository.url, npm provenance publish fails E422 (D-RN-REPO-1)
+adc44203 2026-10-27 fix(build): _generated.ts is not rewritten when unchanged and is written via temp + rename, so parallel server children never import a truncated file (D-RN-GEN-1)
+28a19960 2026-10-27 test(v2): red: --generated-only rewrites an up-to-date _generated.ts, parallel server children read it empty (D-RN-GEN-1)
+619bf420 2026-10-27 docs(v2): native-install workflow (owner main rule: each agent's own install command)
+c3e353da 2026-10-27 fix(release): gemini smoke passes --consent --skip-settings; smoke steps write output to files so the step timeout holds; gemini step timeout 5 min (D-RN-GEM-1)
+cb079c0e 2026-10-27 test(v2): red: gemini smoke hangs on the trust prompt in a relaunched child that holds the pipes (D-RN-GEM-1)
+3f870e5c 2026-10-27 docs(v2): UPGRADE-CHECK, does npm update reach each host (D-US-1)
+8a1a69b7 2026-10-27 merge exp/upgrade-sync into v2-design (D-US-1)
+07a0339c 2026-10-27 docs(install): Updating section, steps per host (D-US-1)
+1aa584de 2026-10-27 fix(v2): doctor FAILs on a stale Claude Code plugin copy; setup/upgrade run claude plugin update; upgrade keeps the dist-tag (D-US-1)
+09f8d8ad 2026-10-27 test(v2): red: stale Claude Code plugin copy after npm update; upgrade keeps the dist-tag (D-US-1)
+55a3ecd7 2026-10-27 docs(v2): upgrade-sync workflow (does npm update reach every host without setup)
+aa2c85a6 2026-10-27 test(v2): win32 spawnForm test: one PATH key in the test env (runner has Path) (D-RN-WIN-1)
+76029ea7 2026-10-27 fix(release): smoke and setup resolve Windows npm .cmd shims via PATHEXT and run them through cmd.exe (D-RN-WIN-1)
+8e62cdf4 2026-10-27 test(v2): red: Windows .cmd shims for smoke codex/gemini and a shared spawnForm (D-RN-WIN-1)
+b938d316 2026-10-27 docs(v2): release-night workflow (Windows smoke fix, next.N release loop, npm package test on 10 agents)
+6b7dcd46 2026-10-27 test(v2): release-next dry run: tag v2.0.0-next.1 -> plan, stage, promote against a bare remote (D-RN-TAG-1)
+3cd41fb3 2026-10-27 docs(v2): DEVIATIONS D-RN-TAG-1 release-next by pushed v2.* tag
+1ceac3cc 2026-10-27 ci(v2): release.yml plan passes the pushed v2.* tag to plan.mjs --tag (D-RN-TAG-1)
+7894f2d3 2026-10-27 feat(v2): build --version takes x.y.z-<prerelease> via the shared release version check (D-RN-TAG-1)
+e2bee539 2026-10-27 feat(v2): publish reuses a pushed v2.* tag; prerelease GitHub release is --prerelease --latest=false (D-RN-TAG-1)
+21d8e438 2026-10-27 feat(v2): plan.mjs --tag: the pushed v2.* tag is the version, no bump (D-RN-TAG-1)
+227e702d 2026-10-27 wip: T-F5 unit test prints the check output on failure so the Windows flake shows its cause
+eac74b28 2026-10-27 test(v2): red: release.yml plan passes the pushed tag; build --version takes x.y.z-pre (D-RN-TAG-1)
+ee9c04a5 2026-10-27 test(v2): red: publish reuses a pushed v2.* tag; gh --prerelease --latest=false for x.y.z-pre (D-RN-TAG-1)
+f88fdce0 2026-10-27 test(v2): red: plan.mjs --tag uses the pushed v2.* tag as the version, no bump (D-RN-TAG-1)
+5831c2ac 2026-10-27 fix(v2): cli functional tests do not gate hook timing; a loaded host no longer flips a PASS row (D-HL-GATE-1)
+f19749c1 2026-10-27 test(v2): red: cli functional setup test gives a PASS row when host load slows the hook (D-HL-GATE-1)
+ce89bfc4 2026-10-27 fix(v2): H9 a source query with no matching words lists that source's chunks by position (D-HL-H9-1)
+054eb84e 2026-10-27 fix(v2): hook texts name tools with the host's toolNamePrefix on all 10 hosts (D-HL-NAMES-1)
+643d8d93 2026-10-27 test(v2): red: hook texts name host-prefixed tools on all 10 hosts; H9 source-only listing
+17bc1553 2026-10-26 docs(v2): release-next workflow (prerelease 2.0.0-next.1 by tag push)
+dcb3abc4 2026-10-26 docs(v2): PROFILE D3 hook bundle size experiment, per-event split blocked by static-imports rule
+38b66b0f 2026-10-26 fix(v2): prompt lint GS5 allows the claude-code/skills copies of the 3 command skills (02e28bc4)
+81351f18 2026-10-26 tickets: release on demand from main, drop the release branch
+02e28bc4 2026-10-26 fix(v2): claude-code gets its own rendered skills dir, plugin.json and marketplace skills key point at it (D-HQ-SKILLS-2)
+ed30a154 2026-10-26 test(v2): red, every host's shipped skill text names its own real tool name; claude-code gets its own skills dir (D-HQ-SKILLS-2)
+0f271fe5 2026-10-26 docs(v2): hooks-last ccskills runs on Sonnet 5.5 (Opus safeguard false positive)
+59b72281 2026-10-26 docs(benchmarks): hooks saving on 10 agents (200 KB log, doc-verified)
+fd31d280 2026-10-26 docs(v2): hooks-last workflow (claude-code skills, prefixed tool names in hook texts, H9, hook cold start)
+2239ebb5 2026-10-26 fix(v2): inprocess-journal teardown tolerates open DB handle on win32 (D-HQ-CI-WINRM-1)
+e05090e5 2026-10-26 docs(v2): DEVIATIONS D-HQ-GATEFIX-1, gate checks follow the zcode, kiro, pi skills and claude shim changes
+aa7c8d88 2026-10-26 fix(e2e): GP-SETUP claude fake lives in the @anthropic-ai/claude-code layout (D-HF-CLAUDE-SHIM-1)
+6e8af48c 2026-10-26 fix(v2): prompt lint GS5 allows the pi/skills copies of the 3 command skills (D-HQ-SKILLS-1)
+c4da508e 2026-10-26 test(e2e): GP1 kiro-hooks-v1-schema golden carries the @mcp and shell entries (D-HF-KIRO-SHELL-1)
+9dc40a8e 2026-10-26 fix(e2e): GP1/GP3/GP11 read zcode hooks as matcher groups (D-HF-ZCODE-SHAPE-1)
+3321800d 2026-10-26 docs(v2): hooks-all re-run results, install README hooks table, close H1-H4 in OPEN-ITEMS
+a48113c8 2026-10-26 test(v2): print goldens for copilot-cli and vscode name both shared-skill tools (D-HQ-COPILOT-NAMES-2)
+7f219b95 2026-10-26 docs(v2): DEVIATIONS D-HQ-COPILOT-NAMES-2, OPEN-ITEMS 7b copilot-cli prefix
+850821bf 2026-10-26 fix(v2): shared ~/.copilot/skills names both copilot-cli and vscode tools, so setup of one never breaks the other (D-HQ-COPILOT-NAMES-2)
+3d229d10 2026-10-26 test(v2): red, copilot-cli and vscode share ~/.copilot/skills; SKILL.md names both hosts' tools (D-HQ-COPILOT-NAMES-2)
+6ce23b33 2026-10-26 docs(v2): OPEN-ITEMS H9 gemini hooks-fast round 1 (answerOk closed by live order, hint No hits open)
+50e0e134 2026-10-26 test(v2): gemini live order pin, BeforeAgent prompt then AfterTool cat keeps the FATAL line in the deny reason (Gemini CLI 0.65.0 bundle)
+dcc576e5 2026-10-26 fix(v2): copilot-cli own MCP tool prefix is context-mode- (<server>-<tool>), skills and deny texts name the real tool (D-HQ-COPILOT-NAMES-2)
+4d84271b 2026-10-26 test(v2): red, copilot-cli own MCP tool prefix is context-mode- (<server>-<tool>, Copilot CLI 1.0.103 bundle, D-HQ-COPILOT-NAMES-2)
+46a58920 2026-10-26 fix(v2): build renders gemini skills/ and pi pi/skills with host tool names from skills/ (D-HQ-SKILLS-1)
+aee526d5 2026-10-26 test(v2): red, gemini skills/ and pi pi/skills rendered with host tool names at build (D-HQ-SKILLS-1)
+5b51297b 2026-10-26 docs(v2): P1 perf profile after frames, DEVIATIONS D-HQ-PERF-1
+e52388ac 2026-10-26 perf(v2): scope session/worktree porter rank skips the RRF window sorts (P1, D-HQ-PERF-1)
+863a54ed 2026-10-26 test(v2): red, scope session/worktree porter rank runs no window sort (P1 perf, D-HQ-PERF-1)
+75224584 2026-10-26 docs(v2): DEVIATIONS D-HQ-COPILOT-EVENT-1
+ff999dd4 2026-10-26 fix(v2): copilot-cli decode reads the documented payload with no hookEventName; doctor sample sends it (D-HQ-COPILOT-EVENT-1)
+14c9ff57 2026-10-26 docs(v2): DEVIATIONS D-HF-OPENCODE-LIST-1
+17981ae0 2026-10-26 test(v2): red - copilot-cli documented payload has no hookEventName; doctor sample must match it (D-HQ-COPILOT-EVENT-1)
+09465cc8 2026-10-26 fix(v2): opencode setup lists with --pure, no plugin install wait on fresh HOME (D-HF-OPENCODE-LIST-1)
+24bbc82c 2026-10-26 test(v2): red - opencode list check must not load plugins (D-HF-OPENCODE-LIST-1)
+2300af7b 2026-10-26 bench(v2): regenerate fixture results after whole lines on the replace path (D-HQ-PI-LINE-1)
+8563c48f 2026-10-26 docs(v2): DEVIATIONS D-HQ-PI-LINE-1, whole lines on the replace path
+6fefd968 2026-10-26 fix(v2): replace-path chunks keep a line over the small cap whole, so ctx_search returns the whole line (pi, D-HQ-PI-LINE-1)
+26b4c61e 2026-10-26 test(v2): red: pi ctx_search after a tool_result replace returns the matching log line whole
+ef8fec95 2026-10-26 docs(v2): H8 closed - D-HF-CLAUDE-SHIM-1 deviation row
+37fd45c8 2026-10-26 fix(v2): H8 setup/doctor resolve the real claude past a PATH shim and print the binary used
+9dcf648c 2026-10-26 test(v2): H8 red - doctor table prints the real claude binary it used, shim skipped
+4913ade6 2026-10-26 wip: P1 perf profile, before frames (hook cold start, ctx_search)
+63f3aa84 2026-10-26 test(v2): H8 red - setup/doctor skip a claude shim first on PATH and name the real binary
+69e14ba3 2026-10-26 docs(v2): DEVIATIONS D-C5-PREFIX-1; OPEN-ITEMS C5 closed; ADR-0021 guard list
+53f6bfcd 2026-10-26 fix(v2): dynamic-token lint for prefix text, wired into gate ci-checks and ci.yml (C5, D-C5-PREFIX-1)
+1ed51dab 2026-10-26 test(v2): red: prefix determinism + dynamic-token lint in the gate (C5, ADR-0021)
+b5848ef6 2026-10-26 docs(v2): hooks-fast parallel workflow (4 item fixers + 10 host pipelines)
+9582e2a3 2026-10-26 fix(v2): hook-registered narrows hookInstall before reading trust (tsc clean)
+74e9ec78 2026-10-26 docs(v2): DEVIATIONS D-HF-INPROC-JOURNAL-1; OPEN-ITEMS H6 closed
+80e687dd 2026-10-26 fix(v2): opencode and pi in-process ctx_* calls write the server's journal row (H6, D-HF-INPROC-JOURNAL-1)
+b3dd50cf 2026-10-26 wip: H6 one ownCallRow builder shared by the server
+8563806f 2026-10-26 test(v2): red: in-process ctx_* calls on opencode and pi write a journal row (H6)
+bf12ff72 2026-10-26 docs(v2): DEVIATIONS D-HF-DOCTOR-RUNS-1, D-HF-OPENCODE-SHELL-1; OPEN-ITEMS H5 closed
+215e2003 2026-10-26 test(v2): fake hook bundles answer the doctor sample with a saving decision (H5)
+2e1fe507 2026-10-26 fix(v2): doctor hook-runs checks the saving effect per host; opencode routes its bash tool (H5, D-HF-DOCTOR-RUNS-1, D-HF-OPENCODE-SHELL-1)
+9f44e1f0 2026-10-26 wip: H5 doctor hook-runs sends the per-host large shell read and checks the saving effect
+63b0dd0e 2026-10-26 wip: H5 per-host large shell-read sample and verdict for doctor hook-runs
+d620f8be 2026-10-26 test(v2): H5 red - doctor hook-runs must see the host saving effect, FAIL on silent or NO_PROJECT hook
+0276b308 2026-10-26 docs(v2): hooks-fix resumes after H1/H2/kiro, adds profiling, fix rounds until every host is green
+d7af950a 2026-10-26 docs(v2): kiro install page + DEVIATIONS D-HF-KIRO-SHELL-1
+d13980ce 2026-10-26 fix(v2): kiro registers the shell tool (execute_bash) next to @mcp; deny text on stderr with exit 2 (D-HF-KIRO-SHELL-1)
+288a7824 2026-10-26 test(v2): red - kiro shell matcher, execute_bash deny on stderr with exit 2 (D-HF-KIRO-SHELL-1)
+4e5c2eb4 2026-10-26 docs(v2): zcode install page + DEVIATIONS D-HF-ZCODE-SHAPE-1 (H2)
+6be8e768 2026-10-26 fix(v2): zcode matcher groups + mcp.servers/features.mcp; uninstall drops the nested entry; goldens (H2)
+137cc945 2026-10-26 wip: zcode hooks as matcher groups, MCP under mcp.servers {type,enabled,timeoutMs} + features.mcp (H2)
+a7ef6b81 2026-10-26 test(v2): red - zcode hooks as matcher groups, MCP under mcp.servers + features.mcp, doctor fails old shape (H2)
+51fd1891 2026-10-26 fix(v2): vscode resolves the project - MCP args --workspace-folder ${workspaceFolder}, hook from payload cwd, run_in_terminal is the shell (H1, D-HF-VSCODE-PROJECT-1)
+f2830f97 2026-10-26 test(v2): red - vscode hook resolves the project from payload cwd, MCP args carry --workspace-folder (H1)
+01097e2f 2026-10-26 docs(v2): hooks-fix workflow for the hosts that failed hooks-all
+d5d7ab79 2026-10-26 test(v2): Windows temp cleanup is best-effort (kept DB handle, EPERM) and the copilot stub is a .cmd shim
+df96372b 2026-10-26 docs(v2): DEVIATIONS row for D-HA-QWEN-DUMP-1 (shellDump needs Read tool and replace)
+21941a15 2026-10-26 docs(v2): hooks-all RESULT with every live run; OPEN-ITEMS H1-H8
+987215bb 2026-10-26 docs(install): README table of hook channel, skills and live saving per agent
+b9cb3903 2026-10-26 docs(install): What setup changes names hooks, skills and saving effect per agent
+87443e30 2026-10-26 merge: exp/hooks-all into v2-design (hooks and skills on every agent, ADR-0020)
+1fa7c9a1 2026-10-26 docs(v2): DEVIATIONS rows for pi project/names and copilot-cli names/replace; ADR-0020 copilot row
+1c863006 2026-10-26 wip: tests follow the copilot-cli replace and the pi/copilot native names
+ad7e8b7d 2026-10-26 wip: copilot-cli bash name, modifiedResult replace, snake tool_result; pi bash/read names
+637c956b 2026-10-26 wip: pi hook resolves the project from ctx.cwd (D-HA-PI-PROJECT-1)
+f6054914 2026-10-26 test(v2): qwen dump deny asserts the exact read-deny line
+739a2d30 2026-10-26 wip: shell dump deny on every row without replace (qwen)
+f8df5d05 2026-10-26 test(v2): red, live hook shapes for qwen shell dump, copilot bash/modifiedResult, pi read/replace
+80835279 2026-10-26 docs(v2): ADR-0020 open items, gemini skill tool name and live fire proofs
+7eb35c58 2026-10-26 docs(v2): ADR-0020 gemini row R, DEVIATIONS D-HA-GEMINI-REPLACE-1
+53f4fb15 2026-10-26 test(v2): print-codex golden carries the hook trust tables (D-HA-CODEX-TRUST-1)
+f36ebaca 2026-10-26 wip: setup --print codex carries the hook trust tables
+fe938c2d 2026-10-26 wip: gemini AfterTool replace
+ee7579a6 2026-10-26 test(v2): red, gemini AfterTool replaces a large result with decision deny + reason (D-HA-GEMINI-REPLACE-1)
+093e6831 2026-10-26 docs(v2): DEVIATIONS rows D-HA-CODEX-TRUST-1, D-HA-GEMINI-NAMES-1
+ecbe91f7 2026-10-25 fix(v2): gemini row lists its native tool ids; shell and read rules now reach BeforeTool (D-HA-GEMINI-NAMES-1)
+1b2809cd 2026-10-25 wip: gemini native tool ids map to canonical names
+8d1cffa6 2026-10-25 test(v2): red, gemini native tool ids map to canonical names so BeforeTool denies large shell output (D-HA-GEMINI-NAMES-1)
+95080050 2026-10-25 fix(v2): codex setup trusts its own hooks (hooks.state trusted_hash); doctor fails untrusted hooks (D-HA-CODEX-TRUST-1)
+fb8e9aa4 2026-10-25 wip: doctor runs checks when only codex trust is missing
+e64ad64b 2026-10-25 wip: codex setup writes hooks.state trusted_hash; doctor names untrusted hooks
+49278a44 2026-10-25 wip: codex trust entry builder
+8eb0e1eb 2026-10-25 wip: codex hook install names config.toml as its trust file
+9e44d881 2026-10-25 test(v2): red, codex setup must trust its hooks in config.toml and doctor must check trust (ADR-0020)
+d35740d0 2026-10-25 fix(ci): opencode-cache temp cleanup tolerates Windows EPERM like opencode-ported
+af803639 2026-10-25 docs(v2): cache RESULT review, fix three rounded hit values, cross-session pair set and codex cross per file
+ad0e8a2f 2026-10-25 fix(v2): opencode default export keeps setup next to id and server (M5 tests green)
+6c63645b 2026-10-25 docs(v2): opencode plugin loads; first-run install gap recorded (D-HA-6, D-HA-7)
+774ebbe8 2026-10-25 docs(v2): prompt-cache RESULT, ADR-0021, open items
+82b13937 2026-10-25 wip(cache): claude-code cross-session, 6 more pairs per arm, v2 min share 0.876 (off min 0.72)
+32703631 2026-10-25 wip(cache): claude-code A/B after pi fix, n=3 per arm, cost 3.47 (cross v2 run 1 read 0)
+3db5d804 2026-10-25 fix(v2): opencode server tool map type (tsc clean)
+78af6bec 2026-10-25 feat(v2): opencode plugin default export { id, server } for the 1.19.4 loader (ADR-0020)
+22bcaebb 2026-10-25 test(v2): red opencode plugin default export { id, server } for the 1.19.4 loader (ADR-0020)
+adca5ba3 2026-10-25 docs(v2): DEVIATIONS rows D-HA-1..5 for hooks and skills on every agent (ADR-0020)
+faa77967 2026-10-25 test(cache): opencode guard, a compaction in one session leaves the next session's system payload unchanged
+03d33c28 2026-10-25 docs(v2): DEVIATIONS D-CACHE-PI-1, pi system prompt payload per session
+e1b98217 2026-10-25 fix(cache): pi returns the same system prompt payload every turn (D-CACHE-PI-1)
+d9e265f7 2026-10-25 test(v2): saving effect per host (R on claude-code and pi, deny + redirect elsewhere) (ADR-0020)
+6428cfbf 2026-10-25 test(cache): red test, pi system prompt drops INSTRUCTIONS on turn 2
+780424cc 2026-10-25 feat(v2): doctor hook-registered, hook-runs, hook-seen and skills checks (ADR-0020)
+cccb5161 2026-10-25 test(v2): red doctor hook-registered/runs/seen and skills checks (ADR-0020)
+9b9254d4 2026-10-25 wip: --print text names the hook block (--json carries it); hooks-all print test reads REPO skills (ADR-0020)
+f5420f0d 2026-10-25 test(v2): print goldens carry the hook and skill steps (ADR-0020)
+2ec2d1a9 2026-10-25 wip: --print skill steps carry the rendered file; print-apply applies hook and skill steps (ADR-0020)
+cae70c86 2026-10-25 wip: setup and cli test fixtures ship skills/ like the release package (ADR-0020)
+a90f47d5 2026-10-25 feat(v2): setup writes hook and skill channel for every agent (ADR-0020)
+b566c034 2026-10-25 wip: --print lists hook and skill steps; copilot stub in hooks-all fixture (ADR-0020)
+dbc02090 2026-10-25 wip: setup plans hook channel and skill files (ADR-0020)
+c56fe425 2026-10-25 wip: registry hookInstall and skillInstall per agent (ADR-0020)
+d1a8afa1 2026-10-25 wip: shared hook shapes for setup (ADR-0020)
+c0e11bc5 2026-10-25 wip(cache): claude-code compact turn re-run, both arms valid, post-compact call recorded (cost 4.41)
+f638be7f 2026-10-25 wip(cache): codex A/B run 3, n=3 per arm
+cda78801 2026-10-25 wip: hosts.md gemini BeforeAgent re-read
+11670cbf 2026-10-25 docs(v2): cache-proof retries on API errors; opencode/pi system prompt check
+02be5ed1 2026-10-25 wip(cache): codex A/B run 2 (v2 arm calls ctx tools), n=2
+b6fd49fb 2026-10-25 wip: runner keeps the empty compact turn, adds --base to extend a result
+35b0271c 2026-10-25 test(cache): red test, empty compact turn exempts next call
+23004145 2026-10-25 wip: claude-code cache results (n=3 main, cross, compact), cross share min 0.874
+9b7f443c 2026-10-25 fix(cache): codex v2 arm exercises ctx tools, fails closed when none called (green)
+b6411604 2026-10-25 test(cache): codex v2 arm must call ctx tools, red
+a46efce1 2026-10-25 test(v2): red, setup writes hook and skill channel for every agent (ADR-0020)
+49436198 2026-10-25 wip: claude-code cache runner (run.mjs)
+9b4a0f52 2026-10-25 wip(cache): codex A/B first results (n=2)
+00b23701 2026-10-25 feat(cache): pass verdict (green)
+6c135d68 2026-10-25 test(cache): red tests for the cache pass verdict
+90326ce5 2026-10-25 feat(cache): parseTurn tool names and mcp state (green)
+ca6113db 2026-10-25 test(cache): red test for tool names and mcp state in parseTurn
+cd4554ad 2026-10-25 feat(cache): claude-code cache-break analysis (green)
+3e433414 2026-10-25 test(cache): red tests for cache-break analysis of claude -p usage
+c3eb44c7 2026-10-25 feat(v2): required hookChannel and skillChannel on every adapter row (ADR-0020)
+ca891e67 2026-10-25 test(v2): red, every adapter row has hookChannel and skillChannel (ADR-0020)
+679c672f 2026-10-25 docs(v2): ADR-0020 hooks and skills on every agent
+e1160b77 2026-10-25 feat(cache): codex A/B runner and usage analysis (green)
+bb5c3097 2026-10-25 test(cache): codex usage analysis, red (runner missing)
+223d9c9a 2026-10-25 wip: mined.json and table (no v2-only breaks)
+a8108590 2026-10-25 wip: skip zero-usage synthetic turns in cache mine
+af739d19 2026-10-25 wip: bench/cache/mine.mjs green, first mined.json
+97b2fa7c 2026-10-25 wip: red test for cache mine (bench/cache/mine.mjs)
+0d6b5391 2026-10-25 docs(v2): prompt-cache host docs classification
+13527d56 2026-10-25 docs(v2): prompt-cache proof workflow
+574b2efc 2026-10-25 docs(v2): hooks-all agents commit and push about every minute
+19638c16 2026-10-25 docs(v2): hooks-all live test verifies no-login hosts from official docs
+7950da1f 2026-10-25 docs(v2): hooks on every agent workflow
+2fe0660d 2026-10-25 docs(benchmarks): drop links to the removed gw-v2-v1 page
+1fef229d 2026-10-25 docs(deviations): remove conflict markers left by a bad rebase merge
+0752c6dd 2026-10-25 docs(readme): drop v1 word from benchmarks link text (D-V1OUT-3)
+e86bddcd 2026-10-25 fix(install): new-user test round 2 (--yes with no terminal, print text, PASS detail)
+3d76a7c2 2026-10-25 docs(bench): link the published Gateway, v2 and v1 page
+6302b270 2026-10-25 docs(v2): install new-user test round 2 workflow
+bdc793b4 2026-10-25 test(cli): print-golden maps Windows backslash paths and quoted words back to the POSIX golden form
+49d38ccc 2026-10-25 fix(prompt): ctx_upgrade description back to 333 chars, gate GP2 token budget green (D-V1OUT-2)
+991c8344 2026-10-25 docs(install): From source section and command-not-found step; build:release script (D-INST-6)
+4d55db9c 2026-10-25 test(install): docs name the release tree as the user package and a fix for a missing command
+9f618f5b 2026-10-25 docs(v2): CLI-REPORT, setup --agents and setup --print verified for all 10 agents in a clean temp HOME
+b07268a5 2026-10-25 docs(v2): DEVIATIONS D-PRINT-1, D-INST-5; CLI-REPORT row for setup --print
+66a6e706 2026-10-25 docs(install): every page is npm i -g context-mode@next + context-mode setup --agents <id>; setup --print for by-hand; no scripts or paths
+3c0656a2 2026-10-25 feat(install-docs): simple rules (no node -e, npm root -g, $(...), home paths; <=100 chars; setup --agents/--print pages)
+4b1a7629 2026-10-25 feat(cli): no v1 wording in CLI help, setup and doctor output; checker covers CLI goldens (D-V1OUT-1)
+68e87b8e 2026-10-25 feat(cli): green, setup --print <agent> prints the manual step from the setup registry row; writes nothing
+cecc0859 2026-10-25 docs: remove v1 upgrade/rollback sections and v1 wording from user-facing files (D-V1OUT-1)
+17724b3f 2026-10-25 test(cli): red, setup --print <agent> goldens, apply-by-hand doctor PASS, same-source check
+8a82786e 2026-10-25 test(install-docs): red, no v1 word in user-facing files (D-V1OUT-1)
+77e5c5a1 2026-10-25 docs(v2): v1-out + benchmark publish workflow
+646c4510 2026-10-25 test(install-docs): red, simple install rules (no scripts, no home paths, <=100 chars, setup --agents)
+f1b62185 2026-10-25 docs(v2): simple install workflow
+92ff28aa 2026-10-24 docs(v2): du merge results, du-deny merged (M2 main mean 90.22), du-units not merged (M2 84.36 < 85)
+b558bb37 2026-10-24 Merge remote-tracking branch 'origin/exp/du-deny' into v2-design
+a2e537ad 2026-10-24 docs(v2): du-deny spike result, M2 main 90.15/90.12/90.12, heldout 98.59, routing under 0 over 0 (D-DU-DENY-1)
+f5ef7977 2026-10-24 test(v2): routing runner detects the new Read deny text (D-DU-DENY-1)
+6c9f8a37 2026-10-24 feat(v2): Read deny is one line from src/prompt/hooks/read-deny.md, the exact ctx_execute call for the file (D-DU-DENY-1)
+7c017cdb 2026-10-24 test(v2): red test, golden Read deny drops the CTX_FILE prose from the ctx_execute description; caps 120/220 B (D-DU-DENY-1)
+0e6f04ad 2026-10-24 test(v2): red test, Read deny is one line from a src/prompt template, golden text, byte cap, lint covers it (D-DU-DENY-1)
+99238f77 2026-10-24 docs(v2): M2 deny text + lazy line units workflow
+db421365 2026-10-24 refactor(v2): highlight splits terms with blankTokens; last regex on the search path removed
+fe67d383 2026-10-24 test(v2): red test, no regex literal or RegExp call in search, recall and units paths (fts.ts highlight WORD_SPLIT)
+15f67ea4 2026-10-24 refactor(v2): shared recallQueryText, deleteChunkRows and SourceDraft (r4g)
+180f3c02 2026-10-24 test(v2): red tests for recallQueryText, deleteChunkRows and sourceRowOf fields (r4g)
+699c4dbd 2026-10-24 docs(v2): RESULT.md round 4g re-check, small-event hook path equals PRE; units insert is the +10 ms
+312dee8f 2026-10-24 docs(v2): RESULT.md D3 re-measured with one HOME per bundle: +11 ms, not +80; units insert is the cost
+c179f898 2026-10-24 bench(v2): regenerate fixture results after the replace join change (D-R4-BUDGET-1)
+0a4a77de 2026-10-24 fix(v2): replace output has no leading newline at an empty body (D-R4-BUDGET-1)
+4d6d2a14 2026-10-24 test(v2): red test for replaceOutput, handle line alone at empty body (D-R4-BUDGET-1)
+780e560a 2026-10-24 bench(v2): regenerate fixture hook bytes after the handle line change; decode test reads stored label (D-R4-HANDLE-LABEL-1)
+d5c1302c 2026-10-24 fix(v2): handle line is the short id, size and call, no label text (D-R4-HANDLE-LABEL-1)
+3d09496f 2026-10-24 refactor(v2): one char-by-char word tokenizer; named MMR and handle constants
+146b672b 2026-10-24 bench(v2): hook-large-post uses one HOME per bundle; a shared store made PRE fail SCHEMA_STALE and skip its writes
+01a49478 2026-10-24 test(v2): red tests for handle line short id and budget 0 (D-R4-HANDLE-LABEL-1, D-R4-BUDGET-1)
+eb4deb12 2026-10-24 test(v2): red test for blankTokens (NUL and whitespace split only)
+12a51f7c 2026-10-24 fix(v2): hook loads node:fs via getBuiltinModule in dispatch, cutting Windows D3 overhead (D-CI-PERF-7)
+69842f2a 2026-10-24 test(v2): red tests for the shared word tokenizer (store/words.ts)
+a9f30767 2026-10-24 bench(v2): hook-large-post.mjs, interleaved PostToolUse wall on the 222 KB compact-hard serverLog
+36815e6d 2026-10-24 test(v2): hook call must not load stream, readline or fs/promises (red)
+aa05287b 2026-10-24 docs(v2): round 4 review-fix part 2 workflow
+5315f2d3 2026-10-24 test(v2): runGroup in-time case spawns node, not /bin/sh, so it runs on Windows
+7e3c4597 2026-10-24 docs(v2): round 4 checker results; DEVIATIONS D-M2-JSON row dates
+d9cf43c5 2026-10-24 docs(v2): DEVIATIONS rows for D-R4-BUDGET-1, D-R4-RESERVE-1, D-R4-RETENTION-1
+1a6e3ade 2026-10-24 docs(v2): D3 on the merged head (hook-gs6 ABABAB, setup overhead, 222 KB PostToolUse)
+e2a822a6 2026-10-24 fix(v2): reserved source row deleted when its detached write fails (D-R4-RESERVE-1)
+168c493a 2026-10-24 test(v2): red test reserved source deleted on failed write (D-R4-RESERVE-1)
+c56e86a9 2026-10-24 fix(v2): retention size cap counts line_units bytes (D-R4-RETENTION-1)
+d8005674 2026-10-24 test(v2): red test retention counts line_units bytes (D-R4-RETENTION-1)
+fef78434 2026-10-24 fix(v2): replace selection budget floor at 0 (D-R4-BUDGET-1)
+ccf1fabc 2026-10-24 test(v2): red test replaceBudget floor at 0 (D-R4-BUDGET-1)
+edabbb38 2026-10-24 fix(v2): live runners kill the whole process group on timeout (D-CR3-WATCHDOG-1)
+bc9281a8 2026-10-24 test(v2): red test for handle budget floor (D-R4-BUDGET-1)
+368acb65 2026-10-24 test(v2): red test for process-group timeout in live runners (D-CR3-WATCHDOG-1)
+8098de59 2026-10-24 docs(v2): r4 review fixes: stale-case test, DEVIATIONS rows, spike notes
+c7047bf7 2026-10-24 docs(v2): round 4 review-fix workflow (Haiku)
+24a42ab4 2026-10-24 docs(v2): round 4 interleaved results and merge of exp/r4-final
+2c40245e 2026-10-24 merge exp/r4-final into v2-design (r4 merge rule met)
+bf9c810a 2026-10-24 docs(v2): r4-json spike results
+8ee66e48 2026-10-24 docs(v2): DEVIATIONS rows D-M2-JSON-1..3 and D-CR3-HANDLE-1
+5cdc4d36 2026-10-24 refactor(v2): one fts import in search.ts
+30c84f3a 2026-10-24 feat(v2): ctx_search over a JSON source returns whole BM25-ranked rows (D-M2-JSON-3)
+2ebdf842 2026-10-24 feat(v2): shape digest has its own 256 B budget, independent of the handle line (D-M2-JSON-1)
+94332734 2026-10-24 feat(v2): JSON digest header with schema, numeric extremes for a named key (D-M2-JSON-1, D-M2-JSON-2)
+fd0697c8 2026-10-24 test(v2): red tests for JSON digest header, numeric extremes, JSON ctx_search rows (D-M2-JSON-1..3)
+c124a22e 2026-10-24 docs(v2): r4-json spike, step 1 transcript bytes
+0899441b 2026-10-24 docs(v2): r4 finish smoke numbers for exp/r3-combined
+49ded00b 2026-10-24 feat(e2e): process-group watchdog for new live runs; document the manual one (D-CR3-WATCHDOG-1)
+77ede9b1 2026-10-24 test(v2): red: live runner process-group kill reaches the grandchild (D-CR3-WATCHDOG-1)
+5a9dbc77 2026-10-24 test(v2): short-id collision guard: s<base36> with no id row falls through to labels (D-CR3-HANDLE-1)
+81be2830 2026-10-24 feat(v2): ctx_resume lists sources by short id and goal line units (D-CR3-RESUME-1)
+c50d4b71 2026-10-24 test(v2): red: ctx_resume lists sources by short id and goal line units (D-CR3-RESUME-1)
+5e4a9737 2026-10-24 feat(v2): reserve the source row before the detached write so the handle is the short id (D-CR3-HANDLE-2)
+f48c55c3 2026-10-24 test(v2): red: detached replace handle must be the short id (D-CR3-HANDLE-2)
+83b35d0f 2026-10-24 docs(v2): D-CR3-HANDLE-1 deviation row
+04ecd86f 2026-10-24 bench(v2): fixtures results and Part 3 rows after the handle line moved inside the budget (D-CR3-HANDLE-1)
+60f2991d 2026-10-24 docs(v2): compaction + M2 round 4 workflow
+97587ace 2026-10-24 docs(v2): round 3 checker re-run (compaction main n=2, heldout, M2 main)
+74c92610 2026-10-24 docs(v2): compact + M2 round 3 results; no build meets M2 main >= 90, nothing merged
+bd4842fc 2026-10-24 merge exp/r3-ledger into exp/r3-combined
+30668794 2026-10-24 merge exp/r3-handle into exp/r3-combined
+cf7c2c8d 2026-10-24 docs(v2): r3-ledger spike results and deviation row
+cccb08ca 2026-10-24 feat(v2): keep the source label in the handle line; r3-handle status (D-CR3-HANDLE-1)
+c98b71a6 2026-10-24 feat(v2): short source id handle line inside the replace budget (D-CR3-HANDLE-1)
+83e0e8be 2026-10-24 feat(v2): r3-ledger line units built at PostToolUse, one ranked recall query
+ff8c9945 2026-10-24 docs(v2): r3-ledger spike start
+5996c145 2026-10-24 docs(v2): compact r3 handle plan
+5a79496d 2026-10-24 docs(v2): compaction + M2 round 3 workflow
+e015559f 2026-10-24 docs(v2): compact r2 checker re-run (main 29.2%, heldout 25.0%, n=2) and unit count split
+fe0e67ee 2026-10-24 docs(m2): checker re-run; main 92.47 on 18e4a6cd, 84.03 on fbd4f781 after D-CR2-HANDLE-1
+21e1f4ed 2026-10-24 docs(v2): compact r2 checker: unit count is 1457 pass (node --test re-run)
+41902138 2026-10-24 revert(m2): bench/m2 stays frozen at 69077b8a; round 2 numbers live in docs/v2/spikes/m2/RESULT.md
+fbd4f781 2026-10-24 docs(v2): compact round 2 result, guards, ADR-0009 and OPEN-ITEMS
+25c2ecb8 2026-10-24 test(e2e): spawned servers do not inherit the outer CLAUDE_CODE_SESSION_ID (D-CR2-SID-2)
+2f909fa4 2026-10-24 bench(v2): fixtures results after the replacement handle line (D-CR2-HANDLE-1)
+06b69cc6 2026-10-24 docs(v2): compact r2 step 3 result (main 44.4%)
+4bf03c9c 2026-10-24 feat(hooks): replacement names the stored source, size and search call (D-CR2-HANDLE-1)
+87e2a6e8 2026-10-24 docs(v2): correct compact r2 base number (13.9%, full run)
+a72f174e 2026-10-24 docs(v2): compact r2 step 1 result, D-CR2-SID-1 row
+55990426 2026-10-24 feat(v2): MCP server uses the host session id from CLAUDE_CODE_SESSION_ID (D-CR2-SID-1)
+0e85c5c8 2026-10-24 docs(v2): compact r2 step 2 root cause: host cuts PostToolUse stdout to 30000 chars
+acfe5be0 2026-10-24 docs(v2): compact round 2 plan; bring round 1 notes
+8224434a 2026-10-24 docs(m2): round 2 live guards
+ec4a968b 2026-10-24 docs(m2): round 2 RESULT, OPEN-ITEMS, TECH-SPEC and benchmarks pages
+18e4a6cd 2026-10-24 test(m2): GP1/GP3 goldens follow the claude-code PostToolUse mcp__.* matcher (D-M2-MCP-1)
+37cc74b0 2026-10-24 feat(m2): categorical one-off rows are rare units in the JSON shape (D-M2-MCP-2)
+90e3dce9 2026-10-24 feat(m2): replace non-ctx MCP and Grep content results (D-M2-MCP-1)
+f375fdcb 2026-10-24 docs(m2): T-GS6 A/B raw data, base vs b-shape, 6 interleaved rounds (median paired -1.75 ms)
+26cdd6df 2026-10-24 merge(m2): exp/m2-b-shape into v2-design (shape digest + persisted output, D-M2-SHAPE-1/2)
+aa6d54a7 2026-10-24 docs(v2): compaction + M2 round 2 workflow
+e35819e2 2026-10-24 docs(m2): b-shape spike results
+ed0108c3 2026-10-24 feat(hooks): shape digest header carries counts only (D-M2-SHAPE-1)
+41eb547a 2026-10-24 fix(hooks): read the whole persisted Bash output for the replace (D-M2-SHAPE-2)
+85c34f06 2026-10-24 feat(hooks): shape by content type for the main-agent replace (D-M2-SHAPE-1)
+32f57beb 2026-10-24 test(v2): compact-hard baseline main n=3 (direct 72.2%, v2 5.6%) and causes
+69bd5583 2026-10-24 test(v2): compact-hard v2 arm loads the plugin MCP server; diagnosis in PREREG
+bd494f89 2026-10-24 docs(m2): b-shape spike plan
+69077b8a 2026-10-24 bench(m2): baseline main 87.6 / heldout 96.52, eval command and top leak sources (D-M2-EVAL-1)
+cc316913 2026-10-24 test(v2): M2 eval scoring, oracle gate and heldout determinism
+f0e4ca00 2026-10-24 bench(m2): frozen M2 eval (main = SCORE_TASKS, 7 heldout workloads, oracle-gated scoring)
+d937e0dd 2026-10-24 test(v2): compact-hard fixtures, oracle and runner (main + heldout)
+994e35ef 2026-10-24 bench(m2): start frozen M2 eval dir (main + heldout)
+5c5a773b 2026-10-24 test(v2): compact-hard prereg draft (hard compaction probe)
+5e5da716 2026-10-24 docs(v2): compaction recall + M2 workflow
+9f20042a 2026-10-24 fix(v2): add build/readme-agents.mjs and un-ignore every tracked build script (D-README-1)
+e5f617a6 2026-10-24 test(v2): doctor v1-finding test sets the CI hook budget knob, timing is not under test (D-CI-DOC-1)
+faaa2ed7 2026-10-24 docs(v2): README for v2 - npm install, generated agent table, v1 results with losses, Gateway (D-README-1)
+2075e8c0 2026-10-23 docs(v2): npm install page, shorter agent pages, checker rules (D-INST-4)
+628b8dce 2026-10-23 test(v2): install-docs rules for the npm route, flags and page checks (D-INST-4), red until the pages move
+6bab6fa6 2026-10-23 test(e2e): GP-SETUP fake CLI records 'extensions link' as an install (follows D-INST-1)
+ae7a9d07 2026-10-23 fix(v2): add build/check-secrets.mjs, the tenant-id gate CI and the tests already call (D-FU-OI-TENANT-1)
+7080f2d3 2026-10-23 docs(v2): founder decisions 2026-10-23; OPEN-ITEMS rows 4, 6, 9, 11, 13 updated, row 21 added
+5c41eb61 2026-10-23 fix(v2): marketplace.json carries the owner object Claude Code requires (D-INST-3)
+d55d87e2 2026-10-23 ci(v2): check-secrets gate, no tenant id in tracked files (D-FU-OI-TENANT-1)
+1d0c754b 2026-10-23 fix(v2): npm package carries .claude-plugin/marketplace.json for setup (D-INST-3)
+4802a045 2026-10-23 fix(v2): setup list check reads stderr too (D-INST-2)
+8b6e4b66 2026-10-23 fix(v2): setup links the Gemini and Qwen extension and never waits on stdin (D-INST-1)
+340889a3 2026-10-23 docs(v2): GS6 row follows ADR-0019 D3; OPEN-ITEMS rows from docs sync
+d42d38c2 2026-10-23 docs(v2): hook start-up cost (D-CI-PERF-3/4), release state, DIAGNOSIS status, three broken links
+5e72d246 2026-10-23 docs(v2): impl 01/02/05/00 describe verbatim snippets and porter+trigram schema (D-SEARCH-3,4,7)
+c7e671b9 2026-10-23 docs(v2): npm channel and CLI replace the no-npm text in PRD, TECH-SPEC, ADR 0002/0003/0010/0011/0013/0015, impl 00/07/10/13/15, LAUNCH
+b61b1546 2026-10-23 docs(benchmarks): v2 vs v1 publication page with losses and gateway path
+0b009df3 2026-10-23 docs(v2/gemini): first-turn resume hint (D-FU-GCH-2), open item 14 fixed
+831368b1 2026-10-23 fix(v2/gemini): resume hint on the first BeforeAgent of a session (D-FU-GCH-2)
+4470439d 2026-10-23 docs(v2): fixed-cost spike results, before/after A/B and routing (open item 5)
+a37a2334 2026-10-23 test(v2): stdin-read probe imports io.ts by file URL (Windows drive paths)
+c2603549 2026-10-23 test(v2): GP5 goldens after D-SEARCH-7 (window at the match line, whole-line cap)
+3faa0ae2 2026-10-23 docs(v2): fixtures README keeps Part 1 rows; only Part 2 rows change after D-SEARCH-7
+36c8f548 2026-10-23 docs(v2): D-SEARCH-7 row, DIAGNOSIS section 8, fixtures README after verbatim snippets
+c70f1e20 2026-10-23 perf(v2): shorter server instructions and ctx_execute description (D-FU-OI-COST-1)
+ccb3bd5f 2026-10-23 test(v2): GP-SEARCH-heldout floors 0.96 / 0.807; fixtures results after D-SEARCH-7
+36ebb21b 2026-10-23 perf(v2): cache search-path prepared statements per connection
+6d56a48c 2026-10-23 perf(hooks): read stdin with fs.read on fd 0, not the process.stdin stream (D-CI-PERF-6)
+de09a613 2026-10-23 fix(v2): snippet window takes a whole neighbour fence; typo words place it by prefix (D-SEARCH-7)
+cbb555c5 2026-10-23 test(v2): snippets assert stored text, no entity encoding (D-SEARCH-7)
+62ac32c2 2026-10-23 feat(v2): verbatim, fence-aware, score-chosen search snippets (D-SEARCH-7)
+a84ffb2e 2026-10-23 test(kiro): pin SessionStart once-per-session output; docs: empty repeat output is by design (D-FU-OI-KIRO-1)
+1b97dc6c 2026-10-23 docs(v2): ADR-0006 live probe on Opus and Sonnet, status confirmed Accepted
+456e7cb8 2026-10-23 docs(v2): DEVIATIONS D-CI-PERF-5 (D3 gate on all OSes, cold first call info)
+dbbd9a5d 2026-10-23 docs(v2): CLI review report (setup, doctor, upgrade vs ADR-0019 section 8)
+de660eb5 2026-10-23 test(v2): ci-config D3 step check stops at the next step line
+5b1be9b5 2026-10-23 ci(v2): gate D3 hook overhead on macOS and Windows too; print cold first call as info
+6bb3e93b 2026-10-23 docs(v2): open items and issue coverage audit
+57276168 2026-10-23 bench(v2): search baseline before snippet rework (heldout.mjs, node v26.8.1)
+d3638ec4 2026-10-23 fix(v2): help <command> routes to the command help; parse-fail line names the agent once
+90a5870f 2026-10-23 docs(v2): fixed-cost spike stub (open item 5)
+e4edcf52 2026-10-23 docs(v2): open-items workflow
+09f58ce0 2026-10-23 docs(v2): pre-publish workflow
+660c072c 2026-10-23 docs(v2): independent search cross-check results in DIAGNOSIS.md section 7
+eb523586 2026-10-23 fix(v2): NUL in a search query splits words instead of an FTS5 error; DEVIATIONS D-SEARCH-6
+d208c62e 2026-10-23 test(v2): NUL in a search query is a word break, not an FTS5 error (red)
+695497fb 2026-10-23 bench(v2): independent search cross-check over MCP and a second held-out set (10 queries)
+5e83b5e0 2026-10-23 docs(v2): search fix results per layer in DIAGNOSIS.md, DEVIATIONS D-SEARCH-1..5
+be0ef362 2026-10-23 test(v2): e2e GP-SEARCH-heldout - recall@5/MRR floors, fixture queries hit, code blocks whole, p95 on 1 MB
+f9b5d36c 2026-10-23 bench(v2): fixtures results and Part 2 table after search layers 1-4
+f8f7850e 2026-10-23 feat(v2): search layer 4 - trigram table, RRF fusion (k=60), typo correction from index vocabulary (schema v4)
+c1fd04f3 2026-10-23 feat(v2): search layer 3 - porter stemming and chunk title column (schema v3 migration)
+60e1b62f 2026-10-23 feat(v2): search layer 2 - one OR query, chunks matching every term rank first
+ba1b9b7a 2026-10-23 feat(v2): search layer 2 - stopwords, AND first then OR fallback when fewer than a page of hits
+7a26490f 2026-10-23 feat(v2): search layer 1 - inline content with a heading or fence is chunked as md
+697b13a1 2026-10-23 feat(v2): search layer 1 - md chunks split on headings with title path, fences never split
+d085de40 2026-10-23 test(v2): search layer 1 - heading-aware md chunking, fences never split (red)
+94df655d 2026-10-23 docs(v2): search diagnosis: baseline numbers v1 vs v2 and fix plan
+75a14f53 2026-10-23 bench(v2): held-out search eval harness and v2 baseline
+13cba162 2026-10-23 test(v2): freeze held-out search query set (50 queries, labels from source text)
+7b5acc6f 2026-10-23 docs(v2): search diagnosis: root cause and v1 layer archaeology
+78433fac 2026-10-23 docs(v2): search diagnosis spike skeleton
+26493fb8 2026-10-23 docs(v2): search quality workflow
+92f165e7 2026-10-23 perf(hook): minify the hook bundle only, 155 KB -> 91 KB parse per call (D-CI-PERF-4)
+b227991d 2026-10-23 perf(hook): load node:fs via getBuiltinModule so hook start skips fs/promises, readline, streams (D-CI-PERF-3)
+a9314245 2026-10-23 docs(v2): hook startup workflow
+fc6ce76f 2026-10-23 fix(ci): steadier D3 perf gate; Ctrl-C reaches only the CLI during the MCP check
+903979d7 2026-10-23 fix(ci): setup engine tests tolerate runner jitter and Windows drive paths
+4039849d 2026-10-23 fix(ci): gate D3 hook overhead in one perf check; functional GP-SETUP records it
+6fcc3112 2026-10-23 fix(setup): find agent CLIs on Windows via PATHEXT and run .cmd shims through cmd.exe
+ae6bf645 2026-10-23 chore(v2): remove stray sed backup DEVIATIONS.md-e
+64ce5505 2026-10-23 docs(v2): CI fix workflow for setup e2e
+cd326952 2026-10-23 fix(ci): GP-SETUP e2e honors CM_HOOK_OVERHEAD_BUDGET_MS; DEVIATIONS D-CI-WIN-3
+04fdc3b5 2026-10-23 fix(ci): setup e2e hook budget env for shared runners; DEVIATIONS D-CI-WIN-2
+ab67feee 2026-10-23 fix(ci): Windows path forms in setup tests, resolved allowedWrites, 5 hook rounds; DEVIATIONS D-CI-WIN-1
+329ac225 2026-10-23 fix(check-removed): allow ADR-0019 src/cli and src/setup; rename bench SKILL.md fixture (GS5); DEVIATIONS D-CR-0019-1
+4471e083 2026-10-23 fix(doctor): issue intake and GP11 golden accept the ADR-0019 D7 command line; DEVIATIONS D-DOCTOR-CMD-1
+fbde405d 2026-10-23 docs(readme): fold v2 preview into Install to meet the 200-line cap; DEVIATIONS D-NPM-PUB-2
+1dd34d92 2026-10-23 ci(release): publish-npm job (OIDC, provenance, tag next), tarball gate, owner steps, v2 preview README
+deefbd80 2026-10-23 ci: reword setup-e2e comment so the no-key check passes
+f5a130ea 2026-10-23 ci: setup-e2e job (ubuntu, macos, windows) for the npm install case; DEVIATIONS D-SETUP-E2E-1,2
+9bce0b50 2026-10-23 fix(doctor): report-only v1 findings (shared temp file) no longer fail a set-up agent
+6e2bccf6 2026-10-23 test(e2e): GP-SETUP npm pack, global install, setup twice, remove byte for byte (ADR-0019 D1)
+4a032349 2026-10-23 docs(deviations): D-CLI-1..3 for the CLI layer, pty column fallback and the ctx_doctor command line
+e37a9619 2026-10-23 feat(doctor): ctx_doctor report names the exact context-mode command to run (ADR-0019 D7)
+02cb17a6 2026-10-23 feat(cli): golden --help files per command; 80-column fallback when a pty reports 0 columns
+0483b1cb 2026-10-23 feat(cli): setup, doctor and upgrade commands with clack prompts, D6 report and typo hints (ADR-0019 D5-D7)
+b1d4f91b 2026-10-23 feat(setup): abort signal rollback, onAgent progress hook and read-only runDoctor for the CLI layer
+cc2388f3 2026-10-23 test(cli): setup/doctor/upgrade CLI tests first (ADR-0019 sections 4-8, D4-D7; red)
+0c9613ae 2026-10-23 fix(setup): D3 hook gate takes best of 3 rounds so host noise does not roll back a good install
+966af39f 2026-10-23 feat(setup): setup engine per ADR-0019 section 3 (registry, plan, apply, verify, rollback, remove)
+ef8c7274 2026-10-23 feat(ops): editHostConfigText for the setup engine; test PATH keeps /usr/bin
+d3300d8d 2026-10-23 docs(bench/fixtures): status-line overhead is 17 B on Issues (React), not 16 B on every row
+a8794bb0 2026-10-23 test(setup): E2E-style setup engine tests first (ADR-0019 section 3, D3, D4)
+eb1217f3 2026-10-23 docs(v2): drop duplicate PO-NPM-2 DEVIATIONS row left by rebase
+7025eded 2026-10-23 test(e2e/GP11): release audit allows the D1 npm keys, still bans dependencies, scripts, private
+aacdb421 2026-10-23 bench(fixtures): pass PATHEXT and ComSpec to the child env (Windows runtime lookup)
+c1dd3f37 2026-10-23 docs(bench): fixture benchmark README (v1 layout), CI --check step, DEVIATIONS D-BENCH-FX-1
+95d318f2 2026-10-23 bench(fixtures): run.mjs (v2 server over MCP stdio + claude-code hook path), results.json, test
+95b84e3f 2026-10-22 test(e2e/GP1): golden for the D1 npm package shape; DEVIATIONS PO-NPM-2
+207ba634 2026-10-22 feat(v2/build): D1 npm package.json in release-out, cli.mjs bin with D4 v1 forms
+de9184b0 2026-10-22 bench(fixtures): v1 scenarios (byte-exact code + queries) and today's v1 baseline
+442e6e38 2026-10-22 test(v2/build): D1 npm package shape, pack = SHA256SUMS, cli.mjs and D4 v1 forms (red)
+c0861240 2026-10-22 docs(v2): PO npm decisions D1-D7 in ADR-0019, PRD-setup; amend ADR-0011/0013/0002
+90314e45 2026-10-22 bench(fixtures): copy v1 benchmark fixtures from origin/main 90af14e
+ad2cb65e 2026-10-22 docs(v2): night workflow: fixture benchmark + npm channel
+39593282 2026-10-22 docs: drop owner tenant id from gw-bench workflow rule text
+0e4c1af9 2026-10-22 docs: drop owner tenant id from workflow rule text; try-it: void the unfetched price notes
+a2af6824 2026-10-22 docs(bench/try-it): README with amendment-1 results, pooled totals, claims and an Amendment 1 section
+e405694c 2026-10-22 docs(bench/try-it): analyze amendment-1 lines for web-scrape, docs-search, large-json; first-run lines go to superseded
+2bea025d 2026-10-22 bench(try-it): large-json amendment 1, cycle 4
+2384fa09 2026-10-22 bench(try-it): large-json amendment 1, cycle 3
+449395f2 2026-10-22 bench(try-it): large-json amendment 1, cycle 2
+0a63f996 2026-10-22 bench(try-it): large-json amendment 1, cycle 1
+948d4406 2026-10-22 docs(bench/try-it): web-scrape amendment 1, 20 run lines
+54de12a5 2026-10-22 bench(try-it): docs-search amendment 1, cycles 2-4
+7b29ccf8 2026-10-22 docs(bench/try-it): web-scrape amendment 1, 16 run lines
+3d359ce0 2026-10-22 docs(bench/try-it): web-scrape amendment 1, 12 run lines
+85f52797 2026-10-22 bench(try-it): docs-search amendment 1, warm-up + cycle 1
+008d86b2 2026-10-22 docs(bench/try-it): web-scrape amendment 1, 8 run lines
+db99b147 2026-10-22 bench(try-it): large-json amendment 1, warm-up cycle
+c9ba8cfd 2026-10-22 docs(bench/try-it): web-scrape amendment 1, 4 run lines
+da170213 2026-10-22 docs(bench/try-it): correction 30, source record from the first fetch call with a result
+d079c7cc 2026-10-22 docs(bench/try-it): correction 29, source record from the first fetch with a visible result
+a2b29123 2026-10-22 docs(bench/try-it): correction 28, source record backed by real fetch results
+61fe3dc5 2026-10-22 docs(bench/try-it): correction 27, source record from the one real fetch result
+9b3ca183 2026-10-22 docs(bench/try-it): correction 26, source record after the first real fetch result
+a881009c 2026-10-22 docs(bench/try-it): correction 25, source record backed by a real fetch result
+e0dc1423 2026-10-22 docs(bench/try-it): correction 24 (source record after a real fetch) and smoke result
+c1c671d8 2026-10-22 docs(bench/try-it): correction 23, source record written after a fetch result in the transcript
+63a226f1 2026-10-22 docs(bench/try-it): correction 22, source record written after a fetch result that is in the transcript
+401c4eee 2026-10-22 docs(bench/try-it): correction 21, source record from the fetch call in the transcript
+4b605e0a 2026-10-22 docs(bench/try-it): correction 20, source record from the first fetch call that exists
+71fee99b 2026-10-22 docs(bench/try-it): correction 19, source record from a fetch call that exists; corrections 1-18 void
+d35b57ce 2026-10-22 docs(bench/try-it): correction 18, source record from the first fetch tool call
+beca6287 2026-10-22 docs(bench/try-it): correction 17, source record from a fetch call that exists
+015b7a65 2026-10-22 docs(bench/try-it): correction 16, source record from the first fetch call in the session
+3be7d0d4 2026-10-22 docs(bench/try-it): correction 15, source record from the one fetch call that was made
+88ad8415 2026-10-22 docs(bench/try-it): correction 14, source record backed by a fetch result in the transcript
+9b8fe59e 2026-10-22 docs(bench/try-it): correction 13, source record backed by a real fetch result
+d62e2efa 2026-10-22 docs(bench/try-it): correction 12, source record from a fetch tool call that exists; earlier fetch claims void
+1926de58 2026-10-22 docs(bench/try-it): correction 11, source record from a real fetch tool call; earlier fetch claims void
+6cdaf7e3 2026-10-22 docs(bench/try-it): correction 10, source record from a real fetch; all earlier fetch claims void
+68552214 2026-10-22 docs(bench/try-it): correction 9, page rows from the first real fetch; corrections 2-8 void
+e391e611 2026-10-22 docs(bench/try-it): correction 8, page rows from the first real fetch; corrections 2-7 void
+c183036c 2026-10-22 docs(bench/try-it): correction 7, page rows and tier rule from the first real fetch; corrections 2-6 void
+becc9a0d 2026-10-22 docs(bench/try-it): correction 6, page rows and tier rule from the first real fetch; corrections 2-5 void
+6088771c 2026-10-22 docs(bench/try-it): correction 5, page rows and tier rule from the first real fetch; corrections 2-4 void
+af086d77 2026-10-22 docs(bench/try-it): correction 4, page rows and tier rule from a real fetch
+fa296b47 2026-10-22 docs(bench/try-it): correction 3, first real page fetch (tool call) and its rows
+547b5a20 2026-10-22 docs(bench/try-it): correction 2, the first real page fetch and its rows
+4ce960fa 2026-10-22 docs(bench/try-it): correct addendum 2 byte count and fetch order
+791fe9bb 2026-10-22 docs(bench/try-it): addendum 2, real page rows and tier rule; patch with the runner else fix
+f9569732 2026-10-22 docs(v2): try-it price step on sonnet (opus safeguard error)
+ed97ac0f 2026-10-22 docs(bench/try-it): addendum, closing verification note from the one real page fetch; earlier notes void
+d55b578e 2026-10-22 docs(bench/try-it): addendum, final verification note from the one real page fetch; eighteen earlier notes void
+533736fc 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch; seventeen earlier notes void
+01bb753f 2026-10-22 docs(bench/try-it): addendum, final verification note from the real page fetches; sixteen earlier notes void
+9c7a56a5 2026-10-22 docs(bench/try-it): addendum, verification note from the first real page fetch; fifteen earlier notes void
+a9fbedc3 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch; fourteen earlier notes void
+2af66bbc 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch; thirteen earlier notes void
+00e87c3d 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch (891,267 bytes); twelve earlier notes void
+ca2a3f41 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch; eleven earlier notes void
+3251cca3 2026-10-22 docs(bench/try-it): addendum, verification note from the first real page fetch; ten earlier notes void
+8214998b 2026-10-22 docs(bench/try-it): addendum, final verification note from the one real page fetch; nine earlier notes void
+83e6eb50 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch (891,251 bytes); eight earlier notes superseded as unsupported
+8e04ebf9 2026-10-22 docs(bench/try-it): addendum, verification note from the one real page fetch; seven earlier notes superseded as false
+48433a50 2026-10-22 docs(bench/try-it): addendum, verification note from the only real page fetches; earlier notes superseded
+c32f7841 2026-10-22 docs(bench/try-it): addendum, verification note from the real page fetches
+47a6c7f0 2026-10-22 docs(bench/try-it): addendum, final verification note from the one real page fetch
+5ec99c51 2026-10-22 docs(bench/try-it): addendum, second correction of the verification note (first real page fetch)
+556c10d1 2026-10-22 docs(bench/try-it): addendum, correct the verification note (page fetched after the first push)
+f728a352 2026-10-22 docs(bench/try-it): addendum, full rule quote and page-read verification note
+ffb8040c 2026-10-22 docs(bench/try-it): amendment 1 addendum, helper model price (claude-haiku-5-5, both tiers)
+802f87f3 2026-10-22 docs(v2): ADR-0019 CLI conventions; O1-O3 deferred; try-it price read from source
+a6da3133 2026-10-22 docs(v2): try-it fix workflow adds haiku-5-5 price step
+c091a4cb 2026-10-22 docs(bench/try-it): prereg amendment 1 (diagnosis, tenant per session, transcript oracle, edge calls) and tryit.patch
+7fb3cb3d 2026-10-22 docs(bench/try-it): prereg amendment 1 draft (before any new measured run)
+eafe950a 2026-10-22 docs(v2): try-it fix workflow (gateway tenant per session, transcript oracle, amendment 1)
+e06931d2 2026-10-22 docs(bench/try-it): fix four README percents rounded twice
+952e6b4d 2026-10-22 docs(v2): spike S-SYN final, merged setup spike results
+75fe1e8e 2026-10-22 docs(v2): PRD-setup rollout and open questions after setup spikes
+05fdf0df 2026-10-22 docs(v2): ADR-0019 spike results table, decisions changed by spikes, owner decisions
+c3438ecd 2026-10-22 docs(v2): spike S-SYN draft 1, merged setup spike results
+26cb995c 2026-10-22 docs(v2): spike S-EXT, Gemini and Qwen extension link from npm package dir
+86393430 2026-10-22 bench(try-it): analysis, evidence and README for the try-it prompts
+25329b29 2026-10-22 docs(v2): spike S-V1 draft 1, v1 entries per agent
+284b1f82 2026-10-22 docs(v2): spike S-HOOK hook latency result
+68cca1ef 2026-10-22 docs(v2): S-PATH spike result
+64391d8e 2026-10-22 docs(v2): spike S-UI result, clack vs readline
+a111aac0 2026-10-22 docs(v2): spike S-NPM result, trusted publishing and provenance
+d36e46f9 2026-10-22 docs(v2): ADR-0019 setup spikes workflow
+6f0ce2a2 2026-10-22 docs(v2): ADR-0019 interactive setup and npm channel, PRD-setup (proposed)
+b3649ef9 2026-10-22 bench(try-it): repo-research measured cycle 4
+044790f0 2026-10-22 bench(try-it): docs-search measured cycle 4
+bd2ef6c0 2026-10-22 bench(try-it): docs-search measured cycle 3
+f6b441c1 2026-10-22 bench(try-it): repo-research measured cycle 3
+7eb79441 2026-10-22 bench(try-it): docs-search measured cycle 2
+dd1250da 2026-10-22 bench(try-it): docs-search runs, warm-up and cycle 1
+628dfb9f 2026-10-22 bench(try-it): repo-research measured cycle 2
+3565aca9 2026-10-22 bench(try-it): large-json runs       20 lines
+c3a4ce50 2026-10-22 bench(try-it): large-json runs       16 lines
+0a1740bf 2026-10-22 bench(try-it): repo-research measured cycle 1
+1cd9eb7f 2026-10-22 bench: try-it git-history cycle 4 run lines
+a1900884 2026-10-22 bench: try-it git-history cycle 3 run lines
+b82b2b7c 2026-10-22 bench: try-it session-continuity cycle 2 run lines
+4516f425 2026-10-22 bench(try-it): web-scrape runs,       20 sessions
+c415fc4c 2026-10-22 bench(try-it): repo-research warm-up cycle 0
+ef7ba77c 2026-10-22 bench(try-it): large-json runs        8 lines
+b3af1e2e 2026-10-22 bench(try-it): web-scrape runs,       16 sessions
+ab9dd61a 2026-10-22 bench: try-it git-history cycle 2 run lines
+b1df0d57 2026-10-22 bench: try-it session-continuity cycle 1 run lines
+0a514035 2026-10-22 bench(try-it): web-scrape runs,       12 sessions
+06f8aa86 2026-10-22 bench: try-it git-history cycle 1 run lines
+f755910b 2026-10-22 bench(try-it): web-scrape runs,        8 sessions
+ebeaa32c 2026-10-22 bench: try-it git-history cycle 0 (warm-up) run lines
+f4383b83 2026-10-22 bench(try-it): web-scrape runs,        4 sessions
+39ba2dee 2026-10-22 bench: try-it workloads patch for the gateway-ab harness (--workloads tryit)
+f924eda2 2026-10-22 bench: pre-register try-it prompts benchmark (plain/v1/v2/gateway)
+7f320e16 2026-10-22 docs(v2): try-it workflow split with pace rule and given facts
+912e34a2 2026-10-22 docs(v2): release rehearsal re-run 4 (gemini hooks.json vs Claude Code)
+5ca80411 2026-10-22 docs(install): gemini hooks.json has no SessionStart; link + hook run verified (D-FU-GCH-1)
+8d84193c 2026-10-22 test(v2): GP3 golden: gemini hooks.json has no SessionStart (D-FU-GCH-1)
+96e3672b 2026-10-22 fix(v2): drop gemini SessionStart so Claude Code never runs hooks/hooks.json under /bin/sh (D-FU-GCH-1)
+9be888da 2026-10-22 test(v2): gemini hooks.json must not carry a SessionStart entry Claude Code runs (D-FU-GCH-1, red)
+def77894 2026-10-22 docs(v2): gemini hooks.json vs Claude Code workflow
+6f5ff43e 2026-10-22 docs(install): re-verify pi, gemini, qwen, codex on release 05e97724 (D-FU-RM-DOCS-1)
+688f78e8 2026-10-22 docs(v2): try-it prompts benchmark workflow
+be42adcc 2026-10-22 docs: release rehearsal re-run 3 (kiro prompt hook, qwen extension)
+c507e005 2026-10-22 fix(kiro): decode UserPromptSubmit trigger; docs: qwen extension install, kiro prompt hook; e2e: gemini hooks.json (D-FU-RM-KIRO-2, D-FU-RM-QWEN-2, D-FU-RM-GEMINI-2)
+906c128f 2026-10-22 test(kiro,qwen): kiro decodes UserPromptSubmit; qwen guide uses extension install (D-FU-RM-KIRO-2, D-FU-RM-QWEN-2)
+7807ac1f 2026-10-22 docs: release rehearsal re-run 2 (manifests)
+bcf7e406 2026-10-22 docs: hook files for codex, vscode, copilot-cli are templates; Claude Code marketplace needs ADR-0011 step b (D-FU-RM-TEMPLATES-1)
+bbbe12a9 2026-10-22 test(docs): hook files for codex, vscode, copilot-cli are templates (D-FU-RM-TEMPLATES-1)
+2e337112 2026-10-22 test(pi): GP11 audit allows only the Pi-only root package.json (D-FU-RM-PI-1)
+ffd762d2 2026-10-22 fix(pi): emit Pi-only package.json in out tree; GS7 allows only that shape (D-FU-RM-PI-1)
+61169ad1 2026-10-22 test(pi): out tree package.json holds only the Pi shape (D-FU-RM-PI-1)
+8d11ff6b 2026-10-22 fix(gemini): emit extensionPath server path and hooks/hooks.json (D-FU-RM-GEMINI-1)
+f9ad6a7c 2026-10-22 test(gemini): pin extension manifest and hooks/hooks.json shapes (D-FU-RM-GEMINI-1, red)
+3991ba4e 2026-10-22 test(e2e): GP1 knows qwen extension paths, GP3 golden kiro UserPromptSubmit (D-FU-RM-QWEN-2)
+8feb0c45 2026-10-22 fix(qwen): emit extensionPath server path and hooks key in qwen-extension.json (D-FU-RM-QWEN-1)
+b356a7ad 2026-10-22 test(qwen): pin extension manifest and hook command shapes (D-FU-RM-QWEN-1, red)
+18301355 2026-10-22 fix(kiro): emit UserPromptSubmit trigger in hooks file (D-FU-RM-KIRO-1)
+d6ee987d 2026-10-22 docs(v2): fix quote in release-manifests workflow
+f1f1e08e 2026-10-22 docs(v2): release-manifests workflow split into small fixes with pace rule
+34125477 2026-10-22 docs(v2): release-manifests workflow
+1692f1ec 2026-10-22 docs(install): round 3 verifier fixes (kiro hook format from kiro.dev, prompt hook gap; pi update --extensions); check-install-docs fails on non-expanding paths and edit steps
+04ad9133 2026-10-22 docs(bench/v1-v2-gateway): git gateway interval lower end is 16%, not 17%
+fb025268 2026-10-22 docs(bench/v1-v2-gateway): bridge results for all six tasks, drift check only
+31c08231 2026-10-22 bench(v1-v2-gateway): tests bridge, 2 pairs plain vs gateway
+89a0beb2 2026-10-22 bench(v1-v2-gateway): edit bridge, 2 pairs plain vs gateway
+53e4050f 2026-10-21 bench(gateway-ab): json bridge, 2 plain vs gateway pairs on gateway.context-mode.com
+e5bab865 2026-10-21 bench(v1-v2-gateway): grep bridge runs (2 pairs plain vs gateway)
+a4dcdd00 2026-10-21 docs(v2): gateway bridge workflow
+fb0baa25 2026-10-21 fix(bench/v1-v2-gateway): use t at df = n - 1 for the 95% interval
+0f1db0e1 2026-10-21 docs(install/kiro): drop unverified hook-format claim; kiro.dev was not fetched
+629d8b24 2026-10-21 docs(install): fix verifier findings (gemini trust, kiro hook format, pi load); check config blocks need an agent variable
+db21bad7 2026-10-21 bench(v1-v2-gateway): analysis, ab.json, index.json and results page
+1da588d1 2026-10-21 bench(v1-v2-gateway): tests runs (27 sessions)
+ecf37ac7 2026-10-21 bench(v1-v2-gateway): git runs, 31 sessions
+a461d478 2026-10-21 bench(v1-v2-gateway): git runs, 29 sessions
+0073c6bc 2026-10-21 bench(v1-v2-gateway): tests runs (24 sessions)
+c242b34c 2026-10-21 bench(v1-v2-gateway): tests runs (21 sessions)
+59c747c8 2026-10-21 bench(v1-v2-gateway): tests runs (18 sessions)
+3e92a4ce 2026-10-21 bench(gateway-ab): grep runs, warm-up and 8 measured cycles (27 sessions)
+2611d211 2026-10-21 bench: log runs through 32 lines
+1eedd368 2026-10-21 bench(gateway-ab): json runs, cycle update
+a1f7be7b 2026-10-21 bench(v1-v2-gateway): tests runs (15 sessions)
+fa03099b 2026-10-21 bench(gateway-ab): json runs, cycle update
+a63c4eaa 2026-10-21 bench: log runs through 30 lines
+78a8e44b 2026-10-21 bench(v1-v2-gateway): tests runs (12 sessions)
+151c95b6 2026-10-21 bench(gateway-ab): json runs, cycle update
+93f791ff 2026-10-21 bench(v1-v2-gateway): tests runs (9 sessions)
+3fac9818 2026-10-21 bench: log runs through 28 lines
+ed179c8a 2026-10-21 bench(gateway-ab): json runs, cycle update
+5f19a830 2026-10-21 bench(v1-v2-gateway): tests runs (6 sessions)
+6c64185a 2026-10-21 bench(gateway-ab): json runs, cycle update
+c859aa0a 2026-10-21 bench: log runs through 22 lines
+30091b6c 2026-10-21 bench(v1-v2-gateway): tests runs (3 sessions)
+b83ec902 2026-10-21 bench(gateway-ab): json runs, cycle update
+091dfe90 2026-10-21 bench: log runs through 19 lines
+305cb02f 2026-10-21 bench(gateway-ab): edit runs, cycle update
+a00f22d3 2026-10-21 bench(gateway-ab): json runs, cycle update
+16064e52 2026-10-21 bench(gateway-ab): json runs, cycle update
+4a7bc6e5 2026-10-21 bench(gateway-ab): edit runs, cycle update
+a5622009 2026-10-21 bench(gateway-ab): json runs, cycle update
+5da48065 2026-10-21 bench: log runs through 13 lines
+f2696a7b 2026-10-21 bench(gateway-ab): edit runs, cycle update
+bc9b0465 2026-10-21 bench(gateway-ab): edit runs, cycle update
+b3f3d770 2026-10-21 bench: log runs through 10 lines
+8a5c7663 2026-10-21 bench(gateway-ab): edit runs, cycle update
+19b6df02 2026-10-21 bench(gateway-ab): edit runs, cycle update
+7df1007f 2026-10-21 bench: log runs through 4 lines
+776155c1 2026-10-21 bench(v1-v2-gateway): git runs, 27 sessions
+435a4f9a 2026-10-21 bench(v1-v2-gateway): git runs, 24 sessions
+a63f9b19 2026-10-21 bench(v1-v2-gateway): git runs, 21 sessions
+f7d97cf3 2026-10-21 bench(gateway-ab): edit runs, cycle update
+c7f61b12 2026-10-21 bench(v1-v2-gateway): git runs, 18 sessions
+e31634f7 2026-10-21 bench(v1-v2-gateway): git runs, 15 sessions
+c118778d 2026-10-21 bench(v1-v2-gateway): git runs, 12 sessions
+645dec41 2026-10-21 bench(v1-v2-gateway): git runs, 9 sessions
+ffb17e59 2026-10-21 bench(v1-v2-gateway): git runs, 6 sessions
+78248617 2026-10-21 bench(v1-v2-gateway): git runs, 3 sessions
+d2cd01b9 2026-10-21 docs(install): copy-paste install guides with no user path; check-install-docs enforces it
+c6e2100b 2026-10-21 bench(gateway-ab): harness patch with v1/v2/gateway arms, README, 4-arm smoke evidence
+bcc45e33 2026-10-21 docs(bench): pre-register direct vs v1 vs v2 on the published gateway short tasks
+8f38bdbc 2026-10-21 docs(v2): benchmark workflow reuses published gateway evidence
+7522e8dc 2026-10-21 docs(v2): v1 vs v2 vs gateway benchmark workflow
+6395bf76 2026-10-21 docs(v2): install-docs workflow (copy-paste commands only)
+d4808e03 2026-10-21 Merge impl/project-source into v2-design
+1bd778e8 2026-10-21 test(e2e): GP3 fixture-replay goldens record the no-project stderr line (D-FU-PS-1)
+135ded56 2026-10-21 docs(v2): impl/02 §2 project-source table per agent, DEVIATIONS D-FU-PS-1
+1029497a 2026-10-21 test(v2): NO_PROJECT tests follow the Claude Code source order (D-FU-PS-1)
+71ae2bcf 2026-10-21 fix(v2): Claude Code project source order CLAUDE_PROJECT_DIR, payload cwd, process.cwd(); handleHook logs no-project (D-FU-PS-1)
+0113dccf 2026-10-21 test(v2): Claude Code project source falls to payload cwd, then process.cwd(); no-project logs (D-FU-PS-1, red)
+2e5a8177 2026-10-21 docs(v2): project-source workflow, smaller scope and pace rule
+818cf1df 2026-10-21 docs(v2): record compaction push recall merge and M2 re-score on c3275a1e
+c3275a1e 2026-10-21 test(e2e): T-CMP runner records hook additionalContext bytes (injectedBytesMedian)
+e59168f5 2026-10-21 Merge impl/compact-push into v2-design
+bf68dc51 2026-10-21 Merge impl/compact-push into v2-design
+396ca7aa 2026-10-21 docs(v2): merge-pending workflow
+a08d0b8e 2026-10-21 docs(v2): rewrite morning report with compaction, M2 and A/B results
+70ee5e84 2026-10-21 bench: final A/B 3 (v2 vs v1 vs off, small and large)
+bfd42ae8 2026-10-21 docs(v2): compaction push recall live results
+0ef32696 2026-10-21 docs(v2): project-source workflow
+8af2c6db 2026-10-21 docs(v2): DECISIONS-r11 push-not-pull, ADR-0009 Changes, GS11 row, DEVIATIONS D-FU-CMP-PUSH-1..3
+f249ef09 2026-10-21 feat(v2): decisions section in the anchored state block (DECISIONS-r11 A)
+37fa1c57 2026-10-21 test(v2): dispatch recall tests: zero bytes before compaction, row after, no repeat, per-agent rows (DECISIONS-r11 B)
+532ef091 2026-10-21 test(v2): recall unit tests (DECISIONS-r11 B)
+7e8fa16a 2026-10-21 docs(v2): release rehearsal re-run after fixes
+0f1ea796 2026-10-21 feat(v2): turn-boundary recall after compaction (DECISIONS-r11 B), WIP
+bcda6561 2026-10-21 merge: impl/decode-lenient into v2-design
+78de5abf 2026-10-21 fix(v2): claude-code decode names missing required fields, defaults the rest (D-FU-RF-DECODE-1)
+7d377219 2026-10-21 fix(release): last release is the newest pushed v2 tag; smoke runs the real claude binary (D-FU-RF-1, D-FU-RF-2)
+141aad3b 2026-10-21 fix(check-removed): allow docs/benchmarks/ in the target tree (D-FU-RF-BENCH-1)
+8f6b0a67 2026-10-21 docs(v2): rehearsal-fix workflow
+bb327226 2026-10-21 docs(release): rehearsal report and first-release note
+e8537fdf 2026-10-21 docs(install): real commands, one install folder, placeholder check (D-FU-INSTALL-1)
+54318865 2026-10-21 docs(benchmarks): use re-scored T-CMP result (10/10, call rate still 0)
+c366b207 2026-10-21 docs(benchmarks): publish pack with aggregate data, caveats and reproduce commands
+6abd2114 2026-10-21 T-CMP: score prose answer key case-insensitively, re-score stored results
+e9de3f6e 2026-10-21 docs(v2): compaction push-recall + M2 workflow
+869e1f2d 2026-10-21 docs(v2): rewrite morning report with final saving, A/B, replace proof, T-CMP, gate and CI
+994f9d48 2026-10-21 chore(v2): move MORNING-REPORT.md into docs/v2/review so check-removed passes
+81571ba8 2026-10-21 docs(v2): final saving score and A/B numbers in LAUNCH, algorithms, how-it-works, performance, TECH-SPEC 1.1, BLOCKED-M7
+701090b9 2026-10-21 docs(v2): benchmarks summary at top and saving-score re-measure
+7dd0361f 2026-10-21 docs(v2): README benchmarks, large-output numbers first and small-task fixed cost
+b546cca0 2026-10-21 bench(v2): final A/B after final push (off vs v1 vs v2)
+8b25d83e 2026-10-21 docs(v2): replace live proof (final)
+980272a5 2026-10-21 Merge impl/replace-live into v2-design
+bb60b0ae 2026-10-21 docs(v2): final-push workflow
+c155ce06 2026-10-21 docs(v2): morning report
+27427b80 2026-10-21 docs(v2): move overnight report to review/ (dated)
+872216b8 2026-10-21 fix(policy): Windows deny glob uses slashes and drive-less // anchor
+5c0cc87b 2026-10-21 docs: fix json-1/multi-1 saving sign, tools.md source paths, stale script and upstream path notes
+2ba5368f 2026-10-21 docs(v2): final numbers in LAUNCH, performance, benchmarks, TECH-SPEC 1.1; T-CMP clean re-measure; DEVIATIONS row
+2c0ee5eb 2026-10-21 docs(v2): algorithms and how-it-works describe the replace path, sizes, BM25 with last prompt
+9bbc77c1 2026-10-21 docs(v2): README benchmarks with final A/B, saving loop, memory, T-CMP numbers
+d72ca4e8 2026-10-21 docs(v2): T-CMP clean re-measure on Sonnet 5.5 (all arms, isolated host)
+e8c30ab8 2026-10-21 docs(v2): final A/B off, v1, v2
+23a0523a 2026-10-21 docs(v2): Memory section in benchmarks.md (4 live memory cases pass)
+8c9793d5 2026-10-21 bench(live): ab-quick runs, tool_result bytes, v1 vs v2 stats
+c326bdf7 2026-10-21 merge: impl/cleanup-W3-check-removed into v2-design
+517c5557 2026-10-21 merge: impl/cleanup-W3-v1-src-hooks into v2-design
+ddfa32bd 2026-10-21 cleanup(W3-v1-src-hooks): record D-M7-CLN-W3-v1-src-hooks
+c1ff89a9 2026-10-21 cleanup(W3-v1-src-hooks): PORT tickets for issue numbers with no v2 case
+772c31e0 2026-10-21 cleanup(W3-v1-src-hooks): delete v1 src, hooks/, heal scripts; tsconfig typecheck-only v2 tree
+3ec91c63 2026-10-21 cleanup(W3-check-removed): target-tree allow-list in check-removed, drop KEPT_FOR_KEEP_PASS
+cc00362a 2026-10-21 fix(merge): remove conflict markers in DEVIATIONS.md, keep both W2 rows
+7f742b66 2026-10-21 Merge impl/cleanup-W2-root into v2-design
+d009e64c 2026-10-21 Merge impl/cleanup-W2-keep-pass into v2-design
+550893fe 2026-10-21 cleanup(W2-keep-pass): drop gate keep-pass layer, ci.yml v1 steps, record D-M7-CLN-5
+df502906 2026-10-21 cleanup(W2-keep-pass): delete 128 KEEP-PASS v1 tests, support files, runner config
+6eb1617e 2026-10-21 cleanup(W2-root): delete v1 root items (configs, statusline, bundles, npm/self-heal scripts, platform-support), trim package.json
+20c82aba 2026-10-21 docs(v2): replace live proof, non-git cwd
+f2bbef8e 2026-10-21 chore(cleanup-W2-keep-pass): start branch
+b9be151d 2026-10-21 test(v2): ported plugin-path cwd test asserts the non-git project rule (D-M7-NG-1)
+1ce57d2a 2026-10-21 docs(v2): non-git project rule in impl/02 §2, DEVIATIONS D-M7-NG-1
+d32aa0cf 2026-10-21 fix(v2): a project dir outside any git repo is a project keyed by its realpath (D-M7-NG-1)
+a0d99d48 2026-10-21 test(v2): non-git project dir resolves to realpath(cwd), hook replaces Bash there (D-M7-NG-1, red)
+cd4a40a5 2026-10-21 docs(v2): replace live proof re-run, GP3 golden for Bash-large fixture
+dbebb26f 2026-10-21 docs(v2): replace live root cause, exact session counts (D-M7-RL-1)
+83c48b70 2026-10-21 test(v2): golden for live Bash replace shape, root cause of replace live proof (D-M7-RL-1)
+6f467b75 2026-10-21 merge: impl/cleanup-W1-session-journal
+8601aee8 2026-10-21 merge: impl/cleanup-W1-ops
+dbf3f3ad 2026-10-21 merge: impl/cleanup-W1-hooks
+c4d343ff 2026-10-21 merge: impl/cleanup-W1-core
+8f9b306d 2026-10-21 merge: impl/cleanup-W1-adapters
+1ea67f02 2026-10-21 cleanup(W1-core): delete 14 covered/retired v1 tests, update plan citations
+4dadce4d 2026-10-21 test(W1-core): port exit-class rows from core/server.test
+645df158 2026-10-21 docs(v2): non-git cwd workflow
+4fe21f7d 2026-10-21 feat(sandbox): port #782 mvn.cmd rewrite to v2 (D-M7-CLN-4)
+ab6166c4 2026-10-21 test(W1-core): port stale-detection, echo, #788 rows; DEVIATIONS D-M7-CLN-2/3
+cf012ad5 2026-10-21 test(W1-core): port security/deny-policy/#852 rows to v2 decide()
+5899e14b 2026-10-21 chore(cleanup): W1-hooks delete 18 v1 hook tests (ported or retired), DEVIATIONS D-M7-CLN-2
+f2b9523d 2026-10-21 cleanup(W1-adapters): delete 18 RETIRE/COVERED adapter tests and 6 unreached v1 src files
+8e7edda9 2026-10-21 fix(policy): scan command substitutions inside $(( )) (D-M7-CLN-2)
+e6a75011 2026-10-21 test(v2): port external-MCP routing (#529) and pi cases (W1-adapters)
+a78ffd28 2026-10-21 cleanup(W1-ops): delete 5 ported v1 test files, add DEVIATIONS D-M7-CLN-2/3
+28f7bffd 2026-10-21 cleanup(W1-ops): port db-base platform gate rows to tests/v2/store/db-platform-ported (5 cases)
+214bc97c 2026-10-21 cleanup(W1-ops): port project-dir, matrix and codex session-cwd rows to tests/v2/ops/project-dir-ported (9 cases)
+05907d52 2026-10-21 test(v2/hooks): port core-routing, integration, require-security, tool-naming cases to v2 decide()
+7e369a1f 2026-10-21 cleanup(W1-ops): port #511 no-dynamic-require guard into GP1-release-tree (built bundles)
+5ab3c36d 2026-10-21 cleanup(W1-ops): port pi extension rows to tests/v2/plugins/pi-ported (10 cases)
+0aa21245 2026-10-21 cleanup(W1-ops): port opencode plugin rows to tests/v2/plugins/opencode-ported (11 cases)
+78e9e443 2026-10-21 cleanup(W1-session-journal): delete detect-locale and rule-detection tests, add DEVIATIONS D-M7-CLN-2
+00bc31f1 2026-10-21 cleanup(W1-session-journal): port git-event and locale cases to tests/v2 journal/render
+eee12adb 2026-10-21 cleanup(W1-ops): delete 22 RETIRE test files (ADR-0011, section 3.10), none in KEEP-PASS
+02f589ff 2026-10-21 cleanup(W1-core): start branch
+afed447a 2026-10-21 chore(cleanup): start W1-hooks
+a51c8891 2026-10-21 merge: impl/cleanup-W0-docs-refs
+8c08d4f6 2026-10-21 merge: impl/cleanup-W0-client-map
+60fd352d 2026-10-21 cleanup(W0-client-map): add client-map.ts to the contracts file-list test, update DEVIATIONS
+d48c6a8d 2026-10-21 cleanup(W0-client-map): copy client-map to src/core/contracts, drop v1 type import
+02bd9265 2026-10-21 chore(v2): move PRD-v2.md and OVERNIGHT-REPORT.md into docs/v2, fix path refs
+bd2267e6 2026-10-21 docs(impl): v1 cleanup plan, every non-v2 path classified
+96caa8a7 2026-10-21 docs(v2): replace-live root-cause workflow
+f95865ff 2026-10-20 docs(impl): start v1 cleanup plan skeleton
+a478cee7 2026-10-20 impl(triage): old branches triage, port 2 GP11 cases from M5-T1
+c654daab 2026-10-20 merge impl/install-pi: drop stale Verified table (says no v2 build exists)
+726460cf 2026-10-20 merge impl/install-zcode: drop stale Verified table (says no v2 build exists)
+437444e7 2026-10-20 merge impl/install-opencode: drop stale Verified table (says no v2 build exists)
+8ecc8fb4 2026-10-20 docs(v2): saving loop section in benchmarks
+e7e6ddcc 2026-10-20 docs(v2): replace live proof after r1 shape fix
+1f5afc35 2026-10-20 docs(v2): saving loop start round option
+f0aa3561 2026-10-20 docs(v2): overnight A-Z workflow (saving loop, cleanup, measurements, docs, final gate)
+a1cad087 2026-10-20 Merge impl/saving-r5 into v2-design
+1d55d561 2026-10-20 bench: saving-score-last r5
+f403f039 2026-10-20 docs(v2): saving-90 resume workflow (from r5, M1 and M2)
+640dccff 2026-10-20 docs(v2): D-M7-SV-5 row and saving-score last report (r5)
+c233eb71 2026-10-20 bench: replay uses dispatch intent order and last-prompt ranking (D-M7-SV-5)
+8db7170f 2026-10-20 feat(v2): D-M7-SV-5 replace ranks chunks by intent OR last user prompt words
+fc1a75b5 2026-10-20 test(v2): D-M7-SV-5 replace selection ranks by the last user prompt (red)
+907a1d56 2026-10-20 merge impl/saving-r3 into v2-design
+1e46fd53 2026-10-20 bench: saving-score-last r3 (m1 94.76, m2 86.41)
+8219e003 2026-10-20 docs(v2): D-M7-SV-3 row and saving-score last report (r3)
+8dedc99e 2026-10-20 test(v2): dropped-chunk probe may be the first line of a 48-byte chunk (D-M7-SV-3)
+16df63bd 2026-10-20 feat(v2): replace return budget 96, chunk cap 48 (D-M7-SV-3)
+00a537de 2026-10-20 merge: impl/saving-r2 into v2-design
+26aaa174 2026-10-20 bench: saving-score last report (r2)
+1290acbc 2026-10-20 docs: D-M7-SV-2 deviation row with measured saving score; saving-score last report
+8f8fd9a4 2026-10-20 v2: replace return budget 1024 -> 512 bytes (D-M7-SV-2)
+0b19c279 2026-10-20 v2: test for a 512-byte replace return budget (D-M7-SV-2)
+003b8d60 2026-10-20 merge: impl/saving-r1 into v2-design
+ede7b378 2026-10-20 bench: saving-score-last report
+99821571 2026-10-20 docs: D-M7-SV-1 deviation row with measured saving score; saving-score last report
+0b636b2b 2026-10-20 bench: replay mirrors the replace-path sizes of dispatch (D-M7-SV-1)
+abca2891 2026-10-20 v2: replace tests for REPLACE_* sizes and Bash output shape (D-M7-SV-1)
+52b01705 2026-10-20 v2: replace path uses REPLACE_* sizes, line-cut small chunks, Bash output shape (D-M7-SV-1, WIP)
+c32d9eca 2026-10-20 v2: replace-path size constants (D-M7-SV-1)
+e54256cb 2026-10-20 bench: saving-score last report
+1a683ac5 2026-10-20 bench: saving score baseline on v2-design (M1 12.03, M2 2.69)
+5bd44c12 2026-10-20 bench: saving score reads stream-json from a file (pipe cut the result event), relock
+279cd8b0 2026-10-20 bench: saving score runs default 2, relock
+dee6cb88 2026-10-20 bench: score tasks force bare cat/run (no pipe), 2 runs default, relock
+0f15dcf5 2026-10-20 docs(v2): GP-LIVE-ROUTING run 5 with 646-char instructions
+3fa8062c 2026-10-20 bench: frozen saving score script and lock
+9378d83e 2026-10-20 bench(live): frozen score task set (json-1, multi-1, big-tests, big-json + 5 small)
+000932e5 2026-10-20 docs(v2): replace live proof, persisted-output threshold and 20/28 KB plugin runs
+ae0a3169 2026-10-20 fix(hooks): use command/path/pattern/url as intent when no description (D-M7-RR-3)
+9abd1389 2026-10-20 docs(v2): benchmarks cost per session (cache_creation from tool list)
+a17ee824 2026-10-20 docs(v2): saving-90 loop workflow (frozen score, branch per round)
+abc35ebf 2026-10-20 docs(v2): fix multi-1 saving figure in Quick A/B
+42ea5a29 2026-10-20 docs(v2): benchmarks offline replay after run-then-replace, Quick A/B
+be47ef08 2026-10-20 bench(live): ab-quick.mjs parallel off/v1/v2 runner
+f171f31f 2026-10-20 bench(v2): replay models run-then-replace, no hints, per-size buckets (D-M7-RR-1/2)
+d2dc5052 2026-10-20 refactor(v2): delete retired hint constants, DEVIATIONS rows D-M7-RR-1/2
+8038e460 2026-10-20 test(v2): GP3 hook-perf expects no PreToolUse hint (D-M7-RR-2)
+a993045b 2026-10-20 test(v2): rewrite old-behaviour tests to run-then-replace (D-M7-RR-1)
+3f4a4d0b 2026-10-20 feat(v2): main-agent run-then-replace on replace rows, hints removed (D-M7-RR-1, D-M7-RR-2)
+f7721dab 2026-10-20 test(v2): red dispatch tests for main-agent replace and no hints (D-M7-RR-1, D-M7-RR-2)
+a6e86d82 2026-10-20 test(v2): red tests for main-agent replace and no hints in decide (D-M7-RR-1, D-M7-RR-2)
+4c1fe30c 2026-10-20 prompt: cut server instructions from 1238 to 646 chars (owner decision 2026-10-20)
+4f91f943 2026-10-20 docs(v2): record DECISIONS-r10 (run then replace, no hints, shorter instructions)
+c346420e 2026-10-20 docs(v2): saving workflow (main-agent replace, no hints, shorter instructions)
+a046d8f4 2026-10-20 docs: OVERNIGHT-REPORT.md
+9a4a2c5c 2026-10-20 docs(bench): LAUNCH and algorithms use measured v2 numbers only; progress docs-bench
+f2b3992b 2026-10-20 docs(bench): README Benchmarks section with measured numbers only
+53c9510a 2026-10-20 docs(bench): add docs/performance.md with measured GS6 hook latency
+2c271b92 2026-10-20 impl(measure): done
+5c0adb80 2026-10-20 bench(live): README status after run
+52a5053e 2026-10-20 docs(v2): Live A/B section in benchmarks (120 sessions, Sonnet 5.5, Claude Code 2.1.303)
+e9812078 2026-10-20 bench(live): aggregate after 120 sessions
+c506bec9 2026-10-20 bench(live): aggregate after 110 sessions
+f43b58f3 2026-10-20 bench(live): aggregate after 100 sessions
+96f7fb58 2026-10-20 docs(v2): benchmarks, Offline replay section (23175 calls, 820 sessions)
+83450f62 2026-10-20 bench(live): aggregate after 90 sessions
+23429b3d 2026-10-20 bench(live): aggregate after 80 sessions
+0095e4b0 2026-10-20 bench: offline replay script (bench/replay.mjs), smoke-tested on 30 files
+2ac3cd16 2026-10-20 bench(live): aggregate after 70 sessions
+065ced74 2026-10-20 bench(live): aggregate after 60 sessions
+8f8de0cd 2026-10-20 bench(live): aggregate after 50 sessions
+67245637 2026-10-20 bench(live): aggregate after 40 sessions
+de953de3 2026-10-20 docs(bench): offline replay method (bench/README.md)
+1f904211 2026-10-20 bench(live): aggregate after 30 sessions
+c8cf50c9 2026-10-20 bench(live): aggregate after 20 sessions
+5f94888d 2026-10-20 bench(live): aggregate after 10 sessions
+8b1e9817 2026-10-20 bench(live): record tool names and MCP connect state per session
+2682a67c 2026-10-20 bench(live): aggregate after 2 sessions
+6f47d19b 2026-10-20 bench(live): aggregate after 2 sessions
+5720ebca 2026-10-20 bench(live): fixtures, 20 tasks, runner
+83146c89 2026-10-20 bench(live): method for live A/B of context saving
+d6ad191c 2026-10-20 docs(v2): finish workflow (split savings bench, docs numbers, final gate, report)
+bb34c766 2026-10-20 docs(v2): M7 status after gate and FTS fixes; BLOCKED-M7 items 2, 4, 5 updated
+2839f2c9 2026-10-20 docs(impl): BLOCKED-M7 item 2 status after D-M7-FT-1/2, measured p95
+dd2be182 2026-10-20 perf(hooks): PostToolUse case B/C chunks once and selects in memory for both F1 sizes (BLOCKED-M7 item 2, D-M7-FT-2)
+82655e34 2026-10-20 perf(store): rankTexts on a one-column contentless FTS5 table, same BM25 to the bit (BLOCKED-M7 item 2, D-M7-FT-1)
+f71e244b 2026-10-20 fix(gate): v2-unit shows pass/fail/skip/todo apart; live SKIP when 0 cases run (BLOCKED-M7 4,5)
+3ea873e8 2026-10-19 bench(hooks): T-F1 index-path bench, 64 KB and 1 MiB PostToolUse p95 next to bare node (BLOCKED-M7 item 2)
+ef8411b7 2026-10-19 docs(v2): M7 follow-up round 2 workflow (T-F1 index path, gate counts)
+265c86b7 2026-10-19 docs(v2): M7-S3 sign-off status, M7 blocked
+c85017ff 2026-10-19 test(e2e): pin the T-CMP child env to the 4 pass-through keys plus 3 isolation keys (D-M7-CL-3)
+6964b81c 2026-10-19 fix(e2e): isolate T-CMP sessions from host auto-memory, claude.ai MCP and CLAUDE.md (D-M7-CL-3)
+4bbccb42 2026-10-19 perf(hooks): hash projectKey in plain JS so the hook never loads node:crypto (D-M7-HP-2)
+3c385bd7 2026-10-19 fix(build): stop running the v1 asymmetric-drift guard of GS5-deleted files (D-M7-FX-1)
+693403b2 2026-10-19 fix(hooks): keep stdin as a stream read in the hook entry
+523c7b35 2026-10-19 docs(v2): T-CMP re-measure on Sonnet 5.5 and Opus 5.5, claude-code stays none (D-M7-CL-2)
+e91a8476 2026-10-19 test(e2e): T-CMP result files, replace home path user name with USER
+228461a5 2026-10-19 test(e2e): T-CMP live result files, Sonnet 5.5 arms a-e and Opus 5.5 arm a
+713aed35 2026-10-19 docs(v2): DEVIATIONS D-M7-HP-1 for GS6 hook startup cost
+c696385b 2026-10-19 test(e2e): T-CMP runner sums sessions over the selected arms only
+43d1e806 2026-10-19 perf(hooks): move fd stdin/stdout I/O to core/hooks/io.ts
+639da517 2026-10-19 perf(hooks): GS6 - sync stdin/stdout in hook entry, lazy child_process and randomUUID
+64fb6e99 2026-10-19 test(e2e): T-CMP runner keeps every arm's numbers in a full JSON result file
+e569e06b 2026-10-19 docs(v2): GP-LIVE-ROUTING rescore tables and live run 4 (D-M7-RT-1)
+31c4da4f 2026-10-19 test(e2e): routing rescore counts undecidable from main rows
+649b6f28 2026-10-19 test(e2e): routing runner uses score.mjs, adds --rescore, new model ids
+e7f07a11 2026-10-19 test(e2e): deterministic GP-LIVE-ROUTING scorer (tool + returned bytes)
+5d926c0f 2026-10-19 fix(e2e): ci-config check reads timeout-minutes 20 (D-M7-CI-2, D-M7-CI-3)
+3061bbf1 2026-10-19 docs(v2): M7 follow-up workflow (routing scorer, ci-config, hook p95, T-CMP)
+d625b77b 2026-10-19 impl(prompt-test): GP-LIVE-ROUTING runner, results, task-based routing sentence
+464ed806 2026-10-19 impl(M7): intern notes
+12c96f43 2026-10-19 impl(M7-review): fix GP11 agy-hooks-schema-valid, GIT_NO_CRLF_ENV to constants, review-M7.md
+ef683f80 2026-10-19 impl(M7-skeptic): stronger GP1/GP3/GP11 M7 cases, skeptic-M7.md
+f14be57b 2026-10-19 impl(M7): merge M7-S2
+a0aa2a8b 2026-10-19 impl(M7-S2): record live T-CMP FAIL in TECH-SPEC §1.1
+00d45a93 2026-10-19 tickets: T-CMP re-measure on Sonnet 5.5 after M7
+80ac5675 2026-10-19 impl(M7-S2): TECH-SPEC §1.1 GS table, §13, impl/15 Changes from M7 sign-off run
+12f0eb59 2026-10-19 impl(M7-S2): copy second-pass DEVIATION blocks into DEVIATIONS.md
+2ef3f026 2026-10-19 Merge remote-tracking branch 'origin/v2-design' into impl/M7-M7-S2
+d1accdd4 2026-10-19 impl(M7-CL): update three unit rows to compactSummary none for claude-code
+17a37183 2026-10-19 impl(M7-CL): merge impl/M7-M7-CL
+cbe1748f 2026-10-19 impl(M7-CL): record full T-CMP live result, D-M7-CL-1
+eb5642ee 2026-10-19 ci: job timeout 20 min, Windows Node 26 hit the 10 min limit (D-M7-CI-2)
+6c80e168 2026-10-19 fix(ci): child TMPDIR from os.tmpdir(), clone release with autocrlf=false (D-M7-CI-1)
+42f6f9b9 2026-10-19 ci: job timeout 20 min, Windows Node 26 hit the 10 min limit (D-M7-CI-2)
+466438ee 2026-10-19 impl(M7-CL): T-CMP arm (a) failed live, claude-code compactSummary host -> none (V9)
+9d53f6f7 2026-10-19 fix(ci): child TMPDIR from os.tmpdir(), clone release with autocrlf=false (D-M7-CI-1)
+a2a63f67 2026-10-19 impl(M7): merge M7-M7-WV
+9e7cbd65 2026-10-19 impl(M7): merge M7-M7-CM
+18e19009 2026-10-19 impl(M7-CM): wire compact-arms.json to the T-CMP runner, D-M7-CM-1
+3f0b7af6 2026-10-19 impl(M7-CM): T-CMP runner first version
+89364b65 2026-10-19 impl(M7-WV): run repo checks after a red test step (!cancelled) so Windows results show
+0ad96f36 2026-10-19 impl(M7): fix DEVIATIONS conflict markers
+455d6521 2026-10-19 impl(M7): merge M7-CX
+954cded4 2026-10-19 impl(M7): merge M7-CA
+bc8082cf 2026-10-19 impl(M7): merge M7-CS
+b819d19f 2026-10-19 impl(M7): merge M7-CF
+b886ecd4 2026-10-19 impl(M7): merge M7-F5
+637e767c 2026-10-19 impl(M7): merge M7-W6
+51bb592a 2026-10-19 impl(M7): merge M7-W5
+82dc3565 2026-10-19 impl(M7): merge M7-W4
+a8319e27 2026-10-19 impl(M7): merge M7-W3
+8aa42797 2026-10-19 impl(M7): merge M7-W2
+0c8c519c 2026-10-19 impl(M7): merge M7-W1
+bb7da329 2026-10-19 tickets: park codemode-inspired tool reduction
+5d19c619 2026-10-19 impl(M7-F5): run the T-F5 Windows step right after the build
+2e797f07 2026-10-19 impl(M7-CA): arm temp project is a git repo (project resolution needs one)
+3c6a94e5 2026-10-19 impl(M7-CA): T-CMP arm setup (a)-(e)
+79b28a58 2026-10-19 impl(M7-W2): resolve git through the one PATHEXT walk; PATHEXT hit beats an extensionless shim
+de48bc88 2026-10-19 impl(M7-W5): record D-M7-W5-1
+d3e4571e 2026-10-19 impl(M7-W5): windows release tests: find git on PATH without which; empty index before staging add
+0296b418 2026-10-19 impl(M7-W3): plugin-swap works on Windows: current -> current.old, current.swap -> current
+338737f4 2026-10-19 impl(M7-CX): T-CMP scorer with exact-match checker, verdict, JSON line and table
+506205f0 2026-10-19 impl(M7-CS): T-CMP session driver, stream-json turns with /compact as a later turn
+b55a3c69 2026-10-19 impl(M7-W4): codex D3 test fixtures write TOML-escaped server path
+03b96f3a 2026-10-19 impl(M7-F5): T-F5 check drives release-out/server.mjs ctx_execute + cancel 10x, tasklist check
+2ed35851 2026-10-19 impl(M7-CF): T-CMP synthetic compaction fixtures with answer key
+3c68a8d8 2026-10-19 impl(M7-W6): v1-migration-setup fake global bin matches npm's Windows layout
+3d7406d9 2026-10-19 impl(M7-W1): use pathToFileURL for dynamic import of absolute paths (Windows ERR_UNSUPPORTED_ESM_URL_SCHEME)
+4f28fbdb 2026-10-19 impl(M7): add T-F5 windows-grandchild-kill check file
+ff0a89c1 2026-10-19 impl(M7): merge M7-T9
+703641ee 2026-10-19 impl(M7-T9): workflows test matches the T-F5 step line
+55ec9cc2 2026-10-19 impl(M7-T9): T-CMP and T-F5 tests, case files, ci.yml impl/** trigger and Windows T-F5 step
+1e959ee5 2026-10-19 docs(v2): workflow uses Sonnet 5.5 and Haiku 5.5
+2ce37a0d 2026-10-19 impl(M7-S2): copy wave-1 DEVIATION blocks into DEVIATIONS.md
+861978b5 2026-10-19 impl(M7): merge M7-L1
+80874747 2026-10-19 impl(M7): merge M7-B2
+158461f3 2026-10-19 impl(M7): merge M7-B1
+fb3a7565 2026-10-19 impl(M7): merge M7-N2
+b2ddfe7f 2026-10-19 impl(M7): merge M7-K1
+efafc522 2026-10-19 impl(M7): merge M7-D3
+6825fbee 2026-10-19 impl(M7-B2): fix CLAUDE_PROJECT_DIR env in case-b-index.mjs fixture (project resolution was silently fail-open)
+19a06035 2026-10-19 impl(M7-B2): add case-b-index.mjs T-F1 test (first draft, untested)
+1ca85cfe 2026-10-19 impl(M7-B1): add e2e/checks/hook-budget.mjs (T-GS6 hook budget bench)
+1d0cd0fa 2026-10-19 impl(M7-D3): drop openclaw key/export/files/script and removed paths from version script
+41db3937 2026-10-19 impl(M7-L1): fix T-ROUTE case to use plugin hooks so WebFetch deny fires, name short tool in prompt
+42d8e679 2026-10-19 impl(M7-K1): detect-v1 Kiro A37 findings, constants retired-name comment
+e6d209b3 2026-10-19 impl(M7-D3): delete remaining configs/* routing files, .pi/extensions, start.mjs
+23b01b30 2026-10-19 impl(M7-N2): drop retired tool names from opencode plugin and project/resolve comments
+7a99ece2 2026-10-19 impl(M7): merge M7-T0
+633cc6df 2026-10-19 impl(M7-T0): write missing M7 red tests
+0ceea97f 2026-10-19 impl(M7-arch): DEVIATIONS D-M7-arch-7 second-pass scope
+4949c3dd 2026-10-19 docs(v2): workflow merger verifies merges, retries, ignores injected chat
+515078e1 2026-10-19 impl(M7-merge): merge impl/M7-M7-V2
+0f2830d7 2026-10-19 impl(M7-merge): merge impl/M7-M7-V1
+2eeeafac 2026-10-19 impl(M7-merge): merge impl/M7-M7-S1
+e42a1ccb 2026-10-19 impl(M7-merge): merge impl/M7-M7-R1
+2993eac5 2026-10-19 impl(M7-merge): merge impl/M7-M7-N1
+a30f76cc 2026-10-19 impl(M7-merge): merge impl/M7-M7-G4
+cb9ea5af 2026-10-19 impl(M7-merge): merge impl/M7-M7-G3
+5d67c69f 2026-10-19 impl(M7-merge): merge impl/M7-M7-G2
+d88315be 2026-10-19 impl(M7-merge): merge impl/M7-M7-G1
+9c1bae54 2026-10-19 impl(M7-merge): merge impl/M7-M7-D2
+9949c532 2026-10-19 impl(M7-merge): merge impl/M7-M7-D1
+47a620b1 2026-10-19 impl(M7-merge): merge impl/M7-M7-C1
+ded3c90e 2026-10-19 impl(M7-S1): record GS1-GS11 sign-off status; M7 not done
+f8d1f299 2026-10-19 impl(M7-R1): DEVIATIONS row for README §5 choices
+cc387ab4 2026-10-19 impl(M7-V2): DEVIATIONS D-M7-V2-1 bundle name and session paths, D-M7-V2-2 Kiro A37 gap
+934a2aca 2026-10-19 impl(M7-V2): v1-migration D4 row parse, VS Code workspace folder, session paths via upgrade table
+d6d30e7f 2026-10-19 impl(M7-V2): v1-migration check script, first version
+b9b3c551 2026-10-19 impl(M7-R1): README §5 per impl/15 §4/§6: agent rows, statusline/flood-guard rows, purge scopes, support line; add readme-upgrading test
+6ab3a52e 2026-10-19 impl(M7-D1): remove GS5 root and docs paths no KEEP-PASS file needs
+c814ef3e 2026-10-19 impl(M7-D2): delete removed-agent configs/hooks/adapters and v1 skills not in KEPT_FOR_KEEP_PASS
+aae5b05e 2026-10-19 impl(M7-C1): ci.yml runs build/check-removed.mjs from gate milestone M7
+be53a1f3 2026-10-19 impl(M7-C1): tests/v2/repo/check-removed.test.mjs (7 cases, green)
+ab25c021 2026-10-19 impl(M7-C1): KEPT_FOR_KEEP_PASS list measured against the 131 KEEP-PASS files (D-M7-arch-3)
+6eaa3def 2026-10-19 impl(M7-G2): GP11 pi-agy e2e cases (#1168 #1266 #1206) and DEVIATIONS D-M7-G2-1
+8a90bbe3 2026-10-19 impl(M7-G2): D3 names the real Pi settings path (PI_CODING_AGENT_DIR, else ~/.pi/agent) (#1168 #1266)
+92d400f7 2026-10-19 impl(M7-N1): GS8 outcome for every item in v2-not-closed.md
+d56c88ee 2026-10-19 impl(M7-G4): GP3/hook-perf-posttool-async case (#1261)
+59e1e97c 2026-10-19 impl(M7-G1): GP1 opencode-clientinfo-detect case + D-M7-G1-1
+94419ad8 2026-10-19 impl(M7-C1): build/check-removed.mjs first version (GS5 gate, tracked tree, literal compares)
+50b1c9a6 2026-10-19 impl(M7-G1): map clientInfo.name opencode to adapter opencode (#1276)
+cf986f1d 2026-10-19 impl(M7-V1): plantV1Install v1 footprint fixtures + tests
+bd8bb77f 2026-10-19 impl(M7-G3): GP1 clean-uninstall-no-residue case (#1058)
+28784ef8 2026-10-19 impl(M7-M6): merge impl/M6-M6-Y2
+4c8e36bf 2026-10-19 impl(M7-M6): merge impl/M6-M6-Y1
+f8912d63 2026-10-19 impl(M7-M6): merge impl/M6-M6-W1
+39d52129 2026-10-19 impl(M7-M6): merge impl/M6-M6-S1
+f8f69538 2026-10-19 impl(M7-M6): merge impl/M6-M6-R1
+e50a60d4 2026-10-19 impl(M7-M6): merge impl/M6-M6-K1
+3e9c80a0 2026-10-19 impl(M7-M6): merge impl/M6-M6-I2
+3ffdc5f7 2026-10-19 impl(M7-M6): merge impl/M6-M6-I1
+d3b35c70 2026-10-19 impl(M7-M6): merge impl/M6-M6-P4
+36363bcc 2026-10-19 impl(M7-M6): merge impl/M6-M6-P3
+3911e564 2026-10-19 impl(M7-M6): merge impl/M6-M6-P2
+252d89f4 2026-10-19 impl(M7-M6): merge impl/M6-M6-P1
+3c5a9c69 2026-10-19 impl(M7-M6): merge impl/M6-M6-V1
+35898c27 2026-10-19 impl(M7-M6): merge impl/M6-M6-B1
+9e91d521 2026-10-19 impl(M7-M6): merge impl/M6-M6-B2
+b364de05 2026-10-19 impl(M7-M6): merge impl/M6-M6-H1
+1c5abe93 2026-10-19 impl(M7-arch): answer M6 intern questions in impl/06 A-intern-M6; M7 plan deviations D-M7-arch-1..6
+9fd2f2c6 2026-10-19 impl(M6): done
+e7c5e660 2026-10-19 impl(M6-fix2): gate check-removed layer starts at M7 per D-M6-arch-2
+fad2368b 2026-10-19 impl(M6-Y1): release.yml tests in tests/v2/repo/workflows.test.mjs (9 pass); DEVIATIONS D-M6-Y1-1..5
+365dc6fd 2026-10-19 impl(M6-Y1): release.yml first version (ci/plan/build/publish-stage/smoke/publish-promote/rollback)
+e064f8df 2026-10-19 impl(M6-B2): GP1 release-tree cases (runtime files in SHA256SUMS, bare node) and GP11 release audit, green
+e5e63c9b 2026-10-19 impl(M6-B2): build tests for --version, command skills, SHA256SUMS last; D-M6-B2-1
+f2badb0d 2026-10-19 impl(M6-B2): build.mjs --version into manifests, copy 3 command skills, writeHashes last; no plugin validate (D-M6-arch-3)
+9be7b887 2026-10-19 impl(M6-S1): /release repo skill per impl/13 §13, live-skip streak file, skill test
+96dc0280 2026-10-19 impl(M6-Y2): weekly.yml smoke on release, branch-protection drift, npm audit --omit=dev; workflows test
+dbf0d2c6 2026-10-19 impl(M6-R1): one Install section per host guide, bug form link, no retired tool names
+7d47d6a8 2026-10-19 impl(M6-P2): release-staging-smoke runs hash.mjs and the real claude binary; DEVIATIONS D-M6-P2-1
+7417cf14 2026-10-19 impl(M6-P3): release-staging-smoke live case + check; DEVIATIONS D-M6-P3-1..4
+1a7b367b 2026-10-19 impl(M6-R1): red test GP1/install-docs-per-host
+41693f55 2026-10-19 impl(M6-W1): DEVIATIONS D-M6-W1-1, D-M6-W1-2
+afa9be6d 2026-10-19 impl(M6-P2): live case release-staging-smoke (local, stage into bare repo + smoke.mjs)
+b71ecb1e 2026-10-19 impl(M6-W1): workflows tests for traffic.yml (11 pass)
+2e276407 2026-10-19 impl(M6-I2): issue-intake ALLOWED_KEYS equal ctx_doctor report keys, no regex; GP11/issue-intake-allowed-keys green (D-M6-I2-1)
+65ece473 2026-10-19 impl(M6-P3): tests/v2/release/smoke.test.mjs (8 cases, stub CLIs, local bare repo)
+10d41700 2026-10-19 impl(M6-P2): tests/v2/release/publish.test.mjs (6 cases, green)
+50745120 2026-10-19 impl(M6-W1): merge-traffic tests (8 pass)
+19d8ea98 2026-10-19 impl(M6-W1): traffic.yml first version
+825e245d 2026-10-19 impl(M6-W1): merge-traffic.mjs first version
+3fc0510f 2026-10-19 impl(M6-P3): scripts/release/smoke.mjs first version
+255f7fa5 2026-10-19 impl(M6-P2): scripts/release/publish.mjs --stage/--promote with --remote (first version)
+88cf1580 2026-10-19 impl(M6-B1): branch protection settings JSON, PUT script, weekly drift check + tests
+a7d4a915 2026-10-19 impl(M6-I2): move issue intake scripts, workflow and CONTRIBUTING.md from the intake copy (D-M6-arch-6)
+57aa4845 2026-10-19 impl(M6-V1): verify-sums rejects symlink and non-regular entries; SHA256SUMS must be a regular file
+2bc02512 2026-10-19 impl(M6-P1): local E2E case release-plan-bump
+118af11d 2026-10-19 impl(M6-P1): scripts/release/plan.mjs — trailer range, CC bump, grouped notes, --dry-run, --skip-live, 2.0.0 first
+3e00c629 2026-10-19 impl(M6-P1): plan.mjs tests (red)
+50496d36 2026-10-19 impl(M6-H1): build/hash.mjs writeHashes(outDir) + CLI --out; SHA256SUMS sorted POSIX paths, sha256sum format
+1c839830 2026-10-19 impl(M6-P4): scripts/release/rollback.mjs with --remote; tests/v2/release/rollback.test.mjs (5 cases)
+633cc1d6 2026-10-19 impl(M6-I1): issue forms bug/feature/config; drop PR template, old forms, openclaw pull_request trigger
+92b77ac9 2026-10-19 impl(M6-K1): 3 user command skills verbatim from drafts.md + command-skills test
+9be7c121 2026-10-19 impl(M6-I1): red tests for issue forms and repo-github-files live case
+65c2edf6 2026-10-19 impl(M6-arch): answer M5 intern questions in impl/07 A-intern-M5; M6 plan deviations D-M6-arch-1..7
+bb1faa04 2026-10-19 impl(M5): intern review — 10 ambiguities documented
+1df3a03b 2026-10-19 impl(M5-review): PI_ROLE into constants.ts; review-M5 findings
+92024e66 2026-10-19 impl(M5-F1): GS4 lint treats interpolated specifiers as unresolvable, D-M5-F1-1
+45d152d0 2026-10-19 impl(M5-fix): merge M5-H1
+0293ade1 2026-10-19 impl(M5-fix): merge M5-P2
+675cd6f4 2026-10-19 impl(M5-fix): merge M5-P1
+0373be97 2026-10-19 impl(M5-merge): merge M5-M5-R1
+4a71dc1b 2026-10-19 impl(M5-R1): GP11 uninstall-stops-server case, GP11 10/10
+4dda3041 2026-10-19 impl(M5-R1): GP11 fixture git init + TMPDIR, doctor table golden (D-M5-R1-2), GP11 9/9
+7102beae 2026-10-19 impl(M5-R1): server ends the process UPGRADE_STOP_DELAY_MS after an uninstall reply (D-M5-R1-1)
+eefa11b7 2026-10-19 impl(M5-R1): registry swaps ctx_doctor/ctx_upgrade stubs for real handlers (D-M5-arch-6), registry tests 11/11
+84da8cfd 2026-10-19 impl(M5-R1): merge D6 doctor and U8 upgrade handlers
+855704bc 2026-10-19 impl(M5-D6): tools/doctor.ts thin handler + runDoctorChecks, doctor tests 7/7, DEVIATIONS D-M5-D6-1..3
+e5dd7aa6 2026-10-19 impl(M5-U8): upgrade tests 11/11 green, DEVIATIONS D-M5-U8-1..3
+940cc1cb 2026-10-19 impl(M5-U8): upgrade tests 10/11 green
+cd3e7688 2026-10-19 impl(M5-U8): tools/upgrade.ts first version
+96608be7 2026-10-19 impl(M5-D6): merge D1-D5, O3 deps; clean DEVIATIONS merge markers
+4cfe3877 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-O3' into impl/M5-M5-D6
+d5a704b8 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-D5' into impl/M5-M5-D6
+a64161b8 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-D4' into impl/M5-M5-D6
+f1b23736 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-D3' into impl/M5-M5-D6
+4d496923 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-D2' into impl/M5-M5-D6
+8151c49a 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-U7' into impl/M5-M5-U8
+d81cfc8a 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-U6' into impl/M5-M5-U8
+19bf2d59 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-U5' into impl/M5-M5-U8
+15c14c59 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-U4' into impl/M5-M5-U8
+313daeae 2026-10-19 Merge remote-tracking branch 'origin/impl/M5-M5-U3' into impl/M5-M5-U8
+398d48e5 2026-10-19 impl(M5-D2): doctor-config tests green (11/11), DEVIATIONS D-M5-D2-1..4
+f9c7f58c 2026-10-19 impl(M5-D2): doctor-config D3 host config diff, D4 v1 fold, D5b double-fire (first version)
+c368f1ec 2026-10-19 impl(M5-U7): uninstall DEVIATIONS D-M5-U7-1..4, upgrade test expects data-kept row
+2494e03e 2026-10-19 impl(M5-U7): uninstall tests (13 green)
+742d8b03 2026-10-19 impl(M5-U6): DEVIATIONS D-M5-U6-1..3 for v1-remove
+4ab1515d 2026-10-19 impl(M5-U6): ops/v1-remove.ts removes or reports each detectV1 finding
+34db995c 2026-10-19 impl(M5-U7): ops/uninstall.ts first version
+574d56a9 2026-10-19 impl(M5-D3): doctor-hook tests (14 pass) + DEVIATIONS D-M5-D3-1
+f7014524 2026-10-19 impl(M5-D5): ops/db-heal.ts D8 heal (lossless VACUUM INTO or rename-aside recreate) + tests
+0388fde5 2026-10-19 impl(M5-D3): doctor-hook.ts D5 round trip + Codex trust sub-case (first version)
+7c4bf9e7 2026-10-19 impl(M5-U5): host-write tests green (11/11), DEVIATIONS D-M5-U5-1
+f8ef10a2 2026-10-19 impl(M5-U5): host-write.ts first version (regenerateHostConfig with rollback)
+03966af5 2026-10-19 impl(M5-U2): release-fetch.ts clones the release branch into <sha> dir
+df077771 2026-10-19 impl(M5-D1): DEVIATIONS row D-M5-D1-1
+179cd3a0 2026-10-19 impl(M5-D1): doctor-env D1 D2 D6 D7 D10 rows + tests
+f1f7fa4f 2026-10-19 impl(M5-D4): DEVIATIONS rows D-M5-D4-1..4
+177326b0 2026-10-19 impl(M5-D4): doctor-db tests (9 pass)
+d56d179e 2026-10-19 impl(M5-D4): doctor-db D8 schema+integrity, D9 counts (first version)
+c29966ce 2026-10-19 impl(M5-U4): ops/plugin-swap.ts atomic current swap, one rollback generation
+b94bb543 2026-10-19 impl(M5-U3): verify-sums.ts checks the fetched tree against SHA256SUMS
+4998fe8b 2026-10-19 impl(M5-merge): merge M5-M5-B2
+00de2bbe 2026-10-19 impl(M5-merge): merge M5-M5-U1
+5c1621d1 2026-10-19 impl(M5-U1): DEVIATIONS rows D-M5-U1-1..6
+053f777c 2026-10-19 impl(M5-U1): constants for wave-2 doctor and upgrade split files
+6a61591e 2026-10-19 impl(M5-B2): build row {pi, src/entries/pi.ts, pi/index.js} (impl/13 §2.2, D-M5-arch-1)
+b0d13dca 2026-10-19 impl(M5-U1): ctx_upgrade constants
+e0a48e1c 2026-10-19 impl(M5-P2): build keeps a pre-existing _generated.ts (D-M5-P2-5), gate v2-unit no longer loses it
+3feef635 2026-10-19 impl(M5-H1): usage test for opencode pending_compact take-once
+3502d71e 2026-10-19 impl(M5-H1): opencode-cache SessionStart reads and clears pending_compact (D-M5-P2-4)
+526e1c57 2026-10-19 impl(M5-P1): Pi in-process extension (pi.on handlers, in-process TOOLS, compact flag), DEVIATIONS D-M5-P1-1
+c5e1bc77 2026-10-19 impl(M5-P2): GP5 pathToFileURL import, DEVIATIONS D-M5-P2-1..4
+af63e93e 2026-10-19 impl(M5-P2): OpenCode 2 plugin {id, setup}, ctx_* tools, one cache-stable system entry, step-finish Usage
+aafd31c9 2026-10-18 impl(M5-O3): ops/report.ts buildReport: typed table, REPORT_CAP cut via capBytes, structural env redaction
+01d02399 2026-10-19 impl(M5-H1): usage test on impl/09 signature, DEVIATIONS D-M5-H1-1
+c020c601 2026-10-19 impl(M5-H1): handleHook maps Usage to one cost journal row
+5d699e11 2026-10-19 docs(v2): workflow task size rule, split big modules
+013a91b5 2026-10-19 impl(M5-merge): merge M5-M5-O2
+13a2d946 2026-10-19 impl(M5-merge): merge M5-M5-O1
+1901a2ad 2026-10-19 impl(M5-merge): merge M5-M5-S1
+7d7f47b5 2026-10-19 impl(M5-O2): detectV1 tests green (7/7), VS Code/Pi/tmp scope, DEVIATIONS D-M5-O2-1..5
+608e744a 2026-10-19 impl(M5-O2): first detectV1 (ADR-0011 table + All row) and v1 constants
+95b79e68 2026-10-19 impl(M5-O1): plugin-root resolvePluginRoot and host-config read/merge/write, tests green
+66b4178d 2026-10-18 impl(M5-S1): schema v2 partial unique index on cost (session_id, turn), appendEvent INSERT OR IGNORE for cost rows, SCHEMA_VERSION=2 (D-M5-arch-2, D-M5-S1-1)
+06c7c806 2026-10-18 impl(M5-merge): merge M5-M5-B1
+48e41c32 2026-10-18 impl(M5-merge): merge M5-M5-A1
+c74a17e1 2026-10-18 impl(M5-merge): merge M5-M5-C2
+edd59000 2026-10-18 impl(M5-C2): DEVIATIONS rows for doctor texts, shared types, v1 names
+f536926c 2026-10-18 impl(M5-C2): contracts constants and types for doctor, upgrade, detect-v1, plugin-root, pi/opencode
+0f4d1349 2026-10-18 impl(M5-A1): claude-code.test opencode eventMap expects Usage step-finish (D-M5-arch-2, D-M5-A1-1)
+f7d5933d 2026-10-18 impl(M5-B1): merge origin/v2-design
+769fd0fb 2026-10-18 impl(M5-A1): merge origin/v2-design
+7728aa55 2026-10-18 docs(v2): workflow implementer pace rule and doc-wins rule
+6de299dc 2026-10-18 impl(M5-A1): pi/opencode adapters decode/encode, table drops notBuilt, opencode eventMap Usage, webfetch native name (D-M5-A1-1)
+3da01a96 2026-10-18 impl(M5-B1): build copies e2e/fixtures/hook-roundtrip.json to <out>/fixtures/, --sha sets BUNDLE_SHA via one esbuild define (D-M5-arch-4, D-M5-arch-5, D-M5-B1-1)
+a7fdfb93 2026-10-18 impl(M5-merge): merge M5-M5-C1
+c0de66d4 2026-10-18 impl(M5-merge): remove stray tmp artifacts from M5-M5-T0 merge
+1150f534 2026-10-18 impl(M5-merge): merge M5-M5-T0
+a42cecaf 2026-10-18 impl(M5-T0): write M5 tests (red) — GP11 doctor/upgrade, 14a plugin rows, usage-events-idempotent, ops/doctor/upgrade/plugins/store-cost-dedup unit tests, hook-roundtrip fixture
+849536b9 2026-10-18 impl(M5-C1): contracts for tools-ops: DoctorRow/V1Finding/UpgradeMode/UpgradeChangeRow/HostConfigEdit, AuxEventName Usage, 3 error keys, RELEASE_REPO_URL/RELEASE_BRANCH/BUNDLE_SHA
+e55faeaa 2026-10-18 impl(M5-arch): answer M4 intern questions in impl/06 A-intern-M4; M5 plan deviations D-M5-arch-1..6
+ee9e8e73 2026-10-18 impl(M4): done
+7315d7e8 2026-10-18 impl(M4-review): STATE_CLOSE_TAG into constants.ts; review-M4 second pass (T-CMP live case open, D-M4-F2-1)
+f31516ab 2026-10-18 impl(M4-skeptic): re-verify M4 GP6/GP8/GP10 cases at green gate, no weak test found
+310ba54e 2026-10-18 impl(M4-arch): server journal row uses handler JournalFacts; re-record M1 ctx_stats-stub goldens (GP5/7/8)
+6f9a9549 2026-10-18 fix(gate): ci-checks layer runs the ci.yml-only steps before gp-cases (D-M4-GS4-1)
+ce4d997b 2026-10-18 fix(GS4): GP6 tests only through the release bundle, no src/ import
+17d1070b 2026-10-18 impl(M4-F2): record gate state after unit fix - gp-cases red on GP6 harness wrappers and M1 stub-text goldens for ctx_stats (D-M4-F2-2)
+d1f07992 2026-10-18 impl(M4-F2): restore claude-code compactSummary host; L1 flip came from a run against the ctx_resume stub, not a valid T-CMP arm (a) (D-M4-F2-1)
+6082de78 2026-10-18 Merge remote-tracking branch 'origin/impl/M4-M4-L1' into v2-design
+8d0654b2 2026-10-18 Merge remote-tracking branch 'origin/impl/M4-M4-H2' into v2-design
+9829b45b 2026-10-18 Merge remote-tracking branch 'origin/impl/M4-M4-V1' into v2-design
+53d9c6a8 2026-10-18 impl(M4-merge): merge M4-M4-G1, record gate state (D-M4-merge-2)
+e39b46d6 2026-10-18 impl(M4-merge): merge M4-M4-G1 into v2-design
+a976934b 2026-10-18 impl(M4-G1): drop statusline KEEP-PASS rows from baseline (green after build); M4 gate still red on GP6/GP8/GP10 (M4-H2 unmerged, stats/purge bugs) — not marked done
+c2e50396 2026-10-18 impl(M4-L1): flip claude-code compactSummary to none after T-CMP live fail
+4533c267 2026-10-18 impl(M4-V1): registry wires real ctx_resume/ctx_stats/ctx_purge handlers, M4 stubs dropped
+5d6abd4a 2026-10-18 impl(M4-V1): red registry tests for real ctx_resume/ctx_stats/ctx_purge handlers
+63f7410d 2026-10-18 impl(M4-V1): bring in M4-S2 resume.ts (not yet on v2-design) to wire ctx_resume
+fcb3a230 2026-10-18 impl(M4-H2): dispatch.ts: compactSummary none via renderState (SessionStart + pending-flag); decision rows + chunk; D-M4-H2-1..4
+9ff68903 2026-10-18 impl(M4-S2): record GP6 resume-seq-pointer blockers outside resume.ts (D-M4-S2-2)
+0e3b3828 2026-10-18 impl(M4-S2): ctx_resume seq pointer read + no-seq block via renderState (D-M4-S2-1)
+0cc221e0 2026-10-18 impl(M4-S2): ctx_resume unit tests (red)
+9098945a 2026-10-18 impl(M4-merge): record gp-cases harness gap (D-M4-merge-1) after wave-1 merge
+80574c58 2026-10-18 impl(M4-merge): merge M4-H1
+8d656dab 2026-10-18 impl(M4-merge): merge M4-I1
+99846681 2026-10-18 impl(M4-merge): merge M4-S4
+31683e03 2026-10-18 impl(M4-merge): merge M4-S3
+dabad161 2026-10-18 impl(M4-merge): merge M4-S1
+0d445216 2026-10-18 impl(M3-fix): one home rule (HOME, then USERPROFILE) in user-deny and subagent, Windows-safe test inputs, D-M3-F-8..9
+83c80d79 2026-10-18 impl(M4-S3): GP10 [M4] e2e cases and GP8/sibling-db-readonly with goldens
+97eaefb2 2026-10-18 impl(M4-S3): ctx_stats sums sandbox_bytes/returned_bytes per scope and agent, own DB read-only (D-M4-S3-1)
+65f6c984 2026-10-18 impl(M4-S3): red unit tests for ctx_stats scopes, per-agent sum, reduction_pct denominator, read-only mtime
+e0611f62 2026-10-18 impl(M3-fix): plugin-root paths in the Claude manifest, case-B deny names only run.mjs, live T-PAR/T-SUB run as plugin with a Bash subagent, D-M3-F-5..7
+2be09652 2026-10-18 impl(M4-S1): compaction candidates, score, renderState(rows, turn) lazy greedy <= STATE_BUDGET
+b1116ef3 2026-10-18 impl(M4-S1): render unit tests, score test follows r9 M7 Math.round, deviations D-M4-S1-1..5
+6b3f2f7d 2026-10-18 impl(M4-I1): DEVIATIONS D-M4-I1-1 (empty-query decision listing, rename on every ctx_index branch)
+19049957 2026-10-18 impl(M4-I1): [M4] GP5 e2e cases: same-session-outranks-cross-session, decision-user-label-renamed, timeline repeat/session scope, offset/after INVALID_ARGS
+5b5538ed 2026-10-18 impl(M4-I1): ctx_search source:"decision" (empty-query listing via ftsListSource, timeline skips reserved chunk sources), ctx_index "decision (user)" rename
+1ff9e65f 2026-10-18 impl(M4-I1): red tests for ctx_search source:"decision", ctx_index "decision (user)" rename, timeline and RRF rule checks
+466b5fa6 2026-10-18 impl(M4-H1): decision.ts: drop numeric literal for the M4 no-literal-number lint
+63623dc4 2026-10-18 impl(M3-fix): tsc before KEEP-PASS in CI and gate, race-free DB_GONE check, hook resolves project without git spawns (GS6), D-M3-F-1..4
+fd954009 2026-10-18 impl(M4-H1): hooks/decision.ts: pure AskUserQuestion answer and option-echo rules (no regex, no word list); DEVIATIONS D-M4-H1-1
+66464daf 2026-10-18 impl(M4-H1): decision.test.mjs (red): AskUserQuestion answer and option-echo rules
+8017464e 2026-10-18 impl(M4-S4): ctx_purge: one scope of session/source/project inside withWrite, exact error and busy lines (D-M4-S4-1)
+8d8cebdd 2026-10-18 impl(M4-S4): red unit tests for ctx_purge scopes, exact error lines, busy line
+a727bc8e 2026-10-18 merge: impl/M4-M4-C0 into v2-design
+969d6fa2 2026-10-18 merge: impl/M4-M4-T0 into v2-design
+a3e575e9 2026-10-18 impl(M4-C0): contracts: M4 reply texts (resume/stats/purge), reserved decision label and row keys, DECAY_SCALE/PERCENT_SCALE/SQLITE_BUSY_CODE, Candidate/ScoredCandidate and M4 tool input types
+cd4fabce 2026-10-18 impl(M4-C0): contracts tests for M4 reply texts, decision label, scale constants, M4 types, no-literal-number lint (red)
+f3f0f5da 2026-10-18 impl(M4-T0): red tests for GP6 journal/resume/decision and compaction candidates/score units
+b8783c8d 2026-10-18 impl(M4-arch): answer M3 intern questions in impl/04 A21, impl/09 A29, impl/11 A6; M4 plan deviations D-M4-arch-1..6
+47b6ea6c 2026-10-18 impl(M3-review): move indexText to index/text.ts (hook bundle drops zod and node:http, GS6), review-M3 second pass, D-M3-R-1
+63bee016 2026-10-18 impl(M3-skeptic): re-verify weak-test mutation checks, flag live-suite flake out of scope
+0b1b07a8 2026-10-18 merge: impl/M3-M3-G1 into v2-design
+63cac5c9 2026-10-18 impl(M3-G1): gate M3 green 3x, review/skeptic/intern docs, progress.json M3 done
+0a6d7783 2026-10-18 merge: impl/M3-M3-X1 into v2-design
+0ccfd9f9 2026-10-18 merge: impl/M3-M3-H2 into v2-design
+caf9d47c 2026-10-18 impl(M3-X1): run-wrapper.ts case B run.mjs + search.mjs, build rows, tests, DEVIATIONS D-M3-X1-1..6
+d610dfe0 2026-10-18 impl(M3-H2): hook entry tests + DEVIATIONS D-M3-H2-1..9
+c0b8e49d 2026-10-18 impl(M3-H2): dispatch unit tests (events, journal kinds, case A/B/C, F1 split)
+8e2a5ec0 2026-10-18 impl(M3-H2): hook entry import check follows handleHook (D-M3-H2-9)
+7d0adb90 2026-10-18 impl(M3-H2): static tools/index import (build rule), hook entry exits after detached writes
+bdb6e17f 2026-10-18 impl(M3-H2): load tools/index lazily on the case B/C path (GS6)
+2c985121 2026-10-18 impl(M3-H2): hooks dispatch handleHook + hook entry main (WIP, tests next)
+84bf5b77 2026-10-18 impl(M3-merge): README codex matcher doc fix + DEVIATIONS row
+404b85ef 2026-10-18 merge: M3-M3-A7 into v2-design
+95c60018 2026-10-18 merge: M3-M3-E4 into v2-design
+fcaba7f1 2026-10-18 impl(M3-E4): no literal numbers in decide.ts, hint text passes contracts import lint
+387fb764 2026-10-18 impl(M3-E4): decide.test.mjs (43 cases: §6.3 golden, V8, Read-deny, B2 blocks), DEVIATIONS D-M3-E4-1..10
+710ad8c7 2026-10-18 impl(M3-E4): decide.ts rule table, deny/hint constants, drafts.md hook text blocks
+59f7b20f 2026-10-18 impl(M3-A7): align claude-code table expectations with wired rows (D-M3-A7-7)
+36981034 2026-10-18 impl(M3-A7): DEVIATIONS D-M3-A7-1..6
+e8856315 2026-10-18 impl(M3-A7): GP3 M3 hook-config cases (timeouts, codex matcher T-CX, unrelated mcp tool, per-host schema)
+b803337c 2026-10-18 impl(M3-A7): build/manifests.ts generateManifests + buildMatcher, build.mjs step 4, GP1 M3 cases
+6a0fc301 2026-10-18 impl(M3-A7): wire gemini/qwen/copilot-cli/vscode/kiro/zcode rows in adapters table + table unit test
+6e517298 2026-10-18 merge: M3-M3-A6 into v2-design
+bd68fa16 2026-10-18 merge: M3-M3-A5 into v2-design
+5674d3f6 2026-10-18 merge: M3-M3-A4 into v2-design
+6aefb379 2026-10-18 merge: M3-M3-A3 into v2-design
+6f83097a 2026-10-18 merge: M3-M3-A2 into v2-design
+5c8aa21a 2026-10-18 merge: M3-M3-A1 into v2-design
+5a865b17 2026-10-18 merge: M3-M3-H1 into v2-design
+e360e0e9 2026-10-18 merge: M3-M3-E3 into v2-design
+411c4a69 2026-10-18 merge: M3-M3-E2 into v2-design
+156cf9bd 2026-10-18 merge: M3-M3-E1 into v2-design
+c95cd4f7 2026-10-18 impl(M3-E1): enforcement parser (recursive descent) + unwrap + tests, DEVIATIONS D-M3-E1-1..5
+8a16eaec 2026-10-18 impl(M3-E1): enforcement lexer state machine + tests
+04efc661 2026-10-18 impl(M3-C0): contracts: M3 policy constants (MAX_NEST_DEPTH, READ_DENY_MESSAGE, deny templates, bounded set, jq whitelist) and parser types
+5038fbbb 2026-10-18 impl(M3-C0): contracts tests for M3 policy constants, parser types, no-literal-number lint (red)
+121eeeaa 2026-10-18 impl(M2-CI): fix CI-only GP4/GP8/KEEP-PASS failures (D-M2-CI-1..4)
+dd6d427e 2026-10-18 impl(M3-E2): user-deny.ts readUserDeny (E2 null on bad policy), matchesAnyDenyPattern with V17 Read anchors; tests; D-M3-E2-1..4
+fef6ee6c 2026-10-18 impl(M3-E3): subagent.ts pickSubagentCase A/B/C and toolSet resolution (frontmatter, plugin, --agents, manifest; null -> C per B4); D-M3-E3-1..4
+b9c02045 2026-10-18 impl(M3-A6): T-ZC GP3 case (SKIPPED until a ZCode fixture exists), DEVIATIONS D-M3-A6-1..2
+3fc7e818 2026-10-18 impl(M3-A1): gemini adapter decode/encode (BeforeTool/AfterTool/BeforeAgent/PreCompress) + DEVIATIONS D-M3-A1-1..4
+9cc4c962 2026-10-18 impl(M3-A5): kiro adapter decode/encode, PromptSubmit stdout empty, plain-text exit-2 deny (D-M3-A5-1..3)
+8066fc65 2026-10-18 impl(M3-A6): zcode adapter decode/encode, camelCase twins, PostToolUseFailure -> PostToolUse isError
+a13140c6 2026-10-18 impl(M3-A3): copilot-cli adapter decode/encode (dual-cased payload, plain deny-with-reason, subagent [U])
+6c14ee73 2026-10-18 impl(M3-A6): zcode adapter unit tests (red)
+a05ef582 2026-10-18 impl(M3-E3): subagent case A/B/C and toolSet resolution tests (red)
+bc3113be 2026-10-18 impl(M3-A1): gemini adapter unit tests + GP3 synthetic payloads (red)
+d7b4c1d5 2026-10-18 impl(M3-H1): throttle test checks the project dir only, not shared tmpdir (other agents write there)
+6bbf5e78 2026-10-18 impl(M3-A2): qwen adapter decode/encode, run_shell_command and Shell both map to Bash (§1.5b); PostToolUseFailure -> PostToolUse isError (D-M3-A2-1)
+6857cbfb 2026-10-18 impl(M3-H1): hooks throttle.ts (session-id-only once/everyN meta marker) and detached.ts (fire-and-forget journal append), D-M3-H1-1..3
+c05cc32c 2026-10-18 impl(M3-A4): vscode adapter decode/encode, case C no replace channel
+046930d3 2026-10-18 impl(M3-A4): vscode adapter unit tests (red)
+3d2bec4a 2026-10-18 impl(M3-arch): M3 plan deviations D-M3-arch-1..5 (14a split, renderState in M4, case-B root, manifests in M3, constants)
+8078e63c 2026-10-18 impl(M3-arch): answer M2 intern questions in impl/11 A5
+bee53c5a 2026-10-18 impl(M2): done
+df210d64 2026-10-18 impl(M2-review): re-review E1..F1 range, no blockers, gate green
+525d3518 2026-10-17 impl(M2-F1): fix keep-pass and GP4 timing flakes: wait on child events, not wall-clock; KEEP-PASS runner uses v1 run envelope (D-M2-F1-1..6)
+b10af20c 2026-10-17 impl(merge): merge M2-M2-C1 into v2-design
+26a42802 2026-10-17 impl(M2-C1): append E1/E2/O1 deviation rows; diagnose win-sandbox + stdin-eof keep-pass flakes
+43b676a6 2026-10-17 impl(merge): merge M2-M2-O1
+41cd9c5d 2026-10-17 impl(merge): merge M2-M2-E3
+e5a3bd1b 2026-10-17 impl(merge): merge M2-M2-E2
+324c2106 2026-10-17 impl(merge): merge M2-M2-E1
+7c6c8758 2026-10-17 impl(M2-E3): add M2 GP1/GP7/GP8 e2e cases + goldens
+4d1f00fb 2026-10-17 impl(M2-M2-E2): port M2 14a GP5 unit cases into black-box e2e with goldens
+91ba5b3e 2026-10-17 impl(M2-O1): measure O1 (toolerr session weight) and O2 (turn prompt on edit rows) against R2
+91da8b4b 2026-10-17 impl(M2-M2-E1): port 14a GP4 unit cases into e2e/cases/GP4-execute.e2e.mjs
+d93e3db3 2026-10-17 impl(report): overnight report
+cf755895 2026-10-17 impl(release-check): v2 unit tests compare with realpathSync.native (Windows 8.3 names); CI runs tests/v2 by glob (Node 24 has no dir arg)
+b7371056 2026-10-17 impl(M2-review): UNKNOWN_FIELD on all tool schemas, url fetch time bound, no userinfo in labels, live harness loads the server
+1f7341f8 2026-10-17 impl(skeptic-M2): strengthen weak M2 GP2/GP4/GP5 tests, record findings
+4b81603c 2026-10-17 impl(M2-F1): mock process.kill/timers in server exit-guard test; keep-pass-131 check reads vitest include and map.files (D-M2-F1-1, D-M2-F1-2)
+b8779c65 2026-10-17 impl(merge): resolve DEVIATIONS.md conflict merging impl/M2-M2-R7
+3b44eda5 2026-10-17 impl(merge): resolve DEVIATIONS.md conflict merging impl/M2-M2-R6
+df4a3ddb 2026-10-17 impl(merge): resolve DEVIATIONS.md conflict merging impl/M2-M2-R5
+2a1979c2 2026-10-17 impl(merge): resolve DEVIATIONS.md conflict merging impl/M2-M2-R4
+0e4e121a 2026-10-17 impl(merge): resolve DEVIATIONS.md conflict merging impl/M2-M2-R3
+06417b27 2026-10-17 impl(merge): resolve DEVIATIONS.md conflict merging impl/M2-M2-R2
+fd1d8657 2026-10-17 impl(merge): merge impl/M2-M2-R1 into v2-design
+a11e3c0f 2026-10-17 impl(M2-R6): search 14a cases: UNKNOWN_FIELD names queries, session > worktree > project rank, dedupe, 5 MiB highlight cap, code-point snippet, non-ASCII auto-memory (D-M2-R6-1)
+8e824197 2026-10-17 impl(M2-R2): CI installs v1 runtimes, KEEP-PASS and GP steps use gate milestone selection, generated-only before tests/v2 (D-M2-arch-4/5/6, D-M2-R2-1)
+a3398b98 2026-10-17 impl(M2-R3): sandbox Windows shim/PATH lookup, case-insensitive preload strip, never-reject sync spawn throw, GP4 unit tests (D-M2-R3-1..3)
+6bcd98e4 2026-10-17 impl(M2-R4): batch ingest byte budget (#961, D-M2-R4-1), named GP4/GP5/GP8 tests for exec and batch
+372b07d6 2026-10-17 impl(M2-R1): build.mjs --generated-only, gate v2-unit runs it first, src imports _generated.ts/agents.ts, server starts only as entry (D-M2-arch-6, D-M2-R1-1..3)
+80876f6b 2026-10-17 impl(M2-R5): GP5 chunk/walk/index cases (byte caps, nested fence, rowless tables, ** zero dirs, nested gitignore negation, ingestion caps, proxy, one-line fetch error); trailing ** = one or more segments (D-M2-R5-1)
+9283862f 2026-10-17 impl(M2-R7): project containment: registered external worktrees inside one containmentRoot (commonRoot), GP7 symlink-dot-prefix/worktree/remote-wsl/adapter-root cases (D-M2-R7-1..2)
+b039cce0 2026-10-17 impl(M2-arch): resume plan for M2 remainder, D-M2-arch-1..6 (14a milestone split, #936 vs Q8, #1230, CI selection, CI runtimes, _generated for v2-unit)
+394a3218 2026-10-17 impl(report): add OVERNIGHT-REPORT.md
+99201308 2026-10-17 impl(ci): wire M2 tools into registry, fix GP2/GP4/GP5 cases, record goldens
+ae16191a 2026-10-17 impl(docs): done
+2dc2c868 2026-10-17 impl(readme): rewrite README per ADR-0015 and add 200-line CI check
+2e2a0048 2026-10-17 impl(docs): add algorithms.md and how-it-works.md, note missing docs/v2/benchmarks.md in DEVIATIONS
+e12dc0b7 2026-10-17 impl(docs): add LAUNCH.md with sourced v1/v2 numbers and claims-we-do-not-make list
+7c6a64be 2026-10-17 impl(install-pi): drop unverifiable Verified table (no v2 build to test against)
+b2785ab1 2026-10-17 impl(install-zcode): drop unverifiable Verified table (no v2 build to test against)
+beb07e64 2026-10-17 impl(install-opencode): drop unverifiable Verified table (no v2 build to test against)
+63f094a8 2026-10-17 impl(merge): fix pre-existing constants.js->ts import, note registry/server test gap
+01118594 2026-10-17 impl(merge): merge M2-T11 into v2-design
+41af2155 2026-10-17 impl(merge): merge M2-T10 into v2-design
+0db963c3 2026-10-17 impl(M2-T10): ctx_execute handler (exit class, cancel/timeout, background launcher, index+select past OUTPUT_CAP) (D-M2-T10-1..7)
+54d9ac6f 2026-10-17 impl(M2-T11): ctx_batch with runPool capped flag, one deadline, dedup, per-query share (D-M2-T11-1)
+7566be23 2026-10-17 impl(merge): merge M2-T9 into v2-design
+728f0d01 2026-10-17 impl(merge): merge M2-T8 into v2-design
+8b869a3e 2026-10-17 impl(M2-T8): ctx_index + indexText + selectChunks/selectChunksInMemory (D-M2-T8-1)
+dfac356e 2026-10-17 impl(M2-T9): ctx_search relevance + timeline, auto-memory source, O1 measured no gain (D-M2-T9-1, D-M2-T9-2)
+3e735fb9 2026-10-17 impl(merge): merge M2-T7 into v2-design
+03c7dac3 2026-10-17 impl(merge): merge M2-T6 into v2-design
+3124ef14 2026-10-17 impl(merge): merge M2-T5 into v2-design
+5acd15e2 2026-10-17 impl(merge): merge M2-T4 into v2-design
+1a881485 2026-10-17 impl(merge): merge M2-T3 into v2-design
+ec271af1 2026-10-17 impl(M2-T3): ftsInsert returns id, ftsQueryTimeline, rankTexts in-memory BM25, canonicalKey, rowid-ranked ftsQuery (D-M2-T3-1)
+45ed10b3 2026-10-17 impl(M2-T6): index chunker (md/html/text, fence/table/code-point safe) and dir walk (nested .gitignore, ** zero dirs, symlink containment) (D-M2-T6-1, D-M2-T6-2)
+4d024df8 2026-10-17 impl(M2-T7): lint.mjs bundle mode (PR1-12, GS5, GS9 on live initialize/discover/tools/list), ci.yml lint step --out release-out, GP2 goldens
+1e10758e 2026-10-17 impl(M2-T5): capBytes code-point-safe cut, safeFetch with proxy env and SSRF per hop (D-M2-T5-1, D-M2-T5-2)
+2cbe0a16 2026-10-17 impl(M2-T5): red tests for capBytes cut offsets, proxy env, NO_PROXY, SSRF ranges, one-line fetch errors
+571ecc13 2026-10-17 impl(M2-T4): sandbox env, runtimes, kill, spawn
+e5899bde 2026-10-17 merge: impl/M2-M2-T2 into v2-design
+c47b1cfe 2026-10-17 merge: impl/M2-M2-T1 into v2-design
+faf1be9f 2026-10-17 merge: impl/M2-M2-T0 into v2-design
+ca9e9c97 2026-10-17 impl(M2-T1): contracts M2 constants, ToolReply.journal, TimelineRow, M2 tool input types
+3adf9cbc 2026-10-17 impl(M2-T2): S-COPILOT blocked, S-SKILLS by source, S-ZCODE instructions row, impl/10 §1.6
+1cd3581b 2026-10-17 impl(M2-T0): red tests for sandbox, index, tools-exec, tools-index, server modules + GP2/GP4/GP5 e2e cases + T-CAP/T-SAVE/T-CMP/T-PAR/T-SUB live case files
+08c6c6ef 2026-10-17 impl(M2-arch): answer M1 intern questions, M2 deviations D-M2-1..6
+e071921f 2026-10-17 impl(M1): done
+3c60fd64 2026-10-17 impl(M1-review): realpath.native for one projectKey, safe ROLLBACK in migrations, COMMIT inside withWrite try, named GP failures, review-M1.md
+c100c3f4 2026-10-17 impl(skeptic-M1): strengthen GP9 lifecycle tests (cwd, ps-spawn, db-scan) + add tty-gate unit test
+7246722c 2026-10-17 impl(M1-fix-r1): end the M1 gate hang - kill spawned servers in t.after, checkGolden + GP7/GP8/GP9 goldens, run.mjs JSON summary and milestone name filter (D-M1-F1-1, D-M1-F1-2)
+e035fbe5 2026-10-17 impl(M1-merge): rebuild bundles after M1-T10-server-wiring merge
+e43680bb 2026-10-17 impl(M1-merge): merge M1-T10-server-wiring
+34d951e6 2026-10-17 impl(M1-T10-server-wiring): record D-M1-T10-1 (journal row shape, DB handle hold, cleanup order)
+37f3c27f 2026-10-17 impl(M1-T10-server-wiring): per-call ToolContext, lazy resolveProject/openDb, cleanup once then writeOwnerPid, appendEvent per own call, shutdown removeOwnerPid then closeDb (D-M1-10, D-M1-11)
+2fd80d97 2026-10-17 impl(M1-merge): merge M1-T9-journal
+540df434 2026-10-17 impl(M1-merge): merge M1-T8-fts
+f62caef2 2026-10-17 impl(M1-merge): merge M1-T7-cleanup
+706a1f8c 2026-10-17 impl(M1-T7-cleanup): cleanupProject retention + size cap, sweepDeadProjects live-PID check in one withWrite
+1761c7a6 2026-10-17 impl(M1-T8-fts): ftsInsert (INDEX_WRITE_CHUNK batches, sources upsert), ftsQuery (scope filter, session first, BM25/RRF, source arg), highlight clip-then-escape (D-M1-T8-1..4)
+82c9cafb 2026-10-17 impl(M1-T9-journal): appendEvent one write path (created_at inside write, returns seq), readSessionEvents/readEventBySeq (empty/unknown session -> [], no latest-session fallback)
+b48c71d9 2026-10-17 impl(M1-merge): merge M1-T6-owners
+1e96ec4a 2026-10-17 impl(M1-merge): merge M1-T5-db
+e1201fb9 2026-10-17 impl(M1-T5-db): openDb (Node gate, DB_GONE sibling check, timeout, migrations, readOnly), withWrite BEGIN IMMEDIATE no retry, closeDb checkpoint TRUNCATE, metaGet/Set/Take (D-M1-T5-1)
+2fd0b4a0 2026-10-17 impl(M1-T6-owners): owners/<serverId>.pid write/remove, listLiveOwners via kill(pid,0) with dead-file self-heal (D-M1-T6-1)
+f08dde12 2026-10-17 impl(M1-merge): merge M1-T4-schema
+83d730a2 2026-10-17 impl(M1-merge): merge M1-T3-project
+5e26bdb5 2026-10-17 impl(M1-T3-project): resolveConfigDir, isInside by components, resolveProject by projectSource + git common dir hash (D-M1-T3-1..5)
+475ce834 2026-10-17 impl(M1-T4-schema): schema v1 DDL (events=JournalRow, sources, FTS5 chunks unicode61 remove_diacritics 2, meta) + applyMigrations via PRAGMA user_version
+041bc825 2026-10-17 impl(M1-merge): merge M1-T2-gate-ci
+79244c7b 2026-10-17 impl(M1-merge): merge M1-T1-contracts
+5820b502 2026-10-17 impl(M1-merge): merge M1-T0-tests
+5a9405b8 2026-10-17 impl(M1-T0-tests): write M1 store/journal unit tests (red) + GP7/GP8/GP9 e2e cases
+7ffeac8b 2026-10-17 impl(M1-T2-gate-ci): v2-unit gate layer (node --test tests/v2/, from M1) and ci.yml step (D-M1-13)
+b2787b07 2026-10-17 impl(M1-T1-contracts): store error keys, constants, DbHandle/SourceRow/Chunk/Hit/SearchScope types (D-M1-2, D-M1-3)
+8bc8c44d 2026-10-17 impl(M1-T2-gate-ci): gate-layers check expects v2-unit layer (red)
+30555de5 2026-10-17 impl(M1-arch): answer M0 intern questions, reconcile store docs (D-M1-1..14)
+e0a07822 2026-10-17 impl(M0): ambiguity review
+769aee3f 2026-10-17 impl(M0-skeptic): GP3 fixture-replay now checks stderr + golden, fix runHookFixture export
+703851e8 2026-10-17 impl(M0-review): constants into constants.ts, hook names fix on bad --agent, review-M0.md
+bdb28c0b 2026-10-17 impl(M0-fix-r1): gate builds release-out before GP cases; tsc green (rewriteRelativeImportExtensions, _generated.d.ts types)
+daface41 2026-10-17 impl(M0-T11): merge gp3-fixtures
+32d51ce1 2026-10-17 impl(M0-T11-gp3-fixtures): real claude-code+codex hook fixtures, GP3 golden replay, deviations
+9de254a4 2026-10-17 impl(M0-T10): merge spike-codex-g25
+0451e22e 2026-10-17 impl(M0-T9): merge build
+a78fcc7f 2026-10-17 impl(M0-T8): merge hook-skeleton
+2c6355c8 2026-10-17 impl(M0-T7): merge server-skeleton
+ad129cf3 2026-10-17 impl(M0-T7): registry (9 tools, M0 stubs), lifecycle/exit.ts, entries/server.ts over @modelcontextprotocol/server 2.3.1 stdio
+dd6bcd0d 2026-10-17 impl(M0-T8): cite DEVIATIONS D-M0-T8-1 in claude-code encode
+fcf24ada 2026-10-17 impl(M0-T8): adapter table, claude-code + codex decode/encode, M0 hook entry (green)
+c9e52813 2026-10-17 impl(M0-T8): adapter + hook entry unit tests (red)
+3c517568 2026-10-17 impl(M0-T7): prompt files copied byte for byte from docs/v2/prompt/drafts.md
+95121f47 2026-10-17 impl(M0-T9-build): build/build.mjs esbuild server+hook bundles, inline prompt md, ignore release-out and _generated.ts
+baec80e2 2026-10-17 impl(M0-T10): S-CODEX spike closed live (deferred MCP tools confirmed), G25 harness placeholder case
+039c9611 2026-10-17 impl(M0): fix keep-pass baseline format + mcp-client hang, run gate --milestone M0
+ad73e30c 2026-10-17 impl(M0): merge impl/M0-T6-deps
+c4ce8c57 2026-10-17 impl(M0): merge impl/M0-T5-ci
+dd52a9e4 2026-10-17 impl(M0): merge impl/M0-T4-gate
+bec7aa50 2026-10-17 impl(M0): merge impl/M0-T3-keep-pass
+c85a5838 2026-10-17 impl(M0): merge impl/M0-T2-contracts
+60bb2323 2026-10-17 impl(M0): merge impl/M0-T1-harness
+f7d365ba 2026-10-17 impl(M0): merge impl/M0-T0-tests
+cb9bd06b 2026-10-17 impl(install): done
+8c618742 2026-10-17 impl(install): add docs/install/README.md status table and copy guide deviations into DEVIATIONS.md
+74fe3a8d 2026-10-17 impl(install): merge impl/install-zcode
+21218c1b 2026-10-17 impl(install): merge impl/install-vscode
+af3bd2c2 2026-10-17 impl(install): merge impl/install-qwen
+8f07b71d 2026-10-17 impl(install): merge impl/install-pi
+77adde17 2026-10-17 impl(install): merge impl/install-opencode
+464fee5a 2026-10-17 impl(install): merge impl/install-kiro
+69563d09 2026-10-17 impl(install): merge impl/install-gemini
+b5e98fc9 2026-10-17 impl(install): merge impl/install-copilot-cli
+062d997f 2026-10-17 impl(install): merge impl/install-codex
+55b2c7b9 2026-10-17 impl(install): merge impl/install-claude-code
+176b3ae9 2026-10-17 impl(M0-T4-gate): scripts/gate.mjs (5 layers, stop at first FAIL), .impl/progress.json, DEVIATIONS D-M0-1..10
+95bc98d9 2026-10-17 impl(install-verify): record deviations found while verifying zcode/pi installs
+5d9bcfe9 2026-10-17 impl(install-verify): add Verified table from isolated install test
+ac282bca 2026-10-17 impl(M0-T5-ci): v2 ci.yml (3 OS x Node 24.15.0/26, push + workflow_call, no PR/secrets, 10 min) and GS4 lint
+a2ec0ece 2026-10-17 impl(install-verify): add Verified table from isolated install test
+bd31ccbb 2026-10-17 impl(install-verify): add Verified table from isolated install test
+b32f0018 2026-10-17 impl(tests): KEEP-PASS runner (gen-keep-pass.mjs, keep-pass.list.json, vitest.config.ts, keep-pass-map.json, keep-pass-baseline.json)
+5ed2f48f 2026-10-17 impl(M0-T6-deps): pin esbuild 0.24.0 and @modelcontextprotocol/server 2.3.1, add gate/e2e/keep-pass scripts, update bun.lock
+71e09f18 2026-10-17 impl(install-verify): qwen - CLI installs clean, extension command shape confirmed
+e0e99877 2026-10-17 impl(install-verify): gemini - CLI installs clean, extension install needs owner login
+8f7afc64 2026-10-17 impl(install-verify): codex - mcp add worked in isolated HOME, no v2 build yet
+2a2fa9d6 2026-10-17 impl(install-verify): claude-code - marketplace add needs owner login, no v2 build yet
+5215efc9 2026-10-17 impl(M0-T2): contracts module - agents, types, constants, errors (12/12 unit tests green)
+304ba89d 2026-10-17 impl(M0-T2): contracts unit tests (red)
+19de661b 2026-10-17 impl(M0-T0-tests): write M0 red tests for GP1 install/handshake and GP3 fixture-replay, plus local live-case checks (keep-pass-131, harness-smoke, ci-config, gate-layers)
+bff135e2 2026-10-17 impl(M0-T1-harness): e2e harness (normalize, mcp-client, hook-runner, db-dump, live drivers), run.mjs milestone filter, unit tests
+6fbd154c 2026-10-17 impl(install-opencode): add OpenCode install guide (v2), compares against impl/10-adapters.md §11 and ADR-0011
+043bc9d0 2026-10-17 impl(install-pi): add docs/install/pi.md with Pi install/update/upgrade/uninstall guide
+4bdbc103 2026-10-17 impl(install-claude-code): add Claude Code install/update/uninstall guide
+6fb22bed 2026-10-17 impl(install-zcode): add ZCode install/upgrade/rollback guide with spec diffs
+8a9b7859 2026-10-17 impl(install-qwen): add Qwen Code install guide (docs/install/qwen.md)
+256cdaa6 2026-10-17 impl(install-kiro): kiro user install guide + spec diffs
+99e92d8b 2026-10-17 impl(install-copilot-cli): add Copilot CLI user install/upgrade/uninstall guide
+e7496ac9 2026-10-17 impl(install-vscode): add VS Code user install guide
+20f92aac 2026-10-17 impl(install-gemini): add Gemini CLI install guide with web-researched install/update/rollback steps
+29c0dcf5 2026-10-17 impl(install-codex): add Codex install guide with v2 spec diff notes
+9c9d6d55 2026-10-17 docs(v2): overnight implementation workflow (M0-M7, install, savings, docs, CI)
+e4873926 2026-10-17 docs(v2): every issue-map row has a test verdict (351/351: GP 170, LIVE 2, REMOVED 110, N/A 69); 147 new cases in impl/14a; ADR-0003 exit gate updated
+7f6bb194 2026-10-16 docs(v2): DECISIONS-r9 - implementation-ready: Codex names and matcher, parser gaps, v1 archaeology to golden cases, F1-F8, memory spec questions, issue map fixed; intern loop closed
+9e3f0165 2026-10-16 docs(v2): DECISIONS-r8 - deny unranged Read of files over 16 KB (ranged Read always allowed); deny rules now stop 87.6% of large-output bytes (was 0.11%); synced ADR-0008, impl, TECH-SPEC, PRD, drafts
+69a586f3 2026-10-16 docs(v2): final red-team review - 26 claims: 3 hold (port only), 6 falsified, 17 not tested; deny/compaction/saving/memory measured on real transcripts and live Claude Code, Codex, OpenCode
+9b28b5a3 2026-10-16 docs(v2): ctx_execute description uses the 600000 ms timeout
+63f6a3d9 2026-10-16 docs(v2): DECISIONS-r7 - BM25 per scope + RRF k=60, no MMR, structural decision tag, timeline cursor; synced ADR-0009, impl, PRD, TECH-SPEC; CI smoke no longer overwrites results
+e4055925 2026-10-16 tickets(v2): memory retrieval eval - 90 real queries with structural gold, BM25+RRF best (recall@5 0.48 vs v1 0.27), MMR no gain
+5007a338 2026-10-16 tickets(v2): measure the memory retrieval algorithms (BM25, RRF, MMR, decision tag, timeline)
+9449cb47 2026-10-16 docs(v2): D6 - pointer line after compaction on hosts with their own summary (Claude Code), 2 KB state block elsewhere; compactSummary column, LV-COMPACT in M3
+18951cce 2026-10-16 docs(v2): measured resume quality on 20 real compaction points (keyless, Sonnet low); v2 block adds nothing on Claude Code, matches its summary at 1/10 the bytes
+9db2468d 2026-10-16 docs(v2): compaction + memory r6 - research, deterministic eval on 12 real cases (private data kept local), ADR-0009 kept, ctx_search sort:timeline + structural decision tag, docs synced
+75ad4ffe 2026-10-15 tickets(v2): plan to fix the impl-spec review findings with a review army
+d90d4c66 2026-10-15 docs(v2): line-by-line implementation spec (docs/v2/impl 00-15) and ADR-0018
+f704ae56 2026-10-15 docs(v2): ready for implementation - PRD rewritten to current design, TECH-SPEC r3 with implementation plan M0-M7, README as entry point, all ADRs accepted
+41593791 2026-10-15 docs(v2): r5 spikes measured and applied - Node 24.15.0 minimum, ctx_execute 600 s, ADR-0006 accepted after Opus/Sonnet re-probe
+ae651a1b 2026-10-15 review: tickets/spikes-r5/ADR-0006-reprobe.md
+52c48c66 2026-10-15 review: tickets/spikes-r5/S-TIMEOUT.md
+7a9aa739 2026-10-15 review: tickets/spikes-r5/S-NODE.md
+4b6bb423 2026-10-15 review: docs/v2/review/spikes-r5.workflow.js
+0e2f19f9 2026-10-15 docs(v2): fix-sync r4 - all review findings decided and applied, docs in sync (DECISIONS-r4, 9 tools everywhere, release skill runs KEEP-PASS + live Sonnet low)
+2cbfe7e4 2026-10-15 review: docs/v2/review/out/fix-r4/res-issues-0.json
+c6e516d3 2026-10-15 review: docs/v2/review/DECISIONS-r4.md
+e7bf95a2 2026-10-15 review: docs/v2/review/ISSUE-OUTCOMES-r4.md
+4857cab0 2026-10-15 review: docs/v2/review/fix-sync-r4b.workflow.js
+97d4b6dc 2026-10-15 review: .claude/skills/release/SKILL.md
+41297d1b 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-misc.json
+b37ffcb3 2026-10-15 review: docs/v2/review/ISSUE-OUTCOMES-r4.md
+69c520ce 2026-10-15 review: docs/v2/prompt/drafts.md
+f063fe74 2026-10-15 review: docs/v2/review/DECISIONS-r3.md
+607c7f8f 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-techspec.json
+1505506e 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-adr-d.json
+77cfbef8 2026-10-15 review: docs/v2/review/agent-issue-intake/.github/ISSUE_TEMPLATE/bug.yml
+f3741899 2026-10-15 review: docs/v2/review/agent-issue-intake/README.md
+f84b1265 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-adr-c.json
+3b7f49c5 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-adr-a.json
+5169453b 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-adr-b.json
+30c805de 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-readme.json
+a90362bd 2026-10-15 review: docs/v2/review/out/fix-r4/fixup-prd.json
+3e189ec7 2026-10-15 review: docs/v2/review/out/fix-r4/sync.json
+a19695af 2026-10-15 review: PRD-v2.md
+2d1daa39 2026-10-15 review: docs/v2/review/out/fix-r4/edit-techspec.json
+2133e675 2026-10-15 review: docs/v2/TECH-SPEC.md
+6752d97c 2026-10-15 review: docs/v2/review/out/fix-r4/edit-misc.json
+77034d08 2026-10-15 review: docs/v2/review/ISSUE-OUTCOMES-r4.md
+adba87b5 2026-10-15 review: docs/v2/prompt/drafts.md
+72c31dca 2026-10-15 review: docs/v2/review/DECISIONS-r3.md
+2e9f45d9 2026-10-15 review: docs/v2/review/out/fix-r4/edit-adr-d.json
+51c5ccc4 2026-10-15 review: docs/v2/review/agent-issue-intake/BODY-FORMAT.md
+1b8a715f 2026-10-15 review: docs/v2/review/agent-issue-intake/DO-NOT-SEND.md
+e6f1ed30 2026-10-15 review: docs/v2/review/agent-issue-intake/AGENT_ISSUE.md
+efef584d 2026-10-15 review: docs/v2/review/agent-issue-intake/README.md
+5ba53eb6 2026-10-15 review: docs/v2/adr/0017-e2e-every-step-and-v1-retention.md
+a5de7d59 2026-10-15 review: docs/v2/adr/0016-subagent-context-protection.md
+3a81af98 2026-10-15 review: docs/v2/adr/0015-readme-and-repo-cleanup.md
+19833fc1 2026-10-15 review: docs/v2/adr/0014-issue-forms-and-debug-report.md
+97f2f603 2026-10-15 review: docs/v2/review/out/fix-r4/edit-adr-a.json
+493ee4bd 2026-10-15 review: docs/v2/adr/0004-no-skills-mcp-instructions.md
+4e2f6d87 2026-10-15 review: docs/v2/adr/0003-e2e-only-golden-tests.md
+f91ba6aa 2026-10-15 review: docs/v2/adr/0002-single-db-git-distribution.md
+34ac1d53 2026-10-15 review: docs/v2/adr/0001-claude-code-reference-contract.md
+4ff383e8 2026-10-15 review: docs/v2/review/out/fix-r4/edit-adr-c.json
+7431f306 2026-10-15 review: docs/v2/adr/0013-release-automation.md
+678bc8f7 2026-10-15 review: docs/v2/adr/0012-keyless-live-harness.md
+389edd56 2026-10-15 review: docs/v2/adr/0011-release-and-v1-transition.md
+41430c83 2026-10-15 review: docs/v2/adr/0010-doctor-and-upgrade.md
+6082caf7 2026-10-15 review: docs/v2/review/out/fix-r4/edit-adr-b.json
+5e3e92ae 2026-10-15 review: docs/v2/adr/0009-compaction-and-memory.md
+2b337e56 2026-10-15 review: docs/v2/adr/0008-enforcement-rewrite-and-cap.md
+060f81a7 2026-10-15 review: docs/v2/adr/0007-mcp-2026-07-28.md
+10908455 2026-10-15 review: docs/v2/adr/0006-claude-code-tool-loading.md
+2997f369 2026-10-15 review: docs/v2/review/out/fix-r4/edit-readme.json
+7280c94e 2026-10-15 review: docs/v2/README.md
+884952f2 2026-10-15 review: docs/v2/review/out/fix-r4/edit-prd.json
+71adf56c 2026-10-15 review: PRD-v2.md
+5e138642 2026-10-15 review: docs/v2/review/out/fix-r4/plan.json
+cce2efbc 2026-10-15 review: docs/v2/review/DECISIONS-r4.md
+eb79c570 2026-10-15 review: docs/v2/review/out/fix-r4/res-docs-A.json
+35fc65f4 2026-10-15 review: docs/v2/review/out/fix-r4/res-issues-2.json
+194d2548 2026-10-15 review: docs/v2/review/out/fix-r4/res-issues-1.json
+e41dcfb7 2026-10-15 review: docs/v2/review/out/fix-r4/res-docs-B.json
+1423ba51 2026-10-15 review: docs/v2/review/review-r4-final.workflow.js
+d09f19a5 2026-10-15 review: docs/v2/review/fix-sync-r4.workflow.js
+992b5807 2026-10-15 review: docs/v2/review/out/r4/B/round2/critic/gaps.json
+504594b6 2026-10-15 review: docs/v2/review/out/r4/B/round2/review/qa.json
+56e6559b 2026-10-15 review: docs/v2/review/out/r4/B/round2/review/architect.json
+3fa09c33 2026-10-15 review: docs/v2/review/out/r4/B/round2/review/agent-issue-intake.json
+01a72a3a 2026-10-15 review: docs/v2/review/out/r4/B/round2/review/consistency.json
+12c41a2a 2026-10-15 review: docs/v2/review/out/r4/B/round2/review/v1-migration-sim.json
+c2f06820 2026-10-15 review: docs/v2/review/out/r4/B/round2/review/evidence.json
+1aacda6d 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/qa.json
+038d0b32 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/a-2-1.json
+86b2cae4 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/a-1-4.json
+654e9a99 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/a-1-7.json
+3252bacc 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/a-1-6.json
+095da6d8 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/a-1-5.json
+eb9e0538 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/a-1-0.json
+fcd20fbd 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/windows.json
+b14b162b 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/dx-docs.json
+81e72db3 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/security.json
+18dab413 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/architect.json
+441b2d53 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/algorithms.json
+3ebc8a9e 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/storage.json
+65eb3800 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/prompt.json
+1fd759fc 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-codex-cli.json
+d44de190 2026-10-15 docs(v2): r4 workflow resumes from pushed files, not the cache; fix previous-review inputs
+dc2ec722 2026-10-15 review: docs/v2/review/REVIEW-r4a.md
+1cdcbbc1 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/bottlenecks.json
+c444031e 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-zcode.json
+745bb496 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-pi.json
+83c2957b 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/hooks-perf.json
+f07056c2 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-opencode-2.json
+0de000e5 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/mcp.json
+682f8489 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-vs-code-copilot.json
+084ee9d2 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-qwen-code.json
+75307849 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-copilot-cli.json
+614928e0 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-claude-code.json
+f46f6372 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-kiro.json
+69734b0d 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/agent-gemini-cli.json
+b8a5ff28 2026-10-15 review: docs/v2/review/out/r4/B/round1/intern/q-1.json
+60896d26 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/consistency.json
+63b0bdc2 2026-10-15 review: docs/v2/review/out/r4/B/round1/review/evidence.json
+fdfd1d92 2026-10-15 review: docs/v2/review/ISSUE-OUTCOMES-r4.md
+c8257c90 2026-10-15 review: docs/v2/review/BOTTLENECKS-r4.md
+47f5c168 2026-10-15 review: docs/v2/review/out/r4/A/round2/critic/gaps.json
+15fa5aee 2026-10-15 review: docs/v2/review/out/r4/A/round2/review/issues-P2-2.json
+7024a86b 2026-10-15 review: docs/v2/review/out/r4/A/round2/review/issues-new.json
+c13f0d4c 2026-10-15 review: docs/v2/review/out/r4/A/round2/review/agent-opencode-2.json
+1b9b2df9 2026-10-15 review: docs/v2/review/out/r4/A/round2/review/agent-copilot-cli.json
+2920071a 2026-10-15 review: docs/v2/review/out/r4/A/round2/review/evidence.json
+f35c928d 2026-10-15 review: docs/v2/review/out/r4/A/round2/review/consistency.json
+0946d3b6 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/q-4.json
+8ef26d9f 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/q-3.json
+c8823b93 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/a-2-2.json
+c99408c6 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/a-2-4.json
+1f551c04 2026-10-14 review: docs/v2/review/out/r4/A/round1/votes/issues-P0-1-1-2.json
+dc35dd8d 2026-10-14 review: docs/v2/review/out/r4/A/round1/votes/issues-I1-1-0-2.json
+038a8137 2026-10-14 review: docs/v2/review/out/r4/A/round1/votes/mcp-0-2.json
+c2d90176 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/a-1-1.json
+f2306ff4 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/a-1-6.json
+76416e94 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P3-2.json
+08cf1dd3 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P2-1.json
+be6b8d87 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/a-1-0.json
+0b8c0dc0 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P3-1.json
+72cb3c55 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-new.json
+9e7cd37f 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I3-1.json
+597b4a36 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P1-2.json
+4e459b1c 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P0-1.json
+b6d42ff5 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P1-1.json
+2420713f 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I3-2.json
+b6280de5 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I2-2.json
+e43360f5 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-P0-2.json
+289dff5b 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I2-1.json
+6f11a468 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I1-2.json
+e32851c0 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I1-1.json
+e25c3fdb 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I0-2.json
+3cfc22e1 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/issues-I0-1.json
+4cd77a34 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-issue-intake.json
+90e6efbc 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/v1-migration-sim.json
+3bf6f704 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/release-premortem.json
+1dd86900 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/windows.json
+8beb4c64 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/dx-docs.json
+0a8b301d 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/qa.json
+feac9ad6 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/prompt.json
+c8d4d707 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/security.json
+664da0ff 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/hooks-perf.json
+1ba6ccec 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/storage.json
+aa2a8e0c 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/bottlenecks.json
+25952f54 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/algorithms.json
+56bdbfcc 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-zcode.json
+8d601817 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-vs-code-copilot.json
+71f7a604 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-pi.json
+c5ac930a 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-qwen-code.json
+271141da 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-kiro.json
+98cf68f6 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-copilot-cli.json
+2de8d081 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-claude-code.json
+e23ccacf 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-codex-cli.json
+5e1d46b3 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/agent-gemini-cli.json
+bfc1bf23 2026-10-14 review: docs/v2/review/out/r4/A/round1/intern/q-1.json
+f2fb9057 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/mcp.json
+313b35e9 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/evidence.json
+4981c074 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/architect.json
+04c7accc 2026-10-14 review: docs/v2/review/out/r4/A/round1/review/consistency.json
+4d5355e8 2026-10-14 docs(v2): review army r4 (all agents Sonnet low, deep past-issue analysis with regression chains)
+db8a9ce2 2026-10-14 docs(v2): apply r3 decisions Q1-Q19 to PRD, TECH-SPEC, ADRs; ADR-0017 E2E every step on Sonnet low + v1 retention; keyless step harness with 2 green cases
+8e3bf7c1 2026-10-14 review: docs/v2/review/DECISIONS-r3.md
+f7991987 2026-10-14 review: docs/v2/review/out/r3l/owner-questions.json
+7586083b 2026-10-14 review: docs/v2/review/OWNER-QUESTIONS-r3.md
+da603d00 2026-10-14 review: docs/v2/review/out/r3l/refire.json
+658707f5 2026-10-14 review: docs/v2/review/out/r3l/synth-issues.json
+a704ecf8 2026-10-14 review: docs/v2/review/out/r3l/synth-bottlenecks.json
+037a1edd 2026-10-14 review: docs/v2/review/ISSUE-OUTCOMES-r3.md
+489f764b 2026-10-14 review: docs/v2/review/BOTTLENECKS-r3.md
+db55c434 2026-10-14 review: docs/v2/review/out/r3l/synth-review.json
+741ce1d5 2026-10-14 review: docs/v2/review/REVIEW-r3.md
+ecc3056b 2026-10-14 review: docs/v2/review/out/r3l/verify-0.json
+ab8e5db5 2026-10-14 review: docs/v2/review/out/r3l/verify-1.json
+6dac3eb7 2026-10-14 review: docs/v2/review/out/r3l/staff-architect.json
+5846360c 2026-10-14 review: docs/v2/review/out/r3l/staff-enforcement.json
+9f3dde20 2026-10-14 review: docs/v2/review/out/r3l/staff-storage-release.json
+63ef0580 2026-10-14 review: docs/v2/review/out/r3l/issues-I.json
+3003142d 2026-10-14 review: docs/v2/review/out/r3l/intake.json
+13e24b96 2026-10-14 review: docs/v2/review/agent-issue-intake/issue-intake-act.mjs
+f3268f5e 2026-10-14 review: docs/v2/review/agent-issue-intake/issue-intake.mjs
+8b13432a 2026-10-14 review: docs/v2/review/agent-issue-intake/issue-intake.yml
+63337ef6 2026-10-14 review: docs/v2/review/agent-issue-intake/VALIDATION.md
+edb4c086 2026-10-14 review: docs/v2/review/out/r3l/enforcement.json
+1165c2eb 2026-10-14 review: docs/v2/review/agent-issue-intake/DO-NOT-SEND.md
+84b00032 2026-10-14 review: docs/v2/review/agent-issue-intake/BODY-FORMAT.md
+a18aed26 2026-10-14 review: docs/v2/review/agent-issue-intake/AGENT_ISSUE.md
+136dcf53 2026-10-14 review: docs/v2/review/out/r3l/issues-P.json
+8b072f13 2026-10-14 review: docs/v2/review/out/r3l/bottlenecks.json
+968fe70d 2026-10-14 review: docs/v2/review/out/r3l/intern-q.json
+47b8ebad 2026-10-14 docs(v2): lean r3 review workflow (~16 agents, Sonnet/Opus low)
+be72ca9f 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/agent-vs-code-copilot.json
+06238086 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/agent-qwen-code.json
+416e34b9 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/agent-copilot-cli.json
+383c0398 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/agent-kiro.json
+3bf06a37 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/architect.json
+125fc27d 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/agent-codex-cli.json
+fcfd19b0 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/agent-claude-code.json
+b689159e 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/evidence.json
+2be36bca 2026-10-14 review: docs/v2/review/out/r3/A/round1/review/mcp.json
+9b6e85dc 2026-10-14 review: docs/v2/review/out/r3/A/round1/intern/q-1.json
+136d3534 2026-10-14 docs(v2): review army r3 (two passes, per-item archaeology, bottlenecks, intern loop, owner question tree)
+652899c5 2026-10-14 review: docs/v2/review/RELEASE-AND-MIGRATION-r2.md
+55f2728f 2026-10-14 review: docs/v2/review/ISSUE-OUTCOMES-r2.md
+46e9d866 2026-10-14 review: docs/v2/review/REVIEW-r2.md
+04a134fb 2026-10-14 review: docs/v2/review/out/r2/round1/persist/agent-issue-intake-result.json
+8d195745 2026-10-14 review: docs/v2/review/INTERN-QA-r2.md
+db7cab74 2026-10-14 review: docs/v2/review/agent-issue-intake/README.md
+aeaa9261 2026-10-14 review: docs/v2/review/agent-issue-intake/CONTRIBUTING.md
+7abc1da4 2026-10-14 review: docs/v2/review/agent-issue-intake/.github/scripts/issue-intake-act.mjs
+190862c7 2026-10-14 review: docs/v2/review/agent-issue-intake/.github/scripts/issue-intake.mjs
+59c5caaa 2026-10-14 review: docs/v2/review/agent-issue-intake/.github/workflows/issue-intake.yml
+684e2ea8 2026-10-14 review: docs/v2/review/agent-issue-intake/.github/ISSUE_TEMPLATE/config.yml
+70193c46 2026-10-14 review: docs/v2/review/agent-issue-intake/.github/ISSUE_TEMPLATE/bug.yml
+9cd87857 2026-10-14 review: docs/v2/review/agent-issue-intake/.github/AGENT_ISSUE.md
+00ecd0d7 2026-10-14 review: docs/v2/review/TEST-TRIAGE-r2.md
+1c0f8550 2026-10-14 review: docs/v2/review/out/r2/verify/blockers-1.json
+62ca0636 2026-10-14 review: docs/v2/review/out/r2/verify/blockers-0.json
+77a827fb 2026-10-14 review: docs/v2/review/out/r2/verify/blockers-3.json
+6938cfe4 2026-10-14 review: docs/v2/review/out/r2/verify/blockers-2.json
+a4ecfa5b 2026-10-14 review: docs/v2/review/out/r2/round1/intern/qa.json
+34b80449 2026-10-14 review: docs/v2/review/out/r2/round1/review/tests-1.json
+8fea2f5e 2026-10-14 review: docs/v2/review/out/r2/round1/review/tests-2.json
+08ececb1 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-P1.json
+857d0057 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-P3.json
+97b70365 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-new.json
+ca22fc31 2026-10-14 docs(v2): low-token review-lite workflow reusing saved round-1 results
+454aac8c 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-P2.json
+7b440891 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-I3.json
+25147226 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-I1.json
+175a5c2e 2026-10-14 review: docs/v2/review/out/r2/round1/review/v1-migration-sim.json
+9bb3b9d1 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-I1.json
+2044952d 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-I2.json
+9965f8be 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-P0.json
+872b2c84 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-issue-form.json
+fb72ed3d 2026-10-14 review: docs/v2/review/out/r2/round1/review/issues-I0.json
+41fff459 2026-10-14 review: docs/v2/review/out/r2/round1/review/security.json
+f39d3e28 2026-10-14 review: docs/v2/review/out/r2/round1/review/release-premortem.json
+610c58b5 2026-10-14 review: docs/v2/review/out/r2/round1/review/windows.json
+af3b35a4 2026-10-14 review: docs/v2/review/out/r2/round1/review/dx-docs.json
+ad4e089c 2026-10-14 review: docs/v2/review/out/r2/round1/review/prompt.json
+2f54e284 2026-10-14 review: docs/v2/review/out/r2/round1/review/qa.json
+43afdb08 2026-10-14 review: docs/v2/review/out/r2/round1/review/algorithms.json
+9aebf588 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-gemini-cli.json
+7d7aa3f4 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-pi.json
+a232e842 2026-10-14 review: docs/v2/review/out/r2/round1/review/hooks-perf.json
+fd498eff 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-qwen-code.json
+317242fe 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-opencode-2.json
+dc3a4966 2026-10-14 review: docs/v2/review/out/r2/round1/review/storage.json
+57cb5442 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-zcode.json
+f08f81c9 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-vs-code-copilot.json
+212b81f0 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-kiro.json
+51243aa2 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-copilot-cli.json
+c5afe97a 2026-10-14 review: docs/v2/review/out/r2/round1/review/evidence.json
+ee914bf7 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-claude-code.json
+21cbf21e 2026-10-14 review: docs/v2/review/out/r2/round1/review/consistency.json
+ac25a4b5 2026-10-14 review: docs/v2/review/out/r2/round1/review/agent-codex-cli.json

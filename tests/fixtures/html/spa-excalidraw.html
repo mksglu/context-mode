@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Excalidraw Whiteboard</title><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,shrink-to-fit=no"/><meta name="referrer" content="origin"/><meta name="mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#121212"/><meta name="title" content="Free, collaborative whiteboard • Hand-drawn look & feel | Excalidraw"/><meta name="description" content="Excalidraw is a virtual collaborative whiteboard tool that lets you easily sketch diagrams that have a hand-drawn feel to them."/><meta name="image" content="https://excalidraw.com/og-image-3.png"/><meta property="og:site_name" content="Excalidraw"/><meta property="og:type" content="website"/><meta property="og:url" content="https://excalidraw.com"/><meta property="og:title" content="Excalidraw — Collaborative whiteboarding made easy"/><meta property="og:image:alt" content="Excalidraw logo"/><meta property="og:description" content="Excalidraw is a virtual collaborative whiteboard tool that lets you easily sketch diagrams that have a hand-drawn feel to them."/><meta property="og:image" content="https://excalidraw.com/og-image-3.png"/><meta property="twitter:card" content="summary_large_image"/><meta property="twitter:site" content="@excalidraw"/><meta property="twitter:url" content="https://excalidraw.com"/><meta property="twitter:title" content="Excalidraw — Collaborative whiteboarding made easy"/><meta property="twitter:description" content="Excalidraw is a virtual collaborative whiteboard tool that lets you easily sketch diagrams that have a hand-drawn feel to them."/><meta property="twitter:image" content="https://excalidraw.com/og-image-3.png"/><link rel="canonical" href="https://excalidraw.com"/><script>try {
+        function setTheme(theme) {
+          if (theme === "dark") {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        }
+
+        function getTheme() {
+          const theme = window.localStorage.getItem("excalidraw-theme");
+
+          if (theme && theme === "system") {
+            return window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          } else {
+            return theme || "light";
+          }
+        }
+
+        setTheme(getTheme());
+      } catch (e) {
+        console.error("Error setting dark mode", e);
+      }</script><style>html.dark{background-color:#121212;color:#fff}</style><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><script>// Redirect Excalidraw+ users which have auto-redirect enabled.
+      //
+      // Redirect only the bare root path, so link/room/library urls are not
+      // redirected.
+      //
+      // Putting into index.html for best performance (can't redirect on server
+      // due to location.hash checks).
+      if (
+        window.location.pathname === "/" &&
+        !window.location.hash &&
+        !window.location.search &&
+        // if its present redirect
+        document.cookie.includes("excplus-autoredirect=true")
+      ) {
+        window.location.href = "https://app.excalidraw.com";
+      }</script><script>// point into our CDN in prod, fallback to root (excalidraw.com) domain in case of issues
+        window.EXCALIDRAW_ASSET_PATH = [
+          "https://excalidraw.nyc3.cdn.digitaloceanspaces.com/oss/",
+          "/",
+        ];</script><link rel="preload" href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/oss/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2" as="font" type="font/woff2" crossorigin="anonymous"/><link rel="preload" href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/oss/fonts/Nunito/Nunito-Regular-XRXI3I6Li01BKofiOc5wtlZ2di8HDIkhdTQ3j6zbXWjgeg.woff2" as="font" type="font/woff2" crossorigin="anonymous"/><link rel="preload" href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/oss/fonts/Assistant/Assistant-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous"/><link rel="preload" href="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/oss/fonts/ComicShanns/ComicShanns-Regular-279a7b317d12eb88de06167bd672b4b4.woff2" as="font" type="font/woff2" crossorigin="anonymous"/><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"/><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"/><meta name="version" content="2026-10-27T16:39:50Z-4ce8305"/><script>// setting this so that libraries installation reuses this window tab.
+      window.name = "_excalidraw";</script><style>body,html{margin:0;-webkit-text-size-adjust:100%;width:100%;height:100%;overflow:hidden}.visually-hidden{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap;user-select:none}#root{height:100%;-webkit-touch-callout:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}@media screen and (min-width:1200px){#root{-webkit-touch-callout:default;-webkit-user-select:auto;-khtml-user-select:auto;-moz-user-select:auto;-ms-user-select:auto;user-select:auto}}</style><script type="module" crossorigin src="/assets/index-DVAv9QEc.js"></script><link rel="modulepreload" crossorigin href="/assets/bundler-helpers-DA6W-a70.js"><link rel="stylesheet" crossorigin href="/assets/index-D0I-IbtP.css"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><link rel="manifest" href="/manifest.webmanifest"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><header><h1 class="visually-hidden">Excalidraw</h1></header><div id="root"></div><script>// need to load this script dynamically bcs. of iframe embed tracking
+      var scriptEle = document.createElement("script");
+      scriptEle.setAttribute(
+        "src",
+        "https://scripts.simpleanalyticscdn.com/latest.js",
+      );
+      scriptEle.setAttribute("type", "text/javascript");
+      scriptEle.setAttribute("defer", true);
+      scriptEle.setAttribute("async", true);
+      // if iframe
+      if (window.self !== window.top) {
+        scriptEle.setAttribute("data-auto-collect", true);
+      }
+
+      document.body.appendChild(scriptEle);
+
+      // if iframe
+      if (window.self !== window.top) {
+        scriptEle.addEventListener("load", () => {
+          if (window.sa_pageview) {
+            window.window.sa_event(action, {
+              category: "iframe",
+              label: "embed",
+              value: window.location.pathname,
+            });
+          }
+        });
+      }</script></body></html>

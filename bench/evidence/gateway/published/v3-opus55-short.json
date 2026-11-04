@@ -1,0 +1,2370 @@
+{
+ "analysis_method": "Every valid measured pair, no outlier dropped. % = mean(Context Mode - plain) / mean(plain), with the 95% t interval. Verdict: \"less\" when the whole interval is below zero, \"more\" when above, else \"same\". Gateway wins: pairs where Context Mode cost less.",
+ "arms": {"gateway": "Claude Code talks to Anthropic through Context Mode.", "plain": "Claude Code talks to Anthropic direct."},
+ "client": "Claude Code 2.1.283",
+ "cost_basis": "Cost in US dollars at API list price, both arms: list price applied to the token counts Anthropic returned for each call. The runs used a claude.ai login, which has no per-token invoice. Plain: Claude Code's own total. Context Mode: the gateway's per-call record for the run's sessions, hidden calls included, each call at the list price of the model it ran on, checked per run against Claude Code's own figure.",
+ "coverage": {"arms": 176, "arms_recomputed": 88, "arms_with_client_figure": 176, "calls_known_total": 527, "calls_with_tokens": 176},
+ "date": "2026-09-29",
+ "deployed_commits": ["6e2b65d565aa68f3eacdcece77fe72721c18573f","a809caf0741cbd4426f0ca49b10b692018c0b03c","ddfaf557d3e79a4d97ecbc4708d2e09cd09e468a"],
+ "gateway_commit": "408333a48d082830f5813b3f539ec03993830a89",
+ "harness": "start-cost-ab",
+ "legend": {"col.cr": "cache read tokens", "col.cw1h": "cache write tokens, 1 hour lifetime", "col.cw5": "cache write tokens, 5 minute lifetime", "col.cwx": "cache write tokens whose lifetime was not saved: usd_recomputed prices them at the 1 hour rate (Claude Code's main thread), usd_recomputed_low at the 5 minute rate", "col.in": "input tokens not read from or written to the cache", "col.missing": "a token column left out of a block is all zeros; model indexes into models", "col.out": "output tokens; null = not saved per call", "from.client_first_call": "Claude Code's stream: the first call's input-side usage only", "from.ledger_first_row": "the gateway ledger: the first row of the session only", "rest.after_first_call": "the gateway ledger's session totals minus the first row", "why.first_call_only": "Only the first call's input-side tokens were saved for this arm. The run folders with the other calls were deleted after the run."},
+ "model": "claude-opus-5-5",
+ "prices": {
+  "aliases": {"claude-haiku-4-5-20251001": "claude-haiku-4-5"},
+  "as_of": "2026-09-29",
+  "models": {
+   "claude-haiku-4-5": {"cr": 0.1, "cw1h": 2, "cw5": 1.25, "in": 1, "out": 5},
+   "claude-opus-5-5": {"cr": 0.2, "cw1h": 8, "cw5": 5, "in": 4, "out": 20}
+  },
+  "source_url": "https://www.anthropic.com/pricing",
+  "unit": "USD per million tokens"
+ },
+ "schema": "context-mode.benchmark-evidence/2",
+ "source_file": "v3-opus55-short.json",
+ "warmup_pairs": 1,
+ "workloads": [
+  {
+   "analysis": {"gateway_usd_mean": 0.06832, "gateway_wins": 15, "n": 16, "pct": -21.8, "pct_ci95": [-27.7,-15.8], "plain_usd_mean": 0.08731, "success_gateway": "16/16", "success_plain": "16/16", "verdict": "less"},
+   "id": "tests",
+   "invalid_attempts": 2,
+   "label": "npm test fix loop, short",
+   "pairs": [
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2314], "in": [1164], "model": [0], "models": ["claude-opus-5-5"], "out": [177]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32235], "cwx": [3126], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [279], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.066238,
+      "usd_client": 0.0662378,
+      "usd_recomputed": 0.066238,
+      "usd_recomputed_low": 0.05686
+     },
+     "pair": 1,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0899218,
+      "usd_client": 0.08992180000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2315], "in": [1134], "model": [0], "models": ["claude-opus-5-5"], "out": [164]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [50320], "cwx": [3629], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [465], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.077235,
+      "usd_client": 0.0772348,
+      "usd_recomputed": 0.077235,
+      "usd_recomputed_low": 0.066348
+     },
+     "pair": 2,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0911418,
+      "usd_client": 0.09114180000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [1034], "model": [0], "models": ["claude-opus-5-5"], "out": [154]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32244], "cwx": [3105], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [232], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.064144,
+      "usd_client": 0.0641436,
+      "usd_recomputed": 0.064144,
+      "usd_recomputed_low": 0.054829
+     },
+     "pair": 3,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.08934,
+      "usd_client": 0.08934,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [1133], "model": [0], "models": ["claude-opus-5-5"], "out": [163]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32262], "cwx": [3130], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [267], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.065623,
+      "usd_client": 0.06562319999999999,
+      "usd_recomputed": 0.065623,
+      "usd_recomputed_low": 0.056233
+     },
+     "pair": 4,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0914054,
+      "usd_client": 0.09140539999999998,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2312], "in": [1137], "model": [0], "models": ["claude-opus-5-5"], "out": [139]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32848], "cwx": [3862], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [294], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.071664,
+      "usd_client": 0.0716644,
+      "usd_recomputed": 0.071664,
+      "usd_recomputed_low": 0.060078
+     },
+     "pair": 5,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5562], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0894516,
+      "usd_client": 0.0894516,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [130]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32776], "cwx": [3651], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [271], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.067442,
+      "usd_client": 0.067442,
+      "usd_recomputed": 0.067442,
+      "usd_recomputed_low": 0.056489
+     },
+     "pair": 6,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.088324,
+      "usd_client": 0.088324,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2314], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [146]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32809], "cwx": [3680], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [282], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.068229,
+      "usd_client": 0.0682286,
+      "usd_recomputed": 0.068229,
+      "usd_recomputed_low": 0.057189
+     },
+     "pair": 7,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5562], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0887034,
+      "usd_client": 0.08870340000000002,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2311], "in": [1474], "model": [0], "models": ["claude-opus-5-5"], "out": [184]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [50358], "cwx": [3719], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [527], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.08093,
+      "usd_client": 0.0809304,
+      "usd_recomputed": 0.08093,
+      "usd_recomputed_low": 0.069773
+     },
+     "pair": 8,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5562], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0897716,
+      "usd_client": 0.08977160000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [1137], "model": [0], "models": ["claude-opus-5-5"], "out": [133]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32787], "cwx": [3648], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [248], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.068908,
+      "usd_client": 0.0689082,
+      "usd_recomputed": 0.068908,
+      "usd_recomputed_low": 0.057964
+     },
+     "pair": 9,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5564], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.089962,
+      "usd_client": 0.08996200000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [1524], "model": [0], "models": ["claude-opus-5-5"], "out": [139]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32850], "cwx": [3742], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [269], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.071761,
+      "usd_client": 0.0717608,
+      "usd_recomputed": 0.071761,
+      "usd_recomputed_low": 0.060535
+     },
+     "pair": 10,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5390], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.068724,
+      "usd_client": 0.068724,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [1136], "model": [0], "models": ["claude-opus-5-5"], "out": [157]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32264], "cwx": [3125], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [257], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.065276,
+      "usd_client": 0.0652756,
+      "usd_recomputed": 0.065276,
+      "usd_recomputed_low": 0.055901
+     },
+     "pair": 11,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5390], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.06987,
+      "usd_client": 0.06987,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2312], "in": [1526], "model": [0], "models": ["claude-opus-5-5"], "out": [130]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32773], "cwx": [3648], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [253], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.070493,
+      "usd_client": 0.07049339999999998,
+      "usd_recomputed": 0.070493,
+      "usd_recomputed_low": 0.059549
+     },
+     "pair": 12,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0901158,
+      "usd_client": 0.09011580000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [130]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32776], "cwx": [3637], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [264], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.06719,
+      "usd_client": 0.06719,
+      "usd_recomputed": 0.06719,
+      "usd_recomputed_low": 0.056279
+     },
+     "pair": 13,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0905378,
+      "usd_client": 0.0905378,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2140], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [130]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30458], "cwx": [1717], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [275], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.050194,
+      "usd_client": 0.0501944,
+      "usd_recomputed": 0.050194,
+      "usd_recomputed_low": 0.045043
+     },
+     "pair": 14,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0906696,
+      "usd_client": 0.0906696,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2312], "in": [1475], "model": [0], "models": ["claude-opus-5-5"], "out": [133]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32785], "cwx": [3660], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [261], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.070608,
+      "usd_client": 0.0706078,
+      "usd_recomputed": 0.070608,
+      "usd_recomputed_low": 0.059628
+     },
+     "pair": 15,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5563], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.08828,
+      "usd_client": 0.08828,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2313], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [130]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32776], "cwx": [3651], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [257], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.067162,
+      "usd_client": 0.06716200000000001,
+      "usd_recomputed": 0.067162,
+      "usd_recomputed_low": 0.056209
+     },
+     "pair": 16,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5562], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0907452,
+      "usd_client": 0.09074520000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    }
+   ],
+   "pairs_planned": 16
+  },
+  {
+   "analysis": {"gateway_usd_mean": 0.06751, "gateway_wins": 12, "n": 12, "pct": -21.4, "pct_ci95": [-29.9,-12.9], "plain_usd_mean": 0.08588, "success_gateway": "12/12", "success_plain": "12/12", "verdict": "less"},
+   "id": "json",
+   "invalid_attempts": 0,
+   "label": "One large JSON file",
+   "pairs": [
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2128], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30624], "cwx": [1782], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [117], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.045968,
+      "usd_client": 0.0459676,
+      "usd_recomputed": 0.045968,
+      "usd_recomputed_low": 0.040622
+     },
+     "pair": 1,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0864188,
+      "usd_client": 0.08641879999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2128], "in": [1232], "model": [0], "models": ["claude-opus-5-5"], "out": [152]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30623], "cwx": [1818], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [156], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.051267,
+      "usd_client": 0.051267400000000005,
+      "usd_recomputed": 0.051267,
+      "usd_recomputed_low": 0.045813
+     },
+     "pair": 2,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5549], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0866552,
+      "usd_client": 0.0866552,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2128], "in": [1232], "model": [0], "models": ["claude-opus-5-5"], "out": [152]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30629], "cwx": [1884], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [187], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.052417,
+      "usd_client": 0.05241660000000001,
+      "usd_recomputed": 0.052417,
+      "usd_recomputed_low": 0.046765
+     },
+     "pair": 3,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5377], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0677306,
+      "usd_client": 0.06773059999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [1232], "model": [0], "models": ["claude-opus-5-5"], "out": [132]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 5, "sum_complete": true},
+      "rest": {"cr": [69811], "cwx": [4322], "in": [10], "model": [0], "models": ["claude-opus-5-5"], "n": [4], "out": [225], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 5,
+      "usd": 0.081525,
+      "usd_client": 0.081525,
+      "usd_recomputed": 0.081525,
+      "usd_recomputed_low": 0.068559
+     },
+     "pair": 4,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.086427,
+      "usd_client": 0.086427,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [935], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 5, "sum_complete": true},
+      "rest": {"cr": [69812], "cwx": [4466], "in": [10], "model": [0], "models": ["claude-opus-5-5"], "n": [4], "out": [238], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 5,
+      "usd": 0.080189,
+      "usd_client": 0.08018920000000002,
+      "usd_recomputed": 0.080189,
+      "usd_recomputed_low": 0.066791
+     },
+     "pair": 5,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0864352,
+      "usd_client": 0.0864352,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [1050], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51379], "cwx": [3930], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [227], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.072447,
+      "usd_client": 0.0724466,
+      "usd_recomputed": 0.072447,
+      "usd_recomputed_low": 0.060657
+     },
+     "pair": 6,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0865584,
+      "usd_client": 0.0865584,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [1050], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51374], "cwx": [3956], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [266], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.073434,
+      "usd_client": 0.0734336,
+      "usd_recomputed": 0.073434,
+      "usd_recomputed_low": 0.061566
+     },
+     "pair": 7,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5552], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.0976054,
+      "usd_client": 0.09760539999999998,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [1281], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32941], "cwx": [3732], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [96], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.065471,
+      "usd_client": 0.065471,
+      "usd_recomputed": 0.065471,
+      "usd_recomputed_low": 0.054275
+     },
+     "pair": 8,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5549], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0865828,
+      "usd_client": 0.0865828,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2300], "in": [1409], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 5, "sum_complete": true},
+      "rest": {"cr": [69821], "cwx": [4473], "in": [10], "model": [0], "models": ["claude-opus-5-5"], "n": [4], "out": [244], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 5,
+      "usd": 0.082255,
+      "usd_client": 0.08225500000000001,
+      "usd_recomputed": 0.082255,
+      "usd_recomputed_low": 0.068836
+     },
+     "pair": 9,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0865912,
+      "usd_client": 0.08659120000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32945], "cwx": [3796], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [156], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.064716,
+      "usd_client": 0.0647158,
+      "usd_recomputed": 0.064716,
+      "usd_recomputed_low": 0.053328
+     },
+     "pair": 10,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5549], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0864186,
+      "usd_client": 0.0864186,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51491], "cwx": [4085], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [405], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.075725,
+      "usd_client": 0.07572500000000001,
+      "usd_recomputed": 0.075725,
+      "usd_recomputed_low": 0.06347
+     },
+     "pair": 11,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0865502,
+      "usd_client": 0.08655020000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2301], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32949], "cwx": [3800], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [156], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.064749,
+      "usd_client": 0.06474859999999999,
+      "usd_recomputed": 0.064749,
+      "usd_recomputed_low": 0.053349
+     },
+     "pair": 12,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5550], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0865304,
+      "usd_client": 0.0865304,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    }
+   ],
+   "pairs_planned": 12
+  },
+  {
+   "analysis": {"gateway_usd_mean": 0.07051, "gateway_wins": 15, "n": 16, "pct": -22.4, "pct_ci95": [-30.2,-14.7], "plain_usd_mean": 0.09089, "success_gateway": "16/16", "success_plain": "16/16", "verdict": "less"},
+   "id": "log",
+   "invalid_attempts": 2,
+   "label": "One large log",
+   "pairs": [
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [1110], "model": [0], "models": ["claude-opus-5-5"], "out": [78]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33038], "cwx": [3966], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [98], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.067038,
+      "usd_client": 0.0670384,
+      "usd_recomputed": 0.067038,
+      "usd_recomputed_low": 0.05514
+     },
+     "pair": 1,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.1006856,
+      "usd_client": 0.10068560000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51818], "cwx": [4354], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [571], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.081102,
+      "usd_client": 0.0811024,
+      "usd_recomputed": 0.081102,
+      "usd_recomputed_low": 0.06804
+     },
+     "pair": 2,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.1018778,
+      "usd_client": 0.10187779999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33043], "cwx": [3971], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [135], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.065555,
+      "usd_client": 0.0655554,
+      "usd_recomputed": 0.065555,
+      "usd_recomputed_low": 0.053642
+     },
+     "pair": 3,
+     "plain": {
+      "calls": {"cr": [10010], "cw1h": [5135], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.0804838,
+      "usd_client": 0.0804838,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [1084], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51642], "cwx": [4255], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [339], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.077315,
+      "usd_client": 0.0773152,
+      "usd_recomputed": 0.077315,
+      "usd_recomputed_low": 0.06455
+     },
+     "pair": 4,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.104672,
+      "usd_client": 0.10467200000000002,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51885], "cwx": [4573], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [762], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.086688,
+      "usd_client": 0.0866878,
+      "usd_recomputed": 0.086688,
+      "usd_recomputed_low": 0.072969
+     },
+     "pair": 5,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5356], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.0794418,
+      "usd_client": 0.0794418,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [1136], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33042], "cwx": [3978], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [184], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.068479,
+      "usd_client": 0.0684792,
+      "usd_recomputed": 0.068479,
+      "usd_recomputed_low": 0.056545
+     },
+     "pair": 6,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5528], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.093175,
+      "usd_client": 0.093175,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [1133], "model": [0], "models": ["claude-opus-5-5"], "out": [122]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51693], "cwx": [4254], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [366], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.079413,
+      "usd_client": 0.07941340000000001,
+      "usd_recomputed": 0.079413,
+      "usd_recomputed_low": 0.066651
+     },
+     "pair": 7,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0886978,
+      "usd_client": 0.0886978,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2280], "in": [1105], "model": [0], "models": ["claude-opus-5-5"], "out": [85]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51651], "cwx": [4147], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [309], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.076549,
+      "usd_client": 0.07654899999999999,
+      "usd_recomputed": 0.076549,
+      "usd_recomputed_low": 0.064108
+     },
+     "pair": 8,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.0990908,
+      "usd_client": 0.0990908,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2107], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30715], "cwx": [2361], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [336], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.054838,
+      "usd_client": 0.054837800000000006,
+      "usd_recomputed": 0.054838,
+      "usd_recomputed_low": 0.047755
+     },
+     "pair": 9,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5531], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.0992832,
+      "usd_client": 0.0992832,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [1136], "model": [0], "models": ["claude-opus-5-5"], "out": [125]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33040], "cwx": [4082], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [254], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.072131,
+      "usd_client": 0.07213080000000001,
+      "usd_recomputed": 0.072131,
+      "usd_recomputed_low": 0.059885
+     },
+     "pair": 10,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5531], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0884136,
+      "usd_client": 0.0884136,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2108], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30723], "cwx": [2205], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [345], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.053771,
+      "usd_client": 0.0537714,
+      "usd_recomputed": 0.053771,
+      "usd_recomputed_low": 0.047156
+     },
+     "pair": 11,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5357], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.088351,
+      "usd_client": 0.088351,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2280], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51645], "cwx": [4285], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [445], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.077988,
+      "usd_client": 0.0779878,
+      "usd_recomputed": 0.077988,
+      "usd_recomputed_low": 0.065133
+     },
+     "pair": 12,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5529], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0880376,
+      "usd_client": 0.08803760000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [1550], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33038], "cwx": [3983], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [290], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.072294,
+      "usd_client": 0.07229440000000001,
+      "usd_recomputed": 0.072294,
+      "usd_recomputed_low": 0.060345
+     },
+     "pair": 13,
+     "plain": {
+      "calls": {"cr": [10010], "cw1h": [5135], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0729368,
+      "usd_client": 0.0729368,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33040], "cwx": [4053], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [220], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.067911,
+      "usd_client": 0.0679108,
+      "usd_recomputed": 0.067911,
+      "usd_recomputed_low": 0.055752
+     },
+     "pair": 14,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5529], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0896494,
+      "usd_client": 0.0896494,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2281], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [33043], "cwx": [4171], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [384], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.072135,
+      "usd_client": 0.07213539999999999,
+      "usd_recomputed": 0.072135,
+      "usd_recomputed_low": 0.059622
+     },
+     "pair": 15,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0914132,
+      "usd_client": 0.0914132,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2109], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [54]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30724], "cwx": [2351], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [345], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.054956,
+      "usd_client": 0.05495560000000001,
+      "usd_recomputed": 0.054956,
+      "usd_recomputed_low": 0.047903
+     },
+     "pair": 16,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5530], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0879572,
+      "usd_client": 0.0879572,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    }
+   ],
+   "pairs_planned": 16
+  },
+  {
+   "analysis": {"gateway_usd_mean": 0.05296, "gateway_wins": 15, "n": 16, "pct": -25.2, "pct_ci95": [-33.9,-16.5], "plain_usd_mean": 0.07079, "success_gateway": "16/16", "success_plain": "16/16", "verdict": "less"},
+   "id": "git",
+   "invalid_attempts": 2,
+   "label": "Repo history question (git log, 320 commits)",
+   "pairs": [
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2489], "in": [1121], "model": [0], "models": ["claude-opus-5-5"], "out": [104]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14843], "cwx": [2796], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [95], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.056199,
+      "usd_client": 0.0561994,
+      "usd_recomputed": 0.056199,
+      "usd_recomputed_low": 0.047811
+     },
+     "pair": 1,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0764628,
+      "usd_client": 0.0764628,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2393], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [73]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14747], "cwx": [821], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [36], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.035976,
+      "usd_client": 0.0359762,
+      "usd_recomputed": 0.035976,
+      "usd_recomputed_low": 0.033513
+     },
+     "pair": 2,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5739], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.074839,
+      "usd_client": 0.07483899999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2488], "in": [1030], "model": [0], "models": ["claude-opus-5-5"], "out": [106]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14842], "cwx": [2853], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [66], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.055743,
+      "usd_client": 0.05574320000000001,
+      "usd_recomputed": 0.055743,
+      "usd_recomputed_low": 0.047184
+     },
+     "pair": 3,
+     "plain": {
+      "calls": {"cr": [9977], "cw1h": [5421], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.053991,
+      "usd_client": 0.053991,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2395], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [137]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14749], "cwx": [885], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [37], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.037805,
+      "usd_client": 0.0378046,
+      "usd_recomputed": 0.037805,
+      "usd_recomputed_low": 0.03515
+     },
+     "pair": 4,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5737], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0756066,
+      "usd_client": 0.0756066,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2488], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [99]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14842], "cwx": [2846], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [33], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.053423,
+      "usd_client": 0.053423200000000004,
+      "usd_recomputed": 0.053423,
+      "usd_recomputed_low": 0.044885
+     },
+     "pair": 5,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5643], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0561398,
+      "usd_client": 0.0561398,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2489], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [96]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14843], "cwx": [2982], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [65], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.055099,
+      "usd_client": 0.05509939999999999,
+      "usd_recomputed": 0.055099,
+      "usd_recomputed_low": 0.046153
+     },
+     "pair": 6,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5643], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0575718,
+      "usd_client": 0.05757179999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2489], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [99]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14843], "cwx": [2973], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [64], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.055067,
+      "usd_client": 0.0550674,
+      "usd_recomputed": 0.055067,
+      "usd_recomputed_low": 0.046148
+     },
+     "pair": 7,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0748708,
+      "usd_client": 0.0748708,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2488], "in": [1030], "model": [0], "models": ["claude-opus-5-5"], "out": [105]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14842], "cwx": [2852], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [39], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.055175,
+      "usd_client": 0.05517520000000001,
+      "usd_recomputed": 0.055175,
+      "usd_recomputed_low": 0.046619
+     },
+     "pair": 8,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0749108,
+      "usd_client": 0.0749108,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2489], "in": [979], "model": [0], "models": ["claude-opus-5-5"], "out": [76]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14843], "cwx": [2796], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [53], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.054231,
+      "usd_client": 0.0542314,
+      "usd_recomputed": 0.054231,
+      "usd_recomputed_low": 0.045843
+     },
+     "pair": 9,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5737], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0749146,
+      "usd_client": 0.0749146,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2490], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [132]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14844], "cwx": [2852], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [60], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.054688,
+      "usd_client": 0.0546876,
+      "usd_recomputed": 0.054688,
+      "usd_recomputed_low": 0.046132
+     },
+     "pair": 10,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5643], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0568078,
+      "usd_client": 0.05680779999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2489], "in": [980], "model": [0], "models": ["claude-opus-5-5"], "out": [189]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14843], "cwx": [3034], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [90], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.059139,
+      "usd_client": 0.059139399999999995,
+      "usd_recomputed": 0.059139,
+      "usd_recomputed_low": 0.050037
+     },
+     "pair": 11,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0755028,
+      "usd_client": 0.07550280000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2488], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [99]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14842], "cwx": [2973], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [71], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.055199,
+      "usd_client": 0.055199200000000004,
+      "usd_recomputed": 0.055199,
+      "usd_recomputed_low": 0.04628
+     },
+     "pair": 12,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0748908,
+      "usd_client": 0.07489080000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2490], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [133]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14844], "cwx": [2853], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [66], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.054836,
+      "usd_client": 0.0548356,
+      "usd_recomputed": 0.054836,
+      "usd_recomputed_low": 0.046277
+     },
+     "pair": 13,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0765348,
+      "usd_client": 0.0765348,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2490], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [137]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14844], "cwx": [2857], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [66], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.054948,
+      "usd_client": 0.0549476,
+      "usd_recomputed": 0.054948,
+      "usd_recomputed_low": 0.046377
+     },
+     "pair": 14,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0765028,
+      "usd_client": 0.0765028,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2488], "in": [664], "model": [0], "models": ["claude-opus-5-5"], "out": [94]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14842], "cwx": [2966], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [62], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.054863,
+      "usd_client": 0.0548632,
+      "usd_recomputed": 0.054863,
+      "usd_recomputed_low": 0.045965
+     },
+     "pair": 15,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0766708,
+      "usd_client": 0.07667080000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2489], "in": [1039], "model": [0], "models": ["claude-opus-5-5"], "out": [77]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": true},
+      "rest": {"cr": [14843], "cwx": [2797], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [1], "out": [76], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 2,
+      "usd": 0.054959,
+      "usd_client": 0.054959400000000005,
+      "usd_recomputed": 0.054959,
+      "usd_recomputed_low": 0.046568
+     },
+     "pair": 16,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5738], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 2, "sum_complete": false},
+      "success": true,
+      "turns": 2,
+      "usd": 0.0764948,
+      "usd_client": 0.0764948,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    }
+   ],
+   "pairs_planned": 16
+  },
+  {
+   "analysis": {"gateway_usd_mean": 0.06599, "gateway_wins": 16, "n": 16, "pct": -28.7, "pct_ci95": [-34.1,-23.4], "plain_usd_mean": 0.0926, "success_gateway": "16/16", "success_plain": "16/16", "verdict": "less"},
+   "id": "grep",
+   "invalid_attempts": 1,
+   "label": "Code search (grep over 150 files)",
+   "pairs": [
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2294], "in": [1180], "model": [0], "models": ["claude-opus-5-5"], "out": [175]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31938], "cwx": [2940], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [245], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.063874,
+      "usd_client": 0.0638744,
+      "usd_recomputed": 0.063874,
+      "usd_recomputed_low": 0.055054
+     },
+     "pair": 1,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0911262,
+      "usd_client": 0.0911262,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2122], "in": [980], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30625], "cwx": [2147], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [284], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.053504,
+      "usd_client": 0.053503800000000004,
+      "usd_recomputed": 0.053504,
+      "usd_recomputed_low": 0.047063
+     },
+     "pair": 2,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5547], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0963766,
+      "usd_client": 0.0963766,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [1039], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32944], "cwx": [3920], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [264], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.06938,
+      "usd_client": 0.0693796,
+      "usd_recomputed": 0.06938,
+      "usd_recomputed_low": 0.05762
+     },
+     "pair": 3,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.09356,
+      "usd_client": 0.09356,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2296], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32942], "cwx": [3936], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [238], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.067499,
+      "usd_client": 0.0674992,
+      "usd_recomputed": 0.067499,
+      "usd_recomputed_low": 0.055691
+     },
+     "pair": 4,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0934632,
+      "usd_client": 0.09346319999999998,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2122], "in": [980], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30619], "cwx": [2193], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [338], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.054951,
+      "usd_client": 0.0549506,
+      "usd_recomputed": 0.054951,
+      "usd_recomputed_low": 0.048372
+     },
+     "pair": 5,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5544], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0960986,
+      "usd_client": 0.09609859999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51573], "cwx": [4192], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [411], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.076733,
+      "usd_client": 0.0767334,
+      "usd_recomputed": 0.076733,
+      "usd_recomputed_low": 0.064157
+     },
+     "pair": 6,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5544], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0960938,
+      "usd_client": 0.09609380000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32938], "cwx": [3914], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [196], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.066474,
+      "usd_client": 0.0664744,
+      "usd_recomputed": 0.066474,
+      "usd_recomputed_low": 0.054732
+     },
+     "pair": 7,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5372], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.076226,
+      "usd_client": 0.076226,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2294], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32935], "cwx": [3862], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [177], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.06567,
+      "usd_client": 0.0656698,
+      "usd_recomputed": 0.06567,
+      "usd_recomputed_low": 0.054084
+     },
+     "pair": 8,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5544], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.093443,
+      "usd_client": 0.093443,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2294], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32936], "cwx": [3914], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [186], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.066266,
+      "usd_client": 0.06626599999999999,
+      "usd_recomputed": 0.066266,
+      "usd_recomputed_low": 0.054524
+     },
+     "pair": 9,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5546], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0985998,
+      "usd_client": 0.09859979999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12159], "cw1h": [2226], "in": [677], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [30493], "cwx": [2079], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [250], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.05185,
+      "usd_client": 0.051850400000000005,
+      "usd_recomputed": 0.05185,
+      "usd_recomputed_low": 0.045613
+     },
+     "pair": 10,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5546], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0927638,
+      "usd_client": 0.09276380000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32942], "cwx": [3856], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [108], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.064251,
+      "usd_client": 0.06425120000000001,
+      "usd_recomputed": 0.064251,
+      "usd_recomputed_low": 0.052683
+     },
+     "pair": 11,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.093187,
+      "usd_client": 0.09318699999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [32944], "cwx": [3920], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [196], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.066524,
+      "usd_client": 0.0665236,
+      "usd_recomputed": 0.066524,
+      "usd_recomputed_low": 0.054764
+     },
+     "pair": 12,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0892352,
+      "usd_client": 0.0892352,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [1094], "model": [0], "models": ["claude-opus-5-5"], "out": [69]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31980], "cwx": [4041], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [327], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.071875,
+      "usd_client": 0.0718748,
+      "usd_recomputed": 0.071875,
+      "usd_recomputed_low": 0.059752
+     },
+     "pair": 13,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5543], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.097917,
+      "usd_client": 0.09791699999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2297], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51408], "cwx": [4060], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [214], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.07172,
+      "usd_client": 0.0717204,
+      "usd_recomputed": 0.07172,
+      "usd_recomputed_low": 0.05954
+     },
+     "pair": 14,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5533], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": false},
+      "success": true,
+      "turns": 4,
+      "usd": 0.0867144,
+      "usd_client": 0.08671440000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2295], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51481], "cwx": [4039], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [280], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.072871,
+      "usd_client": 0.07287099999999999,
+      "usd_recomputed": 0.072871,
+      "usd_recomputed_low": 0.060754
+     },
+     "pair": 15,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0932864,
+      "usd_client": 0.0932864,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2294], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [57]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 4, "sum_complete": true},
+      "rest": {"cr": [51476], "cwx": [4039], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [3], "out": [259], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 4,
+      "usd": 0.072442,
+      "usd_client": 0.072442,
+      "usd_recomputed": 0.072442,
+      "usd_recomputed_low": 0.060325
+     },
+     "pair": 16,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5545], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0935192,
+      "usd_client": 0.0935192,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    }
+   ],
+   "pairs_planned": 16
+  },
+  {
+   "analysis": {"gateway_usd_mean": 0.05422, "gateway_wins": 11, "n": 12, "pct": -27.8, "pct_ci95": [-42.2,-13.5], "plain_usd_mean": 0.07514, "success_gateway": "12/12", "success_plain": "12/12", "verdict": "less"},
+   "id": "edit",
+   "invalid_attempts": 0,
+   "label": "One-line edit",
+   "pairs": [
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2100], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [29596], "cwx": [1036], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [118], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.039622,
+      "usd_client": 0.039622000000000004,
+      "usd_recomputed": 0.039622,
+      "usd_recomputed_low": 0.036514
+     },
+     "pair": 1,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5524], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0801272,
+      "usd_client": 0.0801272,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2272], "in": [1371], "model": [0], "models": ["claude-opus-5-5"], "out": [53]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31889], "cwx": [2987], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [161], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.060717,
+      "usd_client": 0.060716599999999996,
+      "usd_recomputed": 0.060717,
+      "usd_recomputed_low": 0.051756
+     },
+     "pair": 2,
+     "plain": {
+      "calls": {"cr": [10010], "cw1h": [5128], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.058327,
+      "usd_client": 0.058327000000000004,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2100], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [111]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [29648], "cwx": [1006], "in": [4], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [196], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.042064,
+      "usd_client": 0.0420644,
+      "usd_recomputed": 0.042064,
+      "usd_recomputed_low": 0.039046
+     },
+     "pair": 3,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5522], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.080195,
+      "usd_client": 0.080195,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2273], "in": [1372], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31914], "cwx": [3009], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [120], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.06013,
+      "usd_client": 0.0601296,
+      "usd_recomputed": 0.06013,
+      "usd_recomputed_low": 0.051103
+     },
+     "pair": 4,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5523], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0802434,
+      "usd_client": 0.08024339999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [8167], "cw1h": [6282], "in": [677], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [29733], "cwx": [1208], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [126], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.07386,
+      "usd_client": 0.07386000000000001,
+      "usd_recomputed": 0.07386,
+      "usd_recomputed_low": 0.070236
+     },
+     "pair": 5,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5523], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0802434,
+      "usd_client": 0.08024339999999999,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12159], "cw1h": [2205], "in": [1383], "model": [0], "models": ["claude-opus-5-5"], "out": [59]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [29418], "cwx": [1082], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [130], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.043955,
+      "usd_client": 0.0439554,
+      "usd_recomputed": 0.043955,
+      "usd_recomputed_low": 0.040709
+     },
+     "pair": 6,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5523], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0804244,
+      "usd_client": 0.08042440000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12159], "cw1h": [2376], "in": [1384], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [29810], "cwx": [1113], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [119], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.045354,
+      "usd_client": 0.0453538,
+      "usd_recomputed": 0.045354,
+      "usd_recomputed_low": 0.042015
+     },
+     "pair": 7,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5523], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0803964,
+      "usd_client": 0.0803964,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2272], "in": [1370], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31912], "cwx": [2928], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [198], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.061017,
+      "usd_client": 0.0610172,
+      "usd_recomputed": 0.061017,
+      "usd_recomputed_low": 0.052233
+     },
+     "pair": 8,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5521], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0801138,
+      "usd_client": 0.0801138,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2099], "in": [665], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [29594], "cwx": [1034], "in": [6], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [123], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.039698,
+      "usd_client": 0.0396976,
+      "usd_recomputed": 0.039698,
+      "usd_recomputed_low": 0.036596
+     },
+     "pair": 9,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5523], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0804284,
+      "usd_client": 0.0804284,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2273], "in": [1405], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31914], "cwx": [3010], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [127], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.06041,
+      "usd_client": 0.060409599999999994,
+      "usd_recomputed": 0.06041,
+      "usd_recomputed_low": 0.05138
+     },
+     "pair": 10,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5350], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0605596,
+      "usd_client": 0.0605596,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2273], "in": [1405], "model": [0], "models": ["claude-opus-5-5"], "out": [55]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31914], "cwx": [3008], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [123], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.060314,
+      "usd_client": 0.0603136,
+      "usd_recomputed": 0.060314,
+      "usd_recomputed_low": 0.05129
+     },
+     "pair": 11,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5350], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0604916,
+      "usd_client": 0.0604916,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    },
+    {
+     "gateway": {
+      "calls": {"cr": [12354], "cw1h": [2274], "in": [1405], "model": [0], "models": ["claude-opus-5-5"], "out": [120]},
+      "calls_from": "ledger_first_row",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": true},
+      "rest": {"cr": [31927], "cwx": [3082], "in": [8], "model": [0], "models": ["claude-opus-5-5"], "n": [2], "out": [188], "what": ["after_first_call"]},
+      "success": true,
+      "turns": 3,
+      "usd": 0.063516,
+      "usd_client": 0.06351620000000001,
+      "usd_recomputed": 0.063516,
+      "usd_recomputed_low": 0.05427
+     },
+     "pair": 12,
+     "plain": {
+      "calls": {"cr": [10118], "cw1h": [5523], "in": [2], "model": [0], "models": ["claude-opus-5-5"], "out": null},
+      "calls_from": "client_first_call",
+      "coverage": {"calls": 1, "of": 3, "sum_complete": false},
+      "success": true,
+      "turns": 3,
+      "usd": 0.0801306,
+      "usd_client": 0.08013060000000001,
+      "usd_recomputed": null,
+      "usd_recomputed_reason": "first_call_only"
+     }
+    }
+   ],
+   "pairs_planned": 12
+  }
+ ]
+}

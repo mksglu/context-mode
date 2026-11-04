@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Fetch failed: ENOTFOUND. Fix: check the URL or proxy."
+    }
+  ],
+  "isError": true
+}

@@ -1,0 +1,20 @@
+{
+  "offset": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Invalid argument offset. Fix: drop offset; page a timeline with \"after\"."
+      }
+    ],
+    "isError": true
+  },
+  "after": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Invalid argument after. Fix: drop after, or pass sort:\"timeline\"."
+      }
+    ],
+    "isError": true
+  }
+}

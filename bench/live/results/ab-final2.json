@@ -1,0 +1,121 @@
+{
+  "date": "2026-10-21",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "runsPerCell": 3,
+  "note": "large = multi-1, big-tests, big-json (own run) + json-1 (rows from the small run, same task and arms); totalCostUsd counts each session once (small run 1.2262 + large run 1.4535)",
+  "groups": {
+    "small": {
+      "off": {
+        "sessions": 15,
+        "pass": 15,
+        "medianTokens": 36184,
+        "medianToolResultBytes": 31,
+        "ctxCalls": 0,
+        "costUsd": 0.3298
+      },
+      "v1": {
+        "sessions": 15,
+        "pass": 15,
+        "medianTokens": 42493,
+        "medianToolResultBytes": 31,
+        "ctxCalls": 0,
+        "costUsd": 0.537
+      },
+      "v2": {
+        "sessions": 15,
+        "pass": 15,
+        "medianTokens": 38210,
+        "medianToolResultBytes": 8,
+        "ctxCalls": 0,
+        "costUsd": 0.3594
+      },
+      "savingPct": {
+        "v1VsOff": -17.4,
+        "v2VsOff": -5.7,
+        "v2VsV1": 10.2
+      },
+      "perTask": {
+        "log-1": {
+          "off": 36184,
+          "v1": 42424,
+          "v2": 38114
+        },
+        "json-1": {
+          "off": 55024,
+          "v1": 64541,
+          "v2": 60386
+        },
+        "tests-1": {
+          "off": 36121,
+          "v1": 42493,
+          "v2": 38166
+        },
+        "file-1": {
+          "off": 36159,
+          "v1": 42453,
+          "v2": 38210
+        },
+        "git-1": {
+          "off": 36248,
+          "v1": 42629,
+          "v2": 38296
+        }
+      }
+    },
+    "large": {
+      "off": {
+        "sessions": 12,
+        "pass": 12,
+        "medianTokens": 55897,
+        "medianToolResultBytes": 4694.5,
+        "ctxCalls": 0,
+        "costUsd": 0.6065
+      },
+      "v1": {
+        "sessions": 12,
+        "pass": 12,
+        "medianTokens": 65599,
+        "medianToolResultBytes": 2436.5,
+        "ctxCalls": 0,
+        "costUsd": 0.7535
+      },
+      "v2": {
+        "sessions": 12,
+        "pass": 12,
+        "medianTokens": 60389.5,
+        "medianToolResultBytes": 734.5,
+        "ctxCalls": 5,
+        "costUsd": 0.3913
+      },
+      "savingPct": {
+        "v1VsOff": -16.5,
+        "v2VsOff": -19.6,
+        "v2VsV1": -2.7
+      },
+      "perTask": {
+        "multi-1": {
+          "off": 108290,
+          "v1": 125342,
+          "v2": 140110
+        },
+        "big-tests": {
+          "off": 53104,
+          "v1": 59478,
+          "v2": 38359
+        },
+        "big-json": {
+          "off": 56707,
+          "v1": 66559,
+          "v2": 98955
+        },
+        "json-1": {
+          "off": 55024,
+          "v1": 64541,
+          "v2": 60386
+        }
+      }
+    }
+  },
+  "totalCostUsd": 2.6797
+}

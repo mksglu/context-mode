@@ -1,0 +1,6 @@
+{
+  "matcher": "^(Bash|apply_patch|mcp__context_mode__ctx_.*)$",
+  "recorded": [
+    "Bash"
+  ]
+}

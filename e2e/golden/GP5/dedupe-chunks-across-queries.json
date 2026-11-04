@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Query \"alpha\":\nboth #0: alpha and beta in one chunk\nQuery \"beta\":\nSame as above: both (chunk 0)\nQuery \"alpha\":\nSame as above: both (chunk 0)"
+    }
+  ],
+  "isError": false
+}

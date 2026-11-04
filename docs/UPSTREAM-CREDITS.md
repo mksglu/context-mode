@@ -27,7 +27,7 @@ npx skills add mattpocock/skills \
   -a claude-code -y
 ```
 
-| Skill | Upstream path |
+| Skill | Path in the upstream repo (mattpocock/skills, not in this tree) |
 |-------|---------------|
 | `/diagnose` | `skills/engineering/diagnose/` |
 | `/tdd` | `skills/engineering/tdd/` |

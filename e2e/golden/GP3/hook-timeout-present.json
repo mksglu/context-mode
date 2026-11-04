@@ -1,0 +1,26 @@
+{
+  "claude-code": [
+    5
+  ],
+  "codex": [
+    5
+  ],
+  "gemini": [
+    5
+  ],
+  "qwen": [
+    5
+  ],
+  "copilot-cli": [
+    5
+  ],
+  "vscode": [
+    5
+  ],
+  "kiro": [
+    5
+  ],
+  "zcode": [
+    5
+  ]
+}

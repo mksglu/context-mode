@@ -1,0 +1,2239 @@
+{
+  "id": "T-CMP",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "runsPerArm": 10,
+  "arms": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e"
+  ],
+  "complete": true,
+  "costUsd": 4.5222,
+  "stats": {
+    "a": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "b": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "c": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "d": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "e": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    }
+  },
+  "checks": [
+    {
+      "name": "runs_per_arm",
+      "pass": true,
+      "want": ">= 10 each"
+    },
+    {
+      "name": "a_call_rate",
+      "pass": false,
+      "got": 0,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "a_correct",
+      "pass": false,
+      "got": 0.7,
+      "want": ">= 0.8"
+    },
+    {
+      "name": "a_correct_ge_c",
+      "pass": true,
+      "got": 0.7,
+      "want": ">= c 0.7"
+    },
+    {
+      "name": "d_correct",
+      "pass": true,
+      "got": 0.7,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "resume_seq",
+      "pass": true,
+      "got": "50/50",
+      "want": "all, >= 10"
+    }
+  ],
+  "info": {
+    "a_correct_minus_b": 0
+  },
+  "runs": {
+    "a": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0944045,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01FYM3A1P5R2YRN5Dxx5BcsR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src src/store 2>&1 | head -30",
+              "intent": "repo layout"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01VvhivFtcwuNZJJcxjwHqTp",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>&1 | head -30",
+              "intent": "README structure"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.10874850000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Fv8og1USww84CxUic67NaB",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls packages/cli packages/cli/lib 2>&1 | head -30; cat package.json packages/cli/package.json 2>/dev/null | head -40"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0673923,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01RHizBFinqHdJxKYAFK7z7z",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls services/reports/export; wc -l services/reports/export/paginate.ts; cat services/reports/export/paginate.ts | head -150",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01UdXmj7cNxKkFfyFnHEmQk1",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-a-DFXlWZ/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01PqSCsD7enjWpDWo54BtSZj",
+            "name": "Glob",
+            "input": {
+              "pattern": "services/reports/export/**"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0830299,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_018mnj69LtgbiKQEfjYsV52E",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src src/store 2>/dev/null; grep -ril journal src 2>/dev/null | head",
+              "intent": "project layout and journal references"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01AfiuF8ZNeepzy5XxDYg8Xa",
+            "name": "Bash",
+            "input": {
+              "command": "git ls-files | head -50; ls src src/store 2>/dev/null; grep -ril journal src 2>/dev/null | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.09625529999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01FexWrvbiCRhDtcMvj3yR8W",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -30; cat package.json 2>&1 | head -20"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0665149,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01UYMW7G1DbU2vpLEpfQTwmc",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cd services/reports/export 2>/dev/null && ls && wc -l paginate.ts && cat paginate.ts | head -120"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01SCbnbRmPo5STkV4FgmmEPr",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-a-QUxoUm/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_014vGbDMBZw1zXaMZfpbS89w",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01Kab7oQBFsZrK1toT3DP7NZ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.|log\\(\" services/reports/export"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0828597,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01NKzv9a5pPY8zCRsf1Se49j",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>&1; cat package.json tsconfig.json 2>&1 | head -40; grep -ril journal src 2>/dev/null",
+              "intent": "repo layout"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_012RDMsSbt7gXYE3xTcA3Ddk",
+            "name": "Bash",
+            "input": {
+              "command": "ls; grep -n '^#' README.md"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.11941969999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Fe2FPg622iGQHtruVxizTD",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls; ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -40; cat package.json 2>/dev/null | head -30"
+              ],
+              "queries": [
+                "directory layout and package type",
+                "existing config files or schema"
+              ]
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_014AiynobxvfmtP53bRwCvsJ",
+            "name": "Bash",
+            "input": {
+              "command": "ls; ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -40"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01UEQWTN4iNB7PFBMzLJP7FU",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "javascript",
+              "code": "const fs = require('fs');\nconst path = require('path');\nconst target = path.resolve('packages/cli/lib/config/layered-loader.mjs');\nfs.mkdirSync(path.dirname(target), { recursive: true });\nconst src = `import { readFileSync } from 'node:fs';\n\nconst SCHEMA_VERSION = 4;\nconst SCHEMA_ID = \\`cfg-schema-v\\${SCHEMA_VERSION}\\`;\n\nconst DEFAULTS = Object.freeze({});\n\n// Known keys and their expected types. Keys not listed here warn, never fail.\nconst SCHEMA = Object.freeze({});\n\nconst isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);\n\nfunction readLayer(file, layer) {\n  if (!file) return null;\n  let text;\n  try {\n    text = readFileSync(file, 'utf8');\n  } catch (err) {\n    if (err.code === 'ENOENT') return null;\n    throw new Error(\\`config: cannot read \\${layer} file \\${file}: \\${err.message}\\`);\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(\\`config: \\${layer} file \\${file} is not valid JSON: \\${err.message}\\`);\n  }\n  if (!isPlainObject(data)) {\n    throw new Error(\\`config: \\${layer} file \\${file} must contain a JSON object\\`);\n  }\n  return data;\n}\n\n// A file with no declared version is accepted as the current one.\nfunction checkVersion(data, file, layer) {\n  if (data.schema === undefined) return;\n  const match = /^cfg-schema-v(\\\\d+)$/.exec(String(data.schema));\n  if (!match) {\n    throw new Error(\\`config: \\${layer} file \\${file} declares an invalid schema \"\\${data.schema}\"\\`);\n  }\n  if (Number(match[1]) > SCHEMA_VERSION) {\n    throw new Error(\n      \\`config: \\${layer} file \\${file} declares \\${data.schema}, newer than supported \\${SCHEMA_ID}\\`,\n    );\n  }\n}\n\nfunction merge(target, sources, data, layer, schema, warnings, prefix = '') {\n  for (const [key, value] of Object.entries(data)) {\n    if (!prefix && key === 'schema') continue;\n    const dotted = prefix + key;\n    const known = Object.hasOwn(schema, dotted);\n    if (isPlainObject(value) && !known) {\n      const nested = Object.keys(schema).some((k) => k.startsWith(dotted + '.'));\n      if (nested) {\n        target[key] = isPlainObject(target[key]) ? target[key] : {};\n        merge(target[key], sources, value, layer, schema, warnings, dotted + '.');\n        continue;\n      }\n    }\n    if (!known) {\n      warnings.push({ key: dotted, layer, message: \\`unknown key \"\\${dotted}\" in \\${layer} layer\\` });\n    } else if (schema[dotted] && !matchesType(value, schema[dotted])) {\n      throw new Error(\\`config: key \"\\${dotted}\" in \\${layer} layer must be of type \\${schema[dotted]}\\`);\n    }\n    target[key] = value;\n    sources[dotted] = layer;\n  }\n}\n\nfunction matchesType(value, type) {\n  if (type === 'array') return Array.isArray(value);\n  if (type === 'object') return isPlainObject(value);\n  return typeof value === type;\n}\n\n/**\n * Load config in three layers: defaults, project file, user file.\n * Returns { config, sources, warnings }; sources maps each dotted key to the\n * layer that set it ('default' | 'project' | 'user').\n */\nexport function loadConfig({ projectFile, userFile, defaults = DEFAULTS, schema = SCHEMA } = {}) {\n  const config = {};\n  const sources = {};\n  const warnings = [];\n\n  // Defaults are trusted, so every default key counts as known.\n  const knownSchema = { ...schema };\n  const addKnown = (obj, prefix = '') => {\n    for (const [k, v] of Object.entries(obj)) {\n      const dotted = prefix + k;\n      if (isPlainObject(v)) addKnown(v, dotted + '.');\n      else if (!Object.hasOwn(knownSchema, dotted)) knownSchema[dotted] = null;\n    }\n  };\n  addKnown(defaults);\n\n  merge(config, sources, structuredClone(defaults), 'default', knownSchema, warnings);\n\n  for (const [layer, file] of [['project', projectFile], ['user', userFile]]) {\n    const data = readLayer(file, layer);\n    if (!data) continue;\n    checkVersion(data, file, layer);\n    merge(config, sources, data, layer, knownSchema, warnings);\n  }\n\n  return { config, sources, warnings };\n}\n`;\nfs.writeFileSync(target, src);\nconsole.log('wrote', target);",
+              "intent": "write file"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0660912,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01ADJecVaF5fgrXgMDZhkVng",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "wc -l services/reports/export/paginate.ts; cat services/reports/export/paginate.ts | head -150; ls services/reports/export",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_016gD7zxBmdPZmG8spr7RnzP",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01BCq8Eofms9mpD6NGpWSDqY",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0834667,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01YHp955uewYwH811YQWCXVx",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -a; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -30",
+              "intent": "project layout"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ],
+    "b": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0875184,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_016WrUFotUgiq2yTB9ds1WTP",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -30; git log --oneline | head",
+              "intent": "repo layout"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_012WuaHuYJmY6s6tLTFv3RFT",
+            "name": "Bash",
+            "input": {
+              "command": "ls; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -30"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.11919679999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_019j73RszWFoBGcxitCSc2Wk",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli packages/cli/lib 2>&1 | head -30; cat packages/cli/package.json 2>/dev/null | head -20"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01AWgRrZTM72QU9ocFDN17Zi",
+            "name": "Write",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-b-h5eJaM/project/packages/cli/lib/config/layered-loader.mjs",
+              "content": "import { readFile } from \"node:fs/promises\";\n\nconst MAX_SCHEMA_VERSION = 4;\nconst SCHEMA_ID = `cfg-schema-v${MAX_SCHEMA_VERSION}`;\nconst VERSION_KEY = \"schema\";\n\nfunction checkVersion(declared, layer) {\n  if (declared === undefined) return;\n  const match = /^cfg-schema-v(\\d+)$/.exec(String(declared));\n  if (!match) {\n    throw new Error(`${layer} config declares invalid schema \"${declared}\"`);\n  }\n  if (Number(match[1]) > MAX_SCHEMA_VERSION) {\n    throw new Error(\n      `${layer} config declares ${declared}, newer than supported ${SCHEMA_ID}`,\n    );\n  }\n}\n\nasync function readLayer(path, layer) {\n  if (!path) return null;\n  let text;\n  try {\n    text = await readFile(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`${layer} config ${path} is not valid JSON: ${err.message}`);\n  }\n  if (data === null || typeof data !== \"object\" || Array.isArray(data)) {\n    throw new Error(`${layer} config ${path} must be a JSON object`);\n  }\n  return data;\n}\n\nfunction checkType(key, value, spec) {\n  const actual = Array.isArray(value) ? \"array\" : typeof value;\n  if (actual !== spec.type) {\n    throw new Error(`Config key \"${key}\" must be ${spec.type}, got ${actual}`);\n  }\n  if (spec.enum && !spec.enum.includes(value)) {\n    throw new Error(`Config key \"${key}\" must be one of: ${spec.enum.join(\", \")}`);\n  }\n}\n\n/**\n * Load config from three layers: defaults, project file, user file (later wins).\n * The merged result is checked against one schema.\n *\n * @param {object} options\n * @param {Record<string, unknown>} [options.defaults] built-in defaults\n * @param {Record<string, {type: string, enum?: unknown[]}>} options.schema\n *   top-level keys; type is a typeof name or \"array\"\n * @param {string} [options.projectPath]\n * @param {string} [options.userPath]\n * @returns {Promise<{values: object, sources: Record<string, string>, warnings: string[], schema: string}>}\n *   `sources` maps each key to the layer that set it, for the doctor command.\n */\nexport async function loadConfig({ defaults = {}, schema, projectPath, userPath } = {}) {\n  if (!schema) throw new Error(\"loadConfig requires a schema\");\n\n  const layers = [\n    [\"defaults\", defaults],\n    [\"project\", await readLayer(projectPath, \"project\")],\n    [\"user\", await readLayer(userPath, \"user\")],\n  ];\n\n  const values = {};\n  const sources = {};\n  const warnings = [];\n\n  for (const [layer, data] of layers) {\n    if (!data) continue;\n    checkVersion(data[VERSION_KEY], layer);\n    for (const [key, value] of Object.entries(data)) {\n      if (key === VERSION_KEY) continue;\n      if (!Object.hasOwn(schema, key)) {\n        warnings.push(`Unknown config key \"${key}\" in ${layer} layer`);\n        continue;\n      }\n      values[key] = value;\n      sources[key] = layer;\n    }\n  }\n\n  for (const [key, value] of Object.entries(values)) {\n    checkType(key, value, schema[key]);\n  }\n\n  return { values, sources, warnings, schema: SCHEMA_ID };\n}\n"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01G9Qe6kXCYEkgiei4wewVLv",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib/config 2>&1; grep -rn \"writeFile\\|mkdir\" packages/cli --include=*.mjs --include=*.js -l 2>/dev/null | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0641307,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01KgqSGFyzs146QJBaFzjLoM",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cd services/reports/export && ls && wc -l paginate.ts && cat paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_016x8Ryu8mH3n3fXDvPATREP",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.|log\\(\" services/reports/export"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0822895,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01EEnm4cXbZUC22xwSQCPV9z",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -30",
+              "intent": "project layout"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01R3sFjHvceyd2vEnoAqrxSj",
+            "name": "Bash",
+            "input": {
+              "command": "ls; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -30"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1368674,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Ro2tC8LgZET8379R4WojHV",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "cd packages/cli 2>/dev/null && ls -R lib | head -40; cat package.json | head -30; git ls-files | head -30"
+              ],
+              "queries": [
+                "existing lib file style, module type, schema or config files"
+              ]
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_0155krgdQyFxen5Phjw58ynH",
+            "name": "Bash",
+            "input": {
+              "command": "ls packages/cli packages/cli/lib 2>&1 | head -30; git ls-files | head -30"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01FhafuwgtLoX1AS4Tnxcs9q",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "javascript",
+              "code": "const fs = require('fs'), path = require('path');\nconst out = path.resolve('packages/cli/lib/config/layered-loader.mjs');\nfs.mkdirSync(path.dirname(out), { recursive: true });\nfs.writeFileSync(out, `import { readFileSync } from 'node:fs';\n\nconst SCHEMA_VERSION = 4;\nconst SCHEMA_ID = \\`cfg-schema-v\\${SCHEMA_VERSION}\\`;\n\n// Known keys and their expected types. Nested objects are described by nested maps.\nconst DEFAULT_SCHEMA = {\n  schemaVersion: 'string',\n};\n\nconst isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);\n\nfunction readLayer(file, layer) {\n  if (!file) return null;\n  let text;\n  try {\n    text = readFileSync(file, 'utf8');\n  } catch (err) {\n    if (err.code === 'ENOENT') return null;\n    throw new Error(\\`config: cannot read \\${layer} file \\${file}: \\${err.message}\\`);\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(\\`config: \\${layer} file \\${file} is not valid JSON: \\${err.message}\\`);\n  }\n  if (!isPlainObject(data)) {\n    throw new Error(\\`config: \\${layer} file \\${file} must contain a JSON object\\`);\n  }\n  return data;\n}\n\nfunction checkVersion(data, layer, file) {\n  if (data.schemaVersion === undefined) return;\n  const match = /^cfg-schema-v(\\\\d+)$/.exec(String(data.schemaVersion));\n  if (!match) {\n    throw new Error(\\`config: \\${layer} file \\${file} declares invalid schemaVersion \"\\${data.schemaVersion}\"\\`);\n  }\n  if (Number(match[1]) > SCHEMA_VERSION) {\n    throw new Error(\n      \\`config: \\${layer} file \\${file} declares \\${data.schemaVersion}, newer than supported \\${SCHEMA_ID}\\`,\n    );\n  }\n}\n\n// Merge src into target, recording the layer that set each leaf in sources.\nfunction merge(target, src, layer, sources, prefix = '') {\n  for (const [key, value] of Object.entries(src)) {\n    const keyPath = prefix + key;\n    if (isPlainObject(value)) {\n      if (!isPlainObject(target[key])) target[key] = {};\n      merge(target[key], value, layer, sources, \\`\\${keyPath}.\\`);\n    } else {\n      target[key] = value;\n      sources[keyPath] = layer;\n    }\n  }\n}\n\n// Validate the merged result; unknown keys and type mismatches warn, never throw.\nfunction validate(node, schema, sources, warnings, prefix = '') {\n  for (const [key, value] of Object.entries(node)) {\n    const keyPath = prefix + key;\n    const expected = schema[key];\n    const layer = sources[keyPath] ?? 'defaults';\n    if (expected === undefined) {\n      if (isPlainObject(value)) {\n        const leaves = [];\n        collectLeaves(value, keyPath + '.', leaves);\n        for (const leaf of leaves) {\n          warnings.push(\\`unknown key \"\\${leaf}\" in \\${sources[leaf] ?? layer} layer\\`);\n        }\n      } else {\n        warnings.push(\\`unknown key \"\\${keyPath}\" in \\${layer} layer\\`);\n      }\n    } else if (isPlainObject(expected)) {\n      if (isPlainObject(value)) validate(value, expected, sources, warnings, keyPath + '.');\n      else warnings.push(\\`key \"\\${keyPath}\" in \\${layer} layer should be an object\\`);\n    } else if (typeof value !== expected) {\n      warnings.push(\\`key \"\\${keyPath}\" in \\${layer} layer should be \\${expected}, got \\${typeof value}\\`);\n    }\n  }\n}\n\nfunction collectLeaves(node, prefix, acc) {\n  for (const [k, v] of Object.entries(node)) {\n    if (isPlainObject(v)) collectLeaves(v, \\`\\${prefix}\\${k}.\\`, acc);\n    else acc.push(prefix + k);\n  }\n}\n\n/**\n * Load config from built-in defaults, then the project file, then the user file,\n * and validate the merged result against one schema.\n *\n * @param {object} [options]\n * @param {object} [options.defaults] built-in defaults\n * @param {string} [options.projectFile] path to the project config file\n * @param {string} [options.userFile] path to the user config file\n * @param {object} [options.schema] key -> type name, nested objects for nested keys\n * @returns {{ config: object, sources: Record<string, string>, warnings: string[] }}\n *   sources maps each dotted key path to the layer that set it.\n */\nexport function loadConfig({ defaults = {}, projectFile, userFile, schema = DEFAULT_SCHEMA } = {}) {\n  const config = {};\n  const sources = {};\n  const warnings = [];\n\n  merge(config, defaults, 'defaults', sources);\n\n  for (const [layer, file] of [['project', projectFile], ['user', userFile]]) {\n    const data = readLayer(file, layer);\n    if (!data) continue;\n    checkVersion(data, layer, file);\n    merge(config, data, layer, sources);\n  }\n\n  validate(config, { ...DEFAULT_SCHEMA, ...schema }, sources, warnings);\n  return { config, sources, warnings };\n}\n`);\nconsole.log('wrote', out);"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_014wXKo6Y3nUSJaivA87g2DQ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -40; ls packages/cli/lib packages/cli/lib/config 2>&1; grep -rli doctor packages/cli --include=*.mjs --include=*.js --include=*.json 2>/dev/null | grep -v node_modules | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0710978,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01RaWp4kE6UHAMsVcux1zCNW",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cd services/reports/export 2>&1 && ls && wc -l paginate.ts && cat paginate.ts",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_0126uaLhzu8AH6o6TREiMbed",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-b-FZAzqt/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_017jbWspx946M1mSdL2EVJC8",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_index",
+            "input": {
+              "path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-b-FZAzqt/project/services/reports/export/paginate.ts",
+              "source": "paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_014qkKXMu2vPDLiNnPeo24H3",
+            "name": "Grep",
+            "input": {
+              "pattern": "console\\.|logger\\.|log\\(",
+              "path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-b-FZAzqt/project/services/reports/export",
+              "output_mode": "content",
+              "-n": "true"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0936781,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Rguoa89ZExfMx2Xqk4bgE5",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; cat package.json 2>/dev/null | head -30; find src -type f 2>/dev/null | head -30",
+              "intent": "project layout"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_019wKBZwpRtrgggQC4WZL64U",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls -a; cat package.json 2>/dev/null | head -30; find src -type f 2>/dev/null | head -30"
+              ],
+              "queries": [
+                "project layout and package.json",
+                "files under src"
+              ]
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.09820000000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01N9g8HTq6MW9c2mQYcU2jTV",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib packages/cli/lib/config 2>&1 | head -30; cat packages/cli/package.json 2>&1 | head -20"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0748374,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01PmCRSucHLGNd4cp8E4AZ8A",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls services/reports/export/ 2>&1; wc -l services/reports/export/paginate.ts 2>&1"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_017zP46ooDyddufgiXckJiFB",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-b-tyQ6HC/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01D2Aj14oMWB9JRZesRbiomJ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_index",
+            "input": {
+              "path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-b-tyQ6HC/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_015DPBRhTSnoTA3RFWwGJiWc",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.(log|info|warn|error|debug)|logger\\.\" services/reports/export/"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.08363100000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01SukvVJhX2g9xZ8igfqi8dA",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; cat package.json 2>/dev/null | head -30; ls src src/store 2>/dev/null; git ls-files | head -30"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01RA9R14DhAuyejShGkudnzY",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md | head -30; ls src/store"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ],
+    "c": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0903823,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01AuB9E2Br1FNCUJDQzMt71U",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src/store 2>/dev/null; grep -ril journal --include=* . 2>/dev/null | grep -v node_modules | grep -v '^./.git/' | head"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01HEKSeDSgyKufu6dZ4u9hCD",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "git ls-files | head -50"
+              ],
+              "queries": [
+                "files in repo"
+              ]
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01BYr64QmiUKUq64hrdVZBqH",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>/dev/null; ls src/store"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.113781,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_019GPbsUJ55WcKxteJTZepEp",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFile } from \"node:fs/promises\";\n\nconst SCHEMA_VERSION = 4;\nconst SCHEMA_ID = `cfg-schema-v${SCHEMA_VERSION}`;\nconst SCHEMA_KEY = \"schema\";\n\n// One schema for the merged result: key -> type check. Extend as options are added.\nconst SCHEMA = {\n  logLevel: (v) => [\"debug\", \"info\", \"warn\", \"error\"].includes(v),\n  telemetry: (v) => typeof v === \"boolean\",\n  timeoutMs: (v) => Number.isInteger(v) && v >= 0,\n};\n\nconst DEFAULTS = {\n  logLevel: \"info\",\n  telemetry: false,\n  timeoutMs: 30000,\n};\n\nasync function readLayer(path, layer) {\n  let text;\n  try {\n    text = await readFile(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`${layer} config ${path}: invalid JSON (${err.message})`);\n  }\n  if (data === null || typeof data !== \"object\" || Array.isArray(data)) {\n    throw new Error(`${layer} config ${path}: top level must be an object`);\n  }\n  return data;\n}\n\nfunction checkSchemaVersion(data, layer, path) {\n  if (!(SCHEMA_KEY in data)) return;\n  const match = /^cfg-schema-v(\\d+)$/.exec(String(data[SCHEMA_KEY]));\n  if (!match) {\n    throw new Error(`${layer} config ${path}: unrecognized schema \"${data[SCHEMA_KEY]}\"`);\n  }\n  if (Number(match[1]) > SCHEMA_VERSION) {\n    throw new Error(\n      `${layer} config ${path}: declares ${data[SCHEMA_KEY]}, newer than supported ${SCHEMA_ID}`,\n    );\n  }\n}\n\n/**\n * Load config from built-in defaults, then the project file, then the user file.\n * Later layers win. Unknown keys produce a warning (key + layer) and are dropped.\n * Returns { values, sources, warnings, schema } where sources[key] is the layer\n * that set each value (\"defaults\" | \"project\" | \"user\").\n */\nexport async function loadConfig({ projectPath, userPath } = {}) {\n  const values = { ...DEFAULTS };\n  const sources = Object.fromEntries(Object.keys(DEFAULTS).map((k) => [k, \"defaults\"]));\n  const warnings = [];\n\n  const layers = [\n    [\"project\", projectPath],\n    [\"user\", userPath],\n  ];\n  for (const [layer, path] of layers) {\n    if (!path) continue;\n    const data = await readLayer(path, layer);\n    if (!data) continue;\n    checkSchemaVersion(data, layer, path);\n    for (const [key, value] of Object.entries(data)) {\n      if (key === SCHEMA_KEY) continue;\n      if (!(key in SCHEMA)) {\n        warnings.push({ key, layer, message: `unknown key \"${key}\" in ${layer} config` });\n        continue;\n      }\n      values[key] = value;\n      sources[key] = layer;\n    }\n  }\n\n  for (const [key, valid] of Object.entries(SCHEMA)) {\n    if (!valid(values[key])) {\n      throw new Error(\n        `invalid value for \"${key}\" (set by ${sources[key]}): ${JSON.stringify(values[key])}`,\n      );\n    }\n  }\n\n  return { values, sources, warnings, schema: SCHEMA_ID };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo ok"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0735885,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_018SV9ZfcpFEZMtUtmKcmSWG",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_015LqR3LkXvWBRAjBJQrt1hF",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-c-C1cKZ7/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01FPnHtks4vLHBa7Zw74aH33",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01Mz9Bj5swVzcmET9Zd7n3UF",
+            "name": "Grep",
+            "input": {
+              "pattern": "console\\.(log|warn|error|info|debug)|logger\\.",
+              "path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-c-C1cKZ7/project/services/reports/export",
+              "output_mode": "content",
+              "-n": "true"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01DJFxmq9MVWgF3EKmVfbkCx",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0838164,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01LxsYz6fGp5QmqkjA4uksCu",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src src/store 2>/dev/null; grep -ril journal . --exclude-dir=.git --exclude-dir=node_modules | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.11917869999999998,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_011gW8DF4FF11A7pzt1yzBr6",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFile } from 'node:fs/promises';\n\nconst SCHEMA_VERSION = 'cfg-schema-v4';\nconst VERSION_KEY = 'schemaVersion';\n\nconst versionNumber = (v) => {\n  const m = /^cfg-schema-v(\\d+)$/.exec(String(v));\n  return m ? Number(m[1]) : null;\n};\n\nconst isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);\n\nconst typeOf = (v) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v);\n\n// Flatten nested objects to dotted paths so each value can carry its own origin.\nconst flatten = (obj, prefix = '', out = {}) => {\n  for (const [k, v] of Object.entries(obj)) {\n    const path = prefix ? `${prefix}.${k}` : k;\n    if (isPlainObject(v) && Object.keys(v).length > 0) flatten(v, path, out);\n    else out[path] = v;\n  }\n  return out;\n};\n\nconst unflatten = (flat) => {\n  const out = {};\n  for (const [path, value] of Object.entries(flat)) {\n    const parts = path.split('.');\n    let node = out;\n    for (const p of parts.slice(0, -1)) node = node[p] ??= {};\n    node[parts.at(-1)] = value;\n  }\n  return out;\n};\n\nasync function readLayer(name, path) {\n  if (!path) return null;\n  let text;\n  try {\n    text = await readFile(path, 'utf8');\n  } catch (err) {\n    if (err.code === 'ENOENT') return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`Config layer \"${name}\" (${path}) is not valid JSON: ${err.message}`);\n  }\n  if (!isPlainObject(data)) {\n    throw new Error(`Config layer \"${name}\" (${path}) must contain a JSON object`);\n  }\n  if (VERSION_KEY in data) {\n    const n = versionNumber(data[VERSION_KEY]);\n    if (n === null) {\n      throw new Error(`Config layer \"${name}\" (${path}) has invalid ${VERSION_KEY}: ${data[VERSION_KEY]}`);\n    }\n    if (n > versionNumber(SCHEMA_VERSION)) {\n      throw new Error(\n        `Config layer \"${name}\" (${path}) declares ${data[VERSION_KEY]}, newer than supported ${SCHEMA_VERSION}`,\n      );\n    }\n    delete data[VERSION_KEY];\n  }\n  return flatten(data);\n}\n\n/**\n * Load config from three layers: defaults, project file, user file (later wins).\n * The schema is derived from `defaults`: its keys are the known keys and its\n * value types are the expected types. Unknown keys warn; type mismatches throw.\n *\n * @param {{defaults?: object, projectPath?: string, userPath?: string}} [options]\n * @returns {Promise<{config: object, sources: Record<string,string>, warnings: string[], schemaVersion: string}>}\n */\nexport async function loadConfig({ defaults = {}, projectPath, userPath } = {}) {\n  const flatDefaults = flatten(defaults);\n  const layers = [\n    ['defaults', flatDefaults],\n    ['project', await readLayer('project', projectPath)],\n    ['user', await readLayer('user', userPath)],\n  ];\n\n  const merged = {};\n  const sources = {};\n  const warnings = [];\n\n  for (const [name, flat] of layers) {\n    if (!flat) continue;\n    for (const [key, value] of Object.entries(flat)) {\n      if (name !== 'defaults' && !(key in flatDefaults)) {\n        warnings.push(`Unknown config key \"${key}\" in ${name} layer`);\n      }\n      merged[key] = value;\n      sources[key] = name;\n    }\n  }\n\n  for (const [key, value] of Object.entries(merged)) {\n    if (!(key in flatDefaults)) continue;\n    const expected = typeOf(flatDefaults[key]);\n    if (expected !== 'null' && typeOf(value) !== expected) {\n      throw new Error(\n        `Config key \"${key}\" from ${sources[key]} layer must be ${expected}, got ${typeOf(value)}`,\n      );\n    }\n  }\n\n  return { config: unflatten(merged), sources, warnings, schemaVersion: SCHEMA_VERSION };\n}\nEOF\nnode --input-type=module -e \"import {loadConfig} from './packages/cli/lib/config/layered-loader.mjs';console.log(await loadConfig({defaults:{a:1,b:{c:'x'}}}))\""
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01Ss94Y2P2mHEkS1ovxVHGcn",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -ril doctor packages --include=*.mjs --include=*.js --include=*.json --exclude-dir=node_modules | head; ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -30"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0688738,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01Fn1iRuKEbxEh7GfiiiYWCk",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "wc -l services/reports/export/paginate.ts; ls services/reports/export; cat services/reports/export/paginate.ts | head -150",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01H4n1h2kvc2fe7y6vnUKyTY",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-c-89yJi1/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01U4gJYiSR52oYwtJ8YZtT4g",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "grep -rnE 'console\\.|logger\\.|log\\(' services/reports/export"
+              ],
+              "queries": [
+                "log lines in the exporter"
+              ]
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0909934,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01E4wdX2gqxA5rbpjCzHsFTQ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -40; git log --oneline | head"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01HJNAtJcC9Kq3jiui2epuX5",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>/dev/null | head -30; ls src/store 2>/dev/null"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1057434,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_011HbS5zKUumvAPsJ5kEuoqp",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib packages/cli/lib/config 2>&1 | head -30; ls; head -30 $(ls packages/cli/lib/*.mjs 2>/dev/null | head -1) 2>/dev/null"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.070428,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_016iufTDqa7JAuLZh84n2eNR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls services/reports/export/ 2>&1; wc -l services/reports/export/paginate.ts; cat services/reports/export/paginate.ts | head -150"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01RUgECN6EW9snqUudNVCKXe",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-c-Zw4WOs/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_016vjpATf31oc8t29PM23Th2",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "cat services/reports/export/paginate.ts",
+                "ls services/reports/export"
+              ],
+              "queries": [
+                "paginate loop and page parsing"
+              ]
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01QKQFnxMXX2kZnUTdar9yde",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export/"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON).",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0846413,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01KWZVd6KVeTSDs2DwJnvJXf",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -a; ls src src/store 2>&1; cat package.json tsconfig.json 2>&1 | head -40; git log --oneline | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ],
+    "d": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.08960019999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01W2QocJe2TbBn2KhuopvwbC",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -R src 2>/dev/null | head -50; ls; cat package.json 2>/dev/null | head -30; git log --oneline | head"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01EunXTEbUzDaoByqzKFRewp",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md 2>/dev/null; ls src/store 2>/dev/null"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0933706,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_016xwcR5hJCCqkU4rCDQE7RS",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls packages/cli packages/cli/lib 2>&1 | head -30; cat package.json 2>/dev/null | head -20"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0668706,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01R3m4Gjbtyr5A56beJeaPdG",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cd services/reports/export 2>/dev/null && ls && wc -l paginate.ts && cat paginate.ts | head -150",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_015TAvTiG1TAMtjNNpVTepFQ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls services/reports/export",
+                "cat services/reports/export/paginate.ts"
+              ],
+              "queries": [
+                "paginate.ts contents and exports",
+                "files in export directory"
+              ]
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01BtAG2eoZG1B5ugX4MTXWsu",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0927029,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01W3NFeDremDrk2517bYd5PT",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src src/store 2>&1 | head -30; cat package.json tsconfig.json 2>&1 | head -40",
+              "intent": "project layout"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1277658,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_012dRQJiEwgkosyw8jPH56Ga",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -40; cat package.json packages/cli/package.json 2>&1 | head -50"
+              ],
+              "queries": [
+                "directory layout and module style",
+                "existing config files, schema, dependencies"
+              ]
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01YTkHY9936njg5SYMkXcrJQ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFile } from \"node:fs/promises\";\n\nconst SCHEMA_VERSION = 4;\nconst VERSION_KEY = \"schema\";\nconst VERSION_PATTERN = /^cfg-schema-v(\\d+)$/;\n\nasync function readLayer(name, path) {\n  if (!path) return null;\n  let text;\n  try {\n    text = await readFile(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`config (${name} layer, ${path}): invalid JSON: ${err.message}`);\n  }\n  if (data === null || typeof data !== \"object\" || Array.isArray(data)) {\n    throw new Error(`config (${name} layer, ${path}): top level must be an object`);\n  }\n  return data;\n}\n\nfunction checkVersion(name, path, data) {\n  const declared = data[VERSION_KEY];\n  if (declared === undefined) return;\n  const match = VERSION_PATTERN.exec(String(declared));\n  if (!match) {\n    throw new Error(`config (${name} layer, ${path}): unrecognized schema \"${declared}\"`);\n  }\n  if (Number(match[1]) > SCHEMA_VERSION) {\n    throw new Error(\n      `config (${name} layer, ${path}): declares ${declared}, newer than supported cfg-schema-v${SCHEMA_VERSION}`,\n    );\n  }\n}\n\nfunction typeOf(value) {\n  if (Array.isArray(value)) return \"array\";\n  if (value === null) return \"null\";\n  return typeof value;\n}\n\n/**\n * Load config in three layers: defaults, project file, user file.\n * The merged result is checked against one schema (key -> type name,\n * inferred from defaults unless `schema` is given). Unknown keys produce a\n * warning naming the key and layer; type mismatches and newer schema\n * versions throw.\n *\n * @returns {Promise<{ values: object, sources: Record<string,string>, warnings: string[] }>}\n */\nexport async function loadConfig({ defaults = {}, projectFile, userFile, schema } = {}) {\n  const types = schema ?? Object.fromEntries(\n    Object.entries(defaults).map(([key, value]) => [key, typeOf(value)]),\n  );\n  const values = {};\n  const sources = {};\n  const warnings = [];\n\n  for (const key of Object.keys(defaults)) {\n    values[key] = defaults[key];\n    sources[key] = \"defaults\";\n  }\n\n  const layers = [\n    [\"project\", projectFile],\n    [\"user\", userFile],\n  ];\n  for (const [name, path] of layers) {\n    const data = await readLayer(name, path);\n    if (!data) continue;\n    checkVersion(name, path, data);\n    for (const [key, value] of Object.entries(data)) {\n      if (key === VERSION_KEY) continue;\n      if (!Object.hasOwn(types, key)) {\n        warnings.push(`unknown config key \"${key}\" in ${name} layer (${path})`);\n        continue;\n      }\n      values[key] = value;\n      sources[key] = name;\n    }\n  }\n\n  for (const [key, expected] of Object.entries(types)) {\n    if (!Object.hasOwn(values, key)) continue;\n    const actual = typeOf(values[key]);\n    if (actual !== expected) {\n      throw new Error(\n        `config key \"${key}\" (from ${sources[key]} layer): expected ${expected}, got ${actual}`,\n      );\n    }\n  }\n\n  return { values, sources, warnings };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo ok"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_013t7cz6HvVJbwZBiCsYe9zp",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib/config 2>&1; grep -rn \"writeFile\\|mkdir\" packages/cli --include=*.mjs --include=*.js -l 2>&1 | head"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01R9qbJF1T5w75kCRFEGvd44",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli/lib packages/cli/lib/config; grep -rnil \"doctor\" packages/cli --include=*.mjs --include=*.js --include=*.json | grep -v node_modules | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0705451,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01TZBYCJ84oMoxYkozar7abU",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export",
+              "intent": "view paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01SXjDHnS8Htx6Woc2JFUXTp",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_index",
+            "input": {
+              "path": "services/reports/export/paginate.ts",
+              "source": "paginate.ts"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0871062,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01AsJpUDZ9GpBpYCN3ozAxDS",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -a; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.10836860000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01H3r31yfKzftAb3mzNdCJV4",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -30; cat package.json packages/cli/package.json 2>&1 | head -40",
+              "intent": "repo layout"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.06748230000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01VrxXazFGTirJdaTcLHvvzm",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "wc -l services/reports/export/paginate.ts; ls services/reports/export; cat services/reports/export/paginate.ts | head -120",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01SdccVDqtPYjC36SSwS1hkZ",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-d-p0oflI/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01VciQa2gfL9mVjhKU4AsBQb",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "cat services/reports/export/paginate.ts",
+                "ls services/reports/export"
+              ],
+              "queries": [
+                "paginate loop and response parsing"
+              ]
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0859797,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01RhjGsvmYQMJHgszALkzrKJ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -a; cat package.json tsconfig.json 2>/dev/null | head -40; find src -type f 2>/dev/null | head -30"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ],
+    "e": [
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.11287549999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_0132PkuKE3VGACu71K1biQKc",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -la; ls src src/store 2>&1; cat package.json tsconfig.json 2>&1 | head -40"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.12278810000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_017GgCFJgU83Ski7FvY5LeuG",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -30",
+                "cat package.json packages/cli/package.json 2>&1 | head -40",
+                "grep -rl 'cfg-schema' . --include=* -s --exclude-dir=node_modules --exclude-dir=.git | head"
+              ],
+              "queries": [
+                "what files exist in packages/cli/lib",
+                "package type and dependencies",
+                "any existing schema references"
+              ]
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01H3Wb18M5F8VT5wr6tozY9x",
+            "name": "Write",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-e-zx8sNr/project/packages/cli/lib/config/layered-loader.mjs",
+              "content": "import { readFile } from \"node:fs/promises\";\n\nconst MAX_SCHEMA_VERSION = 4;\nconst SCHEMA_ID = \"cfg-schema-v4\";\nconst VERSION_PATTERN = /^cfg-schema-v(\\d+)$/;\n\nconst DEFAULTS = {};\n\n// Known keys and their expected types. Extend as the config grows.\nconst SCHEMA = {};\n\nfunction typeOf(value) {\n  if (value === null) return \"null\";\n  if (Array.isArray(value)) return \"array\";\n  return typeof value;\n}\n\nfunction isPlainObject(value) {\n  return typeOf(value) === \"object\";\n}\n\nasync function readLayerFile(path, layer) {\n  let text;\n  try {\n    text = await readFile(path, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`${layer} config ${path}: invalid JSON (${err.message})`);\n  }\n  if (!isPlainObject(data)) {\n    throw new Error(`${layer} config ${path}: top level must be an object`);\n  }\n  return data;\n}\n\nfunction checkVersion(data, layer, path) {\n  if (data.schema === undefined) return;\n  const match = typeof data.schema === \"string\" && VERSION_PATTERN.exec(data.schema);\n  if (!match) {\n    throw new Error(`${layer} config ${path}: unrecognized schema \"${data.schema}\"`);\n  }\n  if (Number(match[1]) > MAX_SCHEMA_VERSION) {\n    throw new Error(\n      `${layer} config ${path}: declares ${data.schema}, newer than supported ${SCHEMA_ID}`,\n    );\n  }\n}\n\n// Flatten nested objects to dotted keys so each leaf can record its layer.\nfunction flatten(obj, prefix = \"\", out = {}) {\n  for (const [key, value] of Object.entries(obj)) {\n    const full = prefix ? `${prefix}.${key}` : key;\n    if (isPlainObject(value) && Object.keys(value).length > 0) flatten(value, full, out);\n    else out[full] = value;\n  }\n  return out;\n}\n\nfunction unflatten(flat) {\n  const root = {};\n  for (const [key, value] of Object.entries(flat)) {\n    const parts = key.split(\".\");\n    let node = root;\n    for (const part of parts.slice(0, -1)) {\n      if (!isPlainObject(node[part])) node[part] = {};\n      node = node[part];\n    }\n    node[parts.at(-1)] = value;\n  }\n  return root;\n}\n\n/**\n * Load config from three layers: built-in defaults, project file, user file.\n * Later layers win. The merged result is validated against one schema.\n * Unknown keys and type mismatches in a value produce warnings, never errors.\n * A file declaring a schema newer than cfg-schema-v4 is refused.\n *\n * @param {{ projectPath?: string, userPath?: string }} [options]\n * @returns {Promise<{ config: object, sources: Record<string, string>, warnings: string[] }>}\n *   `sources` maps each dotted key to the layer that set it.\n */\nexport async function loadConfig({ projectPath, userPath } = {}) {\n  const layers = [{ name: \"defaults\", path: null, data: DEFAULTS }];\n  for (const [name, path] of [[\"project\", projectPath], [\"user\", userPath]]) {\n    if (!path) continue;\n    const data = await readLayerFile(path, name);\n    if (!data) continue;\n    checkVersion(data, name, path);\n    layers.push({ name, path, data });\n  }\n\n  const merged = {};\n  const sources = {};\n  const warnings = [];\n\n  for (const { name, data } of layers) {\n    for (const [key, value] of Object.entries(flatten(data))) {\n      if (key === \"schema\") continue;\n      const expected = SCHEMA[key];\n      if (expected === undefined) {\n        warnings.push(`unknown key \"${key}\" in ${name} layer`);\n      } else if (typeOf(value) !== expected) {\n        warnings.push(\n          `key \"${key}\" in ${name} layer should be ${expected}, got ${typeOf(value)}; ignored`,\n        );\n        continue;\n      }\n      merged[key] = value;\n      sources[key] = name;\n    }\n  }\n\n  return { config: unflatten(merged), sources, warnings };\n}\n"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01NoCa891cz7so6mZw9JKmFQ",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git status --short; ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1; grep -rIl -i doctor packages --exclude-dir=node_modules 2>/dev/null | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0816109,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01FNsdLgQLRATwRDT9xuj1fR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "wc -l services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01A53x5GWSpmWBXEFK8Svgts",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-e-Iqbyfg/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01J9heW5ot8FhwbTLFbngE3r",
+            "name": "Bash",
+            "input": {
+              "command": "cd /private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-e-Iqbyfg/project && cat services/reports/export/paginate.ts && ls services/reports/export"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_0118qQj89UP12SZRJD8u56zE",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "grep -rnE \"console\\.|logger\\.|log\\(\" services/reports/export"
+              ],
+              "queries": [
+                "log lines in exporter"
+              ]
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0776272,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01WFseLJatQ2MkniUVxhtEMz",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>&1 | head -30; grep -ril journal src 2>/dev/null | head; cat package.json 2>/dev/null | head -30"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01LVWMw6UtcLuUCQVoR6FAFx",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; grep -n '^#' README.md | head -30; ls src/store"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1172946,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_016Su3qqfFyF1dCfg1Ch1bv5",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFileSync } from 'node:fs';\n\nconst SCHEMA_VERSION = 4;\nconst SCHEMA_ID = `cfg-schema-v${SCHEMA_VERSION}`;\n\n// Built-in defaults double as the schema: a key is known if it appears here,\n// and its value must match the type of the default.\nconst DEFAULTS = {\n  logLevel: 'info',\n  telemetry: false,\n};\n\nconst isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);\n\nfunction readLayer(path, layer) {\n  if (!path) return null;\n  let text;\n  try {\n    text = readFileSync(path, 'utf8');\n  } catch (err) {\n    if (err.code === 'ENOENT') return null;\n    throw err;\n  }\n  try {\n    return JSON.parse(text);\n  } catch (err) {\n    throw new Error(`${layer} config ${path} is not valid JSON: ${err.message}`);\n  }\n}\n\nfunction checkVersion(data, layer, path) {\n  const declared = data.schemaVersion;\n  if (declared === undefined) return;\n  const match = typeof declared === 'string' && /^cfg-schema-v(\\d+)$/.exec(declared);\n  if (!match) {\n    throw new Error(`${layer} config ${path} declares invalid schema version ${JSON.stringify(declared)}`);\n  }\n  if (Number(match[1]) > SCHEMA_VERSION) {\n    throw new Error(`${layer} config ${path} declares ${declared}, newer than supported ${SCHEMA_ID}`);\n  }\n}\n\n// Applies one layer onto the merged result, recording provenance per dotted key.\nfunction applyLayer(target, sources, schema, data, layer, warnings, prefix = '') {\n  for (const [key, value] of Object.entries(data)) {\n    const dotted = prefix + key;\n    if (!prefix && key === 'schemaVersion') continue;\n    if (!Object.hasOwn(schema, key)) {\n      warnings.push({ key: dotted, layer, message: `unknown key \"${dotted}\" in ${layer} layer` });\n      continue;\n    }\n    const expected = schema[key];\n    if (isPlainObject(expected)) {\n      if (!isPlainObject(value)) {\n        throw new Error(`${layer} layer: \"${dotted}\" must be an object`);\n      }\n      applyLayer(target[key], sources, expected, value, layer, warnings, `${dotted}.`);\n    } else {\n      if (typeof value !== typeof expected) {\n        throw new Error(`${layer} layer: \"${dotted}\" must be of type ${typeof expected}`);\n      }\n      target[key] = value;\n      sources[dotted] = layer;\n    }\n  }\n}\n\nfunction recordDefaults(obj, sources, prefix = '') {\n  for (const [key, value] of Object.entries(obj)) {\n    if (isPlainObject(value)) recordDefaults(value, sources, `${prefix}${key}.`);\n    else sources[prefix + key] = 'defaults';\n  }\n}\n\n/**\n * Loads config from defaults, then the project file, then the user file.\n * Returns { config, sources, warnings } where sources maps each dotted key\n * to the layer that set it.\n */\nexport function loadConfig({ projectPath, userPath } = {}) {\n  const config = structuredClone(DEFAULTS);\n  const sources = {};\n  const warnings = [];\n  recordDefaults(DEFAULTS, sources);\n\n  for (const [layer, path] of [['project', projectPath], ['user', userPath]]) {\n    const data = readLayer(path, layer);\n    if (data === null) continue;\n    if (!isPlainObject(data)) throw new Error(`${layer} config ${path} must be a JSON object`);\n    checkVersion(data, layer, path);\n    applyLayer(config, sources, DEFAULTS, data, layer, warnings);\n  }\n\n  return { config, sources, warnings };\n}\nEOF\nnode -e \"import('./packages/cli/lib/config/layered-loader.mjs').then(m=>console.log(m.loadConfig()))\""
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01Eb6AzQxhDxrxHTtiWBjq8a",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls -la packages/cli/lib/config 2>&1; git status --short; grep -rn \"writeFile\\|mkdir\" packages 2>/dev/null | head"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01Dn5fK3abagSdtQoPYfftUd",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git status --short; ls packages/cli packages/cli/lib packages/cli/lib/config; grep -rln \"doctor\" packages --include=*.mjs --include=*.js --include=*.json | grep -v node_modules | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.06660619999999999,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01BZ1kpH2DsgMVNVjzDbYeK5",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export",
+              "intent": "paginate.ts contents"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_01MUA4Q2WGmc6MBjRpMqyP3b",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-e-08zvoc/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 2,
+            "id": "toolu_018T9jWH54p2JB2d8cpYetGB",
+            "name": "Glob",
+            "input": {
+              "pattern": "services/reports/export/**"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01LYVRjj6p2wBUidSg1eiohn",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export | head -50",
+              "intent": "log lines in exporter"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0811753,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01FEUVEpBMP9kzQvJh4moErx",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "git ls-files | head -50; ls src src/store 2>/dev/null; cat package.json tsconfig.json 2>/dev/null | head -50",
+              "intent": "project layout"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-02",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.1335606,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_012Na1BfTurCNWAVdpUNRA5x",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_batch",
+            "input": {
+              "commands": [
+                "ls packages/cli packages/cli/lib packages/cli/lib/config 2>&1 | head -30",
+                "cat package.json packages/cli/package.json 2>&1 | head -40",
+                "grep -rn \"cfg-schema\\|schemaVersion\" --include=*.mjs --include=*.js --include=*.json -l . 2>/dev/null | grep -v node_modules | head"
+              ],
+              "queries": [
+                "directory contents of packages/cli",
+                "package.json dependencies and type",
+                "existing schema version references"
+              ]
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01P6vqeYKujAsuS9jx2Yj96u",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "mkdir -p packages/cli/lib/config && cat > packages/cli/lib/config/layered-loader.mjs <<'EOF'\nimport { readFile } from \"node:fs/promises\";\n\nconst SCHEMA_VERSION = 4;\nconst SCHEMA_PREFIX = \"cfg-schema-v\";\nconst VERSION_KEY = \"schema\";\n\nexport const DEFAULTS = Object.freeze({});\n\nconst isPlainObject = (v) => v !== null && typeof v === \"object\" && !Array.isArray(v);\n\nfunction parseSchemaVersion(declared, file) {\n  const match = typeof declared === \"string\" && declared.startsWith(SCHEMA_PREFIX)\n    ? /^\\d+$/.exec(declared.slice(SCHEMA_PREFIX.length))\n    : null;\n  if (!match) throw new Error(`${file}: invalid \"${VERSION_KEY}\" value ${JSON.stringify(declared)}`);\n  return Number(match[0]);\n}\n\nasync function readLayer(layer, file) {\n  if (!file) return null;\n  let text;\n  try {\n    text = await readFile(file, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") return null;\n    throw err;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    throw new Error(`${file}: invalid JSON (${err.message})`);\n  }\n  if (!isPlainObject(data)) throw new Error(`${file}: top level must be an object`);\n  if (VERSION_KEY in data) {\n    const version = parseSchemaVersion(data[VERSION_KEY], file);\n    if (version > SCHEMA_VERSION) {\n      throw new Error(\n        `${file}: declares ${data[VERSION_KEY]}, newer than supported ${SCHEMA_PREFIX}${SCHEMA_VERSION}`,\n      );\n    }\n    delete data[VERSION_KEY];\n  }\n  return data;\n}\n\n// Merges `data` into `target`, recording the layer for each leaf in `sources`.\n// Keys absent from `schema` warn and are dropped; type mismatches throw.\nfunction mergeLayer({ target, sources, data, schema, layer, path, warnings }) {\n  for (const [key, value] of Object.entries(data)) {\n    const dotted = path ? `${path}.${key}` : key;\n    if (!Object.hasOwn(schema, key)) {\n      warnings.push({ key: dotted, layer, message: `unknown key \"${dotted}\" in ${layer} layer` });\n      continue;\n    }\n    const expected = schema[key];\n    if (isPlainObject(expected)) {\n      if (!isPlainObject(value)) {\n        throw new Error(`${layer} layer: \"${dotted}\" must be an object`);\n      }\n      mergeLayer({ target: target[key], sources, data: value, schema: expected, layer, path: dotted, warnings });\n      continue;\n    }\n    if (expected !== null && value !== null && typeof value !== typeof expected) {\n      throw new Error(`${layer} layer: \"${dotted}\" must be of type ${typeof expected}`);\n    }\n    target[key] = value;\n    sources[dotted] = layer;\n  }\n}\n\nfunction seedDefaults(defaults, sources, path = \"\") {\n  const out = {};\n  for (const [key, value] of Object.entries(defaults)) {\n    const dotted = path ? `${path}.${key}` : key;\n    if (isPlainObject(value)) {\n      out[key] = seedDefaults(value, sources, dotted);\n    } else {\n      out[key] = Array.isArray(value) ? [...value] : value;\n      sources[dotted] = \"defaults\";\n    }\n  }\n  return out;\n}\n\n/**\n * Loads config in three layers (defaults, project file, user file) and\n * validates the merged result against the schema derived from `defaults`.\n *\n * Returns { config, sources, warnings }:\n *  - sources maps each dotted key to the layer that set it\n *  - warnings lists unknown keys as { key, layer, message }; never an error\n * Throws if a file declares a schema newer than cfg-schema-v4.\n */\nexport async function loadConfig({ projectFile, userFile, defaults = DEFAULTS } = {}) {\n  const sources = {};\n  const warnings = [];\n  const config = seedDefaults(defaults, sources);\n\n  for (const [layer, file] of [[\"project\", projectFile], [\"user\", userFile]]) {\n    const data = await readLayer(layer, file);\n    if (data) mergeLayer({ target: config, sources, data, schema: defaults, layer, path: \"\", warnings });\n  }\n\n  return { config, sources, warnings };\n}\nEOF\nnode --check packages/cli/lib/config/layered-loader.mjs && echo ok"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01AaBNop4LjT7KhMUWD8uXne",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls packages/cli packages/cli/lib packages/cli/lib/config; grep -rni \"doctor\" packages/cli --include=*.mjs --include=*.js -l | grep -v node_modules | head"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "packages/cli/lib/config/layered-loader.mjs",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-03",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": false,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.06816080000000001,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01KMKgF9A1WFE7uHr3XyEdxR",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "cat services/reports/export/paginate.ts; ls services/reports/export"
+            }
+          },
+          {
+            "turn": 1,
+            "id": "toolu_01WAaRLcvsqMuY4f44AfyS7J",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-e-lmI0GH/project/services/reports/export/paginate.ts"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01PhhHM8J2xF1vzTqyh6QHmr",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "grep -rnE \"console\\.|logger\\.\" services/reports/export | head -50"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "Newline-delimited JSON (NDJSON)",
+        "exitCode": 0
+      },
+      {
+        "fixture": "session-01",
+        "factInSummary": false,
+        "calledTool": false,
+        "correct": true,
+        "resumeSeqOk": true,
+        "compacted": true,
+        "isError": false,
+        "costUsd": 0.0896884,
+        "toolCalls": [
+          {
+            "turn": 1,
+            "id": "toolu_01L3UTEek7WEXNGkD3492DWM",
+            "name": "mcp__plugin_context-mode_context-mode__ctx_execute",
+            "input": {
+              "language": "shell",
+              "code": "ls; ls src src/store 2>&1 | head -30; cat package.json 2>/dev/null | head -30; ls tsconfig.json",
+              "intent": "project layout"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_0192w2y2M2P8btw8VZrjtBNK",
+            "name": "Read",
+            "input": {
+              "file_path": "/private/tmp/cm-v2-fu-az-tcmp-scratch/cm-t-cmp-B2ZxRC/arm-e-Xl1Adj/project/README.md"
+            }
+          },
+          {
+            "turn": 3,
+            "id": "toolu_01Cudx9xTi69B2wq3pNmTFZL",
+            "name": "Glob",
+            "input": {
+              "pattern": "src/store/*"
+            }
+          }
+        ],
+        "returned": {
+          "calls": 0,
+          "bytes": 0,
+          "errors": 0,
+          "factReturned": false
+        },
+        "finalText": "7350",
+        "exitCode": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Query \"decision\":\ndecision-row #0: decision: ship BM25+RRF ranking for ctx_search, no MMR step, k=60."
+    }
+  ],
+  "isError": false
+}

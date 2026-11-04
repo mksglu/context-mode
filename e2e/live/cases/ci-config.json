@@ -1,0 +1,7 @@
+{
+  "id": "ci-config",
+  "kind": "local",
+  "covers": [".github/workflows/ci.yml"],
+  "run": ["node", "e2e/checks/ci-config.mjs"],
+  "expect": { "jsonField": "ok", "equals": true }
+}

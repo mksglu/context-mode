@@ -1,0 +1,35 @@
+Manual setup for copilot-cli. Run:
+
+copilot mcp add context-mode -- <NODE> <PKG>/server.mjs --agent copilot-cli
+
+Hooks: add the hook block from `context-mode setup --print copilot-cli --json` to <HOME>/.copilot/hooks/context-mode.json
+(keep your own entries).
+
+Skill: put this in <HOME>/.copilot/skills/ctx-doctor/SKILL.md:
+
+---
+name: ctx-doctor
+description: Check that context-mode is installed and working, as a table.
+disable-model-invocation: true
+---
+Call the context-mode-ctx_doctor tool and show its table to the user unchanged. If a row failed, list the fixes it names, in order.
+
+Skill: put this in <HOME>/.copilot/skills/ctx-stats/SKILL.md:
+
+---
+name: ctx-stats
+description: Show how much context context-mode saved, as a detailed report.
+disable-model-invocation: true
+---
+Call the context-mode-ctx_stats tool and show the text block of its reply to the user unchanged, inside a code block so the columns stay aligned. Add one sentence under it that names the largest saving.
+
+Skill: put this in <HOME>/.copilot/skills/ctx-upgrade/SKILL.md:
+
+---
+name: ctx-upgrade
+description: Update context-mode to the latest release.
+disable-model-invocation: true
+---
+Call the context-mode-ctx_upgrade tool and show its table to the user. Then call context-mode-ctx_doctor and show its table. If a restart is needed, say so in one sentence.
+
+Then restart the agent and check it: context-mode doctor --agents copilot-cli

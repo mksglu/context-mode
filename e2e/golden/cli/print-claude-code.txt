@@ -1,0 +1,6 @@
+Manual setup for claude-code. Run:
+
+claude plugin marketplace add <PKG>
+claude plugin install context-mode@context-mode
+
+Then restart the agent and check it: context-mode doctor --agents claude-code

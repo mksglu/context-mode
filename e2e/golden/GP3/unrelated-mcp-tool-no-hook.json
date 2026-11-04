@@ -1,0 +1,22 @@
+{
+  "claude-code": [
+    "no-hook",
+    "no-hook",
+    "no-hook"
+  ],
+  "codex": [
+    "no-hook",
+    "no-hook",
+    "no-hook"
+  ],
+  "qwen": [
+    "no-hook",
+    "no-hook",
+    "no-hook"
+  ],
+  "zcode": [
+    "no-hook",
+    "no-hook",
+    "no-hook"
+  ]
+}
