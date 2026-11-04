@@ -1152,14 +1152,18 @@ describe("ADR-0002: owner pid files (GP9)", { concurrency: CONC }, () => {
     const dir = mkdtempSync(join(tmpdir(), "cm-owners-"));
     try {
       writeOwnerPid(dir, "proj1", "srv-live");
-      const before = process.cpuUsage();
-      listLiveOwners(dir, "proj1");
-      const after = process.cpuUsage();
-      // A ps/exec spawn would cost several ms of user+system CPU; a pure
-      // process.kill(pid,0) probe costs microseconds. This is a smoke bound,
-      // not a precise timing assertion.
-      const deltaMs = (after.user - before.user + (after.system - before.system)) / 1000;
-      assert.ok(deltaMs < 20, `listLiveOwners used ${deltaMs}ms CPU, suspiciously high for a signal-0 probe`);
+      // A ps/exec spawn would cost several ms of user+system CPU on EVERY call; a pure
+      // process.kill(pid,0) probe costs microseconds. Take the minimum of several probes:
+      // a loaded CI runner can stall one probe (D-R24-FLAKE-1: 56 ms seen on ubuntu node 26),
+      // it cannot stall all of them, and a real spawn would raise every one.
+      let deltaMs = Infinity;
+      for (let i = 0; i < 7; i++) {
+        const before = process.cpuUsage();
+        listLiveOwners(dir, "proj1");
+        const after = process.cpuUsage();
+        deltaMs = Math.min(deltaMs, (after.user - before.user + (after.system - before.system)) / 1000);
+      }
+      assert.ok(deltaMs < 20, `listLiveOwners used at least ${deltaMs}ms CPU on every probe, suspiciously high for a signal-0 probe`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
