@@ -150,6 +150,36 @@ describe("ADR-0013: plan.mjs on main", { concurrency: CONC }, () => {
     assert.equal(r.status, 1);
     assert.equal(r.stderr, "release failed: tag v2.0.2 is already on origin\n");
   });
+
+  // D-RN-STABLE-1: latest notes start at the previous stable tag in HEAD history of any major; next keeps
+  // "since the newest tag".
+  test("[MAIN-ONLY] plan --main: latest notes start at the previous stable tag (v1 counts), next at the newest tag", (t) => {
+    const dir = seed(t);
+    commit(dir, "fix: v1 era");
+    tagged(dir, "1.0.169");
+    commit(dir, "feat: a");
+    tagged(dir, "2.0.0-next.1");
+    commit(dir, "fix: b");
+    const latest = plan(dir, ...LATEST);
+    assert.equal(latest.status, 0, latest.stderr);
+    assert.equal(versionOf(latest.stdout), "version=2.0.0");
+    assert.ok(latest.stdout.includes("- feat: a") && latest.stdout.includes("- fix: b"), latest.stdout);
+    assert.ok(!latest.stdout.includes("v1 era"), latest.stdout);
+    const next = plan(dir, ...NEXT);
+    assert.equal(next.status, 0, next.stderr);
+    assert.equal(next.stdout, ["version=2.0.0-next.2", "notes<<EOF", "### Fixes", "- fix: b", "EOF", ""].join("\n"));
+  });
+
+  test("[MAIN-ONLY] plan --main: latest after v2.0.0 and v2.0.1-next.1 -> notes since v2.0.0", (t) => {
+    const dir = seed(t);
+    tagged(dir, "2.0.0");
+    commit(dir, "fix: c");
+    tagged(dir, "2.0.1-next.1");
+    commit(dir, "fix: d");
+    const r = plan(dir, ...LATEST);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, ["version=2.0.1", "notes<<EOF", "### Fixes", "- fix: d", "- fix: c", "EOF", ""].join("\n"));
+  });
 });
 
 describe("ADR-0013: publish.mjs", { concurrency: CONC }, () => {

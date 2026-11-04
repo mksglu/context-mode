@@ -303,6 +303,52 @@ describe("ADR-0013 release: plan", () => {
     assert.equal(other.status, 1);
     assert.equal(other.stderr, `release failed: tag v2.0.0-next.1 on origin points at ${first}, not HEAD ${git(dir, "rev-parse", "HEAD")}\n`);
   });
+
+  // D-RN-STABLE-1: a stable version's notes start at the previous stable tag of any major (v1 counts), not at
+  // the newest prerelease; a prerelease keeps "since the newest older tag".
+  function stableSeed(t) {
+    const dir = seed(t);
+    commit(dir, "fix: v1 era");
+    pushTag(dir, "v1.0.169");
+    commit(dir, "feat: a");
+    pushTag(dir, "v2.0.0-next.1");
+    commit(dir, "fix: b");
+    return dir;
+  }
+
+  test("[RN] release/plan: --tag v2.0.0 stable after prereleases -> notes since the previous stable tag (v1.0.169)", (t) => {
+    const dir = stableSeed(t);
+    pushTag(dir, "v2.0.0");
+    const r = plan(dir, "--tag", "v2.0.0");
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(versionOf(r.stdout), "version=2.0.0");
+    assert.ok(r.stdout.includes("- feat: a") && r.stdout.includes("- fix: b"), r.stdout);
+    assert.ok(!r.stdout.includes("v1 era"), r.stdout);
+  });
+
+  test("[RN] release/plan: --tag v2.0.0-next.2 prerelease -> notes since the newest older tag only", (t) => {
+    const dir = stableSeed(t);
+    pushTag(dir, "v2.0.0-next.2");
+    const r = plan(dir, "--tag", "v2.0.0-next.2");
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(versionOf(r.stdout), "version=2.0.0-next.2");
+    assert.ok(r.stdout.includes("- fix: b"), r.stdout);
+    assert.ok(!r.stdout.includes("feat: a") && !r.stdout.includes("v1 era"), r.stdout);
+  });
+
+  test("[RN] release/plan: --tag v2.0.1 stable after v2.0.0 and v2.0.1-next.1 -> notes since v2.0.0", (t) => {
+    const dir = seed(t);
+    commit(dir, "feat: old");
+    pushTag(dir, "v2.0.0");
+    commit(dir, "fix: c");
+    pushTag(dir, "v2.0.1-next.1");
+    commit(dir, "fix: d");
+    pushTag(dir, "v2.0.1");
+    const r = plan(dir, "--tag", "v2.0.1");
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.includes("- fix: c") && r.stdout.includes("- fix: d"), r.stdout);
+    assert.ok(!r.stdout.includes("feat: old"), r.stdout);
+  });
 });
 
 describe("ADR-0013 release: smoke", () => {

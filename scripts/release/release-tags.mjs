@@ -93,3 +93,19 @@ export function parseTaggedReleases(lsRemoteOutput, { prerelease = false } = {})
   out.sort((a, b) => compareReleaseVersions(b.version, a.version));
   return out.map(({ tag, commit }) => ({ tag, commit }));
 }
+
+// Release-notes start only (D-RN-STABLE-1): annotated stable tags v<x.y.z> of ANY major (v1.x counts), no
+// prerelease part, from `git ls-remote --tags` output -> [{ tag, commit, version }] newest version first.
+// Not a "tagged release" (parseTaggedReleases): v1 tags never drive a version bump.
+export function parseStableTags(lsRemoteOutput) {
+  const out = [];
+  for (const [commit, ref] of lines(lsRemoteOutput)) {
+    if (!ref.endsWith(PEELED_SUFFIX)) continue;
+    const tag = ref.slice(TAG_REF_PREFIX.length, -PEELED_SUFFIX.length);
+    if (!tag.startsWith(TAG_PREFIX)) continue;
+    const version = parseReleaseVersion(tag.slice(TAG_PREFIX.length));
+    if (version && version.pre === null) out.push({ tag, commit, version });
+  }
+  out.sort((a, b) => compareReleaseVersions(b.version, a.version));
+  return out;
+}

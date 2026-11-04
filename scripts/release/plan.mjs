@@ -11,18 +11,21 @@
 // untagged rehearsal commits): first release, version 2.0.0 over all history (A11).
 // A tagged release that `release` does not contain: refuse.
 // --tag v<x.y.z>[-<pre>] (release.yml on a pushed v2.* tag, D-RN-TAG-1): the version is the tag without "v",
-// never a bump. The tag must be on origin at HEAD. Notes: commits since the newest older v2+ tag on origin
-// (prereleases count): a tag on a HEAD ancestor starts the range at its commit, a tag in `release` at its
-// Source-Commit trailer; none -> all history.
+// never a bump. The tag must be on origin at HEAD. Notes (D-RN-STABLE-1): a prerelease tag lists the commits
+// since the newest older v2+ tag on origin (prereleases count); a stable tag (no prerelease part) lists the
+// commits since the previous stable tag on origin of ANY major (v1.x counts, prereleases do not), so v2.0.0
+// covers all of v1 -> v2, not only the commits since the last next. A start tag on a HEAD ancestor starts the
+// range at its commit, a tag in `release` at its Source-Commit trailer; none -> all history.
 // --main --channel next|latest [--confirm latest] (main-only release, docs/architecture/release/MAIN-ONLY.md): no release
 // branch. Base = newest stable v2+ tag that is in HEAD's history (none: 2.0.0), bumped by the conventional commits
 // since it. latest = the base; next = <base>-next.<N>, N = 1 + the highest N of that base among all tags on origin.
-// Notes and the "releasable" check cover the commits since the newest tag (any kind) in HEAD's history. latest
-// needs --confirm latest, and refuses a version whose tag is already on origin.
+// Notes and the "releasable" check (D-RN-STABLE-1): next covers the commits since the newest tag (any kind) in
+// HEAD's history; latest covers the commits since the newest stable tag of ANY major (v1.x counts) in HEAD's
+// history. latest needs --confirm latest, and refuses a version whose tag is already on origin.
 // Failure: one stderr line `release failed: <reason>` and exit 1 (impl/13 §1).
 import { spawnSync } from "node:child_process";
 import { GIT_REMOTE_NAME, RELEASE_BRANCH } from "../../src/core/contracts/constants.ts";
-import { compareReleaseVersions, parseReleaseTag, parseTaggedReleases, tagCommit } from "./release-tags.mjs";
+import { compareReleaseVersions, parseReleaseTag, parseStableTags, parseTaggedReleases, tagCommit } from "./release-tags.mjs";
 
 const FIRST_VERSION = "2.0.0";
 const FIRST_CORE = Object.freeze([2, 0, 0]);
@@ -107,11 +110,15 @@ function lsRemoteTags() {
   return ls.out;
 }
 
-// --tag mode: the commit the notes range starts after, or null (all history).
+// --tag mode: the commit the notes range starts after, or null (all history). A stable version starts at the
+// previous stable tag of any major; a prerelease at the newest older v2+ tag (D-RN-STABLE-1).
 function previousTagStart(ls, tag, version) {
   const hasRelease = git("rev-parse", "--verify", "--quiet", `refs/heads/${RELEASE_BRANCH}`).ok;
-  for (const t of parseTaggedReleases(ls, { prerelease: true })) {
-    if (t.tag === tag || compareReleaseVersions(parseReleaseTag(t.tag, { prerelease: true }), version) >= 0) continue;
+  const candidates = version.pre === null
+    ? parseStableTags(ls)
+    : parseTaggedReleases(ls, { prerelease: true }).map((t) => ({ ...t, version: parseReleaseTag(t.tag, { prerelease: true }) }));
+  for (const t of candidates) {
+    if (t.tag === tag || compareReleaseVersions(t.version, version) >= 0) continue;
     if (git("merge-base", "--is-ancestor", t.commit, "HEAD").ok) return t.commit;
     if (hasRelease && git("merge-base", "--is-ancestor", t.commit, `refs/heads/${RELEASE_BRANCH}`).ok) return sourceCommit(t.commit);
   }
@@ -175,8 +182,10 @@ function planFromMain(channel, confirm) {
     if (rank === 0) fail(`no releasable commits since ${stable.tag}`);
     core = bumpCore(stable.v.core, rank);
   }
-  const subjects = subjectsIn(newest ? `${newest.commit}..HEAD` : "HEAD");
-  if (newest && rankOf(subjects) === 0) fail(`no releasable commits since ${newest.tag}`);
+  // latest: notes since the previous stable tag of any major in HEAD's history (D-RN-STABLE-1); next: since the newest tag.
+  const from = channel === "latest" ? parseStableTags(ls).find((t) => git("merge-base", "--is-ancestor", t.commit, "HEAD").ok) : newest;
+  const subjects = subjectsIn(from ? `${from.commit}..HEAD` : "HEAD");
+  if (from && rankOf(subjects) === 0) fail(`no releasable commits since ${from.tag}`);
   const base = core.join(".");
   let version = base;
   if (channel === "next") {
