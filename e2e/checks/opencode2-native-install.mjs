@@ -33,12 +33,12 @@ const run = (line) => {
 };
 try {
   const add = run(OPENCODE2_INSTALL);
-  steps.push({ ...add, pass: add.exit === 0 && Array.isArray(add.plugins) && add.plugins.includes("context-mode@next") });
+  steps.push({ ...add, pass: add.exit === 0 && Array.isArray(add.plugins) && add.plugins.includes("context-mode") });
   const upd = run(OPENCODE2_UPDATE);
-  steps.push({ ...upd, pass: upd.exit === 0 && Array.isArray(upd.plugins) && upd.plugins.includes("context-mode@next") });
+  steps.push({ ...upd, pass: upd.exit === 0 && Array.isArray(upd.plugins) && upd.plugins.includes("context-mode") });
   const rm = run(OPENCODE2_REMOVE);
-  steps.push({ ...rm, pass: rm.exit === 0 && Array.isArray(rm.plugins) && !rm.plugins.includes("context-mode@next") });
-  const old = run("opencode plugin context-mode@next --global");
+  steps.push({ ...rm, pass: rm.exit === 0 && Array.isArray(rm.plugins) && !rm.plugins.includes("context-mode") });
+  const old = run("opencode plugin context-mode --global");
   steps.push({ ...old, pass: old.exit !== 0 || old.out.includes("Unknown subcommand") || old.out.includes("Unrecognized flag") });
 } finally {
   // Windows keeps a handle on the temp HOME for a moment after the host exits (EPERM on rm); the dir is in the OS temp, so a failed clean-up is not a failed check.
