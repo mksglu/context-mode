@@ -1093,3 +1093,157 @@ describe("[NPM-NAMES] D-NPM-NAMES-1 one config file for the npm names", { concur
     assert.equal(m.npmPackageJson("2.0.0").name, "context-mode");
   });
 });
+
+// D-REL-WHO-1: owner, 2026-11-04: "Claude Code hatasi duzeldi mi? npm cikmamiza gerek kalmadi mi Claude Code icin? Release
+// workflow una bunu yazalim bir sekilde." One version goes to both channels on every release; the plan maps the files changed
+// since the last tag to the agents they reach and writes a "Who gets this" table (agent, channel, each agent's own update
+// command, copied from docs/install/<id>.md). Only docs, tests or CI changed: nothing to release.
+describe("[WHO] D-REL-WHO-1 release plan: who gets this release", { concurrency: CONC }, () => {
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const PLAN = path.join(REPO, "scripts", "release", "plan.mjs");
+  const GIT_ID = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"];
+  const reach = () => import(pathToFileURL(path.join(REPO, "scripts", "release", "reach.mjs")).href);
+  const ALL = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"];
+
+  test("docs, tests, CI, bench and e2e reach no agent", async () => {
+    const { reachOf } = await reach();
+    assert.deepEqual(reachOf(["docs/install/pi.md", "tests/0002-store.test.mjs", ".github/workflows/ci.yml", "e2e/cases/run.mjs",
+      "bench/a.json", "README.md", "scripts/release/plan.mjs", "build/check-readme.mjs"]), []);
+  });
+
+  test("shared code reaches every agent: src/core, src/prompt, the adapter table, the server, skills, package.json, the build", async () => {
+    const { reachOf } = await reach();
+    for (const f of ["src/core/store/db.ts", "src/prompt/instructions.md", "src/adapters/table.ts", "src/entries/server.ts",
+      "src/setup/engine.ts", "skills/ctx-stats/SKILL.md", "package.json", "build/manifests.ts"]) assert.deepEqual(reachOf([f]), ALL, f);
+  });
+
+  test("an agent's own files reach that agent; an adapter other adapters import reaches them too", async () => {
+    const { reachOf } = await reach();
+    assert.deepEqual(reachOf(["src/adapters/pi.ts"]), ["pi"]);
+    assert.deepEqual(reachOf(["src/entries/opencode.ts"]), ["opencode"]);
+    assert.deepEqual(reachOf(["src/setup/codex-trust.ts"]), ["codex"]);
+    assert.deepEqual(reachOf(["src/setup/copilot-hooks.ts"]), ["copilot-cli"]);
+    assert.deepEqual(reachOf(["src/setup/zcode-gate.ts"]), ["zcode"]);
+    assert.deepEqual(reachOf(["hooks/qwen.json", "qwen-extension.json"]), ["qwen"]);
+    assert.deepEqual(reachOf(["hooks/hooks.json"]), ["gemini"]);
+    assert.deepEqual(reachOf([".codex-plugin/plugin.json"]), ["codex"]);
+    assert.deepEqual(reachOf(["plugins/claude-code/server.mjs"]), ["claude-code", "codex", "gemini", "qwen"]);
+    // codex, qwen, zcode and vscode import the Claude shape from src/adapters/claude-code.ts (#1304 changed it).
+    assert.deepEqual(reachOf(["src/adapters/claude-code.ts"]), ["claude-code", "codex", "qwen", "vscode", "zcode"]);
+    assert.deepEqual(reachOf(["src/adapters/pi.ts", "src/adapters/gemini.ts", "docs/x.md"]), ["gemini", "pi"]);
+  });
+
+  test("the table: agent, channel, the agent's own update command; the other agents are named", async () => {
+    const { whoGetsTable } = await reach();
+    assert.equal(whoGetsTable(["claude-code", "codex", "pi"]), [
+      "### Who gets this",
+      "",
+      "One version on both channels: the release commit on main (GitHub) and npm.",
+      "",
+      "| Agent | Channel | Update with |",
+      "|---|---|---|",
+      "| Claude Code | GitHub | `claude plugin update context-mode@context-mode` |",
+      "| Codex | GitHub, npm for the one-time hook trust step | `codex plugin marketplace upgrade context-mode` |",
+      "| Pi | npm | `pi update --extensions` |",
+      "",
+      "Same version, no code change: Gemini CLI, Qwen Code, Copilot CLI, VS Code (Copilot), Kiro, ZCode, OpenCode.",
+    ].join("\n"));
+    assert.ok(!whoGetsTable(ALL).includes("Same version"), "every agent reached: no extra line");
+  });
+
+  test("every update command is the one the README shows (each agent's own command, from docs/install)", async () => {
+    const { whoGetsTable } = await reach();
+    const { agentRows } = await import(pathToFileURL(path.join(REPO, "build", "readme-agents.mjs")).href);
+    const table = whoGetsTable(ALL);
+    for (const r of agentRows()) assert.ok(table.includes(`| ${r.name} | `) && table.includes(`\`${r.cmds.update.join("; ")}\``), r.id);
+    for (const id of ["copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"]) assert.ok(!table.includes("| " + id), id);
+  });
+
+  function git(dir, ...args) {
+    const r = spawnSync("git", [...GIT_ID, ...args], { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  }
+  function change(dir, file, subject) {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), subject);
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "--allow-empty", "-m", subject);
+  }
+  function seedTagged(t) {
+    const root = mkdtempSync(path.join(tmpdir(), "cm-v2-who-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const bare = path.join(root, "origin.git");
+    const dir = path.join(root, "work");
+    git(root, "init", "-q", "--bare", bare);
+    git(root, "init", "-q", dir);
+    git(dir, "remote", "add", "origin", bare);
+    change(dir, "src/core/a.ts", "feat: first");
+    git(dir, "tag", "-a", "v2.0.0", "-m", "v2.0.0");
+    git(dir, "push", "-q", "origin", "refs/tags/v2.0.0");
+    return dir;
+  }
+  const plan = (dir, ...args) => spawnSync(process.execPath, [PLAN, "--main", ...args], { cwd: dir, encoding: "utf8" });
+
+  test("plan --main: a fix that changes only CI, tests or docs -> nothing to release", (t) => {
+    const dir = seedTagged(t);
+    change(dir, ".github/workflows/ci.yml", "fix(ci): runner");
+    change(dir, "tests/a.test.mjs", "fix(test): flake");
+    const r = plan(dir, "--channel", "next");
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout, "");
+    assert.equal(r.stderr, "release failed: nothing to release since v2.0.0: only docs, tests or CI changed\n");
+  });
+
+  test("plan --main: the notes end with the table for the agents the changed files reach", (t) => {
+    const dir = seedTagged(t);
+    change(dir, "src/adapters/pi.ts", "fix(pi): x");
+    change(dir, "docs/a.md", "docs: y");
+    const r = plan(dir, "--channel", "next", "--dry-run");
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.startsWith("version: 2.0.1-next.1\n\n### Fixes\n- fix(pi): x\n\n### Who gets this\n"), r.stdout);
+    assert.ok(r.stdout.includes("| Pi | npm | `pi update --extensions` |\n"), r.stdout);
+    assert.ok(!r.stdout.includes("| Claude Code |") && r.stdout.includes("no code change: Claude Code, Codex,"), r.stdout);
+  });
+
+  // workflow_dispatch dry_run (docs/architecture/release/MAIN-ONLY.md): plan, build and smoke, then stop; the job summary shows the plan.
+  const yml = readFileSync(path.join(REPO, ".github", "workflows", "release.yml"), "utf8");
+  const jobOf = (name) => {
+    const rest = yml.slice(yml.indexOf(`\n  ${name}:\n`) + 1).split("\n");
+    const end = rest.findIndex((l, i) => i > 0 && l.startsWith("  ") && !l.startsWith("   ") && l.trim().endsWith(":"));
+    return rest.slice(0, end).join("\n");
+  };
+
+  // The lines under a key, while they are indented deeper than the key.
+  const under = (lines, i) => {
+    const ind = lines[i].length - lines[i].trimStart().length;
+    const out = [];
+    for (let j = i + 1; j < lines.length && (lines[j].trim() === "" || lines[j].length - lines[j].trimStart().length > ind); j++) out.push(lines[j]);
+    return out;
+  };
+
+  test("release.yml: dry_run input, boolean, default false", () => {
+    const lines = yml.split("\n");
+    const i = lines.indexOf("      dry_run:");
+    assert.ok(i > 0, "input dry_run");
+    const block = under(lines, i).map((l) => l.trim());
+    for (const s of ["type: boolean", "default: false", "required: false"]) assert.ok(block.includes(s), s);
+  });
+
+  test("release.yml: a dry run publishes nothing; main-plan writes the plan and the table to the job summary", () => {
+    for (const j of ["main-npm", "main-commit", "main-github-release"]) {
+      const cond = jobOf(j).split("\n").find((l) => l.trim().startsWith("if:"));
+      assert.ok(cond.includes("!inputs.dry_run"), j + ": " + cond);
+    }
+    for (const j of ["main-plan", "main-build", "main-smoke"]) assert.ok(!jobOf(j).split("\n").find((l) => l.trim().startsWith("if:")).includes("dry_run"), j);
+    const p = jobOf("main-plan");
+    assert.ok(p.includes("NOTES: ${{ steps.plan.outputs.notes }}") && p.includes("DRY_RUN: ${{ inputs.dry_run }}"), p);
+    assert.ok(p.includes('>> "$GITHUB_STEP_SUMMARY"'), p);
+    // Run text reads env only, never ${{ }} (template injection).
+    const lines = p.split("\n");
+    lines.forEach((l, i) => {
+      if (!l.trim().startsWith("run:")) return;
+      for (const r of [l, ...under(lines, i)]) assert.ok(!r.includes("${{"), r);
+    });
+  });
+});

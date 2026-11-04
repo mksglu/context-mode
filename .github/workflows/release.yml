@@ -42,6 +42,11 @@ on:
         type: choice
         options: [release, rollback]
         default: release
+      dry_run:
+        description: "plan, build and smoke only; the job summary shows the version, the notes and who gets this. Publishes nothing."
+        required: false
+        type: boolean
+        default: false
 concurrency:
   group: release
   cancel-in-progress: false
@@ -321,6 +326,8 @@ jobs:
           node-version: "24.15.0"
       - id: sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: npm install
+        name: dev tooling for the agents table (scripts/release/reach.mjs reads src/adapters and src/setup)
       - id: plan
         name: version and notes from the commits since the last tag on main; latest needs confirm_latest
         env:
@@ -328,6 +335,17 @@ jobs:
           CONFIRM: ${{ inputs.confirm_latest }}
         run: |
           node scripts/release/plan.mjs --main --channel "$CHANNEL" --confirm "$CONFIRM" >> "$GITHUB_OUTPUT"
+      - name: job summary, the version, the notes and who gets this (D-REL-WHO-1)
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          NOTES: ${{ steps.plan.outputs.notes }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            if [ "$DRY_RUN" = "true" ]; then echo "## Dry run: v$VERSION (publishes nothing)"; else echo "## Release v$VERSION"; fi
+            echo
+            printf '%s\n' "$NOTES"
+          } >> "$GITHUB_STEP_SUMMARY"
   main-build:
     needs: [route, main-plan]
     if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
@@ -408,7 +426,7 @@ jobs:
         continue-on-error: true   # tier-2 per GS2
   main-npm:
     needs: [route, main-plan, main-smoke]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-publish
@@ -458,7 +476,7 @@ jobs:
         run: node scripts/release/npm-names.mjs publish-shims --pkg release-out --version "$VERSION" --tag "$NPM_TAG"
   main-commit:
     needs: [route, main-plan, main-npm]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -481,7 +499,7 @@ jobs:
         run: node scripts/release/commit-main.mjs --pkg release-out --version "$VERSION"
   main-github-release:
     needs: [route, main-plan, main-commit]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

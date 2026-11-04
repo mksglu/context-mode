@@ -61,7 +61,7 @@ Status: accepted 2026-10-30, move done. Decision record: [ADR-0024](adr/0024-tes
 | 0010-doctor-upgrade | ADR-0010, PRD-v2 section 13, GP11 | `tests/0010-doctor-upgrade.test.mjs` | doctor, upgrade, release fetch, checksums, report | 124 | 12.9 |
 | 0011-v1-transition | ADR-0011, GP11 | `tests/0011-v1-transition.test.mjs` | v1 detect and remove, v1 migration | 44 | 1.7 |
 | 0013-release-main | ADR-0013, PRD-v2 section 14 | `tests/0013-release-main.test.mjs` | release to main: publish, plan-main, commit, branch protection | 43 | 22.0 |
-| 0013-release-plan | ADR-0013, ADR-0019, PRD-v2 section 14 | `tests/0013-release-plan.test.mjs` | release plan, smoke, rollback, npm publish | 60 | 23.6 |
+| 0013-release-plan | ADR-0013, ADR-0019, PRD-v2 section 14 | `tests/0013-release-plan.test.mjs` | release plan, smoke, rollback, npm publish, who gets this | 69 | 23.6 |
 | 0014-repo-hygiene | ADR-0013, ADR-0014, ADR-0015 | `tests/0014-repo-hygiene.test.mjs` | issue forms, workflows, README, secrets, removed files | 80 | 3.6 |
 | 0023-install-docs | ADR-0023, PRD-setup | `tests/0023-install-docs.test.mjs` | install docs per agent use the native install command | 44 | 0.8 |
 | 0021-cache-safety | ADR-0021 | `tests/0021-cache-safety.test.mjs` | prompt cache safety, prefix determinism, cache usage | 37 | 9.5 |

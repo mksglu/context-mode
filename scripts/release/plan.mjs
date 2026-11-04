@@ -22,6 +22,8 @@
 // Notes and the "releasable" check (D-RN-STABLE-1): next covers the commits since the newest tag (any kind) in
 // HEAD's history; latest covers the commits since the newest stable tag of ANY major (v1.x counts) in HEAD's
 // history. latest needs --confirm latest, and refuses a version whose tag is already on origin.
+// Who gets this (D-REL-WHO-1): the files changed in that same range map to the agents they reach (scripts/release/reach.mjs);
+// the notes end with the "Who gets this" table. Files changed, none of them reach an agent (only docs, tests or CI): refuse.
 // Failure: one stderr line `release failed: <reason>` and exit 1 (impl/13 §1).
 import { spawnSync } from "node:child_process";
 import { GIT_REMOTE_NAME, RELEASE_BRANCH } from "../../src/core/contracts/constants.ts";
@@ -168,7 +170,8 @@ const bumpCore = ([major, minor, patch], rank) => (rank === MAJOR ? [major + 1, 
 const sameCore = (a, b) => a.core.every((n, i) => n === b[i]);
 
 // Main-only mode: { version, subjects }.
-function planFromMain(channel, confirm) {
+// reach.mjs reads the adapter table and the setup registry (dev dependencies); only --main loads it.
+async function planFromMain(channel, confirm) {
   if (!CHANNELS.includes(channel)) fail(`--channel must be one of ${CHANNELS.join(", ")}`);
   if (channel === "latest" && confirm !== "latest") fail("channel latest needs --confirm latest");
   const ls = lsRemoteTags();
@@ -186,6 +189,13 @@ function planFromMain(channel, confirm) {
   const from = channel === "latest" ? parseStableTags(ls).find((t) => git("merge-base", "--is-ancestor", t.commit, "HEAD").ok) : newest;
   const subjects = subjectsIn(from ? `${from.commit}..HEAD` : "HEAD");
   if (from && rankOf(subjects) === 0) fail(`no releasable commits since ${from.tag}`);
+  // An empty tree diff (commits without files) carries no file list, so the table is left out.
+  const files = (from ? mustGit("diff", "--name-only", "--no-renames", from.commit, "HEAD") : mustGit("ls-tree", "-r", "--name-only", "HEAD"))
+    .split("\n").filter((f) => f.length > 0);
+  const { reachOf, whoGetsTable } = await import("./reach.mjs");
+  const agents = reachOf(files);
+  if (files.length > 0 && agents.length === 0) fail(`nothing to release since ${from ? from.tag : "the first commit"}: only docs, tests or CI changed`);
+  const who = files.length > 0 ? whoGetsTable(agents) : "";
   const base = core.join(".");
   let version = base;
   if (channel === "next") {
@@ -193,10 +203,10 @@ function planFromMain(channel, confirm) {
     version = `${base}-${NEXT_PRE}.${n + 1}`;
   }
   if (tagCommit(ls, TAG_PREFIX + version) !== "") fail(`tag ${TAG_PREFIX}${version} is already on ${GIT_REMOTE_NAME}`);
-  return { version, subjects };
+  return { version, subjects, who };
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   let tag = null;
   let mainMode = false;
@@ -218,9 +228,10 @@ function main() {
 
   let version;
   let subjects;
+  let who = "";
   const last = tag === null && !mainMode ? lastRelease() : undefined;
   if (mainMode) {
-    ({ version, subjects } = planFromMain(channel, confirm));
+    ({ version, subjects, who } = await planFromMain(channel, confirm));
   } else if (tag !== null) {
     ({ version, subjects } = planFromTag(tag));
   } else if (last === null) {
@@ -243,10 +254,10 @@ function main() {
     version = bump(current, rank);
   }
 
-  const notes = notesFor(subjects, skipLive);
+  const notes = [notesFor(subjects, skipLive), who].filter((b) => b.length > 0).join("\n\n");
   process.stdout.write(dryRun
     ? `version: ${version}\n\n${notes}\n`
     : `version=${version}\nnotes<<EOF\n${notes}\nEOF\n`);
 }
 
-main();
+await main();
