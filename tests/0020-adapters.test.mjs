@@ -777,6 +777,24 @@ describe("ADR-0020 adapters", () => {
     test("encode replace is a no-op on Codex (no replace field, documented gap)", () => {
       assert.deepEqual(encode({ ...pre, event: "PostToolUse" }, { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
     });
+
+    // D-NI-CODEX-TRUST-4 audit: tests/fixtures/host-schemas/codex.json holds Codex's own output schemas (rust-v0.166.0
+    // hooks/schema/generated, deny_unknown_fields in output_parser.rs). Every non-empty reply must be valid for its event.
+    test("every encode reply is empty or valid against the Codex 0.166 output schema of its event", async () => {
+      const { default: Ajv } = await import("ajv");
+      const fx = JSON.parse(readFileSync(new URL("./fixtures/host-schemas/codex.json", import.meta.url), "utf8"));
+      const ajv = new Ajv({ strict: false });
+      const decisions = [{ kind: "allow" }, { kind: "hint", text: "prefer ctx_execute", onceKey: "k" }, { kind: "deny", reason: "why" }, { kind: "deny", reason: "why", rewritten: "node /x/run.mjs" }, { kind: "replace", output: "x" }];
+      for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"]) {
+        const check = ajv.compile(fx.output[event]);
+        for (const d of decisions) {
+          if (d.kind === "deny" && event !== "PreToolUse") continue; // deny is a PreToolUse decision only
+          const out = encode({ ...pre, event }, d);
+          if (out.stdout === "") continue;
+          assert.ok(check(JSON.parse(out.stdout)), `${event} ${d.kind}: ${JSON.stringify(check.errors)}\n${out.stdout}`);
+        }
+      }
+    });
   });
 
   describe("ADR-0020 copilot-cli adapter", () => {

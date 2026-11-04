@@ -738,7 +738,7 @@ function trustPluginHooks(row: CheckRow, ctx: SetupContext, apply: { run: Run; d
   const file = path.join(codexDirOf(ctx.env, ctx.home), CODEX_CONFIG_FILE);
   const text = readOr(file);
   let edit;
-  try { edit = editHostConfigText(row.id, file, text ?? "", "toml", pluginTrustEntries(hooks)); }
+  try { edit = editHostConfigText(row.id, file, text ?? "", "toml", pluginTrustEntries(hooks, text ? parseHostConfig(row.id, file, text, "toml") : undefined)); }
   catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, file)); throw e; }
   if (!edit.edits.length) return [];
   if (!apply.dryRun) {

@@ -703,12 +703,45 @@ exit 0`);
     assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
   });
 
-  test("[D-NI-CODEX-TRUST-2] pluginTrustEntries: trusted_hash is the hook hash of a composite or plain currentHash, a trusted hook gets none (runs on Windows too)", () => {
+  // D-NI-CODEX-TRUST-4 (rust-v0.166.0 app-server/src/config_manager_service.rs: Codex splits "<decl>/<content>" into
+  // trusted_hash + trusted_content_hash): the 0.166 row has both hashes; the 0.156.1 row (no "/") has trusted_hash only.
+  test("[D-NI-CODEX-TRUST-4] pluginTrustEntries: a composite currentHash gives trusted_hash + trusted_content_hash, a plain one trusted_hash only, a trusted hook none (runs on Windows too)", () => {
     const A = "sha256:" + "a".repeat(64), B = "sha256:" + "b".repeat(64);
     assert.equal(hookHashOf(`${A}/${B}`), A);
     assert.equal(hookHashOf(A), A);
-    const got = pluginTrustEntries([{ key: "p:k1", hash: `${A}/${B}`, trusted: false }, { key: "p:k2", hash: A, trusted: false }, { key: "p:k3", hash: A, trusted: true }]);
-    assert.deepEqual(got, [[["hooks", "state", "p:k1"], { trusted_hash: A }], [["hooks", "state", "p:k2"], { trusted_hash: A }]]);
+    const got = pluginTrustEntries([{ key: "p:k1", hash: `${A}/${B}`, trusted: false, status: "modified" }, { key: "p:k2", hash: A, trusted: false, status: "untrusted" }, { key: "p:k3", hash: A, trusted: true, status: "trusted" }]);
+    assert.deepEqual(got, [[["hooks", "state", "p:k1"], { trusted_hash: A, trusted_content_hash: B }], [["hooks", "state", "p:k2"], { trusted_hash: A }]]);
+  });
+
+  test("[D-NI-CODEX-TRUST-4] pluginTrustEntries keeps the other fields of a hook state table (enabled = false stays)", () => {
+    const A = "sha256:" + "a".repeat(64), B = "sha256:" + "b".repeat(64);
+    const doc = { hooks: { state: { "p:k1": { enabled: false, trusted_hash: "sha256:old" } } } };
+    const got = pluginTrustEntries([{ key: "p:k1", hash: `${A}/${B}`, trusted: false, status: "modified" }], doc);
+    assert.deepEqual(got, [[["hooks", "state", "p:k1"], { enabled: false, trusted_hash: A, trusted_content_hash: B }]]);
+  });
+
+  // Audit codex-1 (Codex 0.166.0, live): rows with trusted_hash only pin the plugin to a one-time .hook-trust baseline,
+  // so after any plugin content change (an upgrade) all 4 hooks are "modified" and a second setup wrote the same rows: FAIL.
+  test("[D-NI-CODEX-TRUST-4] setup after a plugin upgrade (stale legacy baseline, Codex lists modified): writes trusted_content_hash, ends PASS; doctor PASS", SKIP_SH, async (t) => {
+    const s = sandbox(t);
+    const toml = codexWithHookTrust(s);
+    put(toml, `[hooks.state.${JSON.stringify(PLUGIN_KEY("pre_tool_use"))}]\nenabled = true\ntrusted_hash = ${JSON.stringify(hashOf(PLUGIN_KEY("pre_tool_use")))}\n`);
+    Object.assign(s.env, { FAKE_COMPOSITE: "1", FAKE_LEGACY_BASELINE: "sha256:" + "0".repeat(64), FAKE_CONTENT: "sha256:" + "c".repeat(64) });
+    const doc0 = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    const reg = doc0.agents[0].checks.find((c) => c.name === "hook-registered");
+    assert.equal(reg.detail, "codex lists 4 of 4 context-mode plugin hooks untrusted or modified (3 untrusted, 1 modified), so they do not run; run: context-mode setup");
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "u1" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    const text = readFileSync(toml, "utf8");
+    for (const ev of PLUGIN_EVENTS) assert.ok(text.includes(`trusted_hash = ${JSON.stringify(hashOf(PLUGIN_KEY(ev)))}\ntrusted_content_hash = "sha256:${"c".repeat(64)}"\n`), `both hashes: ${ev}\n${text}`);
+    assert.ok(text.includes("enabled = true"), `other fields stay\n${text}`);
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
+    s.env.FAKE_CONTENT = "sha256:" + "d".repeat(64); // the next upgrade
+    const docAfter = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    assert.equal(docAfter.agents[0].checks.find((c) => c.name === "hook-registered").detail, "codex lists 4 of 4 context-mode plugin hooks modified, so they do not run; run: context-mode setup");
+    const again = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "u2" });
+    assert.equal(again.agents[0].status, "PASS", JSON.stringify(again.agents[0], null, 2));
   });
 
   // D-NI-EXT-DOCTOR-1 (ADR-0023): `qwen extensions install <source>` (Qwen Code 0.26.1) and `gemini extensions install

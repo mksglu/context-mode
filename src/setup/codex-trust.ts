@@ -18,6 +18,7 @@ const TRUST_KEY = ["hooks", "state"] as const;
 /** The change path every trust edit starts with (editHostConfigText joins the key path with "."). */
 export const CODEX_TRUST_PATH = TRUST_KEY.join(".") + ".";
 const HASH_FIELD = "trusted_hash";
+const CONTENT_HASH_FIELD = "trusted_content_hash"; // D-NI-CODEX-TRUST-4: Codex 0.166 HookStateToml (config/src/hook_config.rs)
 const HASH_PREFIX = "sha256:";
 
 function sortKeys(v: unknown): unknown {
@@ -117,13 +118,15 @@ export function codexTrustEntries(hooksFile: string, doc: unknown, command: stri
 
 // ---------- D-NI-CODEX-TRUST-1: hooks of an installed Codex plugin ----------
 
-/** One hook as `hooks/list` reports it: Codex's own key and the hash it computes now. */
-export interface PluginHook { key: string; hash: string; trusted: boolean; }
+/** One hook as `hooks/list` reports it: Codex's own key, the hash it computes now and its trustStatus word
+ *  (trusted, untrusted, modified, managed). */
+export interface PluginHook { key: string; hash: string; trusted: boolean; status: string; }
 
 const LIST_TIMEOUT_MS = 15_000;
 const EXIT_GRACE_MS = 5_000; // after hooks/list the caller waits this long at most for the codex process to exit (it may hold its cwd open)
 const PLUGIN_SOURCE = "plugin";
 const TRUSTED = "trusted";
+const UNTRUSTED = "untrusted";
 
 /** The hooks of plugin `pluginId` in a `hooks/list` reply (id 2). Hooks of other plugins and user hooks are left out. */
 export function pluginHooksFromReply(m: unknown, pluginId: string): PluginHook[] {
@@ -135,7 +138,8 @@ export function pluginHooksFromReply(m: unknown, pluginId: string): PluginHook[]
       if (!isObj(h) || h.source !== PLUGIN_SOURCE || h.pluginId !== pluginId) continue;
       if (typeof h.key !== "string" || typeof h.currentHash !== "string") continue;
       if (out.some((x) => x.key === h.key)) continue; // one entry per key, also when two cwds list it
-      out.push({ key: h.key, hash: h.currentHash, trusted: h.trustStatus === TRUSTED });
+      const status = typeof h.trustStatus === "string" ? h.trustStatus : UNTRUSTED;
+      out.push({ key: h.key, hash: h.currentHash, trusted: status === TRUSTED, status });
     }
   }
   return out;
@@ -212,17 +216,33 @@ function stopTree(pid: number | undefined, kill: () => void): void {
 
 const HASH_PART_SEP = "/";
 
-/** D-NI-CODEX-TRUST-2: Codex 0.166.0-alpha.5.1 reports currentHash as "<hook hash>/<plugin hash>" and trusts a hook only
- *  when trusted_hash is the hook hash alone (the full value gives "modified"). 0.156.1 reports the hook hash alone. */
+/** D-NI-CODEX-TRUST-2: Codex 0.166 reports currentHash as "<hook hash>/<plugin hash>" and trusts a hook only when
+ *  trusted_hash is the hook hash alone (the full value gives "modified"). 0.156.1 reports the hook hash alone. */
 export function hookHashOf(currentHash: string): string {
   const cut = currentHash.indexOf(HASH_PART_SEP);
   return cut < 0 ? currentHash : currentHash.slice(0, cut);
 }
 
+/** D-NI-CODEX-TRUST-4: the plugin hash part of a 0.166 currentHash (after the "/"), undefined for a 0.156.1 hash. */
+export function contentHashOf(currentHash: string): string | undefined {
+  const cut = currentHash.indexOf(HASH_PART_SEP);
+  return cut < 0 ? undefined : currentHash.slice(cut + 1);
+}
+
 /** The [hooks.state."<key>"] tables that trust every hook of the plugin that Codex does not trust now. Codex's key and
- *  hook hash (hookHashOf of currentHash) are used: no hash is computed here. */
-export function pluginTrustEntries(hooks: PluginHook[]): [readonly string[], unknown][] {
-  return hooks.filter((h) => !h.trusted).map((h): [readonly string[], unknown] => [[...TRUST_KEY, h.key], { [HASH_FIELD]: hookHashOf(h.hash) }]);
+ *  hashes are used: no hash is computed here. D-NI-CODEX-TRUST-4: a 0.166 hash gives trusted_hash (hook part) and
+ *  trusted_content_hash (plugin part), the split Codex's own config writer makes (app-server config_manager_service.rs);
+ *  without trusted_content_hash Codex pins the plugin to a one-time .hook-trust baseline, so an upgrade lists the hooks
+ *  "modified". `doc` is the parsed config.toml: the other fields of an existing table (enabled) stay. */
+export function pluginTrustEntries(hooks: PluginHook[], doc?: unknown): [readonly string[], unknown][] {
+  const states = isObj(doc) && isObj(doc.hooks) && isObj(doc.hooks.state) ? doc.hooks.state : {};
+  return hooks.filter((h) => !h.trusted).map((h): [readonly string[], unknown] => {
+    const old = isObj(states[h.key]) ? states[h.key] as Json : {};
+    const content = contentHashOf(h.hash);
+    const row: Json = { ...old, [HASH_FIELD]: hookHashOf(h.hash) };
+    if (content !== undefined) row[CONTENT_HASH_FIELD] = content;
+    return [[...TRUST_KEY, h.key], row];
+  });
 }
 
 /** The plugin id Codex gives our package (`codex plugin add context-mode@context-mode`). */
@@ -235,5 +255,10 @@ export const CODEX_UNTRUSTED_FIX = "run: context-mode setup";
 export function untrustedPluginHooksDetail(hooks: PluginHook[]): string | undefined {
   const bad = hooks.filter((h) => !h.trusted);
   if (!bad.length) return undefined;
-  return `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks untrusted, so they do not run; ${CODEX_UNTRUSTED_FIX}`;
+  // D-NI-CODEX-TRUST-4: the Codex status word (untrusted, modified), most frequent first, so the line matches `/hooks`.
+  const counts = new Map<string, number>();
+  for (const h of bad) counts.set(h.status, (counts.get(h.status) ?? 0) + 1);
+  const words = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+  const state = words.length === 1 ? words[0][0] : `${words.map(([w]) => w).join(" or ")} (${words.map(([w, n]) => `${n} ${w}`).join(", ")})`;
+  return `codex lists ${bad.length} of ${hooks.length} context-mode plugin hooks ${state}, so they do not run; ${CODEX_UNTRUSTED_FIX}`;
 }

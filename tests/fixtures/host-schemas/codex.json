@@ -1,0 +1,291 @@
+{
+  "host": "codex",
+  "source": "github.com/openai/codex tag rust-v0.166.0 codex-rs/hooks/schema/generated/*.command.output.schema.json",
+  "output": {
+    "PreToolUse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "definitions": {
+        "PreToolUseDecisionWire": {
+          "enum": [
+            "approve",
+            "block"
+          ],
+          "type": "string"
+        },
+        "PreToolUseHookSpecificOutputWire": {
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "default": null,
+              "type": "string"
+            },
+            "hookEventName": {
+              "const": "PreToolUse",
+              "type": "string"
+            },
+            "permissionDecision": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/PreToolUsePermissionDecisionWire"
+                }
+              ],
+              "default": null
+            },
+            "permissionDecisionReason": {
+              "default": null,
+              "type": "string"
+            },
+            "updatedInput": {
+              "default": null
+            }
+          },
+          "required": [
+            "hookEventName"
+          ],
+          "type": "object"
+        },
+        "PreToolUsePermissionDecisionWire": {
+          "enum": [
+            "allow",
+            "deny",
+            "ask"
+          ],
+          "type": "string"
+        }
+      },
+      "properties": {
+        "continue": {
+          "default": true,
+          "type": "boolean"
+        },
+        "decision": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/PreToolUseDecisionWire"
+            }
+          ],
+          "default": null
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/PreToolUseHookSpecificOutputWire"
+            }
+          ],
+          "default": null
+        },
+        "reason": {
+          "default": null,
+          "type": "string"
+        },
+        "stopReason": {
+          "default": null,
+          "type": "string"
+        },
+        "suppressOutput": {
+          "default": false,
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "default": null,
+          "type": "string"
+        }
+      },
+      "title": "pre-tool-use.command.output",
+      "type": "object"
+    },
+    "PostToolUse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "definitions": {
+        "BlockDecisionWire": {
+          "enum": [
+            "block"
+          ],
+          "type": "string"
+        },
+        "PostToolUseHookSpecificOutputWire": {
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "default": null,
+              "type": "string"
+            },
+            "hookEventName": {
+              "const": "PostToolUse",
+              "type": "string"
+            },
+            "updatedMCPToolOutput": {
+              "default": null
+            }
+          },
+          "required": [
+            "hookEventName"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "continue": {
+          "default": true,
+          "type": "boolean"
+        },
+        "decision": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BlockDecisionWire"
+            }
+          ],
+          "default": null
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/PostToolUseHookSpecificOutputWire"
+            }
+          ],
+          "default": null
+        },
+        "reason": {
+          "default": null,
+          "type": "string"
+        },
+        "stopReason": {
+          "default": null,
+          "type": "string"
+        },
+        "suppressOutput": {
+          "default": false,
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "default": null,
+          "type": "string"
+        }
+      },
+      "title": "post-tool-use.command.output",
+      "type": "object"
+    },
+    "SessionStart": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "definitions": {
+        "SessionStartHookSpecificOutputWire": {
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "default": null,
+              "type": "string"
+            },
+            "hookEventName": {
+              "const": "SessionStart",
+              "type": "string"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "continue": {
+          "default": true,
+          "type": "boolean"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SessionStartHookSpecificOutputWire"
+            }
+          ],
+          "default": null
+        },
+        "stopReason": {
+          "default": null,
+          "type": "string"
+        },
+        "suppressOutput": {
+          "default": false,
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "default": null,
+          "type": "string"
+        }
+      },
+      "title": "session-start.command.output",
+      "type": "object"
+    },
+    "UserPromptSubmit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "definitions": {
+        "BlockDecisionWire": {
+          "enum": [
+            "block"
+          ],
+          "type": "string"
+        },
+        "UserPromptSubmitHookSpecificOutputWire": {
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "default": null,
+              "type": "string"
+            },
+            "hookEventName": {
+              "const": "UserPromptSubmit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "continue": {
+          "default": true,
+          "type": "boolean"
+        },
+        "decision": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BlockDecisionWire"
+            }
+          ],
+          "default": null
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/UserPromptSubmitHookSpecificOutputWire"
+            }
+          ],
+          "default": null
+        },
+        "reason": {
+          "default": null,
+          "type": "string"
+        },
+        "stopReason": {
+          "default": null,
+          "type": "string"
+        },
+        "suppressOutput": {
+          "default": false,
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "default": null,
+          "type": "string"
+        }
+      },
+      "title": "user-prompt-submit.command.output",
+      "type": "object"
+    }
+  }
+}
