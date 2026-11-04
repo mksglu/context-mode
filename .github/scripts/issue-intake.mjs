@@ -1,54 +1,148 @@
 // .github/scripts/issue-intake.mjs
-// Parses an issue body by heading and by line prefix, not by regex (owner rule). Checks the
-// required headings, the ctx_doctor report keys, and scans free text for secret prefixes.
-// Prints a structured JSON result for issue-intake-act.mjs to act on.
-// ADR-0014 §2/§3/§5, https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/agent-issue-intake/VALIDATION.md, DEVIATIONS D-M6-arch-6, D-M6-I2-1.
+// Scores an issue body for repro readiness. It reads lines, headings and fenced blocks by prefix and
+// substring, with zero regex (owner rule). It accepts any layout: the agent-report form, the bug form,
+// or free Markdown with "##" headings. Prints a JSON result for issue-intake-act.mjs.
+// D-INTAKE-SCORE-1 (owner 2026-11-05: "bu GitHub Actions bot u cok kati calisiyor"; #1306 and #1307
+// were clear reports with steps, output and the source line, and the old check closed both).
+// ADR-0014 §2/§3/§5, DEVIATIONS D-M6-arch-6, D-M6-I2-1.
 import { pathToFileURL } from "node:url";
-
-export const REQUIRED_HEADINGS = ["Summary", "ctx-report", "What happened", "Expected", "Steps", "Environment"];
 
 // Mirror of the ctx_doctor report (src/core/ops/report.ts, src/core/contracts/constants.ts):
 // REPORT_HEADER, REPORT_HEADER_RULE, DOCTOR_CHECK_ORDER, REPORT_ENV_PREFIX + REPORT_ENV_ENUMS keys,
-// REPORT_COMMAND_PREFIX (ADR-0019 D7), REPORT_TRUNCATED_LINE prefix. GP11/issue-intake-allowed-keys fails when the two sides differ.
+// REPORT_COMMAND_PREFIX (ADR-0019 D7), REPORT_TRUNCATED_LINE prefix, DOCTOR_NOTE_PREFIXES.
+// GP11/issue-intake-allowed-keys and tests/0014-repo-hygiene.test.mjs fail when the two sides differ.
 export const REPORT_HEADER = "| Check | Status | Detail | Fix |";
 export const REPORT_HEADER_RULE = "|---|---|---|---|";
 export const CHECK_KEYS = ["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"];
 export const ENV_KEYS = ["env.NODE_ENV"];
 export const ALLOWED_KEYS = new Set([...CHECK_KEYS, ...ENV_KEYS]);
+export const NOTE_PREFIXES = ["Environment: ", "Docs: ", "Report file: ", "File it: ", "--", "Or open: ", "Rules: "]; // = DOCTOR_NOTE_PREFIXES
+// = the agent-report.yml field the doctor report goes in (ISSUE_FORM_HEADINGS[1]).
+export const REPORT_FIELD = "ctx-report";
 const TRUNCATED_PREFIX = "(report truncated at ";
 const COMMAND_PREFIX = "Run in a terminal: ";
-const NOTE_PREFIXES = ["Environment: ", "Docs: ", "Report file: ", "File it: ", "--", "Or open: "]; // = DOCTOR_NOTE_PREFIXES (D-DOCTOR-FIX-1)
+const HEADER_START = "| Check | Status"; // the 3-column table of 2.0.0 and the 4-column table of 2.0.1+
 const ROW_PREFIX = "| ";
 const ENV_PREFIX = "env.";
 const FENCE = "```";
+const NO_RESPONSE = "_No response_"; // GitHub's text for an empty form field
 
-// ADR-0014 §3: substring scan of free text; a match is flagged in the comment, never blocks.
-const SECRET_MARKERS = ["github_pat_", "sk-", "TOKEN="];
-const PATH_MARKERS = ["/Users/", "/home/", "C:\\"];
-const SCANNED = ["Summary", "What happened", "Steps"];
+// What a maintainer needs to replay a report, in the order the comment lists the missing ones.
+export const ITEMS = [
+  { key: "report", label: "ctx_doctor report", hint: "call the `ctx_doctor` tool and paste its full output unchanged in the `ctx-report` field" },
+  { key: "version", label: "context-mode version", hint: "row D1 of the doctor report, or `npm ls -g context-mode --depth=0`" },
+  { key: "agent", label: "agent name and version", hint: "for example `claude --version`, `codex --version`, `opencode --version`" },
+  { key: "os", label: "OS and arch", hint: "`uname -sm`; on Windows, `$env:OS` and `$env:PROCESSOR_ARCHITECTURE`" },
+  { key: "node", label: "Node version", hint: "`node --version`" },
+  { key: "steps", label: "numbered repro steps from a fresh project", hint: "start from `mktemp -d` and the agent's own install command" },
+  { key: "expected", label: "what you expected", hint: "one line under an `Expected` heading" },
+  { key: "observed", label: "what happened instead", hint: "one line under an `Actual` or `What happened` heading" },
+  { key: "output", label: "exact command and exact output", hint: "in a fenced code block, copied unchanged" },
+];
+// A body with these three is repro-ready, with or without the doctor table (owner 2026-11-05).
+export const READY_KEYS = ["version", "steps", "output"];
 
-function splitHeadings(body) {
-  const sections = {};
-  const order = [];
-  let current = null;
-  for (const raw of body.split("\n")) {
-    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
-    if (line.startsWith("### ")) {
-      current = line.slice(4).trim();
-      order.push(current);
-      sections[current] = [];
-      continue;
-    }
-    if (current) sections[current].push(line);
-  }
-  return { sections, order };
+const AGENT_MARKERS = ["claude code", "claude-code", "claude", "codex", "gemini cli", "gemini", "qwen code", "qwen", "opencode",
+  "pi coding agent", "pi", "copilot cli", "copilot", "vs code", "vscode", "kiro", "zcode", "cursor"];
+const RUNTIME_MARKERS = ["node", "bun"];
+const OS_MARKERS = ["linux", "macos", "darwin", "windows", "win32", "wsl", "ubuntu", "debian", "fedora", "alpine"];
+const OBSERVED_MARKERS = ["observed", "actual", "what happened", "output", "error", "warning"];
+const STEP_HEAD_MARKERS = ["step", "repro"];
+const VERSION_FILLERS = [" ", "\t", ":", "@", "=", "(", "version", "-cli", "cli", "v"];
+// ADR-0014 §3: a substring scan for secret prefixes; a hit adds a note to the comment and changes nothing else.
+const SECRET_MARKERS = ["github_pat_", "ghp_", "sk-ant-", "sk-proj-", "TOKEN="];
+
+const isDigit = (c) => c !== undefined && c >= "0" && c <= "9";
+const isWordChar = (c) => c !== undefined && ((c >= "a" && c <= "z") || isDigit(c) || c === "_" || c === "-" || c === ".");
+
+/** A line a reporter left unfilled: blank, GitHub's "_No response_", or a value that starts with "<". */
+export function isPlaceholder(raw) {
+  let t = raw.trim();
+  if (t === "" || t === NO_RESPONSE) return true;
+  if (t.startsWith("- ") || t.startsWith("* ")) t = t.slice(2).trim();
+  const n = numberedRest(t);
+  if (n !== null) t = n;
+  const colon = t.indexOf(": ");
+  const value = colon === -1 ? t : t.slice(colon + 2).trim();
+  return value === "" ? t.startsWith("<") : value.startsWith("<");
 }
 
-// One report line -> its key, or null when the line carries no key (header, rule, command, truncation).
-// A line that is none of these returns undefined: it was not written by ctx_doctor.
+/** "3. text" or "3) text" -> "text"; any other line -> null. */
+function numberedRest(t) {
+  let i = 0;
+  while (isDigit(t[i])) i++;
+  if (i === 0 || i > 3) return null;
+  if ((t[i] === "." || t[i] === ")") && t[i + 1] === " ") return t.slice(i + 2).trim();
+  return null;
+}
+
+/** Splits a body into headed sections and fenced blocks; "#" lines inside a fence stay code. */
+export function parse(body) {
+  const sections = [{ head: "", lines: [], fences: [] }];
+  const fences = [];
+  let fence = null;
+  for (const raw of body.split("\n")) {
+    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+    const t = line.trim();
+    const sec = sections[sections.length - 1];
+    if (t.startsWith(FENCE)) {
+      if (fence === null) { fence = []; continue; }
+      fences.push(fence);
+      sec.fences.push(fence);
+      fence = null;
+      continue;
+    }
+    if (fence !== null) { fence.push(line); continue; }
+    if (t.startsWith("#")) {
+      let i = 0;
+      while (t[i] === "#") i++;
+      if (i <= 6 && t[i] === " ") {
+        sections.push({ head: t.slice(i + 1).trim(), lines: [], fences: [] });
+        continue;
+      }
+    }
+    sec.lines.push(line);
+  }
+  if (fence !== null) { fences.push(fence); sections[sections.length - 1].fences.push(fence); }
+  return { sections, fences };
+}
+
+const filled = (lines) => lines.filter((l) => !isPlaceholder(l));
+const sectionFilled = (s) => filled(s.lines).length > 0 || s.fences.some((f) => filled(f).length > 0);
+
+/** True when `marker` occurs as a word and a version number follows it (after "version", ":", "@", "v" ...). */
+export function versionAfter(lower, marker) {
+  let at = lower.indexOf(marker);
+  while (at !== -1) {
+    const before = lower[at - 1];
+    if (!isWordChar(before)) {
+      let i = at + marker.length;
+      let moved = true;
+      while (moved) {
+        moved = false;
+        for (const f of VERSION_FILLERS) if (lower.startsWith(f, i)) { i += f.length; moved = true; break; }
+      }
+      if (isDigit(lower[i]) && i > at + marker.length) return true;
+    }
+    at = lower.indexOf(marker, at + 1);
+  }
+  return false;
+}
+
+/** The key of a ctx_doctor table row, with or without the leading "| ", or null. */
+function rowKey(line) {
+  let t = line.trim();
+  if (t.startsWith(ROW_PREFIX)) t = t.slice(ROW_PREFIX.length);
+  const end = t.indexOf(" ");
+  if (end === -1 || !t.includes(" | ")) return null;
+  const key = t.slice(0, end);
+  return CHECK_KEYS.includes(key) ? key : null;
+}
+
+// One report line -> its key, or null when the line carries no key (header, rule, command, note, truncation).
+// A line that is none of these returns undefined: it was written by hand.
 export function lineKey(line) {
   if (line === REPORT_HEADER || line === REPORT_HEADER_RULE || line.startsWith(TRUNCATED_PREFIX) || line.startsWith(COMMAND_PREFIX)) return null;
-  // D-DOCTOR-ISSUE-1: the environment line above the table and the report-file lines under it carry no key.
   if (NOTE_PREFIXES.some((p) => line.startsWith(p))) return null;
   if (line.startsWith(ROW_PREFIX)) {
     const cell = line.slice(ROW_PREFIX.length);
@@ -62,7 +156,7 @@ export function lineKey(line) {
   return undefined;
 }
 
-// Keys of a pasted report, in order; `bad` holds lines that are not report lines.
+// Keys of a pasted report, in order; `bad` holds lines that ctx_doctor did not write.
 export function reportKeys(lines) {
   const keys = [];
   const bad = [];
@@ -76,42 +170,35 @@ export function reportKeys(lines) {
   return { keys, bad };
 }
 
-export function check(body) {
-  const findings = [];
-  const warnings = [];
-  const { sections, order } = splitHeadings(body);
+/** Scores a body: which ITEMS it holds, which are missing, and "repro-ready" or "needs-info". */
+export function score(body) {
+  const { sections, fences } = parse(body || "");
+  const textLines = filled(sections.flatMap((s) => s.lines));
+  const codeLines = filled(fences.flat());
+  const all = [...textLines, ...codeLines];
+  const lower = all.join("\n").toLowerCase();
+  const heads = sections.filter((s) => s.head !== "" && sectionFilled(s)).map((s) => s.head.toLowerCase());
+  const said = (markers) => markers.some((m) => heads.some((h) => h.includes(m)) || textLines.some((l) => l.toLowerCase().includes(m)));
 
-  const missing = REQUIRED_HEADINGS.filter((h) => !(h in sections));
-  if (missing.length) findings.push({ code: "missing-heading", headings: missing });
-  const presentRequired = order.filter((h) => REQUIRED_HEADINGS.includes(h));
-  const inOrder = REQUIRED_HEADINGS.filter((h) => presentRequired.includes(h));
-  if (presentRequired.join("\n") !== inOrder.join("\n")) findings.push({ code: "heading-order" });
-
-  for (const name of SCANNED) {
-    const text = (sections[name] || []).join("\n");
-    for (const m of [...SECRET_MARKERS, ...PATH_MARKERS]) if (text.includes(m)) warnings.push({ section: name, marker: m });
-  }
-
-  // VALIDATION.md item 5: a Steps line that names a denied tool also names the alternative (substring check).
-  const steps = (sections["Steps"] || []).filter((l) => l.includes("denied") && !l.includes("alternative"));
-  if (steps.length) findings.push({ code: "steps-deny-no-alt", count: steps.length });
-
-  const reportLines = sections["ctx-report"] || [];
-  if (!reportLines.some((l) => l.trim() === REPORT_HEADER)) {
-    findings.push({ code: "no-report" });
-    return { ok: false, findings, warnings, hasReport: false };
-  }
-  const { keys, bad } = reportKeys(reportLines);
-  if (bad.length) findings.push({ code: "foreign-line", count: bad.length });
-  const unknown = keys.filter((k) => !ALLOWED_KEYS.has(k));
-  if (unknown.length) findings.push({ code: "unknown-key", keys: unknown });
-  const absent = CHECK_KEYS.filter((k) => !keys.includes(k));
-  const truncated = reportLines.some((l) => l.trim().startsWith(TRUNCATED_PREFIX));
-  if (absent.length && !truncated) findings.push({ code: "missing-key", keys: absent });
-
-  return { ok: findings.length === 0, findings, warnings, hasReport: true };
+  const rows = new Set(all.map(rowKey).filter((k) => k !== null));
+  const steps = sections.filter((s) => STEP_HEAD_MARKERS.some((m) => s.head.toLowerCase().includes(m)));
+  const have = {
+    report: all.some((l) => l.trim().startsWith(HEADER_START)) || rows.size >= 3,
+    version: versionAfter(lower, "context-mode"),
+    agent: AGENT_MARKERS.some((m) => versionAfter(lower, m)),
+    os: OS_MARKERS.some((m) => lower.includes(m)),
+    node: RUNTIME_MARKERS.some((m) => versionAfter(lower, m)),
+    steps: textLines.filter((l) => numberedRest(l.trim()) !== null).length >= 2 || steps.some((s) => s.fences.some((f) => filled(f).length > 0)),
+    expected: said(["expected"]),
+    observed: said(OBSERVED_MARKERS),
+    output: fences.some((f) => filled(f).length > 0),
+  };
+  const missing = ITEMS.filter((i) => !have[i.key]).map((i) => i.key);
+  const status = READY_KEYS.every((k) => have[k]) ? "repro-ready" : "needs-info";
+  const warnings = SECRET_MARKERS.filter((m) => (body || "").includes(m));
+  return { status, have, missing, warnings };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.stdout.write(JSON.stringify(check(process.env.BODY || "")));
+  process.stdout.write(JSON.stringify(score(process.env.BODY || "")));
 }

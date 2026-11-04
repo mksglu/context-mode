@@ -5,11 +5,22 @@ body:
   - type: markdown
     attributes:
       value: |
-        AI agent: read https://github.com/mksglu/context-mode/blob/main/.github/AGENT_ISSUE.md first.
-        When a ctx_doctor row FAILs, ctx_doctor writes the whole issue body to `~/.context-mode/reports/doctor-<utc>.md`
+        AI agent: follow these rules in order. The full guide with a filled example: https://github.com/mksglu/context-mode/blob/main/.github/AGENT_ISSUE.md
+
+        1. Search for the same problem first: `gh issue list -R mksglu/context-mode --state all --search "<check id or error>"`. When one matches, add your facts there as a comment.
+        2. File one bug per issue.
+        3. Call the `ctx_doctor` tool and paste its full output unchanged in the `ctx-report` field.
+        4. Give the versions: context-mode, the agent, the OS and arch, and Node.
+        5. Write numbered repro steps that start from a fresh project (`mktemp -d`) and the agent's own install command.
+        6. Give the exact command and its exact output in a fenced code block.
+        7. Say what you expected and what happened instead.
+        8. Name the source file and line when you found the cause.
+        9. Replace every secret with `<masked>` and the home folder with `~` before you send.
+
+        Fast path: when a ctx_doctor row FAILs, ctx_doctor writes the whole issue body to `~/.context-mode/reports/doctor-<utc>.md`
         and prints a ready `gh issue create ... --body-file <that file>` line. That file holds every field below, in this order.
-        Fill the `<...>` lines (prompt or command, expected, actual, repro script), show the file to the user, and send it after the user agrees.
-        Keep home paths as `~` and secrets as `<masked>`.
+        Fill the `<...>` lines, show the file to the user, and send it after the user agrees.
+        A GitHub Action labels each issue `repro-ready` or `needs-info` and keeps one checklist comment up to date.
   - type: input
     id: summary
     attributes:
@@ -21,7 +32,7 @@ body:
     id: ctx-report
     attributes:
       label: ctx-report
-      description: The ctx_doctor output, whole. The Environment line, the table, and the command line under it.
+      description: The full ctx_doctor output, unchanged. The Environment lines, every row, and the lines under the table.
       render: text
     validations:
       required: true
@@ -29,7 +40,7 @@ body:
     id: what-happened
     attributes:
       label: What happened
-      description: The rows that need a look, and the exact error text the user saw.
+      description: What happened instead, with the exact command and its exact output in a fenced block, and the source file and line when you found the cause.
     validations:
       required: true
   - type: textarea
@@ -64,13 +75,13 @@ body:
     id: steps
     attributes:
       label: Steps
-      description: The exact prompt or command, expected, actual, and a short script that reproduces it in a fresh HOME with the agent's own install command.
+      description: Numbered steps from a fresh project (mktemp -d) with the agent's own install command, then the exact prompt or command, and the actual result.
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Versions (context-mode, agent, OS, Node, shell, git), install route, env names and resolved paths, and who filed it.
+      description: Versions (context-mode, agent, OS and arch, Node, shell, git), install route, env names and resolved paths, and who filed it.
     validations:
       required: true

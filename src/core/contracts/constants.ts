@@ -872,13 +872,28 @@ export const DOCTOR_REPORT_FILE_PREFIX = "doctor-";
 export const DOCTOR_REPORT_LINE = "Report file: ";
 export const DOCTOR_GH_LINE = "File it: ";
 export const DOCTOR_URL_LINE = "Or open: ";
+export const DOCTOR_RULES_LINE = "Rules: "; // D-INTAKE-SCORE-1: the agent's filing rules, under the form URL
 // D-DOCTOR-FIX-1: the gh command wraps; each next line starts with this and the line before ends with " \".
 export const DOCTOR_GH_NEXT = "  --";
 export const DOCTOR_NOTE_PREFIXES: readonly string[] = Object.freeze([
-  DOCTOR_ENV_PREFIX, DOCTOR_DOCS_LABEL, DOCTOR_REPORT_LINE, DOCTOR_GH_LINE, DOCTOR_GH_NEXT.trim(), DOCTOR_URL_LINE,
+  DOCTOR_ENV_PREFIX, DOCTOR_DOCS_LABEL, DOCTOR_REPORT_LINE, DOCTOR_GH_LINE, DOCTOR_GH_NEXT.trim(), DOCTOR_URL_LINE, DOCTOR_RULES_LINE,
 ]);
 export const ISSUE_REPO_SLUG = "mksglu/context-mode";
 export const ISSUE_FORM_FILE = "agent-report.yml"; // .github/ISSUE_TEMPLATE/agent-report.yml
+export const ISSUE_GUIDE_URL = `https://github.com/${ISSUE_REPO_SLUG}/blob/main/.github/AGENT_ISSUE.md`;
+// D-INTAKE-SCORE-1: the numbered rules for the user's agent. AGENT_ISSUE.md and agent-report.yml print them word for
+// word, and the intake bot (.github/scripts/issue-intake.mjs ITEMS) checks the same facts; tests/0014 pins all three.
+export const ISSUE_AGENT_RULES: readonly string[] = Object.freeze([
+  "Search for the same problem first: `gh issue list -R mksglu/context-mode --state all --search \"<check id or error>\"`. When one matches, add your facts there as a comment.",
+  "File one bug per issue.",
+  "Call the `ctx_doctor` tool and paste its full output unchanged in the `ctx-report` field.",
+  "Give the versions: context-mode, the agent, the OS and arch, and Node.",
+  "Write numbered repro steps that start from a fresh project (`mktemp -d`) and the agent's own install command.",
+  "Give the exact command and its exact output in a fenced code block.",
+  "Say what you expected and what happened instead.",
+  "Name the source file and line when you found the cause.",
+  "Replace every secret with `<masked>` and the home folder with `~` before you send.",
+]);
 export const ISSUE_URL_MAX = 8000; // the prefilled form URL holds the title and the summary fields only
 // The report file is the issue body: one "### <label>" section per form field, in the form's order.
 export const ISSUE_FORM_HEADINGS: readonly string[] = Object.freeze([

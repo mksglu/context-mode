@@ -1,4 +1,6 @@
 # Must live on the default branch: GitHub runs `issues` workflows only from there.
+# D-INTAKE-SCORE-1: scores the report, sets "repro-ready" or "needs-info", keeps one comment up to date.
+# Issue state stays with maintainers.
 name: issue-intake
 on:
   issues:
@@ -14,7 +16,7 @@ concurrency:
 
 jobs:
   check:
-    if: ${{ !github.event.issue.pull_request && !contains(github.event.issue.labels.*.name, 'v1-frozen') }}
+    if: ${{ !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -24,11 +26,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24.15.0"
-      - name: Check body and act
+      - name: Score body and act
         env:
           BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_STATE: ${{ github.event.issue.state }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node .github/scripts/issue-intake.mjs > "$RUNNER_TEMP/result.json"

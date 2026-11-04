@@ -1,12 +1,26 @@
 # Filing a context-mode issue (for coding agents)
 
-Your user asked you to report a context-mode problem. Work as if the issue came to you: what facts would you need, what is the smallest way to reproduce it, and what would the fix start from? Collect exactly those, in this order. A GitHub Action reads every new issue, checks the headings and the doctor report, and comments with a list of what is missing. A body that follows section 5 passes that check.
+Your user asked you to report a context-mode problem. Write the issue so a maintainer's agent can replay it in one pass: the facts, the smallest repro from a fresh project, the exact output, and the cause when you found it. Follow the rules below in order. A GitHub Action scores every new issue against them, labels it `repro-ready` or `needs-info`, and keeps one comment with a checklist of what is still missing. Edit the issue body to fill that checklist; the comment updates itself.
 
 One person maintains context-mode for 10 agents on 3 operating systems. A fix starts from the doctor report and a repro that runs in a fresh directory.
 
-Fast path: when a `ctx_doctor` row FAILs, ctx_doctor writes the whole issue body to `~/.context-mode/reports/doctor-<utc>.md` and prints a ready `gh issue create --repo mksglu/context-mode ... --body-file <that file>` line and a link to the form `.github/ISSUE_TEMPLATE/agent-report.yml`. The file already holds every section of the form: the doctor table, versions, install route, config entries, hook errors, journal rows and env paths. Run each Fix first. When a FAIL stays, fill the `<...>` lines in Steps and Expected, show the file to the user, and send it after the user agrees. Sections 1 to 5 below say what each part means.
-
 Security problems go to https://github.com/mksglu/context-mode/security/advisories/new as a private advisory.
+
+## Rules
+
+Follow every rule. Each one names a fact the maintainer needs to replay the bug.
+
+1. Search for the same problem first: `gh issue list -R mksglu/context-mode --state all --search "<check id or error>"`. When one matches, add your facts there as a comment.
+2. File one bug per issue.
+3. Call the `ctx_doctor` tool and paste its full output unchanged in the `ctx-report` field.
+4. Give the versions: context-mode, the agent, the OS and arch, and Node.
+5. Write numbered repro steps that start from a fresh project (`mktemp -d`) and the agent's own install command.
+6. Give the exact command and its exact output in a fenced code block.
+7. Say what you expected and what happened instead.
+8. Name the source file and line when you found the cause.
+9. Replace every secret with `<masked>` and the home folder with `~` before you send.
+
+Fast path: when a `ctx_doctor` row FAILs, ctx_doctor writes the whole issue body to `~/.context-mode/reports/doctor-<utc>.md` and prints a ready `gh issue create --repo mksglu/context-mode ... --body-file <that file>` line, a link to the form `.github/ISSUE_TEMPLATE/agent-report.yml`, and a `Rules:` link to this page. The file already holds every section of the form: the doctor table, versions, install route, config entries, hook errors, journal rows and env paths. Run each Fix first. When a FAIL stays, fill the `<...>` lines in What happened, Expected and Steps, show the file to the user, and send it after the user agrees. Sections 0 to 7 below say what each part means.
 
 ## 0. Before you start
 
@@ -102,7 +116,7 @@ Each hit gets a replacement or a reason to keep it. The doctor table is typed an
 
 ## 5. Fill in this template
 
-Save the body to a file, because multi-line Markdown breaks in shell quoting. The headings, their order and their text below are what the intake check reads.
+Save the body to a file, because multi-line Markdown breaks in shell quoting. Use these headings in this order: they are the fields of the agent-report form, and the `ctx-report` field holds the doctor output unchanged.
 
 ````
 ### Summary
@@ -111,17 +125,27 @@ Save the body to a file, because multi-line Markdown breaks in shell quoting. Th
 
 ### ctx-report
 
-<the table from ctx_doctor in the agent, whole: every Detail and Fix cell word for word>
-
-<the table from `context-mode doctor --agents <agent>`, whole>
+```text
+<the full ctx_doctor output from the agent, unchanged: Environment lines, every row, every Detail and Fix cell>
+<the full output of `context-mode doctor --agents <agent>`>
+```
 
 ### What happened
 
-Error code and text: <for example E_DB_BUSY context.db is locked by another writer>
-Hook errors (hook-errors.log, UTC):
-<lines>
-Journal rows (events, newest first):
-<rows>
+<what context-mode did, with the exact error text and the byte count>
+Cause (when you found it): <file and line, for example src/adapters/claude-code.ts line 120, and one sentence>
+
+### Hook errors
+
+<lines of hook-errors.log around the failure, UTC>
+
+### Journal rows
+
+<rows from the sqlite command in section 1>
+
+### Agent config
+
+<the agent's context-mode entries, secrets as <masked>>
 
 ### Expected
 
@@ -130,11 +154,15 @@ Journal rows (events, newest first):
 ### Steps
 
 Reproduced: yes (2 of 2)
-1. <setup commands, with sizes>
-2. <the prompt>
+1. <fresh project: mktemp -d, then the agent's own install command>
+2. <the prompt or the exact command>
 3. <the tool call>
 4. Actual: <what context-mode did, with the byte count>; the denied tool was <tool> and the alternative it gave was <tool>
 5. Newest next: <version>, result: still fails or fixed
+
+```text
+<the exact command and its exact output, unchanged>
+```
 
 ### Environment
 
@@ -146,12 +174,83 @@ Node version: <vXX.Y.Z>
 Filed by: <your agent name, version, model id>
 ````
 
+## 6. A filled example
+
+This body scores `repro-ready`: it has the doctor report, the versions, numbered steps from a fresh project, the exact output, expected and actual, and the source line.
+
+````
+### Summary
+
+D5 hook round trip: PostToolUse returns a string for Read, Claude Code wants an object
+
+### ctx-report
+
+```text
+Environment: context-mode 2.0.0 (30b95f7), agent claude-code 2.1.318
+Environment: linux-x64, Node 24.21.0, shell /usr/bin/zsh
+| Check | Status | Detail | Fix |
+|---|---|---|---|
+| D1 version | PASS | 2.0.0 (30b95f7): latest on npm | |
+| D5 hook round trip | PASS | ok | |
+(the other rows, D2 to D11, each one unchanged)
+Run in a terminal: context-mode doctor --agents claude-code
+```
+
+### What happened
+
+Claude Code prints the warning "PostToolUse:Read hook warning" (updatedToolOutput shape) on each Read of a large file (22 times in one session). The hook sends a 180 B string; Read's output is an object.
+Cause: src/adapters/claude-code.ts, the replace step writes a string for every tool.
+
+### Hook errors
+
+(hook-errors.log holds zero lines)
+
+### Journal rows
+
+| kind | tool | bytes | ok | exit_code | created_at |
+|---|---|---|---|---|---|
+| read | Read | 41170 | 1 | | 2026-11-04T10:02:03.000Z |
+
+### Agent config
+
+agent settings (enabledPlugins): ~/.claude/settings.json (1 matching lines)
+    "context-mode@context-mode": true
+
+### Expected
+
+Read keeps its object shape; the warning stays away; the agent sees a 180 B pointer in place of 41170 B.
+
+### Steps
+
+Reproduced: yes (2 of 2)
+1. `export REPRO=$(mktemp -d); export HOME="$REPRO/home"; mkdir -p "$HOME"; cd "$REPRO"`
+2. `claude plugin marketplace add mksglu/context-mode#release` then `claude plugin install context-mode@context-mode`
+3. `head -c 30000 /dev/urandom | base64 > big.txt; wc -c big.txt` gives 40538 B
+4. Send the PostToolUse Read payload for big.txt to the hook:
+
+```text
+$ CLAUDE_PLUGIN_ROOT=$P node $P/hook.mjs --agent claude-code < payload.json
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","updatedToolOutput":"ctx_search(...) searches the whole output (41170 B)."}}
+```
+
+5. Newest next: 2.0.0-next.40, result: still fails
+
+### Environment
+
+context-mode version: 2.0.0
+Install route: claude plugin install context-mode@context-mode
+Agent and version: Claude Code 2.1.318
+OS and arch: Linux x86_64 (WSL2)
+Node version: 24.21.0
+Filed by: <agent name, version, model id>
+````
+
 Show the user the title and the full body, then send after the user agrees. The user owns the GitHub account:
 
 ```sh
 gh issue create -R mksglu/context-mode --title "<check id or error code>: <short summary>" --label bug --body-file body.md
 ```
 
-## 6. After you send it
+## 7. After you send it
 
-The intake check comments within a minute. When it lists missing items, fix the file and run `gh issue edit <n> -R mksglu/context-mode --body-file body.md`; the check runs again on each edit and reopens the issue when the body passes. This repo takes issues and keeps pull requests closed. Put your analysis of the cause, if you have one, as a short paragraph under What happened.
+The intake check comments within a minute, once per issue, and edits that same comment on each later edit. When its checklist lists missing items, fix the file and run `gh issue edit <n> -R mksglu/context-mode --body-file body.md`. The label moves to `repro-ready` when the body holds the version, the steps and the output. Issue state stays with the maintainer. This repo takes issues and keeps pull requests closed.

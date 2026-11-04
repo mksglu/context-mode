@@ -259,7 +259,7 @@ describe("GP11 doctor and upgrade", () => {
     const all = text(reply).split("\n");
     assert.match(all[0] ?? "", /^Environment: context-mode .+, agent claude-code/);
     assert.match(all[1] ?? "", /^Environment: .+, Node v[\d.]+, shell /);
-    const NOTES = ["Environment: ", "Docs: ", "Report file: ", "File it: ", "  --", "Or open: "];
+    const NOTES = ["Environment: ", "Docs: ", "Report file: ", "File it: ", "  --", "Or open: ", "Rules: "];
     const lines = all.filter((l) => !NOTES.some((p) => l.startsWith(p)));
     const body = lines.slice(2);
     const rows = body.filter((l) => l.startsWith("| "));
@@ -389,7 +389,7 @@ describe("GP11 doctor and upgrade", () => {
     assert.deepEqual([...new Set(keys)].sort(), [...intake.ALLOWED_KEYS].sort());
     const body = ["### Summary", "x", "", "### ctx-report", "```text", report, "```", "", "### What happened", "x", "",
       "### Expected", "x", "", "### Steps", "1. x", "", "### Environment", "node: x"].join("\n");
-    assert.deepEqual(intake.check(body).findings, []);
+    assert.equal(intake.score(body).have.report, true);
   });
 
   // 14a GP11/codex-hooks-default-true (#1152). With no [features].hooks key in config.toml, Codex's

@@ -2417,7 +2417,11 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     for (const leak of ["SECRETBODY", "ghp_seedsecret", h]) assert.ok(!body.includes(leak), "report leaks: " + leak);
     // The report is a valid issue body for the intake check.
     const intake = await import("../.github/scripts/issue-intake.mjs");
-    assert.deepEqual(intake.check(body).findings, []);
+    // D-INTAKE-SCORE-1: the bot finds the doctor table and the env facts; a source checkout prints no version number.
+    const sc = intake.score(body);
+    for (const k of ["report", "agent", "os", "node", "output"]) assert.ok(sc.have[k], k + " " + JSON.stringify(sc));
+    // D-INTAKE-SCORE-1: the last note line links the agent's filing rules.
+    assert.ok(lines.includes(C.DOCTOR_RULES_LINE + C.ISSUE_GUIDE_URL), reply.text);
     // D-DOCTOR-FIX-1: the whole reply pasted into an issue reads clean too (two env lines, docs line, wrapped gh lines).
     assert.deepEqual(intake.reportKeys(lines).bad, []);
   });

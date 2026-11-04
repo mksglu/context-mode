@@ -10,8 +10,8 @@ import { delimiter, join } from "node:path";
 import {
   BUNDLE_SHA, CONFIG_TOML_FILE, DOCTOR_CONFIG_LINES, DOCTOR_ENV_NAMES, DOCTOR_ENV_PREFIX, DOCTOR_GH_LINE, DOCTOR_GH_NEXT,
   DOCTOR_GIT_VERSION_TIMEOUT_MS, DOCTOR_HOOK_LOG_LINES, DOCTOR_JOURNAL_ROWS, DOCTOR_LOG_TAIL_BYTES, DOCTOR_MASK,
-  DOCTOR_PATH_TOOLS, DOCTOR_REPORT_FILE_PREFIX, DOCTOR_REPORT_LINE, DOCTOR_REPORTS_DIR, DOCTOR_SECRET_WORDS, DOCTOR_URL_LINE,
-  EXE_SUFFIX, ISSUE_FORM_HEADINGS, ISSUE_FORM_URL, ISSUE_REPO_SLUG, ISSUE_URL_MAX, NATIVE_INSTALL, SETTINGS_FILE,
+  DOCTOR_PATH_TOOLS, DOCTOR_REPORT_FILE_PREFIX, DOCTOR_REPORT_LINE, DOCTOR_REPORTS_DIR, DOCTOR_SECRET_WORDS, DOCTOR_URL_LINE, DOCTOR_RULES_LINE,
+  EXE_SUFFIX, ISSUE_FORM_HEADINGS, ISSUE_FORM_URL, ISSUE_GUIDE_URL, ISSUE_REPO_SLUG, ISSUE_URL_MAX, NATIVE_INSTALL, SETTINGS_FILE,
 } from "../contracts/constants.ts";
 import type { AdapterRow, DoctorRow, ToolContext } from "../contracts/types.ts";
 import { hookLogPath } from "../hooks/fallback.ts";
@@ -206,7 +206,7 @@ export async function buildIssueBody(i: IssueInput): Promise<string> {
   return tilde(out.join("\n"));
 }
 
-/** Writes the report file and returns the lines printed under the table: path, gh command, form URL. */
+/** Writes the report file and returns the lines printed under the table: path, gh command, form URL, filing rules. */
 export async function writeIssueReport(i: IssueInput): Promise<string[]> {
   const tilde = tildeOf(i.env);
   const body = await buildIssueBody(i);
@@ -219,7 +219,7 @@ export async function writeIssueReport(i: IssueInput): Promise<string[]> {
   // gh refuses --template together with --body-file; the body file already holds the form's sections.
   // D-DOCTOR-FIX-1: the command wraps with a trailing backslash, so each line fits 80 columns and a shell runs it as one.
   const gh = [`gh issue create --repo ${ISSUE_REPO_SLUG} --label bug \\`, `${DOCTOR_GH_NEXT}title ${JSON.stringify(title)} \\`, `${DOCTOR_GH_NEXT}body-file ${shown}`];
-  return [DOCTOR_REPORT_LINE + shown, DOCTOR_GH_LINE + gh[0], gh[1]!, gh[2]!, DOCTOR_URL_LINE + formUrl(title, summaryOf(i.adapter.id, i.rows))];
+  return [DOCTOR_REPORT_LINE + shown, DOCTOR_GH_LINE + gh[0], gh[1]!, gh[2]!, DOCTOR_URL_LINE + formUrl(title, summaryOf(i.adapter.id, i.rows)), DOCTOR_RULES_LINE + ISSUE_GUIDE_URL];
 }
 
 /** The prefilled agent-report.yml URL: title and summary only, under ISSUE_URL_MAX. */

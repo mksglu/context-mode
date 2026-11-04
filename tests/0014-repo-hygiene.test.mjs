@@ -1322,11 +1322,20 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
 
   test("AGENT_ISSUE.md is a repro brief: facts with commands, clean-state repro, next check, redaction, template with the bot's headings (D-AGENT-ISSUE-2)", async () => {
     // Owner 2026-11-02: "repro stepleri onemli"; the brief answers "how would I reproduce and fix this if it came to me".
-    const { REQUIRED_HEADINGS } = await import("../.github/scripts/issue-intake.mjs");
+    const { ISSUE_FORM_HEADINGS: REQUIRED_HEADINGS, ISSUE_AGENT_RULES } = await import("../src/core/contracts/constants.ts");
     const text = readRepo(".github/AGENT_ISSUE.md");
+    // D-INTAKE-SCORE-1: the brief, the agent-report form and the constant hold the same numbered rules, word for word.
+    const form = readRepo(".github/ISSUE_TEMPLATE/agent-report.yml");
+    ISSUE_AGENT_RULES.forEach((r, i) => {
+      assert.ok(text.includes(`\n${i + 1}. ${r}\n`), "AGENT_ISSUE.md rule " + (i + 1));
+      assert.ok(form.includes(`\n        ${i + 1}. ${r}\n`), "agent-report.yml rule " + (i + 1));
+    });
+    for (const fact of ["ctx_doctor", "ctx-report", "context-mode", "Node", "fresh project", "exact output", "expected", "source file", "one bug", "same problem", "secret"]) {
+      assert.ok(ISSUE_AGENT_RULES.some((r) => r.includes(fact)), "rules must name: " + fact);
+    }
     const mustHold = [
       "## 1. Collect these facts", "## 2. Reproduce from a clean state", "## 3. Check the newest next release",
-      "## 4. Redact", "## 5. Fill in this template",
+      "## 4. Redact", "## 5. Fill in this template", "## 6. A filled example", "## Rules",
       "node --version", "uname -sm", "context-mode doctor", "ctx_doctor", "hook-errors.log", "sqlite3 -readonly",
       "events", "mktemp -d", "HOME=", "wc -c", "npm view context-mode dist-tags",
       "claude plugin marketplace add", "codex plugin add", "gemini extensions install", "pi install", "opencode plugin add",
@@ -2357,5 +2366,124 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
       assert.ok(buf.length <= 120 * 1024, theme + ": palette PNG, " + buf.length + " bytes");
     }
     assert.ok(readmeImageBytes(REPO) <= README_IMAGES_MAX_BYTES, "README figures " + readmeImageBytes(REPO) + " bytes");
+  });
+});
+
+describe("ADR-0014 issue intake: score, one comment, issue state stays with maintainers (D-INTAKE-SCORE-1)", () => {
+  // Owner 2026-11-05: "bu GitHub Actions bot u cok kati calisiyor ... User 2 kez issue acmis issue ise gayet net kodlarina
+  // kadar vermis." #1306 and #1307 held steps, output and the source line; the first check closed them for a heading.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
+  const intake = () => import("../.github/scripts/issue-intake.mjs");
+  const act = () => import("../.github/scripts/issue-intake-act.mjs");
+  // The body GitHub writes for agent-report.yml when the reporter fills nothing.
+  const emptyForm = () => {
+    const out = [];
+    for (const b of readRepo(".github/ISSUE_TEMPLATE/agent-report.yml").split("\n  - type: ").slice(1)) {
+      const at = b.indexOf("label: ");
+      if (at === -1) continue;
+      const label = b.slice(at + 7, b.indexOf("\n", at)).trim();
+      out.push(`### ${label}`, "", b.includes("render: text") ? "```text\n\n```" : "_No response_", "");
+    }
+    return out.join("\n");
+  };
+
+  for (const n of ["1304", "1306", "1307"]) {
+    test(`#${n} (real body) scores repro-ready`, async () => {
+      const { score } = await intake();
+      const r = score(readRepo(`tests/fixtures/issue-intake/${n}.md`));
+      assert.equal(r.status, "repro-ready", JSON.stringify(r));
+      for (const k of ["version", "agent", "os", "steps", "expected", "observed", "output"]) assert.ok(r.have[k], `#${n} ${k}`);
+    });
+  }
+
+  test("an empty agent-report form scores needs-info and lists every item", async () => {
+    const { score, ITEMS } = await intake();
+    const body = emptyForm();
+    assert.ok(body.includes("### ctx-report") && body.includes("### Steps"), body);
+    const r = score(body);
+    assert.equal(r.status, "needs-info");
+    assert.deepEqual(r.missing, ITEMS.map((i) => i.key));
+    assert.equal(score("").status, "needs-info");
+  });
+
+  test("the AGENT_ISSUE.md fill-in template scores needs-info; the filled example scores repro-ready with every item", async () => {
+    const { score } = await intake();
+    const text = readRepo(".github/AGENT_ISSUE.md");
+    const block = (head) => { const a = text.indexOf("````\n", text.indexOf(head)) + 5; return text.slice(a, text.indexOf("\n````", a)); };
+    assert.equal(score(block("## 5. Fill in this template")).status, "needs-info");
+    const r = score(block("## 6. A filled example"));
+    assert.deepEqual([r.status, r.missing], ["repro-ready", []]);
+  });
+
+  test("the doctor table counts in a fenced block under any heading, with 3 or 4 columns", async () => {
+    const { score } = await intake();
+    const table = ["```", "| Check | Status | Detail |", "|---|---|---|", "| D1 version | PASS | 2.0.0 |", "```"].join("\n");
+    assert.ok(score("## Doctor output\n\n" + table).have.report);
+    assert.ok(score("D1 version | PASS | ok\nD2 node | PASS | ok\nD3 host config | FAIL | x").have.report);
+    assert.equal(score("## Notes\n\nall fine").have.report, false);
+  });
+
+  test("version, agent, Node and steps read from free text by substring and digit walk", async () => {
+    const { score, versionAfter, isPlaceholder } = await intake();
+    assert.ok(versionAfter("context-mode version: 2.0.0", "context-mode"));
+    assert.ok(versionAfter("installed context-mode@2.0.1", "context-mode"));
+    assert.equal(versionAfter("context-mode version: <x.y.z>", "context-mode"), false);
+    assert.equal(versionAfter("my-context-mode 2", "context-mode"), false);
+    assert.ok(versionAfter("opencode version: 2.2.5", "opencode"));
+    assert.ok(versionAfter("node v24.21.0", "node"));
+    assert.ok(isPlaceholder("Node version: <vXX.Y.Z>") && isPlaceholder("_No response_") && isPlaceholder("1. <fresh project>"));
+    assert.equal(isPlaceholder("Node version: v24.21.0"), false);
+    const r = score("1. run x\n2. run y\n\ncontext-mode 2.0.2\n\n```\n$ x\nboom\n```");
+    assert.deepEqual([r.status, r.have.steps, r.have.version, r.have.output], ["repro-ready", true, true, true]);
+    assert.equal(score("1. run x\n\ncontext-mode 2.0.2\n\n```\nboom\n```").status, "needs-info", "one step is too few");
+  });
+
+  test("a secret prefix adds a note to the comment and leaves the status as scored", async () => {
+    const { score } = await intake();
+    const { commentBody } = await act();
+    const r = score("1. a\n2. b\ncontext-mode 2.0.2\n```\nGITHUB_TOKEN=github_pat_x\n```");
+    assert.equal(r.status, "repro-ready");
+    assert.deepEqual(r.warnings, ["github_pat_", "TOKEN="]);
+    assert.ok(commentBody(r).includes("`github_pat_` appears in the body"));
+  });
+
+  test("plan(): one comment found by its marker and edited in place; a second run with the same score does nothing", async () => {
+    const { score } = await intake();
+    const { plan, MARKER, commentBody } = await act();
+    const result = score(emptyForm());
+    const first = plan({ result, author: "NONE", labels: ["bug"], comments: [] });
+    assert.deepEqual(first.actions.map((a) => a.op), ["label-create", "label-add", "comment-create"]);
+    assert.equal(first.actions[0].name, "needs-info");
+    const body = commentBody(result);
+    assert.ok(body.startsWith(MARKER) && body.includes("- [ ] **ctx_doctor report**"), body);
+    const own = { id: 7, body, bot: true, assoc: "NONE" };
+    assert.deepEqual(plan({ result, author: "NONE", labels: ["bug", "needs-info"], comments: [own] }).actions, []);
+    const ready = score(readRepo("tests/fixtures/issue-intake/1307.md"));
+    const next = plan({ result: ready, author: "NONE", labels: ["bug", "needs-info", "no-report"], comments: [own] });
+    assert.deepEqual(next.actions.map((a) => a.op + " " + (a.name ?? a.id)), ["label-remove needs-info", "label-remove no-report", "label-create repro-ready", "label-add repro-ready", "comment-edit 7"]);
+  });
+
+  test("plan(): a complete report gets the label alone; issue state stays with maintainers", async () => {
+    const { score } = await intake();
+    const { plan } = await act();
+    const text = readRepo(".github/AGENT_ISSUE.md");
+    const a = text.indexOf("````\n", text.indexOf("## 6. A filled example")) + 5;
+    const p = plan({ result: score(text.slice(a, text.indexOf("\n````", a))), author: "NONE", labels: [], comments: [] });
+    assert.deepEqual(p.actions.map((x) => x.op), ["label-create", "label-add"]);
+    const src = readRepo(".github/scripts/issue-intake-act.mjs") + readRepo(".github/workflows/issue-intake.yml");
+    for (const verb of ['"close"', '"reopen"', "issue close", "issue reopen", "state_reason"]) assert.ok(!src.includes(verb), "intake must leave issue state alone: " + verb);
+  });
+
+  test("plan(): steps back for a maintainer author, the maintainer-ack label, or a maintainer comment", async () => {
+    const { score } = await intake();
+    const { plan } = await act();
+    const result = score("");
+    for (const author of ["OWNER", "MEMBER", "COLLABORATOR"]) assert.ok(plan({ result, author, labels: [], comments: [] }).skip, author);
+    assert.equal(plan({ result, author: "NONE", labels: ["maintainer-ack"], comments: [] }).skip, "label maintainer-ack");
+    const owner = { id: 1, body: "stop github actions", bot: false, assoc: "OWNER" };
+    assert.deepEqual(plan({ result, author: "NONE", labels: [], comments: [owner] }), { skip: "a maintainer commented", actions: [] });
+    const user = { id: 2, body: "more info", bot: false, assoc: "NONE" };
+    assert.equal(plan({ result, author: "CONTRIBUTOR", labels: [], comments: [user] }).skip, null);
   });
 });
