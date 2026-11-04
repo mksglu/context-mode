@@ -34,7 +34,8 @@ const readJson = (repo, rel) => JSON.parse(readFileSync(path.join(repo, rel), "u
 const writeJson = (repo, rel, obj) => writeFileSync(path.join(repo, rel), JSON.stringify(obj, null, 2) + "\n");
 
 // Every place a dev version lives. Dependency versions in the lockfile are not touched.
-function setVersions(repo, version) {
+// D-REL-MAIN-VERSION-1: commit-main.mjs calls this too, so a release commit on main never leaves a manifest behind.
+export function setVersions(repo, version) {
   const touched = [];
   const set = (rel, edit) => {
     if (!existsSync(path.join(repo, rel))) return;

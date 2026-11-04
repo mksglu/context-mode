@@ -88,6 +88,14 @@ const ALLOWED_SKILL_FILES = [
   "skills/ctx-upgrade/SKILL.md",
   ".claude/skills/release/SKILL.md",
 ];
+// D-REL-MAIN-VERSION-1: the release commit (scripts/release/commit-main.mjs, build/main-tree.mjs) tracks the built plugin
+// under plugins/claude-code/ with the 4 rendered skill copies build.mjs ships (skills/ for Gemini and Qwen, claude-code/skills
+// for the Claude Code plugin.json "skills", codex/skills, pi/skills) and the root Gemini and Qwen manifests.
+const MAIN_TREE_PLUGIN_DIR = "plugins/claude-code/";
+const MAIN_TREE_SKILL_DIRS = ["skills/", "claude-code/skills/", "codex/skills/", "pi/skills/"];
+const MAIN_TREE_SKILL_FILES = MAIN_TREE_SKILL_DIRS.flatMap((d) =>
+  ["ctx-stats", "ctx-doctor", "ctx-upgrade"].map((n) => MAIN_TREE_PLUGIN_DIR + d + n + "/SKILL.md"));
+const MAIN_TREE_FILES = ["gemini-extension.json", "qwen-extension.json", "hooks/hooks.json", "hooks/qwen.json"];
 const REMOVED_BASENAMES = ["AGENTS.md", "GEMINI.md", "QWEN.md", "CLAUDE.md", "SYSTEM.md", "copilot-instructions.md"];
 
 // The two retired tool names (00-architecture Assumption A3). Scan scope per D-M7-arch-4.
@@ -107,6 +115,7 @@ const ALLOWED_DIRS = [
   "scripts/release/",
   ".github/",
   ".claude-plugin/", ".codex-plugin/", ".agents/plugins/",
+  MAIN_TREE_PLUGIN_DIR,
 ];
 const ALLOWED_FILES = [
   // The 11 adapter files (impl/00 §1).
@@ -123,6 +132,7 @@ const ALLOWED_FILES = [
   "docs/how-it-works.md", "docs/tools.md", "docs/algorithms.md", "docs/performance.md", "docs/UPSTREAM-CREDITS.md",
   // Root files.
   "README.md", "CONTRIBUTING.md", "LICENSE", "stats.json", "package.json", "tsconfig.json", ".gitignore", ".gitattributes",
+  ...MAIN_TREE_FILES,
 ];
 
 // v1 test files that cleanup-plan §3 leaves open for an owner decision (platform rollup forward
@@ -172,7 +182,7 @@ function check(repoRoot) {
     const name = baseName(p);
     const removed =
       REMOVED_PATHS.some((e) => matchesRemoved(p, e)) ||
-      (name === "SKILL.md" && !ALLOWED_SKILL_FILES.includes(p)) ||
+      (name === "SKILL.md" && !ALLOWED_SKILL_FILES.includes(p) && !MAIN_TREE_SKILL_FILES.includes(p)) ||
       REMOVED_BASENAMES.includes(name);
     if (removed) {
       found.push(p);

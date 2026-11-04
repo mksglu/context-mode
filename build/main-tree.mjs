@@ -64,9 +64,12 @@ export function writeMainTree(pkg, repo, version) {
   cpSync(pkg, plugin, { recursive: true });
   rmSync(path.join(plugin, CLAUDE_MARKETPLACE)); // the marketplace lives at the repo root, not inside the plugin
   writeHashes(plugin);
+  // D-REL-MAIN-VERSION-1: the root marketplace on main is the source-tree manifest too (tests/0018 package-meta), so it
+  // carries the package version, description and keywords, as the v2-design one did.
   writeJson(path.join(repo, CLAUDE_MARKETPLACE), {
     ...pkgMarket,
-    plugins: pkgMarket.plugins.map((p) => ({ ...p, source: PLUGIN_SOURCE })),
+    metadata: { ...pkgMarket.metadata, version },
+    plugins: pkgMarket.plugins.map((p) => ({ ...p, description: pkgJson.description, keywords: pkgJson.keywords, version, source: PLUGIN_SOURCE })),
   });
   writeJson(path.join(repo, "gemini-extension.json"), repoint(readJson(path.join(pkg, "gemini-extension.json"))));
   writeJson(path.join(repo, "hooks", "hooks.json"), repoint(readJson(path.join(pkg, "hooks", "hooks.json"))));

@@ -9,9 +9,10 @@
 // --before-push <shell command>: test seam, runs once before the first push.
 // Failure: one stderr line `release failed: <reason>` and exit 1.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { setVersions } from "./dev-version.mjs";
 
 const MAIN_BRANCH = "main";
 const TAG_PREFIX = "v";
@@ -74,11 +75,10 @@ function release({ pkg, version, remote, "before-push": beforePush }) {
   checkoutBase(remote);
   const r = spawnSync(process.execPath, [MAIN_TREE, "--pkg", path.resolve(pkg), "--repo", process.cwd(), "--version", version], { encoding: "utf8" });
   if (r.status !== 0) fail((r.stderr ?? "").trim().replace("main-tree failed: ", "main tree: "));
-  if (existsSync("package.json")) {
-    const p = JSON.parse(readFileSync("package.json", "utf8"));
-    if (p.version !== version) { p.version = version; writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n"); }
-  }
-  mustGit("add", "-A", "--", ...GENERATED.filter((g) => existsSync(g)));
+  // D-REL-MAIN-VERSION-1: every source-tree version file (dev-version.mjs SOURCES), not only package.json. A tracked file only:
+  // package-lock.json is gitignored on main.
+  const versioned = setVersions(process.cwd(), version).filter((f) => git("ls-files", "--error-unmatch", "--", f).ok);
+  mustGit("add", "-A", "--", ...new Set([...GENERATED.filter((g) => existsSync(g)), ...versioned]));
   mustGit(...BOT, "commit", "-q", "--allow-empty", "-m", `chore(release): ${tag}`);
   mustGit(...BOT, "tag", "-a", tag, "-m", tag);
   pushWithRetry(remote, tag, beforePush);

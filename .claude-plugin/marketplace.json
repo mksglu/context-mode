@@ -9,7 +9,27 @@
       "name": "context-mode",
       "skills": "./claude-code/skills",
       "source": "./plugins/claude-code",
-      "version": "2.0.0"
+      "version": "2.0.0",
+      "keywords": [
+        "claude-code",
+        "codex",
+        "gemini-cli",
+        "qwen-code",
+        "copilot-cli",
+        "vscode",
+        "opencode",
+        "pi",
+        "kiro",
+        "zcode",
+        "mcp",
+        "context-window",
+        "sandbox",
+        "fts5",
+        "pi-package"
+      ]
     }
-  ]
+  ],
+  "metadata": {
+    "version": "2.0.0"
+  }
 }

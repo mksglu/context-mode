@@ -690,7 +690,8 @@ describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
     writeFileSync(path.join(root, rel), typeof value === "string" ? value : JSON.stringify(value));
   };
 
-  function fixture(t, version) {
+  // seed: { rel: value } more files on main before the release (the source-tree manifests of the real repo).
+  function fixture(t, version, seed = {}) {
     const root = mkdtempSync(path.join(tmpdir(), "cm-v2-commitmain-"));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const bare = path.join(root, "origin.git");
@@ -698,6 +699,7 @@ describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
     const work = path.join(root, "work");
     git(root, "clone", "-q", bare, work);
     put(work, "README.md", "x");
+    for (const [rel, value] of Object.entries(seed)) put(work, rel, value);
     git(work, "add", "-A");
     git(work, "commit", "-q", "-m", "feat: init");
     git(work, "push", "-q", "origin", "HEAD:refs/heads/main");
@@ -711,6 +713,9 @@ describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
     put(pkg, "hooks/hooks.json", { hooks: { BeforeTool: [{ hooks: [{ type: "command", command: 'node "${extensionPath}${/}hook.mjs" --agent gemini' }] }] } });
     put(pkg, "hooks/qwen.json", { hooks: {} });
     put(pkg, "qwen-extension.json", { name: "context-mode", version, hooks: "hooks/qwen.json", mcpServers: { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "qwen"] } } });
+    put(pkg, ".codex-plugin/plugin.json", { name: "context-mode", version, skills: "./codex/skills/" });
+    // The skill copies build.mjs ships: skills/ (Gemini, Qwen), claude-code/skills (plugin.json "skills"), codex/skills, pi/skills.
+    for (const dir of ["skills", "claude-code/skills", "codex/skills", "pi/skills"]) put(pkg, dir + "/ctx-stats/SKILL.md", dir);
     return { root, bare, work, pkg };
   }
   const run = (fx, version, extra = []) =>
@@ -762,6 +767,60 @@ describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
     assert.equal(r.status, 1);
     assert.ok(r.stderr.startsWith("release failed: "), r.stderr);
     assert.ok(!existsSync(path.join(fx.bare, "refs", "tags", "v2.0.1")));
+  });
+
+  // D-REL-MAIN-VERSION-1: v2.0.0 left .claude-plugin/plugin.json and .codex-plugin/plugin.json at 2.0.0-next.39 on main.
+  const OLD = "2.0.0-next.39";
+  const SOURCE_TREE = {
+    "package.json": { name: "context-mode", version: OLD },
+    ".claude-plugin/plugin.json": { name: "context-mode", version: OLD },
+    ".claude-plugin/marketplace.json": { name: "context-mode", metadata: { version: OLD }, plugins: [{ name: "context-mode", version: OLD }] },
+    ".codex-plugin/plugin.json": { name: "context-mode", version: OLD },
+  };
+  const MANIFEST_NAMES = ["package.json", "plugin.json", "marketplace.json", "gemini-extension.json", "qwen-extension.json"];
+  const treeFiles = (fx, ref) => git(fx.bare, "ls-tree", "-r", "--name-only", ref).split("\n");
+
+  test("[MAIN-ONLY] commit-main: every manifest on main that carries a version says the release version (D-REL-MAIN-VERSION-1)", (t) => {
+    const fx = fixture(t, "2.0.0", SOURCE_TREE);
+    const r = run(fx, "2.0.0");
+    assert.equal(r.status, 0, r.stderr);
+    const head = git(fx.bare, "rev-parse", "refs/heads/main");
+    const manifests = treeFiles(fx, head).filter((f) => MANIFEST_NAMES.includes(f.slice(f.lastIndexOf("/") + 1)));
+    for (const f of Object.keys(SOURCE_TREE)) assert.ok(manifests.includes(f), f);
+    let seen = 0;
+    for (const f of manifests) {
+      const m = JSON.parse(git(fx.bare, "show", `${head}:${f}`));
+      for (const [where, v] of [["version", m.version], ["metadata.version", m.metadata?.version], ...(m.plugins ?? []).map((p, i) => [`plugins[${i}].version`, p.version])]) {
+        if (v === undefined) continue;
+        assert.equal(v, "2.0.0", `${f} ${where}`);
+        seen++;
+      }
+    }
+    assert.ok(seen >= 10, `versions checked: ${seen}`);
+  });
+
+  test("[MAIN-ONLY] commit-main: plugins/claude-code equals the package on every release, a second run nests nothing and keeps no old file", (t) => {
+    const fx = fixture(t, "2.0.0", SOURCE_TREE);
+    put(fx.pkg, "old.mjs", "// only in 2.0.0");
+    assert.equal(run(fx, "2.0.0").status, 0);
+    rmSync(path.join(fx.pkg, "old.mjs"));
+    put(fx.pkg, "package.json", { name: "context-mode", version: "2.0.1" });
+    const r = run(fx, "2.0.1");
+    assert.equal(r.status, 0, r.stderr);
+    const PREFIX = "plugins/claude-code/";
+    const got = treeFiles(fx, "refs/heads/main").filter((f) => f.startsWith(PREFIX)).map((f) => f.slice(PREFIX.length)).sort();
+    const walk = (dir, rel = "") => readdirSync(path.join(dir, rel), { withFileTypes: true })
+      .flatMap((e) => e.isDirectory() ? walk(dir, rel + e.name + "/") : [rel + e.name]);
+    const want = [...walk(fx.pkg).filter((f) => f !== ".claude-plugin/marketplace.json"), "SHA256SUMS"].sort();
+    assert.deepEqual(got, want);
+  });
+
+  test("[MAIN-ONLY] commit-main: the release tree on main passes the repo-cleanup gate build/check-removed.mjs (D-REL-MAIN-VERSION-1)", (t) => {
+    const fx = fixture(t, "2.0.0", SOURCE_TREE);
+    assert.equal(run(fx, "2.0.0").status, 0);
+    const r = spawnSync(process.execPath, [path.join(REPO, "build", "check-removed.mjs")], { cwd: fx.work, encoding: "utf8" });
+    assert.equal(r.stdout, "check-removed: clean\n");
+    assert.equal(r.status, 0);
   });
 
   test("[MAIN-ONLY] commit-main: --rollback-to <sha> restores the generated paths from that release commit as a forward commit, no tag", (t) => {
