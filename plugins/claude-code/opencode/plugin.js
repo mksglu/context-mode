@@ -426,7 +426,7 @@ var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "22367bce5f9db0a23a18cddba4d6e98c5250da10" : void 0;
+var BUNDLE_SHA = true ? "9f1916d761e6a8e55ac43858b99dcdcd3cc53caa" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -685,6 +685,7 @@ var REGEX_SPECIAL_CHARS = ".*+?^${}()|[]\\";
 var REGEX_ESCAPE = "\\";
 var CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"]);
 var D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
+var D5_READ_SHAPE_DETAIL = `PostToolUse Read replace is not Read's output shape {type:"text", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning`;
 function D5_SLOW_DETAIL(ms) {
   return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`;
 }
@@ -1039,8 +1040,27 @@ function outputOf(resp) {
       return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
-  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return resp.content;
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp)) {
+    const slot = textSlot(resp);
+    if (slot !== null) return slot.text;
+  }
   return JSON.stringify(resp);
+}
+function textSlot(r) {
+  const file2 = r.file;
+  if (r.type === "text" && typeof file2 === "object" && file2 !== null && typeof file2.content === "string") {
+    return { text: file2.content, put: (o, output) => ({ ...o, file: { ...o.file, content: output } }) };
+  }
+  if (isGrepContent(r)) return { text: r.content, put: (o, output) => ({ ...o, content: output }) };
+  if (Array.isArray(r.filenames) && r.filenames.every((f) => typeof f === "string")) {
+    return { text: r.filenames.join("\n"), put: (o, output) => ({ ...o, filenames: output.split("\n") }) };
+  }
+  if (typeof r.result === "string") return { text: r.result, put: (o, output) => ({ ...o, result: output }) };
+  return null;
+}
+function isShellShape(resp) {
+  const r = resp;
+  return typeof r.stdout === "string" || typeof r.stderr === "string";
 }
 function isGrepContent(resp) {
   const r = resp;
@@ -1060,7 +1080,10 @@ function readResult(resp) {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
   const info = { isError, bytes: Buffer.byteLength(text), text };
-  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp;
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
+    if (textSlot(resp) !== null) info.shape = resp;
+    else info.keep = true;
+  }
   if (Array.isArray(resp)) {
     info.blocks = true;
     if (blocksOf(resp).keep) info.keep = true;
@@ -1097,7 +1120,9 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources) {
 }
 function replaceShape(ev, output) {
   if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
-  if (ev.result?.shape !== void 0) return { ...ev.result.shape, content: output };
+  const shape = ev.result?.shape;
+  const slot = shape === void 0 ? null : textSlot(shape);
+  if (shape !== void 0 && slot !== null) return slot.put(shape, output);
   if (ev.result?.blocks === true) return [{ type: "text", text: output }];
   return output;
 }
@@ -24026,7 +24051,7 @@ function checkV1Leftovers(agent, home, scope = {}) {
   if (findings.length === 0) return pass("D4");
   const detail = findings.map((f) => f.reason).join(D4_REASON_JOIN);
   if (findings.every((f) => f.reason === V1_REASON.tmpFile)) return { ...pass("D4"), detail };
-  return fail2("D4", detail, DOCTOR_FIX_UPGRADE);
+  return { ...fail2("D4", detail, DOCTOR_FIX_UPGRADE), status: "WARN" };
 }
 function parsedOrNull(agent, file2, jsonc) {
   try {
@@ -24349,7 +24374,8 @@ function checkShell(env) {
 }
 
 // src/core/ops/doctor-hook.ts
-import { existsSync as existsSync10, readFileSync as readFileSync10, realpathSync as realpathSync7 } from "node:fs";
+import { existsSync as existsSync10, mkdtempSync, readFileSync as readFileSync10, realpathSync as realpathSync7, rmSync as rmSync2 } from "node:fs";
+import { tmpdir as tmpdir2 } from "node:os";
 import path6 from "node:path";
 
 // src/setup/codex-trust.ts
@@ -24633,6 +24659,50 @@ function isNativeShape(agent, stdout, exitCode, killed, event) {
       return COPILOT_KEYS.some((k) => Object.hasOwn(out, k));
   }
 }
+var READ_PROBE_LINES = 4 * Math.ceil(REPLACE_TRIGGER_BYTES / 40);
+function readProbePayload(cwd) {
+  const content = Array.from({ length: READ_PROBE_LINES }, (_, n) => "d5 read probe line " + n + " ".padEnd(20, "x")).join("\n");
+  const filePath = path6.join(cwd, "d5-read-probe.txt");
+  return {
+    session_id: "d5-read-probe",
+    transcript_path: "",
+    cwd,
+    hook_event_name: "PostToolUse",
+    tool_name: "Read",
+    tool_use_id: "toolu_d5_read_probe",
+    tool_input: { file_path: filePath },
+    tool_response: { type: "text", file: { filePath, content, numLines: READ_PROBE_LINES, startLine: 1, totalLines: READ_PROBE_LINES } }
+  };
+}
+function isReadShape(stdout) {
+  if (stdout.trim() === "") return true;
+  let out;
+  try {
+    out = JSON.parse(stdout);
+  } catch {
+    return false;
+  }
+  if (!isObject5(out) || !isObject5(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput")) return true;
+  const r = out.hookSpecificOutput.updatedToolOutput;
+  if (!isObject5(r) || r.type !== "text" || !isObject5(r.file)) return false;
+  const f = r.file;
+  return typeof f.filePath === "string" && typeof f.content === "string" && ["numLines", "startLine", "totalLines"].every((k) => typeof f[k] === "number");
+}
+async function readProbeOk(i, timeoutMs) {
+  const home = mkdtempSync(path6.join(tmpdir2(), "cm-d5-read-"));
+  try {
+    const r = await runProcess([process.execPath, path6.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir,
+      env: { ...i.env, HOME: home, USERPROFILE: home },
+      signal: i.signal,
+      timeoutMs,
+      stdin: JSON.stringify(readProbePayload(i.worktree ?? home))
+    });
+    return isReadShape(r.stdout.toString("utf8"));
+  } finally {
+    rmSync2(home, { recursive: true, force: true });
+  }
+}
 function codexHookJournaled(db) {
   if (db === null) return false;
   return db.raw.prepare("SELECT 1 FROM events WHERE agent = ? LIMIT 1").get("codex") !== void 0;
@@ -24700,15 +24770,16 @@ async function checkHookRoundTrip(i) {
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
+  if (i.agent === "claude-code" && !await readProbeOk(i, timeoutMs)) return row("FAIL", D5_READ_SHAPE_DETAIL, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
 
 // src/core/ops/db-heal.ts
-import { existsSync as existsSync11, mkdirSync as mkdirSync5, rmSync as rmSync3 } from "node:fs";
+import { existsSync as existsSync11, mkdirSync as mkdirSync5, rmSync as rmSync4 } from "node:fs";
 import { basename as basename4, dirname as dirname7, join as join14 } from "node:path";
 
 // src/core/store/owners.ts
-import { mkdirSync as mkdirSync4, readdirSync as readdirSync5, readFileSync as readFileSync11, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync4, readdirSync as readdirSync5, readFileSync as readFileSync11, rmSync as rmSync3, writeFileSync as writeFileSync2 } from "node:fs";
 import { basename as basename3, join as join13 } from "node:path";
 function ownersDir(configDir, projectKey) {
   return join13(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
@@ -24749,7 +24820,7 @@ function listLiveOwners(configDir, projectKey) {
     }
     const serverId = basename3(name, OWNER_PID_EXT);
     if (isLive(Number(text.trim()))) live.push(serverId);
-    else rmSync2(file2, { force: true });
+    else rmSync3(file2, { force: true });
   }
   return live;
 }
@@ -24761,7 +24832,7 @@ function integrityOk2(rows) {
 async function healLossless(dbPath) {
   const { DatabaseSync } = await import(SQLITE_MODULE);
   const tmp = dbPath + HEAL_TMP_SUFFIX;
-  rmSync3(tmp, { force: true });
+  rmSync4(tmp, { force: true });
   try {
     const src = new DatabaseSync(dbPath, { readOnly: true, timeout: DB_TIMEOUT_MS });
     try {
@@ -24777,11 +24848,11 @@ async function healLossless(dbPath) {
     } finally {
       copy.close();
     }
-    rmSync3(dbPath + DB_WAL_SUFFIX, { force: true });
-    rmSync3(dbPath + DB_SHM_SUFFIX, { force: true });
+    rmSync4(dbPath + DB_WAL_SUFFIX, { force: true });
+    rmSync4(dbPath + DB_SHM_SUFFIX, { force: true });
     renameWithRetry(tmp, dbPath);
   } finally {
-    rmSync3(tmp, { force: true });
+    rmSync4(tmp, { force: true });
   }
 }
 function renameAside(dbPath) {
@@ -25226,8 +25297,8 @@ var ctxDoctor = Object.freeze({
 });
 
 // src/core/tools/execute.ts
-import { existsSync as existsSync14, mkdtempSync, rmSync as rmSync4, writeFileSync as writeFileSync4 } from "node:fs";
-import { tmpdir as tmpdir2 } from "node:os";
+import { existsSync as existsSync14, mkdtempSync as mkdtempSync2, rmSync as rmSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { tmpdir as tmpdir3 } from "node:os";
 import { dirname as dirname9, join as join17, parse as parse3, resolve as resolve6 } from "node:path";
 
 // src/core/sandbox/win-build.ts
@@ -25393,7 +25464,7 @@ async function handler3(raw, ctx) {
     if (takesDashC(input.language, runtime)) {
       argv = [runtime, "-c", input.language === "shell" ? rewriteWindowsBuildTools(input.code, process.platform) : input.code];
     } else {
-      tmpDir = mkdtempSync(join17(tmpdir2(), TMP_PREFIX));
+      tmpDir = mkdtempSync2(join17(tmpdir3(), TMP_PREFIX));
       const file2 = join17(tmpDir, SCRIPT_NAME + (SCRIPT_EXT[input.language] ?? ""));
       writeFileSync4(file2, scriptText(input.language, input.code), "utf8");
       argv = scriptArgv(input.language, runtime, file2);
@@ -25417,7 +25488,7 @@ async function handler3(raw, ctx) {
     }
     throw err;
   } finally {
-    if (tmpDir !== null && !handedOff) rmSync4(tmpDir, { recursive: true, force: true });
+    if (tmpDir !== null && !handedOff) rmSync5(tmpDir, { recursive: true, force: true });
   }
 }
 var ctxExecute = {
@@ -30136,7 +30207,7 @@ var ctxStats = Object.freeze({
 });
 
 // src/core/tools/upgrade.ts
-import { existsSync as existsSync21, realpathSync as realpathSync10, rmSync as rmSync9 } from "node:fs";
+import { existsSync as existsSync21, realpathSync as realpathSync10, rmSync as rmSync10 } from "node:fs";
 import { basename as basename7, dirname as dirname12, join as join25 } from "node:path";
 
 // src/core/ops/host-write.ts
@@ -30207,7 +30278,7 @@ function regenerateHostConfig(row5, home, opts = {}) {
 }
 
 // src/core/ops/plugin-swap.ts
-import { existsSync as existsSync17, lstatSync, readdirSync as readdirSync8, readlinkSync, rmSync as rmSync5, symlinkSync, unlinkSync as unlinkSync2 } from "node:fs";
+import { existsSync as existsSync17, lstatSync, readdirSync as readdirSync8, readlinkSync, rmSync as rmSync6, symlinkSync, unlinkSync as unlinkSync2 } from "node:fs";
 import { basename as basename6, join as join21, win32 as win322 } from "node:path";
 function linkTarget(path7, win) {
   if (!isLink(path7)) return null;
@@ -30247,13 +30318,13 @@ function swapPluginCurrent(agentDir, sha, opts = {}) {
   const keep = /* @__PURE__ */ new Set([sha]);
   if (before !== null) keep.add(before);
   const removed = generations(agentDir).filter((name) => !keep.has(name)).map((name) => join21(agentDir, name));
-  for (const dir of removed) rmSync5(dir, { recursive: true, force: true });
+  for (const dir of removed) rmSync6(dir, { recursive: true, force: true });
   const previous = before !== null && existsSync17(join21(agentDir, before)) ? join21(agentDir, before) : null;
   return { current: next, previous, removed };
 }
 
 // src/core/ops/release-fetch.ts
-import { existsSync as existsSync18, mkdirSync as mkdirSync8, rmSync as rmSync6 } from "node:fs";
+import { existsSync as existsSync18, mkdirSync as mkdirSync8, rmSync as rmSync7 } from "node:fs";
 import { join as join22 } from "node:path";
 function failed(r) {
   if (r.exitCode === null && r.killed === null) return new CtxError("FETCH_FAILED", { code: GIT_NOT_STARTED });
@@ -30269,7 +30340,7 @@ async function fetchRelease(agent, url2, env, signal, opts = {}) {
   const agentDir = join22(resolveConfigDir(env), DATA_PLUGINS_DIR_NAME, agent);
   mkdirSync8(agentDir, { recursive: true });
   const fetchDir = join22(agentDir, UPGRADE_FETCH_DIR_PREFIX + process.pid);
-  rmSync6(fetchDir, { recursive: true, force: true });
+  rmSync7(fetchDir, { recursive: true, force: true });
   const gitBin = findRuntime(GIT_BIN, env);
   if (gitBin === null) throw new CtxError("FETCH_FAILED", { code: GIT_NOT_STARTED });
   const childEnv = buildChildEnv(env, { ...GIT_NO_PROMPT_ENV, ...GIT_NO_CRLF_ENV });
@@ -30277,17 +30348,17 @@ async function fetchRelease(agent, url2, env, signal, opts = {}) {
     await git2(gitBin, [...GIT_CLONE_ARGS, RELEASE_BRANCH, url2, fetchDir], agentDir, childEnv, signal);
     const sha = await git2(gitBin, GIT_HEAD_SHA_ARGS, fetchDir, childEnv, signal);
     const dir = join22(agentDir, sha);
-    if (existsSync18(dir)) rmSync6(fetchDir, { recursive: true, force: true });
+    if (existsSync18(dir)) rmSync7(fetchDir, { recursive: true, force: true });
     else renameWithRetry(fetchDir, dir, opts);
     return { sha, dir };
   } catch (e) {
-    rmSync6(fetchDir, { recursive: true, force: true });
+    rmSync7(fetchDir, { recursive: true, force: true });
     throw e;
   }
 }
 
 // src/core/ops/uninstall.ts
-import { existsSync as existsSync19, readdirSync as readdirSync9, rmSync as rmSync7, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync19, readdirSync as readdirSync9, rmSync as rmSync8, writeFileSync as writeFileSync6 } from "node:fs";
 import { join as join23 } from "node:path";
 function row2(area, before, after) {
   return { area, before, after };
@@ -30316,13 +30387,13 @@ function removeCache(adapter, env, configDir) {
         const cache = join23(claudeDirOf(env, requireHomeDir(env)), HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME);
         if (!isInside(cache, root) || isInside(root, cache)) return row2(UPGRADE_CACHE_AREA, root, UPGRADE_CACHE_BY_HAND);
       }
-      rmSync7(root, { recursive: true, force: true });
+      rmSync8(root, { recursive: true, force: true });
       return row2(UPGRADE_CACHE_AREA, root, UPGRADE_REMOVED);
     }
     case "plugin": {
       const agentDir = join23(configDir, DATA_PLUGINS_DIR_NAME, adapter.id);
       if (!existsSync19(agentDir)) return row2(UPGRADE_CACHE_AREA, "", UPGRADE_NOT_FOUND);
-      rmSync7(agentDir, { recursive: true, force: true });
+      rmSync8(agentDir, { recursive: true, force: true });
       return row2(UPGRADE_CACHE_AREA, agentDir, UPGRADE_REMOVED);
     }
     case "config-mcp":
@@ -30404,7 +30475,7 @@ function removeProjectData(configDir, projectKey) {
   if (!existsSync19(dir)) return row2(UPGRADE_DATA_AREA, "", UPGRADE_NOT_FOUND);
   if (dir === projects || !isInside(projects, dir)) throw new CtxError("OUTSIDE_ROOT", { p: dir, root: projects });
   for (const name of readdirSync9(dir)) {
-    if (name !== OWNERS_DIR_NAME) rmSync7(join23(dir, name), { recursive: true, force: true });
+    if (name !== OWNERS_DIR_NAME) rmSync8(join23(dir, name), { recursive: true, force: true });
   }
   return row2(UPGRADE_DATA_AREA, dir, UPGRADE_DATA_DELETED);
 }
@@ -30417,20 +30488,20 @@ function runUninstall(input) {
 }
 
 // src/core/ops/v1-remove.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync20, readFileSync as readFileSync16, rmSync as rmSync8 } from "node:fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync20, readFileSync as readFileSync16, rmSync as rmSync9 } from "node:fs";
 var isObj4 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var areaOf = (f) => f.path === "" ? f.file : f.file + UPGRADE_AREA_KEY_SEP + f.path;
 var row3 = (f, after) => ({ area: areaOf(f), before: f.reason, after });
 function moveAside(target, undo) {
   const trash = target + UPGRADE_TRASH_SUFFIX;
-  rmSync8(trash, { recursive: true, force: true });
+  rmSync9(trash, { recursive: true, force: true });
   renameWithRetry(target, trash);
   undo.push({ trash, target });
 }
 function keepOriginal(file2, kept, undo) {
   if (kept.has(file2)) return;
   const trash = file2 + UPGRADE_TRASH_SUFFIX;
-  rmSync8(trash, { recursive: true, force: true });
+  rmSync9(trash, { recursive: true, force: true });
   copyFileSync2(file2, trash);
   kept.add(file2);
   undo.push({ trash, target: file2 });
@@ -30534,12 +30605,12 @@ function removeV1(agent, findings) {
   return {
     rows: findings.map((f) => row3(f, done.get(f) ?? UPGRADE_NOT_FOUND)),
     commit() {
-      for (const u of undo.splice(0)) rmSync8(u.trash, { recursive: true, force: true });
+      for (const u of undo.splice(0)) rmSync9(u.trash, { recursive: true, force: true });
     },
     rollback() {
       for (const u of undo.splice(0).reverse()) {
         if (!existsSync20(u.trash)) continue;
-        rmSync8(u.target, { recursive: true, force: true });
+        rmSync9(u.target, { recursive: true, force: true });
         renameWithRetry(u.trash, u.target);
       }
     }
@@ -30624,7 +30695,7 @@ async function checkout(adapter, deps) {
   try {
     verifySums(fetched.dir);
   } catch (err) {
-    if (!isCurrent(agentDir, fetched.dir)) rmSync9(fetched.dir, { recursive: true, force: true });
+    if (!isCurrent(agentDir, fetched.dir)) rmSync10(fetched.dir, { recursive: true, force: true });
     throw err;
   }
   const swap = swapPluginCurrent(agentDir, fetched.sha);

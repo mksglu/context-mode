@@ -621,8 +621,27 @@ function outputOf(resp) {
       return err2 === "" ? out2 : out2 === "" ? err2 : out2 + "\n" + err2;
     }
   }
-  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return resp.content;
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp)) {
+    const slot = textSlot(resp);
+    if (slot !== null) return slot.text;
+  }
   return JSON.stringify(resp);
+}
+function textSlot(r2) {
+  const file = r2.file;
+  if (r2.type === "text" && typeof file === "object" && file !== null && typeof file.content === "string") {
+    return { text: file.content, put: (o2, output) => ({ ...o2, file: { ...o2.file, content: output } }) };
+  }
+  if (isGrepContent(r2)) return { text: r2.content, put: (o2, output) => ({ ...o2, content: output }) };
+  if (Array.isArray(r2.filenames) && r2.filenames.every((f2) => typeof f2 === "string")) {
+    return { text: r2.filenames.join("\n"), put: (o2, output) => ({ ...o2, filenames: output.split("\n") }) };
+  }
+  if (typeof r2.result === "string") return { text: r2.result, put: (o2, output) => ({ ...o2, result: output }) };
+  return null;
+}
+function isShellShape(resp) {
+  const r2 = resp;
+  return typeof r2.stdout === "string" || typeof r2.stderr === "string";
 }
 function isGrepContent(resp) {
   const r2 = resp;
@@ -642,7 +661,10 @@ function readResult(resp) {
   const text2 = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
   const info = { isError, bytes: Buffer.byteLength(text2), text: text2 };
-  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp;
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
+    if (textSlot(resp) !== null) info.shape = resp;
+    else info.keep = true;
+  }
   if (Array.isArray(resp)) {
     info.blocks = true;
     if (blocksOf(resp).keep) info.keep = true;
@@ -679,7 +701,9 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources2) {
 }
 function replaceShape(ev, output) {
   if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
-  if (ev.result?.shape !== void 0) return { ...ev.result.shape, content: output };
+  const shape = ev.result?.shape;
+  const slot = shape === void 0 ? null : textSlot(shape);
+  if (shape !== void 0 && slot !== null) return slot.put(shape, output);
   if (ev.result?.blocks === true) return [{ type: "text", text: output }];
   return output;
 }

@@ -520,8 +520,27 @@ function outputOf(resp) {
       return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
-  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return resp.content;
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp)) {
+    const slot = textSlot(resp);
+    if (slot !== null) return slot.text;
+  }
   return JSON.stringify(resp);
+}
+function textSlot(r) {
+  const file = r.file;
+  if (r.type === "text" && typeof file === "object" && file !== null && typeof file.content === "string") {
+    return { text: file.content, put: (o, output) => ({ ...o, file: { ...o.file, content: output } }) };
+  }
+  if (isGrepContent(r)) return { text: r.content, put: (o, output) => ({ ...o, content: output }) };
+  if (Array.isArray(r.filenames) && r.filenames.every((f) => typeof f === "string")) {
+    return { text: r.filenames.join("\n"), put: (o, output) => ({ ...o, filenames: output.split("\n") }) };
+  }
+  if (typeof r.result === "string") return { text: r.result, put: (o, output) => ({ ...o, result: output }) };
+  return null;
+}
+function isShellShape(resp) {
+  const r = resp;
+  return typeof r.stdout === "string" || typeof r.stderr === "string";
 }
 function isGrepContent(resp) {
   const r = resp;
@@ -541,7 +560,10 @@ function readResult(resp) {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
   const info = { isError, bytes: Buffer.byteLength(text), text };
-  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp;
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
+    if (textSlot(resp) !== null) info.shape = resp;
+    else info.keep = true;
+  }
   if (Array.isArray(resp)) {
     info.blocks = true;
     if (blocksOf(resp).keep) info.keep = true;
@@ -578,7 +600,9 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources) {
 }
 function replaceShape(ev, output) {
   if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
-  if (ev.result?.shape !== void 0) return { ...ev.result.shape, content: output };
+  const shape = ev.result?.shape;
+  const slot = shape === void 0 ? null : textSlot(shape);
+  if (shape !== void 0 && slot !== null) return slot.put(shape, output);
   if (ev.result?.blocks === true) return [{ type: "text", text: output }];
   return output;
 }
