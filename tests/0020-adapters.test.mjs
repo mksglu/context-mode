@@ -633,6 +633,54 @@ describe("ADR-0020 adapters", () => {
       assert.equal(ev.result.blocks, undefined);
       assert.equal(JSON.parse(encode(ev, { kind: "replace", output: "c" }).stdout).hookSpecificOutput.updatedToolOutput, "c");
     });
+
+    // ---------- D-CC-SHAPE-1 (#1304): every replace keeps the tool's own output object (2.1.274 binary outputSchema) ----------
+    const replaced = (tool_name, tool_response, tool_input = {}) => {
+      const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name, tool_input, tool_response });
+      return { ev, out: JSON.parse(encode(ev, { kind: "replace", output: "chunks\nmore" }).stdout).hookSpecificOutput.updatedToolOutput };
+    };
+
+    test("D-CC-SHAPE-1 (#1304): Read text result: content is the output; replace keeps the file object, never a string", () => {
+      const resp = { type: "text", file: { filePath: "/a.txt", content: "l1\nl2", numLines: 2, startLine: 1, totalLines: 2 } };
+      const { ev, out } = replaced("Read", resp, { file_path: "/a.txt" });
+      assert.equal(ev.result.text, "l1\nl2");
+      assert.deepEqual(out, { type: "text", file: { ...resp.file, content: "chunks\nmore" } });
+    });
+
+    test("D-CC-SHAPE-1: Read of an image or other variant keeps the original (no replace object to build)", () => {
+      const { ev } = replaced("Read", { type: "image", file: { base64: "AAAA", type: "image/png", originalSize: 4 } });
+      assert.equal(ev.result.keep, true);
+    });
+
+    test("D-CC-SHAPE-1: Glob and Grep files results keep the object; filenames are the output lines", () => {
+      const glob = { durationMs: 3, numFiles: 2, filenames: ["a.js", "b.js"], truncated: false };
+      const g = replaced("Glob", glob, { pattern: "*.js" });
+      assert.equal(g.ev.result.text, "a.js\nb.js");
+      assert.deepEqual(g.out, { ...glob, filenames: ["chunks", "more"] });
+      const grep = { mode: "files_with_matches", numFiles: 1, filenames: ["a.js"] };
+      assert.deepEqual(replaced("Grep", grep, { pattern: "x" }).out, { ...grep, filenames: ["chunks", "more"] });
+    });
+
+    test("D-CC-SHAPE-1: WebFetch result keeps the object; result is the output", () => {
+      const resp = { bytes: 10, code: 200, codeText: "OK", result: "page text", durationMs: 5, url: "https://x.test" };
+      const { ev, out } = replaced("WebFetch", resp, { url: "https://x.test", prompt: "p" });
+      assert.equal(ev.result.text, "page text");
+      assert.deepEqual(out, { ...resp, result: "chunks\nmore" });
+    });
+
+    test("D-CC-SHAPE-1: Bash, PowerShell, Grep content and mcp__* keep their own shapes", () => {
+      for (const t of ["Bash", "PowerShell"]) {
+        assert.deepEqual(replaced(t, { stdout: "x", stderr: "", interrupted: false }, { command: "ls" }).out, { stdout: "chunks\nmore", stderr: "", interrupted: false }, t);
+      }
+      const grep = { mode: "content", numFiles: 0, filenames: [], content: "a:1:x", numLines: 1 };
+      assert.deepEqual(replaced("Grep", grep).out, { ...grep, content: "chunks\nmore" });
+      assert.deepEqual(replaced("mcp__tix__list", [{ type: "text", text: "x" }]).out, [{ type: "text", text: "chunks\nmore" }]);
+    });
+
+    test("D-CC-SHAPE-1: an object with no known text field is kept, never replaced by a string", () => {
+      const { ev } = replaced("NotebookEdit", { new_source: "x", cell_id: "1" });
+      assert.equal(ev.result.keep, true);
+    });
   });
 
   describe("ADR-0020 codex adapter", () => {

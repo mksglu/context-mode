@@ -380,6 +380,20 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(r.text.includes(src[0].label + " #" + gone.ord + ":"), "ctx_search finds the dropped chunk: ord " + gone.ord + " num " + num + "\n" + r.text.slice(0, 600));
   });
 
+  test("D-CC-SHAPE-1 (#1304): main-agent Read over the trigger: updatedToolOutput is Read's file object, never a string", async () => {
+    const text = bigText(40000);
+    const n = text.split("\n").length;
+    const file = { filePath: "/big.log", content: text, numLines: n, startLine: 1, totalLines: n };
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "Read", tool_use_id: "toolu_read_1", tool_input: { file_path: "/big.log" }, tool_response: { type: "text", file } });
+    const out = parsed(await handleHook("claude-code", p, env));
+    const r = out.updatedToolOutput;
+    assert.equal(typeof r, "object", "Read replace is an object (Claude Code drops a string)");
+    assert.equal(r.type, "text");
+    assert.deepEqual({ ...r.file, content: "" }, { ...file, content: "" }, "every other file field is kept");
+    assert.ok(Buffer.byteLength(r.file.content) < Buffer.byteLength(text), "the content is replaced");
+    assert.ok(r.file.content.includes(CCP + "ctx_search("), "the more line names ctx_search");
+  });
+
   test("D-M7-RR-3: no Bash description: the intent is the command text, never an empty query", async () => {
     const p = mainBashPost(bigText(40000), undefined);
     delete p.tool_input.description;

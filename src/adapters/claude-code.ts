@@ -44,9 +44,37 @@ function outputOf(resp: unknown): string {
       return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
-  // D-M2-MCP-1: the Grep content shape {mode:"content", content, ...}: the content is the output the model sees.
-  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return (resp as { content: string }).content;
+  // D-M2-MCP-1, D-CC-SHAPE-1: a native tool object whose text sits in one field: that field is the output the model sees.
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp)) {
+    const slot = textSlot(resp as Record<string, unknown>);
+    if (slot !== null) return slot.text;
+  }
   return JSON.stringify(resp);
+}
+
+// D-CC-SHAPE-1 (#1304): Claude Code checks updatedToolOutput against the tool's own output schema and keeps the
+// original output on a mismatch. Shapes from the Claude Code 2.1.274 binary (outputSchema of each tool):
+// Read text {type:"text", file:{filePath, content, numLines, startLine, totalLines}}, Grep content {mode:"content",
+// content, ...}, Grep files and Glob {filenames: string[], numFiles, ...}, WebFetch {result, url, code, ...}.
+// The replace keeps every other field and swaps only the text field, so the object still parses.
+type Slot = { text: string; put: (resp: Record<string, unknown>, output: string) => Record<string, unknown> };
+
+function textSlot(r: Record<string, unknown>): Slot | null {
+  const file = r.file;
+  if (r.type === "text" && typeof file === "object" && file !== null && typeof (file as { content?: unknown }).content === "string") {
+    return { text: (file as { content: string }).content, put: (o, output) => ({ ...o, file: { ...(o.file as object), content: output } }) };
+  }
+  if (isGrepContent(r)) return { text: r.content as string, put: (o, output) => ({ ...o, content: output }) };
+  if (Array.isArray(r.filenames) && r.filenames.every((f) => typeof f === "string")) {
+    return { text: r.filenames.join("\n"), put: (o, output) => ({ ...o, filenames: output.split("\n") }) };
+  }
+  if (typeof r.result === "string") return { text: r.result, put: (o, output) => ({ ...o, result: output }) };
+  return null;
+}
+
+function isShellShape(resp: object): boolean {
+  const r = resp as { stdout?: unknown; stderr?: unknown };
+  return typeof r.stdout === "string" || typeof r.stderr === "string";
 }
 
 function isGrepContent(resp: object): boolean {
@@ -71,7 +99,11 @@ function readResult(resp: unknown): ToolResultInfo {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && (resp as { is_error?: unknown }).is_error === true;
   const info: ToolResultInfo = { isError, bytes: Buffer.byteLength(text), text };
-  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp as Record<string, unknown>;
+  // D-CC-SHAPE-1: an object the replace can rebuild keeps its shape; any other non-Bash object stays as the host made it.
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
+    if (textSlot(resp as Record<string, unknown>) !== null) info.shape = resp as Record<string, unknown>;
+    else info.keep = true;
+  }
   if (Array.isArray(resp)) {
     info.blocks = true;
     if (blocksOf(resp).keep) info.keep = true;
@@ -117,7 +149,9 @@ export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: strin
 // output is an object {stdout, stderr, interrupted}, so a bare string never reached the model.
 function replaceShape(ev: CanonicalHookEvent, output: string): unknown {
   if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
-  if (ev.result?.shape !== undefined) return { ...ev.result.shape, content: output }; // D-M2-MCP-1: Grep content shape
+  const shape = ev.result?.shape;
+  const slot = shape === undefined ? null : textSlot(shape);
+  if (shape !== undefined && slot !== null) return slot.put(shape, output); // D-CC-SHAPE-1: the tool's own object
   if (ev.result?.blocks === true) return [{ type: "text", text: output }]; // D-M2-MCP-1: the MCP result shape
   return output;
 }
