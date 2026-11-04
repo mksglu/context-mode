@@ -554,6 +554,54 @@ exit 0`);
     assert.ok(readFileSync(log, "utf8").includes("mcp list --pure"), readFileSync(log, "utf8"));
   });
 
+  // D-OC2-LIST-1 (#1308, Raidan-Ai, Windows, OpenCode 2): "list: opencode mcp list --standalone does not list
+  // context-mode" (rolled back). OpenCode 2.2.5 --standalone prints the list before its private server has connected
+  // the MCP servers, so it says "No MCP servers configured" for a correct entry. The list check on OpenCode 2 reads
+  // the config the CLI itself loads (opencode debug config --standalone: mcp.servers.<name> after its own parse).
+  test("setup: on OpenCode 2 the list check reads the config the CLI loads, not the racy mcp list (D-OC2-LIST-1, #1308)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const file = path.join(s.home, ".config", "opencode", "opencode.json");
+    const norm = path.join(s.root, "norm.mjs");
+    writeFileSync(norm, `import { readFileSync } from "node:fs"; const f = ${JSON.stringify(file)}; let d = {}; try { d = JSON.parse(readFileSync(f, "utf8")); } catch {}
+const servers = { ...(d.mcp?.servers ?? {}) }; for (const [k, v] of Object.entries(d.mcp ?? {})) if (k !== "servers") servers[k] = v;
+process.stdout.write(JSON.stringify([{ type: "document", path: f, info: { mcp: { servers } } }, { type: "directory", path: ${JSON.stringify(path.dirname(file))} }], null, 2));\n`);
+    fakeBin(s.root, "opencode", `case "$1 $2" in
+  "--version ") echo "opencode v2.2.5" ;;
+  "mcp list") echo "No MCP servers configured" ;;
+  "debug config") "${NODE}" "${norm}" ;;
+esac
+exit 0`);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.ok(res.agents[0].checks.some((c) => c.name === "list" && c.ok), JSON.stringify(res.agents[0].checks));
+    // The check still goes red when the CLI does not load our entry, and names the files it read.
+    writeFileSync(norm, `process.stdout.write(JSON.stringify([{ type: "directory", path: "/elsewhere/opencode" }]));\n`);
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"] });
+    assert.equal(doc.agents[0].status, "FAIL", JSON.stringify(doc.agents[0], null, 2));
+    assert.match(doc.agents[0].reason, /mcp\.servers\.context-mode.*\/elsewhere\/opencode/);
+  });
+
+  // D-SETUP-HOST-BROKEN-1 (#1308): "copilot mcp add ... exited 1: GitHub Copilot CLI: no platform package found.
+  // Reinstall with `npm install -g @github/copilot`". The Copilot install itself is broken: setup reports SKIPPED with the
+  // host's own fix line first, writes nothing, rolls nothing back, and the run does not fail on it.
+  test("setup: a Copilot CLI with no platform package is SKIPPED with the host's fix line, nothing written (D-SETUP-HOST-BROKEN-1, #1308)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "copilot.log");
+    fakeBin(s.root, "copilot", `echo "$@" >> "${log}"
+echo "GitHub Copilot CLI: no platform package found. Reinstall with \`npm install -g @github/copilot\` to fetch the package for your platform." >&2
+exit 1`);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"], runId: "r" });
+    const a = res.agents[0];
+    assert.equal(a.status, "SKIPPED", JSON.stringify(a, null, 2));
+    assert.equal(a.rolledBack, undefined);
+    assert.ok(a.reason.startsWith("host broken: run npm install -g @github/copilot"), a.reason);
+    assert.equal(res.exitCode, 0);
+    assert.equal(existsSync(path.join(s.home, ".copilot")), false, "nothing written for a broken host");
+    assert.equal(readFileSync(log, "utf8").includes("mcp add"), false, readFileSync(log, "utf8"));
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"] });
+    assert.equal(doc.agents[0].status, "SKIPPED", JSON.stringify(doc.agents[0], null, 2));
+  });
+
   // D-US-1 (upgrade-sync): Claude Code runs a copy of the package under ~/.claude/plugins/cache/<mp>/context-mode/<version>
   // and records it in ~/.claude/plugins/installed_plugins.json. npm i -g does not refresh that copy.
   function installedPlugins(home, version) {

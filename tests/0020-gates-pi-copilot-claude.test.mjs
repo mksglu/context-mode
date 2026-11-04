@@ -636,7 +636,9 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     const SKIP_SH_OC = { skip: process.platform === "win32" && "fake opencode is an sh script" };
     function fakeOpencode(s, version) {
       const file = path.join(s.root, "bin", "opencode");
-      writeFileSync(file, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "${version}"; exit 0; fi\necho context-mode connected\n`);
+      // D-OC2-LIST-1: OpenCode 2 setup reads `debug config --standalone` (the documents the CLI loaded) for the list check.
+      const cfg = JSON.stringify([{ type: "document", path: "opencode.json", info: { mcp: { servers: { "context-mode": { type: "local" } } } } }]);
+      writeFileSync(file, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "${version}"; exit 0; fi\nif [ "$1" = "debug" ]; then echo '${cfg}'; exit 0; fi\necho context-mode connected\n`);
       chmodSync(file, 0o755);
     }
 

@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, DB_FILE_NAME, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, DB_FILE_NAME, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
@@ -398,20 +398,55 @@ function opencodeMajor(bin: string, env: SetupContext["env"]): number {
   const digits = text.split("").filter((c) => (c >= "0" && c <= "9") || c === ".").join("");
   return Number(digits.split(".")[0]);
 }
-function opencodeListArgs(bin: string, env: SetupContext["env"]): string[] {
-  return opencodeMajor(bin, env) >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+function opencodeListArgs(major: number): string[] {
+  return major >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+}
+
+/** D-OC2-LIST-1 (#1308): OpenCode 2.2.5 `mcp list --standalone` prints before its private server has connected the
+ *  MCP servers, so it says "No MCP servers configured" for a correct entry. `debug config --standalone` prints the
+ *  documents the CLI itself loaded, after its own parse (1.x form mcp.<name> becomes mcp.servers.<name>), so the
+ *  check reads that: same file choice, same Windows path, same JSONC rules as the host. */
+const OC2_CONFIG_ARGS = ["debug", "config", "--standalone"];
+function opencode2ListCheck(bin: string, env: SetupContext["env"]): Check {
+  const r = runBin(bin, OC2_CONFIG_ARGS, env);
+  const what = `${bin} ${OC2_CONFIG_ARGS.join(" ")}`;
+  let docs: unknown;
+  try { docs = JSON.parse(`${r.stdout}`); } catch { docs = undefined; }
+  if (r.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r.status}: ${`${r.stderr}`.trim().split("\n")[0] ?? ""}` };
+  if (!Array.isArray(docs)) return { name: "list", ok: false, detail: `${what} printed no config list: ${`${r.stdout}`.trim().split("\n")[0] ?? ""}` };
+  const listed = docs.some((d) => isObj(d) && isObj(d.info) && isObj(d.info.mcp) && isObj(d.info.mcp.servers) && isObj(d.info.mcp.servers[SERVER_KEY]));
+  const read = docs.filter(isObj).map((d) => d.path).filter((p): p is string => typeof p === "string");
+  return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+}
+
+/** D-SETUP-HOST-BROKEN-1 (#1308): a host CLI that cannot start names its own fix. Setup reports SKIPPED with that fix
+ *  line first and writes nothing: there is nothing to roll back and nothing of ours to fix. */
+const HOST_BROKEN: Partial<Record<string, { text: string; fix: string }>> = {
+  copilot: { text: "no platform package found", fix: "npm install -g @github/copilot" },
+};
+export const HOST_BROKEN_PREFIX = "host broken: run ";
+function hostBroken(bin: string, out: string): string | undefined {
+  const b = HOST_BROKEN[bin];
+  if (!b || !out.includes(b.text)) return undefined;
+  return `${HOST_BROKEN_PREFIX}${b.fix} (${out.trim().split("\n")[0]})`;
 }
 
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
-function listState(row: CheckRow, env: SetupContext["env"]): { check?: Check; status: PluginStatus } {
-  const l0 = row.listCommand;
+function listState(row: CheckRow, env: SetupContext["env"]): { check?: Check; status: PluginStatus; broken?: string } {
+  let l0 = row.listCommand;
   if (!l0 || !hostBin(l0.bin, env).file) return { status: undefined };
-  const l = row.id === "opencode" ? { bin: l0.bin, args: opencodeListArgs(l0.bin, env) } : l0;
+  if (row.id === "opencode") {
+    const major = opencodeMajor(l0.bin, env);
+    if (major >= 2) return { check: opencode2ListCheck(l0.bin, env), status: undefined };
+    l0 = { bin: l0.bin, args: opencodeListArgs(major) };
+  }
+  const l = l0;
   const r = runBin(l.bin, l.args, env);
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
-  const ok = r.status === 0 && `${r.stdout}${r.stderr}`.includes("context-mode");
+  const out = `${r.stdout}${r.stderr}`;
+  const ok = r.status === 0 && out.includes("context-mode");
   const check: Check = { name: "list", ok, detail: ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
-  return { check, status: r.status === 0 ? statusOf(row, `${r.stdout}`) : undefined };
+  return { check, status: r.status === 0 ? statusOf(row, `${r.stdout}`) : undefined, broken: r.status === 0 ? undefined : hostBroken(l.bin, out) };
 }
 
 
@@ -966,7 +1001,8 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
   if (!row.config && !row.cli) return { ...res, status: "SKIPPED", reason: `${row.id}: no setup path in the registry` };
   let plan: Plan;
   try {
-    const ls = needsBin ? listState(row, ctx.env) : { status: undefined, check: undefined };
+    const ls = needsBin ? listState(row, ctx.env) : { status: undefined, check: undefined, broken: undefined };
+    if (ls.broken) return { ...res, status: "SKIPPED", reason: ls.broken };
     const listed = ls.check?.ok === true;
     plan = planRow(row, listed, copyCheck(row, ctx.pkgDir)?.ok === false, ctx.env, listed && ls.status === "disabled");
   } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
@@ -998,6 +1034,9 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
   } catch (e) {
     run.rollback(row.id, ctx.env);
+    // D-SETUP-HOST-BROKEN-1: the host broke on the install step itself (the list passed): the same SKIPPED line.
+    const broken = row.cli ? hostBroken(row.cli.bin, (e as Error).message) : undefined;
+    if (broken) return { ...res, status: "SKIPPED", reason: broken };
     return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
   }
   return res;
