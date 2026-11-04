@@ -9,7 +9,7 @@ import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolConte
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { collisionLine, ftsListSource, ftsQuery, ftsQueryTimeline, groupDigits, isLongLabel, labelPage, pickSource, rankTexts, shownLabel, sourceCardRow, sourceHandle, type SourcePick } from "../store/fts.ts";
-import { memoryChunks, memoryHits, readAutoMemory, type MemoryChunk } from "../index/auto-memory.ts";
+import { memoryChunks, memoryFileNamed, memoryHits, readAutoMemory } from "../index/auto-memory.ts";
 import { fitRow, jsonRows, namedKeys } from "../index/shape.ts";
 
 // DECISIONS-r9 V23, M23: six keys, strict (unknown key -> the SDK's isError); offset/after are
@@ -57,8 +57,13 @@ function sourceCount(db: DbHandle, scope: SearchScope, ctx: ToolContext, source:
   return Number(row.n);
 }
 
-function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: string | undefined, offset = 0): ToolReply {
-  const n = sourceCount(db, scope, ctx, source);
+// D-MEMORY-SOURCE-1: the memory files one call searches. `rows` = every file in scope (no source), the file the source
+// names, or none; `named` = the source names a memory file (its hits page with `offset` like content hits).
+interface MemorySide { rows: TimelineRow[]; named: boolean }
+
+function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: string | undefined, mem: MemorySide, offset = 0): ToolReply {
+  // D-MEMORY-SOURCE-1: the count holds the memory files in the scope with the indexed sources.
+  const n = sourceCount(db, scope, ctx, source) + mem.rows.length;
   // D-LABEL-HANDLE-2: past the last hit the reply says so (the hits are behind, not missing).
   if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
   return reply('No hits in scope "' + scope + '" across ' + n + " source(s).", false);
@@ -90,10 +95,10 @@ function sourceCard(db: DbHandle, id: number, input: CtxSearchInput, scope: Sear
   return reply(lines.join("\n"), false);
 }
 
-// The call a paging line repeats: same queries, scope and source, plus the cursor.
+// The call a paging line repeats: same queries, scope and source, plus the cursor ("" = the call as is).
 function callText(queries: string[], scope: SearchScope, source: string | undefined, cursor: string): string {
   const src = source === undefined ? "" : ", source:" + JSON.stringify(source);
-  return "ctx_search({queries:" + JSON.stringify(queries) + ", scope:" + JSON.stringify(scope) + src + ", " + cursor + "})";
+  return "ctx_search({queries:" + JSON.stringify(queries) + ", scope:" + JSON.stringify(scope) + src + (cursor === "" ? "" : ", " + cursor) + "})";
 }
 
 // ADR-0009 §8.2: with source:"decision", empty `queries` (or a query with no words) lists every
@@ -221,20 +226,29 @@ const contentIn = (hits: Hit[], n: number): number => hits.slice(0, n).filter((h
 // query (and every later one) gets a `More:` line starting at the first hit not shown (D-M2-6).
 // D-SEARCH-SMALL-1: a hit already shown for an earlier query of the call is named in one `Same as above:` line,
 // so a query never gets an empty block; a hit that was only left out of an earlier query still shows here.
-function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named): ToolReply {
+function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named, ms: MemorySide, indexed: boolean): ToolReply {
   const input: CtxSearchInput = { ...given, queries: decisionQueries(given) };
   const offset = input.offset ?? 0;
   const size = pageSize(input);
+  // D-UNIFIED-MEMORY-1: with no source, memory hits join the first page and the cursor counts content hits.
+  // D-MEMORY-SOURCE-1: a source that names a memory file pages that file's hits (and the indexed source of the same
+  // label, when there is one) as one ranked list, so the cursor counts every hit.
+  const mem = ms.named || offset === 0 ? memoryChunks(ms.rows) : [];
+  const count = (hits: Hit[], n: number): number => (ms.named ? Math.min(n, hits.length) : contentIn(hits, n));
   // One hit past the page: a `More:` line is printed only when a hit is left behind it (D-SEARCH-SMALL-1).
-  const mem: MemoryChunk[] = offset === 0 && scope !== "session" && input.source === undefined ? memoryChunks(readAutoMemory(ctx.project)) : [];
   const fetched: Hit[][] = input.queries.map((q) => {
+    if (ms.named) {
+      const want = offset + size + 1;
+      const content = indexed ? ftsQuery(db, q, scope, ctx.project, ctx.sessionId, want, 0, input.source) : [];
+      return mergeMemory(content, memoryHits(mem, q, want)).slice(offset, want);
+    }
     const content = page(db, q, input, scope, ctx, offset, 1);
     return mem.length === 0 ? content : mergeMemory(content, memoryHits(mem, q, MEMORY_HITS));
   });
   const take: number[] = fetched.map((h) => replyHits(h, size));
   const pages: Hit[][] = fetched.map((h, i) => h.slice(0, take[i]));
   // Step 9: every query had zero hits.
-  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, offset);
+  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, offset);
 
   // D-LABEL-HANDLE-2: the cursor names a long label by its handle, so the line is short and whole.
   const moreLine = (q: string, pos: number): string =>
@@ -274,13 +288,13 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       // D-LABEL-HANDLE-2: a long label is its handle and a short preview, so the snippet keeps the room.
       const line = shownLabel(hit.label, hit.sourceId) + " #" + hit.ord + ": " + hit.snippet;
       if (used + bytes(line) + 1 + reserve > OUTPUT_CAP) {
-        cut = offset + contentIn(hits, i);
+        cut = offset + count(hits, i);
         stopped = true;
         break;
       }
       const room = total.get(hit.sourceId);
       if (room !== undefined && mine.has(hit.sourceId) && (spent.get(hit.sourceId) ?? 0) + bytes(line) + 1 > room * SMALL_SOURCE_SHARE * (qi + 1) / input.queries.length) {
-        cut = offset + contentIn(hits, i);
+        cut = offset + count(hits, i);
         break;
       }
       lines.push(line);
@@ -295,7 +309,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
       used += bytes(line) + 1;
     }
     if (cut >= 0) more.push({ q, pos: cut });
-    else if (contentIn(fetched[qi], fetched[qi].length) > contentIn(fetched[qi], take[qi])) more.push({ q, pos: offset + contentIn(fetched[qi], take[qi]) });
+    else if (count(fetched[qi], fetched[qi].length) > count(fetched[qi], take[qi])) more.push({ q, pos: offset + count(fetched[qi], take[qi]) });
   });
   // D-SEARCH-LEAN-1: queries that stop at one cursor share one `More:` line (the call pages them all from there).
   const moreLines: string[] = [];
@@ -315,11 +329,10 @@ function timelineLine(r: TimelineRow): string {
 
 // ADR-0009 §8.1 rules 1-8, D-M2-3, D-M2-T3-1. Lines are added a whole timestamp group at a time;
 // a group that does not fit ends the page there, so the `after` cursor never skips a row (M18).
-function timeline(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named): ToolReply {
-  // D-M2-T9-1: memory files belong to the worktree, not to a session.
-  const memory = scope === "session" ? [] : readAutoMemory(ctx.project);
-  const page = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, memory);
-  if (page.rows.length === 0) return zeroHits(db, scope, ctx, input.source);
+function timeline(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named, ms: MemorySide): ToolReply {
+  // D-M2-T9-1: memory files belong to the worktree, not to a session (ms.rows is empty for scope "session").
+  const page = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, ms.rows);
+  if (page.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms);
 
   const moreLine = (ts: number): string =>
     "more: " + callText(input.queries, scope, nm.arg, 'sort:"timeline", after:' + ts);
@@ -352,6 +365,16 @@ function timeline(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: 
   return reply(lines.join("\n"), false);
 }
 
+function answer(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named, ms: MemorySide, indexed: boolean, sort: string, pick: SourcePick | null): ToolReply {
+  if (sort === "timeline") return timeline(db, input, scope, ctx, nm, ms);
+  if (pick !== null && pick.id !== null && input.queries.length === 0) {
+    const card = sourceCard(db, pick.id, input, scope, nm.arg as string);
+    if (card !== null) return card;
+  }
+  const rows = ms.named ? null : jsonRowsReply(db, input, scope, ctx, nm);
+  return rows ?? relevance(db, input, scope, ctx, nm, ms, indexed);
+}
+
 async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolReply> {
   const sort = input.sort ?? "relevance";
   // DECISIONS-r9 M23, ADR-0009 §8.1 rule 6.
@@ -369,12 +392,20 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
     const pick = given !== undefined && given !== DECISION_SOURCE ? pickSource(db, given) : null;
     if (pick !== null) input = { ...input, source: pick.label };
     const nm = named(given, pick);
-    if (sort === "timeline") return timeline(db, input, scope, ctx, nm);
-    if (pick !== null && pick.id !== null && input.queries.length === 0) {
-      const card = sourceCard(db, pick.id, input, scope, nm.arg as string);
-      if (card !== null) return card;
+    const indexed = pick !== null && pick.id !== null;
+    // D-MEMORY-SOURCE-1: a source that is a memory file's label, or its label as a hit shows it ("memory AGENTS.md").
+    const files = scope !== "session" || given !== undefined ? readAutoMemory(ctx.project) : [];
+    const file = given === undefined || given === DECISION_SOURCE ? null : memoryFileNamed(files, given);
+    const ms: MemorySide = { rows: scope === "session" ? [] : file !== null ? [file] : given === undefined ? files : [], named: file !== null };
+    if (file !== null && indexed && scope !== "session") {
+      const both = "Source " + JSON.stringify(given) + ": searched the indexed source " + shownLabel(pick.label, pick.id) + " and the memory file " + file.label + ".";
+      nm.note = nm.note === null ? both : nm.note + "\n" + both;
     }
-    return jsonRowsReply(db, input, scope, ctx, nm) ?? relevance(db, input, scope, ctx, nm);
+    const out = answer(db, input, scope, ctx, nm, ms, indexed, sort, pick);
+    if (file === null || scope !== "session") return out;
+    // D-MEMORY-SOURCE-1: scope "session" holds no memory file; one line names the scope that holds it.
+    const call = callText(input.queries, "worktree", nm.arg, sort === "timeline" ? 'sort:"timeline"' : "");
+    return reply(out.text + "\nMemory file " + file.label + ' is in scope "worktree": ' + call + " searches it.", out.isError);
   } finally {
     closeDb(db);
   }

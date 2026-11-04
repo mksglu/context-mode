@@ -6,7 +6,7 @@
 // M2: ftsInsert returns the new id (D-M2-1); ftsQueryTimeline (ADR-0009 §8.1, DECISIONS-r9 M14-M18,
 // D-M2-3, D-M2-T3-1); rankTexts, the in-memory BM25 form selectChunksInMemory calls (impl/05 §5 step 2).
 import { CtxError } from "../contracts/errors.ts";
-import { DECISION_SOURCE, ECHO_MAX_BYTES, INDEX_WRITE_CHUNK, LABEL_PREVIEW_BYTES, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
+import { DECISION_SOURCE, ECHO_MAX_BYTES, INDEX_WRITE_CHUNK, LABEL_PREVIEW_BYTES, MEMORY_LABEL_PREFIX, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow, UnitCandidate } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
@@ -581,7 +581,8 @@ export function ftsQueryTimeline(
   }
 
   for (const m of memory) {
-    if (m.ts > from && (source === undefined || m.label === source)) merged.push(m);
+    // D-MEMORY-SOURCE-1: a source names a memory file by its label or by its shown form ("memory AGENTS.md").
+    if (m.ts > from && (source === undefined || m.label === source || MEMORY_LABEL_PREFIX + m.label === source)) merged.push(m);
   }
 
   merged.sort(timelineOrder);

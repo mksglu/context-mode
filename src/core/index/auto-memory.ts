@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { Hit, ProjectContext, TimelineRow } from "../contracts/types.ts";
 import { isInside } from "../project/contain.ts";
 import { rankTexts, highlight } from "../store/fts.ts";
-import { SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
+import { MEMORY_LABEL_PREFIX, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
 import { chunkText } from "./chunk.ts";
 
 // Project memory / instruction files per host, relative to the worktree root (format facts of the hosts, not
@@ -69,6 +69,15 @@ export function readAutoMemory(project: Pick<ProjectContext, "agent" | "worktree
   return rows;
 }
 
+/**
+ * D-MEMORY-SOURCE-1: the memory file a `source` value names: its label (either slash form) or the label as a hit shows
+ * it ("memory AGENTS.md"). No such file -> null.
+ */
+export function memoryFileNamed(rows: readonly TimelineRow[], value: string): TimelineRow | null {
+  const v = value.split("\\").join("/");
+  return rows.find((r) => r.label === v || MEMORY_LABEL_PREFIX + r.label === v) ?? null;
+}
+
 /** A memory chunk, ready to rank. */
 export interface MemoryChunk { fileNo: number; label: string; ord: number; text: string }
 
@@ -94,5 +103,5 @@ export function memoryHits(chunks: readonly MemoryChunk[], q: string, limit: num
     .filter((e) => e.s > 0)
     .sort((a, b) => Number(b.full) - Number(a.full) || b.s - a.s || a.c.fileNo - b.c.fileNo || a.c.ord - b.c.ord)
     .slice(0, limit)
-    .map((e) => ({ sourceId: -e.c.fileNo, label: "memory " + e.c.label, ord: e.c.ord, snippet: highlight(e.c.text, q, SNIPPET_MAX_BYTES), score: e.s, full: e.full }));
+    .map((e) => ({ sourceId: -e.c.fileNo, label: MEMORY_LABEL_PREFIX + e.c.label, ord: e.c.ord, snippet: highlight(e.c.text, q, SNIPPET_MAX_BYTES), score: e.s, full: e.full }));
 }

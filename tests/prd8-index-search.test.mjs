@@ -204,6 +204,78 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
           rmSync(root, { recursive: true, force: true });
         }
       });
+
+      // D-MEMORY-SOURCE-1 (tester on next.38: "the default search finds AGENTS.md, but adding source:"AGENTS.md" loses
+      // the hit. Timeline with the same filter finds it."): a source that names a memory file searches that file.
+      test("[UM] source names a memory file: the tester's five calls for codex and claude-code", async () => {
+        for (const agent of ["codex", "claude-code"]) {
+          const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-um-src-")));
+          try {
+            writeFileSync(join(root, "AGENTS.md"), "# Synthetic rules\nvioletcheck memory_value=7421\n");
+            const ctx = memCtx(root, agent);
+            assert.equal((await ctxIndex.handler({ source: "job-log", content: "violetcheck job_value=9892" }, ctx)).isError, false);
+            const run = async (args) => {
+              const out = await ctxSearch.handler({ queries: ["violetcheck"], ...args }, ctx);
+              assert.equal(out.isError, false, out.text);
+              return out.text;
+            };
+            const def = await run({});
+            assert.ok(def.includes("job-log #0: violetcheck job_value=9892") && def.includes("memory AGENTS.md #0:"), agent + " default\n" + def);
+            for (const source of ["AGENTS.md", "memory AGENTS.md"]) {
+              const out = await run({ source });
+              assert.ok(out.includes("memory AGENTS.md #0:") && out.includes("memory_value=7421"), agent + " " + source + "\n" + out);
+              assert.ok(!out.includes("job-log"), agent + " " + source + "\n" + out);
+              const tl = await run({ sort: "timeline", source });
+              assert.ok(tl.includes(" AGENTS.md # Synthetic rules"), agent + " timeline " + source + "\n" + tl);
+            }
+            const ctl = await run({ source: "job-log" });
+            assert.ok(ctl.includes("job-log #0: violetcheck job_value=9892") && !ctl.includes("memory AGENTS.md"), agent + " indexed_control\n" + ctl);
+          } finally {
+            rmSync(root, { recursive: true, force: true });
+          }
+        }
+      });
+
+      test("[UM] source names a memory file: zero-hit count, scope session line, paging, a label that is both", async () => {
+        const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-um-src2-")));
+        try {
+          const parts = Array.from({ length: 8 }, (_, i) => "## Part " + i + "\n\npagerword note number " + i + " " + "filler ".repeat(30));
+          writeFileSync(join(root, "AGENTS.md"), parts.join("\n\n") + "\n");
+          writeFileSync(join(root, "CLAUDE.md"), "# Rules\n\nlint first\n");
+          const ctx = memCtx(root, "codex");
+          const search = async (args) => {
+            const out = await ctxSearch.handler(args, ctx);
+            assert.equal(out.isError, false, out.text);
+            return out.text;
+          };
+          assert.equal((await ctxIndex.handler({ source: "job-log", content: "violetcheck job_value=9892" }, ctx)).isError, false);
+          // The zero-hit line counts the memory files in the scope.
+          assert.equal(await search({ queries: ["nothinghere"] }), 'No hits in scope "worktree" across 3 source(s).');
+          assert.equal(await search({ queries: ["nothinghere"], source: "AGENTS.md" }), 'No hits in scope "worktree" across 1 source(s).');
+          // Scope "session" holds no memory files: the reply names the scope that does.
+          assert.equal(await search({ queries: ["pagerword"], source: "AGENTS.md", scope: "session" }),
+            'No hits in scope "session" across 0 source(s).\nMemory file AGENTS.md is in scope "worktree": ctx_search({queries:["pagerword"], scope:"worktree", source:"AGENTS.md"}) searches it.');
+          // Offset pages the memory file's hits; the More line is a whole call.
+          const ords = (text, prefix) => text.split("\n").filter((l) => l.startsWith(prefix)).map((l) => Number(l.slice(prefix.length, l.indexOf(":"))));
+          const p1 = await search({ queries: ["pagerword"], source: "AGENTS.md" });
+          assert.equal(ords(p1, "memory AGENTS.md #").length, 5, p1);
+          assert.ok(p1.split("\n").includes('More: ctx_search({queries:["pagerword"], scope:"worktree", source:"AGENTS.md", offset:5})'), p1);
+          const p2 = await search({ queries: ["pagerword"], source: "AGENTS.md", offset: 5 });
+          assert.ok(!p2.includes("More:"), p2);
+          assert.deepEqual([...ords(p1, "memory AGENTS.md #"), ...ords(p2, "memory AGENTS.md #")].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
+          // A label that is an indexed source and a memory file: both are searched, one line says so.
+          assert.equal((await ctxIndex.handler({ source: "AGENTS.md", content: "pagerword indexed copy" }, ctx)).isError, false);
+          const b1 = await search({ queries: ["pagerword"], source: "AGENTS.md" });
+          assert.equal(b1.split("\n")[0], 'Source "AGENTS.md": searched the indexed source AGENTS.md and the memory file AGENTS.md.', b1);
+          assert.deepEqual(ords(b1, "AGENTS.md #"), [0], b1);
+          assert.ok(b1.split("\n").includes('More: ctx_search({queries:["pagerword"], scope:"worktree", source:"AGENTS.md", offset:5})'), b1);
+          const b2 = await search({ queries: ["pagerword"], source: "AGENTS.md", offset: 5 });
+          assert.deepEqual([...ords(b1, "memory AGENTS.md #"), ...ords(b2, "memory AGENTS.md #")].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7], b1 + "\n---\n" + b2);
+          assert.deepEqual(ords(b2, "AGENTS.md #"), [], b2);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
     });
 
     // Moved from tests/index/chunk-md-sections.test.mjs
