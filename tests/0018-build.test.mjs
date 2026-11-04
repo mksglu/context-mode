@@ -249,8 +249,9 @@ describe("ADR-0018 build: manifests", () => {
   const META = { description: DEV.description, keywords: DEV.keywords, license: DEV.license, homepage: DEV.homepage, bugs: DEV.bugs };
 
   const CLAUDE_MATCHER_NAMES = "Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit";
+  const CC_MATCHER_NAMES = "Bash|PowerShell|Read|Grep|WebFetch|Write|Edit|NotebookEdit"; // D-CC-PWSH-1 (#1212)
   const MATCHERS = {
-    "claude-code": `^(${CLAUDE_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*)$`,
+    "claude-code": `^(${CC_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*)$`,
     codex: "^(Bash|apply_patch|mcp__context_mode__ctx_.*)$",
     qwen: "^(run_shell_command|Shell|read_file|grep_search|web_fetch|mcp__context-mode__ctx_.*)$",
     zcode: `^(${CLAUDE_MATCHER_NAMES}|mcp__context-mode__ctx_.*)$`,
@@ -300,7 +301,7 @@ describe("ADR-0018 build: manifests", () => {
 
   test("D-M2-MCP-1: the claude-code PostToolUse matcher also names every MCP tool; PreToolUse does not", () => {
     const row = getAdapter("claude-code");
-    assert.equal(buildMatcher(row, "PostToolUse"), `^(${CLAUDE_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$`);
+    assert.equal(buildMatcher(row, "PostToolUse"), `^(${CC_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$`);
     assert.equal(buildMatcher(row, "PreToolUse"), MATCHERS["claude-code"]);
     const post = new RegExp(buildMatcher(row, "PostToolUse"));
     assert.ok(post.test("mcp__tix__list_tickets") && post.test("mcp__plugin_context-mode_context-mode__ctx_search") && !post.test("Glob"));
@@ -372,7 +373,7 @@ describe("ADR-0018 build: manifests", () => {
     const claudeCmd = 'node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent claude-code';
     const claude = readJson(dir, "hooks/claude-code.json");
     assert.deepEqual(claude.hooks.PreToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: MATCHERS["claude-code"] }]);
-    assert.deepEqual(claude.hooks.PostToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: `^(${CLAUDE_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$` }]);
+    assert.deepEqual(claude.hooks.PostToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: `^(${CC_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$` }]);
     assert.deepEqual(claude.hooks.SessionStart, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }] }]);
     // D-FU-RM-QWEN-1: Qwen replaces only ${CLAUDE_PLUGIN_ROOT} in hook commands.
     const qwenCmd = 'node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent qwen';

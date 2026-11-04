@@ -17,6 +17,8 @@ import * as opencode from "./opencode.ts";
 
 const CLAUDE_EVENTS = { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" };
 const CLAUDE_TOOLS = { shell: ["Bash"], read: ["Read"], grep: ["Grep"], webfetch: ["WebFetch"], edit: ["Write", "Edit", "NotebookEdit"] };
+// D-CC-PWSH-1 (#1212): Claude Code also has a PowerShell tool on Windows; zcode keeps the Bash-only Claude names.
+const CLAUDE_CODE_TOOLS = { ...CLAUDE_TOOLS, shell: [...claudeCode.SHELL_TOOL_NAMES] };
 
 // In-process rows add one helper each for their plugin entry (DEVIATIONS D-M5-A1-1): Pi turns an encoded deny into
 // its tool_call {block, reason} return; OpenCode maps a native tool name to the canonical name decide() uses.
@@ -28,7 +30,7 @@ type Row = AdapterRow & {
 export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   {
     id: "claude-code", installMode: "marketplace", projectSource: "env:CLAUDE_PROJECT_DIR", toolNamePrefix: claudeCode.TOOL_NAME_PREFIX,
-    nativeTools: CLAUDE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
+    nativeTools: CLAUDE_CODE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
     hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "claude-code/skills" }, // ADR-0020, D-HQ-SKILLS-2
     decode: claudeCode.decode, encode: claudeCode.encode,

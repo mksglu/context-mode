@@ -976,6 +976,17 @@ describe("ADR-0008 decide rule table and golden rows", () => {
     assert.notEqual(bash("Get-Content big.log", CC).kind, "deny");
     assert.notEqual(bash("ls; Get-Content big.log", CC).kind, "deny");
   });
+  // D-CC-PWSH-1 (#1212): Claude Code's PowerShell tool decodes to canonical Bash, so the subagent size-guess denies
+  // and the dump check see it the same way as Bash. A main-agent PowerShell dump runs and PostToolUse replaces it.
+  test("D-CC-PWSH-1 (#1212): a Claude Code subagent PowerShell curl / Invoke-WebRequest gets the same ctx_execute deny as Bash", () => {
+    const sub = { agentId: "sub-1", agentType: "sheller" };
+    const ps = (command) => decide({ ...ev("Bash", { command }, sub), tool: { name: "PowerShell", canonicalName: "Bash", input: { command } } }, CC, []);
+    for (const cmd of ["curl https://example.com/a.json"]) {
+      assert.deepEqual(ps(cmd), decide(ev("Bash", { command: cmd }, sub), CC, []), cmd);
+      assert.deepEqual(ps(cmd), { kind: "deny", reason: denyMessage("curl", cmd, CC) }, cmd);
+    }
+    assert.notEqual(ps("Get-Content big.log -TotalCount 2").kind, "deny");
+  });
   test("D-PWSH-DUMP-1: the PowerShell word reader keeps backslashes, honours quotes and the backtick, and stops at a pipe or redirect", () => {
     assert.deepEqual(psWords("Get-Content C:\\logs\\app.log -Raw"), ["Get-Content", "C:\\logs\\app.log", "-Raw"]);
     assert.deepEqual(psWords("Get-Content 'C:\\a b\\x.log' -TotalCount 3"), ["Get-Content", "C:\\a b\\x.log", "-TotalCount", "3"]);

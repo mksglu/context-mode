@@ -540,6 +540,31 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(c.permissionDecision, "deny");
   });
 
+  // D-CC-PWSH-1 (#1212): Claude Code 2.1.274 names its Windows shell tool "PowerShell" (binary: var Gt="PowerShell",
+  // input {command: "The PowerShell command to execute", timeout?, description?, run_in_background?}). It is routed like Bash.
+  test("D-CC-PWSH-1 (#1212): claude-code PowerShell PreToolUse is decided like Bash (subagent curl deny, bounded read allowed)", async () => {
+    const sub = { hook_event_name: "PreToolUse", agent_id: "sub-ps", tool_name: "PowerShell" };
+    for (const cmd of ["curl https://example.com/data", "Invoke-WebRequest https://example.com/data"]) {
+      const ps = parsed(await handleHook("claude-code", cc({ ...sub, tool_input: { command: cmd } }), env));
+      const bash = parsed(await handleHook("claude-code", cc({ ...sub, tool_name: "Bash", tool_input: { command: cmd } }), env));
+      assert.deepEqual(ps, bash, cmd);
+    }
+    const curl = parsed(await handleHook("claude-code", cc({ ...sub, tool_input: { command: "curl https://example.com/data" } }), env));
+    assert.equal(curl.permissionDecision, "deny");
+    assert.ok(curl.permissionDecisionReason.includes(CCP + "ctx_execute"), curl.permissionDecisionReason);
+    assert.deepEqual(await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", tool_name: "PowerShell", tool_input: { command: "Get-Content big.log -TotalCount 2" } }), env), { stdout: "", exitCode: 0 });
+  });
+  test("D-CC-PWSH-1 (#1212): claude-code main-agent PowerShell over OUTPUT_CAP is replaced in the shell output shape", async () => {
+    const text = bigText(40000);
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "PowerShell", tool_input: { command: "Get-Content big.log", description: "needle target" }, tool_use_id: "toolu_ps" + Math.random().toString(36).slice(2), tool_response: { stdout: text, stderr: "", interrupted: false } });
+    const out = parsed(await handleHook("claude-code", p, env));
+    // Claude Code checks updatedToolOutput against the PowerShell output schema {stdout, stderr, interrupted} (D-M7-SV-1).
+    assert.equal(typeof out.updatedToolOutput, "object", "a bare string is dropped by Claude Code");
+    const replaced = replacedText(out.updatedToolOutput);
+    assert.ok(Buffer.byteLength(replaced) < Buffer.byteLength(text));
+    assert.ok(replaced.includes("needle target"));
+  });
+
   test("D-M7-RR-1: user policy deny and Read deny unchanged on claude-code", async () => {
     mkdirSync(join(repo, ".claude"), { recursive: true });
     const settings = join(repo, ".claude", "settings.json");

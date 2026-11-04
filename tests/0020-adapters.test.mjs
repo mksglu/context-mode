@@ -58,8 +58,9 @@ describe("ADR-0020 adapters", () => {
 
     const CLAUDE_NATIVE = { shell: ["Bash"], read: ["Read"], grep: ["Grep"], webfetch: ["WebFetch"], edit: ["Write", "Edit", "NotebookEdit"] };
     // impl/10 §1.3a; zcode = Claude names per DECISIONS-r9 R4 and impl/00 §3.1 (DEVIATIONS D-M3-A7-1).
+    // #1212: Claude Code's PowerShell tool (tool_name "PowerShell", input {command}) is a shell tool too (D-CC-PWSH-1).
     const NATIVE = {
-      "claude-code": CLAUDE_NATIVE,
+      "claude-code": { ...CLAUDE_NATIVE, shell: ["Bash", "PowerShell"] },
       codex: { shell: ["Bash"], edit: ["apply_patch"] },
       gemini: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, // gemini-cli 0.65.0 *_TOOL_NAME
       qwen: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
@@ -319,7 +320,7 @@ describe("ADR-0020 adapters", () => {
 
     test("nativeTools and execReadOnlyHint follow impl/10 §1.3a and DECISIONS-r9 R4/R5", () => {
       const claude = { shell: ["Bash"], read: ["Read"], grep: ["Grep"], webfetch: ["WebFetch"], edit: ["Write", "Edit", "NotebookEdit"] };
-      assert.deepEqual(getAdapter("claude-code").nativeTools, claude);
+      assert.deepEqual(getAdapter("claude-code").nativeTools, { ...claude, shell: ["Bash", "PowerShell"] }); // D-CC-PWSH-1 (#1212)
       assert.deepEqual(getAdapter("zcode").nativeTools, claude);
       assert.deepEqual(getAdapter("codex").nativeTools, { shell: ["Bash"], edit: ["apply_patch"] });
       assert.deepEqual(getAdapter("qwen").nativeTools, {
@@ -394,6 +395,14 @@ describe("ADR-0020 adapters", () => {
     test("decode UserPromptSubmit reads prompt", () => {
       const ev = decode({ ...base, hook_event_name: "UserPromptSubmit", prompt: "fix the build" });
       assert.deepEqual(ev, { event: "UserPromptSubmit", agent: "claude-code", sessionId: "s-1", cwd: "/tmp/proj", prompt: "fix the build" });
+    });
+
+    test("D-CC-PWSH-1 (#1212): decode PreToolUse PowerShell maps to canonical Bash and keeps the native name", () => {
+      const ev = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "PowerShell", tool_input: { command: "Get-Content big.log" }, tool_use_id: "toolu_ps" });
+      assert.deepEqual(ev.tool, { name: "PowerShell", canonicalName: "Bash", input: { command: "Get-Content big.log" }, callId: "toolu_ps" });
+      const post = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "PowerShell", tool_input: { command: "gc big.log" }, tool_response: { stdout: "a", stderr: "", interrupted: false } });
+      assert.equal(post.tool.canonicalName, "Bash");
+      assert.equal(post.result.text, "a");
     });
 
     test("decode PreToolUse native Bash keeps the name as canonical", () => {

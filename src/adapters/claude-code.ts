@@ -5,6 +5,13 @@ import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, Tool
 
 export const TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__"; // impl/10 §1.3, TECH-SPEC §3.8 (plugin install)
 
+// D-CC-PWSH-1 (#1212): Claude Code 2.1.274 binary: `var Gt="PowerShell"`, input schema {command: "The PowerShell command
+// to execute", timeout?, description?, run_in_background?, dangerouslyDisableSandbox?}, output {stdout, stderr, interrupted, ...}
+// (the Bash shapes). Enabled on Windows (CLAUDE_CODE_USE_POWERSHELL_TOOL). It is the same canonical shell as Bash.
+export const SHELL_TOOL_NAMES: readonly string[] = Object.freeze(["Bash", "PowerShell"]);
+const POWERSHELL_TOOL = "PowerShell";
+const SHELL_CANONICAL = "Bash";
+
 const CLAUDE_SHAPE_EVENTS: readonly CanonicalEventName[] = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"]; // impl/10 §1.4
 const MCP_PREFIX = "mcp__";
 const MCP_SEP = "__";
@@ -163,6 +170,8 @@ function requireFields(raw: unknown): void {
 export function decode(raw: unknown): CanonicalHookEvent {
   requireFields(raw);
   const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  // D-CC-PWSH-1: PowerShell keeps its native name and is decided, replaced and encoded as canonical Bash.
+  if (ev.tool !== undefined && ev.tool.name === POWERSHELL_TOOL) ev.tool.canonicalName = SHELL_CANONICAL;
   // D-FU-RF-DECODE-1 defaults. cwd: the project dir Claude Code sets for its hooks, else the hook's own cwd.
   if (ev.cwd === "") ev.cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   // tool_use_id: a label from a hash of the command and the turn, so one command in one turn keeps one source.

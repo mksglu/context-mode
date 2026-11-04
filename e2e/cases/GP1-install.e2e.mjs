@@ -129,7 +129,7 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
   // Host-matcher rows (impl/10 §1.5): the matcher is a regex over tool_name; each named tool must hit exactly one
   // group per tool event, and every group's entries carry a timeout.
   const REGEX_MATCHER_TOOLS = {
-    "claude-code": ["Bash", "Read", "Grep", "WebFetch", "Write", "Edit", "NotebookEdit", ...TOOL_ORDER.map((t) => "mcp__plugin_context-mode_context-mode__" + t)],
+    "claude-code": ["Bash", "PowerShell", "Read", "Grep", "WebFetch", "Write", "Edit", "NotebookEdit", ...TOOL_ORDER.map((t) => "mcp__plugin_context-mode_context-mode__" + t)],
     codex: ["Bash", "apply_patch", ...TOOL_ORDER.map((t) => "mcp__context_mode__" + t)],
     qwen: ["run_shell_command", "Shell", "read_file", "grep_search", "web_fetch", ...TOOL_ORDER.map((t) => "mcp__context-mode__" + t)],
     zcode: ["Bash", "Read", "Grep", "WebFetch", "Write", "Edit", "NotebookEdit", ...TOOL_ORDER.map((t) => "mcp__context-mode__" + t)],
