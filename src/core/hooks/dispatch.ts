@@ -322,10 +322,17 @@ async function preToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Proj
   const userDeny = readUserDeny(project.worktree, ev.agent);
   const decision0 = decide(ev, row, userDeny);
   let decision = decision0;
-  if (decision0.kind === "deny" && isSubagentCall(ev)) {
-    // Case A and case C keep decision0 (D-M3-H2-4); case B names the run.mjs wrapper.
-    const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
-    if (subCase === "B") decision = caseB(ev, row, decision0, userDeny);
+  if (decision0.kind === "deny" && isSubagentCall(ev) && !isUserPolicyDeny(decision0.reason, row)) {
+    // Case A keeps decision0 (D-M3-H2-4); case B names the run.mjs wrapper for a shell call.
+    // D-SUB-NOCTX-1 (#1311): a deny names only tools the caller has. A caller without ctx_* tools runs the call:
+    // a known tool set without them, or a named agent type no source defines on a row that replaces afterwards
+    // (PostToolUse case C keeps a large output out). A call with no agent type inherits the session tools (case A).
+    const set = toolSetForAgentType(ev, { projectDir: project.worktree, env });
+    const subCase = pickSubagentCase(ev, set);
+    const tool = ev.tool;
+    const runs = set !== null || ((ev.agentType ?? "") !== "" && hasReplace(row));
+    if (subCase === "B" && tool !== undefined && isShell(tool, row)) decision = caseB(ev, row, decision0, userDeny);
+    else if (subCase !== "A" && runs) decision = ALLOW;
   }
   return decision; // no PreToolUse hint, so no throttle marker and no DB touch (D-M7-RR-2)
 }

@@ -88,3 +88,4 @@ LV1 confirms, rather than decides, that Claude Code ignores `allow` + `updatedIn
 
 r4 fix pass: split the Per agent table rows for Qwen, Copilot CLI, Pi, OpenCode 2, Gemini, VS Code and ZCode so each names its own source/mechanism and open-verification tag instead of a shared "yes"; fixed the Claude Code case B cell to match Q3 (was self-contradicting); added the deny-pipeline re-check for the `run.mjs` wrapper, the tie-break rule, the worker-thread indexing note, the Kiro no-rewrite-channel note, and the Remote-WSL/OpenCode-2 detection rows.
 - 2026-10-20 (DECISIONS-r10): main agent uses the same replace as case C.
+- 2026-11-05 (D-SUB-NOCTX-1, #1311): a subagent without ctx tools runs WebFetch/curl at PreToolUse; on a row with a replace channel, case C replaces a large output afterwards.

@@ -329,6 +329,27 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(out.permissionDecisionReason.startsWith("node "), false);
   });
 
+  // D-SUB-NOCTX-1 (#1311, EarthChen): the reporter's hook replay. claude-code-guide has Bash, Read, WebFetch,
+  // WebSearch and no ctx_* tool; a deny that names ctx_index / ctx_execute leaves it with no way to fetch.
+  test("D-SUB-NOCTX-1 (#1311): built-in subagent without ctx tools: WebFetch and curl run (PostToolUse case C replaces)", async () => {
+    const sub = { agent_id: "a-x", agent_type: "claude-code-guide" };
+    for (const [tool_name, tool_input] of [["WebFetch", { url: "https://example.com" }], ["Bash", { command: "curl -s https://example.com" }],
+      ["Bash", { command: "curl -s https://example.com | head -5" }], ["Bash", { command: "wget -qO- https://example.com" }]]) {
+      const out = await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", ...sub, tool_name, tool_input }), env);
+      assert.equal(out.stdout, "", tool_name + " " + JSON.stringify(tool_input) + ": " + out.stdout);
+    }
+  });
+
+  test("D-SUB-NOCTX-1 (#1311): a defined tool set without ctx tools gets no ctx_* deny; a codex unknown type keeps the deny", async () => {
+    const web = cc({ hook_event_name: "PreToolUse", agent_id: "sub-r", agent_type: "reader", tool_name: "WebFetch", tool_input: { url: "https://example.com" } });
+    assert.equal((await handleHook("claude-code", web, env)).stdout, "");
+    const sh = cc({ hook_event_name: "PreToolUse", agent_id: "sub-s", agent_type: "sheller", tool_name: "WebFetch", tool_input: { url: "https://example.com" } });
+    assert.equal((await handleHook("claude-code", sh, env)).stdout, "");
+    // codex has no replace channel: an agent type no source defines keeps decision0 (case C, D-M3-H2-4).
+    const cx = cc({ hook_event_name: "PreToolUse", agent_id: "sub-c", agent_type: "worker", tool_name: "Bash", tool_input: { command: "curl https://example.com" } });
+    assert.equal(parsed(await handleHook("codex", cx, env)).permissionDecision, "deny");
+  });
+
   // ---------- D-M7-RR-1: main agent "run, then replace" (owner decision 2026-10-20) ----------
 
   function mainBashPost(stdout, description = "needle target") {
