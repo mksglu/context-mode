@@ -35,6 +35,7 @@
     "files": [
       ".claude-plugin",
       ".codex-plugin",
+      ".zcode-plugin",
       "LICENSE",
       "README.md",
       "SHA256SUMS",

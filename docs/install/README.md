@@ -20,9 +20,10 @@ The agents with no install command of their own use the npm route: `npm i -g con
 | Qwen Code | `qwen extensions install https://github.com/mksglu/context-mode:context-mode` | `qwen extensions update context-mode` |
 | Pi | `pi install npm:context-mode` | `pi update --extensions` |
 | OpenCode | `opencode plugin add context-mode` (1.19: `opencode plugin context-mode --global`) | `opencode plugin update` (1.19: `opencode plugin context-mode --global --force`) |
-| Copilot CLI, Kiro, VS Code, ZCode | `npm i -g context-mode`, then `context-mode setup --agents <id>` | `context-mode upgrade` |
+| ZCode | `zcode plugins marketplace add mksglu/context-mode`, then `zcode plugins install context-mode@context-mode` | `zcode plugins update context-mode@context-mode` |
+| Copilot CLI, Kiro, VS Code | `npm i -g context-mode`, then `context-mode setup --agents <id>` | `context-mode upgrade` |
 
-Fallback for any agent, and the only route for Copilot CLI, Kiro, VS Code and ZCode:
+Fallback for any agent, and the only route for Copilot CLI, Kiro and VS Code:
 
 ```sh
 npm i -g context-mode

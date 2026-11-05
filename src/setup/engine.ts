@@ -568,8 +568,10 @@ function hookRound(row: CheckRow, env: SetupContext["env"]): Check {
   const bareP95Ms = Math.round(p95(bare));
   const overheadP95Ms = Math.max(0, wallP95Ms - bareP95Ms);
   const budget = overheadBudgetMs(env);
-  const ok = overheadP95Ms <= budget;
-  return { name: "hook", ok, overheadP95Ms, wallP95Ms, bareP95Ms, detail: ok ? undefined : `hook overhead p95 ${overheadP95Ms} ms > ${budget} ms` };
+  // D-R44-OVERHEAD-WARN-1 (host audit zcode-3): the 15 ms budget is a timing gate (e2e/checks/setup-hook-overhead.mjs). On the
+  // user's machine a slow disk or a busy CPU is no broken install, so setup and doctor report it as a warning and keep the install.
+  const over = overheadP95Ms > budget;
+  return { name: "hook", ok: true, ...(over ? { warn: true } : {}), overheadP95Ms, wallP95Ms, bareP95Ms, detail: over ? `hook overhead p95 ${overheadP95Ms} ms > ${budget} ms (slow host; not a failure)` : undefined };
 }
 
 /** D3 gate: best of HOOK_ROUNDS rounds; a hook that exits non-zero fails at once. */
@@ -579,7 +581,7 @@ function hookCheck(row: CheckRow, env: SetupContext["env"]): Check {
     const c = hookRound(row, env);
     if (c.overheadP95Ms === undefined) return c;
     if (!best || c.overheadP95Ms < (best.overheadP95Ms as number)) best = c;
-    if (c.ok) break;
+    if (!c.warn) break;
   }
   return best as Check;
 }
@@ -690,7 +692,7 @@ const EXT_ENABLED_WORKSPACE = "Enabled (Workspace):";
 const EXT_TRUE = "true";
 type NativeState = "enabled" | "disabled" | undefined;
 /** The extension list also shows the workspace scope: off there, gemini runs none of its hooks (D-NI-GEMINI-GATE-1). */
-interface NativeStatus { state: NativeState; workspaceOff: boolean }
+interface NativeStatus { state: NativeState; workspaceOff: boolean; hookGate?: string }
 
 /** codex plugin list: the table row that names the plugin, enabled when one of its words is "enabled". */
 function tableState(n: NativePlugin, text: string): NativeState {
@@ -706,15 +708,36 @@ function extensionState(n: NativePlugin, text: string): NativeStatus {
   let mine = false;
   let state: NativeState;
   let workspaceOff = false;
+  let workspaceOn = false;
   for (const raw of text.split("\n")) {
     const line = raw.trimEnd();
     if (line.length && !line.startsWith(" ")) { mine = line.split(" ")[1] === n.plugin; continue; }
     const t = line.trim();
     if (!mine) continue;
     if (t.startsWith(EXT_ENABLED_USER)) state = t.slice(EXT_ENABLED_USER.length).trim() === EXT_TRUE ? "enabled" : "disabled";
-    if (t.startsWith(EXT_ENABLED_WORKSPACE)) workspaceOff = t.slice(EXT_ENABLED_WORKSPACE.length).trim() !== EXT_TRUE;
+    if (t.startsWith(EXT_ENABLED_WORKSPACE)) { workspaceOff = t.slice(EXT_ENABLED_WORKSPACE.length).trim() !== EXT_TRUE; workspaceOn = !workspaceOff; }
   }
+  // D-R44-QWEN-SCOPE-1 (host audit qwen-2): `--scope project` leaves "Enabled (User): false" and "Enabled (Workspace): true";
+  // the extension runs in this project, so it is enabled here and the user-scope enable command is no fix.
+  if (state === "disabled" && workspaceOn) state = "enabled";
   return { state, workspaceOff };
+}
+
+/** zcode plugins list --json: an array of plugin objects. The row with our id gives enabled; hookDetails name the hook commands. */
+function jsonState(n: NativePlugin, text: string): NativeStatus {
+  const none: NativeStatus = { state: undefined, workspaceOff: false };
+  let doc: unknown;
+  try { doc = JSON.parse(text); } catch { return none; }
+  const mine = Array.isArray(doc) ? doc.find((p) => isObj(p) && p.id === n.plugin) : undefined;
+  if (!isObj(mine)) return none;
+  if (mine.enabled !== true) return { state: "disabled", workspaceOff: false };
+  // The agent flag of the plugin hooks: a plugin built before .zcode-plugin ran its hooks as --agent claude-code, and ZCode
+  // dropped their replies. The fix is the host's own update command.
+  const hooks = Array.isArray(mine.hookDetails) ? mine.hookDetails : [];
+  const own = `${AGENT_FLAG} ${n.bin}`;
+  const hookGate = hooks.some((h) => isObj(h) && typeof h.command === "string" && h.command.includes(own)) ? undefined
+    : `the installed ${n.plugin} runs no ${own} hook; run: ${n.bin} plugins update ${n.plugin}`;
+  return { state: "enabled", workspaceOff: false, hookGate };
 }
 
 /** The host's own install as its list command shows it (undefined: not listed in that form, setup owns the agent). */
@@ -725,6 +748,7 @@ function nativeState(row: CheckRow, env: SetupContext["env"]): NativeStatus {
   const r = runBin(n.bin, n.args, env);
   if (r.status !== 0) return none;
   // Gemini 0.65.0 writes the extension list to stderr (D-INST-2).
+  if (n.format === "json") return jsonState(n, `${r.stdout}`);
   return n.format === "extension" ? extensionState(n, `${r.stdout}${r.stderr}`) : { state: tableState(n, `${r.stdout}`), workspaceOff: false };
 }
 
@@ -746,7 +770,7 @@ function trimChars(w: string, chars: string): string {
  *  disabled extension is a FAIL that names the host's enable command: setup cannot link over it (D-NI-EXT-DOCTOR-1). */
 async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult | undefined> {
   const n = row.nativePlugin;
-  const { state, workspaceOff } = nativeState(row, ctx.env);
+  const { state, workspaceOff, hookGate } = nativeState(row, ctx.env);
   if (!n || state === undefined) return undefined;
   const bin = hostBin(n.bin, ctx.env).file;
   if (state === "disabled") {
@@ -769,6 +793,7 @@ async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run
   res.checks = await verifyRow(nativeRow(row, n), ctx);
   if (n.hookTrust) res.checks = withHookTrust(res.checks, hooks, !!apply?.dryRun);
   if (n.format === "extension") res.checks = withHookGate(res.checks, geminiGate(n, ctx, workspaceOff));
+  if (n.format === "json") res.checks = withHookGate(res.checks, hookGate);
   const bad = res.checks.filter((c) => !c.ok);
   if (bad.length) {
     res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; ");

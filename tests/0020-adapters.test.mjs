@@ -1811,6 +1811,13 @@ describe("ADR-0020 adapters", () => {
       assert.equal(TOOL_NAME_PREFIX, "mcp__context-mode__");
     });
 
+    // D-R44-ZCODE-NATIVE-1: a plugin MCP server reaches the model as mcp__plugin_<plugin>_<server>__<tool>.
+    test("decode maps the zcode plugin tool prefix to bare ctx_* and keeps the settings-server prefix as before", () => {
+      const ev = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp__plugin_context-mode_context-mode__ctx_search", tool_input: { queries: ["a"] } });
+      assert.equal(ev.tool.canonicalName, "ctx_search");
+      assert.equal(decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp__context-mode__ctx_search", tool_input: {} }).tool.canonicalName, "ctx_search");
+    });
+
     test("decode SessionStart: source passes through when present, else undefined (impl/10 §9)", () => {
       for (const source of ["startup", "resume", "clear", "compact"]) {
         assert.equal(decode({ ...base, hook_event_name: "SessionStart", source }).source, source);

@@ -9,6 +9,10 @@ import { decodeClaudeShape, encodeClaudeShape } from "./claude-code.ts";
 // zcode.z.ai/en/docs/subagents: "in the form `mcp__<server>__<tool>`"; ZCode core/src/mcp/name.ts keeps "-" in the server part.
 export const TOOL_NAME_PREFIX = "mcp__context-mode__";
 
+// D-R44-ZCODE-NATIVE-1: a plugin MCP server is shown to the model as mcp__plugin_<plugin>_<server>__<tool> (ZCode
+// core/src/mcp/name.ts sanitizes "plugin:context-mode:context-mode"), so the native install names tools with this prefix.
+export const PLUGIN_TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
+
 type Source = NonNullable<CanonicalHookEvent["source"]>;
 const ZCODE_SOURCES: Readonly<Record<string, Source>> = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 
@@ -23,7 +27,9 @@ export function decode(raw: unknown): CanonicalHookEvent {
   for (const [snake, camel] of Object.entries(TWINS)) if (p[snake] === undefined) p[snake] = p[camel];
   const failure = p.hook_event_name === FAILURE_EVENT;
   if (failure) p.hook_event_name = "PostToolUse";
-  const ev = decodeClaudeShape(p, "zcode", TOOL_NAME_PREFIX, ZCODE_SOURCES);
+  const toolName = typeof p.tool_name === "string" ? p.tool_name : "";
+  const prefix = toolName.startsWith(PLUGIN_TOOL_NAME_PREFIX) ? PLUGIN_TOOL_NAME_PREFIX : TOOL_NAME_PREFIX;
+  const ev = decodeClaudeShape(p, "zcode", prefix, ZCODE_SOURCES);
   if (failure) {
     const text = typeof p.error === "string" ? p.error : p.error === undefined ? "" : JSON.stringify(p.error);
     ev.result = { isError: true, bytes: Buffer.byteLength(text), text };

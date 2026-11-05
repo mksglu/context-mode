@@ -199,6 +199,32 @@ function codexPlugin(row: AdapterRow, version: string): [string, JsonObject][] {
   ];
 }
 
+// D-R44-ZCODE-PLUGIN-1 (host audit zcode-1): `zcode plugins install context-mode@context-mode` reads .zcode-plugin/plugin.json
+// before .claude-plugin/ and runs the plugin hooks with --agent zcode (the .claude-plugin hooks ran --agent claude-code and
+// ZCode dropped their replies). ZCode expands ${CLAUDE_PLUGIN_ROOT} in hook commands and MCP args. The plugin MCP server is
+// shown to the model as mcp__plugin_<plugin>_<server>__ctx_*, so the tool matcher names that prefix.
+const ZCODE_PLUGIN_DIR = ".zcode-plugin";
+const ZCODE_PLUGIN_ROOT = "${CLAUDE_PLUGIN_ROOT}";
+export const ZCODE_PLUGIN_TOOL_PREFIX = "mcp__plugin_" + SERVER_KEY + "_" + SERVER_KEY + "__";
+function zcodePlugin(row: AdapterRow, version: string): [string, JsonObject][] {
+  const pluginRow: AdapterRow = { ...row, toolNamePrefix: ZCODE_PLUGIN_TOOL_PREFIX };
+  const hookCmd: JsonObject = { type: "command", command: [NODE_COMMAND, '"' + ZCODE_PLUGIN_ROOT + "/" + HOOK_BUNDLE + '"', AGENT_FLAG, row.id].join(" ") };
+  const hooks: JsonObject = {};
+  for (const [canonical, native] of events(row)) {
+    const group: JsonObject = { hooks: [{ ...hookCmd, timeout: seconds(row) }] };
+    if (isToolEvent(canonical)) group.matcher = buildMatcher(pluginRow, native);
+    hooks[native] = [group];
+  }
+  return [
+    [ZCODE_PLUGIN_DIR + "/plugin.json", {
+      name: SERVER_KEY, version, description: devMeta().description, author: author(),
+      mcpServers: { [SERVER_KEY]: { command: NODE_COMMAND, args: [ZCODE_PLUGIN_ROOT + "/" + SERVER_BUNDLE, AGENT_FLAG, row.id] } },
+      hooks: "./" + ZCODE_PLUGIN_DIR + "/hooks.json",
+    }],
+    [ZCODE_PLUGIN_DIR + "/hooks.json", { hooks }],
+  ];
+}
+
 const OUT_PACKAGE_JSON = "package.json";
 const PI_EXTENSION = "./pi/index.js";
 const PI_SKILLS = "./pi/skills"; // D-HQ-SKILLS-1: pi's own rendered copy
@@ -211,7 +237,7 @@ const NODE_ENGINE = ">=" + NODE_MIN; // D1, the runtime check constant (D-PKG-ME
 // D1 "files = the release tree": every top-level name build.mjs writes, except package.json (npm always packs it).
 // build.mjs assertOutTree fails the build when the real tree and this list differ.
 export const OUT_FILES: readonly string[] = [
-  ".claude-plugin", CODEX_PLUGIN_DIR, CLI_BUNDLE, "codex", "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
+  ".claude-plugin", CODEX_PLUGIN_DIR, ZCODE_PLUGIN_DIR, CLI_BUNDLE, "codex", "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
   "qwen-extension.json", "run.mjs", "search.mjs", SERVER_BUNDLE, "skills", RELEASE_SUMS_FILE, "README.md", "LICENSE", // D-NPM-README-1
 ].slice().sort();
 // D-RN-REPO-1: npm provenance rejects a publish (E422) unless repository.url names the source repo. This is the
@@ -289,6 +315,7 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
       }]);
     }
     if (row.id === "codex") files.push(...codexPlugin(row, version));
+    if (row.id === "zcode") files.push(...zcodePlugin(row, version));
     const shape = HOOK_SHAPES[row.id];
     if (shape !== null) files.push([hookFile(row), shape(row)]);
   }

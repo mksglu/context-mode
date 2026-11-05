@@ -157,7 +157,7 @@ export function checkSimplePages(pages) {
 }
 
 /** Hosts whose own native command installs context-mode (ADR-0023). Other hosts open with the npm fallback. */
-export const NATIVE_HOSTS = Object.freeze(["claude-code", "codex", "gemini", "qwen", "pi", "opencode"]);
+export const NATIVE_HOSTS = Object.freeze(["claude-code", "codex", "gemini", "qwen", "zcode", "pi", "opencode"]);
 export const CHECK_LINE = "Check: `context-mode doctor`";
 const UPDATE_WORDS = ["update", "upgrade", "--force"];
 

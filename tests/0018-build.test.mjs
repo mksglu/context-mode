@@ -264,6 +264,8 @@ describe("ADR-0018 build: manifests", () => {
     ".codex-plugin/hooks.json", // ADR-0023 D-NI-CODEX-1
     ".codex-plugin/mcp.json",
     ".codex-plugin/plugin.json",
+    ".zcode-plugin/hooks.json", // D-R44-ZCODE-PLUGIN-1
+    ".zcode-plugin/plugin.json",
     "copilot/plugin.json",
     "gemini-extension.json",
     "hooks/claude-code.json",
@@ -440,7 +442,7 @@ describe("ADR-0018 build: manifests", () => {
   // name, version, bin, type, engines, files and pi (Pi reads "pi".extensions from the package dir); no dependencies,
   // no scripts, no private.
   const D1_FILES = [
-    ".claude-plugin", ".codex-plugin", "LICENSE", "README.md", "SHA256SUMS", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
+    ".claude-plugin", ".codex-plugin", ".zcode-plugin", "LICENSE", "README.md", "SHA256SUMS", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
     "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
   ];
   test("package.json is the D1 npm shape: name, version, bin, type, engines, files, pi (extensions, skills)", (t) => {

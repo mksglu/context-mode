@@ -111,11 +111,12 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     codex: [["codex plugin marketplace add mksglu/context-mode", "codex plugin add context-mode@context-mode"], ["codex plugin marketplace upgrade context-mode"]],
     gemini: [["gemini extensions install https://github.com/mksglu/context-mode"], ["gemini extensions update context-mode"]],
     qwen: [["qwen extensions install https://github.com/mksglu/context-mode:context-mode"], ["qwen extensions update context-mode"]],
+    zcode: [["zcode plugins marketplace add mksglu/context-mode", "zcode plugins install context-mode@context-mode"], ["zcode plugins update context-mode@context-mode"]],
     pi: [["pi install npm:context-mode"], ["pi update --extensions"]],
     // D-OC2-NATIVE-CMD-1: OpenCode 2 first (@opencode/cli 2.2.5: `plugin add`, `plugin update`); the 1.19 form is a plain line after the block.
     opencode: [["opencode plugin add context-mode"], ["opencode plugin update"]],
   };
-  const FALLBACK = ["copilot-cli", "vscode", "kiro", "zcode"];
+  const FALLBACK = ["copilot-cli", "vscode", "kiro"];
 
   test("install-native: each native page opens with the host's own command, then the update command", () => {
     for (const [id, [install, update]] of Object.entries(NATIVE)) {

@@ -561,9 +561,9 @@ describe("ADR-0020 Codex 0.166 hook shell command (D-C166-WIN-FIRE-1)", { concur
     for (const c of codexCommands(row)) assert.ok(c.startsWith('"' + process.execPath + '" "'), c);
   });
 
-  test("D-C166-WIN-FIRE-1: only codex changes; every other host keeps the quoted absolute form on Windows", () => {
+  test("D-C166-WIN-FIRE-1: only codex and qwen (D-R44-QWEN-WIN-1) change; every other host keeps the quoted absolute form on Windows", () => {
     const reg = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {}, platform: "win32" });
-    for (const row of reg.filter((r) => r.id !== "codex" && r.hookCommand)) assert.ok(hookCommandString(row).startsWith('"'), row.id);
+    for (const row of reg.filter((r) => r.id !== "codex" && r.id !== "qwen" && r.hookCommand)) assert.ok(hookCommandString(row).startsWith('"'), row.id);
   });
 
   // Windows only: PowerShell runs the line the way 0.166 builds it (hook_environment_executor.rs): the JSON line is piped in.

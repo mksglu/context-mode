@@ -955,7 +955,7 @@ export const NATIVE_INSTALL: Readonly<Record<string, readonly string[]>> = Objec
   "copilot-cli": ["npm i -g context-mode", "context-mode setup --agents copilot-cli"],
   vscode: ["npm i -g context-mode", "context-mode setup --agents vscode"],
   kiro: ["npm i -g context-mode", "context-mode setup --agents kiro"],
-  zcode: ["npm i -g context-mode", "context-mode setup --agents zcode"],
+  zcode: ["zcode plugins marketplace add mksglu/context-mode", "zcode plugins install context-mode@context-mode"],
 });
 export const ISSUE_FORM_URL = `https://github.com/${ISSUE_REPO_SLUG}/issues/new?template=${ISSUE_FORM_FILE}`; // + &title=&summary=
 export const DOCTOR_GIT_VERSION_TIMEOUT_MS = 5000; // git --version for the report file only

@@ -1127,7 +1127,7 @@ describe("[WHO] D-REL-WHO-1 release plan: who gets this release", { concurrency:
     assert.deepEqual(reachOf(["hooks/qwen.json", "qwen-extension.json"]), ["qwen"]);
     assert.deepEqual(reachOf(["hooks/hooks.json"]), ["gemini"]);
     assert.deepEqual(reachOf([".codex-plugin/plugin.json"]), ["codex"]);
-    assert.deepEqual(reachOf(["plugins/claude-code/server.mjs"]), ["claude-code", "codex", "gemini", "qwen"]);
+    assert.deepEqual(reachOf(["plugins/claude-code/server.mjs"]), ["claude-code", "codex", "gemini", "qwen", "zcode"]);
     // codex, qwen, zcode and vscode import the Claude shape from src/adapters/claude-code.ts (#1304 changed it).
     assert.deepEqual(reachOf(["src/adapters/claude-code.ts"]), ["claude-code", "codex", "qwen", "vscode", "zcode"]);
     assert.deepEqual(reachOf(["src/adapters/pi.ts", "src/adapters/gemini.ts", "docs/x.md"]), ["gemini", "pi"]);

@@ -232,17 +232,17 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 <details id="install-zcode"><summary><b>ZCode</b></summary>
 
 ```sh
-npm i -g context-mode
-context-mode setup --agents zcode
+zcode plugins marketplace add mksglu/context-mode
+zcode plugins install context-mode@context-mode
 ```
 
 ```sh
 # update
-context-mode upgrade
+zcode plugins update context-mode@context-mode
 # check
-context-mode doctor --agents zcode
+zcode plugins list
 # remove
-context-mode setup --remove --agents zcode
+zcode plugins uninstall context-mode@context-mode
 ```
 
 Hooks ✓ (hook file) · MCP ✓ · Skills ✓

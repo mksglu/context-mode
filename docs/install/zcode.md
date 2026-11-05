@@ -3,29 +3,37 @@
 ## Install
 
 ```sh
-npm i -g context-mode
-context-mode setup --agents zcode
+zcode plugins marketplace add mksglu/context-mode
+zcode plugins install context-mode@context-mode
 ```
 
 Update:
 
 ```sh
-context-mode upgrade
+zcode plugins update context-mode@context-mode
 ```
 
 Check: `context-mode doctor`
 
-ZCode has no install command of its own that takes the package, so setup is the install path here. `npm i -g context-mode` also gives the `context-mode` command for doctor.
+The plugin brings the MCP server, the four hooks (`.zcode-plugin/hooks.json`, run with `--agent zcode`) and the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade`. Setup writes nothing when ZCode lists the plugin as enabled, so no second hook copy runs.
+
+`npm i -g context-mode` also gives the `context-mode` command for doctor.
+
+Setup is the fallback and the repair for what the native step cannot do:
+
+```sh
+context-mode setup --agents zcode
+```
 
 With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents zcode`. Without it, setup stops with exit 2.
 
-Restart ZCode after setup.
+Restart ZCode after the install and after each update.
 
 On Windows the files are `%USERPROFILE%\.zcode\cli\config.json` and `%USERPROFILE%\.zcode\skills`. ZCode takes its home from the OS profile dir and ignores `HOME`, so setup does the same: Git Bash or MSYS with another `HOME` changes nothing. ZCode source read (zai-org/ZCode `3c5b2276`, 2026-10-20), not run on Windows.
 
 To do the setup step by hand, run `context-mode setup --print zcode` and follow what it prints.
 
-## What setup changes
+## What setup changes (when ZCode has no context-mode plugin)
 
 - Adds the `context-mode` server to `~/.zcode/cli/config.json` under `mcp.servers` (`type: "stdio"`, `enabled: true`, `timeoutMs`) and sets `features.mcp: true`. Other servers stay.
 - Merges the hooks into the same file under `hooks.events` as matcher groups (`{matcher, hooks: [...]}`) for SessionStart, UserPromptSubmit, PreToolUse and PostToolUse, and sets `hooks.enabled: true`.
@@ -38,11 +46,18 @@ To do the setup step by hand, run `context-mode setup --print zcode` and follow 
 
 ```sh
 context-mode doctor --agents zcode
+zcode plugins list
 ```
 
-Run `/ctx-doctor` in ZCode.
+`context-mode@context-mode` must be listed as `[enabled]`. Then run `/ctx-doctor` in ZCode.
 
 ## Remove
+
+```sh
+zcode plugins uninstall context-mode@context-mode
+```
+
+If you also ran setup, undo it first:
 
 ```sh
 context-mode setup --remove --agents zcode

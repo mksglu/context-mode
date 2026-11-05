@@ -131,7 +131,7 @@ export interface CheckRow {
  *  extensions list). enable = the host command that turns a listed but disabled install back on (doctor names it). */
 export interface NativePlugin {
   bin: string; args: string[]; plugin: string; hooksVia: string; skillsVia: string;
-  format: "table" | "extension"; enable?: string[];
+  format: "table" | "extension" | "json"; enable?: string[];
   /** D-NI-CODEX-TRUST-1: the host runs a plugin hook only once its config trusts it (Codex hooks/list trustStatus). */
   hookTrust?: boolean;
 }
@@ -148,6 +148,10 @@ const NATIVE_PLUGIN: Partial<Record<AgentId, NativePlugin>> = {
   codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
   qwen: extensionPlugin("qwen", "qwen"),
   gemini: extensionPlugin("gemini", "gemini"),
+  // D-R44-ZCODE-NATIVE-1 (host audit zcode-1/2): `zcode plugins install context-mode@context-mode` lists as JSON; ZCode loads
+  // <plugin>/.zcode-plugin/plugin.json (MCP server, hooks run with --agent zcode) and the package skills/.
+  zcode: { bin: "zcode", args: ["plugins", "list", "--json"], plugin: PLUGIN_ID, hooksVia: ".zcode-plugin", skillsVia: SKILLS_DIR_NAME, format: "json",
+    enable: ["plugins", "enable", PLUGIN_ID] },
 };
 
 function serverCmd(ctx: SetupContext, id: AgentId): string[] {
@@ -277,7 +281,8 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     const runCommand = [process.execPath, path.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
     // D-C166-WIN-FIRE-1: Codex 0.166 runs a hook through the session shell, PowerShell on Windows, and PowerShell reads a
     // leading quoted path as a string. A bare `node` word runs in sh, cmd.exe and PowerShell; the doctor still runs the absolute node.
-    const bareNode = id === "codex" && (ctx.platform ?? process.platform) === "win32";
+    // D-R44-QWEN-WIN-1 (host audit qwen-3): Qwen spawns a hook through cmd.exe /d /s /c (ComSpec) or PowerShell, so the same bare word.
+    const bareNode = (id === "codex" || id === "qwen") && (ctx.platform ?? process.platform) === "win32";
     const hookCommand = bareNode ? [HOST_NODE_COMMAND, ...runCommand.slice(1)] : runCommand;
     const command = `${bareNode ? HOST_NODE_COMMAND : `"${hookCommand[0]}"`} "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
     const hookInstall = hookInstallFor(ctx, getAdapter(id), command);

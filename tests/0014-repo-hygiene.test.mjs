@@ -1082,7 +1082,8 @@ describe("ADR-0015 repo: README agent lines", () => {
     assert.ok(by.codex.includes("codex plugin add"), by.codex);
     assert.ok(by.gemini.includes("gemini extensions install"), by.gemini);
     assert.ok(by.pi.includes("pi install"), by.pi);
-    for (const id of ["copilot-cli", "kiro", "vscode", "zcode"]) assert.ok(by[id].includes("context-mode setup"), by[id]);
+    for (const id of ["copilot-cli", "kiro", "vscode"]) assert.ok(by[id].includes("context-mode setup"), by[id]);
+    assert.ok(by.zcode.includes("zcode plugins install"), by.zcode);
   });
 
   test("readme-agents: the install cell holds every command of the page's native fence, joined by <br> (D-README-INSTALL-CELL-1)", () => {
