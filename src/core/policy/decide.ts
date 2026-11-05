@@ -11,7 +11,7 @@ import {
   DENY_WEBFETCH_TOOLS, DENY_WHAT, DENY_WHAT_SUFFIX, DUMP_COUNT_COMMANDS, DUMP_COUNT_FLAGS, FETCH_CALL, FETCH_QUOTES,
   HTTP_SCHEME, INLINE_HTTP_CALLS, JQ_COMMAND, JQ_WHITELIST, NEVER_DENY_HOSTS,
   OUTPUT_CAP, PARSE_ERROR_DENY_LINE, prefixToolNames, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING,
-  READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS,
+  READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS, SHELL_FAMILY,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
 import type { AdapterRow, CanonicalHookEvent, Decision, DenyKind, SimpleCommand } from "../contracts/types.ts";
@@ -20,7 +20,7 @@ import { parseShell } from "./parse.ts";
 import { psDumpFiles } from "./powershell.ts";
 import { isSubagentCall } from "./subagent.ts";
 import { unwrap } from "./unwrap.ts";
-import { matchesAnyDenyPattern } from "./user-deny.ts";
+import { denyPatternFromAny, matchesAnyDenyPattern } from "./user-deny.ts";
 import { READ_DENY_MESSAGE } from "./read-deny.ts";
 
 // Canonical tool names (impl/01 §2) and input field values; names, not tunable values.
@@ -38,6 +38,7 @@ const HOST_SEP = ".";
 const SED_RANGE_SEP = ",";
 const SED_PRINT = "p";
 const SED_SCRIPT_FLAGS: readonly string[] = ["-e", "--expression"];
+const EXE_SUFFIX = ".exe";
 const COMMAND_STARTS = ";&|(`\n\r"; // a command can start after these (parse-error "could match", D-M3-E4-8)
 
 const ALLOW: Decision = Object.freeze({ kind: "allow" }) as Decision;
@@ -111,13 +112,39 @@ function userDenyHit(canonical: string, input: Record<string, unknown>, cwd: str
     const byFile = file === undefined || file === "" ? null : readRule(file);
     if (byFile !== null) return byFile;
     const code = str(input.code);
-    return input.language === SHELL_LANGUAGE && code !== undefined ? matchesAnyDenyPattern(code, rules) : null;
+    return isShellLanguage(input.language) && code !== undefined ? shellHit(code, rules) : null;
   }
   if (canonical === CTX_BATCH && Array.isArray(input.commands)) {
     for (const c of input.commands) {
-      const h = typeof c === "string" ? matchesAnyDenyPattern(c, rules) : null;
+      const h = typeof c === "string" ? shellHit(c, rules) : null;
       if (h !== null) return h;
     }
+  }
+  return null;
+}
+
+/** D-DENY-SHELL-LANG-1: "shell" or a shell of the `-c` family, by base name (any case, ".exe" or a path allowed). */
+function isShellLanguage(language: unknown): boolean {
+  if (typeof language !== "string") return false;
+  let name = language.toLowerCase();
+  const slash = Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\"));
+  if (slash >= 0) name = name.slice(slash + 1);
+  if (name.endsWith(EXE_SUFFIX)) name = name.slice(0, name.length - EXE_SUFFIX.length);
+  return name === SHELL_LANGUAGE || has(SHELL_FAMILY, name);
+}
+
+/**
+ * D-DENY-SEGMENTS-1: ctx_execute shell code and each ctx_batch command get the Bash checks: the whole text, then
+ * every unwrapped segment (step 5a); on a parse error, a rule that could match from any command start (Q4).
+ */
+function shellHit(cmd: string, rules: string[]): string | null {
+  const whole = matchesAnyDenyPattern(cmd, rules);
+  if (whole !== null) return whole;
+  const parsed = parseShell(cmd);
+  if (!parsed.ok) return couldMatchRule(cmd, rules);
+  for (const c of unwrap(parsed.commands)) {
+    const h = segmentHit(c, rules);
+    if (h !== null) return h;
   }
   return null;
 }
@@ -128,14 +155,27 @@ function segmentHit(c: SimpleCommand, rules: string[]): string | null {
   return matchesAnyDenyPattern([c.argv0, ...c.args].join(" "), rules) ?? matchesAnyDenyPattern(c.raw, rules);
 }
 
-/** Q4 on a ParseError: could a Bash rule match a command that starts anywhere in the raw text? (D-M3-E4-8) */
-function couldMatch(text: string, rules: string[]): boolean {
-  if (rules.length === 0) return false;
+/**
+ * Q4 on a ParseError: the first Bash rule that could match a command starting anywhere in the raw text (D-M3-E4-8).
+ * A start is offset 0 or after a COMMAND_STARTS char, past leading whitespace. D-DENY-LINEAR-1: one matcher pass
+ * per rule over all starts (it was one pass per start, quadratic on a long line).
+ */
+function couldMatchRule(text: string, rules: string[]): string | null {
+  if (rules.length === 0) return null;
+  const from = new Uint8Array(text.length + 1);
+  let pending = false;
   for (let k = 0; k <= text.length; k++) {
-    if (k > 0 && !COMMAND_STARTS.includes(text.charAt(k - 1))) continue;
-    if (matchesAnyDenyPattern(text.slice(k).trimStart(), rules) !== null) return true;
+    if (k === 0 || COMMAND_STARTS.includes(text.charAt(k - 1))) pending = true;
+    if (pending && (k === text.length || text.charAt(k).trim() !== "")) {
+      from[k] = 1;
+      pending = false;
+    }
   }
-  return false;
+  return denyPatternFromAny(text, rules, from);
+}
+
+function couldMatch(text: string, rules: string[]): boolean {
+  return couldMatchRule(text, rules) !== null;
 }
 
 // ---------- step 4: WebFetch ----------

@@ -824,6 +824,58 @@ describe("ADR-0008 decide rule table and golden rows", () => {
     assert.equal(bash("ls\rrm -rf /tmp/x", CC, ["Bash(rm -rf:*)"]).kind, "deny");
   });
 
+  test("D-DENY-SHELL-LANG-1: a ctx_execute language that runs as a shell gets the Bash rules", () => {
+    const rules = ["Bash(rm -rf:*)"];
+    for (const language of ["shell", "bash", "sh", "zsh", "dash", "ksh", "fish", "/bin/bash", "BASH", "bash.exe"]) {
+      assert.deepEqual(decide(ev("ctx_execute", { language, code: "rm -rf ./dummy" }), CC, rules), { kind: "deny", reason: USER_DENY_REASON_PREFIX + "Bash(rm -rf:*)" }, language);
+    }
+    for (const language of ["python", "javascript", "typescript", "powershell", "bashful"]) {
+      assert.equal(decide(ev("ctx_execute", { language, code: "rm -rf ./dummy" }), CC, rules).kind, "allow", language);
+    }
+  });
+
+  test("D-DENY-SEGMENTS-1: ctx_execute shell code and ctx_batch commands are checked per segment, like Bash", () => {
+    const rules = ["Bash(rm -rf:*)"];
+    const want = { kind: "deny", reason: USER_DENY_REASON_PREFIX + "Bash(rm -rf:*)" };
+    for (const code of ["true; rm -rf /tmp/d", "cd d && rm -rf x", 'sh -c "rm -rf x"', "sudo rm -rf x", "echo $(rm -rf x)", "ls\nrm -rf x", 'ls; rm -rf / "x']) {
+      assert.equal(bash(code, CC, rules).kind, "deny", code);
+      assert.deepEqual(decide(ev("ctx_execute", { language: "shell", code }), CC, rules), want, code);
+      assert.deepEqual(decide(ev("ctx_batch", { commands: ["ls", code] }), CC, rules), want, code);
+    }
+    assert.equal(decide(ev("ctx_batch", { commands: ["ls -la", "echo rm -rf x"] }), CC, rules).kind, "allow");
+    assert.equal(decide(ev("ctx_execute", { language: "shell", code: "git status && ls" }), CC, rules).kind, "allow");
+  });
+
+  test("D-DENY-LINEAR-1: a long ctx_batch command is scanned in linear time and a later denied command is still denied", () => {
+    const rules = ["Bash(rm:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(sudo:*)", "Bash(git push:*)"];
+    const pad = "echo" + " a".repeat(64 * 1024);
+    const t = performance.now();
+    const d = decide(ev("ctx_batch", { commands: [pad, "rm -rf dummy"] }), CC, rules);
+    const ms = performance.now() - t;
+    assert.deepEqual(d, { kind: "deny", reason: USER_DENY_REASON_PREFIX + "Bash(rm:*)" });
+    assert.ok(ms < 2000, `deny check took ${Math.round(ms)} ms on 128K chars`);
+    // many segments must not overflow the stack (a throw would fall back to allow for ctx_* tools)
+    const many = "a;".repeat(200 * 1000) + "rm x";
+    assert.equal(decide(ev("ctx_execute", { language: "shell", code: many }), CC, rules).kind, "deny");
+  });
+
+  test("D-DENY-LINEAR-1: the linear matcher keeps the prefix-rule and glob results", () => {
+    const m = (text, rule) => matchesAnyDenyPattern(text, [rule]) !== null;
+    assert.ok(m("rm", "Bash(rm:*)"));
+    assert.ok(m("rm -rf x", "Bash(rm:*)"));
+    assert.ok(!m("rmdir x", "Bash(rm:*)"));
+    assert.ok(m("git push origin main", "Bash(git push:*)"));
+    assert.ok(!m("git pushx", "Bash(git push:*)"));
+    assert.ok(m("npm run build", "Bash(npm run *)"));
+    assert.ok(!m("npm test", "Bash(npm run *)"));
+    assert.ok(m("rm -rf /", "Bash(rm -rf /)"));
+    assert.ok(!m("rm -rf /x", "Bash(rm -rf /)"));
+    assert.ok(m("ab x", "Bash(a?:*)"));
+    assert.ok(!m("a x", "Bash(a?:*)"));
+    assert.ok(m("foo bar baz qux", "Bash(*bar*:*)"));
+    assert.ok(m("x\ty", "Bash(x:*)"));
+  });
+
   test("E2: unreadable policy fails closed only with the env flag", () => {
     const saved = process.env[REQUIRE_SECURITY_ENV];
     const savedWrite = process.stderr.write;

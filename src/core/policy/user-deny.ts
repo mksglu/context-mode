@@ -106,18 +106,20 @@ function tokenize(glob: string, path: boolean): GlobTok[] {
 }
 
 /**
- * Whole-string glob match by dynamic programming over (token, text offset), O(tokens x text).
+ * Glob match by dynamic programming over (token, text offset), O(tokens x text), two rows of memory.
+ * Result: starts[j] = 1 when the glob matches text[j..m] for some end m with ends[m] = 1.
+ * D-DENY-LINEAR-1: every start and every end in one pass, so a prefix rule or a scan from each command start
+ * costs one pass, not one pass per offset.
  * Command mode: * is any run of chars (newlines too), ? one char. Path mode: * and ? never match "/",
  * ** matches anything, a "**" + "/" pair matches zero or more whole directories.
  */
-function globMatch(glob: string, text: string, path: boolean): boolean {
-  const toks = tokenize(glob, path);
+function matchStarts(toks: GlobTok[], text: string, path: boolean, ends: Uint8Array): Uint8Array {
   const n = text.length;
-  let next = new Uint8Array(n + 1);
-  next[n] = 1; // no tokens left: matches only the empty rest
+  let next: Uint8Array = ends; // no tokens left: matches only where an allowed end is
+  let cur: Uint8Array = new Uint8Array(n + 1);
   for (let i = toks.length - 1; i >= 0; i--) {
     const tok = toks[i];
-    const cur = new Uint8Array(n + 1);
+    if (next === ends) next = Uint8Array.from(ends);
     let acc = 0; // globstarDir: some k > j with text[k-1] === "/" and next[k]
     for (let j = n; j >= 0; j--) {
       const has = j < n;
@@ -133,9 +135,21 @@ function globMatch(glob: string, text: string, path: boolean): boolean {
           break;
       }
     }
-    next = cur;
+    const done = cur;
+    cur = next;
+    next = done;
   }
-  return next[0] === 1;
+  return next;
+}
+
+/** Whole-string match: one end, at the text's end. */
+function globMatch(glob: string, text: string, path: boolean): boolean {
+  const toks = tokenize(glob, path);
+  const first = toks[0];
+  if (first !== undefined && first.t === "lit" && text[0] !== first.c) return false; // fast no
+  const ends = new Uint8Array(text.length + 1);
+  ends[text.length] = 1;
+  return matchStarts(toks, text, path, ends)[0] === 1;
 }
 
 function parsePattern(pattern: string): { tool: string; glob: string } | null {
@@ -145,14 +159,35 @@ function parsePattern(pattern: string): { tool: string; glob: string } | null {
   return glob === "" ? null : { tool: pattern.slice(0, open), glob };
 }
 
+/**
+ * Starts at which a command rule matches. `cmd:*` = the head, then the text end or whitespace (one pass,
+ * D-DENY-LINEAR-1); any other glob must reach the text end.
+ */
+function commandStarts(glob: string, text: string): Uint8Array {
+  const n = text.length;
+  const ends = new Uint8Array(n + 1);
+  ends[n] = 1;
+  if (!glob.endsWith(PREFIX_RULE)) return matchStarts(tokenize(glob, false), text, false, ends);
+  for (let k = 0; k < n; k++) if (WHITESPACE.includes(text[k])) ends[k] = 1;
+  return matchStarts(tokenize(glob.slice(0, glob.length - PREFIX_RULE.length), false), text, false, ends);
+}
+
 function matchCommand(glob: string, text: string): boolean {
-  if (!glob.endsWith(PREFIX_RULE)) return globMatch(glob, text, false);
-  const head = glob.slice(0, glob.length - PREFIX_RULE.length);
-  if (globMatch(head, text, false)) return true;
-  for (let k = 0; k < text.length; k++) {
-    if (WHITESPACE.includes(text[k]) && globMatch(head, text.slice(0, k), false)) return true;
+  return commandStarts(glob, text)[0] === 1;
+}
+
+/**
+ * D-DENY-LINEAR-1: first Bash rule that matches `text` from any offset j with `from[j] = 1`, or null.
+ * One pass per rule, whatever the number of offsets (the parse-error "could match" scan, D-M3-E4-8).
+ */
+export function denyPatternFromAny(text: string, patterns: string[], from: Uint8Array): string | null {
+  for (const pattern of patterns) {
+    const p = parsePattern(pattern);
+    if (p === null || p.tool !== BASH_TOOL) continue;
+    const starts = commandStarts(p.glob, text);
+    for (let j = 0; j <= text.length; j++) if (from[j] === 1 && starts[j] === 1) return pattern;
   }
-  return false;
+  return null;
 }
 
 const DRIVE_PREFIX = /^[A-Za-z]:(?=\/)/;

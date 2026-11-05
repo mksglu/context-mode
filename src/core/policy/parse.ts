@@ -14,6 +14,11 @@ const SUBSHELL_CLOSE = ")";
 const CASE_BREAK = ";;";
 const FUNC_PARENS: readonly string[] = ["(", ")"];
 const NOT = "!";
+
+/** D-DENY-LINEAR-1: push one by one; a spread push of a long list can pass the engine's argument limit. */
+function append<T>(out: T[], items: readonly T[]): void {
+  for (const x of items) out.push(x);
+}
 const KW = Object.freeze({
   group: "{", groupEnd: "}", if: "if", then: "then", elif: "elif", else: "else", fi: "fi", while: "while",
   until: "until", for: "for", in: "in", do: "do", done: "done", case: "case", esac: "esac", function: "function",
@@ -204,8 +209,8 @@ function ifBody(p: Ctx): SimpleCommand[] {
   const out = list(p, [KW.then]);
   while (p.err === null) {
     const t = at(p);
-    if (isWord(t, KW.then) || isWord(t, KW.else)) { p.i++; out.push(...list(p, [KW.elif, KW.else, KW.fi])); continue; }
-    if (isWord(t, KW.elif)) { p.i++; out.push(...list(p, [KW.then])); continue; }
+    if (isWord(t, KW.then) || isWord(t, KW.else)) { p.i++; append(out, list(p, [KW.elif, KW.else, KW.fi])); continue; }
+    if (isWord(t, KW.elif)) { p.i++; append(out, list(p, [KW.then])); continue; }
     if (isWord(t, KW.fi)) p.i++;
     break;
   }
@@ -215,7 +220,7 @@ function ifBody(p: Ctx): SimpleCommand[] {
 function loopBody(p: Ctx): SimpleCommand[] {
   p.i++;
   const out = list(p, [KW.do]);
-  out.push(...doBlock(p));
+  append(out, doBlock(p));
   return out;
 }
 
@@ -230,10 +235,10 @@ function forBody(p: Ctx): SimpleCommand[] {
       p.i++;
       const from = p.i;
       while ((at(p)?.kind === "word" || at(p)?.kind === "unhandled") && !isWord(at(p), KW.do)) p.i++;
-      out.push(...carrierOf(p, from, p.i));
+      append(out, carrierOf(p, from, p.i));
     }
   }
-  out.push(...doBlock(p));
+  append(out, doBlock(p));
   return out;
 }
 
@@ -244,7 +249,7 @@ function caseBody(p: Ctx): SimpleCommand[] {
   const subject = at(p);
   if (subject !== undefined && subject.kind !== "op" && subject.kind !== "io") {
     p.i++;
-    out.push(...carrierOf(p, p.i - 1, p.i));
+    append(out, carrierOf(p, p.i - 1, p.i));
   }
   if (isWord(at(p), KW.in)) p.i++;
   while (p.i < p.toks.length && p.err === null) {
@@ -261,7 +266,7 @@ function caseBody(p: Ctx): SimpleCommand[] {
     p.i++;
     const body = list(p, [KW.esac]);
     tag(body, KW.case);
-    out.push(...body);
+    append(out, body);
   }
   return out;
 }
@@ -370,7 +375,7 @@ function pipeline(p: Ctx): SimpleCommand[] {
   let last: El = EMPTY();
   while (p.err === null) {
     last = element(p);
-    all.push(...last.cmds);
+    append(all, last.cmds);
     const t = at(p);
     if (t !== undefined && t.kind === "op" && PIPES.includes(t.text)) { for (const c of last.cmds) c.pipesOut = true; p.i++; continue; }
     break;
@@ -391,7 +396,7 @@ function list(p: Ctx, stop: readonly string[]): SimpleCommand[] {
     }
     if (t.kind === "word" && stop.includes(t.text)) return out;
     const before = p.i;
-    out.push(...pipeline(p));
+    append(out, pipeline(p));
     if (p.i === before && p.err === null) p.i++;
   }
   return out;
@@ -406,7 +411,7 @@ export function parseShell(cmd: string): ParseResult {
   const p: Ctx = { toks: s.tokens, src: cmd, bodies: new Set(s.heredocBodies), i: 0, depth: 0, err: null };
   const commands: SimpleCommand[] = [];
   while (p.i < p.toks.length && p.err === null) {
-    commands.push(...list(p, NO_STOP));
+    append(commands, list(p, NO_STOP));
     if (p.i < p.toks.length) p.i++; // a stray ")" or ";;" at top level
   }
   if (p.err !== null) return { ok: false, construct: p.err };

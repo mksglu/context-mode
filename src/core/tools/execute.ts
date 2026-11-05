@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
 import { z } from "zod/v4";
 import {
-  BACKGROUND_REPLY_PREFIX, CANCELLED_LINE, EXEC_LANGUAGES, EXEC_PREVIEW_BYTES, EXEC_TIMEOUT_MS, OUTPUT_CAP, SOURCE_LABEL_MAX_CHARS,
+  BACKGROUND_REPLY_PREFIX, CANCELLED_LINE, EXEC_LANGUAGES, EXEC_PREVIEW_BYTES, EXEC_TIMEOUT_MS, OUTPUT_CAP, SHELL_FAMILY, SOURCE_LABEL_MAX_CHARS,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { ExecuteInput, JournalFacts, ToolContext, ToolReply } from "../contracts/types.ts";
@@ -41,7 +41,6 @@ export const ctxExecuteSchema = z.object({
 
 // Interpreter and OS facts (not tunables). A9: runtimes that take code with `-c`; all others get a file.
 // D-M2-T10-7: ".js", not ".mjs": Node's syntax detection runs both require() and import code.
-const SHELL_FAMILY: readonly string[] = Object.freeze(["sh", "bash", "zsh", "dash", "ksh", "fish"]);
 const SCRIPT_EXT: Readonly<Record<string, string>> = Object.freeze({
   javascript: ".js", typescript: ".ts", python: ".py", powershell: ".ps1",
 });
