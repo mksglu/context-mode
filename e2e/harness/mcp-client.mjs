@@ -14,7 +14,9 @@ const CLOSE_TIMEOUT_MS = 2000;
  * @param {string} bundlePath
  * @param {Record<string,string>} [env]
  * @param {string[]} [args] - argv after the bundle path, e.g. ["--agent", "vscode"] (DEVIATIONS D-M1-F1-1)
- * @param {{cwd?: string}} [opts] - spawn cwd: a plugin host starts the server in its plugin dir (D-C166-NATIVE-CWD-1)
+ * @param {{cwd?: string, onRequest?: (method: string, params: unknown) => unknown}} [opts] - spawn cwd: a plugin host
+ *   starts the server in its plugin dir (D-C166-NATIVE-CWD-1); onRequest answers a server-to-client request such as
+ *   roots/list (D-VSCODE-ROOTS-1), undefined = method not found
  * @returns {{request:Function, notify:Function, close:Function, kill:Function}}
  */
 // D-CR2-SID-2: the server reads the host session id from CLAUDE_CODE_SESSION_ID (D-CR2-SID-1). A case
@@ -70,6 +72,14 @@ export function spawnBundle(bundlePath, env, args = [], opts = {}) {
       try {
         msg = JSON.parse(line);
       } catch {
+        continue;
+      }
+      if (msg && msg.method !== undefined && msg.id !== undefined) {
+        // D-VSCODE-ROOTS-1: a request from the server (roots/list); its id space is the server's, not ours.
+        const result = opts.onRequest?.(msg.method, msg.params);
+        write(result === undefined
+          ? { jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } }
+          : { jsonrpc: "2.0", id: msg.id, result });
         continue;
       }
       if (msg && msg.id !== undefined && pending.has(msg.id)) {

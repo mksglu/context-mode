@@ -9,9 +9,7 @@ and keep the rest. These paths are for this machine.)
       "args": [
         "<PKG>/server.mjs",
         "--agent",
-        "vscode",
-        "--workspace-folder",
-        "${workspaceFolder}"
+        "vscode"
       ]
     }
   }

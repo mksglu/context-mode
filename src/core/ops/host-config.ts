@@ -11,7 +11,7 @@ import {
   MCP_ARGS_FIELD, MCP_COMMAND_FIELD, NPM_VERSION_SEP, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_NPM_LATEST,
   OPENCODE_NPM_SPEC_PREFIX, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OWN_MCP_ENTRY, PI_GIT_PACKAGE, PI_NPM_LATEST,
   PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_PATH_SEPS, V1_PI_PACKAGE,
-  VSCODE_WORKSPACE_VAR, WORKSPACE_FOLDER_FLAG, EXE_SUFFIX,
+  EXE_SUFFIX,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import { atomicWriteFile } from "./atomic-file.ts";
@@ -453,9 +453,9 @@ export function isNodeCommand(command: unknown): command is string {
 export function ownMcpValue(agent: AgentId, node: string, server: string): Record<string, unknown> | undefined {
   const mcp = OWN_MCP_ENTRY[agent];
   if (mcp === undefined) return undefined;
-  // D-HF-VSCODE-PROJECT-1: VS Code expands ${workspaceFolder} in MCP server args; the server reads the project from it (D-M1-5).
-  const tail = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [];
-  return { ...mcp.fields, [MCP_COMMAND_FIELD]: node, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent, ...tail] };
+  // D-VSCODE-ROOTS-1: the user mcp.json has no folder scope, so VS Code cannot expand ${workspaceFolder} there; the
+  // vscode server reads the workspace from MCP roots/list instead, and the entry carries no workspace arg.
+  return { ...mcp.fields, [MCP_COMMAND_FIELD]: node, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent] };
 }
 
 /** What doctor D3 accepts beyond the exact ctx_upgrade form: the entry setup wrote (D-DOC-RT-1). */

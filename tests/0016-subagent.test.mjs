@@ -321,9 +321,11 @@ describe("ADR-0016: vscode project resolution", () => {
   });
   after(() => { process.env.HOME = oldHome; rmSync(root, { recursive: true, force: true, maxRetries: 3 }); });
 
-  test("H1: setup writes the VS Code MCP args with --workspace-folder ${workspaceFolder}", () => {
+  // D-VSCODE-ROOTS-1: the user mcp.json has no folder scope, so ${workspaceFolder} there stops the server from starting.
+  // Setup writes no workspace arg; the server reads the workspace from MCP roots/list.
+  test("H1: setup writes the VS Code MCP args with no ${workspaceFolder} (user scope cannot expand it)", () => {
     const row = buildRegistry({ home: "/h", pkgDir: "/abs/pkg", env: {} }).find((r) => r.id === "vscode");
-    assert.deepEqual(row.config.value.args, [path.join("/abs/pkg", "server.mjs"), "--agent", "vscode", "--workspace-folder", "${workspaceFolder}"]);
+    assert.deepEqual(row.config.value.args, [path.join("/abs/pkg", "server.mjs"), "--agent", "vscode"]);
   });
 
   test("H1: the VS Code shell tools are run_in_terminal, runTerminalCommand, bash, powershell (D-N7-VSCODE-TOOLS-1)", () => {

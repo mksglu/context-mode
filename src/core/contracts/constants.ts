@@ -837,6 +837,7 @@ export const OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
 // ops/plugin-root.ts, ops/host-config.ts (impl/07 §1-§2; DEVIATIONS D-M5-O1-1..3).
 export const SERVER_ENTRY_FILE = "server.mjs"; // the MCP server bundle next to hook.mjs in the release root
 export const VSCODE_WORKSPACE_VAR = "${workspaceFolder}"; // VS Code expands it in MCP server args (D-HF-VSCODE-PROJECT-1)
+export const ROOTS_TIMEOUT_MS = 2000; // D-VSCODE-ROOTS-1: one roots/list round trip to the host, then the call goes on without it
 export const OPENCODE_PLUGIN_PATH: readonly string[] = Object.freeze(["opencode", "plugin.js"]); // under the package dir (D-WIN-OCENTRY-1)
 export const HOST_NODE_COMMAND = "node"; // MCP entry `command`
 export const EXE_SUFFIX = ".exe"; // Windows node: "C:\\Program Files\\nodejs\\node.exe" (D-VT-DOCTOR-CMD-1)

@@ -10,7 +10,7 @@ import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server
 import { AGENT_IDS, type AgentId } from "../core/contracts/agents.ts";
 import {
   HOST_SESSION_ENV, INTERNAL_ERROR_LINE, NODE_MIN, OWNER_STOP_EXT, OWNERS_DIR_NAME, PROJECTS_DIR_NAME, RUN_SESSION_PREFIX, SERVER_KEY, TOOLS_TTL_MS,
-  UPGRADE_STOP_DELAY_MS, DOCTOR_TOOL_NAME, JOURNAL_SKIPPED_LINE,
+  UPGRADE_STOP_DELAY_MS, DOCTOR_TOOL_NAME, JOURNAL_SKIPPED_LINE, ROOTS_TIMEOUT_MS, VSCODE_WORKSPACE_VAR, WORKSPACE_FOLDER_FLAG,
 } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { DbHandle, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
@@ -122,6 +122,28 @@ function realOrSame(p: string): string {
   }
 }
 
+/** D-VSCODE-ROOTS-1: true when argv names a real workspace folder (an unexpanded ${workspaceFolder} is not one). */
+function hasWorkspaceFolder(argv: readonly string[]): boolean {
+  const i = argv.indexOf(WORKSPACE_FOLDER_FLAG);
+  const v = i < 0 ? undefined : argv[i + 1];
+  return v !== undefined && v !== "" && v !== VSCODE_WORKSPACE_VAR;
+}
+
+/** D-VSCODE-ROOTS-1: the first file root the host lists, as a path; undefined when the host declares no roots,
+ *  lists none, or does not answer within ROOTS_TIMEOUT_MS. */
+async function workspaceFromRoots(server: McpServer): Promise<string | undefined> {
+  if (server.server.getClientCapabilities()?.roots === undefined) return undefined;
+  try {
+    const { roots } = await server.server.listRoots(undefined, { timeout: ROOTS_TIMEOUT_MS });
+    for (const root of roots) {
+      if (root.uri.startsWith(FILE_URL_PREFIX)) return fileURLToPath(root.uri);
+    }
+  } catch (err) {
+    console.error("context-mode: roots/list: " + (err instanceof Error ? err.message : String(err)));
+  }
+  return undefined;
+}
+
 /** The dir the project is resolved from: the host's workspace when it sent one, else the spawn cwd, never the dir this
  *  bundle runs from (that is the plugin cache dir, not a project): "" then, and resolveProject throws NO_PROJECT. */
 export function workspaceCwdOf(meta: Record<string, unknown> | undefined, spawnCwd: string, script: string | undefined): string {
@@ -207,11 +229,15 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
     return async (input: unknown, req: ServerContext) => {
       const meta = req.mcpReq._meta as Record<string, unknown> | undefined;
       const agent = resolveAgent(argv, env);
+      // D-VSCODE-ROOTS-1: VS Code (user mcp.json, spawn cwd HOME) names the workspace only in roots/list. Asked on
+      // each call, so a folder the user opens later is the project of the next call.
+      const fromRoots = agent === "vscode" && !hasWorkspaceFolder(argv) ? await workspaceFromRoots(server) : undefined;
+      const callArgv = fromRoots === undefined ? argv : [...argv, WORKSPACE_FOLDER_FLAG, fromRoots];
       // §5 step 6a, 7a: resolved lazily, at most once per call, never cached across calls.
       let project: ProjectContext | undefined;
       const projectOf = (): ProjectContext => {
         if (agent === undefined) throw new CtxError("NO_PROJECT", { kind: "--agent" });
-        project ??= resolveProject(agent, { env, argv, cwd: workspaceCwdOf(meta, process.cwd(), process.argv[1]), piCwd: undefined });
+        project ??= resolveProject(agent, { env, argv: callArgv, cwd: workspaceCwdOf(meta, process.cwd(), process.argv[1]), piCwd: undefined });
         return project;
       };
       const ctx: ToolContext = {

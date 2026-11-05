@@ -325,6 +325,38 @@ describe("ADR-0007 call shape on every host", () => {
     await client.close();
   });
 
+  // D-VSCODE-ROOTS-1 (host-audit vscode-1): VS Code cannot expand ${workspaceFolder} in the USER mcp.json (no folder in
+  // that scope: variableResolver.ts throws, the server never starts) and spawns the server in HOME. It declares the roots
+  // capability and answers roots/list with the open workspace folders (mcpServer.ts "Reflect workspaces into the MCP
+  // roots"). The vscode server takes its project from that answer.
+  const vscodeClient = (cwd, roots) => spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root }, ["--agent", "vscode"],
+    { cwd, onRequest: (method) => (method === "roots/list" ? { roots } : undefined) });
+  const vscodeHello = (client, caps) => client.request("initialize", { protocolVersion: "2025-06-18", capabilities: caps, clientInfo: { name: "Visual Studio Code", version: "1.145.0" } });
+
+  test("vscode: started in HOME with no --workspace-folder, a relative path resolves in the roots/list workspace", async (t) => {
+    writeFileSync(join(repo, "vscode-app.log"), "2026-11-05 ERROR checkout timeout\n");
+    const client = vscodeClient(root, [{ uri: pathToFileURL(repo).href, name: "repo" }]);
+    t.after(() => client.kill());
+    await vscodeHello(client, { roots: { listChanged: true } });
+    client.notify("notifications/initialized");
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: "vscode-app.log" } });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.ok(r.content[0].text.includes("vscode-app.log"), r.content[0].text);
+    await client.close();
+  });
+
+  test("vscode: a host with no roots and no workspace folder gets the one-line project fix", async (t) => {
+    const client = vscodeClient(root, []);
+    t.after(() => client.kill());
+    await vscodeHello(client, {});
+    client.notify("notifications/initialized");
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: "vscode-app.log" } });
+    assert.equal(r.isError, true);
+    assert.ok(oneLine(r.content[0].text), r.content[0].text);
+    assert.ok(r.content[0].text.startsWith("Project source "), r.content[0].text);
+    await client.close();
+  });
+
   test("a server started in its own plugin dir with no host workspace never uses that dir: one line names the fix", async (t) => {
     const client = codexClient(bundleDir);
     t.after(() => client.kill());
