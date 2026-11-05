@@ -2,15 +2,15 @@
 
 **A free, local plugin for 10 coding agents. It keeps tool output out of your agent's context window and keeps all usage data on your machine. The plugin is free forever.**
 
-[![npm downloads](https://img.shields.io/npm/dt/context-mode?label=npm%20downloads)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](https://github.com/mksglu/context-mode/blob/v2.1.3/LICENSE)
+[![npm downloads](https://img.shields.io/npm/dt/context-mode?label=npm%20downloads)](https://www.npmjs.com/package/context-mode) [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode) [![Discord](https://img.shields.io/discord/1478479412700909750?label=Discord&logo=discord&color=5865f2)](https://discord.gg/DCN9jUgN5v) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](https://github.com/mksglu/context-mode/blob/v2.1.4/LICENSE)
 
-**33K GitHub stars · 683K npm downloads** (read 2026-11-01, [stats.json](https://github.com/mksglu/context-mode/blob/v2.1.3/stats.json)) · on the Hacker News front page and GitHub Trending: [charts and sources](#adoption-stars-and-npm-downloads)
+**33K GitHub stars · 683K npm downloads** (read 2026-11-01, [stats.json](https://github.com/mksglu/context-mode/blob/v2.1.4/stats.json)) · on the Hacker News front page and GitHub Trending: [charts and sources](#adoption-stars-and-npm-downloads)
 
 > The Context Mode plugin is free and local, with its source open on GitHub. **Context Mode Gateway** is a separate hosted service with its own account and subscription. It takes the same idea from tool output to the whole conversation: Gateway Recall keeps long sessions searchable, and Gateway Memory shares what your agents learn across sessions and tools. [See how the Gateway works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=quote)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/hero-dark.png">
-  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, zero telemetry, the plugin keeps your data on your machine. Bench of 2026-11-01: 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output). A full debugging session (row g-session-total): 281,261 B raw to 3,266 B in context, about 70K to 817 tokens (an estimate at 4 B per token). Resume after compaction (row e-long-session): a 442,893 B transcript to a 2,019 B block, about 111K to 505 tokens (an estimate). Runs in 10 coding agents with 9 MCP tools.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/hero-dark.png">
+  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/hero-light.png" alt="Context Mode plugin: free and local, zero telemetry, the plugin keeps your data on your machine. Bench of 2026-11-01: 99.4% of output bytes saved (median of 36 rows with 10 KB or more of raw output). A full debugging session (row g-session-total): 281,261 B raw to 3,266 B in context, about 70K to 817 tokens (an estimate at 4 B per token). Resume after compaction (row e-long-session): a 442,893 B transcript to a 2,019 B block, about 111K to 505 tokens (an estimate). Runs in 10 coding agents with 9 MCP tools.">
 </picture>
 
 **Contents:** [Why](#why) · [Adoption](#adoption-stars-and-npm-downloads) · [Install](#install) · [Try it](#try-it) · [Use cases](#use-cases) · [Benchmarks](#benchmarks) · [How it works](#how-it-works) · [Tools](#tools) · [Security and privacy](#security-and-privacy) · [Context Mode Gateway](#context-mode-gateway) · [License](#license) · [Community](#community)
@@ -31,8 +31,8 @@ The Context Mode plugin runs that work in a local sandbox, keeps the full output
 ## Adoption: stars and npm downloads
 
 <table><tr>
-<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#stars"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/star-history-dark.png"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode since 2026-02-23. A daily job redraws it."></picture></a></td>
-<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/npm-downloads-dark.png"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/npm-downloads-light.png" alt="Area chart of npm downloads per day for context-mode, the last 90 days. A daily job redraws it."></picture></a></td>
+<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#stars"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/star-history-dark.png"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/star-history-light.png" alt="Line chart of cumulative GitHub stars for mksglu/context-mode since 2026-02-23. A daily job redraws it."></picture></a></td>
+<td width="50%"><a href="https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/npm-downloads-dark.png"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/npm-downloads-light.png" alt="Area chart of npm downloads per day for context-mode, the last 90 days. A daily job redraws it."></picture></a></td>
 </tr></table>
 
 Open the [interactive chart](https://contextmode.ai/open-source/stats?utm_source=github&utm_medium=readme&utm_content=adoption#daily) and point at a bar to read its value. Tabs there show days, weeks, months and years. Stars come from the GitHub GraphQL API (`starredAt`); npm downloads come from `api.npmjs.org/downloads/range`. The total up to 2026-10-29 is 683K npm downloads (`stats.json` keeps a daily copy). A daily job redraws both charts.
@@ -41,11 +41,11 @@ Open the [interactive chart](https://contextmode.ai/open-source/stats?utm_source
 - **GitHub Trending.** A bot that watches GitHub Trending logged the repo there on 14 days from 2026-04-24 to 2026-10-17 ([uibm/trending-watcher](https://github.com/uibm/trending-watcher/issues?q=%22mksglu%2Fcontext-mode%22)).
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/stargazers-dark.png">
-  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/stargazers-light.png" alt="Companies that stargazers of mksglu/context-mode name in their GitHub profile, Microsoft, Tencent, Alibaba, ByteDance, Google and more.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/stargazers-dark.png">
+  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/stargazers-light.png" alt="Companies that stargazers of mksglu/context-mode name in their GitHub profile, Microsoft, Tencent, Alibaba, ByteDance, Google and more.">
 </picture>
 
-Starred by engineers at these companies: each name is the company field of 2 or more stargazer profiles, read with the GitHub GraphQL API on 2026-11-01 ([data](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/data/stargazer-companies.json)).
+Starred by engineers at these companies: each name is the company field of 2 or more stargazer profiles, read with the GitHub GraphQL API on 2026-11-01 ([data](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/data/stargazer-companies.json)).
 
 ## Install
 
@@ -53,7 +53,7 @@ Pick your agent: [Claude Code](#install-claude-code) · [Codex](#install-codex) 
 
 Open its block and copy its own install command. Each block also holds the update, check and remove steps, and the [Install guide](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install) walks through them.
 
-The plugin needs Node 24.15.0 or later, from the engines field in [package.json](https://github.com/mksglu/context-mode/blob/v2.1.3/package.json). On Windows, add Git for Windows: the shell tools run in Git Bash, and doctor checks for it.
+The plugin needs Node 24.15.0 or later, from the engines field in [package.json](https://github.com/mksglu/context-mode/blob/v2.1.4/package.json). On Windows, add Git for Windows: the shell tools run in Git Bash, and doctor checks for it.
 contextmode installs as the npm package and command `context-mode`.
 Claude Code, Codex, Gemini CLI and Qwen Code install from GitHub, and each of their commands names the release branch.
 
@@ -232,17 +232,17 @@ Hooks ✓ (hook file) · MCP ✓ · Skills ✓
 <details id="install-zcode"><summary><b>ZCode</b></summary>
 
 ```sh
-npm i -g context-mode
-context-mode setup --agents zcode
+zcode plugins marketplace add mksglu/context-mode
+zcode plugins install context-mode@context-mode
 ```
 
 ```sh
 # update
-context-mode upgrade
+zcode plugins update context-mode@context-mode
 # check
-context-mode doctor --agents zcode
+zcode plugins list
 # remove
-context-mode setup --remove --agents zcode
+zcode plugins uninstall context-mode@context-mode
 ```
 
 Hooks ✓ (hook file) · MCP ✓ · Skills ✓
@@ -271,8 +271,8 @@ Every agent gets hooks, the MCP server and the plugin skills; the last line of e
 Hooks reach each agent in one of three ways: in the plugin package (Claude Code, Gemini CLI, Qwen Code), in a hook file (Codex, Copilot CLI, Kiro, VS Code, ZCode), or in a plugin inside the agent (OpenCode, Pi). The [Agents guide](https://contextmode.ai/docs/engine/agents?utm_source=github&utm_medium=readme&utm_content=install-agents) shows what each agent runs.
 We ran the real binary of each agent with the plugin hook: Claude Code, Codex, Gemini CLI, Qwen Code, Pi, OpenCode, Copilot CLI and ZCode. Each run used a clean temp home and a local test model, on 2.0.0-next.15.
 For VS Code and Kiro, the check covers the hook setup: VS Code runs the hook command with the documented payload, and kiro-cli 2.35.2 loads all 6 hook entries.
-CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: [HOOKS-FIRE.md](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/architecture/release/HOOKS-FIRE.md).
-Each agent uses its own install command, and [ADR-0023](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/architecture/adr/ADR-0023-native-install.md) says why.
+CI runs setup, doctor, a hook and an MCP handshake for all 10 agents from the packed package on Linux, macOS and Windows. Record: [HOOKS-FIRE.md](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/architecture/release/HOOKS-FIRE.md).
+Each agent uses its own install command, and [ADR-0023](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/architecture/adr/ADR-0023-native-install.md) says why.
 
 </details>
 
@@ -280,7 +280,7 @@ Your first task with the plugin, step by step: [First session](https://contextmo
 
 ## Try it
 
-Paste one of these prompts into your agent after the install. Each one ran once, live, in Claude Code 2.1.312, and its answer matched the source data ([evidence and rerun steps](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/evidence/try-it-2026-11-02/README.md)). The headline numbers in [Benchmarks](#benchmarks) use the median of 5 runs. Other agents do the same job with the same tools: `ctx_execute`, `ctx_index` and `ctx_search`.
+Paste one of these prompts into your agent after the install. Each one ran once, live, in Claude Code 2.1.312, and its answer matched the source data ([evidence and rerun steps](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/evidence/try-it-2026-11-02/README.md)). The headline numbers in [Benchmarks](#benchmarks) use the median of 5 runs. Other agents do the same job with the same tools: `ctx_execute`, `ctx_index` and `ctx_search`.
 After a prompt, run the stats skill and read the report yourself ([See the saving](#see-the-saving)).
 ```text
 On https://react.dev/reference/react/useEffect, show me the example that connects to a chat server and cleans up, and list the rules for the dependency array.
@@ -338,28 +338,28 @@ Real tool output from public projects, run through Context Mode. Bench of 2026-1
 
 | What you do | Tool | Raw | Reaches the context | Saved |
 |---|---|---:|---:|---:|
-| [Read a browser page](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot`, [Thinking in Code](#thinking-in-code) | 136,514 B | 463 B | 99.7% |
-| [List 40 issues](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json`, [Thinking in Code](#thinking-in-code) | 182,943 B | 850 B | 99.5% |
-| [List 25 pull requests with checks](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json`, [Thinking in Code](#thinking-in-code) | 195,471 B | 776 B | 99.6% |
-| [Look up library docs](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs`, [Thinking in Code](#thinking-in-code) | 6,917 B | 473 B | 93.2% |
-| [Run 1,106 tests](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose`, [Thinking in Code](#thinking-in-code) | 62,909 B | 429 B | 99.3% |
-| [Lint a source folder](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json`, [Thinking in Code](#thinking-in-code) | 288,523 B | 577 B | 99.8% |
-| [Install a workspace](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile`, [Thinking in Code](#thinking-in-code) | 14,988 B | 199 B | 98.7% |
-| [Install packages](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http`, [Thinking in Code](#thinking-in-code) | 37,761 B | 435 B | 98.8% |
-| [Read container logs](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs`, [Thinking in Code](#thinking-in-code) | 60,374 B | 587 B | 99.0% |
-| [Plan 72 resources](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan`, [Thinking in Code](#thinking-in-code) | 34,081 B | 166 B | 99.5% |
-| [Read 300 commits with file stats](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat`, [Thinking in Code](#thinking-in-code) | 164,385 B | 268 B | 99.8% |
-| [Read an 89 KB source file](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/f-hook-redirect/README.md#f-read-vite-config) | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
-| [Fetch a 265 KB docs page](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/f-hook-redirect/README.md#f-webfetch-vite-docs) | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
-| [Fetch a 214 KB API reply](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/f-hook-redirect/README.md#f-bash-curl-post) | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
-| [Print a 187 KB git log in Bash](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/f-hook-redirect/README.md#f-bash-dump-post) | Bash, output replaced after it runs | 191,120 B | 204 B | 99.9% |
-| [Print the same git log through a host tool](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/d-externalize/README.md#d-real-git-log) | Host tool output over the cap, indexed whole | 191,120 B | 2,842 B | 98.5% |
-| [Print a 214 KB GitHub API reply through a host tool](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/d-externalize/README.md#d-real-github-json) | Host tool output over the cap, indexed whole | 219,175 B | 4,060 B | 98.1% |
-| [Read a 45 KB log file](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/f-hook-redirect/README.md#f-read-large-file) | Read, sent to `ctx_execute` by the hook | 46,216 B | 371 B | 99.2% |
-| [Read a 60 KB source file](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/f-hook-redirect/README.md#f-read-big-source) | Read, sent to `ctx_execute` by the hook | 61,576 B | 374 B | 99.4% |
-| [Debug for a full session: 8 outputs, 3 searches](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/g-overhead/README.md#g-session-total) | All hooks and tools | 281,261 B | 3,266 B | 98.8% |
+| [Read a browser page](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot`, [Thinking in Code](#thinking-in-code) | 136,514 B | 463 B | 99.7% |
+| [List 40 issues](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json`, [Thinking in Code](#thinking-in-code) | 182,943 B | 850 B | 99.5% |
+| [List 25 pull requests with checks](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json`, [Thinking in Code](#thinking-in-code) | 195,471 B | 776 B | 99.6% |
+| [Look up library docs](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs`, [Thinking in Code](#thinking-in-code) | 6,917 B | 473 B | 93.2% |
+| [Run 1,106 tests](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose`, [Thinking in Code](#thinking-in-code) | 62,909 B | 429 B | 99.3% |
+| [Lint a source folder](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json`, [Thinking in Code](#thinking-in-code) | 288,523 B | 577 B | 99.8% |
+| [Install a workspace](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile`, [Thinking in Code](#thinking-in-code) | 14,988 B | 199 B | 98.7% |
+| [Install packages](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http`, [Thinking in Code](#thinking-in-code) | 37,761 B | 435 B | 98.8% |
+| [Read container logs](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs`, [Thinking in Code](#thinking-in-code) | 60,374 B | 587 B | 99.0% |
+| [Plan 72 resources](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan`, [Thinking in Code](#thinking-in-code) | 34,081 B | 166 B | 99.5% |
+| [Read 300 commits with file stats](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat`, [Thinking in Code](#thinking-in-code) | 164,385 B | 268 B | 99.8% |
+| [Read an 89 KB source file](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/f-hook-redirect/README.md#f-read-vite-config) | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
+| [Fetch a 265 KB docs page](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/f-hook-redirect/README.md#f-webfetch-vite-docs) | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
+| [Fetch a 214 KB API reply](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/f-hook-redirect/README.md#f-bash-curl-post) | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
+| [Print a 187 KB git log in Bash](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/f-hook-redirect/README.md#f-bash-dump-post) | Bash, output replaced after it runs | 191,120 B | 204 B | 99.9% |
+| [Print the same git log through a host tool](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/d-externalize/README.md#d-real-git-log) | Host tool output over the cap, indexed whole | 191,120 B | 2,842 B | 98.5% |
+| [Print a 214 KB GitHub API reply through a host tool](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/d-externalize/README.md#d-real-github-json) | Host tool output over the cap, indexed whole | 219,175 B | 4,060 B | 98.1% |
+| [Read a 45 KB log file](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/f-hook-redirect/README.md#f-read-large-file) | Read, sent to `ctx_execute` by the hook | 46,216 B | 371 B | 99.2% |
+| [Read a 60 KB source file](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/f-hook-redirect/README.md#f-read-big-source) | Read, sent to `ctx_execute` by the hook | 61,576 B | 374 B | 99.4% |
+| [Debug for a full session: 8 outputs, 3 searches](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/g-overhead/README.md#g-session-total) | All hooks and tools | 281,261 B | 3,266 B | 98.8% |
 
-Source: [bench/results/2026-11-01-darwin-arm64.json](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/results/2026-11-01-darwin-arm64.json), one row per line; [SOURCE.md](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/fixtures/data/SOURCE.md) names where each input comes from.
+Source: [bench/results/2026-11-01-darwin-arm64.json](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/results/2026-11-01-darwin-arm64.json), one row per line; [SOURCE.md](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/fixtures/data/SOURCE.md) names where each input comes from.
 Click a task to open its case: the command, the input file with its sha256, and the run command, so you can run the same row on your machine.
 
 The agent gets the part it asks for. The full output stays in the local index, and `ctx_search` reads it back.
@@ -371,8 +371,8 @@ Next, how the bench counts these bytes, in [Benchmarks](#benchmarks).
 ## Benchmarks
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/fig-saving-dark.png">
-  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/fig-saving-light.png" alt="Bar chart: median output bytes saved per category for rows of 10 KB or more. Sandbox 99.5%, Batch 93.1%, Externalize 98.3%, Hook redirect 99.8%, Session total 98.8%. The table below adds Retrieval, 77.2%.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/fig-saving-dark.png">
+  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/fig-saving-light.png" alt="Bar chart: median output bytes saved per category for rows of 10 KB or more. Sandbox 99.5%, Batch 93.1%, Externalize 98.3%, Hook redirect 99.8%, Session total 98.8%. The table below adds Retrieval, 77.2%.">
 </picture>
 
 Rule for every headline number in this README: rows with 10 KB or more of raw output, median of 5 runs per row, measured with `ctx_bytes` against `raw_bytes`; a category is the median of its rows; 1 KB = 1,024 B.
@@ -387,24 +387,24 @@ All 36 such rows, the six categories below: the plugin keeps a median of 99.4% o
 | f. Hook redirect | A big Read, curl or WebFetch sent to the sandbox | 7 | 99.8% |
 | g. Session total | One full scripted session | 1 | 98.8% |
 
-Search replies (category b) carry the matching text, so they save 77.2%. Category e (long sessions) is in [Longer sessions](#longer-sessions). The full file lists every row, small ones too: [2026-11-01-darwin-arm64.md](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/results/2026-11-01-darwin-arm64.md).
-Reproduce with `cd bench && node run.mjs`. It needs plain Node and runs offline; [bench/README.md](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/README.md) lists each scenario and its options.
+Search replies (category b) carry the matching text, so they save 77.2%. Category e (long sessions) is in [Longer sessions](#longer-sessions). The full file lists every row, small ones too: [2026-11-01-darwin-arm64.md](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/results/2026-11-01-darwin-arm64.md).
+Reproduce with `cd bench && node run.mjs`. It needs plain Node and runs offline; [bench/README.md](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/README.md) lists each scenario and its options.
 Method, data files and rerun steps: [Benchmarks guide](https://contextmode.ai/docs/engine/benchmarks?utm_source=github&utm_medium=readme&utm_content=benchmarks).
 
 ### Longer sessions
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/fig-oss-dark.png">
-  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/fig-oss-light.png" alt="A session grows, the context stays small. The PreToolUse hook sends a tool call to ctx_execute or ctx_index; the full output goes into context.db and a small reply returns. At compaction a snapshot keeps the state, and ctx_resume and ctx_search read it back.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/fig-oss-dark.png">
+  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/fig-oss-light.png" alt="A session grows, the context stays small. The PreToolUse hook sends a tool call to ctx_execute or ctx_index; the full output goes into context.db and a small reply returns. At compaction a snapshot keeps the state, and ctx_resume and ctx_search read it back.">
 </picture>
 
 Say you debug a slow test all afternoon. The agent reads files, runs the suite and fetches docs, and each result goes into the context window. When the window is full, the host compacts it, and from then on the agent sees a short summary plus your next message.
 
 Context Mode keeps the full output of each large tool call in `context.db` on your machine and gives the agent a small reply. At compaction, a snapshot of at most 2,048 B keeps the session state. After the compaction, the agent calls `ctx_resume` to read that snapshot back and `ctx_search` to find any earlier output by keyword.
 
-In the bench, a scripted session of 40 tool outputs and one compaction made a 442,893 B transcript, and the `ctx_resume` block that brought the agent back was 2,019 B (row `e-long-session` in the bench file; [open the case](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/e-continuity/README.md#e-long-session)).
-In the same bench, one large log of 666,796 B put 3,380 B into the context, and the full log stayed in the index for `ctx_search` (row `d-synth-1m`; [open the case](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/d-externalize/README.md#d-synth-1m)).
-How the snapshot picks what to keep: the [Long sessions guide](https://contextmode.ai/docs/engine/long-sessions?utm_source=github&utm_medium=readme&utm_content=longer-sessions) and [ADR-0009](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/architecture/adr/0009-compaction-and-memory.md).
+In the bench, a scripted session of 40 tool outputs and one compaction made a 442,893 B transcript, and the `ctx_resume` block that brought the agent back was 2,019 B (row `e-long-session` in the bench file; [open the case](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/e-continuity/README.md#e-long-session)).
+In the same bench, one large log of 666,796 B put 3,380 B into the context, and the full log stayed in the index for `ctx_search` (row `d-synth-1m`; [open the case](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/d-externalize/README.md#d-synth-1m)).
+How the snapshot picks what to keep: the [Long sessions guide](https://contextmode.ai/docs/engine/long-sessions?utm_source=github&utm_medium=readme&utm_content=longer-sessions) and [ADR-0009](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/architecture/adr/0009-compaction-and-memory.md).
 
 ### Speed
 
@@ -416,27 +416,27 @@ Median of 5 runs, bench of 2026-11-01.
 | `ctx_search`, 20 queries over 8 indexed files | 1.62 ms median, 6.70 ms max |
 | `ctx_index`, 3 real files, 625,649 B | 150 ms per MB |
 
-Source: rows `g-hook-kiro` to `g-hook-claude-code`, `g-search-latency` and `g-index-per-mb` of [the bench file](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/results/2026-11-01-darwin-arm64.md), with every agent and query. The [overhead cases](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/g-overhead/README.md) show how each one runs.
+Source: rows `g-hook-kiro` to `g-hook-claude-code`, `g-search-latency` and `g-index-per-mb` of [the bench file](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/results/2026-11-01-darwin-arm64.md), with every agent and query. The [overhead cases](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/g-overhead/README.md) show how each one runs.
 
 Next, what happens inside one tool call, in [How it works](#how-it-works).
 
 ## How it works
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/fig-flow-dark.png">
-  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/fig-flow-light.png" alt="One tool call, step by step: the agent runs a tool, the PreToolUse hook denies a big Read and names the ctx_execute call, the MCP server runs it in the sandbox, SQLite FTS5 keeps the output, and after compaction a state block of at most 2,048 B comes back.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/fig-flow-dark.png">
+  <img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/fig-flow-light.png" alt="One tool call, step by step: the agent runs a tool, the PreToolUse hook denies a big Read and names the ctx_execute call, the MCP server runs it in the sandbox, SQLite FTS5 keeps the output, and after compaction a state block of at most 2,048 B comes back.">
 </picture>
 
 One tool call, in time order, from the install to a hook error.
 
-1. **Install.** Each agent's own install command adds the MCP server, the hooks and the skills `ctx-doctor`, `ctx-stats` and `ctx-upgrade` to that agent's config folder, for example `~/.codex/skills/<name>/SKILL.md`. `context-mode setup` writes or repairs any part the native command leaves out ([ADR-0023](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/architecture/adr/ADR-0023-native-install.md)).
-2. **Session start.** The `SessionStart` hook opens the project database. When the session ran before, the agent gets one line that tells it to call `ctx_resume` ([dispatch.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/hooks/dispatch.ts)).
-3. **PreToolUse checks.** Before a tool runs, the `PreToolUse` hook checks the call in a fixed order: the user's deny list, WebFetch, curl and wget, inline HTTP and build commands, then a full-file Read over `OUTPUT_CAP` (16,384 B) and one-file shell dumps such as `cat` or `tail`. A Read with a line range runs as usual ([decide.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/policy/decide.ts)).
-4. **The exact call.** When a check matches, the hook stops the call and its reply names the exact `ctx_*` call to use, for example `ctx_execute` with `{"language":"shell","code":"<the command>","intent":"<what you need>"}`. For WebFetch the reply names `ctx_index`, then `ctx_search` ([read-deny.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/policy/read-deny.ts)).
-5. **The sandbox.** This is the Thinking in Code step: the agent's script runs here, and only what it prints comes back. `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/tools/execute.ts)).
+1. **Install.** Each agent's own install command adds the MCP server, the hooks and the skills `ctx-doctor`, `ctx-stats` and `ctx-upgrade` to that agent's config folder, for example `~/.codex/skills/<name>/SKILL.md`. `context-mode setup` writes or repairs any part the native command leaves out ([ADR-0023](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/architecture/adr/ADR-0023-native-install.md)).
+2. **Session start.** The `SessionStart` hook opens the project database. When the session ran before, the agent gets one line that tells it to call `ctx_resume` ([dispatch.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/hooks/dispatch.ts)).
+3. **PreToolUse checks.** Before a tool runs, the `PreToolUse` hook checks the call in a fixed order: the user's deny list, WebFetch, curl and wget, inline HTTP and build commands, then a full-file Read over `OUTPUT_CAP` (16,384 B) and one-file shell dumps such as `cat` or `tail`. A Read with a line range runs as usual ([decide.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/policy/decide.ts)).
+4. **The exact call.** When a check matches, the hook stops the call and its reply names the exact `ctx_*` call to use, for example `ctx_execute` with `{"language":"shell","code":"<the command>","intent":"<what you need>"}`. For WebFetch the reply names `ctx_index`, then `ctx_search` ([read-deny.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/policy/read-deny.ts)).
+5. **The sandbox.** This is the Thinking in Code step: the agent's script runs here, and only what it prints comes back. `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/tools/execute.ts)).
    <a id="thinking-in-code"></a>**Thinking in Code.** The agent sends a short script as a tool parameter, the script reads the data in the sandbox, and only what it prints goes into the context. Two real calls, in the form the Claude Code terminal shows them:
 
-   `ctx_execute` on 5,000 JSON records, from the Claude Code 2.1.312 stream of the Try-it run with Context Mode 2.0.0-next.26 ([04-api-json.json](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/evidence/try-it-2026-11-02/04-api-json.json)). The data is 1,039,898 B; the agent gets 254 B.
+   `ctx_execute` on 5,000 JSON records, from the Claude Code 2.1.312 stream of the Try-it run with Context Mode 2.0.0-next.26 ([04-api-json.json](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/evidence/try-it-2026-11-02/04-api-json.json)). The data is 1,039,898 B; the agent gets 254 B.
 
    ```text
    ⏺ context-mode - ctx_execute (MCP)(language: "javascript", c…jsonplaceholder.typicode.com/photos\");
@@ -464,7 +464,7 @@ One tool call, in time order, from the install to a hook error.
         }
    ```
 
-   `ctx_batch` on an install log and a long git log, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([2026-11-03-ctx-batch.json](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)). The commands print 228,881 B; the agent gets 8,667 B, the parts that match its two queries, and the full output stays in the index.
+   `ctx_batch` on an install log and a long git log, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([2026-11-03-ctx-batch.json](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)). The commands print 228,881 B; the agent gets 8,667 B, the parts that match its two queries, and the full output stays in the index.
 
    ```text
    ⏺ context-mode - ctx_batch (MCP)(commands: ["cat npm-install… queries: ["cache miss","feat commit"])
@@ -476,15 +476,15 @@ One tool call, in time order, from the install to a hook error.
         npm http fetch GET 200 https://registry.npmjs.org/@esbuild%2fdarwin-arm64 99ms (cache miss)
         … +95 lines (ctrl+o to expand)
    ```
-6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/store/fts.ts)).
+6. **Indexing.** The full output goes into the index in chunks of at most `MAX_CHUNK_BYTES` (4,096 B). A Markdown chunk stays inside one heading section, and a code block that fits stays whole. Each chunk goes into two SQLite FTS5 tables: a Porter-stemmed table for words and a trigram table for paths, names and parts of words ([fts.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/store/fts.ts)).
 
-   `ctx_index` on a copy of this repo's `docs/how-it-works.md`, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/evidence/terminal-calls-2026-11-03/calls.json)). The file is 11,577 B; the agent gets 64 B.
+   `ctx_index` on a copy of this repo's `docs/how-it-works.md`, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/evidence/terminal-calls-2026-11-03/calls.json)). The file is 11,577 B; the agent gets 64 B.
 
    ```text
    ⏺ context-mode - ctx_index (MCP)(path: "how-it-works.md")
      ⎿  Indexed 1 source(s), 17 chunk(s) from s1. Label: how-it-works.md
    ```
-7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/tools/search.ts)).
+7. **Search.** `ctx_search` ranks each table with BM25 and joins the two lists with Reciprocal Rank Fusion: a hit scores 1/(`RRF_K` + rank), with `RRF_K` = 60. Before it returns an empty list, it tries a spelling fix from the indexed words. Search covers this session, this worktree (the default) or the whole project, and each snippet is at most `SNIPPET_MAX_BYTES` (800 B) ([search.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/tools/search.ts)).
 
    `ctx_search` on that index, in the same run, in a project that also holds an `AGENTS.md`. One search reads the index and every agent's memory files. The agent gets 1,268 B: one content hit and one memory hit, each with its source and heading. For memory shared across machines, agents and sessions, see [Context Mode Gateway Memory](https://contextmode.ai/docs/memory?utm_source=github&utm_medium=readme&utm_content=search-memory).
 
@@ -497,8 +497,8 @@ One tool call, in time order, from the install to a hook error.
         memory AGENTS.md #0: # Agent rules
         … +10 lines (ctrl+o to expand)
    ```
-8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/hooks/dispatch.ts)).
-9. **Journal and compaction.** The hooks log each prompt, edit, command, tool error and decision in a journal. After a compaction the agent gets a state block of at most `STATE_BUDGET` (2,048 B), and each long line becomes a `ctx_resume(seq)` pointer to the full row; one `ctx_resume` reply is at most `RESUME_CAP` (2,048 B). On the next prompt, a prompt-match block brings back the journal rows that match it by BM25 ([ADR-0009](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/architecture/adr/0009-compaction-and-memory.md)).
+8. **Run, then replace.** On hosts that run the tool first, the `PostToolUse` hook checks the result. Output over `REPLACE_TRIGGER_BYTES` (4,096 B) goes into the index whole, and the agent gets the best-matching chunks and one `ctx_search` line for the rest ([dispatch.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/hooks/dispatch.ts)).
+9. **Journal and compaction.** The hooks log each prompt, edit, command, tool error and decision in a journal. After a compaction the agent gets a state block of at most `STATE_BUDGET` (2,048 B), and each long line becomes a `ctx_resume(seq)` pointer to the full row; one `ctx_resume` reply is at most `RESUME_CAP` (2,048 B). On the next prompt, a prompt-match block brings back the journal rows that match it by BM25 ([ADR-0009](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/architecture/adr/0009-compaction-and-memory.md)).
 
    `ctx_resume` with empty parameters returns the state block, in the same run: 209 B.
 
@@ -510,10 +510,10 @@ One tool call, in time order, from the install to a hook error.
         more: ctx_search(queries:[], scope:"session")
         </context_mode_state>
    ```
-10. **The database.** Each project has one `context.db` under `~/.context-mode`, in Node's built-in `node:sqlite`. The database runs in WAL mode and runs a PASSIVE checkpoint on close. A new database gets built under a temp name and moves into place in one atomic step, and the busy timeout is `DB_TIMEOUT_MS` (5,000 ms) ([db.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/store/db.ts)).
-11. **A hook error.** A hook always ends with exit 0. On any error it gives the host's allow reply and writes one log line to `~/.context-mode/hook-errors.log`, so your agent keeps working. A spawned hook has `HOOK_TIMEOUT_MS` (5,000 ms) ([fallback.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/hooks/fallback.ts)).
+10. **The database.** Each project has one `context.db` under `~/.context-mode`, in Node's built-in `node:sqlite`. The database runs in WAL mode and runs a PASSIVE checkpoint on close. A new database gets built under a temp name and moves into place in one atomic step, and the busy timeout is `DB_TIMEOUT_MS` (5,000 ms) ([db.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/store/db.ts)).
+11. **A hook error.** A hook always ends with exit 0. On any error it gives the host's allow reply and writes one log line to `~/.context-mode/hook-errors.log`, so your agent keeps working. A spawned hook has `HOOK_TIMEOUT_MS` (5,000 ms) ([fallback.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/hooks/fallback.ts)).
 
-Every number with its reason: [How it works](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/how-it-works.md). The rules the hook follows: [ADR-0008](https://github.com/mksglu/context-mode/blob/v2.1.3/docs/architecture/adr/0008-enforcement-rewrite-and-cap.md). Next, the [Tools](#tools) the agent calls.
+Every number with its reason: [How it works](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/how-it-works.md). The rules the hook follows: [ADR-0008](https://github.com/mksglu/context-mode/blob/v2.1.4/docs/architecture/adr/0008-enforcement-rewrite-and-cap.md). Next, the [Tools](#tools) the agent calls.
 
 ## Tools
 
@@ -529,7 +529,7 @@ Every number with its reason: [How it works](https://github.com/mksglu/context-m
 | `ctx_upgrade` | Installs, upgrades or uninstalls; replaces old contextmode entries |
 | `ctx_purge` | Deletes indexed data by session, source or project |
 
-Three more real calls, from the same live run of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](https://github.com/mksglu/context-mode/blob/v2.1.3/bench/evidence/terminal-calls-2026-11-03/calls.json)).
+Three more real calls, from the same live run of Context Mode 2.0.0-next.36 on 2026-11-03 ([calls.json](https://github.com/mksglu/context-mode/blob/v2.1.4/bench/evidence/terminal-calls-2026-11-03/calls.json)).
 
 `ctx_stats`: the agent gets 3,097 B, the first line is the summary.
 
@@ -566,17 +566,16 @@ Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` 
 ## Security and privacy
 
 - The plugin keeps all its data on your machine, one database per project in `~/.context-mode`, and `ctx_purge` deletes it by session, source or project. Read the [Security guide](https://contextmode.ai/docs/engine/security?utm_source=github&utm_medium=readme&utm_content=security).
-- The plugin has zero telemetry: usage data, events and crash reports stay on your machine. It uses the network for five calls, each one started by you or your agent:
+- The plugin has zero telemetry: usage data, events and crash reports stay on your machine. It uses the network for four calls, each one started by you or your agent:
 
 | Call | When | File |
 |---|---|---|
-| Fetch of a URL, for `ctx_index` | Your agent asks for a page. The fetch blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect. | [fetch.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/sandbox/fetch.ts) |
-| One read of the npm dist-tags, with `git ls-remote` of the release tags as the fallback | You run `context-mode doctor`, to check for a new version | [doctor-env.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/ops/doctor-env.ts) |
-| `git clone --depth 1` of the release branch | You run `ctx_upgrade` | [release-fetch.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/core/ops/release-fetch.ts) |
-| `npm i -g context-mode`, or `gh issue create` | You run `context-mode upgrade`, or you press a key to send the debug report | [commands.ts](https://github.com/mksglu/context-mode/blob/v2.1.3/src/cli/commands.ts) |
+| Fetch of a URL, for `ctx_index` | Your agent asks for a page. The fetch blocks private and link-local addresses, checks each address the host name points to, connects to the address it checked, and checks again at each redirect. | [fetch.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/sandbox/fetch.ts) |
+| One read of the npm dist-tags, with `git ls-remote` of the release tags as the fallback | You run `context-mode doctor`, to check for a new version | [doctor-env.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/core/ops/doctor-env.ts) |
+| `npm i -g context-mode`, or `gh issue create` | You run `context-mode upgrade`, or you press a key to send the debug report | [commands.ts](https://github.com/mksglu/context-mode/blob/v2.1.4/src/cli/commands.ts) |
 | Your agent's own install command, npm or git | You install or update | Your agent |
 
-- The guard test D-PRIVACY-NET-1 in [tests/0008-enforcement.test.mjs](https://github.com/mksglu/context-mode/blob/v2.1.3/tests/0008-enforcement.test.mjs) scans the source for HTTP clients, sockets, DNS lookups, git network calls and gh or npm spawns. It flags each new call site, so this table stays true.
+- The guard test D-PRIVACY-NET-1 in [tests/0008-enforcement.test.mjs](https://github.com/mksglu/context-mode/blob/v2.1.4/tests/0008-enforcement.test.mjs) scans the source for HTTP clients, sockets, DNS lookups, git network calls and gh or npm spawns. It flags each new call site, so this table stays true.
 - Doctor and the debug report remove secrets by their structure before they print.
 
 Code from `ctx_execute` runs on your host as your user, with your files, your network and your environment except the preload variables, so keep your agent's own permission prompts on. Here "sandbox" means the output stays in the sandbox and out of the context.
@@ -603,16 +602,16 @@ npx @context-mode/cli
 `npx @context-mode/cli` signs you in to your Gateway account, which has its own subscription, and writes one config change per agent.
 Apps: Claude Code, Claude Desktop, Codex, Codex Desktop, T3 Code, OpenCode and Pi. The Gateway CLI needs Node 20.12 or later, from its npm engines field.
 
-<a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/live.mp4"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/live.webp" width="100%" alt="Gateway Live screen during a session: money saved, bytes kept out per request, history kept and sent, and a feed of each request with its cost and saving"></a>
+<a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/live.mp4"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/live.webp" width="100%" alt="Gateway Live screen during a session: money saved, bytes kept out per request, history kept and sent, and a feed of each request with its cost and saving"></a>
 
 **Live.** One session as it runs: money saved this session, bytes kept out per request, history kept and sent, and a feed of each request with its cost and saving. Click the image for the full video.
 
 Docs: [How saving works](https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=live)
 
 <table>
-<tr><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/overview.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/overview-1200.webp" alt="Gateway Overview: money saved, AI spend, prompt-cache discount and cost per request over 30 days"></a><br><b>Overview.</b> Your spend and what the Gateway saved, per day, in one view.<br>Docs: <a href="https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=overview">How saving works</a></td><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/analytics.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/analytics-1200.webp" alt="Gateway Analytics: saved money over time, split by source"></a><br><b>Analytics.</b> Where each saving comes from: hidden tools, archived old results, large outputs kept in the archive and trimmed context.<br>Docs: <a href="https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=analytics">How saving works</a></td></tr>
-<tr><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/spend.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/spend-1200.webp" alt="Gateway Spend: spend per day by model, cost per request and cache hit rate"></a><br><b>Spend.</b> Spend per day and per model, cost per request and the cache hit rate, to help you plan a budget.<br>Docs: <a href="https://contextmode.ai/docs/prompt-caching?utm_source=github&utm_medium=readme&utm_content=spend">Prompt caching</a></td><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/memory.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/memory-top-1200.webp" alt="Gateway Memory: money saved by Recall and searches per day"></a><br><b>Memory.</b> Facts and decisions carry across sessions and agents. The screen shows what Recall saved and how many searches found an answer.<br>Docs: <a href="https://contextmode.ai/docs/memory?utm_source=github&utm_medium=readme&utm_content=memory">Memory</a></td></tr>
-<tr><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/skills.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/skills-1200.webp" alt="Gateway Skills: import from GitHub and the list of installed skills"></a><br><b>Skills.</b> Add a skill once and all your clients use it when it helps. Import skills from GitHub and see the installed ones.<br>Docs: <a href="https://contextmode.ai/docs/skills?utm_source=github&utm_medium=readme&utm_content=skills">Skills</a></td><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.3/docs/assets/readme/gateway/protect.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.3/docs/assets/readme/gateway/protect-1200.webp" alt="Gateway Protect: a new command rule that blocks terraform destroy"></a><br><b>Protect.</b> Rules that check each shell command before it runs. Here, a rule that stops <code>terraform destroy</code>.<br>Docs: <a href="https://contextmode.ai/docs/protect?utm_source=github&utm_medium=readme&utm_content=protect">Protect</a></td></tr>
+<tr><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/overview.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/overview-1200.webp" alt="Gateway Overview: money saved, AI spend, prompt-cache discount and cost per request over 30 days"></a><br><b>Overview.</b> Your spend and what the Gateway saved, per day, in one view.<br>Docs: <a href="https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=overview">How saving works</a></td><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/analytics.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/analytics-1200.webp" alt="Gateway Analytics: saved money over time, split by source"></a><br><b>Analytics.</b> Where each saving comes from: hidden tools, archived old results, large outputs kept in the archive and trimmed context.<br>Docs: <a href="https://contextmode.ai/docs/how-saving-works?utm_source=github&utm_medium=readme&utm_content=analytics">How saving works</a></td></tr>
+<tr><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/spend.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/spend-1200.webp" alt="Gateway Spend: spend per day by model, cost per request and cache hit rate"></a><br><b>Spend.</b> Spend per day and per model, cost per request and the cache hit rate, to help you plan a budget.<br>Docs: <a href="https://contextmode.ai/docs/prompt-caching?utm_source=github&utm_medium=readme&utm_content=spend">Prompt caching</a></td><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/memory.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/memory-top-1200.webp" alt="Gateway Memory: money saved by Recall and searches per day"></a><br><b>Memory.</b> Facts and decisions carry across sessions and agents. The screen shows what Recall saved and how many searches found an answer.<br>Docs: <a href="https://contextmode.ai/docs/memory?utm_source=github&utm_medium=readme&utm_content=memory">Memory</a></td></tr>
+<tr><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/skills.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/skills-1200.webp" alt="Gateway Skills: import from GitHub and the list of installed skills"></a><br><b>Skills.</b> Add a skill once and all your clients use it when it helps. Import skills from GitHub and see the installed ones.<br>Docs: <a href="https://contextmode.ai/docs/skills?utm_source=github&utm_medium=readme&utm_content=skills">Skills</a></td><td width="50%"><a href="https://github.com/mksglu/context-mode/blob/v2.1.4/docs/assets/readme/gateway/protect.webp"><img src="https://raw.githubusercontent.com/mksglu/context-mode/v2.1.4/docs/assets/readme/gateway/protect-1200.webp" alt="Gateway Protect: a new command rule that blocks terraform destroy"></a><br><b>Protect.</b> Rules that check each shell command before it runs. Here, a rule that stops <code>terraform destroy</code>.<br>Docs: <a href="https://contextmode.ai/docs/protect?utm_source=github&utm_medium=readme&utm_content=protect">Protect</a></td></tr>
 </table>
 
 Numbers in these screens come from the author's own account over 30 days (Oct 3 - Nov 1, 2026), so read them as one account's usage. Click an image for the full size.
@@ -674,6 +673,6 @@ We chose ELv2 so the source stays open to all and the hosted service stays with 
 
 ## Community
 
-Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report, and send ideas there too. The maintainer writes every change; [CONTRIBUTING.md](https://github.com/mksglu/context-mode/blob/v2.1.3/CONTRIBUTING.md) shows how an agent files an issue.
+Report a defect on [Discord](https://discord.gg/DCN9jUgN5v) with the full `/ctx-doctor` report, and send ideas there too. The maintainer writes every change; [CONTRIBUTING.md](https://github.com/mksglu/context-mode/blob/v2.1.4/CONTRIBUTING.md) shows how an agent files an issue.
 
 **Videos.** [Better Stack on Context Mode](https://www.youtube.com/watch?v=QUHrntlfPo4). Make your own video and share it on [Discord](https://discord.gg/DCN9jUgN5v); we add videos over 10K views here.

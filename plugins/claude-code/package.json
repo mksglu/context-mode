@@ -16,6 +16,7 @@
   "files": [
     ".claude-plugin",
     ".codex-plugin",
+    ".zcode-plugin",
     "LICENSE",
     "README.md",
     "SHA256SUMS",
@@ -68,5 +69,5 @@
     "url": "git+https://github.com/mksglu/context-mode.git"
   },
   "type": "module",
-  "version": "2.1.3"
+  "version": "2.1.4"
 }

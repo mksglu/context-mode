@@ -170,6 +170,7 @@ var GIT_COMMONDIR_FILE = "commondir";
 var GIT_HEAD_FILE = "HEAD";
 var WORKSPACE_FOLDER_FLAG = "--workspace-folder";
 var EXEC_LANGUAGES = Object.freeze(["shell", "powershell", "javascript", "typescript", "python"]);
+var SHELL_FAMILY = Object.freeze(["sh", "bash", "zsh", "dash", "ksh", "fish"]);
 var PATHEXT_DEFAULT = ".COM;.EXE;.BAT;.CMD";
 var SOURCE_LABEL_MAX_CHARS = 80;
 var PLAIN_OUTPUT_ENV = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
@@ -185,6 +186,7 @@ var RUN_SESSION_PREFIX = "mcp:";
 var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
 var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
+var DATA_DIR_ENV = "CONTEXT_MODE_DATA_DIR";
 var REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY";
 var PROJECT_PLUGIN_SCOPES = Object.freeze(["local", "project"]);
 var PLUGIN_SCOPE_RANK = Object.freeze({ local: 0, project: 1, user: 2, managed: 2 });
@@ -254,7 +256,8 @@ var DUMP_COUNT_FLAGS = Object.freeze(["-n", "-c", "--lines", "--bytes"]);
 var SED_COMMAND = "sed";
 var SED_QUIET_FLAGS = Object.freeze(["-n", "--quiet", "--silent"]);
 var JQ_COMMAND = "jq";
-var READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path"]);
+var READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path", "filePath"]);
+var READ_PATH_LIST_KEY = "filePaths";
 var EDIT_TOOLS = Object.freeze(["Write", "Edit"]);
 var EDIT_PATH_KEYS = Object.freeze(["file_path", "path"]);
 var STATS_COLUMNS = Object.freeze(["Scope", "Produced", "Returned", "Saved", "Reduction %"]);
@@ -323,19 +326,18 @@ var AGENT_HOME_DIR = Object.freeze({
 var UPGRADE_MODES = Object.freeze(["upgrade", "uninstall"]);
 var GIT_CLONE_ARGS = Object.freeze(["clone", "--depth", "1", "--branch"]);
 var GIT_HEAD_SHA_ARGS = Object.freeze(["rev-parse", "HEAD"]);
-var UPGRADE_GIT_CHECKOUT_AGENTS = Object.freeze(["pi", "opencode"]);
 var GIT_NO_PROMPT_ENV = Object.freeze({ GIT_TERMINAL_PROMPT: "0" });
 var GIT_NO_CRLF_ENV = Object.freeze({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" });
 var GIT_BIN = "git";
 var WIN_SHELL_LANGS = Object.freeze(["shell", "bash", "sh"]);
 var GIT_BASH_RELATIVE = Object.freeze([["..", "bin", "bash.exe"], ["..", "..", "bin", "bash.exe"]]);
+var PERSISTED_OUTPUT_MAX_BYTES = 16 * 1024 * 1024;
 var OPS_SPLIT_FILES = Object.freeze([
   "doctor-env.ts",
   "doctor-config.ts",
   "doctor-hook.ts",
   "doctor-db.ts",
   "doctor-heal.ts",
-  "release-fetch.ts",
   "verify-sums.ts",
   "plugin-swap.ts",
   "host-write.ts",
@@ -360,9 +362,15 @@ var CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"]);
 var DB_SIBLING_SUFFIXES = Object.freeze(["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]);
 var UPGRADE_HOST_COMMAND = Object.freeze({
   "claude-code": "claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode",
-  codex: "rewrite config.toml's [mcp_servers.context-mode*] block to the v2 entry, then restart Codex",
-  gemini: "gemini extensions install https://github.com/mksglu/context-mode --auto-update",
-  qwen: "qwen extensions install https://github.com/mksglu/context-mode --auto-update"
+  codex: "codex plugin marketplace upgrade context-mode",
+  gemini: "gemini extensions update context-mode",
+  qwen: "qwen extensions update context-mode",
+  pi: "pi update --extensions",
+  opencode: "opencode plugin update",
+  "copilot-cli": "npm i -g context-mode && context-mode setup --agents copilot-cli",
+  vscode: "npm i -g context-mode && context-mode setup --agents vscode",
+  kiro: "npm i -g context-mode && context-mode setup --agents kiro",
+  zcode: "npm i -g context-mode && context-mode setup --agents zcode"
 });
 var V1_SCRIPT_NAMES = Object.freeze([
   "afteragentresponse.mjs",
@@ -382,12 +390,16 @@ var V1_SCRIPT_NAMES = Object.freeze([
 ]);
 var V1_CODEX_HOOKS_DIR = Object.freeze(["hooks", "codex"]);
 var V1_CACHE_HEAL_EXTS = Object.freeze([".mjs", ".sh"]);
+var V1_PI_PACKAGE = "npm:context-mode";
 var VSCODE_USER_DIR_SEGMENTS = Object.freeze(["Code", "User"]);
 var VSCODE_MCP_FILE = "mcp.json";
 var KIRO_AGENT_FILE = Object.freeze(["agents", "default.json"]);
 var KIRO_STEERING_FILE = Object.freeze(["steering", "KIRO.md"]);
 var OPENCODE_CONFIG_FILES = Object.freeze(["opencode.jsonc", "opencode.json"]);
 var OPENCODE_NPM_SPEC_PREFIX = `${SERVER_KEY}@`;
+var NPM_VERSION_SEP = "@";
+var OPENCODE_NPM_LATEST = `${OPENCODE_NPM_SPEC_PREFIX}latest`;
+var PI_NPM_LATEST = `${V1_PI_PACKAGE}${NPM_VERSION_SEP}latest`;
 var V1_DATA_ROOT_ENTRIES = Object.freeze(["content", "platform.json"]);
 var PI_ROLE = "custom";
 var V1_PATH_SEPS = Object.freeze(["/", "\\"]);
@@ -408,13 +420,17 @@ var V1_REASON = Object.freeze({
   kiroSteering: "old context-mode Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
   piNpm: "old context-mode Pi package npm:context-mode",
   opencodePlugin: "old context-mode OpenCode plugin spec context-mode",
+  piGit: "old context-mode Pi entry git:github.com/mksglu/context-mode@release: ctx_upgrade replaces it with npm:context-mode@latest",
+  opencodeGit: "old context-mode OpenCode entry git+https://github.com/mksglu/context-mode.git#release: ctx_upgrade replaces it with context-mode@latest",
   zcodeHook: "old context-mode ZCode hook entry: command contains context-mode hook",
   dataDir: "old context-mode data dir <agent home>/context-mode/",
   dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
   dataRoot: "old context-mode content under ~/.context-mode/",
-  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, safe to keep"
+  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, safe to keep",
+  projectLink: "context-mode path in the project reached through a link: report only, upgrade keeps it as is and never follows a link"
 });
-var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering]);
+var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering, V1_REASON.piGit, V1_REASON.opencodeGit, V1_REASON.projectLink]);
+var UPGRADE_KEEP_ASIDE_REASONS = Object.freeze([V1_REASON.dataDir, V1_REASON.dataRoot]);
 var OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
 var OPENCODE_PLUGIN_PATH = Object.freeze(["opencode", "plugin.js"]);
 var ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"]);
@@ -500,13 +516,13 @@ var NATIVE_INSTALL = Object.freeze({
   "copilot-cli": ["npm i -g context-mode", "context-mode setup --agents copilot-cli"],
   vscode: ["npm i -g context-mode", "context-mode setup --agents vscode"],
   kiro: ["npm i -g context-mode", "context-mode setup --agents kiro"],
-  zcode: ["npm i -g context-mode", "context-mode setup --agents zcode"]
+  zcode: ["zcode plugins marketplace add mksglu/context-mode", "zcode plugins install context-mode@context-mode"]
 });
 var ISSUE_FORM_URL = `https://github.com/${ISSUE_REPO_SLUG}/issues/new?template=${ISSUE_FORM_FILE}`;
 
 // src/core/tools/run-wrapper.ts
 import { randomUUID } from "node:crypto";
-import { dirname as dirname4, join as join5 } from "node:path";
+import { dirname as dirname4, join as join6 } from "node:path";
 
 // src/adapters/claude-code.ts
 var TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
@@ -723,6 +739,7 @@ var GEMINI_SOURCES = { startup: "startup", resume: "resume", clear: "clear" };
 var HINT_EVENTS = ["SessionStart", "UserPromptSubmit", "PostToolUse"];
 var DENY_EVENTS = ["UserPromptSubmit", "PreToolUse"];
 var EMPTY = { stdout: "", exitCode: 0 };
+var GEMINI_REPLACE_LEAD = "the tool ran and succeeded; context-mode indexed its full output, and this is the part that answers the call:\n";
 function own(p, key) {
   return Object.hasOwn(p, key) ? p[key] : void 0;
 }
@@ -742,12 +759,66 @@ function canonicalName2(name, mcp) {
   if (typeof server !== "string" || typeof tool !== "string") return name;
   return "mcp:" + server + ":" + tool;
 }
+function partsText(llm) {
+  if (!Array.isArray(llm) || llm.length === 0) return void 0;
+  const out = [];
+  for (const part of llm) {
+    if (typeof part === "string") {
+      out.push(part);
+      continue;
+    }
+    if (typeof part !== "object" || part === null) return void 0;
+    const t = own(part, "text");
+    if (typeof t !== "string") return void 0;
+    out.push(t);
+  }
+  return out.join("");
+}
 function readResult2(resp) {
   const obj = typeof resp === "object" && resp !== null ? resp : void 0;
   const llm = obj === void 0 ? void 0 : own(obj, "llmContent");
-  const text = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : JSON.stringify(resp);
+  const text = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : partsText(llm) ?? JSON.stringify(resp);
   const err = obj === void 0 ? void 0 : own(obj, "error");
   return { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
+}
+var URL_STARTS = ["https://", "http://"];
+var URL_TRAIL = `.,;:!?)]}>'"`;
+var SPACE = " 	\n\r\f\v";
+function words(text) {
+  const out = [];
+  let cur = "";
+  for (const ch of text) {
+    if (SPACE.includes(ch)) {
+      if (cur !== "") out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  if (cur !== "") out.push(cur);
+  return out;
+}
+function firstUrl(prompt) {
+  if (typeof prompt !== "string") return void 0;
+  for (const word of words(prompt)) {
+    const lower = word.toLowerCase();
+    const at2 = URL_STARTS.map((s) => lower.indexOf(s)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+    if (at2 === void 0) continue;
+    let url = word.slice(at2);
+    while (url.length > 0 && URL_TRAIL.includes(url[url.length - 1])) url = url.slice(0, -1);
+    return url;
+  }
+  return void 0;
+}
+function nativeInput(name, input) {
+  if (name === "web_fetch" && own(input, "url") === void 0) {
+    const url = firstUrl(own(input, "prompt"));
+    return url === void 0 ? input : { ...input, url };
+  }
+  if (name === "read_many_files" && own(input, "file_path") === void 0) {
+    const inc = own(input, "include");
+    const list2 = Array.isArray(inc) ? inc.filter((v) => typeof v === "string") : [];
+    return list2.length === 0 ? input : { ...input, file_path: list2.join(" ") };
+  }
+  return input;
 }
 function decode3(raw) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("gemini: hook payload is not a JSON object");
@@ -766,7 +837,7 @@ function decode3(raw) {
     ev.tool = {
       name,
       canonicalName: canonicalName2(name, own(p, "mcp_context")),
-      input: typeof input === "object" && input !== null && !Array.isArray(input) ? input : {}
+      input: nativeInput(name, typeof input === "object" && input !== null && !Array.isArray(input) ? input : {})
     };
   }
   if (event === "PostToolUse") ev.result = readResult2(own(p, "tool_response"));
@@ -784,7 +855,7 @@ function encode3(ev, d, _extra) {
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
       if (ev.event !== "PostToolUse") return EMPTY;
-      return { stdout: JSON.stringify({ decision: "deny", reason: d.output }), exitCode: 0 };
+      return { stdout: JSON.stringify({ decision: "deny", reason: GEMINI_REPLACE_LEAD + d.output }), exitCode: 0 };
   }
 }
 
@@ -1117,6 +1188,7 @@ function encode7(ev, d, _extra) {
 
 // src/adapters/zcode.ts
 var TOOL_NAME_PREFIX8 = "mcp__context-mode__";
+var PLUGIN_TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
 var ZCODE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 var TWINS = { hook_event_name: "hookEventName", session_id: "sessionId" };
 var FAILURE_EVENT2 = "PostToolUseFailure";
@@ -1126,7 +1198,9 @@ function decode8(raw) {
   for (const [snake, camel] of Object.entries(TWINS)) if (p[snake] === void 0) p[snake] = p[camel];
   const failure = p.hook_event_name === FAILURE_EVENT2;
   if (failure) p.hook_event_name = "PostToolUse";
-  const ev = decodeClaudeShape(p, "zcode", TOOL_NAME_PREFIX8, ZCODE_SOURCES);
+  const toolName = typeof p.tool_name === "string" ? p.tool_name : "";
+  const prefix = toolName.startsWith(PLUGIN_TOOL_NAME_PREFIX) ? PLUGIN_TOOL_NAME_PREFIX : TOOL_NAME_PREFIX8;
+  const ev = decodeClaudeShape(p, "zcode", prefix, ZCODE_SOURCES);
   if (failure) {
     const text = typeof p.error === "string" ? p.error : p.error === void 0 ? "" : JSON.stringify(p.error);
     ev.result = { isError: true, bytes: Buffer.byteLength(text), text };
@@ -1207,8 +1281,9 @@ var OPENCODE_EVENTS = {
   "step-finish": "Usage"
 };
 var SHELL_TOOL_NAME = "bash";
+var READ_TOOL_NAME = "read";
 var SHELL_TOOL_NAMES5 = Object.freeze([SHELL_TOOL_NAME, "shell"]);
-var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n) => [n, "Bash"])) };
+var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n) => [n, "Bash"])) };
 function toCanonicalTool(name) {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
   return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL7, name) ? NATIVE_TO_CANONICAL7[name] : name;
@@ -1436,9 +1511,9 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "spawn-cwd",
     toolNamePrefix: TOOL_NAME_PREFIX10,
-    nativeTools: { shell: [SHELL_TOOL_NAME] },
+    nativeTools: { shell: [SHELL_TOOL_NAME], read: [READ_TOOL_NAME] },
     execReadOnlyHint: false,
-    // D-HF-OPENCODE-SHELL-1
+    // D-HF-OPENCODE-SHELL-1, D-R44-OC-READ-1
     // Usage: step-finish cost row (DEVIATIONS D-M5-arch-2).
     eventMap: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     compactDelivery: "opencode-cache",
@@ -1666,6 +1741,15 @@ function applyMigrations(db, fromVersion) {
   }
 }
 
+// src/core/store/open-read.ts
+function openReadOnlyHandle(sqlite, path3, opts = {}) {
+  const bun = "bun" in opts ? opts.bun : process.versions.bun;
+  if (bun === void 0) return new sqlite.DatabaseSync(path3, { timeout: DB_TIMEOUT_MS, readOnly: true });
+  const raw = new sqlite.DatabaseSync(path3, { timeout: DB_TIMEOUT_MS });
+  if (opts.queryOnly !== false) raw.exec("PRAGMA query_only = ON");
+  return raw;
+}
+
 // src/core/store/db.ts
 var { existsSync, linkSync, mkdirSync, rmSync } = process.getBuiltinModule("node:fs");
 function versionParts(v) {
@@ -1731,7 +1815,7 @@ function openWritable(sqlite, path3) {
   }
 }
 function openReadOnly(sqlite, path3) {
-  const raw = new sqlite.DatabaseSync(path3, { timeout: DB_TIMEOUT_MS, readOnly: true });
+  const raw = openReadOnlyHandle(sqlite, path3);
   try {
     const found = readUserVersion(raw);
     if (found !== SCHEMA_VERSION) throw new CtxError("SCHEMA_STALE", { found, want: SCHEMA_VERSION });
@@ -3442,18 +3526,18 @@ function insertChunks(db, id, src, chunks) {
   }
 }
 function toMatch(q) {
-  const words = [];
+  const words2 = [];
   let cur = "";
   for (const ch of q) {
     if (ch.trim() === "" || ch === "\0") {
-      if (cur !== "") words.push(cur);
+      if (cur !== "") words2.push(cur);
       cur = "";
     } else {
       cur += ch === '"' ? '""' : ch;
     }
   }
-  if (cur !== "") words.push(cur);
-  return words.map((w) => `"${w}"*`).join(" ");
+  if (cur !== "") words2.push(cur);
+  return words2.map((w) => `"${w}"*`).join(" ");
 }
 function toMatchAny(q) {
   const terms = new Set(toMatch(q).split(" ").filter((t) => t !== ""));
@@ -4081,6 +4165,9 @@ var SUBSHELL_CLOSE = ")";
 var CASE_BREAK = ";;";
 var FUNC_PARENS = ["(", ")"];
 var NOT = "!";
+function append(out, items) {
+  for (const x of items) out.push(x);
+}
 var KW = Object.freeze({
   group: "{",
   groupEnd: "}",
@@ -4260,12 +4347,12 @@ function ifBody(p) {
     const t = at(p);
     if (isWord(t, KW.then) || isWord(t, KW.else)) {
       p.i++;
-      out.push(...list(p, [KW.elif, KW.else, KW.fi]));
+      append(out, list(p, [KW.elif, KW.else, KW.fi]));
       continue;
     }
     if (isWord(t, KW.elif)) {
       p.i++;
-      out.push(...list(p, [KW.then]));
+      append(out, list(p, [KW.then]));
       continue;
     }
     if (isWord(t, KW.fi)) p.i++;
@@ -4276,7 +4363,7 @@ function ifBody(p) {
 function loopBody(p) {
   p.i++;
   const out = list(p, [KW.do]);
-  out.push(...doBlock(p));
+  append(out, doBlock(p));
   return out;
 }
 function forBody(p) {
@@ -4290,10 +4377,10 @@ function forBody(p) {
       p.i++;
       const from = p.i;
       while ((at(p)?.kind === "word" || at(p)?.kind === "unhandled") && !isWord(at(p), KW.do)) p.i++;
-      out.push(...carrierOf(p, from, p.i));
+      append(out, carrierOf(p, from, p.i));
     }
   }
-  out.push(...doBlock(p));
+  append(out, doBlock(p));
   return out;
 }
 function caseBody(p) {
@@ -4302,7 +4389,7 @@ function caseBody(p) {
   const subject = at(p);
   if (subject !== void 0 && subject.kind !== "op" && subject.kind !== "io") {
     p.i++;
-    out.push(...carrierOf(p, p.i - 1, p.i));
+    append(out, carrierOf(p, p.i - 1, p.i));
   }
   if (isWord(at(p), KW.in)) p.i++;
   while (p.i < p.toks.length && p.err === null) {
@@ -4325,7 +4412,7 @@ function caseBody(p) {
     p.i++;
     const body = list(p, [KW.esac]);
     tag(body, KW.case);
-    out.push(...body);
+    append(out, body);
   }
   return out;
 }
@@ -4340,7 +4427,7 @@ function hasFuncParens(p, from) {
 }
 function simple(p) {
   const first = p.i;
-  const words = [];
+  const words2 = [];
   let toFile = false;
   while (p.i < p.toks.length) {
     const t = p.toks[p.i];
@@ -4349,7 +4436,7 @@ function simple(p) {
       toFile = ioRedirect(p) || toFile;
       continue;
     }
-    if (words.length === 0 && t.kind === "word" && isAssignment(t.text)) {
+    if (words2.length === 0 && t.kind === "word" && isAssignment(t.text)) {
       p.i++;
       const open = at(p);
       if (t.text.endsWith(OPT_VALUE) && open !== void 0 && isOp(open, SUBSHELL_OPEN) && open.start === t.end) {
@@ -4363,15 +4450,15 @@ function simple(p) {
       }
       continue;
     }
-    words.push(t);
+    words2.push(t);
     p.i++;
   }
   if (p.i === first) return EMPTY3();
   const raw = p.src.slice(p.toks[first].start, p.toks[p.i - 1].end);
-  if (words.length === 0) return { cmds: carrier(raw), simple: null };
+  if (words2.length === 0) return { cmds: carrier(raw), simple: null };
   const text = (t) => t.kind === "word" ? dequote(t.text) : t.text;
-  const argv0 = baseName(text(words[0]));
-  const args = words.slice(1).map(text);
+  const argv0 = baseName(text(words2[0]));
+  const args = words2.slice(1).map(text);
   const cmd = { argv0, args, redirectsToFile: toFile || writesFile(argv0, args), endsInBoundedSink: false, raw };
   return { cmds: [cmd], simple: cmd };
 }
@@ -4442,7 +4529,7 @@ function pipeline(p) {
   let last = EMPTY3();
   while (p.err === null) {
     last = element(p);
-    all.push(...last.cmds);
+    append(all, last.cmds);
     const t = at(p);
     if (t !== void 0 && t.kind === "op" && PIPES.includes(t.text)) {
       for (const c of last.cmds) c.pipesOut = true;
@@ -4471,7 +4558,7 @@ function list(p, stop) {
     }
     if (t.kind === "word" && stop.includes(t.text)) return out;
     const before = p.i;
-    out.push(...pipeline(p));
+    append(out, pipeline(p));
     if (p.i === before && p.err === null) p.i++;
   }
   return out;
@@ -4484,7 +4571,7 @@ function parseShell(cmd) {
   const p = { toks: s.tokens, src: cmd, bodies: new Set(s.heredocBodies), i: 0, depth: 0, err: null };
   const commands = [];
   while (p.i < p.toks.length && p.err === null) {
-    commands.push(...list(p, NO_STOP));
+    append(commands, list(p, NO_STOP));
     if (p.i < p.toks.length) p.i++;
   }
   if (p.err !== null) return { ok: false, construct: p.err };
@@ -4739,57 +4826,57 @@ function param(word, names) {
   const hits = names.filter((p) => p.startsWith(name));
   return { full: hits.length === 1 ? hits[0] : void 0, inline };
 }
-function psDump(words) {
-  if (words.length === 0) return null;
-  const name = cmdName(words[0]);
+function psDump(words2) {
+  if (words2.length === 0) return null;
+  const name = cmdName(words2[0]);
   if (!READ_COMMANDS.includes(name)) {
-    const lower = words[0].toLowerCase();
+    const lower = words2[0].toLowerCase();
     const cls = FILE_CLASSES.find((c) => lower.startsWith(c));
-    if (cls === void 0 || !FILE_READS.includes(lower.slice(cls.length)) || words.length < MIN_STATIC_CALL) return null;
-    return { file: words[1], bounded: false };
+    if (cls === void 0 || !FILE_READS.includes(lower.slice(cls.length)) || words2.length < MIN_STATIC_CALL) return null;
+    return { file: words2[1], bounded: false };
   }
   const files = [];
   let bounded = false;
-  for (let k = 1; k < words.length; k++) {
-    const a = words[k];
+  for (let k = 1; k < words2.length; k++) {
+    const a = words2[k];
     if (!a.startsWith(DASH) || a.length === DASH.length) {
       files.push(a);
       continue;
     }
     const p = param(a, ALL_PARAMS);
     if (p.full === void 0 || !VALUE_PARAMS.includes(p.full)) continue;
-    const value = p.inline ?? words[++k];
+    const value = p.inline ?? words2[++k];
     if (value === void 0) return null;
     if (PATH_PARAMS.includes(p.full)) files.push(value);
     if (BOUND_PARAMS.includes(p.full)) bounded = true;
   }
   return files.length === 1 ? { file: files[0], bounded } : null;
 }
-function nestedScript(name, words) {
+function nestedScript(name, words2) {
   if (POWERSHELLS.includes(name)) {
-    for (let k = 1; k < words.length; k++) {
-      const w = words[k];
+    for (let k = 1; k < words2.length; k++) {
+      const w = words2[k];
       if (!w.startsWith(DASH) || w.length === DASH.length) continue;
       const p = param(w, [COMMAND_PARAM]);
       if (p.full === void 0) continue;
-      return [...p.inline === void 0 ? [] : [p.inline], ...words.slice(k + 1)].join(" ");
+      return [...p.inline === void 0 ? [] : [p.inline], ...words2.slice(k + 1)].join(" ");
     }
     return null;
   }
   if (CMDS.includes(name)) {
-    for (let k = 1; k < words.length; k++) {
-      if (CMD_RUN_FLAGS.includes(words[k].toLowerCase())) return words.slice(k + 1).join(" ");
+    for (let k = 1; k < words2.length; k++) {
+      if (CMD_RUN_FLAGS.includes(words2[k].toLowerCase())) return words2.slice(k + 1).join(" ");
     }
   }
   return null;
 }
-function cdTarget(words) {
-  for (let k = 1; k < words.length; k++) {
-    const w = words[k];
+function cdTarget(words2) {
+  for (let k = 1; k < words2.length; k++) {
+    const w = words2[k];
     if (w.toLowerCase() === "/d") continue;
     if (!w.startsWith(DASH) || w.length === DASH.length) return w;
     const p = param(w, PATH_PARAMS);
-    if (p.full !== void 0) return p.inline ?? words[k + 1] ?? null;
+    if (p.full !== void 0) return p.inline ?? words2[k + 1] ?? null;
   }
   return null;
 }
@@ -4849,8 +4936,13 @@ function requireHomeDir(env, platform = process.platform) {
   if (home !== null) return home;
   throw new CtxError("NO_HOME", { name: platform === "win32" ? "USERPROFILE" : "HOME" });
 }
+function dataRootOf(env, home) {
+  const dir = env[DATA_DIR_ENV];
+  return dir !== void 0 && dir !== "" ? resolve2(dir) : join(home, DATA_ROOT.slice(1));
+}
 function resolveConfigDir(env) {
-  const dir = join(requireHomeDir(env), DATA_ROOT.slice(1));
+  const set = env[DATA_DIR_ENV];
+  const dir = dataRootOf(env, set !== void 0 && set !== "" ? "" : requireHomeDir(env));
   mkdirSync2(dir, { recursive: true });
   return realpathSync.native(dir);
 }
@@ -5017,14 +5109,13 @@ function tokenize(glob, path3) {
   }
   return toks;
 }
-function globMatch(glob, text, path3) {
-  const toks = tokenize(glob, path3);
+function matchStarts(toks, text, path3, ends) {
   const n = text.length;
-  let next = new Uint8Array(n + 1);
-  next[n] = 1;
+  let next = ends;
+  let cur = new Uint8Array(n + 1);
   for (let i = toks.length - 1; i >= 0; i--) {
     const tok = toks[i];
-    const cur = new Uint8Array(n + 1);
+    if (next === ends) next = Uint8Array.from(ends);
     let acc = 0;
     for (let j = n; j >= 0; j--) {
       const has2 = j < n;
@@ -5048,9 +5139,19 @@ function globMatch(glob, text, path3) {
           break;
       }
     }
-    next = cur;
+    const done = cur;
+    cur = next;
+    next = done;
   }
-  return next[0] === 1;
+  return next;
+}
+function globMatch(glob, text, path3) {
+  const toks = tokenize(glob, path3);
+  const first = toks[0];
+  if (first !== void 0 && first.t === "lit" && text[0] !== first.c) return false;
+  const ends = new Uint8Array(text.length + 1);
+  ends[text.length] = 1;
+  return matchStarts(toks, text, path3, ends)[0] === 1;
 }
 function parsePattern(pattern) {
   const open = pattern.indexOf("(");
@@ -5058,14 +5159,25 @@ function parsePattern(pattern) {
   const glob = pattern.slice(open + 1, pattern.length - ")".length);
   return glob === "" ? null : { tool: pattern.slice(0, open), glob };
 }
+function commandStarts(glob, text) {
+  const n = text.length;
+  const ends = new Uint8Array(n + 1);
+  ends[n] = 1;
+  if (!glob.endsWith(PREFIX_RULE)) return matchStarts(tokenize(glob, false), text, false, ends);
+  for (let k = 0; k < n; k++) if (WHITESPACE.includes(text[k])) ends[k] = 1;
+  return matchStarts(tokenize(glob.slice(0, glob.length - PREFIX_RULE.length), false), text, false, ends);
+}
 function matchCommand(glob, text) {
-  if (!glob.endsWith(PREFIX_RULE)) return globMatch(glob, text, false);
-  const head = glob.slice(0, glob.length - PREFIX_RULE.length);
-  if (globMatch(head, text, false)) return true;
-  for (let k = 0; k < text.length; k++) {
-    if (WHITESPACE.includes(text[k]) && globMatch(head, text.slice(0, k), false)) return true;
+  return commandStarts(glob, text)[0] === 1;
+}
+function denyPatternFromAny(text, patterns, from) {
+  for (const pattern of patterns) {
+    const p = parsePattern(pattern);
+    if (p === null || p.tool !== BASH_TOOL) continue;
+    const starts = commandStarts(p.glob, text);
+    for (let j = 0; j <= text.length; j++) if (from[j] === 1 && starts[j] === 1) return pattern;
   }
-  return false;
+  return null;
 }
 var DRIVE_PREFIX = /^[A-Za-z]:(?=\/)/;
 function toSlash(p) {
@@ -5136,6 +5248,7 @@ var HOST_SEP = ".";
 var SED_RANGE_SEP = ",";
 var SED_PRINT = "p";
 var SED_SCRIPT_FLAGS = ["-e", "--expression"];
+var EXE_SUFFIX = ".exe";
 var COMMAND_STARTS = ";&|(`\n\r";
 var ALLOW = Object.freeze({ kind: "allow" });
 var deny = (reason) => ({ kind: "deny", reason });
@@ -5173,6 +5286,11 @@ function readPath(input) {
   }
   return void 0;
 }
+function readPaths(input) {
+  const one = readPath(input);
+  const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? input[READ_PATH_LIST_KEY].filter((p) => typeof p === "string" && p !== "") : [];
+  return one === void 0 ? many : [one, ...many];
+}
 function userDenyHit(canonical, input, cwd, rules) {
   if (rules.length === 0) return null;
   const readRule = (p) => matchesAnyDenyPattern(resolve3(cwd, p), rules, { tool: READ, projectDir: cwd });
@@ -5181,21 +5299,43 @@ function userDenyHit(canonical, input, cwd, rules) {
     return cmd === void 0 ? null : matchesAnyDenyPattern(cmd, rules);
   }
   if (canonical === READ) {
-    const p = readPath(input);
-    return p === void 0 ? null : readRule(p);
+    for (const p of readPaths(input)) {
+      const h = readRule(p);
+      if (h !== null) return h;
+    }
+    return null;
   }
   if (canonical === CTX_EXECUTE) {
     const file = str(input.file);
     const byFile = file === void 0 || file === "" ? null : readRule(file);
     if (byFile !== null) return byFile;
     const code = str(input.code);
-    return input.language === SHELL_LANGUAGE && code !== void 0 ? matchesAnyDenyPattern(code, rules) : null;
+    return isShellLanguage(input.language) && code !== void 0 ? shellHit(code, rules) : null;
   }
   if (canonical === CTX_BATCH && Array.isArray(input.commands)) {
     for (const c of input.commands) {
-      const h = typeof c === "string" ? matchesAnyDenyPattern(c, rules) : null;
+      const h = typeof c === "string" ? shellHit(c, rules) : null;
       if (h !== null) return h;
     }
+  }
+  return null;
+}
+function isShellLanguage(language) {
+  if (typeof language !== "string") return false;
+  let name = language.toLowerCase();
+  const slash = Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\"));
+  if (slash >= 0) name = name.slice(slash + 1);
+  if (name.endsWith(EXE_SUFFIX)) name = name.slice(0, name.length - EXE_SUFFIX.length);
+  return name === SHELL_LANGUAGE || has(SHELL_FAMILY, name);
+}
+function shellHit(cmd, rules) {
+  const whole = matchesAnyDenyPattern(cmd, rules);
+  if (whole !== null) return whole;
+  const parsed = parseShell(cmd);
+  if (!parsed.ok) return couldMatchRule(cmd, rules);
+  for (const c of unwrap(parsed.commands)) {
+    const h = segmentHit(c, rules);
+    if (h !== null) return h;
   }
   return null;
 }
@@ -5203,13 +5343,21 @@ function segmentHit(c, rules) {
   if (rules.length === 0) return null;
   return matchesAnyDenyPattern([c.argv0, ...c.args].join(" "), rules) ?? matchesAnyDenyPattern(c.raw, rules);
 }
-function couldMatch(text, rules) {
-  if (rules.length === 0) return false;
+function couldMatchRule(text, rules) {
+  if (rules.length === 0) return null;
+  const from = new Uint8Array(text.length + 1);
+  let pending = false;
   for (let k = 0; k <= text.length; k++) {
-    if (k > 0 && !COMMAND_STARTS.includes(text.charAt(k - 1))) continue;
-    if (matchesAnyDenyPattern(text.slice(k).trimStart(), rules) !== null) return true;
+    if (k === 0 || COMMAND_STARTS.includes(text.charAt(k - 1))) pending = true;
+    if (pending && (k === text.length || text.charAt(k).trim() !== "")) {
+      from[k] = 1;
+      pending = false;
+    }
   }
-  return false;
+  return denyPatternFromAny(text, rules, from);
+}
+function couldMatch(text, rules) {
+  return couldMatchRule(text, rules) !== null;
 }
 function neverDenied(url) {
   let host;
@@ -5284,8 +5432,7 @@ function fileSize(abs) {
 }
 function read(ev, row, input) {
   if (!present(input.offset) && !present(input.limit)) {
-    const p = readPath(input);
-    if (p !== void 0) {
+    for (const p of readPaths(input)) {
       const abs = resolve3(ev.cwd, p);
       const size = fileSize(abs);
       if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
@@ -5379,11 +5526,11 @@ function dumpTarget(name, args) {
 }
 
 // src/core/project/resolve.ts
-import { basename as basename2, dirname as dirname3, join as join4, resolve as resolve4 } from "node:path";
+import { basename as basename2, dirname as dirname3, join as join5, resolve as resolve4 } from "node:path";
 
 // src/core/project/contain.ts
-import { dirname as dirname2, sep as sep2 } from "node:path";
-var { realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
+import { dirname as dirname2, join as join4, relative as relative2, sep as sep2 } from "node:path";
+var { lstatSync, realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
 function real(p) {
   try {
     return realpathSync2.native(p);
@@ -5571,9 +5718,9 @@ function gitDirs(dir) {
   }
   const start = cur;
   for (; ; ) {
-    const gitDir = gitDirAt(join4(cur, GIT_DIR_NAME));
+    const gitDir = gitDirAt(join5(cur, GIT_DIR_NAME));
     if (gitDir !== null) {
-      const common = firstLine(join4(gitDir, GIT_COMMONDIR_FILE));
+      const common = firstLine(join5(gitDir, GIT_COMMONDIR_FILE));
       return { commonDir: realpathSync3.native(common === null ? gitDir : resolve4(gitDir, common)), worktree: cur, start };
     }
     const up = dirname3(cur);
@@ -5594,7 +5741,7 @@ function gitDirAt(dotGit) {
   } catch {
     return null;
   }
-  return existsSync2(join4(gitDir, GIT_HEAD_FILE)) ? gitDir : null;
+  return existsSync2(join5(gitDir, GIT_HEAD_FILE)) ? gitDir : null;
 }
 function firstLine(file) {
   let text;
@@ -5635,11 +5782,11 @@ function resolveProject(agent, src) {
       return key;
     },
     get projectDir() {
-      pdir ??= join4(resolveConfigDir(process.env), PROJECTS_DIR_NAME, this.projectKey);
+      pdir ??= join5(resolveConfigDir(process.env), PROJECTS_DIR_NAME, this.projectKey);
       return pdir;
     },
     get dbPath() {
-      return join4(this.projectDir, DB_FILE_NAME);
+      return join5(this.projectDir, DB_FILE_NAME);
     },
     worktree,
     get containmentRoot() {
@@ -6131,7 +6278,7 @@ function cutPoint(src, start, end, scratch) {
   const r = encoder.encodeInto(src.slice(start, limit), scratch);
   return { end: start + r.read, written: r.written };
 }
-function merge(src, blocks, join6, cap, lineCut) {
+function merge(src, blocks, join7, cap, lineCut) {
   const out = [];
   const scratch = new Uint8Array(cap);
   let wide;
@@ -6141,7 +6288,7 @@ function merge(src, blocks, join6, cap, lineCut) {
     out.push({ ord: out.length, text: src.slice(start, end), bytes: bytes2 });
   };
   for (const b of blocks) {
-    if (cur !== void 0 && !join6) {
+    if (cur !== void 0 && !join7) {
       emit(cur.start, cur.end, curBytes);
       cur = void 0;
     }
@@ -6249,7 +6396,7 @@ function sourceLabel(command) {
   return Array.from(RUN_LABEL_PREFIX + first).slice(0, SOURCE_LABEL_MAX_CHARS).join("");
 }
 function moreLine2(bundleDir, sourceId, terms) {
-  return RUN_MORE_PREFIX + JSON.stringify(join5(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
+  return RUN_MORE_PREFIX + JSON.stringify(join6(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
 }
 function bytes(s) {
   return Buffer.byteLength(s, "utf8");
