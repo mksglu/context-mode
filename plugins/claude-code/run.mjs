@@ -1136,7 +1136,7 @@ var PI_EVENTS = {
   tool_call: { event: "PreToolUse" },
   tool_result: { event: "PostToolUse" }
 };
-var NATIVE_TO_CANONICAL6 = { bash: "Bash", read: "Read" };
+var NATIVE_TO_CANONICAL6 = { bash: "Bash", read: "Read", edit: "Edit", write: "Write" };
 function record(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
 }
@@ -1406,8 +1406,9 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "pi:ctx.cwd",
     toolNamePrefix: TOOL_NAME_PREFIX9,
-    nativeTools: { shell: ["bash"], read: ["read"] },
+    nativeTools: { shell: ["bash", "powershell"], read: ["read"] },
     execReadOnlyHint: false,
+    // D-R38-PI-PWSH-1: Pi on Windows names its shell tool "powershell"
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag",
     compactSummary: "none",

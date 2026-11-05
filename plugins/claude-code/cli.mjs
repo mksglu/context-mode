@@ -434,6 +434,10 @@ var V1_CACHE_HEAL_NAME = "context-mode-cache-heal";
 var V1_CACHE_HEAL_EXTS = Object.freeze([".mjs", ".sh"]);
 var V1_STATUSLINE_COMMAND = "context-mode statusline";
 var V1_PI_PACKAGE = "npm:context-mode";
+var PI_NPM_DIR = "npm";
+var PI_NODE_MODULES_DIR = "node_modules";
+var PI_PACKAGE_JSON_FILE = "package.json";
+var PI_CURRENT_MAJOR = 2;
 var V1_OPENCODE_PLUGIN_SPEC = "context-mode";
 var V1_TMP_PREFIX = "context-mode-";
 var V1_TOML_SECTION_ROOT = "mcp_servers";
@@ -1237,7 +1241,7 @@ var PI_EVENTS = {
   tool_call: { event: "PreToolUse" },
   tool_result: { event: "PostToolUse" }
 };
-var NATIVE_TO_CANONICAL6 = { bash: "Bash", read: "Read" };
+var NATIVE_TO_CANONICAL6 = { bash: "Bash", read: "Read", edit: "Edit", write: "Write" };
 function record(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
 }
@@ -1507,8 +1511,9 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "pi:ctx.cwd",
     toolNamePrefix: TOOL_NAME_PREFIX9,
-    nativeTools: { shell: ["bash"], read: ["read"] },
+    nativeTools: { shell: ["bash", "powershell"], read: ["read"] },
     execReadOnlyHint: false,
+    // D-R38-PI-PWSH-1: Pi on Windows names its shell tool "powershell"
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag",
     compactSummary: "none",
@@ -4727,7 +4732,7 @@ function ownMcpFileOf(agent, file, env, home) {
 
 // src/core/ops/doctor-issue.ts
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync as existsSync8, fstatSync, mkdirSync as mkdirSync4, openSync, readFileSync as readFileSync4, readSync, realpathSync as realpathSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { closeSync, existsSync as existsSync9, fstatSync, mkdirSync as mkdirSync4, openSync, readFileSync as readFileSync5, readSync, realpathSync as realpathSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { delimiter, join as join9 } from "node:path";
 
 // src/core/hooks/fallback.ts
@@ -4824,7 +4829,7 @@ CREATE VIRTUAL TABLE line_units USING fts5(
 var { existsSync: existsSync2, linkSync, mkdirSync: mkdirSync2, rmSync } = process.getBuiltinModule("node:fs");
 
 // src/core/ops/doctor-config.ts
-import { existsSync as existsSync7, readdirSync as readdirSync4 } from "node:fs";
+import { existsSync as existsSync8, readdirSync as readdirSync4 } from "node:fs";
 import { join as join8 } from "node:path";
 
 // src/core/ops/detect-v1.ts
@@ -7549,12 +7554,17 @@ function scanKiro(agentHome, project, out2) {
   }
   dataDir(join6(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out2);
 }
+function piNpmIsCurrent(piAgentDir) {
+  const doc = readJson(join6(piAgentDir, PI_NPM_DIR, PI_NODE_MODULES_DIR, SERVER_KEY, PI_PACKAGE_JSON_FILE));
+  const version = isObj(doc) && typeof doc.version === "string" ? doc.version : "";
+  return Number.parseInt(version, 10) >= PI_CURRENT_MAJOR;
+}
 function scanPi(piAgentDir, agentHome, out2) {
   const file = join6(piAgentDir, SETTINGS_FILE);
   const doc = readJson(file);
   listOf(isObj(doc) ? doc[PI_PACKAGES_KEY] : void 0).forEach((pkg, i2) => {
     const spec = isObj(pkg) ? pkg[PI_PACKAGE_SOURCE_KEY] : pkg;
-    if (spec === V1_PI_PACKAGE) out2.push(finding(file, keyPath(PI_PACKAGES_KEY, i2), V1_REASON.piNpm));
+    if (spec === V1_PI_PACKAGE && !piNpmIsCurrent(piAgentDir)) out2.push(finding(file, keyPath(PI_PACKAGES_KEY, i2), V1_REASON.piNpm));
   });
   dataDir(join6(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out2);
 }
@@ -7652,6 +7662,106 @@ import { existsSync as existsSync6, readdirSync as readdirSync3, readFileSync as
 import { dirname as dirname5, isAbsolute, join as join7, sep } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
+// src/setup/pi-gate.ts
+import { existsSync as existsSync7, readFileSync as readFileSync4, realpathSync as realpathSync3 } from "node:fs";
+import path3 from "node:path";
+var OWN_FILE = "pi/index.js";
+var EXTENSIONS_KEY = "extensions";
+var PROJECT_DIR = ".pi";
+var TRUST_FILE = "trust.json";
+var ALWAYS = "always";
+var SOURCE_PREFIXES = ["npm:", "git:"];
+function load(file) {
+  if (!existsSync7(file)) return void 0;
+  try {
+    return { file, doc: parseHostConfig("pi", file, hostText(readFileSync4(file, "utf8")), "json") };
+  } catch {
+    return void 0;
+  }
+}
+var real = (p3) => {
+  try {
+    return realpathSync3(p3);
+  } catch {
+    return path3.resolve(p3);
+  }
+};
+function sourceName(source) {
+  let s = source;
+  for (const p3 of SOURCE_PREFIXES) if (s.startsWith(p3)) s = s.slice(p3.length);
+  const last2 = s.split("/").pop() ?? "";
+  const at = last2.indexOf("@", 1);
+  const name = at > 0 ? last2.slice(0, at) : last2;
+  return name.endsWith(".git") ? name.slice(0, -4) : name;
+}
+function isOwn(source, pkgDir) {
+  if (typeof source !== "string") return false;
+  return real(source) === real(pkgDir) || sourceName(source) === SERVER_KEY;
+}
+function ownEntries(src, pkgDir) {
+  const list2 = hostConfigValueAt(src.doc, [PI_PACKAGES_KEY]);
+  if (!Array.isArray(list2)) return [];
+  const out2 = [];
+  for (const e of list2) {
+    const obj = typeof e === "object" && e !== null && !Array.isArray(e) ? e : void 0;
+    if (!isOwn(obj ? obj[PI_PACKAGE_SOURCE_KEY] : e, pkgDir)) continue;
+    const ext = obj?.[EXTENSIONS_KEY];
+    out2.push({ source: src, patterns: Array.isArray(ext) ? ext.filter((x2) => typeof x2 === "string") : void 0 });
+  }
+  return out2;
+}
+function matchesAny(patterns, pkgDir) {
+  const abs = path3.join(pkgDir, OWN_FILE).split(path3.sep).join("/");
+  return patterns.some((p3) => {
+    const g2 = p3.startsWith("./") ? p3.slice(2) : p3;
+    return [OWN_FILE, path3.posix.basename(OWN_FILE), abs].some((c3) => path3.posix.matchesGlob(c3, g2));
+  });
+}
+var exactAny = (patterns, pkgDir) => {
+  const abs = path3.join(pkgDir, OWN_FILE).split(path3.sep).join("/");
+  return patterns.some((p3) => {
+    const g2 = p3.startsWith("./") ? p3.slice(2) : p3;
+    return g2 === OWN_FILE || g2 === abs;
+  });
+};
+function loads(patterns, pkgDir) {
+  if (patterns.length === 0) return false;
+  const by = (c3) => patterns.filter((p3) => p3.startsWith(c3)).map((p3) => p3.slice(1));
+  const includes = patterns.filter((p3) => !"+-!".includes(p3[0] ?? ""));
+  let on = includes.length === 0 || matchesAny(includes, pkgDir);
+  if (matchesAny(by("!"), pkgDir)) on = false;
+  if (exactAny(by("+"), pkgDir)) on = true;
+  if (exactAny(by("-"), pkgDir)) on = false;
+  return on;
+}
+function projectTrusted(agentDir, userDoc, cwd) {
+  const trust = load(path3.join(agentDir, TRUST_FILE));
+  const entries = /* @__PURE__ */ new Map();
+  if (trust && typeof trust.doc === "object" && trust.doc !== null) for (const [k, v] of Object.entries(trust.doc)) entries.set(real(k), v);
+  let dir = real(cwd);
+  for (; ; ) {
+    const v = entries.get(dir);
+    if (v === true || v === false) return v;
+    const up = path3.dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return hostConfigValueAt(userDoc, ["defaultProjectTrust"]) === ALWAYS;
+}
+function piSettingsGate(env, home, pkgDir, cwd) {
+  const agentDir = piAgentDirOf(env, home);
+  const user = load(path3.join(agentDir, SETTINGS_FILE));
+  const project = load(path3.join(cwd, PROJECT_DIR, SETTINGS_FILE));
+  const projectOwn = project && projectTrusted(agentDir, user?.doc, cwd) ? ownEntries(project, pkgDir) : [];
+  const effective = projectOwn.length ? projectOwn : user ? ownEntries(user, pkgDir) : [];
+  for (const e of effective) {
+    if (e.patterns !== void 0 && !loads(e.patterns, pkgDir)) {
+      return `${e.source.file}: the packages[] entry for context-mode has extensions ${JSON.stringify(e.patterns)}, which leaves out ${OWN_FILE}, so pi loads no hook; remove the "extensions" filter from that entry`;
+    }
+  }
+  return void 0;
+}
+
 // src/core/ops/doctor-config.ts
 var [PART_MCP, PART_HOOKS, PART_TIMEOUT] = D3_PARTS;
 function composeMatcher(row, event) {
@@ -7672,7 +7782,7 @@ function formUrl(title, summary) {
 }
 
 // src/setup/registry.ts
-import path3 from "node:path";
+import path4 from "node:path";
 
 // src/setup/hook-shapes.ts
 var MS_PER_SECOND = 1e3;
@@ -7758,11 +7868,11 @@ var OPENCODE_HOME_SEGS = AGENT_HOME_DIR.opencode;
 function agentPath(ctx, id, rel) {
   const segs = typeof rel === "string" ? rel.split("/") : [...rel];
   const codexHome = ctx.env[CODEX_HOME_ENV2];
-  if (id === "codex" && segs[0] === CODEX_DIR && codexHome !== void 0 && codexHome !== "") return path3.join(codexHome, ...segs.slice(1));
-  if (id === "copilot-cli" && segs[0] === COPILOT_DIR) return path3.join(copilotDirOf(ctx.env, ctx.home), ...segs.slice(1));
-  if (id === "kiro" && segs[0] === KIRO_DIR) return path3.join(kiroDirOf(ctx.env, ctx.home), ...segs.slice(1));
-  if (id === "opencode" && segs[0] === OPENCODE_HOME_SEGS[0] && segs[1] === OPENCODE_HOME_SEGS[1]) return path3.join(opencodeDirOf(ctx.env, ctx.home), ...segs.slice(2));
-  return path3.join(ctx.home, ...segs);
+  if (id === "codex" && segs[0] === CODEX_DIR && codexHome !== void 0 && codexHome !== "") return path4.join(codexHome, ...segs.slice(1));
+  if (id === "copilot-cli" && segs[0] === COPILOT_DIR) return path4.join(copilotDirOf(ctx.env, ctx.home), ...segs.slice(1));
+  if (id === "kiro" && segs[0] === KIRO_DIR) return path4.join(kiroDirOf(ctx.env, ctx.home), ...segs.slice(1));
+  if (id === "opencode" && segs[0] === OPENCODE_HOME_SEGS[0] && segs[1] === OPENCODE_HOME_SEGS[1]) return path4.join(opencodeDirOf(ctx.env, ctx.home), ...segs.slice(2));
+  return path4.join(ctx.home, ...segs);
 }
 function renderSkill(text2, prefix) {
   const prefixes = typeof prefix === "string" ? [prefix] : prefix;
@@ -7792,12 +7902,12 @@ function extensionPlugin(bin, id) {
   };
 }
 var NATIVE_PLUGIN = {
-  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path3.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
+  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path4.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
   qwen: extensionPlugin("qwen", "qwen"),
   gemini: extensionPlugin("gemini", "gemini")
 };
 function serverCmd(ctx, id) {
-  return [process.execPath, path3.join(ctx.pkgDir, SERVER_BUNDLE), AGENT_FLAG, id];
+  return [process.execPath, path4.join(ctx.pkgDir, SERVER_BUNDLE), AGENT_FLAG, id];
 }
 function hookCommandString(row) {
   const [node, file, flag, id] = row.hookCommand ?? [];
@@ -7824,7 +7934,7 @@ function configFor(ctx, id) {
   }
   if (id === "opencode") {
     return {
-      file: path3.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE),
+      file: path4.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE),
       format: "jsonc",
       key: ["mcp", SERVER_KEY],
       value: { type: "local", command: [node, server, flag, agent], enabled: true }
@@ -7853,7 +7963,7 @@ function cliFor(ctx, id) {
 }
 function copyFor(ctx, id) {
   if (id !== "claude-code") return void 0;
-  const file = path3.join(claudeDirOf(ctx.env, ctx.home), HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE);
+  const file = path4.join(claudeDirOf(ctx.env, ctx.home), HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE);
   return { host: "Claude Code", bin: "claude", plugin: PLUGIN_ID, file, refresh: ["plugin", "update", PLUGIN_ID], enable: ["plugin", "enable", PLUGIN_ID] };
 }
 var LIST = {
@@ -7874,11 +7984,11 @@ function hookFilesFor(ctx, id) {
     case "copilot-cli":
       return [{ file: agentPath(ctx, id, [COPILOT_DIR, "hooks", "context-mode.json"]), mode: "rewrite" }];
     case "claude-code":
-      return [{ file: path3.join(claudeDirOf(ctx.env, home), "settings.json"), mode: "drop" }];
+      return [{ file: path4.join(claudeDirOf(ctx.env, home), "settings.json"), mode: "drop" }];
     case "gemini":
-      return [{ file: path3.join(home, ".gemini", "settings.json"), mode: "drop" }];
+      return [{ file: path4.join(home, ".gemini", "settings.json"), mode: "drop" }];
     case "qwen":
-      return [{ file: path3.join(home, ".qwen", "settings.json"), mode: "drop" }];
+      return [{ file: path4.join(home, ".qwen", "settings.json"), mode: "drop" }];
     default:
       return [];
   }
@@ -7889,13 +7999,13 @@ function hookInstallFor(ctx, row, command) {
     const shape = HOOK_SHAPES[row.id];
     if (!shape) throw new Error(`setup: ${row.id} has a home-file hook channel and no hook shape`);
     const file = agentPath(ctx, row.id, ch.path);
-    if (row.id === "codex") return { kind: "file", file, shape: shape(row, command), command, trust: path3.join(path3.dirname(file), CODEX_CONFIG_FILE) };
+    if (row.id === "codex") return { kind: "file", file, shape: shape(row, command), command, trust: path4.join(path4.dirname(file), CODEX_CONFIG_FILE) };
     return { kind: "file", file, shape: shape(row, command), command };
   }
   if (row.id === "opencode") {
     return {
       kind: "plugin-list",
-      file: path3.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE),
+      file: path4.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE),
       key: ["plugin"],
       entry: ctx.pkgDir
     };
@@ -7911,11 +8021,11 @@ function skillInstallFor(ctx, row) {
   const ch = row.skillChannel;
   if (ch.kind === "package") return { kind: "package", via: ch.path };
   const dir = agentPath(ctx, row.id, ch.path);
-  const src = path3.join(ctx.pkgDir, bareSkillDir());
+  const src = path4.join(ctx.pkgDir, bareSkillDir());
   return { kind: "dir", dir, prefixes: skillDirPrefixes(ch.path), files: COMMAND_SKILLS.map((name) => ({
     name,
-    src: path3.join(src, name, SKILL_FILE),
-    file: path3.join(dir, name, SKILL_FILE)
+    src: path4.join(src, name, SKILL_FILE),
+    file: path4.join(dir, name, SKILL_FILE)
   })) };
 }
 function buildRegistry(ctx) {
@@ -7923,7 +8033,7 @@ function buildRegistry(ctx) {
     const id = row.id;
     const config = configFor(ctx, id);
     const hookFiles = hookFilesFor(ctx, id);
-    const runCommand2 = [process.execPath, path3.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
+    const runCommand2 = [process.execPath, path4.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
     const bareNode = id === "codex" && (ctx.platform ?? process.platform) === "win32";
     const hookCommand = bareNode ? [HOST_NODE_COMMAND, ...runCommand2.slice(1)] : runCommand2;
     const command = `${bareNode ? HOST_NODE_COMMAND : `"${hookCommand[0]}"`} "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
@@ -7949,7 +8059,7 @@ function buildRegistry(ctx) {
       hookInstall,
       skillInstall,
       hookRunCommand: runCommand2,
-      allowedWrites: [...new Set(writes.map((f2) => path3.resolve(f2)))],
+      allowedWrites: [...new Set(writes.map((f2) => path4.resolve(f2)))],
       goldenPayload: golden(row, ctx.home)
     };
     if (copilotSettings) out2.copilotSettings = copilotSettings;
@@ -7962,15 +8072,15 @@ function buildRegistry(ctx) {
   });
 }
 function assertWritable(row, file) {
-  const abs = path3.resolve(file);
-  if (INSTRUCTION_FILES.includes(path3.basename(abs)) || !row.allowedWrites.includes(abs)) {
+  const abs = path4.resolve(file);
+  if (INSTRUCTION_FILES.includes(path4.basename(abs)) || !row.allowedWrites.includes(abs)) {
     throw new Error(`setup: write to ${abs} is not allowed for ${row.id}`);
   }
 }
 
 // src/setup/gemini-gate.ts
-import { existsSync as existsSync9, readFileSync as readFileSync5 } from "node:fs";
-import path4 from "node:path";
+import { existsSync as existsSync10, readFileSync as readFileSync6 } from "node:fs";
+import path5 from "node:path";
 var GEMINI_DIR = ".gemini";
 var SETTINGS_FILE2 = "settings.json";
 var SYSTEM_PATH_ENV = "GEMINI_CLI_SYSTEM_SETTINGS_PATH";
@@ -7982,16 +8092,16 @@ function systemSettingsPath(env) {
   if (process.platform === "win32") return "C:\\ProgramData\\gemini-cli\\settings.json";
   return "/etc/gemini-cli/settings.json";
 }
-function load(file) {
-  if (!existsSync9(file)) return void 0;
+function load2(file) {
+  if (!existsSync10(file)) return void 0;
   try {
-    return { file, doc: parseHostConfig(OWN_AGENT, file, hostText(readFileSync5(file, "utf8")), "jsonc") };
+    return { file, doc: parseHostConfig(OWN_AGENT, file, hostText(readFileSync6(file, "utf8")), "jsonc") };
   } catch {
     return void 0;
   }
 }
 function sources(env, home, cwd) {
-  return [path4.join(home, GEMINI_DIR, SETTINGS_FILE2), path4.join(cwd, GEMINI_DIR, SETTINGS_FILE2), systemSettingsPath(env)].map(load).filter((s) => s !== void 0);
+  return [path5.join(home, GEMINI_DIR, SETTINGS_FILE2), path5.join(cwd, GEMINI_DIR, SETTINGS_FILE2), systemSettingsPath(env)].map(load2).filter((s) => s !== void 0);
 }
 function ownHookEntry(entry2) {
   return typeof entry2 === "string" && entry2.includes(HOOK_BUNDLE) && entry2.includes(`${AGENT_FLAG} ${OWN_AGENT}`);
@@ -8017,8 +8127,8 @@ function geminiSettingsGate(env, home, cwd) {
 }
 
 // src/setup/zcode-gate.ts
-import { existsSync as existsSync10, readFileSync as readFileSync6 } from "node:fs";
-import path5 from "node:path";
+import { existsSync as existsSync11, readFileSync as readFileSync7 } from "node:fs";
+import path6 from "node:path";
 var OWN_AGENT2 = "zcode";
 var EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"];
 var HOOK_TYPES = ["process", "command"];
@@ -8108,117 +8218,17 @@ function zcodeSchemaBad(doc) {
   );
 }
 function zcodeConfigGate(home) {
-  const file = path5.join(home, ".zcode", "cli", "config.json");
-  if (!existsSync10(file)) return void 0;
+  const file = path6.join(home, ".zcode", "cli", "config.json");
+  if (!existsSync11(file)) return void 0;
   let doc;
   try {
-    doc = parseHostConfig(OWN_AGENT2, file, hostText(readFileSync6(file, "utf8")), "json");
+    doc = parseHostConfig(OWN_AGENT2, file, hostText(readFileSync7(file, "utf8")), "json");
   } catch {
     return void 0;
   }
   const bad = zcodeSchemaBad(doc);
   if (!bad) return void 0;
   return `${file}: ${bad.key} ${bad.why}, so zcode drops the whole config.json and runs no context-mode hook; fix or remove that key`;
-}
-
-// src/setup/pi-gate.ts
-import { existsSync as existsSync11, readFileSync as readFileSync7, realpathSync as realpathSync4 } from "node:fs";
-import path6 from "node:path";
-var OWN_FILE = "pi/index.js";
-var EXTENSIONS_KEY = "extensions";
-var PROJECT_DIR = ".pi";
-var TRUST_FILE = "trust.json";
-var ALWAYS = "always";
-var SOURCE_PREFIXES = ["npm:", "git:"];
-function load2(file) {
-  if (!existsSync11(file)) return void 0;
-  try {
-    return { file, doc: parseHostConfig("pi", file, hostText(readFileSync7(file, "utf8")), "json") };
-  } catch {
-    return void 0;
-  }
-}
-var real = (p3) => {
-  try {
-    return realpathSync4(p3);
-  } catch {
-    return path6.resolve(p3);
-  }
-};
-function sourceName(source) {
-  let s = source;
-  for (const p3 of SOURCE_PREFIXES) if (s.startsWith(p3)) s = s.slice(p3.length);
-  const last2 = s.split("/").pop() ?? "";
-  const at = last2.indexOf("@", 1);
-  const name = at > 0 ? last2.slice(0, at) : last2;
-  return name.endsWith(".git") ? name.slice(0, -4) : name;
-}
-function isOwn(source, pkgDir) {
-  if (typeof source !== "string") return false;
-  return real(source) === real(pkgDir) || sourceName(source) === SERVER_KEY;
-}
-function ownEntries(src, pkgDir) {
-  const list2 = hostConfigValueAt(src.doc, [PI_PACKAGES_KEY]);
-  if (!Array.isArray(list2)) return [];
-  const out2 = [];
-  for (const e of list2) {
-    const obj = typeof e === "object" && e !== null && !Array.isArray(e) ? e : void 0;
-    if (!isOwn(obj ? obj[PI_PACKAGE_SOURCE_KEY] : e, pkgDir)) continue;
-    const ext = obj?.[EXTENSIONS_KEY];
-    out2.push({ source: src, patterns: Array.isArray(ext) ? ext.filter((x2) => typeof x2 === "string") : void 0 });
-  }
-  return out2;
-}
-function matchesAny(patterns, pkgDir) {
-  const abs = path6.join(pkgDir, OWN_FILE).split(path6.sep).join("/");
-  return patterns.some((p3) => {
-    const g2 = p3.startsWith("./") ? p3.slice(2) : p3;
-    return [OWN_FILE, path6.posix.basename(OWN_FILE), abs].some((c3) => path6.posix.matchesGlob(c3, g2));
-  });
-}
-var exactAny = (patterns, pkgDir) => {
-  const abs = path6.join(pkgDir, OWN_FILE).split(path6.sep).join("/");
-  return patterns.some((p3) => {
-    const g2 = p3.startsWith("./") ? p3.slice(2) : p3;
-    return g2 === OWN_FILE || g2 === abs;
-  });
-};
-function loads(patterns, pkgDir) {
-  if (patterns.length === 0) return false;
-  const by = (c3) => patterns.filter((p3) => p3.startsWith(c3)).map((p3) => p3.slice(1));
-  const includes = patterns.filter((p3) => !"+-!".includes(p3[0] ?? ""));
-  let on = includes.length === 0 || matchesAny(includes, pkgDir);
-  if (matchesAny(by("!"), pkgDir)) on = false;
-  if (exactAny(by("+"), pkgDir)) on = true;
-  if (exactAny(by("-"), pkgDir)) on = false;
-  return on;
-}
-function projectTrusted(agentDir, userDoc, cwd) {
-  const trust = load2(path6.join(agentDir, TRUST_FILE));
-  const entries = /* @__PURE__ */ new Map();
-  if (trust && typeof trust.doc === "object" && trust.doc !== null) for (const [k, v] of Object.entries(trust.doc)) entries.set(real(k), v);
-  let dir = real(cwd);
-  for (; ; ) {
-    const v = entries.get(dir);
-    if (v === true || v === false) return v;
-    const up = path6.dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  return hostConfigValueAt(userDoc, ["defaultProjectTrust"]) === ALWAYS;
-}
-function piSettingsGate(env, home, pkgDir, cwd) {
-  const agentDir = piAgentDirOf(env, home);
-  const user = load2(path6.join(agentDir, SETTINGS_FILE));
-  const project = load2(path6.join(cwd, PROJECT_DIR, SETTINGS_FILE));
-  const projectOwn = project && projectTrusted(agentDir, user?.doc, cwd) ? ownEntries(project, pkgDir) : [];
-  const effective = projectOwn.length ? projectOwn : user ? ownEntries(user, pkgDir) : [];
-  for (const e of effective) {
-    if (e.patterns !== void 0 && !loads(e.patterns, pkgDir)) {
-      return `${e.source.file}: the packages[] entry for context-mode has extensions ${JSON.stringify(e.patterns)}, which leaves out ${OWN_FILE}, so pi loads no hook; remove the "extensions" filter from that entry`;
-    }
-  }
-  return void 0;
 }
 
 // src/setup/vscode-gate.ts
