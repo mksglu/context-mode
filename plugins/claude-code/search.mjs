@@ -359,8 +359,8 @@ var DB_SIBLING_SUFFIXES = Object.freeze(["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]);
 var UPGRADE_HOST_COMMAND = Object.freeze({
   "claude-code": "claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode",
   codex: "rewrite config.toml's [mcp_servers.context-mode*] block to the v2 entry, then restart Codex",
-  gemini: "gemini extensions install https://github.com/mksglu/context-mode --ref release --auto-update",
-  qwen: "qwen extensions install https://github.com/mksglu/context-mode --ref release --auto-update"
+  gemini: "gemini extensions install https://github.com/mksglu/context-mode --auto-update",
+  qwen: "qwen extensions install https://github.com/mksglu/context-mode --auto-update"
 });
 var V1_SCRIPT_NAMES = Object.freeze([
   "afteragentresponse.mjs",
@@ -385,6 +385,7 @@ var VSCODE_MCP_FILE = "mcp.json";
 var KIRO_AGENT_FILE = Object.freeze(["agents", "default.json"]);
 var KIRO_STEERING_FILE = Object.freeze(["steering", "KIRO.md"]);
 var OPENCODE_CONFIG_FILES = Object.freeze(["opencode.jsonc", "opencode.json"]);
+var OPENCODE_NPM_SPEC_PREFIX = `${SERVER_KEY}@`;
 var V1_DATA_ROOT_ENTRIES = Object.freeze(["content", "platform.json"]);
 var PI_ROLE = "custom";
 var V1_PATH_SEPS = Object.freeze(["/", "\\"]);
@@ -438,6 +439,7 @@ var DOCTOR_DOCS_LABEL = "Docs: ";
 var DOCTOR_REPORT_LINE = "Report file: ";
 var DOCTOR_GH_LINE = "File it: ";
 var DOCTOR_URL_LINE = "Or open: ";
+var DOCTOR_RULES_LINE = "Rules: ";
 var DOCTOR_GH_NEXT = "  --";
 var DOCTOR_NOTE_PREFIXES = Object.freeze([
   DOCTOR_ENV_PREFIX,
@@ -445,10 +447,23 @@ var DOCTOR_NOTE_PREFIXES = Object.freeze([
   DOCTOR_REPORT_LINE,
   DOCTOR_GH_LINE,
   DOCTOR_GH_NEXT.trim(),
-  DOCTOR_URL_LINE
+  DOCTOR_URL_LINE,
+  DOCTOR_RULES_LINE
 ]);
 var ISSUE_REPO_SLUG = "mksglu/context-mode";
 var ISSUE_FORM_FILE = "agent-report.yml";
+var ISSUE_GUIDE_URL = `https://github.com/${ISSUE_REPO_SLUG}/blob/main/.github/AGENT_ISSUE.md`;
+var ISSUE_AGENT_RULES = Object.freeze([
+  'Search for the same problem first: `gh issue list -R mksglu/context-mode --state all --search "<check id or error>"`. When one matches, add your facts there as a comment.',
+  "File one bug per issue.",
+  "Call the `ctx_doctor` tool and paste its full output unchanged in the `ctx-report` field.",
+  "Give the versions: context-mode, the agent, the OS and arch, and Node.",
+  "Write numbered repro steps that start from a fresh project (`mktemp -d`) and the agent's own install command.",
+  "Give the exact command and its exact output in a fenced code block.",
+  "Say what you expected and what happened instead.",
+  "Name the source file and line when you found the cause.",
+  "Replace every secret with `<masked>` and the home folder with `~` before you send."
+]);
 var ISSUE_FORM_HEADINGS = Object.freeze([
   "Summary",
   "ctx-report",
@@ -474,16 +489,16 @@ var DOCTOR_ENV_NAMES = Object.freeze([
 var DOCTOR_PATH_TOOLS = Object.freeze(["node", "git", "sh"]);
 var DOCTOR_SECRET_WORDS = Object.freeze(["token", "secret", "password", "apikey", "api_key", "authorization", "bearer"]);
 var NATIVE_INSTALL = Object.freeze({
-  "claude-code": ["claude plugin marketplace add mksglu/context-mode#release", "claude plugin install context-mode@context-mode"],
-  codex: ["codex plugin marketplace add mksglu/context-mode@release", "codex plugin add context-mode@context-mode"],
-  gemini: ["gemini extensions install https://github.com/mksglu/context-mode --ref release"],
-  qwen: ["qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release"],
-  opencode: ["opencode plugin add context-mode@next"],
-  pi: ["pi install npm:context-mode@next"],
-  "copilot-cli": ["npm i -g context-mode@next", "context-mode setup --agents copilot-cli"],
-  vscode: ["npm i -g context-mode@next", "context-mode setup --agents vscode"],
-  kiro: ["npm i -g context-mode@next", "context-mode setup --agents kiro"],
-  zcode: ["npm i -g context-mode@next", "context-mode setup --agents zcode"]
+  "claude-code": ["claude plugin marketplace add mksglu/context-mode", "claude plugin install context-mode@context-mode"],
+  codex: ["codex plugin marketplace add mksglu/context-mode", "codex plugin add context-mode@context-mode"],
+  gemini: ["gemini extensions install https://github.com/mksglu/context-mode"],
+  qwen: ["qwen extensions install https://github.com/mksglu/context-mode:context-mode"],
+  opencode: ["opencode plugin add context-mode"],
+  pi: ["pi install npm:context-mode"],
+  "copilot-cli": ["npm i -g context-mode", "context-mode setup --agents copilot-cli"],
+  vscode: ["npm i -g context-mode", "context-mode setup --agents vscode"],
+  kiro: ["npm i -g context-mode", "context-mode setup --agents kiro"],
+  zcode: ["npm i -g context-mode", "context-mode setup --agents zcode"]
 });
 var ISSUE_FORM_URL = `https://github.com/${ISSUE_REPO_SLUG}/issues/new?template=${ISSUE_FORM_FILE}`;
 
@@ -995,7 +1010,8 @@ function encode6(ev, d, _extra) {
 }
 
 // src/adapters/kiro.ts
-var TOOL_NAME_PREFIX7 = "mcp_context-mode_";
+var TOOL_NAME_PREFIX7 = "mcp_context_mode_";
+var LEGACY_TOOL_NAME_PREFIX = "mcp_context-mode_";
 var KIRO_EVENTS = {
   SessionStart: "SessionStart",
   agentSpawn: "SessionStart",
@@ -1007,6 +1023,7 @@ var KIRO_EVENTS = {
   PostToolUse: "PostToolUse",
   postToolUse: "PostToolUse"
 };
+var PROMPT_FIELD = "prompt";
 var PROMPT_ENV = "USER_PROMPT";
 var MCP_PREFIX3 = "mcp_";
 var SHELL_TOOL_NAMES4 = Object.freeze(["execute_bash", "execute_pwsh", "shell"]);
@@ -1015,6 +1032,7 @@ var MCP_SEP3 = "_";
 var KIRO_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 function canonicalName5(name) {
   if (name.startsWith(TOOL_NAME_PREFIX7)) return name.slice(TOOL_NAME_PREFIX7.length);
+  if (name.startsWith(LEGACY_TOOL_NAME_PREFIX)) return name.slice(LEGACY_TOOL_NAME_PREFIX.length);
   if (Object.hasOwn(NATIVE_TO_CANONICAL5, name)) return NATIVE_TO_CANONICAL5[name];
   if (!name.startsWith(MCP_PREFIX3)) return name;
   const rest = name.slice(MCP_PREFIX3.length);
@@ -1035,7 +1053,8 @@ function decode7(raw) {
   const ev = { event, agent: "kiro", sessionId: String(p.session_id ?? ""), cwd: String(p.cwd ?? "") };
   if (event === "SessionStart" && typeof p.source === "string" && KIRO_SOURCES[p.source] !== void 0) ev.source = KIRO_SOURCES[p.source];
   if (event === "UserPromptSubmit") {
-    const prompt = process.env[PROMPT_ENV];
+    const field = p[PROMPT_FIELD];
+    const prompt = typeof field === "string" ? field : process.env[PROMPT_ENV];
     if (prompt !== void 0) ev.prompt = prompt;
   }
   if (event === "PreToolUse" || event === "PostToolUse") {
@@ -1047,7 +1066,7 @@ function decode7(raw) {
   return ev;
 }
 function encode7(ev, d, _extra) {
-  if (ev.event === "UserPromptSubmit") return { stdout: "", exitCode: 0 };
+  if (ev.event === "UserPromptSubmit") return { stdout: d.kind === "hint" ? d.text : "", exitCode: 0 };
   switch (d.kind) {
     case "allow":
       return { stdout: "", exitCode: 0 };

@@ -9,7 +9,7 @@
       "name": "context-mode",
       "skills": "./claude-code/skills",
       "source": "./plugins/claude-code",
-      "version": "2.0.2",
+      "version": "2.1.0",
       "keywords": [
         "claude-code",
         "codex",
@@ -30,6 +30,6 @@
     }
   ],
   "metadata": {
-    "version": "2.0.2"
+    "version": "2.1.0"
   }
 }
