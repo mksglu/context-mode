@@ -28066,6 +28066,8 @@ var POINTER_MIN = 640;
 var STATE_CLOSE_TAG = "</context_mode_state>";
 var INDEX_WRITE_CHUNK = 1048576;
 var REPLACE_TRIGGER_BYTES = 4096;
+var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
+var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var MAX_CHUNK_BYTES = 4096;
 var SEARCH_PAGE_SIZE = 20;
 var MEMORY_LABEL_PREFIX = "memory ";
@@ -28407,7 +28409,7 @@ var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "1ce32b37e98bfffd69edcd071b13e1e2d43a0ae9" : void 0;
+var BUNDLE_SHA = true ? "83f2da691359eaaf61f7baba841dea1942d3ccc1" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -28671,6 +28673,7 @@ var REGEX_SPECIAL_CHARS = ".*+?^${}()|[]\\";
 var REGEX_ESCAPE = "\\";
 var CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"]);
 var D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
+var D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the replace trigger came back replaced: a bounded Read must reach the model whole";
 var D5_READ_SHAPE_DETAIL = `PostToolUse Read replace is not Read's output shape {type:"text", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning`;
 function D5_SLOW_DETAIL(ms) {
   return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`;
@@ -45142,6 +45145,14 @@ function canonicalName3(name) {
   if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
   return name;
 }
+var isNum = (v) => typeof v === "number" && Number.isFinite(v);
+function viewRange(name, input) {
+  const r = input.view_range;
+  if (name !== "view" || !Array.isArray(r) || !isNum(r[0])) return input;
+  const out = { ...input, offset: r[0] };
+  if (isNum(r[1]) && r[1] >= r[0]) out.limit = r[1] - r[0] + 1;
+  return out;
+}
 function readArgs(v) {
   if (isRecord(v)) return v;
   if (typeof v !== "string") return {};
@@ -45186,7 +45197,7 @@ function decode7(raw) {
   if (event === "UserPromptSubmit" && typeof raw.prompt === "string") ev.prompt = raw.prompt;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const toolName2 = String(raw[k.tool] ?? "");
-    const tool = { name: toolName2, canonicalName: canonicalName3(toolName2), input: readArgs(raw[k.args]) };
+    const tool = { name: toolName2, canonicalName: canonicalName3(toolName2), input: viewRange(toolName2, readArgs(raw[k.args])) };
     ev.tool = tool;
   }
   if (event === "PostToolUse") ev.result = readResult3(raw[k.result], native.casing, native.failure);
@@ -45234,18 +45245,18 @@ function canonicalName4(name) {
   if (sep3 <= 0 || sep3 === rest.length - 1) return name;
   return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP2.length);
 }
-var isNum = (v) => typeof v === "number" && Number.isFinite(v);
+var isNum2 = (v) => typeof v === "number" && Number.isFinite(v);
 function policyInput(name, canonical, input) {
   if (canonical === "Read" && READ_TOOL_NAMES.includes(name)) {
     const out = { ...input };
     if (name === "read_file") {
       if (typeof input.filePath === "string") out.file_path = input.filePath;
-      if (isNum(input.startLine)) out.offset = input.startLine;
-      if (isNum(input.startLine) && isNum(input.endLine) && input.endLine >= input.startLine) out.limit = input.endLine - input.startLine + 1;
-    } else if (Array.isArray(input.view_range) && isNum(input.view_range[0])) {
+      if (isNum2(input.startLine)) out.offset = input.startLine;
+      if (isNum2(input.startLine) && isNum2(input.endLine) && input.endLine >= input.startLine) out.limit = input.endLine - input.startLine + 1;
+    } else if (Array.isArray(input.view_range) && isNum2(input.view_range[0])) {
       out.offset = input.view_range[0];
       const end = input.view_range[1];
-      if (isNum(end) && end >= input.view_range[0]) out.limit = end - input.view_range[0] + 1;
+      if (isNum2(end) && end >= input.view_range[0]) out.limit = end - input.view_range[0] + 1;
     }
     return out;
   }
@@ -49692,7 +49703,7 @@ function isNativeShape(agent, stdout, exitCode, killed, event) {
   }
 }
 var READ_PROBE_LINES = 4 * Math.ceil(REPLACE_TRIGGER_BYTES / 40);
-function readProbePayload(cwd) {
+function readProbePayload(cwd, ranged) {
   const content = Array.from({ length: READ_PROBE_LINES }, (_, n) => "d5 read probe line " + n + " ".padEnd(20, "x")).join("\n");
   const filePath = path7.join(cwd, "d5-read-probe.txt");
   return {
@@ -49702,7 +49713,7 @@ function readProbePayload(cwd) {
     hook_event_name: "PostToolUse",
     tool_name: "Read",
     tool_use_id: "toolu_d5_read_probe",
-    tool_input: { file_path: filePath },
+    tool_input: ranged ? { file_path: filePath, offset: 1, limit: READ_PROBE_LINES } : { file_path: filePath },
     tool_response: { type: "text", file: { filePath, content, numLines: READ_PROBE_LINES, startLine: 1, totalLines: READ_PROBE_LINES } }
   };
 }
@@ -49720,7 +49731,7 @@ function isReadShape(stdout) {
   const f = r.file;
   return typeof f.filePath === "string" && typeof f.content === "string" && ["numLines", "startLine", "totalLines"].every((k) => typeof f[k] === "number");
 }
-async function readProbeOk(i, timeoutMs) {
+async function readProbe(i, timeoutMs, ranged) {
   const home = mkdtempSync(path7.join(tmpdir2(), "cm-d5-read-"));
   try {
     const r = await runProcess([process.execPath, path7.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
@@ -49728,12 +49739,27 @@ async function readProbeOk(i, timeoutMs) {
       env: { ...i.env, HOME: home, USERPROFILE: home },
       signal: i.signal,
       timeoutMs,
-      stdin: JSON.stringify(readProbePayload(i.worktree ?? home))
+      stdin: JSON.stringify(readProbePayload(i.worktree ?? home, ranged))
     });
-    return isReadShape(r.stdout.toString("utf8"));
+    return r.stdout.toString("utf8");
   } finally {
     rmSync4(home, { recursive: true, force: true });
   }
+}
+function isPassThrough(stdout) {
+  if (stdout.trim() === "") return true;
+  let out;
+  try {
+    out = JSON.parse(stdout);
+  } catch {
+    return false;
+  }
+  return !isObject5(out) || !isObject5(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput");
+}
+async function readProbeDetail(i, timeoutMs) {
+  if (!isReadShape(await readProbe(i, timeoutMs, false))) return D5_READ_SHAPE_DETAIL;
+  if (!isPassThrough(await readProbe(i, timeoutMs, true))) return D5_READ_RANGE_DETAIL;
+  return null;
 }
 function codexHookJournaled(db) {
   if (db === null) return false;
@@ -49802,7 +49828,8 @@ async function checkHookRoundTrip(i) {
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
-  if (i.agent === "claude-code" && !await readProbeOk(i, timeoutMs)) return row("FAIL", D5_READ_SHAPE_DETAIL, D5_FIX);
+  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : null;
+  if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
 

@@ -14,6 +14,8 @@ function prefixToolNames(text, prefix) {
 }
 var OUTPUT_CAP = 16384;
 var INDEX_WRITE_CHUNK = 1048576;
+var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
+var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var MAX_CHUNK_BYTES = 4096;
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
@@ -843,6 +845,14 @@ function canonicalName3(name) {
   if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
   return name;
 }
+var isNum = (v) => typeof v === "number" && Number.isFinite(v);
+function viewRange(name, input) {
+  const r = input.view_range;
+  if (name !== "view" || !Array.isArray(r) || !isNum(r[0])) return input;
+  const out = { ...input, offset: r[0] };
+  if (isNum(r[1]) && r[1] >= r[0]) out.limit = r[1] - r[0] + 1;
+  return out;
+}
 function readArgs(v) {
   if (isRecord(v)) return v;
   if (typeof v !== "string") return {};
@@ -887,7 +897,7 @@ function decode5(raw) {
   if (event === "UserPromptSubmit" && typeof raw.prompt === "string") ev.prompt = raw.prompt;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const toolName = String(raw[k.tool] ?? "");
-    const tool = { name: toolName, canonicalName: canonicalName3(toolName), input: readArgs(raw[k.args]) };
+    const tool = { name: toolName, canonicalName: canonicalName3(toolName), input: viewRange(toolName, readArgs(raw[k.args])) };
     ev.tool = tool;
   }
   if (event === "PostToolUse") ev.result = readResult3(raw[k.result], native.casing, native.failure);
@@ -935,18 +945,18 @@ function canonicalName4(name) {
   if (sep3 <= 0 || sep3 === rest.length - 1) return name;
   return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP2.length);
 }
-var isNum = (v) => typeof v === "number" && Number.isFinite(v);
+var isNum2 = (v) => typeof v === "number" && Number.isFinite(v);
 function policyInput(name, canonical, input) {
   if (canonical === "Read" && READ_TOOL_NAMES.includes(name)) {
     const out = { ...input };
     if (name === "read_file") {
       if (typeof input.filePath === "string") out.file_path = input.filePath;
-      if (isNum(input.startLine)) out.offset = input.startLine;
-      if (isNum(input.startLine) && isNum(input.endLine) && input.endLine >= input.startLine) out.limit = input.endLine - input.startLine + 1;
-    } else if (Array.isArray(input.view_range) && isNum(input.view_range[0])) {
+      if (isNum2(input.startLine)) out.offset = input.startLine;
+      if (isNum2(input.startLine) && isNum2(input.endLine) && input.endLine >= input.startLine) out.limit = input.endLine - input.startLine + 1;
+    } else if (Array.isArray(input.view_range) && isNum2(input.view_range[0])) {
       out.offset = input.view_range[0];
       const end = input.view_range[1];
-      if (isNum(end) && end >= input.view_range[0]) out.limit = end - input.view_range[0] + 1;
+      if (isNum2(end) && end >= input.view_range[0]) out.limit = end - input.view_range[0] + 1;
     }
     return out;
   }

@@ -96,6 +96,8 @@ import { fileURLToPath as fileURLToPath3 } from "node:url";
 var SERVER_KEY = "context-mode";
 var TOOL_ORDER = Object.freeze(["ctx_execute", "ctx_batch", "ctx_index", "ctx_search", "ctx_resume", "ctx_stats", "ctx_doctor", "ctx_upgrade", "ctx_purge"]);
 var OUTPUT_CAP = 16384;
+var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
+var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -948,6 +950,14 @@ function canonicalName3(name) {
   if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
   return name;
 }
+var isNum = (v) => typeof v === "number" && Number.isFinite(v);
+function viewRange(name, input) {
+  const r2 = input.view_range;
+  if (name !== "view" || !Array.isArray(r2) || !isNum(r2[0])) return input;
+  const out2 = { ...input, offset: r2[0] };
+  if (isNum(r2[1]) && r2[1] >= r2[0]) out2.limit = r2[1] - r2[0] + 1;
+  return out2;
+}
 function readArgs(v) {
   if (isRecord(v)) return v;
   if (typeof v !== "string") return {};
@@ -992,7 +1002,7 @@ function decode5(raw) {
   if (event === "UserPromptSubmit" && typeof raw.prompt === "string") ev.prompt = raw.prompt;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const toolName = String(raw[k.tool] ?? "");
-    const tool = { name: toolName, canonicalName: canonicalName3(toolName), input: readArgs(raw[k.args]) };
+    const tool = { name: toolName, canonicalName: canonicalName3(toolName), input: viewRange(toolName, readArgs(raw[k.args])) };
     ev.tool = tool;
   }
   if (event === "PostToolUse") ev.result = readResult3(raw[k.result], native.casing, native.failure);
@@ -1040,18 +1050,18 @@ function canonicalName4(name) {
   if (sep2 <= 0 || sep2 === rest.length - 1) return name;
   return "mcp:" + rest.slice(0, sep2) + ":" + rest.slice(sep2 + MCP_SEP2.length);
 }
-var isNum = (v) => typeof v === "number" && Number.isFinite(v);
+var isNum2 = (v) => typeof v === "number" && Number.isFinite(v);
 function policyInput(name, canonical, input) {
   if (canonical === "Read" && READ_TOOL_NAMES.includes(name)) {
     const out2 = { ...input };
     if (name === "read_file") {
       if (typeof input.filePath === "string") out2.file_path = input.filePath;
-      if (isNum(input.startLine)) out2.offset = input.startLine;
-      if (isNum(input.startLine) && isNum(input.endLine) && input.endLine >= input.startLine) out2.limit = input.endLine - input.startLine + 1;
-    } else if (Array.isArray(input.view_range) && isNum(input.view_range[0])) {
+      if (isNum2(input.startLine)) out2.offset = input.startLine;
+      if (isNum2(input.startLine) && isNum2(input.endLine) && input.endLine >= input.startLine) out2.limit = input.endLine - input.startLine + 1;
+    } else if (Array.isArray(input.view_range) && isNum2(input.view_range[0])) {
       out2.offset = input.view_range[0];
       const end = input.view_range[1];
-      if (isNum(end) && end >= input.view_range[0]) out2.limit = end - input.view_range[0] + 1;
+      if (isNum2(end) && end >= input.view_range[0]) out2.limit = end - input.view_range[0] + 1;
     }
     return out2;
   }
