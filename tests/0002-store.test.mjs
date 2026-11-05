@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
-import { resolveConfigDir } from "../src/core/project/config-dir.ts";
+import { dataRootOf, resolveConfigDir } from "../src/core/project/config-dir.ts";
+import { hookLogPath } from "../src/core/hooks/fallback.ts";
 import { CtxError } from "../src/core/contracts/errors.ts";
 import { closeDb, metaGet, metaSet, metaTake, openDb, withWrite } from "../src/core/store/db.ts";
 import { DB_TIMEOUT_MS, SCHEMA_VERSION as CONSTANTS_SCHEMA_VERSION } from "../src/core/contracts/constants.ts";
@@ -73,6 +74,23 @@ describe("ADR-0002: config dir resolution", { concurrency: CONC }, () => {
         return true;
       }
     );
+  });
+
+  // #1318 (D-DATA-DIR-ENV-1): CONTEXT_MODE_DATA_DIR, when set and not empty, replaces ~/.context-mode for every read and write.
+  test("[#1318] resolveConfigDir uses CONTEXT_MODE_DATA_DIR when set, creates it, and keeps ~/.context-mode when it is empty", () => {
+    const home = mkdtempSync(join(tmpdir(), "cm-cfg-dd-"));
+    try {
+      const want = join(home, "work", "cm-data");
+      const dir = resolveConfigDir({ HOME: home, CONTEXT_MODE_DATA_DIR: want });
+      assert.equal(dir, realpathSync.native(want));
+      assert.equal(existsSync(join(home, ".context-mode")), false, "the default dir is not created");
+      assert.equal(resolveConfigDir({ HOME: home, CONTEXT_MODE_DATA_DIR: "" }), realpathSync.native(join(home, ".context-mode")));
+      assert.equal(dataRootOf({ HOME: home, CONTEXT_MODE_DATA_DIR: want }, home), want);
+      assert.equal(dataRootOf({ HOME: home }, home), join(home, ".context-mode"));
+      assert.equal(hookLogPath({ HOME: home, CONTEXT_MODE_DATA_DIR: want }), join(want, "hook-errors.log"));
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   test("resolveConfigDir never reads process.env directly beyond the passed env object (pure function of its input)", () => {

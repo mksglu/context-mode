@@ -173,6 +173,20 @@ rl.on("line", (l) => {
     assert.equal(existsSync(path.join(s.home, ".context-mode", LOCK_FILE)), false);
   });
 
+  // #1318 (D-DATA-DIR-ENV-1): with CONTEXT_MODE_DATA_DIR set, setup keeps its backups and lock there, and --remove reads them back.
+  test("[#1318] setup and --remove use CONTEXT_MODE_DATA_DIR for backups and the lock; ~/.context-mode is not created", async (t) => {
+    const s = sandbox(t);
+    const data = path.join(s.root, "profile-work", "cm-data");
+    const env = { ...s.env, CONTEXT_MODE_DATA_DIR: data };
+    const codexToml = put(path.join(s.home, ".codex", "config.toml"), CODEX_V1);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env, agents: ["codex"], runId: "r1" });
+    assert.equal(res.exitCode, 0, JSON.stringify(res, null, 2));
+    assert.equal(res.backupDir, path.join(data, BACKUP_DIR, "r1"));
+    assert.equal(existsSync(path.join(s.home, ".context-mode")), false, "the default data dir is not created");
+    assert.equal(runRemove({ home: s.home, env }).exitCode, 0);
+    assert.equal(readFileSync(codexToml, "utf8"), CODEX_V1);
+  });
+
   test("setup: second run changes nothing and makes no backup", async (t) => {
     const s = sandbox(t);
     const codexToml = put(path.join(s.home, ".codex", "config.toml"), CODEX_V1);

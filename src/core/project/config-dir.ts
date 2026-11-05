@@ -3,7 +3,7 @@
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
 const { mkdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { basename, dirname, join, posix, resolve, win32 } from "node:path";
-import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
+import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 
 /** The one home rule. An empty value counts as unset; null when nothing is set (D-M3-F-8).
@@ -155,9 +155,17 @@ export function requireHomeDir(env: NodeJS.ProcessEnv, platform: NodeJS.Platform
   throw new CtxError("NO_HOME", { name: platform === "win32" ? "USERPROFILE" : "HOME" });
 }
 
-/** impl/02 §4 steps 1-4: expand DATA_ROOT ("~/.context-mode"), create it if absent, return its realpath. */
+/** #1318 (D-DATA-DIR-ENV-1): the data root. $CONTEXT_MODE_DATA_DIR when set and not empty (resolved to an absolute path),
+ *  else <home>/.context-mode. Setup, the store, the hook error log and doctor all take it from here. */
+export function dataRootOf(env: NodeJS.ProcessEnv, home: string): string {
+  const dir = env[DATA_DIR_ENV];
+  return dir !== undefined && dir !== "" ? resolve(dir) : join(home, DATA_ROOT.slice(1)); // DATA_ROOT is "~" + "/.context-mode"; join drops the lead "/"
+}
+
+/** impl/02 §4 steps 1-4: expand DATA_ROOT ("~/.context-mode", or $CONTEXT_MODE_DATA_DIR), create it if absent, return its realpath. */
 export function resolveConfigDir(env: NodeJS.ProcessEnv): string {
-  const dir = join(requireHomeDir(env), DATA_ROOT.slice(1)); // DATA_ROOT is "~" + "/.context-mode"; join drops the lead "/"
+  const set = env[DATA_DIR_ENV];
+  const dir = dataRootOf(env, set !== undefined && set !== "" ? "" : requireHomeDir(env));
   mkdirSync(dir, { recursive: true });
   return realpathSync.native(dir); // same canonical form as resolve.ts and contain.ts (review-M1 #1)
 }

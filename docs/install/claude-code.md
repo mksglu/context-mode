@@ -72,6 +72,8 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 Run `context-mode doctor --agents claude-code`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
+To keep the data of each Claude Code profile apart, set `CONTEXT_MODE_DATA_DIR` to its own folder, for example in the `env` block of that profile's `settings.json`. Unset, the data stays in `~/.context-mode`.
+
 ## Verified
 
 Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.

@@ -14,7 +14,7 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { claudeDirOf, codexDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
+import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
 import { AGENT_HOME_DIR, DB_FILE_NAME, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
@@ -23,7 +23,7 @@ import { detectV1 } from "../core/ops/detect-v1.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
-import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, LOCK_FILE, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
+import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, LOCK_FILE, SKILL_FILE, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, HookInstall, NativePlugin, SetupContext } from "./registry.ts";
 import { pathEntries, spawnForm, spawnShim, whichBin, winCmdLine } from "./spawn-bin.ts";
 export { spawnForm, spawnShim, whichBin, winCmdLine };
@@ -642,8 +642,8 @@ export function hookRunsCheck(row: CheckRow, env: SetupContext["env"]): Check {
 const SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
 export const NOT_SEEN_LINE = "not seen yet, run one tool call";
 /** ADR-0020 hook-seen: a journal row from this agent exists in any project db. None yet is a WARN, not a FAIL. */
-function hookSeenCheck(row: CheckRow, home: string): Check {
-  const base = path.join(home, STATE_DIR, PROJECTS_DIR_NAME);
+function hookSeenCheck(row: CheckRow, dataRoot: string): Check {
+  const base = path.join(dataRoot, PROJECTS_DIR_NAME);
   const dirs = existsSync(base) ? readdirSync(base) : [];
   let sqlite: typeof import("node:sqlite") | undefined;
   try { sqlite = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite"); } catch { sqlite = undefined; }
@@ -880,7 +880,7 @@ async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
   const en = hookEnabledCheck(row, ls.status);
   if (en) checks.push(en);
   if (row.copilotSettings) checks.push(await copilotEnabledCheck(row, ctx));
-  checks.push(hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
+  checks.push(hookRunsCheck(row, env), hookSeenCheck(row, dataRootOf(env, ctx.home)), skillsCheck(row, ctx.pkgDir));
   // D-NI-PI-GATE-1: a packages[] extensions filter keeps pi from loading the listed package's hooks.
   if (row.id === "pi") return withHookGate(checks, piSettingsGate(env, ctx.home, ctx.pkgDir, process.cwd()));
   // D-NI-VSCODE-GATE-1: chat.useHooks false, a hookFilesLocations that drops ~/.copilot/hooks, or a managed policy keeps VS Code from running the hook file.
@@ -969,7 +969,7 @@ export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
     if (!existsSync(path.join(ctx.pkgDir, f))) return { exitCode: 1, agents: [], error: `preflight: ${path.join(ctx.pkgDir, f)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
-  const root = path.join(ctx.home, STATE_DIR);
+  const root = dataRootOf(ctx.env, ctx.home); // #1318 D-DATA-DIR-ENV-1
   if (!opts.dryRun) {
     const held = takeLock(root, runId);
     if (held) return { exitCode: 1, agents: [], error: held };
@@ -1064,7 +1064,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     if (!existsSync(path.join(ctx.pkgDir, f))) return { exitCode: 1, agents: [], error: `preflight: ${path.join(ctx.pkgDir, f)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
-  const run = new Run(path.join(ctx.home, STATE_DIR), "doctor"); // dry run: never records or writes
+  const run = new Run(dataRootOf(ctx.env, ctx.home), "doctor"); // dry run: never records or writes
   const agents: AgentResult[] = [];
   for (const id of ids) {
     const row = reg.find((r) => r.id === id);
@@ -1125,7 +1125,7 @@ function isTrust(row: CheckRow, c: Change): boolean {
 /** setup --remove: undo every recorded run, newest first, so each touched file gets its pre-setup bytes back. */
 export function runRemove(opts: { home: string; env?: SetupContext["env"] }): { exitCode: number; restored: number; error?: string } {
   const env = opts.env ?? process.env;
-  const root = path.join(opts.home, STATE_DIR);
+  const root = dataRootOf(env, opts.home); // #1318 D-DATA-DIR-ENV-1
   const base = path.join(root, BACKUP_DIR);
   if (!existsSync(base)) return { exitCode: 0, restored: 0 };
   const held = takeLock(root, "remove");

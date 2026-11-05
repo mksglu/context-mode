@@ -10,9 +10,9 @@ import path from "node:path";
 import * as clack from "@clack/prompts";
 import { ADAPTERS } from "../adapters/table.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
-import { homeDirOf } from "../core/project/config-dir.ts";
+import { dataRootOf, homeDirOf } from "../core/project/config-dir.ts";
 import { formUrl } from "../core/ops/doctor-issue.ts";
-import { buildRegistry, detectAgents, printPlan, printText, runDoctor, runRemove, runSetup, STATE_DIR } from "../setup/index.ts";
+import { buildRegistry, detectAgents, printPlan, printText, runDoctor, runRemove, runSetup } from "../setup/index.ts";
 import type { AgentResult, SetupContext, SetupResult } from "../setup/index.ts";
 import { HELP, parseFlags, UsageError, type Command, type Flags } from "./args.ts";
 
@@ -166,7 +166,7 @@ async function report(ui: Ui, command: string, res: SetupResult, write: boolean)
   const { text, title } = buildIssueReport(command, res, ui);
   let file = "";
   if (write) {
-    const dir = path.join(ui.ctx.home, STATE_DIR, REPORT_DIR);
+    const dir = path.join(dataRootOf(ui.ctx.env, ui.ctx.home), REPORT_DIR);
     mkdirSync(dir, { recursive: true });
     file = path.join(dir, `${command}-${new Date().toISOString().replace(/[:.]/g, "-")}.md`);
     writeFileSync(file, text);
@@ -257,7 +257,7 @@ async function remove(ui: Ui): Promise<number> {
     if (ui.clack.isCancel(ok)) { ui.clack.cancel("Cancelled; nothing changed."); return EXIT_SIGINT; }
     if (!ok) { ui.clack.outro("Nothing changed."); return EXIT_OK; }
   }
-  if (ui.f.dryRun) { out(`Would restore every file recorded under ${path.join(ui.ctx.home, STATE_DIR, "backups")}`); return EXIT_OK; }
+  if (ui.f.dryRun) { out(`Would restore every file recorded under ${path.join(dataRootOf(ui.ctx.env, ui.ctx.home), "backups")}`); return EXIT_OK; }
   const r = runRemove({ home: ui.ctx.home, env: ui.ctx.env });
   if (ui.f.json) out(JSON.stringify(r));
   else out(`Restored ${r.restored} file(s).`);
