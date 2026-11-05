@@ -304,6 +304,22 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     assert.ok(d3.detail.includes(path.join(repo, ".pi", "settings.json")), d3.detail);
   });
 
+  // D-R41-PI-1315-1 (#1315 peperonid): the reporter's own install. `pi install npm:context-mode` wrote the npm spec into
+  // ~/.pi/agent/settings.json and Pi put 2.1.0 at ~/.pi/agent/npm/node_modules/context-mode. D3 is PASS and D4 keeps
+  // the npm package out of its old-entry list.
+  test("[D-R41-PI-1315-1] doctor-config/D3 PASS and D4 without the npm package for the #1315 Pi install", (t) => {
+    const home = tmp(t);
+    const piDir = path.join(home, ".pi", "agent");
+    piSettings(piDir, ["npm:context-mode"]);
+    put(path.join(piDir, "npm", "node_modules", "context-mode", "package.json"), { name: "context-mode", version: "2.1.0" });
+    const env = { HOME: home, USERPROFILE: home };
+    const d3 = checkHostConfig(getAdapter("pi"), env, home);
+    assert.equal(d3.status, "PASS", d3.detail);
+    assert.ok(d3.detail.includes(path.join(piDir, "settings.json")), d3.detail);
+    const d4 = checkV1Leftovers("pi", home, { piAgentDir: piDir, tmp: tmp(t) });
+    assert.equal(d4.status, "PASS", d4.detail);
+  });
+
   test("[M7] doctor-config/D3-pi-missing-package-FAIL-names-the-file-read", (t) => {
     const home = tmp(t);
     const custom = tmp(t);
