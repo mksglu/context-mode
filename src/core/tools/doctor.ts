@@ -8,7 +8,7 @@ import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
   D5_LAST_HOOK_ERROR, D5_PAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_DOCS_LABEL, DOCTOR_DOCS_LINK, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
-  PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
+  NATIVE_INSTALL, PI_LIST_COMMAND, PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type {
@@ -165,7 +165,9 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   const rows = await runDoctorChecks(ctx, adapter, host); // step 2
   const failed = rows.some((r) => r.status === "FAIL");
   // ADR-0019 D7: name the CLI command; setup when a row failed (it repairs and verifies), else doctor.
-  const command = `context-mode ${failed ? "setup" : "doctor"} --agents ${adapter.id}`;
+  // D-R38-PI-CMD-1 (#1312): Pi installs through `pi install` and has no global context-mode CLI; name Pi's own commands.
+  const command = adapter.id === "pi" ? (failed ? NATIVE_INSTALL.pi[0] : PI_LIST_COMMAND)
+    : `context-mode ${failed ? "setup" : "doctor"} --agents ${adapter.id}`;
   const input = { agent: adapter.id, rows, env: reportEnv(host.env), command };
   const envLine = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir));
   const table = buildReport(input); // step 3
@@ -195,7 +197,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
 }
 
 async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolReply> {
-  return doctorReply(ctx, { env: process.env, bundleDir: ownBundleDir(), piCwd: undefined });
+  return doctorReply(ctx, { env: process.env, bundleDir: ownBundleDir(), piCwd: ctx.piCwd }); // D-R38-PI-D7-1: Pi passes its ctx.cwd
 }
 
 export const ctxDoctor = Object.freeze({

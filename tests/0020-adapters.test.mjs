@@ -68,7 +68,7 @@ describe("ADR-0020 adapters", () => {
       vscode: { shell: ["run_in_terminal", "runTerminalCommand", "bash", "powershell"], read: ["read_file", "view"], webfetch: ["fetch_webpage", "web_fetch"] }, // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
       kiro: { shell: ["execute_bash", "execute_pwsh", "shell"] }, // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
       zcode: CLAUDE_NATIVE,
-      pi: { shell: ["bash"], read: ["read"] }, // D-HA-PI-NAMES-1
+      pi: { shell: ["bash", "powershell"], read: ["read"] }, // D-HA-PI-NAMES-1, D-R38-PI-PWSH-1
       opencode: { shell: ["bash"] }, // D-HF-OPENCODE-SHELL-1
     };
 
@@ -330,7 +330,7 @@ describe("ADR-0020 adapters", () => {
         shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"],
       });
       assert.deepEqual(getAdapter("copilot-cli").nativeTools, { shell: ["bash", "powershell"] }); // D-HA-COPILOT-NAMES-1, D-PWSH-DUMP-1
-      assert.deepEqual(getAdapter("pi").nativeTools, { shell: ["bash"], read: ["read"] }); // D-HA-PI-NAMES-1
+      assert.deepEqual(getAdapter("pi").nativeTools, { shell: ["bash", "powershell"], read: ["read"] }); // D-HA-PI-NAMES-1, D-R38-PI-PWSH-1
       assert.deepEqual(getAdapter("vscode").nativeTools, { shell: ["run_in_terminal", "runTerminalCommand", "bash", "powershell"], read: ["read_file", "view"], webfetch: ["fetch_webpage", "web_fetch"] }); // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
       assert.deepEqual(getAdapter("kiro").nativeTools, { shell: ["execute_bash", "execute_pwsh", "shell"] }); // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
       assert.deepEqual(getAdapter("opencode").nativeTools, { shell: ["bash"] }); // D-HF-OPENCODE-SHELL-1

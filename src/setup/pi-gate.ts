@@ -103,6 +103,17 @@ function projectTrusted(agentDir: string, userDoc: unknown, cwd: string): boolea
   return hostConfigValueAt(userDoc, ["defaultProjectTrust"]) === ALWAYS;
 }
 
+/** D-R38-PI-D3-1: the settings file whose packages[] lists context-mode in any form `pi install` writes (npm spec with or
+ *  without @version, {source}, git, local dir): the trusted project .pi/settings.json (`pi install -l`) first, else the
+ *  user settings. Undefined when neither lists it. */
+export function piInstalledIn(env: Env, home: string, pkgDir: string, cwd: string): string | undefined {
+  const agentDir = piAgentDirOf(env as NodeJS.ProcessEnv, home);
+  const user = load(path.join(agentDir, SETTINGS_FILE));
+  const project = load(path.join(cwd, PROJECT_DIR, SETTINGS_FILE));
+  if (project && projectTrusted(agentDir, user?.doc, cwd) && ownEntries(project, pkgDir).length > 0) return project.file;
+  return user && ownEntries(user, pkgDir).length > 0 ? user.file : undefined;
+}
+
 /** One line (what stops the hooks, and the fix), or undefined when no setting gates our extension. */
 export function piSettingsGate(env: Env, home: string, pkgDir: string, cwd: string): string | undefined {
   const agentDir = piAgentDirOf(env as NodeJS.ProcessEnv, home);

@@ -6,7 +6,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
@@ -20,6 +20,8 @@ import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, opencodeDirOf, ownMcpFi
 import { detectV1, type V1Scope } from "./detect-v1.ts";
 import { hostConfigValueAt, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
 import { marketplaceChoice, resolvePluginRoot } from "./plugin-root.ts";
+import { ownBundleDir } from "./bundle-dir.ts";
+import { piInstalledIn } from "../../setup/pi-gate.ts";
 
 type D3Part = (typeof D3_PARTS)[number];
 const [PART_MCP, PART_HOOKS, PART_TIMEOUT] = D3_PARTS;
@@ -266,14 +268,22 @@ export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktre
     const choice = marketplaceChoice(env, worktree);
     if ("installs" in choice) return fail("D3", D3_ROOT_DETAIL(choice.installs.map((r) => r.installPath)), D3_ROOT_FIX(choice.installs));
   }
+  if (row.id === "pi") return checkPiInstall(env, home, worktree);
   const parts: D3Part[] = [...(mcpWrong(row, home, env, worktree) ? [PART_MCP] : []), ...hookParts(row, home, env, worktree)];
-  const read = row.id === "pi" ? mcpFile(row, home, env) : null;
-  if (parts.length === 0) return read === null ? pass("D3") : { ...pass("D3"), detail: read };
+  if (parts.length === 0) return pass("D3");
   const detail = D3_DETAIL(parts);
   // D-D3-SETUP-FIX-1: a wrong or absent MCP entry is fixed by setup (it writes the entry and the hooks), the same command
   // as the closing "Run in a terminal" line. Hook entries or timeout alone keep ctx_upgrade.
   const fix = parts.includes(PART_MCP) ? D3_NO_SETUP_FIX(row.id) : DOCTOR_FIX_UPGRADE;
-  return fail("D3", read === null ? detail : detail + D4_REASON_JOIN + read, fix);
+  return fail("D3", detail, fix);
+}
+
+// D-R38-PI-D3-1 (host audit pi-1, #1312): Pi has no MCP entry and no hook file; the install is a packages[] entry in
+// any form `pi install` writes. PASS names the file read; FAIL names the user file and Pi's own install command.
+function checkPiInstall(env: NodeJS.ProcessEnv, home: string, worktree: string): DoctorRow {
+  const found = piInstalledIn(env, home, ownBundleDir(), worktree);
+  if (found !== undefined) return { ...pass("D3"), detail: found };
+  return fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + join(piAgentDirOf(env, home), SETTINGS_FILE), NATIVE_INSTALL.pi[0]);
 }
 
 /** D4 — old entries: every finding's reason in one row, joined "; ". */

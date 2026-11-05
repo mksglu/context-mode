@@ -97,7 +97,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   },
   {
     id: "pi", installMode: "in-process", projectSource: "pi:ctx.cwd", toolNamePrefix: pi.TOOL_NAME_PREFIX,
-    nativeTools: { shell: ["bash"], read: ["read"] }, execReadOnlyHint: false,
+    nativeTools: { shell: ["bash", "powershell"], read: ["read"] }, execReadOnlyHint: false, // D-R38-PI-PWSH-1: Pi on Windows names its shell tool "powershell"
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
     hookChannel: { kind: "in-process", path: "pi/index.js" }, skillChannel: { kind: "package", path: "pi/skills" }, // ADR-0020

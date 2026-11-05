@@ -283,6 +283,27 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     assert.ok(!d3.detail.includes(path.join(home, ".pi")), d3.detail);
   });
 
+  // D-R38-PI-D3-1 (host audit pi-1, #1312 armingx and worldofgeese): every spec `pi install` writes is the install.
+  for (const spec of ["npm:context-mode", "npm:context-mode@next", "npm:context-mode@2.1.0", { source: "npm:context-mode" }, PI_GIT]) {
+    test(`[D-R38-PI-D3-1] doctor-config/D3-pi-native-install ${JSON.stringify(spec)} is PASS (#1312)`, (t) => {
+      const home = tmp(t);
+      piSettings(path.join(home, ".pi", "agent"), [spec]);
+      const d3 = checkHostConfig(getAdapter("pi"), { HOME: home, USERPROFILE: home }, home);
+      assert.equal(d3.status, "PASS", d3.detail);
+    });
+  }
+
+  test("[D-R38-PI-D3-1] doctor-config/D3-pi `pi install -l` project entry is PASS and names the project file", (t) => {
+    const home = tmp(t);
+    const repo = tmp(t);
+    piSettings(path.join(repo, ".pi"), ["npm:context-mode"]);
+    // Pi runs `pi install -l` only in a trusted project (package-manager.js assertProjectTrustedForScope).
+    put(path.join(home, ".pi", "agent", "trust.json"), { [repo]: true });
+    const d3 = checkHostConfig(getAdapter("pi"), { HOME: home, USERPROFILE: home }, repo);
+    assert.equal(d3.status, "PASS", d3.detail);
+    assert.ok(d3.detail.includes(path.join(repo, ".pi", "settings.json")), d3.detail);
+  });
+
   test("[M7] doctor-config/D3-pi-missing-package-FAIL-names-the-file-read", (t) => {
     const home = tmp(t);
     const custom = tmp(t);
@@ -290,7 +311,7 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     assert.equal(d3.status, "FAIL");
     assert.ok(d3.detail.startsWith("wrong: MCP entry"), d3.detail);
     assert.ok(d3.detail.includes(path.join(custom, "settings.json")), d3.detail);
-    assert.equal(d3.fixCommand, "context-mode setup --agents pi"); // D-D3-SETUP-FIX-1: setup writes the missing MCP entry
+    assert.equal(d3.fixCommand, "pi install npm:context-mode"); // D-R38-PI-D3-1: Pi's own install command
   });
 
   test("[D-N6-CODEX-DIRECT-1] doctor-config/D3 names the MCP entry when the codex entry lacks omit_tools_from deferred", (t) => {
@@ -439,7 +460,9 @@ describe("ADR-0010 doctor D3 fix: setup fixes a wrong or missing MCP entry (D-D3
       const env = { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), XDG_CONFIG_HOME: path.join(home, ".config") };
       const d3 = checkHostConfig(row, env, home);
       assert.equal(d3.status, "FAIL", row.id);
-      if (d3.detail.includes("MCP entry")) assert.equal(d3.fixCommand, `context-mode setup --agents ${row.id}`, row.id + ": " + d3.detail);
+      // D-R38-PI-D3-1: Pi's fix is its own install command (owner rule: each agent's native install).
+      if (row.id === "pi") assert.equal(d3.fixCommand, "pi install npm:context-mode", d3.detail);
+      else if (d3.detail.includes("MCP entry")) assert.equal(d3.fixCommand, `context-mode setup --agents ${row.id}`, row.id + ": " + d3.detail);
       else assert.ok(d3.fixCommand === "run ctx_upgrade" || d3.fixCommand.startsWith("context-mode setup"), row.id + ": " + d3.fixCommand);
     });
   }
@@ -821,6 +844,22 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     const dir = bundleDirOf("B:/~BUN/root/src/index.js", path.join(pkg, "opencode", "plugin.js"));
     assert.equal(dir, pkg);
     assert.equal(bundleVersion(dir), "2.0.1");
+  });
+
+  // D-R38-PI-BUNDLE-1 (host audit pi-5): in Pi argv[1] is Pi's own dist/cli.js; the bundle is the loaded pi/index.js package.
+  test("[D-R38-PI-BUNDLE-1] doctor-env/D1 reads the version from the Pi package when argv[1] is Pi's dist/cli.js", (t) => {
+    const root = tmp(t);
+    const piDist = path.join(root, "node_modules", "@earendil-works", "pi-coding-agent", "dist");
+    mkdirSync(piDist, { recursive: true });
+    writeFileSync(path.join(piDist, "cli.js"), "");
+    const pkg = path.join(root, ".pi", "agent", "npm", "node_modules", "context-mode");
+    mkdirSync(path.join(pkg, "pi"), { recursive: true });
+    writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "context-mode", version: "2.1.0" }));
+    writeFileSync(path.join(pkg, "server.mjs"), "");
+    writeFileSync(path.join(pkg, "pi", "index.js"), "");
+    const dir = bundleDirOf(path.join(piDist, "cli.js"), path.join(pkg, "pi", "index.js"));
+    assert.equal(dir, pkg);
+    assert.equal(bundleVersion(dir), "2.1.0");
   });
 
   test("[D-OC2-BUNDLE-DIR-1] doctor-env/bundle dir stays the server bundle's dir when argv[1] is server.mjs", (t) => {

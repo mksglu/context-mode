@@ -541,6 +541,32 @@ describe("ADR-0020 plugins", () => {
       const out = await b.handlers.get("before_agent_start")({ systemPrompt: "" }, ctxFor("sb"));
       assert.ok(out.systemPrompt.length > 0, "instance b delivers its own instructions");
     });
+
+    // D-R38-PI-D7-1 (host audit pi-4, #1312): ctx_doctor in Pi gets Pi's ctx.cwd, so D7 is PASS inside the repo.
+    test("[D-R38-PI-D7-1] ctx_doctor in Pi: D7 project and worktree is PASS for a session inside the repo (#1312)", async () => {
+      const { pi, handlers, tools } = fakePi();
+      piExtension(pi);
+      await handlers.get("before_agent_start")({ systemPrompt: "" }, ctxFor("s-doc"));
+      const r = await tools.get("ctx_doctor").execute("d1", {});
+      const d7 = r.content[0].text.split("\n").find((l) => l.startsWith("| D7 "));
+      assert.ok(d7 && d7.includes("| PASS |"), d7);
+      // #1312 point 4: a Pi user has no global context-mode CLI; the closing line names Pi's own commands.
+      assert.ok(!r.content[0].text.includes("context-mode setup --agents pi"), r.content[0].text);
+      assert.match(r.content[0].text, /^Run in a terminal: pi (install npm:context-mode|list)$/m);
+    });
+
+    // D-R38-PI-EDIT-1 (host audit pi-6): Pi's edit and write calls are journaled as edits, so ctx_resume names the files.
+    test("[D-R38-PI-EDIT-1] tool_result: Pi edit and write calls are journaled and ctx_resume names both files", async () => {
+      const { pi, handlers, tools } = fakePi();
+      piExtension(pi);
+      await handlers.get("before_agent_start")({ systemPrompt: "" }, ctxFor("s-edit"));
+      for (const [toolName, input] of [["edit", { path: "pi-edited.txt", edits: [] }], ["write", { path: "pi-written.txt", content: "x" }]]) {
+        await handlers.get("tool_result")({ toolName, toolCallId: toolName + "1", input, content: [{ type: "text", text: "ok" }], isError: false }, ctxFor("s-edit"));
+      }
+      const text = (await tools.get("ctx_resume").execute("r1", {})).content[0].text;
+      assert.ok(text.includes("pi-edited.txt"), text);
+      assert.ok(text.includes("pi-written.txt"), text);
+    });
   });
 
   describe("ADR-0020 pi plugin search whole line", () => {

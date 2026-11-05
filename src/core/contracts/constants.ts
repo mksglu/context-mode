@@ -714,6 +714,12 @@ export const V1_CACHE_HEAL_NAME = "context-mode-cache-heal"; // hooks/context-mo
 export const V1_CACHE_HEAL_EXTS = Object.freeze([".mjs", ".sh"] as const);
 export const V1_STATUSLINE_COMMAND = "context-mode statusline"; // report only, never removed
 export const V1_PI_PACKAGE = "npm:context-mode";
+// D-R38-PI-D4-1: Pi's managed npm dir <agentDir>/npm/node_modules/<name> (package-manager.js getManagedNpmInstallPath).
+export const PI_NPM_DIR = "npm";
+export const PI_NODE_MODULES_DIR = "node_modules";
+export const PI_PACKAGE_JSON_FILE = "package.json";
+export const PI_LIST_COMMAND = "pi list"; // D-R38-PI-CMD-1: Pi's own command that lists installed packages
+export const PI_CURRENT_MAJOR = 2; // an installed context-mode at this major or later is the current Pi package
 export const V1_OPENCODE_PLUGIN_SPEC = "context-mode"; // bare npm spec in .plugin[]
 export const V1_TMP_PREFIX = "context-mode-"; // <os tmp>/context-mode-*
 export const V1_TOML_SECTION_ROOT = "mcp_servers"; // codex config.toml: v1 wrote [mcp_servers.context-mode] and its .tools.* tables (D-DOC-RT-1)

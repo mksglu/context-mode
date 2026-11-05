@@ -12,7 +12,7 @@ import {
   AGENT_HOME_DIR, CLAUDE_USER_CONFIG_FILE, CONFIG_JSON_FILE, CONFIG_TOML_FILE, DATA_ROOT, GITHUB_DIR_NAME,
   HOOKS_JSON_FILE, HOOKS_KEY, KIRO_AGENT_FILE, KIRO_AGENT_FILE_EXT, KIRO_AGENT_NAME_KEY, KIRO_AGENTS_DIR,
   KIRO_STEERING_FILE, MCP_SERVERS_KEY, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY,
-  OWN_HOOK_FILE, PI_AGENT_DIR, PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, SERVER_KEY, SETTINGS_FILE, STATUS_LINE_KEY,
+  OWN_HOOK_FILE, PI_AGENT_DIR, PI_CURRENT_MAJOR, PI_NODE_MODULES_DIR, PI_NPM_DIR, PI_PACKAGE_JSON_FILE, PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, SERVER_KEY, SETTINGS_FILE, STATUS_LINE_KEY,
   V1_BIN_COMMAND, V1_CACHE_HEAL_EXTS, V1_CACHE_HEAL_NAME, V1_CODEX_HOOK_COMMAND, V1_CODEX_HOOKS_DIR,
   V1_DATA_DIR_NAME, V1_DATA_ROOT_ENTRIES, V1_HOOK_COMMAND, V1_HOOKS_DIR_NAME, V1_OPENCODE_PLUGIN_SPEC,
   V1_PATH_SEPS, V1_PI_PACKAGE, V1_REASON, V1_SCRIPT_EXT, V1_SCRIPT_NAMES, V1_SESSIONS_DIR_NAME,
@@ -261,12 +261,21 @@ function scanKiro(agentHome: string, project: string | undefined, out: V1Finding
   dataDir(join(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);
 }
 
+// D-R38-PI-D4-1 (host audit pi-3, #1312): `pi install npm:context-mode` writes the v1 string too. The package Pi
+// installed (<agentDir>/npm/node_modules/context-mode, package-manager.js getManagedNpmInstallPath) at major 2 or
+// later is the current install.
+function piNpmIsCurrent(piAgentDir: string): boolean {
+  const doc = readJson(join(piAgentDir, PI_NPM_DIR, PI_NODE_MODULES_DIR, SERVER_KEY, PI_PACKAGE_JSON_FILE));
+  const version = isObj(doc) && typeof doc.version === "string" ? doc.version : "";
+  return Number.parseInt(version, 10) >= PI_CURRENT_MAJOR;
+}
+
 function scanPi(piAgentDir: string, agentHome: string, out: V1Finding[]): void { // agentHome: data dir
   const file = join(piAgentDir, SETTINGS_FILE);
   const doc = readJson(file);
   listOf(isObj(doc) ? doc[PI_PACKAGES_KEY] : undefined).forEach((pkg, i) => {
     const spec = isObj(pkg) ? pkg[PI_PACKAGE_SOURCE_KEY] : pkg;
-    if (spec === V1_PI_PACKAGE) out.push(finding(file, keyPath(PI_PACKAGES_KEY, i), V1_REASON.piNpm));
+    if (spec === V1_PI_PACKAGE && !piNpmIsCurrent(piAgentDir)) out.push(finding(file, keyPath(PI_PACKAGES_KEY, i), V1_REASON.piNpm));
   });
   dataDir(join(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);
 }

@@ -105,6 +105,7 @@ export default function piExtension(pi: PiApi): void {
       // #1182: Pi's abort signal reaches the handler, which kills the process tree and replies "Cancelled.".
       signal: signal ?? new AbortController().signal,
       protocolVersion: "",
+      piCwd: cwd === "" ? undefined : cwd, // D-R38-PI-D7-1 (#1312): ctx_doctor D7 compares against Pi's live ctx.cwd
     };
     let reply: ToolReply;
     try {

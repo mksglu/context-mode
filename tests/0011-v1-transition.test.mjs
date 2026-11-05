@@ -120,6 +120,20 @@ describe("ADR-0011: detect v1", { concurrency: CONC }, () => {
     assert.deepEqual(detectV1("pi", home, { tmp: tmp(t) }), [], "default <home>/.pi/agent has nothing");
   });
 
+  // D-R38-PI-D4-1 (host audit pi-3, #1312 armingx): `pi install npm:context-mode` writes the same string v1 used; the
+  // installed package at Pi's managed npm path tells them apart (package-manager.js getManagedNpmInstallPath).
+  for (const [version, want] of [["2.1.0", []], ["1.0.168", ["packages.0"]]]) {
+    test(`[D-R38-PI-D4-1] detect-v1/pi npm:context-mode with installed ${version} -> ${JSON.stringify(want)} (#1312)`, (t) => {
+      const home = tmp(t);
+      const piDir = tmp(t);
+      writeFileSync(path.join(piDir, "settings.json"), JSON.stringify({ packages: ["npm:context-mode"] }), "utf8");
+      const pkg = path.join(piDir, "npm", "node_modules", "context-mode");
+      mkdirSync(pkg, { recursive: true });
+      writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "context-mode", version }), "utf8");
+      assert.deepEqual(detectV1("pi", home, { piAgentDir: piDir, tmp: tmp(t) }).map((f) => f.path), want);
+    });
+  }
+
   test("[M5] detect-v1/All-row: v1 content under ~/.context-mode and context-mode-* temp files; v2 data is not v1", (t) => {
     const home = tmp(t);
     const tdir = tmp(t);

@@ -27,7 +27,8 @@ export interface PiHookOutput extends HookOutput {
 }
 
 // pi 1.4.0 built-in tool names -> canonical names (D-HA-PI-NAMES-1, dist/core/tools name: "bash" / "read").
-const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { bash: "Bash", read: "Read" };
+// D-R38-PI-EDIT-1 (host audit pi-6): "edit" / "write" map to Edit / Write, so their tool_result is journaled as an edit.
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { bash: "Bash", read: "Read", edit: "Edit", write: "Write" };
 
 function record(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
