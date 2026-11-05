@@ -8,6 +8,7 @@ import type { AgentId } from "../contracts/agents.ts";
 import type { V1Finding } from "../contracts/types.ts";
 import { hostConfigValueAt, isNodeCommand, parseHostConfig, tomlTableSpans } from "./host-config.ts";
 import { hostText } from "./host-text.ts";
+import { reachedThroughLink } from "../project/contain.ts";
 import {
   AGENT_HOME_DIR, CLAUDE_USER_CONFIG_FILE, CONFIG_JSON_FILE, CONFIG_TOML_FILE, DATA_ROOT, GITHUB_DIR_NAME,
   HOOKS_JSON_FILE, HOOKS_KEY, KIRO_AGENT_FILE, KIRO_AGENT_FILE_EXT, KIRO_AGENT_NAME_KEY, KIRO_AGENTS_DIR,
@@ -225,7 +226,9 @@ function scanVscode(agentHome: string, project: string | undefined, out: V1Findi
     if (isObj(entry) && (entry.command === V1_BIN_COMMAND || listOf(entry.args).some((a) => a === V1_BIN_COMMAND))) {
       out.push(finding(mcpFile, keyPath(VSCODE_MCP_SERVERS_KEY, SERVER_KEY), V1_REASON.vscodeMcp));
     }
-    dataDir(join(project, GITHUB_DIR_NAME, V1_DATA_DIR_NAME, V1_SESSIONS_DIR_NAME), V1_REASON.dataDir, out);
+    // D-SEC-V1-LINK-1: a project path reached through a link is reported only (the folder it points at is not ours).
+    const sessions = join(project, GITHUB_DIR_NAME, V1_DATA_DIR_NAME, V1_SESSIONS_DIR_NAME);
+    dataDir(sessions, reachedThroughLink(project, sessions) ? V1_REASON.projectLink : V1_REASON.dataDir, out);
   }
   dataDir(join(agentHome, V1_DATA_DIR_NAME, V1_SESSIONS_DIR_NAME), V1_REASON.dataDir, out);
 }

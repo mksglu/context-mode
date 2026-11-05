@@ -3,11 +3,11 @@
 import { test, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync, existsSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync, existsSync, readFileSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { detectV1 } from "../src/core/ops/detect-v1.ts";
-import { UPGRADE_REPORT_ONLY_REASONS, UPGRADE_NOT_FOUND, UPGRADE_REMOVED, UPGRADE_REPORT_ONLY, UPGRADE_TRASH_SUFFIX, V1_REASON } from "../src/core/contracts/constants.ts";
+import { UPGRADE_ASIDE_SUFFIX, UPGRADE_MOVED_ASIDE, UPGRADE_REPORT_ONLY_REASONS, UPGRADE_NOT_FOUND, UPGRADE_REMOVED, UPGRADE_REPORT_ONLY, UPGRADE_TRASH_SUFFIX, V1_REASON } from "../src/core/contracts/constants.ts";
 import { removeV1 } from "../src/core/ops/v1-remove.ts";
 import { execFileSync, spawnSync } from "node:child_process";
 import { AGENT_IDS as SETUP_AGENT_IDS, plantV1Install, v1GlobalBin, v1NpmBinDir, v1NpmPrefix, v1Project } from "../e2e/live/cases/v1-migration-setup.mjs";
@@ -327,6 +327,48 @@ describe("ADR-0011: remove v1", { concurrency: CONC }, () => {
 
   test("[M5] v1-remove/no-findings-no-rows", () => {
     assert.deepEqual(removeV1("claude-code", []).rows, []);
+  });
+
+  // D-SEC-V1-LINK-1: a v1 path in the project reached through a link (a repo can ship .github as a link) is
+  // reported, and removal never follows it: the folder the link points at stays as it is.
+  test("[M5] v1-remove/project-link-is-reported-and-never-followed (D-SEC-V1-LINK-1)", (t) => {
+    const home = tmp(t);
+    const project = tmp(t);
+    const outside = tmp(t);
+    const kept = put(path.join(outside, "context-mode", "sessions", "keep.db"), "user data");
+    symlinkSync(outside, path.join(project, ".github"), process.platform === "win32" ? "junction" : "dir");
+    const sessions = path.join(project, ".github", "context-mode", "sessions");
+    const findings = detectV1("vscode", home, { project, tmp: tmp(t) });
+    assert.deepEqual(findings.filter((f) => f.file === sessions).map((f) => f.reason), [V1_REASON.projectLink]);
+    assert.ok(UPGRADE_REPORT_ONLY_REASONS.includes(V1_REASON.projectLink));
+    const r = removeV1("vscode", findings, project);
+    r.commit();
+    assert.equal(readFileSync(kept, "utf8"), "user data");
+    // The removal step checks again on its own: a finding made before the link appeared is left in place.
+    const direct = removeV1("vscode", [{ file: sessions, path: "", reason: V1_REASON.dataDir }], project);
+    direct.commit();
+    assert.deepEqual(direct.rows.map((x) => x.after), [UPGRADE_REPORT_ONLY]);
+    assert.equal(readFileSync(kept, "utf8"), "user data");
+  });
+
+  // D-SEC-V1-ASIDE-1 (owner rule: never delete user data): an old data dir is moved aside and kept after commit.
+  test("[M5] v1-remove/data-dir-moved-aside-and-kept-after-commit (D-SEC-V1-ASIDE-1)", (t) => {
+    const home = tmp(t);
+    const dir = path.join(home, ".claude", "context-mode");
+    put(path.join(dir, "old.db"), "v1 data");
+    const findings = detectV1("claude-code", home, { tmp: tmp(t) });
+    const r = removeV1("claude-code", findings);
+    const rowFor = r.rows.find((x) => x.area === dir);
+    assert.equal(rowFor.after, UPGRADE_MOVED_ASIDE + dir + UPGRADE_ASIDE_SUFFIX);
+    assert.ok(!existsSync(dir));
+    r.commit();
+    assert.equal(readFileSync(path.join(dir + UPGRADE_ASIDE_SUFFIX, "old.db"), "utf8"), "v1 data");
+    // A second run keeps the first copy too.
+    put(path.join(dir, "old.db"), "v1 data 2");
+    const again = removeV1("claude-code", detectV1("claude-code", home, { tmp: tmp(t) }));
+    again.commit();
+    assert.equal(readFileSync(path.join(dir + UPGRADE_ASIDE_SUFFIX, "old.db"), "utf8"), "v1 data");
+    assert.ok(again.rows.some((x) => x.after.startsWith(UPGRADE_MOVED_ASIDE)));
   });
 });
 

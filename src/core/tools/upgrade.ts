@@ -69,7 +69,7 @@ function upgrade(adapter: AdapterRow, deps: UpgradeDeps, home: string): UpgradeC
   try {
     const step5 = regenerateHostConfig(adapter, home, { env: deps.env, write: deps.write });
     const findings = detectV1(adapter.id, home, { project: deps.project.worktree, piAgentDir: piAgentDirOf(deps.env, home), claudeDir: claudeDirOf(deps.env, home), geminiDir: geminiDirOf(deps.env, home), copilotDir: copilotDirOf(deps.env, home), kiroDir: kiroDirOf(deps.env, home), opencodeDir: opencodeDirOf(deps.env, home) });
-    removal = removeV1(adapter.id, findings);
+    removal = removeV1(adapter.id, findings, deps.project.worktree);
     const rows = [hostRow(adapter), ...step5, ...removal.rows];
     removal.commit();
     return rows;

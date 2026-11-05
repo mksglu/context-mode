@@ -600,6 +600,14 @@ export const WIN_SHELL_LANGS: readonly string[] = Object.freeze(["shell", "bash"
 export const GIT_BASH_RELATIVE: readonly (readonly string[])[] = Object.freeze([["..", "bin", "bash.exe"], ["..", "..", "bin", "bash.exe"]]);
 export const GIT_EXIT_LABEL = "git exit "; // FETCH_FAILED <code>: git exit <n>: <stderr>
 export const UPGRADE_TRASH_SUFFIX = ".ctx-upgrade-removing"; // a removed path is renamed here first, deleted on commit (rollback)
+// D-SEC-V1-ASIDE-1 (owner rule: never delete user data): an old v1 data dir is moved to <dir>UPGRADE_ASIDE_SUFFIX and kept
+// after commit; a second run picks <dir>UPGRADE_ASIDE_SUFFIX-<n>, so an earlier copy stays too.
+export const UPGRADE_ASIDE_SUFFIX = ".ctx-v1-old";
+export const UPGRADE_MOVED_ASIDE = "moved aside to "; // + the kept path, the After cell of a data dir row
+// D-SEC-PERSIST-1: Claude Code keeps a large tool output at <claude dir>/projects/<project>/<session>/tool-results/<file>.
+// The hook reads such a file only at exactly that place for its own session, and only up to this many bytes.
+export const CLAUDE_TOOL_RESULTS_DIR_NAME = "tool-results";
+export const PERSISTED_OUTPUT_MAX_BYTES = 16 * 1024 * 1024;
 export const TABLE_ROW_START = "| ";
 export const TABLE_CELL_SEP = " | ";
 export const TABLE_ROW_END = " |";
@@ -822,12 +830,15 @@ export const V1_REASON = Object.freeze({
   dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
   dataRoot: "old context-mode content under ~/.context-mode/",
   tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, safe to keep",
+  projectLink: "context-mode path in the project reached through a link: report only, upgrade keeps it as is and never follows a link",
 } as const);
 // ADR-0011 "reported with a fix, not removed" rows, Gemini data "only after a prompt" (a tool cannot prompt), and
 // tmp context-mode-* (a live v1 server may own them), and the Kiro steering doc (A37: manual review): report only
 // (D-M5-U1-4, D-M5-U1-5, D-M7-V2-2). Old release-branch entries: ctx_upgrade step 5 swaps them for the npm spec
 // before v1 removal, so removal never cuts them (D-R44-DOCTOR-D4-GIT-1).
-export const UPGRADE_REPORT_ONLY_REASONS: readonly string[] = Object.freeze<string[]>([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering, V1_REASON.piGit, V1_REASON.opencodeGit]);
+export const UPGRADE_REPORT_ONLY_REASONS: readonly string[] = Object.freeze<string[]>([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering, V1_REASON.piGit, V1_REASON.opencodeGit, V1_REASON.projectLink]);
+// D-SEC-V1-ASIDE-1: these whole-dir findings hold user data: moved aside and kept, never deleted.
+export const UPGRADE_KEEP_ASIDE_REASONS: readonly string[] = Object.freeze<string[]>([V1_REASON.dataDir, V1_REASON.dataRoot]);
 
 // Pi / OpenCode in-process entries (impl/12 §3.1 A21, §4.1 A28, §4.4 step 1).
 export const PLUGIN_ID = SERVER_KEY;

@@ -2,8 +2,8 @@
 // next to the hook bundle), D-M3-H2-1..7, D-M4-arch-5 and D-M4-H2-1..3 (compact "none" branches, decision rows).
 // One path per event. Every failure fails open: allow, one stderr line. Never block the host.
 // D-CI-PERF-7: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
-const { readFileSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
-import { dirname, join } from "node:path";
+const { lstatSync, readFileSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
@@ -11,7 +11,7 @@ import {
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
-  SUBAGENT_RUN_DENY, WORKSPACE_FOLDER_FLAG,
+  SUBAGENT_RUN_DENY, WORKSPACE_FOLDER_FLAG, PROJECTS_DIR_NAME, CLAUDE_TOOL_RESULTS_DIR_NAME, PERSISTED_OUTPUT_MAX_BYTES,
 } from "../contracts/constants.ts";
 import type {
   AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall, ToolResultInfo,
@@ -21,6 +21,8 @@ import { decide } from "../policy/decide.ts";
 import { isSubagentCall, pickSubagentCase, toolSetForAgentType } from "../policy/subagent.ts";
 import { readUserDeny } from "../policy/user-deny.ts";
 import { resolveProject } from "../project/resolve.ts";
+import { claudeDirOf, homeDirOf } from "../project/config-dir.ts";
+import { isInside } from "../project/contain.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { hasAgentRows, hasSessionRows, readFirstPrompt, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
@@ -407,7 +409,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const tool = ev.tool;
   if (tool === undefined || tool.canonicalName.startsWith(OWN_TOOL_PREFIX)) return ALLOW; // step 1 (ADR-0009 §0)
   const result = ev.result ?? { isError: false, bytes: 0 };
-  const text = wholeOutput(result);
+  const text = wholeOutput(result, ev.sessionId, env);
   if (result.persistedPath !== undefined) result.bytes = Buffer.byteLength(text);
   if (tool.canonicalName === DECISION_TOOL) askDetached(ev, project, tool, text); // ADR-0009 §8.2
   const kind = journalKind(tool, row, result.isError); // step 2
@@ -508,11 +510,28 @@ export function replaceBudget(handleLine: string, more: string): number {
   return Math.max(0, REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + more) - 1 - Buffer.byteLength(handleLine));
 }
 
-// D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
-function wholeOutput(result: ToolResultInfo): string {
+// D-SEC-PERSIST-1: a persisted output is read only at <claude dir>/projects/<project>/<this session>/tool-results/<file>:
+// a plain file (not a link), inside that dir after realpath, at most PERSISTED_OUTPUT_MAX_BYTES.
+function hostToolResult(file: string, sessionId: string, env: NodeJS.ProcessEnv): boolean {
+  if (sessionId === "" || sessionId.includes(sep) || sessionId.includes("/")) return false;
+  const projects = join(claudeDirOf(env, homeDirOf(env) ?? ""), PROJECTS_DIR_NAME);
+  const steps = relative(projects, resolve(file)).split(sep);
+  if (steps.length !== 4 || steps.includes("..") || steps.includes("")) return false;
+  if (steps[1] !== sessionId || steps[2] !== CLAUDE_TOOL_RESULTS_DIR_NAME) return false;
+  const st = lstatSync(file);
+  return st.isFile() && st.size <= PERSISTED_OUTPUT_MAX_BYTES && isInside(projects, file);
+}
+
+// D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable or refused file keeps the head.
+function wholeOutput(result: ToolResultInfo, sessionId: string, env: NodeJS.ProcessEnv): string {
   const head = result.text ?? "";
   if (result.persistedPath === undefined) return head;
   try {
+    if (!hostToolResult(result.persistedPath, sessionId, env)) {
+      // D-SEC-PERSIST-1: doctor shows this line under "Hook errors"; the model still gets the head.
+      logHookError(env, "claude-code", "persisted-output", new Error("persisted output path is outside this session's tool-results dir or too large; kept the head"));
+      return head;
+    }
     return readFileSync(result.persistedPath, "utf8");
   } catch {
     return head;

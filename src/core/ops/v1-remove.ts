@@ -2,6 +2,8 @@
 // removeV1: act on detectV1 findings. One UpgradeChangeRow per finding, in finding order:
 //   - reason in UPGRADE_REPORT_ONLY_REASONS: file untouched, after = UPGRADE_REPORT_ONLY;
 //   - path "" (a whole file or dir): renamed to <path>UPGRADE_TRASH_SUFFIX, deleted on commit();
+//   - a v1 data dir (UPGRADE_KEEP_ASIDE_REASONS): moved aside to <dir>UPGRADE_ASIDE_SUFFIX and kept (D-SEC-V1-ASIDE-1);
+//   - a project path reached through a link: left as is, reported only (D-SEC-V1-LINK-1);
 //   - TOML header path (Codex config.toml): that [table] block is cut out, line scan;
 //   - dotted key path (JSON/JSONC): the entry is dropped from its object or list; only the touched
 //     top-level keys are rewritten (writeHostConfigEdit), so other keys and their comments are kept.
@@ -11,12 +13,13 @@ import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "n
 import type { AgentId } from "../contracts/agents.ts";
 import type { UpgradeChangeRow, V1Finding } from "../contracts/types.ts";
 import {
-  TOML_EXT, UPGRADE_AREA_KEY_SEP, UPGRADE_NOT_FOUND, UPGRADE_REMOVED,
+  TOML_EXT, UPGRADE_AREA_KEY_SEP, UPGRADE_ASIDE_SUFFIX, UPGRADE_KEEP_ASIDE_REASONS, UPGRADE_MOVED_ASIDE, UPGRADE_NOT_FOUND, UPGRADE_REMOVED,
   UPGRADE_REPORT_ONLY, UPGRADE_REPORT_ONLY_REASONS, UPGRADE_TRASH_SUFFIX, V1_KEY_PATH_SEP,
 } from "../contracts/constants.ts";
 import { atomicWriteFile, renameWithRetry } from "./atomic-file.ts";
 import { parseHostConfig, tomlTableSpans, writeHostConfigEdit } from "./host-config.ts";
 import { hostLayout, hostText, withLayout } from "./host-text.ts";
+import { reachedThroughLink } from "../project/contain.ts";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -29,7 +32,7 @@ export interface V1Removal {
   rollback(): void;
 }
 
-interface Undo { trash: string; target: string; }
+interface Undo { trash: string; target: string; keep?: boolean; }
 
 const areaOf = (f: V1Finding): string => (f.path === "" ? f.file : f.file + UPGRADE_AREA_KEY_SEP + f.path);
 const row = (f: V1Finding, after: string): UpgradeChangeRow => ({ area: areaOf(f), before: f.reason, after });
@@ -40,6 +43,16 @@ function moveAside(target: string, undo: Undo[]): void {
   rmSync(trash, { recursive: true, force: true });
   renameWithRetry(target, trash);
   undo.push({ trash, target });
+}
+
+/** D-SEC-V1-ASIDE-1: move a v1 data dir to the first free <dir>UPGRADE_ASIDE_SUFFIX[-n] and keep it there. A rename
+ *  moves the link or dir itself, never what a link points at. Returns the kept path. */
+function keepAside(target: string, undo: Undo[]): string {
+  let aside = target + UPGRADE_ASIDE_SUFFIX;
+  for (let n = 2; existsSync(aside); n += 1) aside = target + UPGRADE_ASIDE_SUFFIX + "-" + n;
+  renameWithRetry(target, aside);
+  undo.push({ trash: aside, target, keep: true });
+  return aside;
 }
 
 /** Keep the original of a config file once per run, before its first edit. */
@@ -117,7 +130,8 @@ function stripJsonEntries(agent: AgentId, file: string, findings: V1Finding[], k
 
 /** impl/07 §6 step 6. `agent` only labels CONFIG_PARSE_FAILED. Throws CONFIG_PARSE_FAILED or an fs error; the
  *  caller then calls rollback(). */
-export function removeV1(agent: AgentId, findings: readonly V1Finding[]): V1Removal {
+/** `project` (the worktree): a whole-path finding under it that a link reaches is left as is (D-SEC-V1-LINK-1). */
+export function removeV1(agent: AgentId, findings: readonly V1Finding[], project?: string): V1Removal {
   const undo: Undo[] = [];
   const kept = new Set<string>();
   const done = new Map<V1Finding, string>();
@@ -126,7 +140,9 @@ export function removeV1(agent: AgentId, findings: readonly V1Finding[]): V1Remo
   for (const f of findings) {
     if (UPGRADE_REPORT_ONLY_REASONS.includes(f.reason)) done.set(f, UPGRADE_REPORT_ONLY);
     else if (f.path === "") {
-      if (existsSync(f.file)) { moveAside(f.file, undo); done.set(f, UPGRADE_REMOVED); }
+      if (project !== undefined && reachedThroughLink(project, f.file)) done.set(f, UPGRADE_REPORT_ONLY);
+      else if (existsSync(f.file) && UPGRADE_KEEP_ASIDE_REASONS.includes(f.reason)) done.set(f, UPGRADE_MOVED_ASIDE + keepAside(f.file, undo));
+      else if (existsSync(f.file)) { moveAside(f.file, undo); done.set(f, UPGRADE_REMOVED); }
       else done.set(f, UPGRADE_NOT_FOUND);
     } else entries.set(f.file, [...(entries.get(f.file) ?? []), f]);
   }
@@ -153,7 +169,7 @@ export function removeV1(agent: AgentId, findings: readonly V1Finding[]): V1Remo
   return {
     rows: findings.map((f) => row(f, done.get(f) ?? UPGRADE_NOT_FOUND)),
     commit() {
-      for (const u of undo.splice(0)) rmSync(u.trash, { recursive: true, force: true });
+      for (const u of undo.splice(0)) if (u.keep !== true) rmSync(u.trash, { recursive: true, force: true });
     },
     rollback() {
       for (const u of undo.splice(0).reverse()) {

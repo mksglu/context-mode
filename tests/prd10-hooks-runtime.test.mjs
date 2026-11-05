@@ -4,7 +4,7 @@ import { test, before, after, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync, existsSync, readFileSync, realpathSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -697,11 +697,13 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const lines = Array.from({ length: 1500 }, (_, i) => (i === 900 ? "SECRET-2 value=late9x7q" : "row " + i + " a" + i + " b" + i));
     const full = lines.join("\n") + "\n";
     const head = lines.slice(0, 600).join("\n") + "\n";
-    const dir = mkdtempSync(join(tmpdir(), "persist-"));
+    const u = cc({ hook_event_name: "UserPromptSubmit", prompt: "Run cat on data/part2.txt. Find the line starting with SECRET-2." });
+    // D-SEC-PERSIST-1: the host keeps it at <claude dir>/projects/<project>/<session>/tool-results/<file>.
+    const dir = join(root, ".claude", "projects", "-repo", u.session_id, "tool-results");
+    mkdirSync(dir, { recursive: true });
     try {
       const file = join(dir, "out.txt");
       writeFileSync(file, full);
-      const u = cc({ hook_event_name: "UserPromptSubmit", prompt: "Run cat on data/part2.txt. Find the line starting with SECRET-2." });
       await handleHook("claude-code", u, env);
       await waitRows("SELECT 1 FROM events WHERE session_id = ? AND kind = 'prompt'", [u.session_id], 1);
       const p = { ...mainBashPost(head, ""), session_id: u.session_id };
@@ -718,6 +720,37 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
       assert.equal(out.includes("late9x7q"), false, "unreadable file: the head only");
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // D-SEC-PERSIST-1: the hook reads a persisted output only from the host's own tool-results dir for this
+  // session, and only up to PERSISTED_OUTPUT_MAX_BYTES; any other path keeps the head the host sent.
+  test("D-SEC-PERSIST-1: a persisted path outside this session's tool-results dir is not read", async () => {
+    const head = Array.from({ length: 600 }, (_, i) => "row " + i + " a" + i + " b" + i).join("\n") + "\n";
+    const secret = head + "SECRET-3 value=k8w2p0zq\n";
+    const u = cc({ hook_event_name: "UserPromptSubmit", prompt: "Run cat on data/part3.txt. Find the line starting with SECRET-3." });
+    await handleHook("claude-code", u, env);
+    await waitRows("SELECT 1 FROM events WHERE session_id = ? AND kind = 'prompt'", [u.session_id], 1);
+    const outside = mkdtempSync(join(tmpdir(), "persist-out-"));
+    const projects = join(root, ".claude", "projects", "-repo");
+    const other = join(projects, "other-session", "tool-results");
+    const mine = join(projects, u.session_id, "tool-results");
+    mkdirSync(other, { recursive: true });
+    mkdirSync(mine, { recursive: true });
+    try {
+      writeFileSync(join(outside, "secret.txt"), secret);
+      writeFileSync(join(other, "out.txt"), secret);
+      symlinkSync(join(outside, "secret.txt"), join(mine, "link.txt"));
+      for (const file of [join(outside, "secret.txt"), join(other, "out.txt"), join(mine, "link.txt"), join(mine, "..", "..", "other-session", "tool-results", "out.txt")]) {
+        const p = { ...mainBashPost(head, ""), session_id: u.session_id };
+        p.tool_input = { command: "cat data/part3.txt" };
+        p.tool_response = { stdout: head, stderr: "", interrupted: false, persistedOutputPath: file, persistedOutputSize: Buffer.byteLength(secret) };
+        const out = replacedText(parsed(await handleHook("claude-code", p, env)).updatedToolOutput);
+        assert.equal(out.includes("k8w2p0zq"), false, "not read: " + file);
+      }
+      assert.equal(lastHookError(env)?.stage, "persisted-output", "doctor sees the refused path in hook-errors.log");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 
