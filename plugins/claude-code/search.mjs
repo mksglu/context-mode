@@ -544,7 +544,7 @@ function outputOf(resp) {
 function textSlot(r) {
   const file = r.file;
   if (r.type === "text" && typeof file === "object" && file !== null && typeof file.content === "string") {
-    return { text: file.content, put: (o, output) => ({ ...o, file: { ...o.file, content: output } }) };
+    return { text: file.content, put: (o, output) => ({ ...o, file: readFile(o.file, output) }) };
   }
   if (isGrepContent(r)) return { text: r.content, put: (o, output) => ({ ...o, content: output }) };
   if (Array.isArray(r.filenames) && r.filenames.every((f) => typeof f === "string")) {
@@ -553,13 +553,35 @@ function textSlot(r) {
   if (typeof r.result === "string") return { text: r.result, put: (o, output) => ({ ...o, result: output }) };
   return null;
 }
+function readFile(file, output) {
+  const start = typeof file.startLine === "number" ? file.startLine : 1;
+  const lines = String(file.content).split("\n");
+  const read2 = typeof file.numLines === "number" ? file.numLines : lines.length;
+  const out = output.split("\n");
+  const run = firstRun(lines, out);
+  if (run === null) return { ...file, content: output, startLine: start + read2, numLines: out.length };
+  const kept = out.slice(0, run.length);
+  if (run.length < out.length) kept.push(out[out.length - 1]);
+  return { ...file, content: kept.join("\n"), startLine: start + run.at, numLines: kept.length };
+}
+function firstRun(lines, out) {
+  let best = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] !== out[0]) continue;
+    let n = 1;
+    while (n < out.length && i + n < lines.length && lines[i + n] === out[n]) n++;
+    if (best === null || n > best.length) best = { at: i, length: n };
+    if (n === out.length) break;
+  }
+  return best;
+}
 function isShellShape(resp) {
   const r = resp;
   return typeof r.stdout === "string" || typeof r.stderr === "string";
 }
 function isGrepContent(resp) {
   const r = resp;
-  return r.mode === "content" && typeof r.content === "string";
+  return (r.mode === "content" || r.mode === "count") && typeof r.content === "string";
 }
 function blocksOf(resp) {
   const parts = [];
@@ -575,6 +597,7 @@ function readResult(resp) {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
   const info = { isError, bytes: Buffer.byteLength(text), text };
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isShellShape(resp)) info.shape = resp;
   if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
     if (textSlot(resp) !== null) info.shape = resp;
     else info.keep = true;
@@ -614,8 +637,11 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources) {
   return ev;
 }
 function replaceShape(ev, output) {
-  if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
   const shape = ev.result?.shape;
+  if (ev.tool?.canonicalName === "Bash") {
+    const { persistedOutputPath: _p, persistedOutputSize: _s, ...host } = shape ?? {};
+    return { interrupted: false, ...host, stdout: output, stderr: "" };
+  }
   const slot = shape === void 0 ? null : textSlot(shape);
   if (shape !== void 0 && slot !== null) return slot.put(shape, output);
   if (ev.result?.blocks === true) return [{ type: "text", text: output }];
@@ -1235,8 +1261,8 @@ var ADAPTERS = Object.freeze([
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
     hookChannel: { kind: "package", path: "hooks/claude-code.json" },
-    skillChannel: { kind: "package", path: "claude-code/skills" },
-    // ADR-0020, D-HQ-SKILLS-2
+    skillChannel: { kind: "package", path: "skills" },
+    // ADR-0020, D-R33-CC-SKILLS-1: Claude Code always loads <plugin>/skills, shared with gemini and qwen
     decode,
     encode
   },

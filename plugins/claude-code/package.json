@@ -19,7 +19,6 @@
     "LICENSE",
     "README.md",
     "SHA256SUMS",
-    "claude-code",
     "cli.mjs",
     "codex",
     "copilot",
@@ -69,5 +68,5 @@
     "url": "git+https://github.com/mksglu/context-mode.git"
   },
   "type": "module",
-  "version": "2.1.0"
+  "version": "2.1.1"
 }

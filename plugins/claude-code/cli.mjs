@@ -645,7 +645,7 @@ function outputOf(resp) {
 function textSlot(r2) {
   const file = r2.file;
   if (r2.type === "text" && typeof file === "object" && file !== null && typeof file.content === "string") {
-    return { text: file.content, put: (o2, output) => ({ ...o2, file: { ...o2.file, content: output } }) };
+    return { text: file.content, put: (o2, output) => ({ ...o2, file: readFile(o2.file, output) }) };
   }
   if (isGrepContent(r2)) return { text: r2.content, put: (o2, output) => ({ ...o2, content: output }) };
   if (Array.isArray(r2.filenames) && r2.filenames.every((f2) => typeof f2 === "string")) {
@@ -654,13 +654,35 @@ function textSlot(r2) {
   if (typeof r2.result === "string") return { text: r2.result, put: (o2, output) => ({ ...o2, result: output }) };
   return null;
 }
+function readFile(file, output) {
+  const start = typeof file.startLine === "number" ? file.startLine : 1;
+  const lines = String(file.content).split("\n");
+  const read = typeof file.numLines === "number" ? file.numLines : lines.length;
+  const out2 = output.split("\n");
+  const run = firstRun(lines, out2);
+  if (run === null) return { ...file, content: output, startLine: start + read, numLines: out2.length };
+  const kept = out2.slice(0, run.length);
+  if (run.length < out2.length) kept.push(out2[out2.length - 1]);
+  return { ...file, content: kept.join("\n"), startLine: start + run.at, numLines: kept.length };
+}
+function firstRun(lines, out2) {
+  let best = null;
+  for (let i2 = 0; i2 < lines.length; i2++) {
+    if (lines[i2] !== out2[0]) continue;
+    let n3 = 1;
+    while (n3 < out2.length && i2 + n3 < lines.length && lines[i2 + n3] === out2[n3]) n3++;
+    if (best === null || n3 > best.length) best = { at: i2, length: n3 };
+    if (n3 === out2.length) break;
+  }
+  return best;
+}
 function isShellShape(resp) {
   const r2 = resp;
   return typeof r2.stdout === "string" || typeof r2.stderr === "string";
 }
 function isGrepContent(resp) {
   const r2 = resp;
-  return r2.mode === "content" && typeof r2.content === "string";
+  return (r2.mode === "content" || r2.mode === "count") && typeof r2.content === "string";
 }
 function blocksOf(resp) {
   const parts = [];
@@ -676,6 +698,7 @@ function readResult(resp) {
   const text2 = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
   const info = { isError, bytes: Buffer.byteLength(text2), text: text2 };
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isShellShape(resp)) info.shape = resp;
   if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
     if (textSlot(resp) !== null) info.shape = resp;
     else info.keep = true;
@@ -715,8 +738,11 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources2) {
   return ev;
 }
 function replaceShape(ev, output) {
-  if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
   const shape = ev.result?.shape;
+  if (ev.tool?.canonicalName === "Bash") {
+    const { persistedOutputPath: _p, persistedOutputSize: _s, ...host } = shape ?? {};
+    return { interrupted: false, ...host, stdout: output, stderr: "" };
+  }
   const slot = shape === void 0 ? null : textSlot(shape);
   if (shape !== void 0 && slot !== null) return slot.put(shape, output);
   if (ev.result?.blocks === true) return [{ type: "text", text: output }];
@@ -1336,8 +1362,8 @@ var ADAPTERS = Object.freeze([
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
     hookChannel: { kind: "package", path: "hooks/claude-code.json" },
-    skillChannel: { kind: "package", path: "claude-code/skills" },
-    // ADR-0020, D-HQ-SKILLS-2
+    skillChannel: { kind: "package", path: "skills" },
+    // ADR-0020, D-R33-CC-SKILLS-1: Claude Code always loads <plugin>/skills, shared with gemini and qwen
     decode,
     encode
   },
@@ -9358,11 +9384,20 @@ function hookSeenCheck(row, home) {
   }
   return { name: "hook-seen", ok: true, warn: true, detail: NOT_SEEN_LINE };
 }
+var SKILL_TOOL_STEM = "ctx_";
 function skillsCheck(row, pkgDir) {
   const s = row.skillInstall;
   if (s.kind === "package") {
-    const miss = COMMAND_SKILLS.map((n3) => path12.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync15(f2));
-    return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : void 0 };
+    const files = COMMAND_SKILLS.map((n3) => path12.join(pkgDir, s.via, n3, SKILL_FILE));
+    const miss = files.filter((f2) => !existsSync15(f2));
+    if (miss.length) return { name: "skills", ok: false, detail: `missing ${miss.join(", ")}` };
+    const own2 = getAdapter(row.id).toolNamePrefix + SKILL_TOOL_STEM;
+    const foreign = [...new Set(ADAPTERS.map((r2) => r2.toolNamePrefix + SKILL_TOOL_STEM))].filter((n3) => n3 !== SKILL_TOOL_STEM && n3 !== own2);
+    const bad2 = files.filter((f2) => {
+      const t2 = readFileSync10(f2, "utf8");
+      return !t2.includes(own2) && foreign.some((n3) => t2.includes(n3));
+    });
+    return { name: "skills", ok: bad2.length === 0, detail: bad2.length ? `${bad2.join(", ")} without the ${own2}* tool name` : void 0 };
   }
   const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync15(f2.src) ? renderSkill(readFileSync10(f2.src, "utf8"), s.prefixes) : void 0));
   return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f2) => f2.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : void 0 };
