@@ -1,6 +1,6 @@
 // D-NI-GEMINI-GATE-1: conditions under which gemini-cli 0.66.0 has the context-mode extension installed but runs none of
 // its hooks (live, temp HOME, fake model; `gemini extensions list` showed the extension enabled in each case):
-//   - hooksConfig.enabled=false in the merged settings (system > workspace > user), bundle key "hooksConfig.enabled";
+//   - hooksConfig.enabled=false in the merged settings (system > workspace > user > system defaults), bundle key "hooksConfig.enabled";
 //   - our hook command named in hooksConfig.disabled (union of the scopes);
 //   - admin.extensions.enabled=false (ExtensionManager loads no extension);
 //   - the extension disabled for the workspace scope only (`Enabled (Workspace): false`).
@@ -9,12 +9,15 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { parseHostConfig, hostConfigValueAt } from "../core/ops/host-config.ts";
+import { geminiDirOf } from "../core/project/config-dir.ts";
 import { hostText } from "../core/ops/host-text.ts";
 import { AGENT_FLAG, HOOK_BUNDLE } from "./registry.ts";
 
 const GEMINI_DIR = ".gemini";
 const SETTINGS_FILE = "settings.json";
 const SYSTEM_PATH_ENV = "GEMINI_CLI_SYSTEM_SETTINGS_PATH";
+const SYSTEM_DEFAULTS_ENV = "GEMINI_CLI_SYSTEM_DEFAULTS_PATH";
+const SYSTEM_DEFAULTS_FILE = "system-defaults.json";
 const OWN_AGENT = "gemini";
 
 type Env = Record<string, string | undefined>;
@@ -28,15 +31,23 @@ function systemSettingsPath(env: Env): string {
   return "/etc/gemini-cli/settings.json";
 }
 
+/** D-R38-GEMINI-DEFAULTS-1: gemini-cli 0.67.0 getSystemDefaultsPath (chunk-BW65QRZA.js:37799): the env value, else
+ *  system-defaults.json next to the system settings file. */
+function systemDefaultsPath(env: Env): string {
+  const set = env[SYSTEM_DEFAULTS_ENV];
+  return set ? set : path.join(path.dirname(systemSettingsPath(env)), SYSTEM_DEFAULTS_FILE);
+}
+
 function load(file: string): Source | undefined {
   if (!existsSync(file)) return undefined;
   try { return { file, doc: parseHostConfig(OWN_AGENT, file, hostText(readFileSync(file, "utf8")), "jsonc") }; }
   catch { return undefined; } // an unreadable file is the host's to report; the gate stays silent
 }
 
-/** Lowest to highest precedence, as gemini merges them: user, workspace, system. */
+/** Lowest to highest precedence, as gemini merges them: system defaults, user, workspace, system.
+ *  D-R38-GEMINI-HOME-1: the user file sits under $GEMINI_CLI_HOME when it is set, as the host reads it. */
 function sources(env: Env, home: string, cwd: string): Source[] {
-  return [path.join(home, GEMINI_DIR, SETTINGS_FILE), path.join(cwd, GEMINI_DIR, SETTINGS_FILE), systemSettingsPath(env)]
+  return [systemDefaultsPath(env), path.join(geminiDirOf(env, home), SETTINGS_FILE), path.join(cwd, GEMINI_DIR, SETTINGS_FILE), systemSettingsPath(env)]
     .map(load).filter((s): s is Source => s !== undefined);
 }
 

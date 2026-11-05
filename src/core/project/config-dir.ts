@@ -3,7 +3,7 @@
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
 const { mkdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { basename, dirname, join, posix, resolve, win32 } from "node:path";
-import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
+import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 
 /** The one home rule. An empty value counts as unset; null when nothing is set (D-M3-F-8).
@@ -57,6 +57,13 @@ export function codexRunDirOf(env: NodeJS.ProcessEnv, home: string, bundleDir: s
 export function copilotDirOf(env: NodeJS.ProcessEnv, home: string): string {
   const dir = env[COPILOT_HOME_ENV];
   return dir !== undefined && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR["copilot-cli"]);
+}
+
+/** D-R38-GEMINI-HOME-1: the dir gemini-cli reads .gemini/ from: $GEMINI_CLI_HOME when set and not empty, else the home dir
+ *  (gemini-cli 0.67.0 homedir(), bundle chunk-LAR4JEC7.js:252013). The value is a home, so .gemini sits under it. */
+export function geminiDirOf(env: NodeJS.ProcessEnv, home: string): string {
+  const dir = env[GEMINI_CLI_HOME_ENV];
+  return join(dir !== undefined && dir !== "" ? dir : home, ...AGENT_HOME_DIR.gemini);
 }
 
 /** D-WIN-KIRO-HOME-1: the dir Kiro CLI V3 reads hooks/, settings/mcp.json, skills/ and agents/ from: $KIRO_HOME when it is an

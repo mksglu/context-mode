@@ -9,7 +9,7 @@ import {
 } from "../contracts/constants.ts";
 import type { AdapterRow, AgentId, HostConfigEdit, UpgradeChangeRow } from "../contracts/types.ts";
 import { type AtomicOptions, removeTmpFile, renameWithRetry, replaceFailure, unlinkWithRetry } from "./atomic-file.ts";
-import { opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
+import { geminiDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
 import { mergeOwnEntries, readHostConfig } from "./host-config.ts";
 import { withLayout } from "./host-text.ts";
 
@@ -31,6 +31,7 @@ export function hostConfigPath(agent: AgentId, home: string, env: NodeJS.Process
   switch (agent) {
     case "opencode": return join(opencodeDirOf(env, home), OPENCODE_BASE_CONFIG_FILE); // D-WIN-OPENCODE-DIR-1
     case "pi": return join(piAgentDirOf(env, home), SETTINGS_FILE);
+    case "gemini": return join(geminiDirOf(env, home), SETTINGS_FILE); // D-R38-GEMINI-HOME-1
     case "copilot-cli": return null;
     default: return join(home, ...AGENT_HOME_DIR[agent], SETTINGS_FILE);
   }

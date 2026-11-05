@@ -340,6 +340,7 @@ export interface V1Scope {
   copilotDir?: string; // env COPILOT_HOME (D-WIN-COPILOT-HOME-1); none → <home>/.copilot
   kiroDir?: string; // env KIRO_HOME (D-WIN-KIRO-HOME-1); none → <home>/.kiro
   codexDir?: string; // env CODEX_HOME (D-N6-CODEX-HOME-2); none → <home>/.codex
+  geminiDir?: string; // env GEMINI_CLI_HOME + /.gemini (D-R38-GEMINI-HOME-1); none → <home>/.gemini
   opencodeDir?: string; // env OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME (D-WIN-OPENCODE-DIR-1); none → <home>/.config/opencode
   tmp?: string; // none → os.tmpdir()
 }
@@ -350,6 +351,7 @@ export function detectV1(agent: AgentId, home: string, scope: V1Scope = {}): V1F
   const project = scope.project;
   const agentHome = agent === "claude-code" && scope.claudeDir !== undefined ? scope.claudeDir
     : agent === "codex" && scope.codexDir !== undefined ? scope.codexDir
+    : agent === "gemini" && scope.geminiDir !== undefined ? scope.geminiDir
     : agent === "copilot-cli" && scope.copilotDir !== undefined ? scope.copilotDir
     : agent === "kiro" && scope.kiroDir !== undefined ? scope.kiroDir
     : agent === "opencode" && scope.opencodeDir !== undefined ? scope.opencodeDir : join(home, ...AGENT_HOME_DIR[agent]);

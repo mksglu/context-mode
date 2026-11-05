@@ -282,6 +282,51 @@ rl.on("line", (l) => {
     } finally { process.chdir(before); }
   });
 
+  // D-R44-GEMINI-NATIVE-CMD-1 (host audit gemini-1): gemini on PATH lists no context-mode extension. Doctor FAILs and
+  // names the host's own install command, as context-mode setup does not install a gemini extension.
+  test("[D-R44-GEMINI-NATIVE-CMD-1] doctor: no context-mode extension in the list -> FAIL that names gemini extensions install", SKIP_SH, async (t) => {
+    const s = sandbox(t);
+    writeFileSync(path.join(s.root, "list.txt"), "No extensions installed.\n");
+    const a = await doctor(s);
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    assert.equal(a.reason, "not set up, run context-mode setup, or run: gemini extensions install https://github.com/mksglu/context-mode");
+  });
+
+  // D-R38-GEMINI-HOME-1 (host audit gemini-3): gemini-cli homedir() reads $GEMINI_CLI_HOME before os.homedir(), so the user
+  // settings the host reads are $GEMINI_CLI_HOME/.gemini/settings.json; a file under $HOME is not read.
+  test("[D-R38-GEMINI-HOME-1] doctor: hooksConfig.enabled=false under $GEMINI_CLI_HOME is a FAIL that names that file", SKIP_SH, async (t) => {
+    const s = sandbox(t);
+    const gh = path.join(s.root, "gemini-home");
+    const file = put(path.join(gh, ".gemini", "settings.json"), { hooksConfig: { enabled: false } });
+    const a = await doctor({ ...s, env: { ...s.env, GEMINI_CLI_HOME: gh } });
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    assert.ok(regDetail(a).includes(file) && regDetail(a).includes("hooksConfig.enabled"), regDetail(a));
+  });
+
+  test("[D-R38-GEMINI-HOME-1] doctor: with $GEMINI_CLI_HOME set, a gated file under $HOME is one the host never reads -> PASS", SKIP_SH, async (t) => {
+    const s = sandbox(t);
+    put(s.user, { hooksConfig: { enabled: false } });
+    const gh = path.join(s.root, "gemini-home");
+    put(path.join(gh, ".gemini", "settings.json"), { theme: "dark" });
+    const a = await doctor({ ...s, env: { ...s.env, GEMINI_CLI_HOME: gh } });
+    assert.equal(a.status, "PASS", JSON.stringify(a, null, 2));
+  });
+
+  // D-R38-GEMINI-DEFAULTS-1 (host audit gemini-7): the host merges system-defaults.json under the user scope
+  // ($GEMINI_CLI_SYSTEM_DEFAULTS_PATH, else next to the system settings file).
+  test("[D-R38-GEMINI-DEFAULTS-1] doctor: hooksConfig.enabled=false in system-defaults.json is a FAIL; a user true wins over it", SKIP_SH, async (t) => {
+    const s = sandbox(t);
+    const defaults = put(path.join(path.dirname(s.system), "system-defaults.json"), { hooksConfig: { enabled: false } });
+    const a = await doctor(s);
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    assert.ok(regDetail(a).includes(defaults), regDetail(a));
+    const moved = put(path.join(s.root, "elsewhere", "defaults.json"), { hooksConfig: { enabled: false } });
+    const b = await doctor({ ...s, env: { ...s.env, GEMINI_CLI_SYSTEM_DEFAULTS_PATH: moved } });
+    assert.ok(regDetail(b).includes(moved), regDetail(b));
+    put(s.user, { hooksConfig: { enabled: true } });
+    assert.equal((await doctor(s)).status, "PASS", "the user scope sits above the defaults");
+  });
+
   test("[D-NI-GEMINI-GATE-1] setup: a gated gemini install is a FAIL with the same fix, and setup writes no settings file", SKIP_SH, async (t) => {
     const s = sandbox(t);
     const text = JSON.stringify({ hooksConfig: { enabled: false } });

@@ -18,7 +18,9 @@
 // --prerelease --latest=false, so it never shows as Latest over v1.
 //
 //   --github-release --version <x.y.z> [--notes <text>] [--remote <name-or-path>]
-//     On the default remote runs `gh release create v<x.y.z> --verify-tag` with release-out/SHA256SUMS. The tag
+//     On the default remote runs `gh release create v<x.y.z> --verify-tag` with one asset, context-mode.tar.gz: the
+//     release-out tree (SHA256SUMS inside) with gemini-extension.json at its root. Gemini CLI installs from the one
+//     generic asset of the latest release (D-R44-GEMINI-ASSET-1, host audit gemini-1). The tag
 //     must already be on the remote. release.yml runs this only after publish-npm succeeded (or was not asked
 //     for), so a failed npm publish leaves no GitHub release (D-RN-ORDER-1, run 40496186557, v2.0.0-next.4).
 //
@@ -43,6 +45,8 @@ const RELEASE_STAGING_BRANCH = "release-staging";
 const RELEASE_OUT_DIR = "release-out";
 const RELEASE_TAG_PREFIX = "v";
 const SOURCE_COMMIT_TRAILER = "Source-Commit";
+// D-R44-GEMINI-ASSET-1: the one release asset. No platform word in the name, so gemini-cli findReleaseAsset takes it.
+const RELEASE_ASSET_NAME = "context-mode.tar.gz";
 
 class ReleaseError extends Error {}
 
@@ -198,9 +202,17 @@ function githubRelease({ version, notes, remote }) {
     console.log(`gh release skipped: remote ${remote} is not ${RELEASE_REMOTE_DEFAULT} (D-M6-arch-5)`);
     return;
   }
-  const sums = path.join(RELEASE_OUT_DIR, RELEASE_SUMS_FILE);
-  const pre = isPrerelease(version) ? ["--prerelease", "--latest=false"] : [];
-  run("gh", ["release", "create", tag, "--verify-tag", ...pre, "--title", tag, "--notes", notes ?? "", sums]);
+  if (!existsSync(path.join(RELEASE_OUT_DIR, RELEASE_SUMS_FILE))) fail(`${RELEASE_OUT_DIR}/${RELEASE_SUMS_FILE} not found`);
+  // The archive goes to a temp dir, so release-out stays equal to its SHA256SUMS.
+  const dir = mkdtempSync(path.join(tmpdir(), "cm-release-asset-"));
+  try {
+    const asset = path.join(dir, RELEASE_ASSET_NAME);
+    run("tar", ["-czf", asset, "-C", RELEASE_OUT_DIR, "."]);
+    const pre = isPrerelease(version) ? ["--prerelease", "--latest=false"] : [];
+    run("gh", ["release", "create", tag, "--verify-tag", ...pre, "--title", tag, "--notes", notes ?? "", asset]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 async function main(argv) {

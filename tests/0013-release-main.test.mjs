@@ -477,7 +477,8 @@ describe("ADR-0013: publish.mjs", { concurrency: CONC }, () => {
   function stubGh(t) {
     const bin = mkdtempSync(path.join(tmpdir(), "cm-v2-gh-"));
     t.after(() => rmSync(bin, { recursive: true, force: true }));
-    writeFileSync(path.join(bin, "gh"), `#!/bin/sh\necho "$@" > "${bin}/argv"\n`, { mode: 0o755 });
+    // The last argument is the asset; the stub keeps a copy, as the script removes its temp dir after gh returns.
+    writeFileSync(path.join(bin, "gh"), `#!/bin/sh\necho "$@" > "${bin}/argv"\nfor a in "$@"; do last="$a"; done\ncp "$last" "${bin}/asset" 2>/dev/null\nexit 0\n`, { mode: 0o755 });
     return bin;
   }
 
@@ -491,7 +492,9 @@ describe("ADR-0013: publish.mjs", { concurrency: CONC }, () => {
       const env = { ...ENV, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
       const r = spawnSync(process.execPath, [SCRIPT, "--promote", "--version", version, "--notes", "n"], { cwd: work, encoding: "utf8", env });
       assert.equal(r.status, 0, r.stderr);
-      // D-RN-ORDER-1: the GitHub release is its own step, run only after npm publish.
+      // D-RN-ORDER-1: the GitHub release is its own step, run only after npm publish. Its job downloads the artifact
+      // again (stage moved release-out into the release tree), D-R44-GEMINI-ASSET-1.
+      artifact(work, "b");
       const g = spawnSync(process.execPath, [SCRIPT, "--github-release", "--version", version, "--notes", "n"], { cwd: work, encoding: "utf8", env });
       assert.equal(g.status, 0, g.stderr);
       const argv = readFileSync(path.join(bin, "argv"), "utf8").trim().split(" ");
@@ -520,16 +523,26 @@ describe("ADR-0013: publish.mjs", { concurrency: CONC }, () => {
     assert.equal(existsSync(path.join(bin, "argv")), false, "promote never calls gh");
   });
 
-  test("[N5] publish/github-release: makes the GitHub release for the pushed tag with SHA256SUMS (D-RN-ORDER-1)", posixGh, (t) => {
+  // D-R44-GEMINI-ASSET-1 (host audit gemini-1): gemini-cli installs a GitHub URL from the latest release. With one
+  // asset it downloads that asset as the extension archive, so the one asset is the release tree as a .tar.gz with
+  // gemini-extension.json and SHA256SUMS at its root, and release-out stays as built.
+  test("[N5] publish/github-release: makes the GitHub release for the pushed tag with one release-tree archive (D-RN-ORDER-1, D-R44-GEMINI-ASSET-1)", posixGh, (t) => {
     const { bare, work } = fixture(t);
     const src = pushTag(work, bare, "v2.0.0-next.5");
     artifact(work, "b");
+    writeFileSync(path.join(work, "release-out", "gemini-extension.json"), "{}");
+    const before = readdirSync(path.join(work, "release-out")).sort();
     const bin = stubGh(t);
     const env = { ...ENV, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
     const r = spawnSync(process.execPath, [SCRIPT, "--github-release", "--version", "2.0.0-next.5", "--notes", "n"], { cwd: work, encoding: "utf8", env });
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(bin, "argv"), "utf8").trim(),
-      `release create v2.0.0-next.5 --verify-tag --prerelease --latest=false --title v2.0.0-next.5 --notes n ${path.join("release-out", "SHA256SUMS")}`);
+    const argv = readFileSync(path.join(bin, "argv"), "utf8").trim().split(" ");
+    assert.deepEqual(argv.slice(0, -1), "release create v2.0.0-next.5 --verify-tag --prerelease --latest=false --title v2.0.0-next.5 --notes n".split(" "));
+    assert.equal(path.basename(argv.at(-1)), "context-mode.tar.gz", "one asset, no platform word in its name");
+    assert.equal(existsSync(argv.at(-1)), false, "the temp archive is removed after gh returns");
+    const list = spawnSync("tar", ["-tzf", path.join(bin, "asset")], { encoding: "utf8" }).stdout.split("\n").filter((l) => l !== "" && l !== "./");
+    for (const f of ["gemini-extension.json", "SHA256SUMS", "server.mjs", "hooks/a.json"]) assert.ok(list.includes(`./${f}`), `${f} at the archive root: ${list}`);
+    assert.deepEqual(readdirSync(path.join(work, "release-out")).sort(), before, "release-out unchanged");
     assert.equal(remoteRef(bare, "refs/tags/v2.0.0-next.5^{commit}"), src, "tag untouched");
   });
 
@@ -669,7 +682,8 @@ describe("ADR-0013: release-next (plan then publish)", { concurrency: CONC }, ()
     assert.equal(tags, TAG, "no second tag on the remote");
     const argv = readFileSync(path.join(bin, "argv"), "utf8").split("\0").slice(0, -1); // NUL: notes span lines
     assert.deepEqual(argv, ["release", "create", TAG, "--verify-tag", "--prerelease", "--latest=false",
-      "--title", TAG, "--notes", notes, path.join("release-out", "SHA256SUMS")]);
+      "--title", TAG, "--notes", notes, argv.at(-1)]);
+    assert.equal(path.basename(argv.at(-1)), "context-mode.tar.gz", "D-R44-GEMINI-ASSET-1");
   });
 });
 

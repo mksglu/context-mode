@@ -6,7 +6,7 @@ import path from "node:path";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import { AGENT_HOME_DIR, HOST_NODE_COMMAND, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
 import type { AgentId, AdapterRow, HostConfigFormat } from "../core/contracts/types.ts";
-import { claudeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf } from "../core/project/config-dir.ts";
+import { claudeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf } from "../core/project/config-dir.ts";
 import { ownMcpValue } from "../core/ops/host-config.ts";
 import { HOOK_SHAPES, type JsonObject } from "./hook-shapes.ts";
 
@@ -229,7 +229,7 @@ function hookFilesFor(ctx: SetupContext, id: AgentId): HookFile[] {
     case "codex": return [{ file: agentPath(ctx, id, [CODEX_DIR, "hooks.json"]), mode: "rewrite" }];
     case "copilot-cli": return [{ file: agentPath(ctx, id, [COPILOT_DIR, "hooks", "context-mode.json"]), mode: "rewrite" }];
     case "claude-code": return [{ file: path.join(claudeDirOf(ctx.env, home), "settings.json"), mode: "drop" }];
-    case "gemini": return [{ file: path.join(home, ".gemini", "settings.json"), mode: "drop" }];
+    case "gemini": return [{ file: path.join(geminiDirOf(ctx.env, home), "settings.json"), mode: "drop" }]; // D-R38-GEMINI-HOME-1
     case "qwen": return [{ file: path.join(home, ".qwen", "settings.json"), mode: "drop" }];
     default: return [];
   }

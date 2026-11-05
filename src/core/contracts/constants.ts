@@ -738,6 +738,7 @@ export const HOOKS_JSON_FILE = "hooks.json"; // codex, zcode cli/
 export const CLAUDE_CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR"; // D-WF-CC-CONFIG-1: Claude Code user dir override (default ~/.claude)
 export const CODEX_HOME_ENV = "CODEX_HOME"; // D-N6-CODEX-HOME-2: Codex reads config.toml and hooks.json from here (default ~/.codex)
 export const COPILOT_HOME_ENV = "COPILOT_HOME"; // D-WIN-COPILOT-HOME-1: Copilot CLI replaces ~/.copilot as a whole with it (hooks/, skills/)
+export const GEMINI_CLI_HOME_ENV = "GEMINI_CLI_HOME"; // D-R38-GEMINI-HOME-1: gemini-cli homedir() reads it before os.homedir(); <it>/.gemini holds settings.json and extensions/
 export const KIRO_HOME_ENV = "KIRO_HOME"; // D-WIN-KIRO-HOME-1: Kiro CLI V3 global dir override (hooks/, settings/mcp.json, skills/, agents/); default ~/.kiro
 export const OPENCODE_CONFIG_DIR_ENV = "OPENCODE_CONFIG_DIR"; // D-WIN-OPENCODE-DIR-1: OpenCode custom config dir (opencode.json, skills/)
 export const APPDATA_ENV = "APPDATA"; // D-WIN-VSCODE-MCP-1: Windows roaming app data; VS Code keeps its user dir under it

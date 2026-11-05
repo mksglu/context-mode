@@ -282,7 +282,7 @@ jobs:
         with:
           name: release-out
           path: release-out
-      - name: GitHub Release with SHA256SUMS, after publish-npm
+      - name: GitHub Release with the release-tree archive (SHA256SUMS inside), after publish-npm
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.plan.outputs.version }}
@@ -515,7 +515,7 @@ jobs:
         with:
           name: release-out
           path: release-out
-      - name: GitHub Release with SHA256SUMS, after npm and the release commit
+      - name: GitHub Release with the release-tree archive (SHA256SUMS inside), after npm and the release commit
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.main-plan.outputs.version }}

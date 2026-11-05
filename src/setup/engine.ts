@@ -14,8 +14,8 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, DB_FILE_NAME, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { claudeDirOf, codexDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
+import { AGENT_HOME_DIR, DB_FILE_NAME, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
@@ -949,6 +949,7 @@ function agentHomeDir(id: AgentId, ctx: SetupContext): string {
   if (id === "copilot-cli") return copilotDirOf(ctx.env, ctx.home); // D-WIN-COPILOT-HOME-1
   if (id === "kiro") return kiroDirOf(ctx.env, ctx.home); // D-WIN-KIRO-HOME-1
   if (id === "opencode") return opencodeDirOf(ctx.env, ctx.home); // D-WIN-OPENCODE-DIR-1
+  if (id === "gemini") return geminiDirOf(ctx.env, ctx.home); // D-R38-GEMINI-HOME-1
   return path.join(ctx.home, ...AGENT_HOME_DIR[id]);
 }
 
@@ -1018,7 +1019,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
   } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
   // The config entry is current when the plan changes nothing in that file but codex trust entries.
   const configEdited = (file: string): boolean => plan.edits.some((e) => e.file === file && e.changes.some((c) => !isTrust(row, c)));
-  res.v1 = detectV1(row.id, ctx.home, { claudeDir: claudeDirOf(ctx.env, ctx.home), codexDir: codexDirOf(ctx.env, ctx.home), copilotDir: copilotDirOf(ctx.env, ctx.home), kiroDir: kiroDirOf(ctx.env, ctx.home), opencodeDir: opencodeDirOf(ctx.env, ctx.home) }).filter((f) => !(row.config && f.file === row.config.file && !configEdited(f.file)));
+  res.v1 = detectV1(row.id, ctx.home, { claudeDir: claudeDirOf(ctx.env, ctx.home), codexDir: codexDirOf(ctx.env, ctx.home), geminiDir: geminiDirOf(ctx.env, ctx.home), copilotDir: copilotDirOf(ctx.env, ctx.home), kiroDir: kiroDirOf(ctx.env, ctx.home), opencodeDir: opencodeDirOf(ctx.env, ctx.home) }).filter((f) => !(row.config && f.file === row.config.file && !configEdited(f.file)));
   res.changes = [...plan.edits.flatMap((e) => e.changes), ...[...plan.cli, ...plan.refresh].map((args) => ({ command: [row.cli!.bin, ...args] }))];
   if (dryRun) return res;
   try {
@@ -1093,7 +1094,11 @@ function notSetUpReason(row: CheckRow, res: AgentResult, env: SetupContext["env"
   const h = row.hookInstall;
   const missing = row.id === "opencode" && h.kind === "plugin-list" && res.changes.some((c) => c.path === h.key[0]);
   const oc2 = missing && hostBin("opencode", env).file !== undefined && opencodeMajor("opencode", env) >= 2;
-  return oc2 ? `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode` : NOT_SET_UP_REASON;
+  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode`;
+  // D-R44-GEMINI-NATIVE-CMD-1 (host audit gemini-1): gemini is on PATH and lists no context-mode extension, so the fix
+  // line names the host's own install command too.
+  if (row.id === "gemini" && hostBin("gemini", env).file !== undefined) return `${NOT_SET_UP_REASON}, or run: ${NATIVE_INSTALL.gemini[0]}`;
+  return NOT_SET_UP_REASON;
 }
 
 /** D-HF-OPENCODE-GATE-1: a plugin list that loads twice or names a missing file of ours is a hook-registered FAIL with its own fix line. */

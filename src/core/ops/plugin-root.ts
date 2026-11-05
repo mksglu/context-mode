@@ -10,7 +10,7 @@ import {
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { AdapterRow } from "../contracts/types.ts";
-import { claudeDirOf, ownMcpFileOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
+import { claudeDirOf, geminiDirOf, ownMcpFileOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { hostText } from "./host-text.ts";
 import { hostConfigValueAt, parseHostConfig, readHostConfig } from "./host-config.ts";
 
@@ -179,7 +179,8 @@ function candidate(adapter: RootInput, env: NodeJS.ProcessEnv, worktree?: string
     case "hooks+mcp":
       return configEntryRoot(adapter, env);
     case "extension":
-      return join(requireHomeDir(env), ...AGENT_HOME_DIR[adapter.id], EXTENSIONS_DIR_NAME, PLUGIN_NAME);
+      // D-R38-GEMINI-HOME-1: gemini-cli keeps extensions under $GEMINI_CLI_HOME/.gemini when it is set.
+      return join(adapter.id === "gemini" ? geminiDirOf(env, requireHomeDir(env)) : join(requireHomeDir(env), ...AGENT_HOME_DIR[adapter.id]), EXTENSIONS_DIR_NAME, PLUGIN_NAME);
     case "plugin":
       return join(resolveConfigDir(env), DATA_PLUGINS_DIR_NAME, adapter.id, PLUGIN_CURRENT_LINK);
     case "in-process":

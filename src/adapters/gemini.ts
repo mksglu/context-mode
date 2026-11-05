@@ -28,6 +28,9 @@ const DENY_EVENTS: readonly Event[] = ["UserPromptSubmit", "PreToolUse"];
 
 const EMPTY: HookOutput = { stdout: "", exitCode: 0 };
 
+// D-R38-GEMINI-REPLACE-OK-1: first line of an AfterTool replace reason; the host shows it after "Tool result blocked: ".
+export const GEMINI_REPLACE_LEAD = "the tool ran and succeeded; context-mode indexed its full output, and this is the part that answers the call:\n";
+
 function own(p: Record<string, unknown>, key: string): unknown {
   return Object.hasOwn(p, key) ? p[key] : undefined;
 }
@@ -54,15 +57,71 @@ function canonicalName(name: string, mcp: unknown): string {
   return "mcp:" + server + ":" + tool;
 }
 
+// D-R38-GEMINI-PARTS-1 (host audit gemini-6): read_many_files and MCP tools give llmContent as a Part list. When every
+// Part is a text Part, the joined text is what the model sees, so it is the result text (head lines and a real query).
+function partsText(llm: unknown): string | undefined {
+  if (!Array.isArray(llm) || llm.length === 0) return undefined;
+  const out: string[] = [];
+  for (const part of llm) {
+    if (typeof part === "string") { out.push(part); continue; }
+    if (typeof part !== "object" || part === null) return undefined;
+    const t = own(part as Record<string, unknown>, "text");
+    if (typeof t !== "string") return undefined;
+    out.push(t);
+  }
+  return out.join("");
+}
+
 // tool_response is Gemini's {llmContent, returnDisplay, error?}; a non-null `error` marks failure (DEVIATIONS D-M3-A1-3).
 // D-HA-GEMINI-REPLACE-1: a string llmContent is the text the model sees, so it is the result text a replace selects
-// from; any other shape (Part list) stays the JSON text, as before.
+// from; a text-only Part list is joined (D-R38-GEMINI-PARTS-1); any other shape stays the JSON text, as before.
 function readResult(resp: unknown): ToolResultInfo {
   const obj = typeof resp === "object" && resp !== null ? (resp as Record<string, unknown>) : undefined;
   const llm = obj === undefined ? undefined : own(obj, "llmContent");
-  const text = resp === undefined ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : JSON.stringify(resp);
+  const text = resp === undefined ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : partsText(llm) ?? JSON.stringify(resp);
   const err = obj === undefined ? undefined : own(obj, "error");
   return { isError: err !== undefined && err !== null, bytes: Buffer.byteLength(text), text };
+}
+
+// D-R38-GEMINI-URL-1 (host audit gemini-5): web_fetch takes only `prompt`, with the URLs inside the free text.
+// The first http(s) word of the prompt is the url the WebFetch policy and the intent read.
+const URL_STARTS = ["https://", "http://"];
+const URL_TRAIL = ".,;:!?)]}>'\"";
+const SPACE = " \t\n\r\f\v";
+function words(text: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  for (const ch of text) {
+    if (SPACE.includes(ch)) { if (cur !== "") out.push(cur); cur = ""; } else cur += ch;
+  }
+  if (cur !== "") out.push(cur);
+  return out;
+}
+function firstUrl(prompt: unknown): string | undefined {
+  if (typeof prompt !== "string") return undefined;
+  for (const word of words(prompt)) {
+    const lower = word.toLowerCase();
+    const at = URL_STARTS.map((s) => lower.indexOf(s)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+    if (at === undefined) continue;
+    let url = word.slice(at);
+    while (url.length > 0 && URL_TRAIL.includes(url[url.length - 1])) url = url.slice(0, -1);
+    return url;
+  }
+  return undefined;
+}
+
+// D-R38-GEMINI-PARTS-1: read_many_files names its files in `include` (string list); they are the replace query.
+function nativeInput(name: string, input: Record<string, unknown>): Record<string, unknown> {
+  if (name === "web_fetch" && own(input, "url") === undefined) {
+    const url = firstUrl(own(input, "prompt"));
+    return url === undefined ? input : { ...input, url };
+  }
+  if (name === "read_many_files" && own(input, "file_path") === undefined) {
+    const inc = own(input, "include");
+    const list = Array.isArray(inc) ? inc.filter((v): v is string => typeof v === "string") : [];
+    return list.length === 0 ? input : { ...input, file_path: list.join(" ") };
+  }
+  return input;
 }
 
 export function decode(raw: unknown): CanonicalHookEvent {
@@ -82,7 +141,7 @@ export function decode(raw: unknown): CanonicalHookEvent {
     ev.tool = {
       name,
       canonicalName: canonicalName(name, own(p, "mcp_context")),
-      input: typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : {},
+      input: nativeInput(name, typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : {}),
     };
   }
   if (event === "PostToolUse") ev.result = readResult(own(p, "tool_response"));
@@ -102,8 +161,10 @@ export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): Ho
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === undefined ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
       // gemini-cli 0.65.0 docs/hooks/reference.md AfterTool: decision "deny" + reason, the reason replaces the tool
-      // result sent to the model (D-HA-GEMINI-REPLACE-1).
+      // result sent to the model (D-HA-GEMINI-REPLACE-1). The host code wraps it as "Tool result blocked: <reason>"
+      // with error execution_failed, and it has no other replace channel, so the reason starts with a line that tells
+      // the model the tool ran and succeeded (D-R38-GEMINI-REPLACE-OK-1, host audit gemini-4).
       if (ev.event !== "PostToolUse") return EMPTY;
-      return { stdout: JSON.stringify({ decision: "deny", reason: d.output }), exitCode: 0 };
+      return { stdout: JSON.stringify({ decision: "deny", reason: GEMINI_REPLACE_LEAD + d.output }), exitCode: 0 };
   }
 }

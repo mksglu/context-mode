@@ -14,7 +14,7 @@ import {
 import { CtxError } from "../contracts/errors.ts";
 import type { AdapterRow, CtxUpgradeInput, ProjectContext, ToolContext, ToolReply, UpgradeChangeRow } from "../contracts/types.ts";
 import { getAdapter } from "../../adapters/table.ts";
-import { claudeDirOf, copilotDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir } from "../project/config-dir.ts";
+import { claudeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir } from "../project/config-dir.ts";
 import { detectV1 } from "../ops/detect-v1.ts";
 import { regenerateHostConfig, type HostFileWriter } from "../ops/host-write.ts";
 import { ownBundleDir } from "../ops/bundle-dir.ts";
@@ -104,7 +104,7 @@ async function upgrade(adapter: AdapterRow, deps: UpgradeDeps, home: string): Pr
       ? (done = await checkout(adapter, deps)).rows
       : [hostRow(adapter)];
     const step5 = regenerateHostConfig(adapter, home, { env: deps.env, write: deps.write });
-    const findings = detectV1(adapter.id, home, { project: deps.project.worktree, piAgentDir: piAgentDirOf(deps.env, home), claudeDir: claudeDirOf(deps.env, home), copilotDir: copilotDirOf(deps.env, home), kiroDir: kiroDirOf(deps.env, home), opencodeDir: opencodeDirOf(deps.env, home) });
+    const findings = detectV1(adapter.id, home, { project: deps.project.worktree, piAgentDir: piAgentDirOf(deps.env, home), claudeDir: claudeDirOf(deps.env, home), geminiDir: geminiDirOf(deps.env, home), copilotDir: copilotDirOf(deps.env, home), kiroDir: kiroDirOf(deps.env, home), opencodeDir: opencodeDirOf(deps.env, home) });
     removal = removeV1(adapter.id, findings);
     const rows = [...step4, ...step5, ...removal.rows];
     removal.commit();
