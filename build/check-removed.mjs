@@ -89,9 +89,11 @@ const ALLOWED_SKILL_FILES = [
   ".claude/skills/release/SKILL.md",
 ];
 // D-REL-MAIN-VERSION-1: the release commit (scripts/release/commit-main.mjs, build/main-tree.mjs) tracks the built plugin
-// under plugins/claude-code/ with the 4 rendered skill copies build.mjs ships (skills/ for Gemini and Qwen, claude-code/skills
-// for the Claude Code plugin.json "skills", codex/skills, pi/skills) and the root Gemini and Qwen manifests.
+// under plugins/claude-code/ with the 3 rendered skill copies build.mjs ships (skills/ for Claude Code, Gemini and Qwen,
+// D-R33-CC-SKILLS-1; codex/skills; pi/skills) and the root Gemini and Qwen manifests.
 const MAIN_TREE_PLUGIN_DIR = "plugins/claude-code/";
+// claude-code/skills/ is the copy the v2.1.0 release commit tracked; the next release commit (main-tree.mjs rebuilds the
+// folder) drops it, so the gate allows it until then.
 const MAIN_TREE_SKILL_DIRS = ["skills/", "claude-code/skills/", "codex/skills/", "pi/skills/"];
 const MAIN_TREE_SKILL_FILES = MAIN_TREE_SKILL_DIRS.flatMap((d) =>
   ["ctx-stats", "ctx-doctor", "ctx-upgrade"].map((n) => MAIN_TREE_PLUGIN_DIR + d + n + "/SKILL.md"));

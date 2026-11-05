@@ -242,7 +242,7 @@ function copyPackageDocs(outDir, version) {
 // §2.2 step 6: verbatim copy of skills/<name>/SKILL.md for the 3 command skills (impl/13 §5).
 // D-HQ-SKILLS-1: gemini loads <extension>/skills and pi loads package.json pi.skills as they are, so each host
 // gets its own copy, rendered from the one skills/ source with that host's real tool names (split/join).
-const SKILL_HOSTS = Object.freeze(["claude-code", "gemini", "pi"]); // D-HQ-SKILLS-2: claude-code reads claude-code/skills
+const SKILL_HOSTS = Object.freeze(["gemini", "pi"]); // D-R33-CC-SKILLS-1: claude-code reads skills/ with gemini and qwen
 
 // ADR-0023 (D-NI-CODEX-1): the codex plugin (.codex-plugin/plugin.json "skills") reads its own rendered copy.
 const SKILL_TARGETS = Object.freeze([

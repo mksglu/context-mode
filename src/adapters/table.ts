@@ -32,7 +32,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     id: "claude-code", installMode: "marketplace", projectSource: "env:CLAUDE_PROJECT_DIR", toolNamePrefix: claudeCode.TOOL_NAME_PREFIX,
     nativeTools: CLAUDE_CODE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
-    hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "claude-code/skills" }, // ADR-0020, D-HQ-SKILLS-2
+    hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020, D-R33-CC-SKILLS-1: Claude Code always loads <plugin>/skills, shared with gemini and qwen
     decode: claudeCode.decode, encode: claudeCode.encode,
   },
   {

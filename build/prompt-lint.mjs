@@ -26,8 +26,7 @@ const PROMPT_DIR = path.join(REPO_ROOT, "src", "prompt");
 const SHIPPED_SKILLS = [
   "skills/ctx-stats/SKILL.md", "skills/ctx-doctor/SKILL.md", "skills/ctx-upgrade/SKILL.md",
   "pi/skills/ctx-stats/SKILL.md", "pi/skills/ctx-doctor/SKILL.md", "pi/skills/ctx-upgrade/SKILL.md",
-  // claude-code gets its own rendered copy (plugin.json skills key, 02e28bc4).
-  "claude-code/skills/ctx-stats/SKILL.md", "claude-code/skills/ctx-doctor/SKILL.md", "claude-code/skills/ctx-upgrade/SKILL.md",
+  // D-R33-CC-SKILLS-1: claude-code reads skills/ with Gemini and Qwen (no claude-code/skills copy).
   // D-NI-CODEX-1: the codex plugin (.codex-plugin/plugin.json skills) reads its own rendered copy.
   "codex/skills/ctx-stats/SKILL.md", "codex/skills/ctx-doctor/SKILL.md", "codex/skills/ctx-upgrade/SKILL.md",
 ];

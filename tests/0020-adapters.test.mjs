@@ -235,7 +235,7 @@ describe("ADR-0020 adapters", () => {
       opencode: { kind: "in-process", path: "opencode/plugin.js" },
     };
     const SKILL_CHANNEL = {
-      "claude-code": { kind: "package", path: "claude-code/skills" }, // D-HQ-SKILLS-2
+      "claude-code": { kind: "package", path: "skills" }, // D-R33-CC-SKILLS-1: shared with gemini and qwen
       codex: { kind: "home-dir", path: ".codex/skills" },
       gemini: { kind: "package", path: "skills" },
       qwen: { kind: "package", path: "skills" }, // D-HQ-SKILLS-3: <extension>/skills, shared with gemini
@@ -441,7 +441,8 @@ describe("ADR-0020 adapters", () => {
       const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "echo hello" }, tool_response: resp });
       assert.equal(ev.event, "PostToolUse");
       // D-M7-RR-1: a Bash {stdout, stderr} response is read as the plain output the model sees.
-      assert.deepEqual(ev.result, { isError: false, bytes: Buffer.byteLength("hello\n"), text: "hello\n" });
+      // D-R33-CC-SHELL-1: the host's own object rides along as shape, so the replace keeps its other fields.
+      assert.deepEqual(ev.result, { isError: false, bytes: Buffer.byteLength("hello\n"), text: "hello\n", shape: resp });
       const both = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { stdout: "out", stderr: "err" } });
       assert.equal(both.result.text, "out\nerr");
       const errOnly = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { stdout: "", stderr: "err" } });
@@ -644,7 +645,8 @@ describe("ADR-0020 adapters", () => {
       const resp = { type: "text", file: { filePath: "/a.txt", content: "l1\nl2", numLines: 2, startLine: 1, totalLines: 2 } };
       const { ev, out } = replaced("Read", resp, { file_path: "/a.txt" });
       assert.equal(ev.result.text, "l1\nl2");
-      assert.deepEqual(out, { type: "text", file: { ...resp.file, content: "chunks\nmore" } });
+      // D-R33-CC-READ-LINES-1: no file line kept, so the numbers start past the 2 lines read.
+      assert.deepEqual(out, { type: "text", file: { ...resp.file, content: "chunks\nmore", startLine: 3, numLines: 2 } });
     });
 
     test("D-CC-SHAPE-1: Read of an image or other variant keeps the original (no replace object to build)", () => {
@@ -675,6 +677,46 @@ describe("ADR-0020 adapters", () => {
       const grep = { mode: "content", numFiles: 0, filenames: [], content: "a:1:x", numLines: 1 };
       assert.deepEqual(replaced("Grep", grep).out, { ...grep, content: "chunks\nmore" });
       assert.deepEqual(replaced("mcp__tix__list", [{ type: "text", text: "x" }]).out, [{ type: "text", text: "chunks\nmore" }]);
+    });
+
+    // D-R33-CC-SHELL-1 (claude-code-1): the Bash/PowerShell replace keeps interrupted and every other field of the host's own
+    // object; only stdout and stderr change, and the persisted-output pointer goes (the replace is the whole output now).
+    test("D-R33-CC-SHELL-1: shell replace keeps interrupted and returnCodeInterpretation", () => {
+      for (const t of ["Bash", "PowerShell"]) {
+        const resp = { stdout: "x", stderr: "warn", interrupted: true, returnCodeInterpretation: "grep: no match", noOutputExpected: false,
+          persistedOutputPath: "/x/out.txt", persistedOutputSize: 9 };
+        assert.deepEqual(replaced(t, resp, { command: "grep a b" }).out,
+          { stdout: "chunks\nmore", stderr: "", interrupted: true, returnCodeInterpretation: "grep: no match", noOutputExpected: false }, t);
+      }
+    });
+
+    // D-R33-CC-READ-LINES-1 (claude-code-2): Claude Code numbers Read lines from file.startLine (U6e in 2.1.318). The replace
+    // shows the kept file lines at their own numbers and the handle line after them.
+    test("D-R33-CC-READ-LINES-1: Read replace numbers the kept lines from their own line", () => {
+      const lines = Array.from({ length: 200 }, (_, n) => "row " + (n + 1));
+      const resp = { type: "text", file: { filePath: "/a.txt", content: lines.join("\n"), numLines: 200, startLine: 1, totalLines: 200 } };
+      const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: "/a.txt" }, tool_response: resp });
+      const out = JSON.parse(encode(ev, { kind: "replace", output: "row 199\nrow 200\nctx_search(...)" }).stdout).hookSpecificOutput.updatedToolOutput;
+      assert.deepEqual(out.file, { ...resp.file, content: "row 199\nrow 200\nctx_search(...)", startLine: 199, numLines: 3 });
+      // a Read with an offset: numbers follow the host's own startLine
+      const off = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: "/a.txt" },
+        tool_response: { type: "text", file: { ...resp.file, content: lines.slice(49).join("\n"), startLine: 50, numLines: 151 } } });
+      const o2 = JSON.parse(encode(off, { kind: "replace", output: "row 60\nctx_search(...)" }).stdout).hookSpecificOutput.updatedToolOutput;
+      assert.equal(o2.file.startLine, 60);
+      // two chunks with a gap: only the first run keeps its numbers; the later chunk stays in the store (handle line)
+      const gap = JSON.parse(encode(ev, { kind: "replace", output: "row 10\nrow 150\nctx_search(...)" }).stdout).hookSpecificOutput.updatedToolOutput;
+      assert.deepEqual([gap.file.content, gap.file.startLine, gap.file.numLines], ["row 10\nctx_search(...)", 10, 2]);
+      // no file line kept (a digest or the handle alone): numbers start past the lines read, never on a real line
+      const none = JSON.parse(encode(ev, { kind: "replace", output: "ctx_search(...)" }).stdout).hookSpecificOutput.updatedToolOutput;
+      assert.deepEqual([none.file.startLine, none.file.numLines], [201, 1]);
+    });
+
+    // D-R33-CC-GREP-COUNT-1 (claude-code-3): Grep count mode shows content (per-file counts), so content is the text slot.
+    test("D-R33-CC-GREP-COUNT-1: Grep count mode replaces content, keeps filenames", () => {
+      const grep = { mode: "count", numFiles: 2, filenames: ["a.js", "b.js"], content: "a.js:3\nb.js:4", numMatches: 7 };
+      const { ev, out } = replaced("Grep", grep, { pattern: "x" });
+      assert.equal(ev.result.text, "a.js:3\nb.js:4");
+      assert.deepEqual(out, { ...grep, content: "chunks\nmore" });
     });
 
     test("D-CC-SHAPE-1: an object with no known text field is kept, never replaced by a string", () => {

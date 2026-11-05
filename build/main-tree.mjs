@@ -21,6 +21,7 @@ const CLAUDE_MARKETPLACE = path.join(".claude-plugin", "marketplace.json");
 const CODEX_MARKETPLACE = path.join(".agents", "plugins", "marketplace.json");
 
 const BUILT_PREFIX = "plugins/claude-code/";
+const GEMINI_HOOKS = path.join("hooks", "hooks.json");
 const BUNDLES = ["server.mjs", "hook.mjs"];
 
 // Every string in a manifest that ends a path with a shipped bundle gets the built-copy folder in front of the bundle name.
@@ -63,6 +64,9 @@ export function writeMainTree(pkg, repo, version) {
   rmSync(plugin, { recursive: true, force: true });
   cpSync(pkg, plugin, { recursive: true });
   rmSync(path.join(plugin, CLAUDE_MARKETPLACE)); // the marketplace lives at the repo root, not inside the plugin
+  // D-R33-CC-HOOKS-1 (host audit claude-code-5): Claude Code always loads <plugin>/hooks/hooks.json, and that file holds
+  // Gemini's events (4 "unknown hook event" warnings on every start). Gemini reads the repo-root copy written below.
+  rmSync(path.join(plugin, GEMINI_HOOKS), { force: true });
   writeHashes(plugin);
   // D-REL-MAIN-VERSION-1: the root marketplace on main is the source-tree manifest too (tests/0018 package-meta), so it
   // carries the package version, description and keywords, as the v2-design one did.
@@ -72,7 +76,7 @@ export function writeMainTree(pkg, repo, version) {
     plugins: pkgMarket.plugins.map((p) => ({ ...p, description: pkgJson.description, keywords: pkgJson.keywords, version, source: PLUGIN_SOURCE })),
   });
   writeJson(path.join(repo, "gemini-extension.json"), repoint(readJson(path.join(pkg, "gemini-extension.json"))));
-  writeJson(path.join(repo, "hooks", "hooks.json"), repoint(readJson(path.join(pkg, "hooks", "hooks.json"))));
+  writeJson(path.join(repo, GEMINI_HOOKS), repoint(readJson(path.join(pkg, GEMINI_HOOKS))));
   const qwen = readJson(path.join(pkg, "qwen-extension.json"));
   writeJson(path.join(repo, "qwen-extension.json"), repoint(qwen));
   writeJson(path.join(repo, qwen.hooks), repoint(readJson(path.join(pkg, qwen.hooks))));

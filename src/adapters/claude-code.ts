@@ -62,7 +62,7 @@ type Slot = { text: string; put: (resp: Record<string, unknown>, output: string)
 function textSlot(r: Record<string, unknown>): Slot | null {
   const file = r.file;
   if (r.type === "text" && typeof file === "object" && file !== null && typeof (file as { content?: unknown }).content === "string") {
-    return { text: (file as { content: string }).content, put: (o, output) => ({ ...o, file: { ...(o.file as object), content: output } }) };
+    return { text: (file as { content: string }).content, put: (o, output) => ({ ...o, file: readFile(o.file as Record<string, unknown>, output) }) };
   }
   if (isGrepContent(r)) return { text: r.content as string, put: (o, output) => ({ ...o, content: output }) };
   if (Array.isArray(r.filenames) && r.filenames.every((f) => typeof f === "string")) {
@@ -72,14 +72,45 @@ function textSlot(r: Record<string, unknown>): Slot | null {
   return null;
 }
 
+// D-R33-CC-READ-LINES-1 (claude-code-2): Claude Code 2.1.318 numbers each Read line from file.startLine. The replace
+// keeps the first run of output lines that are real file lines, at their own numbers, then the handle line. A later chunk
+// after a gap stays in the store (the handle searches it). No real file line kept: the lines start past the lines read,
+// so no number names a file line it does not show.
+function readFile(file: Record<string, unknown>, output: string): Record<string, unknown> {
+  const start = typeof file.startLine === "number" ? file.startLine : 1;
+  const lines = String(file.content).split("\n");
+  const read = typeof file.numLines === "number" ? file.numLines : lines.length;
+  const out = output.split("\n");
+  const run = firstRun(lines, out);
+  if (run === null) return { ...file, content: output, startLine: start + read, numLines: out.length };
+  const kept = out.slice(0, run.length);
+  if (run.length < out.length) kept.push(out[out.length - 1]); // the handle line is the last line of a replace
+  return { ...file, content: kept.join("\n"), startLine: start + run.at, numLines: kept.length };
+}
+
+// The file line index where the longest run of the output's leading lines starts, and the run length; null when the
+// first output line is no file line.
+function firstRun(lines: readonly string[], out: readonly string[]): { at: number; length: number } | null {
+  let best: { at: number; length: number } | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] !== out[0]) continue;
+    let n = 1;
+    while (n < out.length && i + n < lines.length && lines[i + n] === out[n]) n++;
+    if (best === null || n > best.length) best = { at: i, length: n };
+    if (n === out.length) break;
+  }
+  return best;
+}
+
 function isShellShape(resp: object): boolean {
   const r = resp as { stdout?: unknown; stderr?: unknown };
   return typeof r.stdout === "string" || typeof r.stderr === "string";
 }
 
+// D-R33-CC-GREP-COUNT-1 (claude-code-3): count mode shows content (per-file counts) too, so content is its text slot.
 function isGrepContent(resp: object): boolean {
   const r = resp as { mode?: unknown; content?: unknown };
-  return r.mode === "content" && typeof r.content === "string";
+  return (r.mode === "content" || r.mode === "count") && typeof r.content === "string";
 }
 
 // D-M2-MCP-1: an MCP result is an array of content blocks; the text blocks joined by a newline are the output.
@@ -100,6 +131,7 @@ function readResult(resp: unknown): ToolResultInfo {
   const isError = typeof resp === "object" && resp !== null && (resp as { is_error?: unknown }).is_error === true;
   const info: ToolResultInfo = { isError, bytes: Buffer.byteLength(text), text };
   // D-CC-SHAPE-1: an object the replace can rebuild keeps its shape; any other non-Bash object stays as the host made it.
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isShellShape(resp)) info.shape = resp as Record<string, unknown>; // D-R33-CC-SHELL-1
   if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && !isShellShape(resp)) {
     if (textSlot(resp as Record<string, unknown>) !== null) info.shape = resp as Record<string, unknown>;
     else info.keep = true;
@@ -147,9 +179,15 @@ export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: strin
 // D-M7-SV-1: Claude Code checks updatedToolOutput against the tool's own output schema and keeps the
 // original output on a mismatch ("does not match Bash's output shape; using original output"). Bash
 // output is an object {stdout, stderr, interrupted}, so a bare string never reached the model.
+// D-R33-CC-SHELL-1 (claude-code-1): the shell replace is the host's own object with stdout and stderr swapped, so
+// interrupted, returnCodeInterpretation and the rest reach the model as the host made them. The persisted-output fields go:
+// the replace is the whole output now.
 function replaceShape(ev: CanonicalHookEvent, output: string): unknown {
-  if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
   const shape = ev.result?.shape;
+  if (ev.tool?.canonicalName === "Bash") {
+    const { persistedOutputPath: _p, persistedOutputSize: _s, ...host } = shape ?? {};
+    return { interrupted: false, ...host, stdout: output, stderr: "" };
+  }
   const slot = shape === undefined ? null : textSlot(shape);
   if (shape !== undefined && slot !== null) return slot.put(shape, output); // D-CC-SHAPE-1: the tool's own object
   if (ev.result?.blocks === true) return [{ type: "text", text: output }]; // D-M2-MCP-1: the MCP result shape

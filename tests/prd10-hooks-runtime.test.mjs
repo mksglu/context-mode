@@ -100,7 +100,8 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
   // D-M7-SV-1: a Bash replace is the Bash output shape {stdout, stderr, interrupted}; other tools get a string.
   function replacedText(v) {
     if (typeof v === "string") return v;
-    assert.deepEqual(Object.keys(v).sort(), ["interrupted", "stderr", "stdout"]);
+    // D-R33-CC-SHELL-1: the host's own Bash object; only stdout and stderr change.
+    for (const k of ["interrupted", "stderr", "stdout"]) assert.ok(k in v, k);
     assert.equal(v.stderr, "");
     assert.equal(v.interrupted, false);
     return v.stdout;
@@ -389,7 +390,12 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const r = out.updatedToolOutput;
     assert.equal(typeof r, "object", "Read replace is an object (Claude Code drops a string)");
     assert.equal(r.type, "text");
-    assert.deepEqual({ ...r.file, content: "" }, { ...file, content: "" }, "every other file field is kept");
+    // D-R33-CC-READ-LINES-1: startLine and numLines follow the kept lines; every other file field is kept.
+    assert.deepEqual({ ...r.file, content: "", startLine: 0, numLines: 0 }, { ...file, content: "", startLine: 0, numLines: 0 }, "every other file field is kept");
+    const shown = r.file.content.split("\n");
+    assert.equal(r.file.numLines, shown.length);
+    const lines = text.split("\n");
+    for (let i = 0; i < shown.length - 1; i++) assert.equal(shown[i], lines[r.file.startLine - 1 + i], "line " + (r.file.startLine + i) + " is that file line");
     assert.ok(Buffer.byteLength(r.file.content) < Buffer.byteLength(text), "the content is replaced");
     assert.ok(r.file.content.includes(CCP + "ctx_search("), "the more line names ctx_search");
   });
@@ -1207,7 +1213,7 @@ describe("PRD-v2 section 10: lenient decode on the claude-code golden payload", 
     assert.equal(hso.hookEventName, "PostToolUse", what);
     const out = hso.updatedToolOutput;
     assert.equal(typeof out, "object", what);
-    assert.deepEqual(Object.keys(out).sort(), ["interrupted", "stderr", "stdout"], what);
+    for (const k of ["interrupted", "stderr", "stdout"]) assert.ok(k in out, what + " " + k); // D-R33-CC-SHELL-1
     assert.ok(Buffer.byteLength(out.stdout) * 10 < FULL_BYTES, what + ": " + Buffer.byteLength(out.stdout) + " bytes");
     assert.ok(out.stdout.includes("ctx_search("), what);
     return out.stdout;
@@ -2042,7 +2048,7 @@ describe("PRD-v2 section 10: replace on the live golden payload", () => {
     const out = hso.updatedToolOutput;
     // Bash's output shape: Claude Code drops a string here and the model sees the full output.
     assert.equal(typeof out, "object");
-    assert.deepEqual(Object.keys(out).sort(), ["interrupted", "stderr", "stdout"]);
+    for (const k of ["interrupted", "stderr", "stdout"]) assert.ok(k in out, k); // D-R33-CC-SHELL-1: host fields stay
     assert.equal(out.stderr, "");
     assert.equal(out.interrupted, false);
     assert.equal(typeof out.stdout, "string");

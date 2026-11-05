@@ -1073,7 +1073,7 @@ describe("ADR-0007: hook run in a non-git project", () => {
     assert.equal(hso.hookEventName, "PostToolUse");
     const out = hso.updatedToolOutput;
     assert.equal(typeof out, "object");
-    assert.deepEqual(Object.keys(out).sort(), ["interrupted", "stderr", "stdout"]);
+    for (const k of ["interrupted", "stderr", "stdout"]) assert.ok(k in out, k); // D-R33-CC-SHELL-1: host fields stay
     assert.equal(out.stderr, "");
     assert.equal(out.interrupted, false);
     assert.ok(Buffer.byteLength(out.stdout) * 10 < Buffer.byteLength(full), `replaced ${Buffer.byteLength(out.stdout)} bytes`);

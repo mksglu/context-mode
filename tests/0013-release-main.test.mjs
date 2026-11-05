@@ -714,8 +714,8 @@ describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
     put(pkg, "hooks/qwen.json", { hooks: {} });
     put(pkg, "qwen-extension.json", { name: "context-mode", version, hooks: "hooks/qwen.json", mcpServers: { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "qwen"] } } });
     put(pkg, ".codex-plugin/plugin.json", { name: "context-mode", version, skills: "./codex/skills/" });
-    // The skill copies build.mjs ships: skills/ (Gemini, Qwen), claude-code/skills (plugin.json "skills"), codex/skills, pi/skills.
-    for (const dir of ["skills", "claude-code/skills", "codex/skills", "pi/skills"]) put(pkg, dir + "/ctx-stats/SKILL.md", dir);
+    // The skill copies build.mjs ships: skills/ (Claude Code, Gemini, Qwen; D-R33-CC-SKILLS-1), codex/skills, pi/skills.
+    for (const dir of ["skills", "codex/skills", "pi/skills"]) put(pkg, dir + "/ctx-stats/SKILL.md", dir);
     return { root, bare, work, pkg };
   }
   const run = (fx, version, extra = []) =>
@@ -811,7 +811,8 @@ describe("ADR-0013: commit-main.mjs", { concurrency: CONC }, () => {
     const got = treeFiles(fx, "refs/heads/main").filter((f) => f.startsWith(PREFIX)).map((f) => f.slice(PREFIX.length)).sort();
     const walk = (dir, rel = "") => readdirSync(path.join(dir, rel), { withFileTypes: true })
       .flatMap((e) => e.isDirectory() ? walk(dir, rel + e.name + "/") : [rel + e.name]);
-    const want = [...walk(fx.pkg).filter((f) => f !== ".claude-plugin/marketplace.json"), "SHA256SUMS"].sort();
+    // D-R33-CC-HOOKS-1: no Gemini hooks/hooks.json in the Claude Code plugin folder (Gemini reads the repo-root copy).
+    const want = [...walk(fx.pkg).filter((f) => f !== ".claude-plugin/marketplace.json" && f !== "hooks/hooks.json"), "SHA256SUMS"].sort();
     assert.deepEqual(got, want);
   });
 

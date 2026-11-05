@@ -100,7 +100,8 @@ describe("ADR-0018 build: release-out tree", () => {
     const { out, status, stderr } = build(t);
     assert.equal(status, 0, stderr);
     // D-HQ-SKILLS-3: qwen reads the same <extension>/skills dir as gemini, so that dir names both tools.
-    for (const [id, dir, stats, prefixes] of [["gemini", "skills", "mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats", ["mcp_context-mode_", "mcp__context-mode__"]], ["pi", "pi/skills", "ctx_stats", [""]]]) {
+    // D-R33-CC-SKILLS-1: Claude Code always loads <plugin>/skills too, so that dir names its tool first.
+    for (const [id, dir, stats, prefixes] of [["gemini", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__"]], ["pi", "pi/skills", "ctx_stats", [""]]]) {
       assert.equal(getAdapter(id).skillChannel.path, dir, id + " skill channel is the build dir");
       assert.deepEqual(readdirSync(path.join(out, dir)).sort(), [...SKILLS].sort(), dir);
       for (const s of SKILLS) {
@@ -341,6 +342,7 @@ describe("ADR-0018 build: manifests", () => {
     }
   });
 
+  const AUTHOR = { name: DEV.author, url: DEV.homepage }; // D-R33-CC-META-1 (claude-code-7)
   test("plugin and extension manifests carry name, dev version and the --agent MCP entry", (t) => {
     const dir = scratch(t);
     generateManifests(dir);
@@ -348,11 +350,11 @@ describe("ADR-0018 build: manifests", () => {
     // D-M3-F-5: Claude Code runs the plugin server with cwd = the project, so the path names the plugin root.
     const claudeEntry = { "context-mode": { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/server.mjs", "--agent", "claude-code"] } };
     assert.deepEqual(readJson(dir, ".claude-plugin/plugin.json"), {
-      description: DEV.description, hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", skills: "./claude-code/skills", version: "0.0.0-dev",
+      author: AUTHOR, description: DEV.description, hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", version: "0.0.0-dev", // D-R33-CC-SKILLS-1, D-R33-CC-META-1
     });
     // D-INST-3: `claude plugin marketplace add <package dir>` (what setup runs) needs this file in the npm package.
     assert.deepEqual(readJson(dir, ".claude-plugin/marketplace.json"), {
-      name: "context-mode", owner: { name: "context-mode" }, plugins: [{ description: DEV.description, name: "context-mode", skills: "./claude-code/skills", source: "./", version: "0.0.0-dev" }],
+      description: DEV.description, name: "context-mode", owner: { name: "context-mode" }, plugins: [{ author: AUTHOR, description: DEV.description, name: "context-mode", source: "./", version: "0.0.0-dev" }],
     });
     // D-FU-RM-GEMINI-1: Gemini expands ${extensionPath} and ${/} in the manifest and reads hooks only from <ext>/hooks/hooks.json.
     const geminiEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "gemini"] } };
@@ -438,7 +440,7 @@ describe("ADR-0018 build: manifests", () => {
   // name, version, bin, type, engines, files and pi (Pi reads "pi".extensions from the package dir); no dependencies,
   // no scripts, no private.
   const D1_FILES = [
-    ".claude-plugin", ".codex-plugin", "LICENSE", "README.md", "SHA256SUMS", "claude-code", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
+    ".claude-plugin", ".codex-plugin", "LICENSE", "README.md", "SHA256SUMS", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
     "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
   ];
   test("package.json is the D1 npm shape: name, version, bin, type, engines, files, pi (extensions, skills)", (t) => {
@@ -678,25 +680,30 @@ describe("ADR-0019 build: host skills", () => {
     }
   });
 
-  test("[D-HQ-SKILLS-2] claude-code ships its own skills dir and the plugin reads only that dir", () => {
+  // D-R33-CC-SKILLS-1 (host audit claude-code-4): Claude Code 2.1.318 loaded BOTH skills/ and the plugin.json skills dir
+  // ("Loaded 3 skills from plugin context-mode default directory", "Total plugin skills loaded: 6"), and
+  // /context-mode:ctx-doctor sent Gemini's tool names. One dir now: skills/, which names the Claude Code tool too.
+  test("[D-R33-CC-SKILLS-1] claude-code loads the one shared skills/ dir: no second copy, no skills key", () => {
     const claude = ADAPTERS.find((a) => a.id === "claude-code");
-    assert.equal(claude.skillChannel.path, "claude-code/skills");
+    assert.deepEqual(claude.skillChannel, { kind: "package", path: "skills" });
+    assert.equal(existsSync(path.join(out, "claude-code")), false, "no claude-code/skills copy");
     const plugin = JSON.parse(readFileSync(path.join(out, ".claude-plugin", "plugin.json"), "utf8"));
-    assert.equal(plugin.skills, "./claude-code/skills");
-    // Claude Code adds a plugin.json skills dir to the default skills/ (which holds Gemini's text), so the marketplace entry
-    // lists the dir too; for a source "./" entry that stops the default scan (plugins reference, checked on claude 2.1.274).
+    assert.equal("skills" in plugin, false);
     const entry = JSON.parse(readFileSync(path.join(out, ".claude-plugin", "marketplace.json"), "utf8")).plugins[0];
-    assert.equal(entry.skills, "./claude-code/skills");
+    assert.equal("skills" in entry, false);
+    for (const name of SKILLS) assert.ok(readFileSync(path.join(out, "skills", name, "SKILL.md"), "utf8").includes(claude.toolNamePrefix + "ctx_"), name);
   });
 
   // N5 (2.0.0-next.5 live runs): codex ctx-stats said "mcp_context-mode_mcp__context_mode__ctx_stats". Setup rendered the
   // home-dir skills from the package skills/ dir, which build.mjs already rendered with Gemini's prefix, so the prefix
   // doubled. Expected names: each host's real tool name as the host lists it (adapters TOOL_NAME_PREFIX, D-HQ-COPILOT-NAMES-2).
+  const SHARED_STATS = "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats";
   const CTX_STATS_NAME = {
-    "claude-code": "mcp__plugin_context-mode_context-mode__ctx_stats",
+    // D-HQ-SKILLS-3, D-R33-CC-SKILLS-1: claude-code, gemini and qwen share <plugin>/skills
+    "claude-code": SHARED_STATS,
     codex: "mcp__context_mode__ctx_stats",
-    gemini: "mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats", // D-HQ-SKILLS-3: gemini and qwen share <extension>/skills
-    qwen: "mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats",
+    gemini: SHARED_STATS,
+    qwen: SHARED_STATS,
     "copilot-cli": "context-mode-ctx_stats", // D-HQ-COPILOT-NAMES-3: one name, Copilot CLI 1.0.103 lists MCP tools <server>-<tool>
     vscode: "mcp_context-mode_ctx_stats",
     kiro: "mcp_context_mode_ctx_stats", // D-R33-KIRO-NAMES-1: Kiro CLI 3.0 tool ids (uel)
@@ -724,12 +731,12 @@ describe("ADR-0019 build: host skills", () => {
     for (const name of SKILLS) {
       let rest = readFileSync(path.join(out, "skills", name, "SKILL.md"), "utf8");
       for (const tool of toolsIn(SOURCE[name])) {
-        for (const p of [gemini.toolNamePrefix, qwen.toolNamePrefix]) {
+        for (const p of [ADAPTERS.find((a) => a.id === "claude-code").toolNamePrefix, gemini.toolNamePrefix, qwen.toolNamePrefix]) {
           assert.ok(rest.includes(p + tool), `${name} names ${p + tool}`);
           rest = rest.split(p + tool).join("");
         }
       }
-      assert.equal(rest.includes("ctx_"), false, `${name} names a tool that is neither gemini's nor qwen's: ${rest}`);
+      assert.equal(rest.includes("ctx_"), false, `${name} names a tool that is not claude-code's, gemini's or qwen's: ${rest}`);
     }
   });
 
@@ -1108,7 +1115,8 @@ describe("ADR-0023 build: native host manifests", () => {
     assert.equal(m.version, VERSION);
     assertServers(pkg, m.mcpServers, "claude-code");
     assertHooks(pkg, stripRoot(m.hooks), "claude-code");
-    assertSkills(pkg, m.skills, "mcp__plugin_context-mode_context-mode__", "claude-code");
+    assert.equal(m.skills, undefined, "D-R33-CC-SKILLS-1: Claude Code loads the default skills/ dir");
+    assertSkills(pkg, "./skills", "mcp__plugin_context-mode_context-mode__", "claude-code");
   });
 
   test("[ADR-0023] native/codex: packed .codex-plugin/plugin.json names shipped mcp.json, hooks.json and codex-named skills", () => {
@@ -1194,9 +1202,12 @@ describe("ADR-0023 build: native host manifests", () => {
     assert.equal(m.version, VERSION);
     assertServers(root, m.mcpServers, "claude-code-main");
     assertHooks(root, stripRoot(m.hooks), "claude-code-main");
-    assertSkills(root, m.skills, "mcp__plugin_context-mode_context-mode__", "claude-code-main");
+    assertSkills(root, "./skills", "mcp__plugin_context-mode_context-mode__", "claude-code-main"); // D-R33-CC-SKILLS-1
     for (const rel of ["run.mjs", "search.mjs", "SHA256SUMS"]) assert.ok(isFile(root, rel), "claude-code-main: " + rel);
     assert.ok(!existsSync(path.join(root, ".claude-plugin", "marketplace.json")), "no nested marketplace inside the plugin folder");
+    // D-R33-CC-HOOKS-1 (claude-code-5): Claude Code always loads <plugin>/hooks/hooks.json; Gemini's copy sits at the repo root.
+    assert.ok(!existsSync(path.join(root, "hooks", "hooks.json")), "no Gemini hooks.json in the Claude Code plugin folder");
+    assert.ok(isFile(main, "hooks/hooks.json"), "Gemini reads the repo-root hooks/hooks.json");
   });
 
   // Owner decision 2026-10-28 (final): Codex uses the context7 style too. codex-cli 0.156.1 reads a marketplace entry

@@ -17,6 +17,7 @@ import path from "node:path";
 import { claudeDirOf, codexDirOf, copilotDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
 import { AGENT_HOME_DIR, DB_FILE_NAME, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
+import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
@@ -658,12 +659,21 @@ function hookSeenCheck(row: CheckRow, home: string): Check {
   return { name: "hook-seen", ok: true, warn: true, detail: NOT_SEEN_LINE };
 }
 
+const SKILL_TOOL_STEM = "ctx_";
+
 /** ADR-0020 skills: every skill file is present with this agent's tool name prefix (package: shipped skills/). */
 function skillsCheck(row: CheckRow, pkgDir: string): Check {
   const s = row.skillInstall;
   if (s.kind === "package") {
-    const miss = COMMAND_SKILLS.map((n) => path.join(pkgDir, s.via, n, SKILL_FILE)).filter((f) => !existsSync(f));
-    return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : undefined };
+    const files = COMMAND_SKILLS.map((n) => path.join(pkgDir, s.via, n, SKILL_FILE));
+    const miss = files.filter((f) => !existsSync(f));
+    if (miss.length) return { name: "skills", ok: false, detail: `missing ${miss.join(", ")}` };
+    // D-R33-CC-SKILLS-1: a shipped skill that names another host's tool must name this host's own tool too (claude-code got
+    // Gemini's names and doctor said PASS).
+    const own = getAdapter(row.id).toolNamePrefix + SKILL_TOOL_STEM;
+    const foreign = [...new Set(ADAPTERS.map((r) => r.toolNamePrefix + SKILL_TOOL_STEM))].filter((n) => n !== SKILL_TOOL_STEM && n !== own);
+    const bad = files.filter((f) => { const t = readFileSync(f, "utf8"); return !t.includes(own) && foreign.some((n) => t.includes(n)); });
+    return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.join(", ")} without the ${own}* tool name` : undefined };
   }
   const bad = s.files.filter((f) => readRaw(f.file) !== (existsSync(f.src) ? renderSkill(readFileSync(f.src, "utf8"), s.prefixes) : undefined));
   return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f) => f.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : undefined };

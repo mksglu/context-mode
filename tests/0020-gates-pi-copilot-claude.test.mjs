@@ -12,6 +12,7 @@ import { TOOL_ORDER } from "../src/core/contracts/constants.ts";
 import { buildRegistry, isOwnHookCommand, runDoctor, runRemove, runSetup } from "../src/setup/index.ts";
 import { createHash } from "node:crypto";
 import { generateManifests } from "../build/manifests.ts";
+import { renderSkill } from "../src/setup/registry.ts";
 import { askCodexHome, codexHomeFromReply, codexKeyDir, codexTrustEntries } from "../src/setup/codex-trust.ts";
 
 describe("ADR-0020 pi gate (D-NI-PI-GATE-1)", () => {
@@ -384,6 +385,21 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       const after = await runDoctor(opts(s));
       assert.equal(after.exitCode, 0, JSON.stringify(after.agents[0], null, 2));
       assert.equal(check(after, "hook-enabled").ok, true);
+    });
+
+    // D-R33-CC-SKILLS-1 (host audit claude-code-4): doctor said PASS while /context-mode:ctx-doctor sent Gemini's tool names
+    // (Claude Code loads <plugin>/skills). The skills check now FAILs on a skill that names another host's tool and not ours.
+    test("[D-R33-CC-SKILLS-1] claude-code: doctor FAILs when the shipped skill names only another host's tool", { skip: SKIP }, async (t) => {
+      const s = sandbox(t);
+      await runSetup({ ...opts(s), runId: "r1" });
+      const file = path.join(s.pkgDir, "skills", "ctx-doctor", "SKILL.md");
+      const src = readFileSync(path.join(REPO, "skills", "ctx-doctor", "SKILL.md"), "utf8");
+      writeFileSync(file, renderSkill(src, ["mcp_context-mode_", "mcp__context-mode__"]));
+      const bad = check(await runDoctor(opts(s)), "skills");
+      assert.equal(bad.ok, false, JSON.stringify(bad));
+      assert.ok(bad.detail.includes(file) && bad.detail.includes("mcp__plugin_context-mode_context-mode__"), bad.detail);
+      writeFileSync(file, renderSkill(src, ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__"]));
+      assert.equal(check(await runDoctor(opts(s)), "skills").ok, true);
     });
 
     test("claude-code: doctor FAILs, naming the file and the key, when a settings file sets disableAllHooks", { skip: SKIP }, async (t) => {
