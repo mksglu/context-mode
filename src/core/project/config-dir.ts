@@ -66,14 +66,33 @@ export function copilotDirOf(env: NodeJS.ProcessEnv, home: string): string {
 export function kiroDirOf(env: NodeJS.ProcessEnv, home: string, platform: NodeJS.Platform = process.platform): string {
   const p = platform === "win32" ? win32 : posix;
   const fallback = p.join(home, ...AGENT_HOME_DIR.kiro);
-  const dir = env[KIRO_HOME_ENV];
+  // D-R33-KIRO-HOME-2: Kiro CLI 3.0 (Dgs) trims the value and returns the resolved path; YDl/Ngs check root and home on
+  // the realpath of the nearest existing parent, so a symlink to home counts as home.
+  const dir = env[KIRO_HOME_ENV]?.trim();
   if (dir === undefined || dir === "" || !p.isAbsolute(dir)) return fallback;
   if (platform === "win32" && p.parse(dir).root.length < 2) return fallback; // "\\kiro" has no drive: relative to the current drive
   const abs = p.resolve(dir);
-  if (p.dirname(abs) === abs) return fallback; // a filesystem root
-  const up = p.relative(abs, p.resolve(home)); // "" = home itself; no leading ".." = home sits inside dir, so dir is an ancestor
+  const real = platform === process.platform ? realOrSelf : (x: string) => x; // a fake-platform path is not on this disk
+  const target = real(abs);
+  if (p.parse(target).root === target) return fallback; // a filesystem root
+  const up = p.relative(target, real(p.resolve(home))); // "" = home itself; no leading ".." = home sits inside dir, so dir is an ancestor
   if (!p.isAbsolute(up) && up.split(p.sep)[0] !== "..") return fallback;
-  return dir;
+  return abs;
+}
+
+/** Kiro CLI 3.0 Ngs: realpath of the nearest existing parent, with the missing tail joined back; the path itself when none exists. */
+function realOrSelf(path: string): string {
+  const tail: string[] = [];
+  for (let at = path; ; ) {
+    try {
+      return join(realpathSync.native(at), ...tail.reverse());
+    } catch {
+      const up = dirname(at);
+      if (up === at) return path;
+      tail.push(basename(at));
+      at = up;
+    }
+  }
 }
 
 /** D-WF-CC-CONFIG-1: the dir Claude Code keeps settings.json, plugins/ and agents/ in: $CLAUDE_CONFIG_DIR when set and

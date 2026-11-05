@@ -1,7 +1,7 @@
 {
   "first": {
     "exitCode": 0,
-    "stdout": "This session may have run before. Call mcp_context-mode_ctx_resume for a summary of what happened.",
+    "stdout": "This session may have run before. Call mcp_context_mode_ctx_resume for a summary of what happened.",
     "stderr": ""
   },
   "sameSessionAgain": {
@@ -11,12 +11,12 @@
   },
   "newSession": {
     "exitCode": 0,
-    "stdout": "This session may have run before. Call mcp_context-mode_ctx_resume for a summary of what happened.",
+    "stdout": "This session may have run before. Call mcp_context_mode_ctx_resume for a summary of what happened.",
     "stderr": ""
   },
   "legacyAgentSpawn": {
     "exitCode": 0,
-    "stdout": "This session may have run before. Call mcp_context-mode_ctx_resume for a summary of what happened.",
+    "stdout": "This session may have run before. Call mcp_context_mode_ctx_resume for a summary of what happened.",
     "stderr": ""
   },
   "noSessionId": {

@@ -571,6 +571,26 @@ describe("ADR-0007: Kiro home dir", { concurrency: CONC }, () => {
     assert.equal(kiroDirOf({}, "/home/jo", "linux"), "/home/jo/.kiro");
   });
 
+  // D-R33-KIRO-HOME-2: Kiro CLI 3.0 (V3 engine bundle, Dgs/YDl/Ngs) trims KIRO_HOME, resolves it, and runs the root and home
+  // checks on the realpath of the dir and of home (walking up to the nearest existing parent).
+  test("kiroDirOf: KIRO_HOME is trimmed and resolved as Kiro CLI 3.0 does", () => {
+    assert.equal(kiroDirOf({ KIRO_HOME: " /work/kiro\t" }, "/home/jo", "linux"), "/work/kiro");
+    assert.equal(kiroDirOf({ KIRO_HOME: "/work/x/../kiro" }, "/home/jo", "linux"), "/work/kiro");
+    assert.equal(kiroDirOf({ KIRO_HOME: "   " }, "/home/jo", "linux"), "/home/jo/.kiro");
+  });
+
+  test("kiroDirOf: a symlink to home is home (realpath check, as Kiro CLI 3.0)", { skip: process.platform === "win32" }, () => {
+    const root = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-kiro-home-")));
+    try {
+      const home = path.join(root, "home");
+      mkdirSync(home);
+      symlinkSync(home, path.join(root, "link"));
+      assert.equal(kiroDirOf({ KIRO_HOME: path.join(root, "link") }, home), path.join(home, ".kiro"));
+      assert.equal(kiroDirOf({ KIRO_HOME: path.join(root, "link", "..") }, path.join(home, "sub")), path.join(home, "sub", ".kiro"));
+      assert.equal(kiroDirOf({ KIRO_HOME: path.join(root, "kiro-new") }, home), path.join(root, "kiro-new"));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   test("kiroDirOf: a dir beside or under home is accepted", () => {
     assert.equal(kiroDirOf({ KIRO_HOME: "C:\\Users\\Jo Doe.kiro" }, WIN_HOME, "win32"), "C:\\Users\\Jo Doe.kiro");
     assert.equal(kiroDirOf({ KIRO_HOME: "C:\\Users\\Jo Doe\\profiles\\work" }, WIN_HOME, "win32"), "C:\\Users\\Jo Doe\\profiles\\work");

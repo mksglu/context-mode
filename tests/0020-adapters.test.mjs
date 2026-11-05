@@ -24,7 +24,7 @@ import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { HOOK_TIMEOUT_MS } from "../src/core/contracts/constants.ts";
+import { HOOK_TIMEOUT_MS, RECALL_BUDGET_BYTES, RESUME_CAP, STATE_BUDGET } from "../src/core/contracts/constants.ts";
 import * as __m0 from "../src/adapters/codex.ts";
 import * as __m1 from "../src/adapters/copilot-cli.ts";
 import * as __m2 from "../src/adapters/gemini.ts";
@@ -50,7 +50,7 @@ describe("ADR-0020 adapters", () => {
       qwen: ["extension", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", 5000, "deny-reason"],
       "copilot-cli": ["plugin", "arg:--agent+cwd", "context-mode-", "pending-flag", "none", 5000, "deny-reason"],
       vscode: ["mcp-entry", "arg:workspaceFolder", "mcp_context-mode_", "pending-flag", "none", 5000, "deny-reason"],
-      kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context-mode_", "none", "none", 5000, "hint-only"],
+      kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context_mode_", "none", "none", 5000, "hint-only"], // D-R33-KIRO-NAMES-1
       zcode: ["hooks+mcp", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", 5000, "deny-reason"],
       pi: ["in-process", "pi:ctx.cwd", "", "pi-flag", "none", 0, "deny-reason"],
       opencode: ["in-process", "spawn-cwd", "", "opencode-cache", "none", 0, "deny-reason"],
@@ -298,7 +298,7 @@ describe("ADR-0020 adapters", () => {
         qwen: ["extension", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", "deny-reason"],
         "copilot-cli": ["plugin", "arg:--agent+cwd", "context-mode-", "pending-flag", "none", "deny-reason"],
         vscode: ["mcp-entry", "arg:workspaceFolder", "mcp_context-mode_", "pending-flag", "none", "deny-reason"],
-        kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context-mode_", "none", "none", "hint-only"],
+        kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context_mode_", "none", "none", "hint-only"], // D-R33-KIRO-NAMES-1
         zcode: ["hooks+mcp", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", "deny-reason"],
         pi: ["in-process", "pi:ctx.cwd", "", "pi-flag", "none", "deny-reason"],
         opencode: ["in-process", "spawn-cwd", "", "opencode-cache", "none", "deny-reason"],
@@ -1140,7 +1140,8 @@ describe("ADR-0020 adapters", () => {
     // Unit tests for src/adapters/kiro.ts (impl/10 §8, impl/09 §5.2 item 6 + A28; DECISIONS-r3 Q24).
     // Unit tests may import src/ (TECH-SPEC §6.2a); e2e/ never does (GS4).
     // Payloads follow the Kiro CLI V3 hook shape (https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/tickets/spike-hooks-verified.md §2): hook_event_name,
-    // session_id, cwd on every hook; tool_input on tool hooks; the prompt comes from env USER_PROMPT.
+    // session_id, cwd on every hook; tool_input on tool hooks. D-R33-KIRO-PROMPT-1: Kiro CLI 3.0 sends the prompt on stdin
+    // as "prompt" (V3 engine bundle, sJn); env USER_PROMPT is the Kiro CLI 2.x fallback.
 
 
     const base = { session_id: "k-1", cwd: "/tmp/proj" };
@@ -1158,8 +1159,27 @@ describe("ADR-0020 adapters", () => {
       }
     }
 
-    test("own prefix is mcp_context-mode_ (impl/10 §1.3, A1)", () => {
-      assert.equal(TOOL_NAME_PREFIX, "mcp_context-mode_");
+    // D-R33-KIRO-NAMES-1: tests/fixtures/host-schemas/kiro.json holds the Kiro CLI 3.0 MCP tool id rule (V3 engine bundle, uel):
+    // "mcp_" + lowercase("<server>_<tool>"), space and "-" -> "_", other chars dropped. The prefix must match that rule.
+    // D-R33-KIRO-RECALL-1: Kiro CLI 3.0 routes exit-0 UserPromptSubmit stdout to the model (uJn -> cJn sendStdout), so a
+    // recall hint goes out as plain stdout; allow stays empty.
+    test("encode UserPromptSubmit: hint is plain stdout, allow is empty, exit 0", () => {
+      const ev = { event: "UserPromptSubmit", agent: "kiro", sessionId: "k-1", cwd: "/tmp/proj", prompt: "p" };
+      assert.deepEqual(encode(ev, { kind: "hint", text: "recall block", onceKey: "recall" }), { stdout: "recall block", exitCode: 0 });
+      assert.deepEqual(encode(ev, { kind: "allow" }), { stdout: "", exitCode: 0 });
+    });
+
+    // kiro-8: the host cuts hook stdout at 3000 chars (mte); every hint we print to Kiro is a STATE_BUDGET or RESUME_CAP block.
+    test("every Kiro hint fits the host hook output cap", () => {
+      const fx = JSON.parse(readFileSync(new URL("./fixtures/host-schemas/kiro.json", import.meta.url), "utf8"));
+      assert.ok(Math.max(STATE_BUDGET, RESUME_CAP, RECALL_BUDGET_BYTES) <= fx.hookOutputCapChars);
+    });
+
+    test("own prefix is the Kiro CLI 3.0 tool id of the context-mode server (host rule uel)", () => {
+      const fx = JSON.parse(readFileSync(new URL("./fixtures/host-schemas/kiro.json", import.meta.url), "utf8"));
+      const uel = (server, tool) => fx.mcpToolId.prefix + (server + fx.mcpToolId.join + tool).replace(/[\s-]/g, "_").replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+      assert.equal(TOOL_NAME_PREFIX + "ctx_execute", uel("context-mode", "ctx_execute"));
+      assert.equal(TOOL_NAME_PREFIX, "mcp_context_mode_");
     });
 
     test("decode SessionStart and legacy agentSpawn; source read only when present", () => {
@@ -1171,21 +1191,23 @@ describe("ADR-0020 adapters", () => {
       assert.equal("source" in decode({ ...base, hook_event_name: "SessionStart", source: "other" }), false);
     });
 
-    test("decode PromptSubmit and legacy userPromptSubmit read the prompt from env USER_PROMPT only", () => {
-      withPrompt("run tests", () => {
-        const ev = decode({ ...base, hook_event_name: "PromptSubmit", prompt: "stdin field is ignored" });
-        assert.deepEqual(ev, { event: "UserPromptSubmit", agent: "kiro", sessionId: "k-1", cwd: "/tmp/proj", prompt: "run tests" });
-        assert.equal(decode({ ...base, hook_event_name: "userPromptSubmit" }).event, "UserPromptSubmit");
+    test("decode PromptSubmit and legacy userPromptSubmit: stdin prompt first, env USER_PROMPT as the 2.x fallback", () => {
+      withPrompt("from env", () => {
+        const ev = decode({ ...base, hook_event_name: "PromptSubmit", prompt: "from stdin" });
+        assert.deepEqual(ev, { event: "UserPromptSubmit", agent: "kiro", sessionId: "k-1", cwd: "/tmp/proj", prompt: "from stdin" });
+        assert.equal(decode({ ...base, hook_event_name: "userPromptSubmit" }).prompt, "from env");
       });
       withPrompt(undefined, () => {
-        const ev = decode({ ...base, hook_event_name: "PromptSubmit", prompt: "stdin field is ignored" });
-        assert.equal("prompt" in ev, false);
+        assert.equal("prompt" in decode({ ...base, hook_event_name: "PromptSubmit" }), false);
+        assert.equal("prompt" in decode({ ...base, hook_event_name: "PromptSubmit", prompt: 7 }), false, "a non-string field is not a prompt");
       });
     });
 
     test("decode PreToolUse: own prefix to bare ctx_*, other mcp server to mcp:<server>:<tool>, native unchanged", () => {
-      const own = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp_context-mode_ctx_execute", tool_input: { language: "shell", code: "ls" } });
-      assert.deepEqual(own.tool, { name: "mcp_context-mode_ctx_execute", canonicalName: "ctx_execute", input: { language: "shell", code: "ls" } });
+      const own = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp_context_mode_ctx_execute", tool_input: { language: "shell", code: "ls" } });
+      assert.deepEqual(own.tool, { name: "mcp_context_mode_ctx_execute", canonicalName: "ctx_execute", input: { language: "shell", code: "ls" } });
+      // D-R33-KIRO-NAMES-1: the 2.x spelling from an older Kiro build still decodes to the own tool.
+      assert.equal(decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp_context-mode_ctx_search", tool_input: {} }).tool.canonicalName, "ctx_search");
       const other = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp_linear_get_issue", tool_input: {} });
       assert.equal(other.tool.canonicalName, "mcp:linear:get_issue");
       const native = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "execute_bash", tool_input: { command: "ls" } });
@@ -1217,10 +1239,14 @@ describe("ADR-0020 adapters", () => {
 
     // D-FU-RM-KIRO-2: the build writes trigger UserPromptSubmit (D-FU-RM-KIRO-1) and the Kiro docs' prompt hook
     // payload has hook_event_name "UserPromptSubmit", so decode must accept it.
-    test("decode UserPromptSubmit (the trigger the build writes) reads the prompt from env USER_PROMPT only", () => {
-      withPrompt("run tests", () => {
-        const ev = decode({ ...base, hook_event_name: "UserPromptSubmit", prompt: "stdin field is ignored" });
+    // D-R33-KIRO-PROMPT-1: the Kiro CLI 3.0 payload (sJn) is {session_id, hook_event_name, cwd, prompt}; no USER_PROMPT env.
+    test("decode UserPromptSubmit (the trigger the build writes) reads the stdin prompt, env USER_PROMPT as the fallback", () => {
+      withPrompt(undefined, () => {
+        const ev = decode({ ...base, hook_event_name: "UserPromptSubmit", prompt: "run tests" });
         assert.deepEqual(ev, { event: "UserPromptSubmit", agent: "kiro", sessionId: "k-1", cwd: "/tmp/proj", prompt: "run tests" });
+      });
+      withPrompt("from env", () => {
+        assert.equal(decode({ ...base, hook_event_name: "UserPromptSubmit" }).prompt, "from env");
       });
       withPrompt(undefined, () => {
         assert.equal("prompt" in decode({ ...base, hook_event_name: "UserPromptSubmit" }), false);
@@ -1242,10 +1268,10 @@ describe("ADR-0020 adapters", () => {
       for (const e of EVENTS) assert.deepEqual(encode(ev(e), { kind: "allow" }), { stdout: "", exitCode: 0 });
     });
 
-    test("encode UserPromptSubmit is stdout \"\" exit 0 for every decision kind (A28, v1 ff0a9a26)", () => {
+    // D-R33-KIRO-RECALL-1: a hint is the one UserPromptSubmit decision with stdout (Kiro CLI 3.0 uJn/cJn); see the recall test.
+    test("encode UserPromptSubmit is stdout \"\" exit 0 for every non-hint decision kind (A28, v1 ff0a9a26)", () => {
       const all = [
         { kind: "allow" },
-        { kind: "hint", text: "use ctx_search", onceKey: "k" },
         { kind: "deny", reason: "why" },
         { kind: "replace", output: "x" },
       ];

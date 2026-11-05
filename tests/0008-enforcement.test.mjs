@@ -1300,7 +1300,7 @@ describe("ADR-0001 PreToolUse routing (ported from v1)", () => {
 
   test("tool-naming #529 #683: every agent has a prefix; deny text names ctx_execute with that prefix", () => {
     const want = { "claude-code": "mcp__plugin_context-mode_context-mode__", codex: "mcp__context_mode__", gemini: "mcp_context-mode_",
-      kiro: "mcp_context-mode_", vscode: "mcp_context-mode_", pi: "", opencode: "" };
+      kiro: "mcp_context_mode_", vscode: "mcp_context-mode_", pi: "", opencode: "" };
     for (const id of AGENT_IDS) {
       const row = getAdapter(id);
       assert.equal(typeof row.toolNamePrefix, "string", id);

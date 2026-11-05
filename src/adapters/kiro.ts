@@ -3,7 +3,11 @@
 // any non-zero exit blocks. denyChannel "hint-only" (impl/10 A3): no structured hint, deny or replace field.
 import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, ToolResultInfo } from "../core/contracts/types.ts";
 
-export const TOOL_NAME_PREFIX = "mcp_context-mode_"; // impl/10 §1.3, A1 (Kiro @mcp matcher ids mcp_<server>_<tool>)
+// D-R33-KIRO-NAMES-1: Kiro CLI 3.0 lists an MCP tool as "mcp_" + lowercase("<server>_<tool>") with every space and "-" turned
+// into "_" (V3 engine bundle, function uel), so context-mode's tools are mcp_context_mode_ctx_*. The 2.x spelling
+// mcp_context-mode_ stays a decode alias for hook payloads from older builds.
+export const TOOL_NAME_PREFIX = "mcp_context_mode_";
+const LEGACY_TOOL_NAME_PREFIX = "mcp_context-mode_";
 
 // Native event name -> canonical; legacy names are aliases (impl/10 §8 event-name row, §1.4).
 // UserPromptSubmit is the trigger the build writes (D-FU-RM-KIRO-1) and the hook_event_name in the Kiro docs'
@@ -19,7 +23,10 @@ const KIRO_EVENTS: Readonly<Record<string, CanonicalEventName>> = {
   PostToolUse: "PostToolUse",
   postToolUse: "PostToolUse",
 };
-const PROMPT_ENV = "USER_PROMPT"; // impl/10 §8: the prompt is an env var, not a stdin field
+// D-R33-KIRO-PROMPT-1: Kiro CLI 3.0 sends the prompt on stdin as "prompt" (V3 engine bundle, function sJn) and sets no
+// USER_PROMPT; the env var stays the fallback for Kiro CLI 2.x (impl/10 §8).
+const PROMPT_FIELD = "prompt";
+const PROMPT_ENV = "USER_PROMPT";
 const MCP_PREFIX = "mcp_";
 // D-N7-KIRO-1. Event names: kiro.dev/docs/cli/v3/hooks-migration (2026-10-10), 2.x camelCase -> V3 PascalCase.
 // Shell tool: the registered matcher "shell" is a category tag; kiro.dev/docs/custom-agents/configuration-reference (2026-10-10)
@@ -35,6 +42,7 @@ const KIRO_SOURCES: Readonly<Record<string, Source>> = { startup: "startup", res
 // (same rule as the VS Code family, DEVIATIONS D-M3-A4-3 / D-M3-A5-2); native names unchanged.
 function canonicalName(name: string): string {
   if (name.startsWith(TOOL_NAME_PREFIX)) return name.slice(TOOL_NAME_PREFIX.length);
+  if (name.startsWith(LEGACY_TOOL_NAME_PREFIX)) return name.slice(LEGACY_TOOL_NAME_PREFIX.length);
   if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
   if (!name.startsWith(MCP_PREFIX)) return name;
   const rest = name.slice(MCP_PREFIX.length);
@@ -59,7 +67,8 @@ export function decode(raw: unknown): CanonicalHookEvent {
   const ev: CanonicalHookEvent = { event, agent: "kiro", sessionId: String(p.session_id ?? ""), cwd: String(p.cwd ?? "") };
   if (event === "SessionStart" && typeof p.source === "string" && KIRO_SOURCES[p.source] !== undefined) ev.source = KIRO_SOURCES[p.source];
   if (event === "UserPromptSubmit") {
-    const prompt = process.env[PROMPT_ENV];
+    const field = p[PROMPT_FIELD];
+    const prompt = typeof field === "string" ? field : process.env[PROMPT_ENV];
     if (prompt !== undefined) ev.prompt = prompt;
   }
   if (event === "PreToolUse" || event === "PostToolUse") {
@@ -71,11 +80,12 @@ export function decode(raw: unknown): CanonicalHookEvent {
   return ev;
 }
 
-// PromptSubmit: stdout "" exit 0 for every decision (A28, v1 PromptSubmit rule, GP3 promptsubmit.json).
+// UserPromptSubmit: hint -> plain stdout, exit 0 (D-R33-KIRO-RECALL-1: Kiro CLI 3.0 uJn/cJn sends it to the model);
+// every other decision -> stdout "" exit 0 (A28).
 // hint -> plain text stdout, exit 0. deny -> plain text reason (rewrite first) on stderr, exit 2: Kiro blocks the
 // tool and returns STDERR to the agent (Kiro CLI 2.x reference; D-HF-KIRO-SHELL-1, was D-M3-A5-1). replace -> no-op.
 export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): HookOutput {
-  if (ev.event === "UserPromptSubmit") return { stdout: "", exitCode: 0 };
+  if (ev.event === "UserPromptSubmit") return { stdout: d.kind === "hint" ? d.text : "", exitCode: 0 };
   switch (d.kind) {
     case "allow":
       return { stdout: "", exitCode: 0 };

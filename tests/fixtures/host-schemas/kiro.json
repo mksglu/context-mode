@@ -1,0 +1,19 @@
+{
+  "host": "kiro",
+  "source": "kiro-cli 3.0.0 (BUILD_HASH 21067db0a7cc, 2026-11-02), V3 engine KAS 3.0.0-e315409f JS bundle (acp-server.js, unpacked by `kiro-cli serve`)",
+  "mcpToolId": {
+    "from": "function uel(server, tool): r = server + '_' + tool; r = r.replace(/[\\s-]/g, '_'); r = r.replace(/[^a-zA-Z0-9_]/g, ''); id = 'mcp_' + r.toLowerCase(); cut to 64 chars",
+    "prefix": "mcp_",
+    "join": "_",
+    "maxLength": 64
+  },
+  "hookStdin": {
+    "from": "function sJn: {session_id, hook_event_name, cwd} plus per trigger fields",
+    "UserPromptSubmit": ["session_id", "hook_event_name", "cwd", "prompt"],
+    "PreToolUse": ["session_id", "hook_event_name", "cwd", "tool_name", "tool_input"],
+    "PostToolUse": ["session_id", "hook_event_name", "cwd", "tool_name", "tool_input", "tool_response"],
+    "SessionStart": ["session_id", "hook_event_name", "cwd"]
+  },
+  "hookOutputCapChars": 3000,
+  "windowsHookShell": "child_process.spawn(command, {shell: true}) in the V3 hook process runner (class tje): COMSPEC (cmd.exe /d /s /c) on win32"
+}

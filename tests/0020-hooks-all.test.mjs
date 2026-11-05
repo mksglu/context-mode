@@ -600,8 +600,10 @@ describe("ADR-0020 Kiro hook shell command", { concurrency: CONC }, () => {
     for (const a of cmds) { assert.equal(a.command, hookCommandString(row)); assert.equal(a.powershell, undefined); }
   });
 
-  // Windows only: spawn(cmd, ["/C", line]) with the default (non-verbatim) quoting, as Kiro's Rust code does.
-  test("KIRO-WIN-4: cmd.exe /C, spawned the way Kiro spawns it, runs the registered kiro hook command", { skip: process.platform !== "win32", todo: "UNVERIFIED KIRO-WIN-4 (D-WIN-KIRO-SHELL-1): if CI shows this red, Node/Rust re-quote the line as \\\" and cmd.exe cannot run a spaced node path; same class as Q-WIN-5; needs a design decision, see OPEN-ITEMS" }, () => {
+  // D-R33-KIRO-WIN-1: Kiro CLI 3.0 runs a command hook in its V3 hook process runner (class tje):
+  // child_process.spawn(command, { shell: true }), so on win32 Node runs `%ComSpec% /d /s /c "<line>"`. PowerShell
+  // (q7, -NoProfile -Command) is the shell of the execute_pwsh tool only. Same spawn as Z-WIN-3, so this runs on Windows CI.
+  test("KIRO-WIN-4: Node spawn with shell=true, as Kiro CLI 3.0 spawns a command hook, runs the registered kiro hook command", { skip: process.platform !== "win32" }, () => {
     const root = mkdtempSync(path.join(tmpdir(), "cm kiro "));
     try {
       const dir = path.join(root, "pkg dir");
@@ -610,7 +612,7 @@ describe("ADR-0020 Kiro hook shell command", { concurrency: CONC }, () => {
       const reg = buildRegistry({ home: root, pkgDir: dir, env: {} });
       const row = reg.find((r) => r.id === "kiro");
       const line = hookCommandString(row);
-      const r = spawnSync(process.env.ComSpec || "cmd.exe", ["/C", line], { input: '{"x":1}', encoding: "utf8", windowsHide: true });
+      const r = spawnSync(line, { shell: true, input: '{"x":1}', encoding: "utf8", windowsHide: true });
       assert.equal(r.status, 0, "stderr=" + r.stderr + " stdout=" + r.stdout + " line=" + line);
       assert.equal(r.stdout.trim(), 'ran:--agent kiro:{"x":1}');
     } finally { rmSync(root, { recursive: true, force: true }); }

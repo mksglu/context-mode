@@ -136,8 +136,8 @@ export function dumpRunsThenReplaces(row: AdapterRow): boolean {
 }
 
 // DECISIONS-r11 (B): rows whose encode carries a UserPromptSubmit hint as additionalContext. Only these rows
-// get turn-boundary recall after a compaction; kiro, pi and opencode keep their one compact path (ADR-0001).
-const RECALL_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "zcode"]);
+// get turn-boundary recall after a compaction; pi and opencode keep their one compact path (ADR-0001).
+const RECALL_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "zcode", "kiro"]); // D-R33-KIRO-RECALL-1
 
 export function hasRecall(row: AdapterRow): boolean {
   return RECALL_ROWS.has(row.id);

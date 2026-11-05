@@ -973,7 +973,7 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
       const out = r.encode(ev, { kind: "hint", text: "RECALL-PROBE", onceKey: "recall" });
       assert.equal(hasRecall(r), JSON.stringify(out).includes("RECALL-PROBE"), r.id);
     }
-    assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["kiro", "pi", "opencode"]);
+    assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["pi", "opencode"]); // D-R33-KIRO-RECALL-1
   });
 
   // ---------- decision rows (ADR-0009 §8.2) ----------
@@ -1600,7 +1600,7 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
   // D-FU-OI-KIRO-1: Kiro CLI V3 SessionStart (https://kiro.dev/docs/hooks/types/, read 2026-10-23): payload
   // hook_event_name, cwd, session_id; exit 0 stdout is added to the agent's context. The hook prints the resume
   // line once per session id (E5, A20): empty stdout is the right answer for a repeat or a payload without session_id.
-  const KIRO_RESUME = "This session may have run before. Call mcp_context-mode_ctx_resume for a summary of what happened.";
+  const KIRO_RESUME = "This session may have run before. Call mcp_context_mode_ctx_resume for a summary of what happened.";
 
   test("kiro SessionStart: first call of a session prints the resume line with the kiro tool prefix, exit 0", () => {
     const p = { hook_event_name: "SessionStart", cwd: repo, session_id: "kiro-ss-1" };
@@ -1763,7 +1763,7 @@ describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
     qwen: { pay: (t, i) => SNAKE("PreToolUse", t, i), shell: "run_shell_command", own: "mcp__context-mode__ctx_execute", safe: "todo_write" },
     "copilot-cli": { pay: (t, i) => CAMEL("preToolUse", t, i), shell: "bash", own: "context-mode-ctx_execute", safe: "skill" },
     vscode: { pay: (t, i) => CAMEL("preToolUse", t, i), shell: "run_in_terminal", own: "mcp_context-mode_ctx_execute", safe: "manage_todo_list" },
-    kiro: { pay: (t, i) => SNAKE("PreToolUse", t, i), shell: "execute_bash", own: "mcp_context-mode_ctx_execute", safe: "todo_list" },
+    kiro: { pay: (t, i) => SNAKE("PreToolUse", t, i), shell: "execute_bash", own: "mcp_context_mode_ctx_execute", safe: "todo_list" },
     zcode: { pay: (t, i) => SNAKE("PreToolUse", t, i), shell: "Bash", own: "mcp__context-mode__ctx_execute", safe: "TodoWrite" },
     pi: { pay: (t, i) => ({ type: "tool_call", sessionId: "s1", cwd: repo, toolName: t, input: i }), shell: "bash", own: "ctx_execute", safe: "todo" },
     opencode: { pay: (t, i) => ({ type: "execute.before", sessionID: "s1", directory: repo, tool: t, args: i }), shell: "bash", own: "context-mode_ctx_execute", safe: "todowrite" },
