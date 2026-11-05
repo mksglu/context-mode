@@ -1,7 +1,7 @@
 // PRD-v2 section 9 (sandbox) and GP4: ctx_execute, ctx_batch, runtimes, child env, output cap, kill, spawn, Git Bash lookup.
 // Moved from tests/sandbox/{cap,env,git-bash,kill,runtimes,spawn}.test.mjs and tests/tools/{execute,batch}.test.mjs. Names and bodies unchanged.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, writeFileSync, chmodSync, readdirSync, mkdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, delimiter } from "node:path";
@@ -239,6 +239,23 @@ describe("PRD-v2 section 9: ctx_execute", { concurrency: CONC }, () => {
       const out = await ctxExecute.handler({ language: "shell", code: "sleep 1", background: true }, ctxFor(root));
       assert.equal(out.isError, false);
       assert.ok(/^started in background, pid \d+$/.test(out.text));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // D-R44-OC-BG-1 (#1310, opencode-2): Bun keeps "--" in execArgv, so the launcher drops it before it adds its own.
+  test("[D-R44-OC-BG-1] ctx_execute background:true runs under a host whose execArgv holds the -- separator", async () => {
+    if (process.platform === "win32") return;
+    const root = mkdtempSync(join(tmpdir(), "cm-bg-"));
+    try {
+      const mark = join(root, "ran.txt");
+      const { LAUNCHER } = await import("../src/core/tools/execute.ts");
+      const r = spawnSync(process.execPath, ["-e", 'process.execArgv.push("--");' + LAUNCHER, "--", "start", "", "/bin/sh", "-c", `echo ok > ${mark}`], { encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr);
+      assert.ok(Number.isSafeInteger(Number(r.stdout)), r.stdout);
+      for (let i = 0; i < 50 && !existsSync(mark); i++) await new Promise((res) => setTimeout(res, 100));
+      assert.ok(existsSync(mark));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

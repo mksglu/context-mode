@@ -11,7 +11,7 @@ import {
   DENY_WEBFETCH_TOOLS, DENY_WHAT, DENY_WHAT_SUFFIX, DUMP_COUNT_COMMANDS, DUMP_COUNT_FLAGS, FETCH_CALL, FETCH_QUOTES,
   HTTP_SCHEME, INLINE_HTTP_CALLS, JQ_COMMAND, JQ_WHITELIST, NEVER_DENY_HOSTS,
   OUTPUT_CAP, PARSE_ERROR_DENY_LINE, prefixToolNames, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING,
-  READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS, SHELL_FAMILY,
+  READ_PATH_KEYS, READ_PATH_LIST_KEY, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS, SHELL_FAMILY,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
 import type { AdapterRow, CanonicalHookEvent, Decision, DenyKind, SimpleCommand } from "../contracts/types.ts";
@@ -96,6 +96,13 @@ function readPath(input: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/** Every file a Read names: the single path, plus the OpenCode 2 `filePaths` list (D-R44-OC-READ-1). */
+function readPaths(input: Record<string, unknown>): string[] {
+  const one = readPath(input);
+  const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? (input[READ_PATH_LIST_KEY] as unknown[]).filter((p): p is string => typeof p === "string" && p !== "") : [];
+  return one === undefined ? many : [one, ...many];
+}
+
 function userDenyHit(canonical: string, input: Record<string, unknown>, cwd: string, rules: string[]): string | null {
   if (rules.length === 0) return null;
   const readRule = (p: string): string | null => matchesAnyDenyPattern(resolve(cwd, p), rules, { tool: READ, projectDir: cwd });
@@ -104,8 +111,11 @@ function userDenyHit(canonical: string, input: Record<string, unknown>, cwd: str
     return cmd === undefined ? null : matchesAnyDenyPattern(cmd, rules);
   }
   if (canonical === READ) {
-    const p = readPath(input);
-    return p === undefined ? null : readRule(p);
+    for (const p of readPaths(input)) {
+      const h = readRule(p);
+      if (h !== null) return h;
+    }
+    return null;
   }
   if (canonical === CTX_EXECUTE) {
     const file = str(input.file);
@@ -271,8 +281,7 @@ function fileSize(abs: string): number {
 
 function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>): Decision {
   if (!present(input.offset) && !present(input.limit)) {
-    const p = readPath(input);
-    if (p !== undefined) {
+    for (const p of readPaths(input)) {
       const abs = resolve(ev.cwd, p);
       const size = fileSize(abs);
       if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));

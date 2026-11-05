@@ -306,7 +306,8 @@ export const SED_COMMAND = "sed";
 export const SED_QUIET_FLAGS = Object.freeze(["-n", "--quiet", "--silent"] as const); // "sed -n" only
 export const JQ_COMMAND = "jq"; // a dump only with the identity filter (D-M3-E4-7)
 // impl/08 §6.1 step 6: Read input path key per host shape (Claude file_path, Gemini/Qwen absolute_path, path). D-M3-E4-4.
-export const READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path"] as const);
+export const READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path", "filePath"] as const); // filePath: OpenCode (D-R44-OC-READ-1)
+export const READ_PATH_LIST_KEY = "filePaths"; // OpenCode 2 multi-read: an array of paths (D-R44-OC-READ-1)
 
 // impl/09 §4 hooks dispatch (DEVIATIONS D-M3-H2-1..6). Keys and texts the dispatch reads; no numbers.
 export const OWN_TOOL_PREFIX = "ctx_"; // §4.6 step 1: canonical names of this server's own tools
@@ -768,6 +769,7 @@ export const STATUS_LINE_KEY = "statusLine";
 export const PI_PACKAGES_KEY = "packages";
 export const OPENCODE_PLUGIN_KEY = "plugin";
 export const OPENCODE_PLUGINS_KEY = "plugins"; // D-OC2-D3-PLUGINS-1: `opencode plugin add context-mode` on OpenCode 2.x writes this key (#1307)
+export const OPENCODE_MCP_COMMAND_FIELD = "command"; // D-R44-OC-D3-1: OpenCode local MCP entry: command is the whole argv array
 export const OPENCODE_PACKAGE_FIELD = "package"; // D-OC2-D3-PLUGINS-1: an object entry {"package": "context-mode@2.0.1"} in the list (#1307)
 export const OPENCODE_NPM_SPEC_PREFIX = `${SERVER_KEY}@`; // D-OC2-D3-PLUGINS-1: the npm spec form "context-mode@2.0.1" / "context-mode@latest"
 export const V1_DATA_DIR_NAME = "context-mode"; // <agent home>/context-mode/

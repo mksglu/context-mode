@@ -17,6 +17,7 @@ import {
 import type { AgentId } from "../contracts/agents.ts";
 import type { DbHandle, DoctorRow } from "../contracts/types.ts";
 import { runProcess } from "../sandbox/spawn.ts";
+import { nodeLaunch } from "../sandbox/host-node.ts";
 import { CODEX_PLUGIN_ID, askPluginHooks, sameDir, untrustedPluginHooksDetail } from "../../setup/codex-trust.ts";
 import { codexPluginHomeOf } from "../project/config-dir.ts";
 
@@ -151,8 +152,9 @@ export function isReadShape(stdout: string): boolean {
 async function readProbe(i: HookCheckInput, timeoutMs: number, ranged: boolean): Promise<string> {
   const home = mkdtempSync(path.join(tmpdir(), "cm-d5-read-"));
   try {
-    const r = await runProcess([process.execPath, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
-      cwd: i.bundleDir, env: { ...i.env, HOME: home, USERPROFILE: home }, signal: i.signal, timeoutMs,
+    const node = nodeLaunch({ ...i.env, HOME: home, USERPROFILE: home });
+    const r = await runProcess([node.file, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs,
       stdin: JSON.stringify(readProbePayload(i.worktree ?? home, ranged)),
     });
     return r.stdout.toString("utf8");
@@ -231,7 +233,8 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
   const timeoutMs = i.timeoutMs ?? HOOK_TIMEOUT_MS;
   const bareMs = i.bareMs ?? (async () => {
     const t = performance.now();
-    await runProcess([process.execPath, "-e", ""], { cwd: i.bundleDir, env: i.env, signal: i.signal, timeoutMs });
+    const node = nodeLaunch(i.env);
+    await runProcess([node.file, "-e", ""], { cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs });
     return performance.now() - t;
   });
   const hookWalls: number[] = [];
@@ -239,9 +242,10 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
   let ms = 0;
   for (let n = 1; n <= maxPairs; n++) {
     const start = now();
-    const r = await runProcess([process.execPath, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+    const node = nodeLaunch(i.env);
+    const r = await runProcess([node.file, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
       cwd: i.bundleDir,
-      env: i.env,
+      env: node.env,
       signal: i.signal,
       timeoutMs,
       stdin: JSON.stringify(payloadFor(i.agent, fixture.payload, i.worktree)),

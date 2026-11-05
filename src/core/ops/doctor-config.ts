@@ -6,11 +6,11 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
-  OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
+  OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_MCP_COMMAND_FIELD, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGIN_PATH, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
   REGEX_SPECIAL_CHARS, SETTINGS_FILE, SHELL_QUOTE, TOOL_HOOK_EVENTS, V1_PATH_SEPS, VSCODE_CLAUDE_HOOKS_SETTING,
   VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE,
 } from "../contracts/constants.ts";
@@ -18,7 +18,7 @@ import type { AdapterRow, AgentId, DoctorRow } from "../contracts/types.ts";
 import { hasReplace } from "../../adapters/table.ts";
 import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
 import { detectV1, type V1Scope } from "./detect-v1.ts";
-import { hostConfigValueAt, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
+import { hostConfigValueAt, isNodeCommand, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
 import { marketplaceChoice, resolvePluginRoot } from "./plugin-root.ts";
 import { ownBundleDir } from "./bundle-dir.ts";
 import { piInstalledIn } from "../../setup/pi-gate.ts";
@@ -188,11 +188,23 @@ function isOwnOpencodeEntry(entry: unknown, key: string, own: readonly string[])
   return key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
 }
 
-/** True when the OpenCode config (the .jsonc wins, #849) lists context-mode under "plugin" or "plugins". */
+/** D-R44-OC-D3-1 (#1310): a local MCP entry runs our server: command is a node (or a command array that starts with one),
+ *  the script is a server.mjs, and the args name this agent. OpenCode 2 reads it as mcp.servers.<name>, 1.x as mcp.<name>. */
+function opencodeMcpOwn(entry: unknown): boolean {
+  if (!isObject(entry)) return false;
+  const cmd = Array.isArray(entry[OPENCODE_MCP_COMMAND_FIELD]) ? entry[OPENCODE_MCP_COMMAND_FIELD] as unknown[] : [entry[MCP_COMMAND_FIELD], ...list(entry[MCP_ARGS_FIELD])];
+  const [node, script, flag, agent] = cmd;
+  return isNodeCommand(node) && typeof script === "string" && lastSegment(script) === SERVER_ENTRY_FILE && flag === AGENT_ARG && agent === "opencode";
+}
+
+/** True when the OpenCode config (the .jsonc wins, #849) lists context-mode under "plugin" or "plugins", or runs its server as a local MCP entry. */
 function opencodeListed(file: string): boolean {
   const { value } = readParsed("opencode", file);
-  const own = [opencodePluginFile()];
-  return [OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY].some((key) => list(isObject(value) ? value[key] : undefined).some((e) => isOwnOpencodeEntry(e, key, own)));
+  const bundle = opencodePluginFile();
+  const own = [bundle, join(bundle, ...OPENCODE_PLUGIN_PATH)]; // D-R44-OC-D3-1: the package dir, or the plugin file inside it
+  if ([OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY].some((key) => list(isObject(value) ? value[key] : undefined).some((e) => isOwnOpencodeEntry(e, key, own)))) return true;
+  const mcp = isObject(value) && isObject(value.mcp) ? value.mcp : {};
+  return opencodeMcpOwn(mcp[SERVER_KEY]) || (isObject(mcp.servers) && opencodeMcpOwn(mcp.servers[SERVER_KEY]));
 }
 
 function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): boolean {

@@ -500,6 +500,22 @@ describe("ADR-0008 shell unwrap", { concurrency: CONC }, () => {
 });
 
 describe("ADR-0008 read-deny hook text", { concurrency: CONC }, () => {
+  // D-R44-OC-READ-1 (#1310, host audit opencode-5): OpenCode's own `read` tool (filePath, or the 2.x filePaths list) gets the Read size guard.
+  test("[D-R44-OC-READ-1] opencode read: a large whole file is denied, a ranged read passes", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-ocread-"));
+    try {
+      const big = join(dir, "big.log");
+      writeFileSync(big, "x".repeat(OUTPUT_CAP + 1000));
+      const row = getAdapter("opencode");
+      const ev = (input) => ({ ...row.decode({ type: "execute.before", sessionID: "s", tool: "read", args: input, directory: dir }) });
+      assert.equal(decide(ev({ filePath: big }), row, null).kind, "deny");
+      assert.equal(decide(ev({ filePaths: [big] }), row, null).kind, "deny");
+      assert.equal(decide(ev({ filePath: big, offset: 1, limit: 10 }), row, null).kind, "allow");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // D-DU-DENY-1: the Read deny is one line built from the src/prompt/hooks/read-deny.md template:
   // the exact ctx_execute call for this file, no prose from the tool descriptions. Golden text + byte cap.
 

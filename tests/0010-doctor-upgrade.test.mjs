@@ -14,7 +14,9 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
-import { bundleDirOf } from "../src/core/ops/bundle-dir.ts";
+import { bundleDirOf, ownBundleDir } from "../src/core/ops/bundle-dir.ts";
+import { openReadOnlyHandle } from "../src/core/store/open-read.ts";
+import { nodeLaunch } from "../src/core/sandbox/host-node.ts";
 import { getAdapter, ADAPTERS } from "../src/adapters/table.ts";
 import { checkDb, checkIndex } from "../src/core/ops/doctor-db.ts";
 import { openDb, closeDb } from "../src/core/store/db.ts";
@@ -464,6 +466,29 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
       assert.equal(d3.status, want, d3.detail);
     });
   }
+
+  // D-R44-OC-D3-1 (#1310, host audit opencode-4): the plugin file path and the local MCP entry (2.x mcp.servers, 1.x mcp) are own entries.
+  const bundle = ownBundleDir();
+  const OC_OWN = [
+    ["the plugin file path inside the package", JSON.stringify({ plugins: [path.join(bundle, "opencode", "plugin.js")] })],
+    ["the package dir", JSON.stringify({ plugin: [bundle] })],
+    ["mcp.servers.context-mode (2.x form)", JSON.stringify({ mcp: { servers: { "context-mode": { type: "local", command: ["node", path.join(bundle, "server.mjs"), "--agent", "opencode"] } } } })],
+    ["mcp.context-mode (1.x form)", JSON.stringify({ mcp: { "context-mode": { type: "local", command: ["node", path.join(bundle, "server.mjs"), "--agent", "opencode"] } } })],
+  ];
+  for (const [name, text] of OC_OWN) {
+    test(`[D-R44-OC-D3-1] doctor-config/D3 opencode: ${name} is PASS`, (t) => {
+      const home = tmp(t);
+      put(path.join(home, ".config", "opencode", "opencode.json"), text);
+      const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home);
+      assert.equal(d3.status, "PASS", d3.detail);
+    });
+  }
+
+  test("[D-R44-OC-D3-1] doctor-config/D3 opencode: an mcp entry that runs another script is FAIL", (t) => {
+    const home = tmp(t);
+    put(path.join(home, ".config", "opencode", "opencode.json"), JSON.stringify({ mcp: { servers: { "context-mode": { type: "local", command: ["node", "/x/other.mjs", "--agent", "opencode"] } } } }));
+    assert.equal(checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home).status, "FAIL");
+  });
 });
 
 describe("ADR-0010 doctor D3 fix: setup fixes a wrong or missing MCP entry (D-D3-SETUP-FIX-1)", { concurrency: CONC }, () => {
@@ -505,6 +530,29 @@ describe("ADR-0010 doctor D8, D9: database and index checks", { concurrency: CON
     const db = await openDb(p);
     closeDb(db);
   }
+
+  // D-R44-OC-SQLITE-RO-1 (#1310, opencode-3): under Bun the read-only open is a normal open plus query_only.
+  test("[D-R44-OC-SQLITE-RO-1] doctor-db/bun read-only handle reads and refuses writes", async (t) => {
+    const p = project(t);
+    await freshDb(p);
+    const raw = openReadOnlyHandle(await import("node:sqlite"), p.dbPath, { bun: "1.4.4" });
+    try {
+      assert.equal(Number(Object.values(raw.prepare("PRAGMA user_version").get())[0]), SCHEMA_VERSION);
+      assert.throws(() => raw.exec("CREATE TABLE zz(a)"), /readonly/i);
+    } finally {
+      raw.close();
+    }
+    const heal = openReadOnlyHandle(await import("node:sqlite"), p.dbPath, { bun: "1.4.4", queryOnly: false });
+    try { heal.prepare("VACUUM INTO ?").run(p.dbPath + ".copy"); } finally { heal.close(); rmSync(p.dbPath + ".copy", { force: true }); }
+  });
+
+  // D-R44-OC-HOSTNODE-1 (#1310, D5): a Bun host's execPath is the host binary; a real node from PATH runs the hook.
+  test("[D-R44-OC-HOSTNODE-1] sandbox/nodeLaunch: node host keeps execPath, Bun host takes node from PATH, else BUN_BE_BUN", () => {
+    const env = { PATH: "/p" };
+    assert.deepEqual(nodeLaunch(env, { bun: undefined, execPath: "/usr/bin/node" }), { file: "/usr/bin/node", env });
+    assert.deepEqual(nodeLaunch(env, { bun: "1.4.4", execPath: "/opt/opencode" }, () => "/usr/bin/node"), { file: "/usr/bin/node", env });
+    assert.deepEqual(nodeLaunch(env, { bun: "1.4.4", execPath: "/opt/opencode" }, () => null), { file: "/opt/opencode", env: { PATH: "/p", BUN_BE_BUN: "1" } });
+  });
 
   test("[M5] doctor-db/D8-pass-on-current-schema", async (t) => {
     const p = project(t);

@@ -18,6 +18,7 @@ import {
 import { CtxError } from "../contracts/errors.ts";
 import type { DbHandle, ProjectContext } from "../contracts/types.ts";
 import { applyMigrations } from "./schema.ts";
+import { openReadOnlyHandle } from "./open-read.ts";
 
 export type { DbHandle } from "../contracts/types.ts";
 
@@ -102,7 +103,7 @@ function openWritable(sqlite: SqliteModule, path: string): DatabaseSync {
 
 // Read-only open (D-M1-T5-1): never migrates; a schema other than SCHEMA_VERSION is SCHEMA_STALE.
 function openReadOnly(sqlite: SqliteModule, path: string): DatabaseSync {
-  const raw = new sqlite.DatabaseSync(path, { timeout: DB_TIMEOUT_MS, readOnly: true });
+  const raw = openReadOnlyHandle(sqlite, path); // D-R44-OC-SQLITE-RO-1
   try {
     const found = readUserVersion(raw);
     if (found !== SCHEMA_VERSION) throw new CtxError("SCHEMA_STALE", { found, want: SCHEMA_VERSION });

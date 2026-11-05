@@ -27,6 +27,7 @@ import { renameWithRetry } from "./atomic-file.ts";
 import type { OrphanFile } from "../contracts/constants.ts";
 import type { DoctorRow, ProjectContext } from "../contracts/types.ts";
 import { closeDb, openDb } from "../store/db.ts";
+import { openReadOnlyHandle } from "../store/open-read.ts";
 import { listLiveOwners } from "../store/owners.ts";
 
 export interface HealD8Input {
@@ -51,7 +52,7 @@ export async function healLossless(dbPath: string): Promise<void> {
   const tmp = dbPath + HEAL_TMP_SUFFIX;
   rmSync(tmp, { force: true });
   try {
-    const src = new DatabaseSync(dbPath, { readOnly: true, timeout: DB_TIMEOUT_MS });
+    const src = openReadOnlyHandle({ DatabaseSync } as typeof import("node:sqlite"), dbPath, { queryOnly: false }); // D-R44-OC-SQLITE-RO-1
     try {
       src.prepare("VACUUM INTO ?").run(tmp);
     } finally {

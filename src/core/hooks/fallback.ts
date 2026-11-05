@@ -10,7 +10,7 @@ import type { AgentId } from "../contracts/agents.ts";
 import { dataRootOf } from "../project/config-dir.ts";
 import {
   DATA_DIR_ENV, HOOK_ERROR_LOG_FILE, HOOK_FAULT_ENV, HOOK_FAULT_STAGES, NODE_MIN, HOOK_FAIL_CWD_KEYS, HOOK_FAIL_EVENT_KEYS, HOOK_FAIL_INPUT_KEYS, HOOK_FAIL_LINE, HOOK_FAIL_PRE_EVENTS, HOOK_FAIL_REDIRECT,
-  HOOK_FAIL_TOOLS, HOOK_FAIL_TOOL_KEYS, HOOK_LOG_TAIL_BYTES, OUTPUT_CAP, OWN_TOOL_PREFIX, prefixToolNames, READ_PATH_KEYS,
+  HOOK_FAIL_TOOLS, HOOK_FAIL_TOOL_KEYS, HOOK_LOG_TAIL_BYTES, OUTPUT_CAP, OWN_TOOL_PREFIX, prefixToolNames, READ_PATH_KEYS, READ_PATH_LIST_KEY,
 } from "../contracts/constants.ts";
 import type { AdapterRow, HookOutput } from "../contracts/types.ts";
 import { getAdapter } from "../../adapters/table.ts";
@@ -139,17 +139,20 @@ function isPreTool(row: AdapterRow, event: string): boolean {
   return HOOK_FAIL_PRE_EVENTS.includes(e) || (row.eventMap.PreToolUse ?? "").toLowerCase() === e;
 }
 
-/** True when the Read target is a whole file over the output cap. An unreadable, unnamed or ranged target is not denied. */
-function bigRead(input: Rec, cwd: string): boolean {
-  if ((input.offset ?? null) !== null || (input.limit ?? null) !== null) return false; // a ranged Read is never denied (same as decide)
-  const p = firstString(input, READ_PATH_KEYS);
-  if (p === "") return false;
+function bigFile(abs: string): boolean {
   try {
-    const st = fs.statSync(resolve(cwd, p));
+    const st = fs.statSync(abs);
     return st.isFile() && st.size > OUTPUT_CAP;
   } catch {
     return false;
   }
+}
+
+/** True when the Read target is a whole file over the output cap. An unreadable, unnamed or ranged target is not denied. */
+function bigRead(input: Rec, cwd: string): boolean {
+  if ((input.offset ?? null) !== null || (input.limit ?? null) !== null) return false; // a ranged Read is never denied (same as decide)
+  const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? (input[READ_PATH_LIST_KEY] as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve(cwd, p)));
 }
 
 /**

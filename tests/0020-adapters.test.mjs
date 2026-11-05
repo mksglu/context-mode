@@ -69,7 +69,7 @@ describe("ADR-0020 adapters", () => {
       kiro: { shell: ["execute_bash", "execute_pwsh", "shell"] }, // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
       zcode: CLAUDE_NATIVE,
       pi: { shell: ["bash", "powershell"], read: ["read"] }, // D-HA-PI-NAMES-1, D-R38-PI-PWSH-1
-      opencode: { shell: ["bash"] }, // D-HF-OPENCODE-SHELL-1
+      opencode: { shell: ["bash"], read: ["read"] }, // D-HF-OPENCODE-SHELL-1, D-R44-OC-READ-1
     };
 
     const CLAUDE_EVENTS = { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" };
@@ -333,7 +333,7 @@ describe("ADR-0020 adapters", () => {
       assert.deepEqual(getAdapter("pi").nativeTools, { shell: ["bash", "powershell"], read: ["read"] }); // D-HA-PI-NAMES-1, D-R38-PI-PWSH-1
       assert.deepEqual(getAdapter("vscode").nativeTools, { shell: ["run_in_terminal", "runTerminalCommand", "bash", "powershell"], read: ["read_file", "view"], webfetch: ["fetch_webpage", "web_fetch"] }); // D-HF-VSCODE-PROJECT-1, D-N7-VSCODE-TOOLS-1
       assert.deepEqual(getAdapter("kiro").nativeTools, { shell: ["execute_bash", "execute_pwsh", "shell"] }); // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
-      assert.deepEqual(getAdapter("opencode").nativeTools, { shell: ["bash"] }); // D-HF-OPENCODE-SHELL-1
+      assert.deepEqual(getAdapter("opencode").nativeTools, { shell: ["bash"], read: ["read"] }); // D-HF-OPENCODE-SHELL-1, D-R44-OC-READ-1
       for (const r of ADAPTERS) assert.equal(r.execReadOnlyHint, r.id === "codex", r.id);
     });
 

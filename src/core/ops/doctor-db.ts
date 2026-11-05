@@ -12,6 +12,7 @@ import {
 } from "../contracts/constants.ts";
 import type { OrphanFile } from "../contracts/constants.ts";
 import type { DoctorRow, ProjectContext } from "../contracts/types.ts";
+import { openReadOnlyHandle } from "../store/open-read.ts";
 
 type SqliteModule = typeof import("node:sqlite");
 
@@ -42,7 +43,7 @@ async function loadSqlite(): Promise<SqliteModule | null> {
 }
 
 function openRead(sqlite: SqliteModule, path: string): DatabaseSync {
-  return new sqlite.DatabaseSync(path, { timeout: DB_TIMEOUT_MS, readOnly: true });
+  return openReadOnlyHandle(sqlite, path); // D-R44-OC-SQLITE-RO-1
 }
 
 // One cell of a one-column PRAGMA/SELECT row.
