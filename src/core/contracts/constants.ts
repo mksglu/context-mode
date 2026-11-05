@@ -27,6 +27,10 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 // replies and the Read deny threshold). A result over REPLACE_TRIGGER_BYTES is indexed whole and the model gets
 // whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
 export const REPLACE_TRIGGER_BYTES = 4096;
+// D-R41-READ-OFFSET-1 (#1314): a read-like tool (canonical name) called with a range key is the user's own window:
+// PostToolUse lets it through whole. Claude Code, Pi, Gemini: offset/limit; VS Code read_file and Copilot view map to them.
+export const RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
+export const READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
 // D-M2-JSON-1: a parser-found shape digest (schema, counts, whole rows) has its own budget, independent of the handle line.
 export const SHAPE_RETURN_BYTES = 256;
@@ -666,6 +670,8 @@ export const CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"] as c
 // doctor-hook.ts: D5 round trip, D5b double-fire (impl/07 §5).
 export const D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
 // D-D5-READ-SHAPE-1 (#1304): the PostToolUse Read probe got an updatedToolOutput that is not Read's own output object.
+// D-R41-READ-OFFSET-1 (#1314): the PostToolUse probe of a bounded Read (offset/limit) got a replace instead of the lines.
+export const D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the replace trigger came back replaced: a bounded Read must reach the model whole";
 export const D5_READ_SHAPE_DETAIL = "PostToolUse Read replace is not Read's output shape {type:\"text\", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning";
 export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`; }
 export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken install

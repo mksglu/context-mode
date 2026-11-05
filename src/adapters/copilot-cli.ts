@@ -55,6 +55,17 @@ function canonicalName(name: string): string {
   return name;
 }
 
+// D-R41-READ-OFFSET-1 (#1314): copilot-cli `view` {path, view_range [start, end]} gets the Claude range keys offset/limit,
+// as vscode.ts policyInput does. Source keys are kept; the canonical name stays "view" (D-HQ-COPILOT-NAMES-2).
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+function viewRange(name: string, input: Record<string, unknown>): Record<string, unknown> {
+  const r = input.view_range;
+  if (name !== "view" || !Array.isArray(r) || !isNum(r[0])) return input;
+  const out: Record<string, unknown> = { ...input, offset: r[0] };
+  if (isNum(r[1]) && r[1] >= r[0]) out.limit = r[1] - r[0] + 1;
+  return out;
+}
+
 // toolArgs arrives as an object or as a JSON-encoded string (D-M3-A3-3); anything else is {}.
 function readArgs(v: unknown): Record<string, unknown> {
   if (isRecord(v)) return v;
@@ -107,7 +118,7 @@ export function decode(raw: unknown): CanonicalHookEvent {
   if (event === "UserPromptSubmit" && typeof raw.prompt === "string") ev.prompt = raw.prompt;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const toolName = String(raw[k.tool] ?? "");
-    const tool: ToolCall = { name: toolName, canonicalName: canonicalName(toolName), input: readArgs(raw[k.args]) };
+    const tool: ToolCall = { name: toolName, canonicalName: canonicalName(toolName), input: viewRange(toolName, readArgs(raw[k.args])) };
     ev.tool = tool;
   }
   if (event === "PostToolUse") ev.result = readResult(raw[k.result], native.casing, native.failure);

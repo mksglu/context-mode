@@ -1060,11 +1060,13 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
   });
 
   // D-D5-READ-SHAPE-1 (#1304): claude-code D5 also sends a large PostToolUse Read and checks updatedToolOutput.
-  const readHook = (out) => `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
-    `process.stdout.write(p.hook_event_name==="PostToolUse"?JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",updatedToolOutput:${out}}}):${JSON.stringify(native)});});`;
-  function readBundle(t, out) {
+  // D-R41-READ-OFFSET-1 (#1314): `full` true replaces only a Read with no offset/limit, as the fixed hook does.
+  const readHook = (out, full) => `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
+    `const bounded=${full ? "p.tool_input.offset!==undefined||p.tool_input.limit!==undefined" : "false"};` +
+    `process.stdout.write(p.hook_event_name!=="PostToolUse"?${JSON.stringify(native)}:bounded?"":JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",updatedToolOutput:${out}}}));});`;
+  function readBundle(t, out, full = true) {
     const dir = bundle(t, native);
-    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), readHook(out));
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), readHook(out, full));
     return dir;
   }
 
@@ -1077,6 +1079,12 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const obj = JSON.stringify({ type: "text", file: { filePath: "/a", content: "c", numLines: 1, startLine: 1, totalLines: 1 } });
     const r = await checkHookRoundTrip(input(readBundle(t, obj)));
     assert.equal(r.status, "PASS", r.detail);
+  });
+
+  test("[M5] doctor-hook/D5-bounded-read-replaced-FAILs (#1314)", async (t) => {
+    const obj = JSON.stringify({ type: "text", file: { filePath: "/a", content: "c", numLines: 1, startLine: 1, totalLines: 1 } });
+    const r = await checkHookRoundTrip(input(readBundle(t, obj, false)));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_RANGE_DETAIL, fixCommand: C.D5_FIX });
   });
 
   test("[M5] doctor-hook/D5-bad-exit-code-FAILs-shape", async (t) => {

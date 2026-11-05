@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_RANGE_DETAIL, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
@@ -124,12 +124,12 @@ function isNativeShape(agent: AgentId, stdout: string, exitCode: number | null, 
 // outputSchema), runs with HOME in a temp dir of its own, so the probe writes nothing to the user's store.
 const READ_PROBE_LINES = 4 * Math.ceil(REPLACE_TRIGGER_BYTES / 40);
 
-function readProbePayload(cwd: string): unknown {
+function readProbePayload(cwd: string, ranged: boolean): unknown {
   const content = Array.from({ length: READ_PROBE_LINES }, (_, n) => "d5 read probe line " + n + " ".padEnd(20, "x")).join("\n");
   const filePath = path.join(cwd, "d5-read-probe.txt");
   return {
     session_id: "d5-read-probe", transcript_path: "", cwd, hook_event_name: "PostToolUse", tool_name: "Read",
-    tool_use_id: "toolu_d5_read_probe", tool_input: { file_path: filePath },
+    tool_use_id: "toolu_d5_read_probe", tool_input: ranged ? { file_path: filePath, offset: 1, limit: READ_PROBE_LINES } : { file_path: filePath },
     tool_response: { type: "text", file: { filePath, content, numLines: READ_PROBE_LINES, startLine: 1, totalLines: READ_PROBE_LINES } },
   };
 }
@@ -147,17 +147,33 @@ export function isReadShape(stdout: string): boolean {
     && ["numLines", "startLine", "totalLines"].every((k) => typeof f[k] === "number");
 }
 
-async function readProbeOk(i: HookCheckInput, timeoutMs: number): Promise<boolean> {
+// D-R41-READ-OFFSET-1 (#1314): a second probe sends the same Read with offset/limit; the hook must let it through whole.
+async function readProbe(i: HookCheckInput, timeoutMs: number, ranged: boolean): Promise<string> {
   const home = mkdtempSync(path.join(tmpdir(), "cm-d5-read-"));
   try {
     const r = await runProcess([process.execPath, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
       cwd: i.bundleDir, env: { ...i.env, HOME: home, USERPROFILE: home }, signal: i.signal, timeoutMs,
-      stdin: JSON.stringify(readProbePayload(i.worktree ?? home)),
+      stdin: JSON.stringify(readProbePayload(i.worktree ?? home, ranged)),
     });
-    return isReadShape(r.stdout.toString("utf8"));
+    return r.stdout.toString("utf8");
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
+}
+
+/** True when the hook gave no updatedToolOutput (the host's own result reaches the model). */
+function isPassThrough(stdout: string): boolean {
+  if (stdout.trim() === "") return true;
+  let out: unknown;
+  try { out = JSON.parse(stdout); } catch { return false; }
+  return !isObject(out) || !isObject(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput");
+}
+
+/** null when both Read probes pass, else the FAIL detail. */
+async function readProbeDetail(i: HookCheckInput, timeoutMs: number): Promise<string | null> {
+  if (!isReadShape(await readProbe(i, timeoutMs, false))) return D5_READ_SHAPE_DETAIL;
+  if (!isPassThrough(await readProbe(i, timeoutMs, true))) return D5_READ_RANGE_DETAIL;
+  return null;
 }
 
 /** R6: true when at least one journal row of any Codex session exists in this project's context.db. */
@@ -237,6 +253,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
-  if (i.agent === "claude-code" && !(await readProbeOk(i, timeoutMs))) return row("FAIL", D5_READ_SHAPE_DETAIL, D5_FIX);
+  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : null;
+  if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }

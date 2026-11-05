@@ -443,6 +443,20 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     }
   });
 
+  // D-R41-READ-OFFSET-1 (#1314, joucarvalho): "Read with offset/limit over 4 KB comes back as a 96 B ctx_search pointer".
+  // A bounded Read is the user's own small window: the host's result reaches the model whole. A full Read still replaces.
+  test("D-R41-READ-OFFSET-1: a Read with offset or limit over REPLACE_TRIGGER_BYTES is never replaced (#1314)", async () => {
+    const content = bigText(REPLACE_TRIGGER_BYTES * 3);
+    const n = content.split("\n").length;
+    const file = { filePath: "/tmp/big.log", content, numLines: n, startLine: 120, totalLines: 9000 };
+    for (const input of [{ file_path: "/tmp/big.log", offset: 120, limit: n }, { file_path: "/tmp/big.log", limit: n }, { file_path: "/tmp/big.log", offset: 120 }]) {
+      const p = cc({ hook_event_name: "PostToolUse", tool_name: "Read", tool_input: input, tool_use_id: "toolu_r", tool_response: { type: "text", file } });
+      assert.equal(parsed(await handleHook("claude-code", p, env)), null, JSON.stringify(input));
+    }
+    const full = cc({ hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: "/tmp/big.log" }, tool_use_id: "toolu_f", tool_response: { type: "text", file } });
+    assert.equal(typeof parsed(await handleHook("claude-code", full, env)).updatedToolOutput, "object", "a full Read over the trigger still replaces");
+  });
+
   test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {
     const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
     const p = mainBashPost(text);
@@ -2265,6 +2279,34 @@ describe("PRD-v2 section 10: saving on live payload shapes", () => {
     const text = r.content[0].text;
     assert.ok(Buffer.byteLength(text) < Buffer.byteLength(big) / 2, "replaced text is under half the raw output");
     assert.ok(text.includes("ctx_search("));
+  });
+
+  // D-R41-READ-OFFSET-1 (#1314): every replace host's own bounded read reaches the model whole. Payloads: pi 1.4.0 read
+  // {path, offset, limit}; gemini-cli 0.65.0 read_file {file_path, offset, limit}; copilot-cli view {path, view_range}.
+  test("pi tool_result of a bounded `read` (offset/limit) is not replaced (#1314)", async (t) => {
+    const { repo, big } = sandbox(t);
+    const { handlers, ctx } = await piHandlers(repo);
+    const input = { path: "logs/app.log", offset: 1, limit: 4000 };
+    const r = await handlers.tool_result({ type: "tool_result", toolCallId: "c3", toolName: "read", input,
+      content: [{ type: "text", text: big }], isError: false, details: undefined }, ctx);
+    assert.equal(r, undefined);
+  });
+
+  test("gemini AfterTool of a bounded read_file (offset/limit) is not replaced (#1314)", async (t) => {
+    const { repo, big, env } = sandbox(t);
+    const out = await handleHook("gemini", { session_id: "g1", transcript_path: "", cwd: repo, hook_event_name: "AfterTool", timestamp: "2026-11-05T00:00:00Z",
+      tool_name: "read_file", tool_input: { file_path: path.join(repo, "logs", "app.log"), offset: 0, limit: 4000 }, tool_response: { llmContent: big, returnDisplay: big } }, env);
+    assert.deepEqual(out, { stdout: "", exitCode: 0 });
+  });
+
+  test("copilot-cli postToolUse of a bounded `view` (view_range) is not replaced (#1314)", async (t) => {
+    const { repo, big, env } = sandbox(t);
+    const out = await handleHook("copilot-cli", { hookEventName: "postToolUse", sessionId: "c1", timestamp: 1, cwd: repo,
+      toolName: "view", toolArgs: { path: path.join(repo, "logs", "app.log"), view_range: [1, 4000] },
+      toolResult: { resultType: "success", textResultForLlm: big } }, env);
+    assert.deepEqual(out, { stdout: "", exitCode: 0 });
+    const d = copilotDecode({ hookEventName: "preToolUse", sessionId: "c1", cwd: repo, toolName: "view", toolArgs: { path: "a", view_range: [3, 9] } });
+    assert.deepEqual(d.tool.input, { path: "a", view_range: [3, 9], offset: 3, limit: 7 });
   });
 
   // D-HQ-COPILOT-EVENT-1: the documented copilot-cli payload has no hookEventName; the hook must still save.

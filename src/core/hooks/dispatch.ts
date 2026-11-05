@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
-  OWN_TOOL_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  OWN_TOOL_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, RANGE_READ_TOOLS, READ_RANGE_KEYS, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
@@ -441,6 +441,7 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // step 5: replace, DECISIONS-r9 F1 split. Subagent case B/C (ADR-0016), and the main agent on a row
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
+  if (boundedRead(tool)) return ALLOW; // D-R41-READ-OFFSET-1 (#1314): the user asked for these lines
   if (result.keep === true) return ALLOW; // D-M2-MCP-1: an MCP result with a non-text block stays as the host made it
   // ADR-0001: one path per row, no runtime fallback. A row with no replace channel gets no replace decision on
   // any path, the subagent one too (D-STATS-RET-2): its encoder drops it, so the model gets the whole output.
@@ -488,6 +489,11 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   if (digest !== null) return { kind: "replace", output: replaceOutput(digest, handleLine) };
   const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
   return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, handleLine) : selected.text };
+}
+
+// D-R41-READ-OFFSET-1 (#1314): a read-like tool called with offset, limit or view_range is a bounded window.
+export function boundedRead(tool: ToolCall): boolean {
+  return RANGE_READ_TOOLS.includes(tool.canonicalName) && READ_RANGE_KEYS.some((k) => tool.input[k] !== undefined && tool.input[k] !== null);
 }
 
 // D-R4-BUDGET-1: the replace is the body, one newline, the handle line. An empty body (selection budget 0, no
