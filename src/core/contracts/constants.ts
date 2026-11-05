@@ -328,6 +328,7 @@ export const RECALL_MIN_SCORE = 5;
 export const RECALL_MAX_ROWS = 340; // newest rows read per prompt (= MAX_CANDIDATES_TOTAL)
 export const COMPACTED_META_PREFIX = "compacted:"; // meta key + session id: a compaction happened in this session
 export const RECALL_UNITS_SEEN_META_PREFIX = "recall_units_seen:"; // r3-ledger: JSON "source:ord" list of line units already injected
+export const UNITS_ANCESTOR_FACTOR = 8; // D-UNITS-BOUND-1: ancestor copies per output <= this x its bytes (0 of 680k units in 3520 real files drop a parent at 8)
 export const RECALL_UNIT_CANDIDATES = 64; // r3-ledger: line units read per recall query (one ranked FTS query)
 export const RECALL_SEEN_META_PREFIX = "recall_seen:"; // meta key + session id: JSON seq list already injected
 export const RECALL_OPEN_TAG = "<context_mode_recall>";

@@ -679,6 +679,35 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         assert.ok(ms < 50, String(ms));
       });
 
+      test("D-UNITS-BOUND-1: units stay linear when one long line parents many short ones", () => {
+        // A long first line, then many short children: each child unit would copy the long line.
+        for (const n of [16384, 65536]) {
+          const m = Math.floor(n / 6);
+          const text = "A".repeat(n - 3 * m) + "\n" + Array.from({ length: m }, () => " x").join("\n");
+          const units = buildUnits(text);
+          const lines = text.split("\n");
+          const total = units.reduce((a, u) => a + Buffer.byteLength(u.body), 0);
+          assert.equal(units.length, lines.length, "one unit per non-blank line");
+          for (const u of units) assert.ok(u.body.endsWith(lines[u.ord]), "the own line stays whole: " + u.ord);
+          assert.ok(total <= (1 + C.UNITS_ANCESTOR_FACTOR) * Buffer.byteLength(text), n + ": " + total);
+          for (const u of units) {
+            const own = Buffer.byteLength(lines[u.ord]);
+            assert.ok(Buffer.byteLength(u.body) <= Math.max(own, C.RECALL_BUDGET_BYTES), "a unit fits one recall block: " + u.ord);
+          }
+        }
+      });
+
+      test("D-UNITS-BOUND-1: deep nesting keeps the nearest parents whole inside the bound", () => {
+        const text = Array.from({ length: 400 }, (_, i) => " ".repeat(i) + "key" + i + ": " + "v".repeat(20)).join("\n");
+        const units = buildUnits(text);
+        const last = units[units.length - 1];
+        assert.ok(Buffer.byteLength(last.body) <= C.RECALL_BUDGET_BYTES, String(Buffer.byteLength(last.body)));
+        const kept = last.body.split("\n");
+        assert.equal(kept[kept.length - 1], text.split("\n")[399]);
+        assert.equal(kept[kept.length - 2], text.split("\n")[398], "the nearest parent is kept first");
+        for (const l of kept) assert.ok(text.split("\n").includes(l), "every kept line is whole");
+      });
+
       const U = (ord, body, score, sourceId = 1) => ({ sourceId, ord, label: "bash:cat", body, score });
 
       test("[r3] pickUnits: whole units inside the budget, best first, seen and low scores out", () => {
@@ -3308,6 +3337,52 @@ describe("PRD-v2 section 8 / safeFetch", () => {
         return true;
       }));
     }
+  });
+
+  test("D-SSRF-RANGES-1: shared, reserved and IPv4-in-IPv6 targets are blocked before any socket", async () => {
+    // Literal IPs only. Through a loopback proxy the origin literal is checked first, so the reply names the origin
+    // and no socket opens; without a proxy the same check runs on the resolved address.
+    const blocked = ["100.64.0.1", "100.100.100.200", "0.1.2.3", "198.18.0.1", "240.0.0.1", "[fec0::1]",
+      "[64:ff9b::7f00:1]", "[2002:7f00:1::]", "[::127.0.0.1]"];
+    for (const lit of blocked) {
+      const u = "http://" + lit + "/latest/meta-data";
+      const host = new URL(u).hostname;
+      const shown = host.startsWith("[") ? host.slice(1, -1) : host;
+      await withEnv({ HTTP_PROXY: "http://127.0.0.1:9" }, () => assert.rejects(safeFetch(u, new AbortController().signal), (err) => {
+        assert.equal(err.message, "Blocked private address " + shown + ". Fix: use a public URL.", u);
+        return true;
+      }));
+      await withEnv({}, () => assert.rejects(safeFetch(u, new AbortController().signal), (err) => {
+        assert.equal(err.code, "SSRF", u);
+        return true;
+      }));
+    }
+    for (const ok of ["8.8.8.8", "100.128.0.1", "198.20.0.1", "[2001:4860:4860::8888]", "[64:ff9b::808:808]", "[2002:808:808::]"]) {
+      // Public targets pass the check: through the loopback proxy the block names the proxy, not the origin.
+      await withEnv({ HTTP_PROXY: "http://127.0.0.1:9" }, () => assert.rejects(safeFetch("http://" + ok + "/", new AbortController().signal), (err) => {
+        assert.equal(err.message, "Blocked private address 127.0.0.1. Fix: use a public URL.", ok);
+        return true;
+      }));
+    }
+  });
+
+  test("D-SSRF-RANGES-1: a redirect to an IPv4-compatible loopback literal is blocked on its hop", async () => {
+    let hits = 0;
+    const srv = createServer((req, res) => {
+      hits += 1;
+      res.writeHead(302, { location: "http://[::127.0.0.1]:" + srv.address().port + "/meta" });
+      res.end();
+    });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    try {
+      // _parity-net-shim: docs.parity.test resolves to its public-looking fake address and connects to this server.
+      await withEnv({}, () => assert.rejects(safeFetch("http://docs.parity.test:" + srv.address().port + "/", AbortSignal.timeout(5000)), (err) => {
+        assert.equal(err.code, "SSRF");
+        assert.equal(err.message, "Blocked private address ::7f00:1. Fix: use a public URL.");
+        return true;
+      }));
+      assert.equal(hits, 1, "only the first hop reaches the server");
+    } finally { await new Promise((r) => srv.close(r)); }
   });
 
   test("GP5/fetch-error-one-line: every failure is one line, code FETCH_FAILED or SSRF", async () => {

@@ -17,11 +17,17 @@ const PRIVATE_RANGES: ReadonlyArray<readonly [string, number, "ipv4" | "ipv6"]> 
   ["172.16.0.0", 12, "ipv4"],
   ["192.168.0.0", 16, "ipv4"],
   ["169.254.0.0", 16, "ipv4"],
-  ["0.0.0.0", 32, "ipv4"],
+  ["0.0.0.0", 8, "ipv4"], // D-SSRF-RANGES-1: "this network", not only 0.0.0.0
+  ["100.64.0.0", 10, "ipv4"], // D-SSRF-RANGES-1: shared address space (RFC 6598), cloud metadata lives here
+  ["198.18.0.0", 15, "ipv4"], // D-SSRF-RANGES-1: benchmark networks (RFC 2544)
+  ["240.0.0.0", 4, "ipv4"], // D-SSRF-RANGES-1: reserved and broadcast
   ["::1", 128, "ipv6"],
   ["::", 128, "ipv6"],
+  ["::", 96, "ipv6"], // D-SSRF-RANGES-1: IPv4-compatible (::a.b.c.d), deprecated, never a public origin
+  ["64:ff9b:1::", 48, "ipv6"], // D-SSRF-RANGES-1: local-use NAT64 (RFC 8215)
   ["fc00::", 7, "ipv6"],
   ["fe80::", 10, "ipv6"],
+  ["fec0::", 10, "ipv6"], // D-SSRF-RANGES-1: site-local (RFC 3879)
 ];
 const BLOCKED = new BlockList();
 for (const [net, prefix, type] of PRIVATE_RANGES) BLOCKED.addSubnet(net, prefix, type);
@@ -91,9 +97,46 @@ function pickProxy(u: URL): Proxy | undefined {
   return { url: p, auth };
 }
 
+// The eight 16-bit words of an IPv6 address (a zone id after "%" is dropped; a dotted tail gives two words).
+function ipv6Words(address: string): number[] {
+  const zone = address.indexOf("%");
+  const a = zone < 0 ? address : address.slice(0, zone);
+  const words = (part: string): number[] => {
+    if (part === "") return [];
+    const out: number[] = [];
+    for (const w of part.split(":")) {
+      if (w.includes(".")) {
+        const q = w.split(".").map(Number) as [number, number, number, number];
+        out.push(q[0] * 256 + q[1], q[2] * 256 + q[3]);
+      } else out.push(parseInt(w, 16));
+    }
+    return out;
+  };
+  const gap = a.indexOf("::");
+  if (gap < 0) return words(a);
+  const head = words(a.slice(0, gap));
+  const tail = words(a.slice(gap + 2));
+  return [...head, ...new Array<number>(8 - head.length - tail.length).fill(0), ...tail];
+}
+
+function dotted(hi: number, lo: number): string {
+  return [hi >> 8, hi & 255, lo >> 8, lo & 255].join(".");
+}
+
+// D-SSRF-RANGES-1: the IPv4 address a NAT64 (64:ff9b::/96) or 6to4 (2002::/16) address carries, else undefined.
+function embeddedIpv4(address: string): string | undefined {
+  const w = ipv6Words(address);
+  if (w[0] === 0x64 && w[1] === 0xff9b && w[2] === 0 && w[3] === 0 && w[4] === 0 && w[5] === 0) {
+    return dotted(w[6] as number, w[7] as number);
+  }
+  if (w[0] === 0x2002) return dotted(w[1] as number, w[2] as number);
+  return undefined;
+}
+
 function checkAddress(hostname: string, address: string): void {
   const family = isIP(address);
-  if (family === 0 || BLOCKED.check(address, family === 4 ? "ipv4" : "ipv6")) {
+  const inner = family === 6 ? embeddedIpv4(address) : undefined;
+  if (family === 0 || BLOCKED.check(address, family === 4 ? "ipv4" : "ipv6") || (inner !== undefined && BLOCKED.check(inner, "ipv4"))) {
     throw new CtxError("SSRF", { host: hostname });
   }
 }
