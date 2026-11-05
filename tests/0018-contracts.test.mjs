@@ -471,7 +471,17 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
       assert.equal(C.V1_TMP_PREFIX, "context-mode-");
       assert.equal(C.PI_GIT_PACKAGE, "git:github.com/mksglu/context-mode@release");
       assert.equal(C.OPENCODE_GIT_SPEC, "git+https://github.com/mksglu/context-mode.git#release");
-      assert.equal(C.UPGRADE_HOST_COMMAND.codex, "rewrite config.toml's [mcp_servers.context-mode*] block to the v2 entry, then restart Codex");
+      // D-R44-UPGRADE-NATIVE-1 (#1309): every agent has its own update command; none names a branch or a dist-tag.
+      assert.equal(C.UPGRADE_HOST_COMMAND.codex, "codex plugin marketplace upgrade context-mode");
+      assert.equal(C.UPGRADE_HOST_COMMAND.pi, "pi update --extensions");
+      assert.equal(C.UPGRADE_HOST_COMMAND.opencode, "opencode plugin update");
+      for (const id of AGENT_IDS) {
+        const cmd = C.UPGRADE_HOST_COMMAND[id];
+        assert.equal(typeof cmd, "string", id);
+        for (const bad of ["#release", "@release", "@next", "git clone"]) assert.ok(!cmd.includes(bad), `${id}: ${cmd}`);
+      }
+      assert.equal(C.OPENCODE_NPM_LATEST, "context-mode@latest");
+      assert.equal(C.PI_NPM_LATEST, "npm:context-mode@latest");
     });
 
     test("[M5] Pi/OpenCode entry ids (impl/12 A21, A28)", () => {
@@ -506,7 +516,7 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
       assert.equal(C.HASH_ENCODING, "hex");
       assert.equal(C.OWNER_STOP_EXT, ".stop");
       assert.equal(C.UPGRADE_DATA_DELETED, "user data deleted");
-      assert.deepEqual([...C.OPS_SPLIT_FILES].sort(), ["doctor-config.ts", "doctor-db.ts", "doctor-env.ts", "doctor-heal.ts", "doctor-hook.ts", "host-write.ts", "plugin-swap.ts", "release-fetch.ts", "uninstall.ts", "v1-remove.ts", "verify-sums.ts"]);
+      assert.deepEqual([...C.OPS_SPLIT_FILES].sort(), ["doctor-config.ts", "doctor-db.ts", "doctor-env.ts", "doctor-heal.ts", "doctor-hook.ts", "host-write.ts", "plugin-swap.ts", "uninstall.ts", "v1-remove.ts", "verify-sums.ts"]);
     });
 
     test("[M5] D-INST-7: the temp-file finding text says it is report only and nothing needs doing", () => {

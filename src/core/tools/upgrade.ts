@@ -1,15 +1,12 @@
 // impl/07 §6 (ctx_upgrade), ADR-0010 §4, ADR-0011, DECISIONS-r3 Q16 Q21; DEVIATIONS D-M5-U1-1..6, D-M5-U2..U7, D-M5-U8-1..3.
-// Thin handler: step 0 plugin-root check, then upgrade (host row or git checkout fetch -> verify -> swap,
-// host config regeneration, v1 removal) or uninstall (ops/uninstall.ts). Reply: change table + "restart needed".
-import { existsSync, realpathSync, rmSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+// Thin handler: step 0 plugin-root check, then upgrade (the agent's own update command, host config regeneration,
+// v1 removal) or uninstall (ops/uninstall.ts). Reply: change table + "restart needed".
+// D-R44-UPGRADE-NATIVE-1 (#1309): no git clone; every agent updates with its own command (UPGRADE_HOST_COMMAND).
 import { z } from "zod/v4";
 import {
-  PLUGIN_CURRENT_LINK, RELEASE_REPO_URL, TABLE_CELL_SEP, TABLE_PIPE,
-  TABLE_PIPE_ESCAPED, TABLE_ROW_END, TABLE_ROW_START, UPGRADE_CACHE_AREA, UPGRADE_CHECKOUT_AREA, UPGRADE_DEFAULT_MODE,
-  UPGRADE_GIT_CHECKOUT_AGENTS, UPGRADE_HOST_AREA, UPGRADE_HOST_COMMAND, UPGRADE_HOST_MANUAL, UPGRADE_MODES,
-  UPGRADE_NOT_FOUND, UPGRADE_PLUGIN_ROOT_AREA, UPGRADE_REMOVED, UPGRADE_RESTART_LINE, UPGRADE_TABLE_HEADER,
-  UPGRADE_TABLE_RULE,
+  TABLE_CELL_SEP, TABLE_PIPE, TABLE_PIPE_ESCAPED, TABLE_ROW_END, TABLE_ROW_START, UPGRADE_DEFAULT_MODE,
+  UPGRADE_HOST_AREA, UPGRADE_HOST_COMMAND, UPGRADE_MODES, UPGRADE_NOT_FOUND, UPGRADE_PLUGIN_ROOT_AREA,
+  UPGRADE_RESTART_LINE, UPGRADE_TABLE_HEADER, UPGRADE_TABLE_RULE,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { AdapterRow, CtxUpgradeInput, ProjectContext, ToolContext, ToolReply, UpgradeChangeRow } from "../contracts/types.ts";
@@ -19,11 +16,8 @@ import { detectV1 } from "../ops/detect-v1.ts";
 import { regenerateHostConfig, type HostFileWriter } from "../ops/host-write.ts";
 import { ownBundleDir } from "../ops/bundle-dir.ts";
 import { resolvePluginRoot } from "../ops/plugin-root.ts";
-import { swapPluginCurrent, type PluginSwapResult } from "../ops/plugin-swap.ts";
-import { fetchRelease } from "../ops/release-fetch.ts";
 import { runUninstall } from "../ops/uninstall.ts";
 import { removeV1, type V1Removal } from "../ops/v1-remove.ts";
-import { verifySums } from "../ops/verify-sums.ts";
 import { unknownField } from "./search.ts";
 
 export type { CtxUpgradeInput } from "../contracts/types.ts";
@@ -33,13 +27,11 @@ export const ctxUpgradeSchema = z.object({
   confirmDelete: z.boolean().optional(),
 }, { error: unknownField }).strict();
 
-/** What the handler takes from its ToolContext and process; tests pass a temp HOME, a local release repo and a
- *  failing writer (D-M5-U8-1). */
+/** What the handler takes from its ToolContext and process; tests pass a temp HOME and a failing writer (D-M5-U8-1). */
 export interface UpgradeDeps {
   project: Pick<ProjectContext, "projectKey" | "worktree" | "agent">;
   env: NodeJS.ProcessEnv;
   signal: AbortSignal;
-  releaseUrl: string;
   write?: HostFileWriter;
 }
 
@@ -66,52 +58,23 @@ function pluginRootRow(adapter: AdapterRow, env: NodeJS.ProcessEnv): UpgradeChan
   return root === own ? [] : [row(UPGRADE_PLUGIN_ROOT_AREA, root, own)];
 }
 
-function isCurrent(agentDir: string, dir: string): boolean {
-  const link = join(agentDir, PLUGIN_CURRENT_LINK);
-  return existsSync(link) && realpathSync.native(link) === realpathSync.native(dir);
-}
-
-interface Checkout { rows: UpgradeChangeRow[]; agentDir: string; swap: PluginSwapResult; }
-
-// Step 4 git checkout (pi, opencode): fetch -> verify -> swap. A fetched tree that fails SHA256SUMS is removed
-// unless `current` already points at it, then BUNDLE_HASH_MISMATCH propagates.
-async function checkout(adapter: AdapterRow, deps: UpgradeDeps): Promise<Checkout> {
-  const fetched = await fetchRelease(adapter.id, deps.releaseUrl, deps.env, deps.signal);
-  const agentDir = dirname(fetched.dir);
-  try {
-    verifySums(fetched.dir);
-  } catch (err) {
-    if (!isCurrent(agentDir, fetched.dir)) rmSync(fetched.dir, { recursive: true, force: true });
-    throw err;
-  }
-  const swap = swapPluginCurrent(agentDir, fetched.sha);
-  const rows = [row(UPGRADE_CHECKOUT_AREA, swap.previous ?? "", swap.current)];
-  for (const dir of swap.removed) rows.push(row(UPGRADE_CACHE_AREA, dir, UPGRADE_REMOVED));
-  return { rows, agentDir, swap };
-}
-
 function hostRow(adapter: AdapterRow): UpgradeChangeRow {
-  return row(UPGRADE_HOST_AREA, "", UPGRADE_HOST_COMMAND[adapter.id] ?? UPGRADE_HOST_MANUAL);
+  return row(UPGRADE_HOST_AREA, "", UPGRADE_HOST_COMMAND[adapter.id]);
 }
 
-// Steps 4-7. Any failure after the swap points `current` back at the kept generation; any failure after v1
-// removal puts every removed path back. Host config writes roll back on their own (host-write.ts).
-async function upgrade(adapter: AdapterRow, deps: UpgradeDeps, home: string): Promise<UpgradeChangeRow[]> {
-  let done: Checkout | null = null;
+// Steps 4-7. Step 4 is the agent's own update command (the user runs it); step 5 rewrites only context-mode's own
+// entries; a failure after v1 removal puts every removed path back. Host config writes roll back on their own.
+function upgrade(adapter: AdapterRow, deps: UpgradeDeps, home: string): UpgradeChangeRow[] {
   let removal: V1Removal | null = null;
   try {
-    const step4 = UPGRADE_GIT_CHECKOUT_AGENTS.includes(adapter.id)
-      ? (done = await checkout(adapter, deps)).rows
-      : [hostRow(adapter)];
     const step5 = regenerateHostConfig(adapter, home, { env: deps.env, write: deps.write });
     const findings = detectV1(adapter.id, home, { project: deps.project.worktree, piAgentDir: piAgentDirOf(deps.env, home), claudeDir: claudeDirOf(deps.env, home), geminiDir: geminiDirOf(deps.env, home), copilotDir: copilotDirOf(deps.env, home), kiroDir: kiroDirOf(deps.env, home), opencodeDir: opencodeDirOf(deps.env, home) });
     removal = removeV1(adapter.id, findings);
-    const rows = [...step4, ...step5, ...removal.rows];
+    const rows = [hostRow(adapter), ...step5, ...removal.rows];
     removal.commit();
     return rows;
   } catch (err) {
     removal?.rollback();
-    if (done !== null && done.swap.previous !== null) swapPluginCurrent(done.agentDir, basename(done.swap.previous));
     throw err;
   }
 }
@@ -135,13 +98,13 @@ export async function runUpgrade(input: CtxUpgradeInput, deps: UpgradeDeps): Pro
     const result = runUninstall({ adapter, project: deps.project, env: deps.env, confirmDelete: input.confirmDelete === true });
     rows.push(...result.rows);
   } else {
-    rows.push(...await upgrade(adapter, deps, home));
+    rows.push(...upgrade(adapter, deps, home));
   }
   return { text: renderTable(rows) + "\n\n" + UPGRADE_RESTART_LINE, isError: false, sandboxBytes: 0 };
 }
 
 async function handler(input: CtxUpgradeInput, ctx: ToolContext): Promise<ToolReply> {
-  return runUpgrade(input, { project: ctx.project, env: process.env, signal: ctx.signal, releaseUrl: RELEASE_REPO_URL });
+  return runUpgrade(input, { project: ctx.project, env: process.env, signal: ctx.signal });
 }
 
 export const ctxUpgrade = Object.freeze({

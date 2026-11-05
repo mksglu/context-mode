@@ -111,12 +111,13 @@ describe("ADR-0011: detect v1", { concurrency: CONC }, () => {
     assert.equal(detectV1("gemini", home, { tmp: tmp(t) }).length, 2);
   });
 
-  test("[M5] detect-v1/pi-npm-entry-found-via-PI_CODING_AGENT_DIR and after the git entry (#1035, #901)", (t) => {
+  test("[M5] detect-v1/pi-npm-entry-found-via-PI_CODING_AGENT_DIR and after the git entry (#1035, #901, #1309)", (t) => {
     const home = tmp(t);
     const piDir = tmp(t);
     writeFileSync(path.join(piDir, "settings.json"),
       JSON.stringify({ packages: ["git:github.com/mksglu/context-mode@release", "npm:context-mode"] }), "utf8");
-    assert.deepEqual(detectV1("pi", home, { piAgentDir: piDir, tmp: tmp(t) }).map((f) => f.path), ["packages.1"]);
+    // D-R44-DOCTOR-D4-GIT-1 (#1309): the release-branch git entry is an old entry too (the branch is gone).
+    assert.deepEqual(detectV1("pi", home, { piAgentDir: piDir, tmp: tmp(t) }).map((f) => f.path), ["packages.0", "packages.1"]);
     assert.deepEqual(detectV1("pi", home, { tmp: tmp(t) }), [], "default <home>/.pi/agent has nothing");
   });
 
@@ -303,9 +304,10 @@ describe("ADR-0011: remove v1", { concurrency: CONC }, () => {
     const file = put(path.join(home, ".pi", "agent", "settings.json"),
       "{\n  // my note\n  \"packages\": [\"npm:context-mode\", \"npm:other\", {\"source\": \"npm:context-mode\"}, \"git:github.com/mksglu/context-mode@release\"],\n  \"theme\": \"dark\"\n}\n");
     const findings = detectV1("pi", home, { tmp: tmp(t) });
-    assert.equal(findings.length, 2);
+    assert.equal(findings.length, 3);
     const r = removeV1("pi", findings);
-    assert.deepEqual(r.rows.map((x) => x.after), [UPGRADE_REMOVED, UPGRADE_REMOVED]);
+    // #1309: the git entry is report only here; ctx_upgrade step 5 swaps it for npm:context-mode@latest first.
+    assert.deepEqual(r.rows.map((x) => x.after), [UPGRADE_REMOVED, UPGRADE_REMOVED, UPGRADE_REPORT_ONLY]);
     const text = readFileSync(file, "utf8");
     assert.ok(text.includes("// my note"));
     assert.ok(text.includes("\"theme\": \"dark\""));

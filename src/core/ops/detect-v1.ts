@@ -11,7 +11,7 @@ import { hostText } from "./host-text.ts";
 import {
   AGENT_HOME_DIR, CLAUDE_USER_CONFIG_FILE, CONFIG_JSON_FILE, CONFIG_TOML_FILE, DATA_ROOT, GITHUB_DIR_NAME,
   HOOKS_JSON_FILE, HOOKS_KEY, KIRO_AGENT_FILE, KIRO_AGENT_FILE_EXT, KIRO_AGENT_NAME_KEY, KIRO_AGENTS_DIR,
-  KIRO_STEERING_FILE, MCP_SERVERS_KEY, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY,
+  KIRO_STEERING_FILE, MCP_SERVERS_KEY, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY, PI_GIT_PACKAGE,
   OWN_HOOK_FILE, PI_AGENT_DIR, PI_CURRENT_MAJOR, PI_NODE_MODULES_DIR, PI_NPM_DIR, PI_PACKAGE_JSON_FILE, PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, SERVER_KEY, SETTINGS_FILE, STATUS_LINE_KEY,
   V1_BIN_COMMAND, V1_CACHE_HEAL_EXTS, V1_CACHE_HEAL_NAME, V1_CODEX_HOOK_COMMAND, V1_CODEX_HOOKS_DIR,
   V1_DATA_DIR_NAME, V1_DATA_ROOT_ENTRIES, V1_HOOK_COMMAND, V1_HOOKS_DIR_NAME, V1_OPENCODE_PLUGIN_SPEC,
@@ -276,6 +276,8 @@ function scanPi(piAgentDir: string, agentHome: string, out: V1Finding[]): void {
   listOf(isObj(doc) ? doc[PI_PACKAGES_KEY] : undefined).forEach((pkg, i) => {
     const spec = isObj(pkg) ? pkg[PI_PACKAGE_SOURCE_KEY] : pkg;
     if (spec === V1_PI_PACKAGE && !piNpmIsCurrent(piAgentDir)) out.push(finding(file, keyPath(PI_PACKAGES_KEY, i), V1_REASON.piNpm));
+    // D-R44-UPGRADE-NATIVE-1 (#1309): the release branch is gone, so the git entry can no longer update.
+    if (spec === PI_GIT_PACKAGE) out.push(finding(file, keyPath(PI_PACKAGES_KEY, i), V1_REASON.piGit));
   });
   dataDir(join(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);
 }
@@ -287,6 +289,7 @@ function scanOpencode(agentHome: string, out: V1Finding[]): void {
     if (!isObj(doc) || !Array.isArray(doc[OPENCODE_PLUGIN_KEY])) continue;
     (doc[OPENCODE_PLUGIN_KEY] as unknown[]).forEach((spec, i) => {
       if (spec === V1_OPENCODE_PLUGIN_SPEC) out.push(finding(file, keyPath(OPENCODE_PLUGIN_KEY, i), V1_REASON.opencodePlugin));
+      if (spec === OPENCODE_GIT_SPEC) out.push(finding(file, keyPath(OPENCODE_PLUGIN_KEY, i), V1_REASON.opencodeGit)); // #1309
     });
     return; // ADR-0011: the first config found with .plugin[]
   }

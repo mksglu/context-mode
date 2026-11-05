@@ -1393,7 +1393,6 @@ describe("ADR-0008 privacy: network call sites in src (D-PRIVACY-NET-1)", { conc
     "src/cli/commands.ts": ['spawnSync("gh"', "spawnSync(npm"], // gh issue create after a keypress (debug report); npm i -g in `context-mode upgrade`
     "src/core/contracts/constants.ts": ["fetch(", "GIT_LS_REMOTE", "GIT_CLONE_ARGS"], // the constants themselves (FETCH_CALL is a deny pattern)
     "src/core/ops/doctor-env.ts": ["fetch(", "GIT_LS_REMOTE"], // doctor D1: GET registry.npmjs.org/-/package/context-mode/dist-tags; after an npm failure, git ls-remote --tags --refs <release repo> v* (D-DOCTOR-D1-TAGS-1)
-    "src/core/ops/release-fetch.ts": ["GIT_CLONE_ARGS"], // ctx_upgrade: git clone --depth 1 of the release branch
     "src/core/sandbox/fetch.ts": ["node:http", "node:net", "node:tls", "node:dns"], // ctx_index / ctx_fetch of a URL the agent asks for
   };
   const codeLines = (text) => text.split("\n").filter((l) => {
@@ -1427,7 +1426,7 @@ describe("ADR-0008 privacy: network call sites in src (D-PRIVACY-NET-1)", { conc
 
   test("README names the zero telemetry line and each allowed call site", () => {
     const readme = readFileSync(join(ROOT, "README.md"), "utf8");
-    for (const need of ["Zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "git clone", "gh issue create", "npm i -g context-mode", "D-PRIVACY-NET-1"]) {
+    for (const need of ["Zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "gh issue create", "npm i -g context-mode", "D-PRIVACY-NET-1"]) {
       assert.ok(readme.includes(need), `README lacks ${need}`);
     }
   });

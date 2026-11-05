@@ -27,7 +27,6 @@ import { checkHookRoundTrip, codexHookJournaled, payloadFor } from "../src/core/
 import { DDL } from "../src/core/store/schema.ts";
 import { healD8 } from "../src/core/ops/db-heal.ts";
 import { writeOwnerPid } from "../src/core/store/owners.ts";
-import { fetchRelease } from "../src/core/ops/release-fetch.ts";
 import { CtxError } from "../src/core/contracts/errors.ts";
 import { buildReport } from "../src/core/ops/report.ts";
 import { verifySums } from "../src/core/ops/verify-sums.ts";
@@ -1561,151 +1560,6 @@ describe("ADR-0010 D8 heal: lossless heal and rename-aside", { concurrency: CONC
   });
 });
 
-describe("ADR-0010 upgrade step 4a: release fetch", { concurrency: CONC }, () => {
-  // Spec: docs/architecture/modules/07-tools-ops.md §6 step 4a, ADR-0010 §3, DEVIATIONS D-M5-U1-1, D-M5-U2-1.
-  // fetchRelease(agent, url, env, signal) clones one branch (RELEASE_BRANCH) of url with depth 1 into
-  // <DATA_ROOT>/plugins/<agent>/.fetch-<pid>, reads HEAD, renames the dir to <sha>. Local repo fixture, no network.
-
-
-  function tmp(t) {
-    const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "cm-release-fetch-")));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
-    return dir;
-  }
-
-  function git(cwd, ...args) {
-    return execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" }).trim();
-  }
-
-  // A repo whose `branch` holds one file; returns { url, sha }.
-  function fixtureRepo(root, branch) {
-    const repo = path.join(root, "origin");
-    mkdirSync(repo);
-    git(repo, "init", "-q", "-b", branch);
-    writeFileSync(path.join(repo, "server.bundle.mjs"), "export {};\n");
-    git(repo, "add", ".");
-    git(repo, "commit", "-q", "-m", "release");
-    return { url: "file://" + repo, sha: git(repo, "rev-parse", "HEAD") };
-  }
-
-  function envFor(home) {
-    return { HOME: home, USERPROFILE: home, PATH: process.env.PATH };
-  }
-
-  function agentDir(home, agent) {
-    return path.join(home, ".context-mode", "plugins", agent);
-  }
-
-  test("[M5] release-fetch/clones-release-branch-into-sha-dir", async (t) => {
-    const root = tmp(t);
-    const { url, sha } = fixtureRepo(root, "release");
-    const home = path.join(root, "home");
-    mkdirSync(home);
-    const r = await fetchRelease("pi", url, envFor(home), new AbortController().signal);
-    assert.equal(r.sha, sha);
-    assert.equal(r.dir, path.join(agentDir(home, "pi"), sha));
-    assert.equal(readFileSync(path.join(r.dir, "server.bundle.mjs"), "utf8"), "export {};\n");
-    assert.equal(git(r.dir, "rev-parse", "--abbrev-ref", "HEAD"), "release");
-    assert.deepEqual(readdirSync(agentDir(home, "pi")), [sha]);
-  });
-
-  test("[M5] release-fetch/missing-release-branch-is-FETCH_FAILED-and-leaves-no-fetch-dir", async (t) => {
-    const root = tmp(t);
-    const { url } = fixtureRepo(root, "main");
-    const home = path.join(root, "home");
-    mkdirSync(home);
-    await assert.rejects(fetchRelease("opencode", url, envFor(home), new AbortController().signal), (e) => {
-      assert.ok(e instanceof CtxError);
-      assert.equal(e.code, "FETCH_FAILED");
-      assert.ok(String(e.vars.code).startsWith("git exit 128: "), String(e.vars.code));
-      return true;
-    });
-    assert.deepEqual(readdirSync(agentDir(home, "opencode")), []);
-  });
-
-  test("[M5] release-fetch/same-sha-already-present-returns-it-unchanged", async (t) => {
-    const root = tmp(t);
-    const { url, sha } = fixtureRepo(root, "release");
-    const home = path.join(root, "home");
-    mkdirSync(home);
-    const first = await fetchRelease("pi", url, envFor(home), new AbortController().signal);
-    writeFileSync(path.join(first.dir, "marker"), "kept");
-    const second = await fetchRelease("pi", url, envFor(home), new AbortController().signal);
-    assert.equal(second.dir, first.dir);
-    assert.equal(readFileSync(path.join(second.dir, "marker"), "utf8"), "kept");
-    assert.deepEqual(readdirSync(agentDir(home, "pi")), [sha]);
-  });
-
-  test("[M5] release-fetch/argv-form-and-no-prompt-env", async (t) => {
-    const root = tmp(t);
-    const home = path.join(root, "home");
-    const bin = path.join(root, "bin");
-    mkdirSync(home);
-    mkdirSync(bin);
-    const log = path.join(root, "argv.log");
-    // A fake git: logs its argv (PATH = bin only, so on Windows the shim is the one hit; printf is an sh builtin) and GIT_TERMINAL_PROMPT, then fails, so the clone never runs.
-    writeFileSync(path.join(bin, "git"), `#!/bin/sh\nprintf '%s\\n' "$GIT_TERMINAL_PROMPT" "$@" > '${log}'\nexit 3\n`);
-    chmodSync(path.join(bin, "git"), 0o755);
-    const url = "https://example.invalid/a b;$(x).git";
-    await assert.rejects(fetchRelease("pi", url, { HOME: home, USERPROFILE: home, PATH: bin }, new AbortController().signal), (e) => {
-      assert.equal(e.code, "FETCH_FAILED");
-      assert.equal(e.vars.code, "git exit 3: ");
-      return true;
-    });
-    const lines = readFileSync(log, "utf8").split("\n");
-    lines.pop();
-    const fetchDir = path.join(agentDir(home, "pi"), ".fetch-" + process.pid);
-    assert.deepEqual(lines, ["0", "clone", "--depth", "1", "--branch", "release", url, fetchDir]);
-    assert.equal(existsSync(fetchDir), false);
-  });
-
-  test("[M5] release-fetch/git-not-on-PATH-is-FETCH_FAILED-git-did-not-start", async (t) => {
-    const root = tmp(t);
-    const home = path.join(root, "home");
-    mkdirSync(home);
-    const empty = path.join(root, "empty-bin");
-    mkdirSync(empty);
-    await assert.rejects(fetchRelease("pi", "file:///nowhere", { HOME: home, USERPROFILE: home, PATH: empty }, new AbortController().signal), (e) => {
-      assert.equal(e.code, "FETCH_FAILED");
-      assert.equal(e.vars.code, "git did not start");
-      return true;
-    });
-    assert.deepEqual(readdirSync(agentDir(home, "pi")), []);
-  });
-
-  test("[M5] release-fetch/stale-fetch-dir-of-same-pid-is-replaced", async (t) => {
-    const root = tmp(t);
-    const { url, sha } = fixtureRepo(root, "release");
-    const home = path.join(root, "home");
-    const stale = path.join(agentDir(home, "pi"), ".fetch-" + process.pid);
-    mkdirSync(stale, { recursive: true });
-    writeFileSync(path.join(stale, "junk"), "x");
-    const r = await fetchRelease("pi", url, envFor(home), new AbortController().signal);
-    assert.equal(r.sha, sha);
-    assert.equal(existsSync(path.join(r.dir, "junk")), false);
-    assert.deepEqual(readdirSync(agentDir(home, "pi")), [sha]);
-  });
-
-  // DEVIATIONS D-WIN-ATOMIC-2: the final .fetch-<pid> -> <sha> dir rename fails with EPERM on Windows while
-  // antivirus scans the fresh clone. Fake platform + injected rename: runs on every OS.
-  test("[win] release-fetch/retries-EPERM-on-dir-rename", async (t) => {
-    const root = tmp(t);
-    const { url, sha } = fixtureRepo(root, "release");
-    const home = path.join(root, "home");
-    mkdirSync(home);
-    const calls = { n: 0 };
-    const rename = (a, b) => {
-      calls.n += 1;
-      if (calls.n <= 2) throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" });
-      renameSync(a, b);
-    };
-    const r = await fetchRelease("pi", url, envFor(home), new AbortController().signal, { platform: "win32", rename, sleep: () => {} });
-    assert.equal(calls.n, 3);
-    assert.equal(r.sha, sha);
-    assert.deepEqual(readdirSync(agentDir(home, "pi")), [sha]);
-  });
-});
-
 describe("ADR-0010 doctor report text", { concurrency: CONC }, () => {
   // Spec: docs/architecture/modules/07-tools-ops.md (exports buildReport). 14a GP11/redact-secrets-in-debug-report
   // (#1144) and GP11/redact-secrets-in-doctor-output (#1141): a token-shaped env value must never
@@ -2123,11 +1977,9 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
   // DEVIATIONS D-M5-U7-4, D-M5-U8-1..3. GP11 rows: keep-user-hooks-on-upgrade (#1239 #1235),
   // opencode-merge-sibling-plugins (#1160), v1 entries removed, no baked paths, rollback works, change table.
   // D-M5-U8-1: the handler takes (input, ToolContext) (impl/07 §6 Export); tests drive runUpgrade(input, deps)
-  // with a temp HOME, a local release repo and an injected failing writer.
+  // with a temp HOME and an injected failing writer.
 
 
-  // D-WIN-JUNCTION-1: POSIX stores the bare sha, a Windows junction stores the absolute <agentDir>/<sha>.
-  const linkText = (agentDir, sha) => (process.platform === "win32" ? path.join(agentDir, sha) : sha);
 
   function tmp(t) {
     const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "cm-upgrade-")));
@@ -2140,25 +1992,8 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
       project: { projectKey: "0123456789abcdef", worktree: path.join(home, "repo"), agent },
       env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH },
       signal: new AbortController().signal,
-      releaseUrl: "file:///nonexistent",
       ...extra,
     };
-  }
-
-  function git(cwd, ...args) {
-    return execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" }).trim();
-  }
-
-  // A local repo whose `release` branch holds server.mjs and a SHA256SUMS for it (good = true) or a wrong one.
-  function releaseRepo(root, body, good = true) {
-    const repo = path.join(root, "origin");
-    if (!existsSync(repo)) { mkdirSync(repo); git(repo, "init", "-q", "-b", "release"); }
-    writeFileSync(path.join(repo, "server.mjs"), body);
-    const hex = createHash("sha256").update(good ? body : body + "x").digest("hex");
-    writeFileSync(path.join(repo, "SHA256SUMS"), hex + "  server.mjs\n");
-    git(repo, "add", ".");
-    git(repo, "commit", "-q", "-m", body);
-    return { url: "file://" + repo, sha: git(repo, "rev-parse", "HEAD") };
   }
 
   test("[M5] upgrade/tool-shape: ctx_upgrade is a write tool with a strict schema", () => {
@@ -2242,46 +2077,85 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "opencode.json");
     writeFileSync(file, JSON.stringify({ plugin: ["p1", "p2", "p3"] }), "utf8");
-    const { url } = releaseRepo(home, "export {};\n");
-    await runUpgrade({ mode: "upgrade" }, deps(home, "opencode", { releaseUrl: url }));
+    await runUpgrade({ mode: "upgrade" }, deps(home, "opencode"));
     const after = JSON.parse(readFileSync(file, "utf8"));
-    for (const p of ["p1", "p2", "p3"]) assert.ok(after.plugin.includes(p));
+    assert.deepEqual(after.plugin, ["p1", "p2", "p3"], "native list is never added to");
   });
 
-  test("[M5] upgrade/git-checkout: fetch, verify, swap current, keep one rollback generation", async (t) => {
+  // D-R44-UPGRADE-NATIVE-1 (#1309): the release branch is gone. ctx_upgrade clones nothing and names each agent's
+  // own update command; an old release-branch entry becomes the npm spec the agent's updater follows.
+  for (const [agent, cmd] of [
+    ["claude-code", "claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode"],
+    ["codex", "codex plugin marketplace upgrade context-mode"],
+    ["gemini", "gemini extensions update context-mode"],
+    ["qwen", "qwen extensions update context-mode"],
+    ["pi", "pi update --extensions"],
+    ["opencode", "opencode plugin update"],
+    ["copilot-cli", "npm i -g context-mode && context-mode setup --agents copilot-cli"],
+    ["vscode", "npm i -g context-mode && context-mode setup --agents vscode"],
+    ["kiro", "npm i -g context-mode && context-mode setup --agents kiro"],
+    ["zcode", "npm i -g context-mode && context-mode setup --agents zcode"],
+  ]) {
+    test(`[M5] upgrade/native-update-command ${agent} (#1309)`, async (t) => {
+      const home = tmp(t);
+      const reply = await runUpgrade({}, deps(home, agent, { env: { HOME: home, USERPROFILE: home, PATH: "" } }));
+      assert.ok(reply.text.includes("| host update |  | " + cmd + " |"), reply.text);
+      for (const bad of ["#release", "@release", "@next", "git clone"]) assert.ok(!reply.text.includes(bad), reply.text);
+      assert.ok(!existsSync(path.join(home, ".context-mode", "plugins")), "no clone dir");
+    });
+  }
+
+  test("[M5] upgrade/opencode-release-git-entry-becomes-npm-latest, siblings kept (#1309)", async (t) => {
     const home = tmp(t);
-    const agentDir = path.join(home, ".context-mode", "plugins", "pi");
-    const one = releaseRepo(home, "export const v = 1;\n");
-    const r1 = await runUpgrade({}, deps(home, "pi", { releaseUrl: one.url }));
-    assert.equal(readlinkSync(path.join(agentDir, "current")), linkText(agentDir, one.sha));
-    assert.ok(r1.text.includes("| plugin checkout |  | " + path.join(agentDir, one.sha) + " |"), r1.text);
-    const two = releaseRepo(home, "export const v = 2;\n");
-    await runUpgrade({}, deps(home, "pi", { releaseUrl: two.url }));
-    assert.equal(readlinkSync(path.join(agentDir, "current")), linkText(agentDir, two.sha));
-    assert.ok(existsSync(path.join(agentDir, one.sha)), "previous generation kept for rollback");
+    const dir = path.join(home, ".config", "opencode");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "opencode.json");
+    writeFileSync(file, JSON.stringify({ plugin: ["p1", C.OPENCODE_GIT_SPEC, "p2"] }), "utf8");
+    await runUpgrade({}, deps(home, "opencode"));
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).plugin, ["p1", "context-mode@latest", "p2"]);
   });
 
-  test("[M5] upgrade/git-checkout: SHA256SUMS mismatch is BUNDLE_HASH_MISMATCH, current unchanged", async (t) => {
+  test("[M5] upgrade/opencode-release-git-entry-dropped-when-native-npm-entry-exists (#1309)", async (t) => {
     const home = tmp(t);
-    const agentDir = path.join(home, ".context-mode", "plugins", "pi");
-    const one = releaseRepo(home, "export const v = 1;\n");
-    await runUpgrade({}, deps(home, "pi", { releaseUrl: one.url }));
-    const bad = releaseRepo(home, "export const v = 2;\n", false);
-    await assert.rejects(() => runUpgrade({}, deps(home, "pi", { releaseUrl: bad.url })), (e) => e.code === "BUNDLE_HASH_MISMATCH");
-    assert.equal(readlinkSync(path.join(agentDir, "current")), linkText(agentDir, one.sha));
-    assert.ok(!existsSync(path.join(agentDir, bad.sha)), "a rejected tree is not left on disk");
+    const dir = path.join(home, ".config", "opencode");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "opencode.json");
+    writeFileSync(file, JSON.stringify({ plugin: [C.OPENCODE_GIT_SPEC, "context-mode@2.1.3"] }), "utf8");
+    await runUpgrade({}, deps(home, "opencode"));
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).plugin, ["context-mode@2.1.3"]);
   });
 
-  test("[M5] upgrade/git-checkout rollback: a failed config write points current back at the kept generation", async (t) => {
+  test("[M5] upgrade/pi-release-git-entry-becomes-npm-latest, object fields kept (#1309, pi-2)", async (t) => {
     const home = tmp(t);
-    const agentDir = path.join(home, ".context-mode", "plugins", "pi");
-    const one = releaseRepo(home, "export const v = 1;\n");
-    await runUpgrade({}, deps(home, "pi", { releaseUrl: one.url }));
-    const two = releaseRepo(home, "export const v = 2;\n");
-    writeFileSync(path.join(home, ".pi", "agent", "settings.json"), "{}", "utf8"); // the run must write its entry again
+    const dir = path.join(home, ".pi", "agent");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "settings.json");
+    writeFileSync(file, JSON.stringify({ packages: ["npm:other", { source: C.PI_GIT_PACKAGE, extensions: ["a"] }] }), "utf8");
+    await runUpgrade({}, deps(home, "pi"));
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).packages, ["npm:other", { source: "npm:context-mode@latest", extensions: ["a"] }]);
+  });
+
+  test("[M5] upgrade/pi-native-npm-entry-is-left-alone (#1309, pi-7)", async (t) => {
+    const home = tmp(t);
+    const dir = path.join(home, ".pi", "agent");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "settings.json");
+    const text = JSON.stringify({ packages: ["npm:context-mode@2.1.3"] });
+    writeFileSync(file, text, "utf8");
+    await runUpgrade({}, deps(home, "pi"));
+    assert.equal(readFileSync(file, "utf8"), text);
+  });
+
+  test("[M5] upgrade/rollback: a failed config write leaves the old entry in place", async (t) => {
+    const home = tmp(t);
+    const dir = path.join(home, ".pi", "agent");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "settings.json");
+    const text = JSON.stringify({ packages: [C.PI_GIT_PACKAGE] });
+    writeFileSync(file, text, "utf8");
     const write = () => { throw new Error("forced write failure"); };
-    await assert.rejects(() => runUpgrade({}, deps(home, "pi", { releaseUrl: two.url, write })));
-    assert.equal(readlinkSync(path.join(agentDir, "current")), linkText(agentDir, one.sha));
+    await assert.rejects(() => runUpgrade({}, deps(home, "pi", { write })));
+    assert.equal(readFileSync(file, "utf8"), text);
   });
 });
 

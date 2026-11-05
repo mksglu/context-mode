@@ -576,11 +576,11 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       const dir = path.join(home, ".config", "opencode");
       mkdirSync(dir, { recursive: true });
       const file = path.join(dir, "opencode.json");
-      writeFileSync(file, JSON.stringify({ plugin: ["p1", "p2", "p3"] }), "utf8");
+      writeFileSync(file, JSON.stringify({ plugin: ["p1", "p2", C.OPENCODE_GIT_SPEC, "p3"] }), "utf8");
       const rows = regenerateHostConfig(getAdapter("opencode"), home, { env: {} });
       const after = JSON.parse(readFileSync(file, "utf8"));
-      for (const p of ["p1", "p2", "p3"]) assert.ok(after.plugin.includes(p));
-      assert.equal(after.plugin.length, 4);
+      // #1309: the old release-branch entry becomes the npm spec in place; siblings and their order stay.
+      assert.deepEqual(after.plugin, ["p1", "p2", "context-mode@latest", "p3"]);
       assert.equal(rows.length, 1);
       assert.ok(rows[0].area.startsWith(file));
     });
@@ -592,21 +592,21 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       const json = path.join(dir, "opencode.json");
       const jsonc = path.join(dir, "opencode.jsonc");
       writeFileSync(json, JSON.stringify({ plugin: ["untouched"] }), "utf8");
-      writeFileSync(jsonc, '{\n  // mine\n  "plugin": ["context-mode", "p1"]\n}\n', "utf8");
+      writeFileSync(jsonc, `{\n  // mine\n  "plugin": [${JSON.stringify(C.OPENCODE_GIT_SPEC)}, "p1"]\n}\n`, "utf8");
       regenerateHostConfig(getAdapter("opencode"), home, { env: {} });
       assert.equal(readFileSync(json, "utf8"), JSON.stringify({ plugin: ["untouched"] }));
       const text = readFileSync(jsonc, "utf8");
       assert.ok(text.includes("// mine"));
       assert.ok(text.includes('"p1"'));
-      assert.ok(!text.includes('"context-mode",'), "bare v1 spec dropped");
+      assert.ok(text.includes('"context-mode@latest"') && !text.includes(C.OPENCODE_GIT_SPEC), "old git entry swapped in the .jsonc");
     });
 
     test("[M5] host-write/second-run-is-a-no-op", (t) => {
       const home = tmp(t);
       const dir = path.join(home, ".config", "opencode");
       mkdirSync(dir, { recursive: true });
-      writeFileSync(path.join(dir, "opencode.json"), JSON.stringify({ plugin: [] }), "utf8");
-      regenerateHostConfig(getAdapter("opencode"), home, { env: {} });
+      writeFileSync(path.join(dir, "opencode.json"), JSON.stringify({ plugin: [C.OPENCODE_GIT_SPEC] }), "utf8");
+      assert.equal(regenerateHostConfig(getAdapter("opencode"), home, { env: {} }).length, 1);
       assert.deepEqual(regenerateHostConfig(getAdapter("opencode"), home, { env: {} }), []);
     });
 
@@ -615,7 +615,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       const dir = path.join(home, ".config", "opencode");
       mkdirSync(dir, { recursive: true });
       const file = path.join(dir, "opencode.json");
-      const original = JSON.stringify({ plugin: ["p1"] });
+      const original = JSON.stringify({ plugin: ["p1", C.OPENCODE_GIT_SPEC] });
       writeFileSync(file, original, "utf8");
       const write = (f, text) => { writeFileSync(f, text.slice(0, 3), "utf8"); throw new Error("disk full"); };
       assert.throws(() => regenerateHostConfig(getAdapter("opencode"), home, { env: {}, write }), /disk full/);
@@ -693,7 +693,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       const dir = path.join(home, ".config", "opencode");
       mkdirSync(dir, { recursive: true });
       const file = path.join(dir, "opencode.json");
-      writeFileSync(file, JSON.stringify({ keep: 1, plugin: [] }), "utf8");
+      writeFileSync(file, JSON.stringify({ keep: 1, plugin: [C.OPENCODE_GIT_SPEC] }), "utf8");
       const rename = (a, b) => {
         if (b === file && a.includes(String(process.pid))) throw Object.assign(new Error("EBUSY: busy, rename"), { code: "EBUSY" });
         renameSync(a, b);
@@ -714,7 +714,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       const dir = path.join(home, ".config", "opencode");
       mkdirSync(dir, { recursive: true });
       const file = path.join(dir, "opencode.json");
-      writeFileSync(file, JSON.stringify({ plugin: ["p1"] }), "utf8");
+      writeFileSync(file, JSON.stringify({ plugin: ["p1", C.OPENCODE_GIT_SPEC] }), "utf8");
       const rename = () => { throw busy("EBUSY", "rename"); };
       assert.throws(
         () => regenerateHostConfig(getAdapter("opencode"), home, { env: {}, atomic: { platform: "win32", rename, sleep: () => {} } }),
@@ -727,7 +727,7 @@ describe("ADR-0019 host config (concurrent blocks)", { concurrency: CONC }, () =
       const dir = path.join(home, ".config", "opencode");
       mkdirSync(dir, { recursive: true });
       const file = path.join(dir, "opencode.json");
-      writeFileSync(file, JSON.stringify({ plugin: ["p1"] }), "utf8");
+      writeFileSync(file, JSON.stringify({ plugin: ["p1", C.OPENCODE_GIT_SPEC] }), "utf8");
       const unlinked = [];
       const unlink = (f) => { unlinked.push(f); throw busy("EBUSY", "unlink"); };
       const rows = regenerateHostConfig(getAdapter("opencode"), home, { env: {}, atomic: { platform: "win32", unlink, sleep: () => {} } });

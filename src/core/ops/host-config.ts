@@ -8,8 +8,9 @@ import { getStaticTOMLValue, parseTOML } from "toml-eslint-parser";
 import type { AST } from "toml-eslint-parser";
 import {
   AGENT_ARG, HOST_CONFIG_TEXT_PATH, HOST_NODE_COMMAND, JSON_INDENT_UNIT, JSONC_EXT,
-  MCP_ARGS_FIELD, MCP_COMMAND_FIELD, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY, OWN_MCP_ENTRY,
-  PI_GIT_PACKAGE, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_OPENCODE_PLUGIN_SPEC, V1_PATH_SEPS, V1_PI_PACKAGE,
+  MCP_ARGS_FIELD, MCP_COMMAND_FIELD, NPM_VERSION_SEP, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_NPM_LATEST,
+  OPENCODE_NPM_SPEC_PREFIX, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OWN_MCP_ENTRY, PI_GIT_PACKAGE, PI_NPM_LATEST,
+  PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, SERVER_ENTRY_FILE, TOML_EXT, V1_PATH_SEPS, V1_PI_PACKAGE,
   VSCODE_WORKSPACE_VAR, WORKSPACE_FOLDER_FLAG, EXE_SUFFIX,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
@@ -468,15 +469,27 @@ export function opencodePluginFile(): string {
   return ownBundleDir(); // D-OC2-BUNDLE-DIR-1: argv[1] is the host binary under OpenCode
 }
 
-function listTarget(key: string, own: string, v1: string, alt: readonly string[] = []): OwnTarget {
+/** D-R44-UPGRADE-NATIVE-1 (#1309, host audit pi-2): the old release-branch entry (`legacy`) becomes the npm spec
+ *  the agent's own updater follows (`swap` keeps the other fields of an object entry). Native entries are never
+ *  added or removed: when the list already holds an own npm entry (`isNative`), the legacy entry is dropped instead.
+ *  No legacy entry: the list is unchanged. */
+function listTarget(key: string, legacy: (x: unknown) => boolean, swap: (x: unknown) => unknown, isNative: (x: unknown) => boolean): OwnTarget {
   return {
     key: [key],
     next(current) {
-      const list = Array.isArray(current) ? current.filter((x) => x !== v1) : [];
-      return list.includes(own) || alt.some((a) => list.includes(a)) ? list : [...list, own];
+      if (!Array.isArray(current) || !current.some(legacy)) return current;
+      const keep = current.filter((x) => !legacy(x));
+      if (keep.some(isNative)) return keep;
+      const at = current.findIndex(legacy);
+      return current.flatMap((x, i) => (i === at ? [swap(x)] : legacy(x) ? [] : [x]));
     },
   };
 }
+
+const piSource = (x: unknown): unknown => (isPlainObject(x) ? x[PI_PACKAGE_SOURCE_KEY] : x);
+const opencodeSpec = (x: unknown): unknown => (isPlainObject(x) ? x[OPENCODE_PACKAGE_FIELD] : x);
+const isNpmOf = (bare: string) => (s: unknown): boolean => typeof s === "string" && (s === bare || s.startsWith(bare + NPM_VERSION_SEP));
+const swapField = (field: string, spec: string) => (x: unknown): unknown => (isPlainObject(x) ? { ...x, [field]: spec } : spec);
 
 // D-M5-O1-4: the own entries a host config holds per agent. Hook entries ship in the release's hook files
 // (build/manifests.ts); this module regenerates the MCP entry and the plugin/package list entry.
@@ -492,8 +505,16 @@ function ownTargets(agent: AgentId, accept: OwnAccept): OwnTarget[] {
       },
     }, ...(mcp.also ?? []).map(([key, value]): OwnTarget => ({ key, next: () => value }))];
   }
-  if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC, accept.listEntries)];
-  if (agent === "pi") return [listTarget(PI_PACKAGES_KEY, PI_GIT_PACKAGE, V1_PI_PACKAGE)];
+  if (agent === "opencode") {
+    const alt = accept.listEntries ?? [];
+    // The bare v1 spec stays a v1 finding (detect-v1.ts); the versioned npm form and the setup plugin path are native.
+    const native = (x: unknown): boolean => { const s = opencodeSpec(x); return typeof s === "string" && (s.startsWith(OPENCODE_NPM_SPEC_PREFIX) || alt.includes(s)); };
+    return [listTarget(OPENCODE_PLUGIN_KEY, (x) => opencodeSpec(x) === OPENCODE_GIT_SPEC, swapField(OPENCODE_PACKAGE_FIELD, OPENCODE_NPM_LATEST), native)];
+  }
+  if (agent === "pi") {
+    const npm = isNpmOf(V1_PI_PACKAGE);
+    return [listTarget(PI_PACKAGES_KEY, (x) => piSource(x) === PI_GIT_PACKAGE, swapField(PI_PACKAGE_SOURCE_KEY, PI_NPM_LATEST), (x) => npm(piSource(x)))];
+  }
   return [];
 }
 
