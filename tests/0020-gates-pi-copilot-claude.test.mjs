@@ -12,7 +12,7 @@ import { TOOL_ORDER } from "../src/core/contracts/constants.ts";
 import { buildRegistry, isOwnHookCommand, runDoctor, runRemove, runSetup } from "../src/setup/index.ts";
 import { createHash } from "node:crypto";
 import { generateManifests } from "../build/manifests.ts";
-import { renderSkill } from "../src/setup/registry.ts";
+import { renderSkill, SETUP_NODE } from "../src/setup/registry.ts";
 import { askCodexHome, codexHomeFromReply, codexKeyDir, codexTrustEntries } from "../src/setup/codex-trust.ts";
 
 describe("ADR-0020 pi gate (D-NI-PI-GATE-1)", () => {
@@ -172,7 +172,7 @@ describe("ADR-0020 gates (concurrent blocks)", { concurrency: CONC === true ? 2 
     // The stub spells source relative to COPILOT_HOME, as copilot 1.0.105 does. The host here is a stub that answers `copilot --server --stdio` hooks.discover from the files in COPILOT_HOME.
 
 
-    const NODE = process.execPath;
+    const NODE = SETUP_NODE; // D-STABLE-NODE-1: the node setup writes
     const REPO = path.resolve(import.meta.dirname, "..");
     const SKILLS = ["ctx-doctor", "ctx-stats", "ctx-upgrade"];
     const key = (source, event) => createHash("sha256").update(source + "\n" + event).digest("hex");

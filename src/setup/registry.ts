@@ -1,6 +1,7 @@
 // src/setup/registry.ts
 // ADR-0019 section 3: one check registry, built from src/adapters/table.ts, shared by setup, doctor and upgrade.
 // Every write path is absolute and listed; every command is absolute node + absolute bundle file (never npx).
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
@@ -154,8 +155,36 @@ const NATIVE_PLUGIN: Partial<Record<AgentId, NativePlugin>> = {
     enable: ["plugins", "enable", PLUGIN_ID] },
 };
 
+const CELLAR_SEGMENT = "/Cellar/";
+const NODE_BIN: readonly string[] = ["bin", "node"];
+
+export interface NodePathFs { exists: (p: string) => boolean; real: (p: string) => string; }
+const REAL_FS: NodePathFs = { exists: existsSync, real: (p) => realpathSync.native(p) };
+
+/** D-STABLE-NODE-1 (#1183, host audit copilot-cli-3/vscode-3): a Homebrew node runs from
+ *  <prefix>/Cellar/<formula>/<version>/bin/node, a dir `brew upgrade` removes. The links <prefix>/opt/<formula>/bin/node
+ *  and <prefix>/bin/node stay; setup writes the first one that exists and points at the same binary, else the path as is. */
+export function stableNodePath(execPath: string, fs: NodePathFs = REAL_FS): string {
+  const at = execPath.indexOf(CELLAR_SEGMENT);
+  if (at < 0) return execPath;
+  const prefix = execPath.slice(0, at);
+  const formula = execPath.slice(at + CELLAR_SEGMENT.length).split("/")[0] ?? "";
+  const target = fs.real(execPath);
+  for (const link of [[prefix, "opt", formula, ...NODE_BIN].join("/"), [prefix, ...NODE_BIN].join("/")]) {
+    try {
+      if (fs.exists(link) && fs.real(link) === target) return link;
+    } catch {
+      // a broken link is not a stable path: try the next one
+    }
+  }
+  return execPath;
+}
+
+/** The node setup writes into host configs (D-STABLE-NODE-1). */
+export const SETUP_NODE = stableNodePath(process.execPath);
+
 function serverCmd(ctx: SetupContext, id: AgentId): string[] {
-  return [process.execPath, path.join(ctx.pkgDir, SERVER_BUNDLE), AGENT_FLAG, id];
+  return [SETUP_NODE, path.join(ctx.pkgDir, SERVER_BUNDLE), AGENT_FLAG, id];
 }
 
 /** D4: the one v2 hook command string (quoted, so paths with spaces survive the host shell). */
@@ -278,7 +307,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     const id = row.id;
     const config = configFor(ctx, id);
     const hookFiles = hookFilesFor(ctx, id);
-    const runCommand = [process.execPath, path.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
+    const runCommand = [SETUP_NODE, path.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
     // D-C166-WIN-FIRE-1: Codex 0.166 runs a hook through the session shell, PowerShell on Windows, and PowerShell reads a
     // leading quoted path as a string. A bare `node` word runs in sh, cmd.exe and PowerShell; the doctor still runs the absolute node.
     // D-R44-QWEN-WIN-1 (host audit qwen-3): Qwen spawns a hook through cmd.exe /d /s /c (ComSpec) or PowerShell, so the same bare word.

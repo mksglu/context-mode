@@ -8,6 +8,7 @@ import path from "node:path";
 import { TOOL_ORDER, EXEC_TIMEOUT_MS } from "../src/core/contracts/constants.ts";
 import { generateManifests } from "../build/manifests.ts";
 import { runDoctor, runSetup } from "../src/setup/index.ts";
+import { SETUP_NODE } from "../src/setup/registry.ts";
 import { getAdapter } from "../src/adapters/table.ts";
 import { composeMatcher } from "../src/core/ops/doctor-config.ts";
 
@@ -129,7 +130,7 @@ describe("ADR-0020: zcode config shape (H2, Z-WIN-1)", () => {
   // (zcode.z.ai/en/docs/hooks; github.com/zai-org/ZCode apps/zcode-cli/docs/usage/09-hooks.md), and MCP servers as
   // mcp.servers.<name> {type:"stdio", command, args, enabled, timeoutMs} with features.mcp true
   // (apps/zcode-cli/docs/usage/07-mcp.md: "先确保 features.mcp 已启用"; zcode.z.ai/en/docs/mcp-services, ZCode 3.16.3).
-  const NODE = process.execPath;
+  const NODE = SETUP_NODE; // D-STABLE-NODE-1: the node setup writes
   const REPO = path.resolve(import.meta.dirname, "..");
 
   function sandbox(t) {

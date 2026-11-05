@@ -2,6 +2,7 @@
 // ADR-0019 (one interactive context-mode setup), PRD-setup. CLI behaviour through the real entry and a real pty.
 
 import { after, before, describe, test } from "node:test";
+import { SETUP_NODE } from "../src/setup/registry.ts"; // D-STABLE-NODE-1
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -487,7 +488,7 @@ describe("ADR-0019 cli", () => {
         t = t.replaceAll(JSON.stringify(dir).slice(1, -1), "<VSCODE_USER>").replaceAll(dir, "<VSCODE_USER>");
       }
       // The CLI finds its package dir through realpath (macOS: /var -> /private/var), so map that form first.
-      for (const [p, tag] of [[realpathSync(s.pkg), "<PKG>"], [s.pkg, "<PKG>"], [realpathSync(s.home), "<HOME>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
+      for (const [p, tag] of [[realpathSync(s.pkg), "<PKG>"], [s.pkg, "<PKG>"], [realpathSync(s.home), "<HOME>"], [s.home, "<HOME>"], [SETUP_NODE, "<NODE>"], [process.execPath, "<NODE>"]]) {
         t = t.replaceAll(JSON.stringify(p).slice(1, -1), tag).replaceAll(p, tag);
       }
       // D-HA-CODEX-TRUST-1: a codex trust hash covers the hook command, which holds this sandbox's paths; the golden

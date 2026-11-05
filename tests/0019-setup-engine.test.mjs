@@ -12,7 +12,7 @@ import ts from "typescript";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { TOOL_ORDER } from "../src/core/contracts/constants.ts";
 import { OVERHEAD_P95_MS } from "../src/setup/engine.ts";
-import { hookCommandString } from "../src/setup/registry.ts";
+import { hookCommandString, stableNodePath, SETUP_NODE } from "../src/setup/registry.ts";
 import { qwenHooksOff } from "../src/setup/qwen-gate.ts";
 import { hookHashOf, pluginTrustEntries } from "../src/setup/codex-trust.ts";
 import { assertWritable, buildRegistry, hostBin, installExitOk, pathEntries, runDoctor, runRemove, runSetup, spawnForm, spawnShim, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR, shellWord } from "../src/setup/index.ts";
@@ -27,7 +27,7 @@ describe("ADR-0019 section 3: setup engine (setup, doctor, remove, spawn, lock, 
   // initialize + tools/list, hook.mjs answers a hook call), fake agent binaries on a temp PATH.
 
 
-  const NODE = process.execPath;
+  const NODE = SETUP_NODE; // D-STABLE-NODE-1: the node setup writes
 
   function fakePkg(root, { tools = TOOL_ORDER } = {}) {
     const dir = path.join(root, "pkg");
@@ -131,6 +131,18 @@ rl.on("line", (l) => {
     assert.equal(reg.find((r) => r.id === "kiro").hookCommand[0], NODE);
     const posix = buildRegistry({ home: "/h", pkgDir: "/abs/pkg", env: {}, platform: "linux" });
     assert.equal(posix.find((r) => r.id === "qwen").hookCommand[0], NODE);
+  });
+
+  // D-STABLE-NODE-1 (host audit copilot-cli-3, vscode-3; #1183 stable-interpreter-path): a Homebrew node runs from
+  // <prefix>/Cellar/node/<version>/bin/node, a dir `brew upgrade node` removes. <prefix>/bin/node links to the same binary
+  // and survives the upgrade, so setup writes that one.
+  test("[D-STABLE-NODE-1] setup writes the stable Homebrew node link, not the versioned Cellar path", () => {
+    const cellar = "/opt/homebrew/Cellar/node/26.8.1/bin/node";
+    const same = { exists: (p) => p === "/opt/homebrew/bin/node", real: () => cellar };
+    assert.equal(stableNodePath(cellar, same), "/opt/homebrew/bin/node");
+    assert.equal(stableNodePath(cellar, { exists: () => false, real: () => cellar }), cellar); // no link: keep the real path
+    assert.equal(stableNodePath(cellar, { exists: () => true, real: (p) => p }), cellar); // link names another node: keep
+    assert.equal(stableNodePath("/usr/local/bin/node", same), "/usr/local/bin/node"); // not a Cellar path: unchanged
   });
 
   test("registry: server and hook commands are absolute node + absolute file, never the bin name", () => {

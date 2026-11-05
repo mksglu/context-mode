@@ -13,6 +13,7 @@ import { getAdapter } from "../src/adapters/table.ts";
 import { TOOL_ORDER } from "../src/core/contracts/constants.ts";
 import { generateManifests } from "../build/manifests.ts";
 import { buildRegistry, printPlan, runRemove, runSetup, hookCommandString } from "../src/setup/index.ts";
+import { SETUP_NODE } from "../src/setup/registry.ts";
 import { hookSample } from "../src/setup/hook-sample.ts";
 
   // serial: runSetup and runDoctor share in-process state; the tests fail when they overlap
@@ -21,7 +22,7 @@ describe("ADR-0020 fire matrix: hook channel and skill channel per agent", () =>
   // skill channel on a fresh HOME; a second run changes nothing; --remove restores every byte.
 
 
-  const NODE = process.execPath;
+  const NODE = SETUP_NODE; // D-STABLE-NODE-1: the node setup writes
   const REPO = path.resolve(import.meta.dirname, "..");
   const SKILLS = ["ctx-doctor", "ctx-stats", "ctx-upgrade"];
 
@@ -553,12 +554,12 @@ describe("ADR-0020 Codex 0.166 hook shell command (D-C166-WIN-FIRE-1)", { concur
     }
     assert.equal(hookCommandString(row), cmds[0], "the v1 rewrite and the doctor use the same line");
     assert.equal(row.hookCommand[0], "node", "the written line uses bare node");
-    assert.equal(row.hookRunCommand[0], process.execPath, "the doctor still runs the absolute node");
+    assert.equal(row.hookRunCommand[0], SETUP_NODE, "the doctor still runs the absolute node");
   });
 
   test("D-C166-WIN-FIRE-1: off Windows the codex hook command keeps the absolute quoted node path (D4)", () => {
     const row = buildRegistry({ home: "/home/jane", pkgDir: "/opt/context mode", env: {}, platform: "linux" }).find((r) => r.id === "codex");
-    for (const c of codexCommands(row)) assert.ok(c.startsWith('"' + process.execPath + '" "'), c);
+    for (const c of codexCommands(row)) assert.ok(c.startsWith('"' + SETUP_NODE + '" "'), c);
   });
 
   test("D-C166-WIN-FIRE-1: only codex and qwen (D-R44-QWEN-WIN-1) change; every other host keeps the quoted absolute form on Windows", () => {
