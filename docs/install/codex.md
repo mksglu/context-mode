@@ -74,7 +74,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
-- After `codex plugin add`, `context-mode doctor` checks the plugin (`codex plugin list` shows it enabled) and setup writes nothing under `~/.codex`, so the hooks never run twice (D-NI-CODEX-DOCTOR-1).
+- After `codex plugin add`, `context-mode doctor` checks the plugin (`codex plugin list --json` shows it enabled, read whole, D-1322-LIST-SIZE-1) and setup writes nothing under `~/.codex`, so the hooks never run twice (D-NI-CODEX-DOCTOR-1).
 - Codex 0.156.1 reads a local marketplace folder only when it is a git repo.
 - The `release` branch at `2.0.0-next.5` had no `.codex-plugin` folder (it was built before ADR-0023). From `2.0.0-next.8` the folder is there, so the install above carries the MCP server and the hooks.
 - The shipped `hooks/codex.json` is a template: the writer fills the path; do not copy hooks/codex.json by hand.

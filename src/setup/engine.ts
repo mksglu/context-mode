@@ -125,7 +125,8 @@ export function installExitOk(status: number | null, listed: boolean, platform: 
 
 /** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe (spawnForm). */
 function runBin(bin: string, args: string[], env: SetupContext["env"], input?: string, timeout = VERIFY_TIMEOUT_MS): ReturnType<typeof spawnSync> {
-  return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout }) as ReturnType<typeof spawnSync>;
+  // D-1322-LIST-SIZE-1: no output cap; a host list can be megabytes (codex 0.165.0 printed 2.16 MB, the 1 MiB default cut it).
+  return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout, maxBuffer: Infinity }) as ReturnType<typeof spawnSync>;
 }
 
 /** CC-WIN-3: host file text as plain LF without a BOM (PowerShell 5 writes both); apply gives the layout back. */
@@ -683,8 +684,6 @@ function skillsCheck(row: CheckRow, pkgDir: string): Check {
 
 // ---------- native plugin (D-NI-CODEX-DOCTOR-1) ----------
 
-const PLUGIN_ENABLED = "enabled";
-const WORD_TRIM = ",;";
 const CODEX_CONFIG_FILE = "config.toml";
 
 const EXT_ENABLED_USER = "Enabled (User):";
@@ -692,13 +691,18 @@ const EXT_ENABLED_WORKSPACE = "Enabled (Workspace):";
 const EXT_TRUE = "true";
 type NativeState = "enabled" | "disabled" | undefined;
 /** The extension list also shows the workspace scope: off there, gemini runs none of its hooks (D-NI-GEMINI-GATE-1). */
-interface NativeStatus { state: NativeState; workspaceOff: boolean; hookGate?: string }
+/** stopped: the list command ended early (signal or spawn error) after it named the plugin (D-1322-LIST-SIZE-1). */
+interface NativeStatus { state: NativeState; workspaceOff: boolean; hookGate?: string; stopped?: string }
 
-/** codex plugin list: the table row that names the plugin, enabled when one of its words is "enabled". */
-function tableState(n: NativePlugin, text: string): NativeState {
-  const line = text.split("\n").find((l) => l.split(" ").includes(n.plugin));
-  if (line === undefined) return undefined;
-  return line.split(" ").map((w) => trimChars(w, WORD_TRIM)).includes(PLUGIN_ENABLED) ? "enabled" : "disabled";
+/** D-1322-LIST-SIZE-1, codex plugin list --json (codex-rs/cli/src/plugin_cmd.rs JsonPluginListOutput): { installed: [{ pluginId,
+ *  enabled }], available: [] }. Without --available only installed plugins are listed, so the output stays small. */
+function codexJsonState(n: NativePlugin, text: string): NativeState {
+  let doc: unknown;
+  try { doc = JSON.parse(text); } catch { return undefined; }
+  const list = isObj(doc) && Array.isArray(doc.installed) ? doc.installed : [];
+  const mine = list.find((p) => isObj(p) && p.pluginId === n.plugin);
+  if (!isObj(mine)) return undefined;
+  return mine.enabled === true ? "enabled" : "disabled";
 }
 
 /** qwen 0.26.1 / gemini 0.65.0 extensions list: a block per extension. A header line starts in column 0 ("<mark> <name>
@@ -746,10 +750,17 @@ function nativeState(row: CheckRow, env: SetupContext["env"]): NativeStatus {
   const n = row.nativePlugin;
   if (!n || !hostBin(n.bin, env).file) return none;
   const r = runBin(n.bin, n.args, env);
+  // D-1322-LIST-SIZE-1: a list that stopped after it named the plugin is the host's install; the old setup path is no fix.
+  const why = (r.error as NodeJS.ErrnoException | undefined)?.code ?? r.signal;
+  if (why && `${r.stdout}`.includes(n.plugin)) {
+    const cmd = [n.bin, ...n.args].join(" ");
+    return { ...none, stopped: `${cmd} stopped before it finished (${why}); it names ${n.plugin}, run ${cmd} in a terminal` };
+  }
   if (r.status !== 0) return none;
   // Gemini 0.65.0 writes the extension list to stderr (D-INST-2).
   if (n.format === "json") return jsonState(n, `${r.stdout}`);
-  return n.format === "extension" ? extensionState(n, `${r.stdout}${r.stderr}`) : { state: tableState(n, `${r.stdout}`), workspaceOff: false };
+  if (n.format === "codex-json") return { state: codexJsonState(n, `${r.stdout}`), workspaceOff: false };
+  return extensionState(n, `${r.stdout}${r.stderr}`);
 }
 
 /** The row as the host's own plugin install sets it up. */
@@ -758,21 +769,14 @@ function nativeRow(row: CheckRow, n: NativePlugin): CheckRow {
     hookInstall: { kind: "package", via: n.hooksVia }, skillInstall: { kind: "package", via: n.skillsVia } };
 }
 
-function trimChars(w: string, chars: string): string {
-  let a = 0;
-  let b = w.length;
-  while (a < b && chars.includes(w.charAt(a))) a++;
-  while (b > a && chars.includes(w.charAt(b - 1))) b--;
-  return w.slice(a, b);
-}
-
 /** A native plugin install: verify it as is, write nothing (a second hook copy under HOME would run twice). A listed but
  *  disabled extension is a FAIL that names the host's enable command: setup cannot link over it (D-NI-EXT-DOCTOR-1). */
 async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult | undefined> {
   const n = row.nativePlugin;
-  const { state, workspaceOff, hookGate } = nativeState(row, ctx.env);
+  const { state, workspaceOff, hookGate, stopped } = nativeState(row, ctx.env);
+  const bin = n ? hostBin(n.bin, ctx.env).file : undefined;
+  if (stopped) return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin, reason: stopped };
   if (!n || state === undefined) return undefined;
-  const bin = hostBin(n.bin, ctx.env).file;
   if (state === "disabled") {
     if (!n.enable) return undefined;
     return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin,

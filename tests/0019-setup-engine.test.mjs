@@ -699,8 +699,13 @@ exit 0`);
   // D-NI-CODEX-DOCTOR-1 (ADR-0023): `codex plugin add context-mode@context-mode` installs the npm package as a Codex plugin.
   // The plugin ships the MCP server, hooks (.codex-plugin) and skills (codex/skills); setup writes nothing under ~/.codex.
   // Live run (codex-cli 0.156.1, temp HOME): codex plugin list showed "installed, enabled", doctor said "not set up".
+  // D-1322-LIST-SIZE-1: doctor reads `codex plugin list --json` (codex-rs/cli/src/plugin_cmd.rs JsonPluginListOutput).
+  const SKIP_SH_EARLY = { skip: process.platform === "win32" && "fake agent binaries are sh scripts" };
+  const codexEntry = (pluginId, enabled) => ({ pluginId, name: pluginId.split("@")[0], marketplaceName: pluginId.split("@")[1], version: "2.0.0",
+    installed: true, enabled, source: { source: "local", path: "/x" }, installPolicy: "AVAILABLE", authPolicy: "ON_INSTALL" });
+  const codexListJson = (installed) => JSON.stringify({ installed, available: [] }, null, 2);
   const CODEX_PLUGIN_FAKE = (status) => `case "$1 $2" in
-  "plugin list") printf 'PLUGIN                     STATUS              VERSION  SOURCE\\ncontext-mode@context-mode  ${status}  2.0.0    /x\\n' ;;
+  "plugin list") printf '%s\\n' '${codexListJson([codexEntry("context-mode@context-mode", status === "installed, enabled")])}' ;;
   "mcp list") echo "context-mode  node  ./server.mjs --agent codex  enabled" ;;
 esac
 exit 0`;
@@ -725,6 +730,43 @@ exit 0`;
     assert.equal(doc.agents[0].reason, "not set up, run context-mode setup");
   });
 
+  // D-1322-LIST-SIZE-1 (#1322, codex 0.165.0): `codex plugin list` printed about 2.16 MB (every marketplace plugin); the
+  // read stopped at 1 MiB (ENOBUFS), doctor took the plugin as absent and named the old data dir: "old context-mode entry".
+  function codexBigList(s) {
+    const rows = [codexEntry("context-mode@context-mode", true)];
+    for (let i = 0; i < 7000; i++) rows.push(codexEntry(`other-${i}@market`, true));
+    const list = put(path.join(s.root, "codex-list.json"), `${codexListJson(rows)}\n`);
+    assert.ok(readFileSync(list).length > 2_000_000, "the fixture is over 1 MiB, as the reporter's 2.16 MB list");
+    cpSync(path.join(import.meta.dirname, "..", "skills"), path.join(s.pkgDir, "codex", "skills"), { recursive: true });
+    mkdirSync(path.join(s.home, ".codex", "context-mode"), { recursive: true }); // the reporter's old data dir
+    return list;
+  }
+
+  test("[D-1322-LIST-SIZE-1] doctor: a codex plugin list over 1 MiB is read whole; the enabled plugin passes", SKIP_SH_EARLY, async (t) => {
+    const s = sandbox(t);
+    const list = codexBigList(s);
+    fakeBin(s.root, "codex", `case "$1 $2" in
+  "plugin list") cat "${list}" ;;
+  "mcp list") echo "context-mode  node  ./server.mjs --agent codex  enabled" ;;
+esac
+exit 0`);
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    assert.equal(doc.agents[0].status, "PASS", JSON.stringify({ ...doc.agents[0], checks: doc.agents[0].checks.filter((c) => !c.ok) }, null, 2));
+    assert.ok(doc.agents[0].checks.find((c) => c.name === "list")?.ok);
+  });
+
+  test("[D-1322-LIST-SIZE-1] doctor: a codex plugin list that stops after it names the plugin reports the list command, not an old entry", SKIP_SH_EARLY, async (t) => {
+    const s = sandbox(t);
+    codexBigList(s);
+    fakeBin(s.root, "codex", `printf '{"installed":[{"pluginId":"context-mode@context-mode","installed":true,"enabled":true},'
+kill -9 $$`);
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    const a = doc.agents[0];
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    assert.equal(a.reason, "codex plugin list --json stopped before it finished (SIGKILL); it names context-mode@context-mode, run codex plugin list --json in a terminal");
+    assert.equal(existsSync(path.join(s.home, ".codex", "config.toml")), false, "doctor writes nothing");
+  });
+
   // D-NI-CODEX-TRUST-1: after `codex plugin add context-mode@context-mode` Codex 0.156.1 lists the plugin hooks "untrusted"
   // (hooks/list: key "<plugin>:.codex-plugin/hooks.json:<event>:0:0", currentHash) and never runs them. A
   // [hooks.state."<key>"] trusted_hash = <currentHash> entry in $CODEX_HOME/config.toml flips them to "trusted" (live probe).
@@ -733,7 +775,7 @@ exit 0`;
     const app = put(path.join(s.root, "fake-app-server.mjs"), FAKE_APP_SERVER);
     cpSync(path.join(import.meta.dirname, "..", "skills"), path.join(s.pkgDir, "codex", "skills"), { recursive: true });
     fakeBin(s.root, "codex", `case "$1" in
-  plugin) printf 'PLUGIN                     STATUS              VERSION  SOURCE\\ncontext-mode@context-mode  installed, enabled  2.0.0    /x\\n' ;;
+  plugin) printf '%s\\n' '${codexListJson([codexEntry("context-mode@context-mode", true)])}' ;;
   app-server) exec "${NODE}" "${app}" ;;
 esac
 exit 0`);

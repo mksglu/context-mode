@@ -127,12 +127,13 @@ export interface CheckRow {
   nativePlugin?: NativePlugin;
 }
 
-/** list = one table row per plugin with an "enabled" word (codex plugin list); extension = one block per extension, a
+/** codex-json = codex plugin list --json, { installed: [{ pluginId, enabled }] } (D-1322-LIST-SIZE-1); json = zcode plugins
+ *  list --json, an array of { id, enabled }; extension = one block per extension, a
  *  "<mark> <name> (<version>)" header line then an indented "Enabled (User): true|false" line (qwen / gemini
  *  extensions list). enable = the host command that turns a listed but disabled install back on (doctor names it). */
 export interface NativePlugin {
   bin: string; args: string[]; plugin: string; hooksVia: string; skillsVia: string;
-  format: "table" | "extension" | "json"; enable?: string[];
+  format: "codex-json" | "extension" | "json"; enable?: string[];
   /** D-NI-CODEX-TRUST-1: the host runs a plugin hook only once its config trusts it (Codex hooks/list trustStatus). */
   hookTrust?: boolean;
 }
@@ -146,7 +147,7 @@ function extensionPlugin(bin: string, id: AgentId): NativePlugin {
 }
 
 const NATIVE_PLUGIN: Partial<Record<AgentId, NativePlugin>> = {
-  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
+  codex: { bin: "codex", args: ["plugin", "list", "--json"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path.join("codex", SKILLS_DIR_NAME), format: "codex-json", hookTrust: true },
   qwen: extensionPlugin("qwen", "qwen"),
   gemini: extensionPlugin("gemini", "gemini"),
   // D-R44-ZCODE-NATIVE-1 (host audit zcode-1/2): `zcode plugins install context-mode@context-mode` lists as JSON; ZCode loads
