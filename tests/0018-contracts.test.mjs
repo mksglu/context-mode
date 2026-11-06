@@ -408,9 +408,9 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
       ]) assert.ok(src.includes(s), s);
     });
 
-    test("[M5] AuxEventName adds Usage (D-M5-arch-2)", () => {
+    test("[M5] AuxEventName adds Usage (D-M5-arch-2) and Stop (D-1323-CODEX-STOP-1)", () => {
       const src = readFileSync(join(SRC, "types.ts"), "utf8");
-      assert.ok(src.includes('export type AuxEventName = "PreCompact" | "Usage";'));
+      assert.ok(src.includes('export type AuxEventName = "PreCompact" | "Usage" | "Stop";'));
     });
 
     test("[M5] tools-ops error keys are the impl/07 texts (A-T2)", () => {

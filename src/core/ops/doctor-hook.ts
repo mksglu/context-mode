@@ -11,7 +11,7 @@ import path from "node:path";
 import { hostText } from "./host-text.ts";
 import { replyErrors } from "./hook-shape.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL, D5_STOP_DETAIL, DATA_DIR_ENV, HOOK_ERROR_LOG_FILE,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
@@ -223,6 +223,31 @@ async function codexPluginTrust(i: HookCheckInput): Promise<DoctorRow | null> {
 }
 
 /** D5 row. Never throws: a hook that cannot start is a FAIL on shape, a missing fixture is UNKNOWN. */
+// D-1323-CODEX-STOP-1 (#1323): "codex: unknown hook event Stop" on each turn while D5 passed: D5 sent only PreToolUse.
+// codex only: one Stop call with every field of Codex's rust-v0.166.0 stop.command.input schema. HOME and the data dir are a
+// temp dir of its own, so the probe writes nothing to the user's store and a hook-errors.log line there is this call's own.
+export function codexStopPayload(cwd: string): Record<string, unknown> {
+  return {
+    session_id: "d5-stop-probe", turn_id: "d5-stop-turn", transcript_path: null, cwd, hook_event_name: "Stop",
+    model: "d5-probe", permission_mode: "default", stop_hook_active: false, last_assistant_message: "d5 stop probe",
+  };
+}
+
+/** null when the Codex Stop probe gets an empty or Codex Stop reply and logs no hook error, else the FAIL detail. */
+export async function codexStopDetail(i: HookCheckInput, timeoutMs: number): Promise<string | null> {
+  const home = mkdtempSync(path.join(tmpdir(), "cm-d5-stop-"));
+  try {
+    const node = nodeLaunch({ ...i.env, HOME: home, USERPROFILE: home, [DATA_DIR_ENV]: home });
+    const r = await runProcess([node.file, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs, stdin: JSON.stringify(codexStopPayload(i.worktree ?? home)),
+    });
+    const logged = existsSync(path.join(home, HOOK_ERROR_LOG_FILE));
+    return !logged && isNativeShape(i.agent, r.stdout.toString("utf8"), r.exitCode, r.killed, "Stop") ? null : D5_STOP_DETAIL;
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> {
   // D-NI-CODEX-TRUST-3: the native plugin route leaves no hooks.json, so the host is asked (hooks/list), as the terminal doctor does.
   // A hook Codex lists untrusted never runs, whatever hook.mjs answers here. No answer from Codex: no claim, the round trip decides.
@@ -267,7 +292,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
-  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : null;
+  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
   if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }

@@ -4,7 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
 export type { AgentId } from "./agents.js";
 
 export type CanonicalEventName = "SessionStart" | "UserPromptSubmit" | "PreToolUse" | "PostToolUse"; // ADR-0001, PRD §10.1
-export type AuxEventName = "PreCompact" | "Usage"; // PreCompact: pending_compact on gemini, copilot-cli, vscode (ADR-0009 §6); Usage: OpenCode step-finish cost row (D-M5-arch-2)
+export type AuxEventName = "PreCompact" | "Usage" | "Stop"; // PreCompact: pending_compact on gemini, copilot-cli, vscode (ADR-0009 §6); Usage: OpenCode step-finish cost row (D-M5-arch-2); Stop: Codex turn end, empty reply (D-1323-CODEX-STOP-1)
 
 export interface CanonicalHookEvent {
   event: CanonicalEventName | AuxEventName;

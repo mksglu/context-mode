@@ -21,7 +21,7 @@ import * as opencode from "../src/adapters/opencode.ts";
 import { CLIENT_NAME_TO_PLATFORM } from "../src/core/contracts/client-map.ts";
 import { HOST_SHAPES, replyErrors, shapeErrors } from "../src/core/ops/hook-shape.ts";
 import { spawnSync } from "node:child_process";
-import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -549,6 +549,22 @@ describe("ADR-0020 adapters", () => {
       assert.equal(r.stdout, "");
     });
 
+    // #1323: the reporter's repro through the hook entry: exit 0, empty reply, nothing on stderr, no hook-errors.log line.
+    test("hook entry: codex Stop (#1323 reporter payload) -> empty reply, no decode error, no hook-errors.log line", () => {
+      const data = mkdtempSync(join(tmpdir(), "cm-codex-stop-"));
+      try {
+        const payload = { hook_event_name: "Stop", session_id: "stop-hook-check", cwd: "/tmp", stop_hook_active: false };
+        const env = { PATH: process.env.PATH, HOME: data, USERPROFILE: data, CONTEXT_MODE_DATA_DIR: data };
+        const r = spawnSync(process.execPath, [HOOK_ENTRY, "--agent", "codex"], { input: JSON.stringify(payload), encoding: "utf8", env });
+        assert.equal(r.status, 0, r.stderr);
+        assert.equal(r.stdout, "");
+        assert.equal(r.stderr, "");
+        assert.equal(existsSync(join(data, "hook-errors.log")), false, "hook-errors.log was written");
+      } finally {
+        rmSync(data, { recursive: true, force: true });
+      }
+    });
+
     test("hook entry fails open: unknown agent, missing agent, bad JSON, unknown event, unbuilt adapter", () => {
       const cases = [
         [["--agent", "nope"], "{}"],
@@ -788,8 +804,24 @@ describe("ADR-0020 adapters", () => {
       assert.equal(bad.result.isError, true);
     });
 
+    // #1323: "codex: unknown hook event Stop" on each completed turn (Codex 0.166.0-alpha.6, context-mode 2.1.4).
+    const REPORTER_STOP = { hook_event_name: "Stop", session_id: "stop-hook-check", cwd: "/tmp", stop_hook_active: false };
+    // Codex rust-v0.166.0 hooks/schema/generated/stop.command.input.schema.json: every required field.
+    const CODEX_166_STOP = { ...base, hook_event_name: "Stop", stop_hook_active: false, last_assistant_message: "done" };
+
+    test("decode Stop (#1323): the reporter's payload and the Codex 0.166 Stop payload decode as Stop", () => {
+      assert.deepEqual(decode(REPORTER_STOP), { event: "Stop", agent: "codex", sessionId: "stop-hook-check", cwd: "/tmp" });
+      assert.deepEqual(decode(CODEX_166_STOP), { event: "Stop", agent: "codex", sessionId: "c-1", cwd: "/tmp/proj" });
+    });
+
+    test("encode on Stop is the empty reply for every decision (#1323)", () => {
+      for (const d of [{ kind: "allow" }, { kind: "hint", text: "x", onceKey: "k" }, { kind: "replace", output: "x" }]) {
+        assert.deepEqual(encode(decode(REPORTER_STOP), d), { stdout: "", exitCode: 0 });
+      }
+    });
+
     test("decode throws on unknown event names and non-object payloads", () => {
-      assert.throws(() => decode({ ...base, hook_event_name: "Stop" }));
+      assert.throws(() => decode({ ...base, hook_event_name: "SubagentStop" }));
       assert.throws(() => decode({ ...base, hook_event_name: "PreCompact" }));
       assert.throws(() => decode(undefined));
       assert.throws(() => decode([1]));

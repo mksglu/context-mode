@@ -81,6 +81,8 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   } catch (err) {
     return fail("decode", err); // step 2
   }
+  // D-1323-CODEX-STOP-1: Stop has no project or store work; it gets this agent's allow reply before the project step.
+  if (ev.event === "Stop") return row.encode(ev, ALLOW);
   let project: ProjectContext;
   try {
     fault(env, "project");

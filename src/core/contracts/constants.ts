@@ -707,6 +707,8 @@ export const D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the
 export const D5_READ_MEDIA_DETAIL = "PreToolUse Read of a PNG over the one-read limit came back denied: an image Read must reach the model as an image block (#1321)";
 export const D5_READ_SHAPE_DETAIL = "PostToolUse Read replace is not Read's output shape {type:\"text\", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning";
 export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`; }
+// D-1323-CODEX-STOP-1 (#1323): the Codex Stop probe (rust-v0.166.0 stop.command.input) failed or wrote a hook-errors.log line.
+export const D5_STOP_DETAIL = "Codex Stop event: the hook did not give an empty or Codex Stop reply, or it logged a hook error";
 export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken install
 // doctor-db.ts: D8 checks, D9 counts, D10 mode (impl/07 §5).
 export const PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";

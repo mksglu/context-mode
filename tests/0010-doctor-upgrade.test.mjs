@@ -23,7 +23,7 @@ import { openDb, closeDb } from "../src/core/store/db.ts";
 import * as C from "../src/core/contracts/constants.ts";
 import { SCHEMA_VERSION, TOOL_ORDER } from "../src/core/contracts/constants.ts";
 import { bundleVersion, channelOf, fetchCause, checkMcp, checkMode, checkNode, checkProject, checkVersion, compareVersions, parseVersion } from "../src/core/ops/doctor-env.ts";
-import { checkHookRoundTrip, codexHookJournaled, payloadFor } from "../src/core/ops/doctor-hook.ts";
+import { checkHookRoundTrip, codexHookJournaled, codexStopDetail, codexStopPayload, payloadFor } from "../src/core/ops/doctor-hook.ts";
 import { DDL } from "../src/core/store/schema.ts";
 import { healD8 } from "../src/core/ops/db-heal.ts";
 import { writeOwnerPid } from "../src/core/store/owners.ts";
@@ -1053,7 +1053,7 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     // D-WIN-RM-RETRY-1: Windows can hold a child's cwd after "close" (EPERM); see rmTempDir.
     t.after(() => rmTempDir(dir));
     writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
-      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);process.stderr.write(process.argv.slice(2).join(" "));process.stdout.write(p.tool_name==="Read"&&p.hook_event_name==="PreToolUse"?"":${JSON.stringify(out)});process.exitCode=${exit};});`);
+      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);process.stderr.write(process.argv.slice(2).join(" "));process.stdout.write((p.tool_name==="Read"&&p.hook_event_name==="PreToolUse")||p.hook_event_name==="Stop"?"":${JSON.stringify(out)});process.exitCode=${exit};});`);
     if (fixture !== null) {
       mkdirSync(path.join(dir, C.HOOK_FIXTURE_DIR));
       writeFileSync(path.join(dir, C.HOOK_FIXTURE_DIR, C.HOOK_FIXTURE_FILE), JSON.stringify(fixture));
@@ -1357,6 +1357,36 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.equal(r.status, "PASS", JSON.stringify(r));
   });
 
+  // D-1323-CODEX-STOP-1 (#1323): "codex: unknown hook event Stop" on each turn while D5 passed, because D5 sent only PreToolUse.
+  // D5 now also sends Codex's own Stop payload (rust-v0.166.0 stop.command.input) and checks the reply and hook-errors.log.
+  function stopBundle(t, stopBody) {
+    const dir = bundle(t, native);
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
+      `import fs from "node:fs";import path from "node:path";let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
+      `if(p.hook_event_name!=="Stop"){process.stdout.write(${JSON.stringify(native)});return;}${stopBody}});`);
+    return dir;
+  }
+
+  test("[D-1323-CODEX-STOP-1] D5 codex: a hook that fails to decode Stop (stderr, hook-errors.log, exit 0) FAILs with the Stop detail", async (t) => {
+    const dir = stopBundle(t, `fs.appendFileSync(path.join(process.env.${C.DATA_DIR_ENV},${JSON.stringify(C.HOOK_ERROR_LOG_FILE)}),'{"stage":"decode","message":"codex: unknown hook event Stop"}\\n');process.stderr.write("hooks: decode failed: codex: unknown hook event Stop");`);
+    const r = await checkHookRoundTrip(input(dir, { agent: "codex" }));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_STOP_DETAIL, fixCommand: C.D5_FIX });
+  });
+
+  test("[D-1323-CODEX-STOP-1] D5 codex: a Stop reply outside Codex's Stop schema FAILs with the Stop detail", async (t) => {
+    const dir = stopBundle(t, `process.stdout.write(${JSON.stringify(native)});`);
+    const r = await checkHookRoundTrip(input(dir, { agent: "codex" }));
+    assert.equal(r.detail, C.D5_STOP_DETAIL);
+  });
+
+  test("[D-1323-CODEX-STOP-1] D5 codex: the Stop probe carries every field of Codex's Stop input; a Codex Stop reply PASSes", async (t) => {
+    const keys = ["cwd", "hook_event_name", "last_assistant_message", "model", "permission_mode", "session_id", "stop_hook_active", "transcript_path", "turn_id"];
+    assert.deepEqual(Object.keys(codexStopPayload("/w")).sort(), keys);
+    const dir = stopBundle(t, `process.stdout.write(${JSON.stringify(JSON.stringify({ continue: true }))});`);
+    const r = await checkHookRoundTrip(input(dir, { agent: "codex" }));
+    assert.equal(r.status, "PASS", r.detail);
+  });
+
   test("[M5] doctor-hook/codexHookJournaled-filters-agent-codex", (t) => {
     assert.equal(codexHookJournaled(null), false);
     assert.equal(codexHookJournaled(dbWith(t, [])), false);
@@ -1368,7 +1398,7 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     // The stub JSON.parses stdin (a non-JSON stdin would crash it -> exit 1 -> FAIL), so PASS proves the payload.
     const dir = bundle(t, native);
     writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
-      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);const ok=process.argv[2]===${JSON.stringify(C.AGENT_ARG)}&&process.argv[3]==="codex"&&p.command==="ls";process.stdout.write(ok?${JSON.stringify(native)}:"bad");});`);
+      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);const ok=process.argv[2]===${JSON.stringify(C.AGENT_ARG)}&&process.argv[3]==="codex"&&p.command==="ls";process.stdout.write(p.hook_event_name==="Stop"?"":ok?${JSON.stringify(native)}:"bad");});`);
     const r = await checkHookRoundTrip(input(dir, { agent: "codex" }));
     assert.equal(r.status, "PASS");
   });
@@ -1421,6 +1451,17 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
         assert.equal(entry.payload.hook_event_name, "PreToolUse", host);
         assert.deepEqual(Object.keys(entry.payload).sort(), Object.keys(recordedPreToolUse(host)).sort(), host);
         assert.equal(entry.payload.tool_name, recordedPreToolUse(host).tool_name, host);
+      }
+    });
+
+    // D-1323-CODEX-STOP-1 (#1323): the built hook answers Codex's Stop with the empty reply and logs no hook error.
+    test("the built hook passes the D5 Codex Stop probe (#1323)", async () => {
+      const home = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-d5-stop-built-")));
+      try {
+        const detail = await codexStopDetail({ agent: "codex", bundleDir: out, env: { PATH: process.env.PATH ?? "" }, signal: new AbortController().signal, worktree: home }, 30_000);
+        assert.equal(detail, null);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
       }
     });
 
@@ -1896,7 +1937,7 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
     const bundleDir = path.join(codexDir, "plugins", "cache", "context-mode", "context-mode", "1.0.0");
     generateManifests(bundleDir);
     put(path.join(codexDir, "config.toml"), `[plugins."context-mode@context-mode"]\nenabled = true\n\n${toml}`);
-    writeFileSync(path.join(bundleDir, C.HOOK_ENTRY_FILE), `process.stdin.resume().on("end",()=>process.stdout.write(${JSON.stringify(RUN_NATIVE)}));`);
+    writeFileSync(path.join(bundleDir, C.HOOK_ENTRY_FILE), `let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).hook_event_name==="Stop"?"":${JSON.stringify(RUN_NATIVE)}));`);
     put(path.join(bundleDir, C.HOOK_FIXTURE_DIR, C.HOOK_FIXTURE_FILE), { codex: { event: "PreToolUse", payload: { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } } } });
     const profile = path.join(root, "os-profile");
     mkdirSync(path.join(profile, ".codex"), { recursive: true });
