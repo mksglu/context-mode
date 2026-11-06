@@ -15,5 +15,12 @@
     "SessionStart": ["session_id", "hook_event_name", "cwd"]
   },
   "hookOutputCapChars": 3000,
-  "windowsHookShell": "child_process.spawn(command, {shell: true}) in the V3 hook process runner (class tje): COMSPEC (cmd.exe /d /s /c) on win32"
+  "windowsHookShell": "child_process.spawn(command, {shell: true}) in the V3 hook process runner (class tje): COMSPEC (cmd.exe /d /s /c) on win32",
+  "stdout": "text",
+  "output": {
+    "PreToolUse": { "type": "string", "description": "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" },
+    "PostToolUse": { "type": "string", "description": "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" },
+    "UserPromptSubmit": { "type": "string", "description": "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" },
+    "SessionStart": { "type": "string", "description": "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" }
+  }
 }

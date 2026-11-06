@@ -1,0 +1,23 @@
+{
+  "host": "opencode",
+  "source": "@opencode/cli 2.2.5 plugin hooks (tool.execute.before throws to block, session hooks add text). The plugin runs the hook and reads plain stdout; exit 2 blocks the tool call with stdout as the reason.",
+  "stdout": "text",
+  "output": {
+    "PreToolUse": {
+      "type": "string",
+      "description": "plain text read by the context-mode OpenCode plugin"
+    },
+    "PostToolUse": {
+      "type": "string",
+      "description": "plain text read by the context-mode OpenCode plugin"
+    },
+    "UserPromptSubmit": {
+      "type": "string",
+      "description": "plain text read by the context-mode OpenCode plugin"
+    },
+    "SessionStart": {
+      "type": "string",
+      "description": "plain text read by the context-mode OpenCode plugin"
+    }
+  }
+}

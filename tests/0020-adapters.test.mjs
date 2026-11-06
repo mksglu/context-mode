@@ -19,6 +19,7 @@ import * as zcode from "../src/adapters/zcode.ts";
 import * as pi from "../src/adapters/pi.ts";
 import * as opencode from "../src/adapters/opencode.ts";
 import { CLIENT_NAME_TO_PLATFORM } from "../src/core/contracts/client-map.ts";
+import { HOST_SHAPES, replyErrors, shapeErrors } from "../src/core/ops/hook-shape.ts";
 import { spawnSync } from "node:child_process";
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1917,6 +1918,73 @@ describe("ADR-0020 adapters", () => {
 
     test("encode replace is a no-op on ZCode (no replace field documented)", () => {
       assert.deepEqual(encode({ ...pre, event: "PostToolUse" }, { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
+    });
+  });
+
+  // D-HOST-SCHEMAS-1: tests/fixtures/host-schemas/<agent>.json holds each host's own hook reply rules, read from the host
+  // source named in the file. Every encode reply on representative events must be empty or valid for its host and event.
+  describe("ADR-0020 host reply shapes (tests/fixtures/host-schemas)", () => {
+    const tool = { name: "Bash", canonicalName: "Bash", input: { command: "ls" } };
+    const events = {
+      PreToolUse: { event: "PreToolUse", sessionId: "s", cwd: "/tmp/p", turn: 0, tool },
+      PostToolUse: { event: "PostToolUse", sessionId: "s", cwd: "/tmp/p", turn: 0, tool, result: { isError: false, bytes: 9, text: "x", shape: { stdout: "x", stderr: "", interrupted: false } } },
+      UserPromptSubmit: { event: "UserPromptSubmit", sessionId: "s", cwd: "/tmp/p", turn: 0, prompt: "p" },
+      SessionStart: { event: "SessionStart", sessionId: "s", cwd: "/tmp/p", turn: 0, source: "startup" },
+    };
+    const decisions = [
+      { kind: "allow" }, { kind: "hint", text: "prefer ctx_execute", onceKey: "k" }, { kind: "deny", reason: "why" },
+      { kind: "deny", reason: "why", rewritten: "node /x/run.mjs" }, { kind: "replace", output: "x" },
+    ];
+
+    test("every agent has a host-schemas file with a reply schema for each of the four events", () => {
+      for (const id of AGENT_IDS) {
+        for (const event of Object.keys(events)) assert.ok(HOST_SHAPES[id].output[event] !== undefined, `${id} ${event}`);
+      }
+    });
+
+    test("every encode reply of every agent is empty or valid for its host's reply schema", () => {
+      for (const id of AGENT_IDS) {
+        for (const [event, ev] of Object.entries(events)) {
+          for (const d of decisions) {
+            if (d.kind === "deny" && event !== "PreToolUse") continue; // deny is a PreToolUse decision only (policy/decide.ts, dispatch caseB)
+            const out = getAdapter(id).encode({ ...ev, agent: id }, d);
+            if (out.stdout === "") continue;
+            assert.deepEqual(replyErrors(id, event, out.stdout), [], `${id} ${event} ${d.kind}: ${out.stdout}`);
+          }
+        }
+      }
+    });
+
+    test("the checker finds an unknown key, a value outside an enum, a missing required key and stdout that is not JSON", () => {
+      assert.deepEqual(replyErrors("claude-code", "PreToolUse", JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "block" } })),
+        ['$.hookSpecificOutput.permissionDecision: "block" is not one of ["allow","deny","ask","defer"]']);
+      assert.deepEqual(replyErrors("zcode", "SessionStart", JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", permissionDecision: "deny" } })),
+        ["$.hookSpecificOutput: permissionDecision is not a known key"]);
+      assert.deepEqual(replyErrors("copilot-cli", "PostToolUse", JSON.stringify({ modifiedResult: { textResultForLlm: "x" } })), ["$.modifiedResult: resultType is required"]);
+      assert.deepEqual(replyErrors("qwen", "PreToolUse", JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse" } })),
+        ['$.hookSpecificOutput.hookEventName: "PostToolUse" is not "PreToolUse"']);
+      assert.deepEqual(replyErrors("gemini", "PreToolUse", "deny"), ["gemini PreToolUse: stdout is not JSON"]);
+      assert.deepEqual(replyErrors("pi", "PreToolUse", "plain reason"), []);
+    });
+
+    test("the checker throws on a keyword it does not read, so no fixture rule goes unchecked", () => {
+      assert.throws(() => shapeErrors({ type: "string", pattern: "x" }, "x"), /keyword pattern/);
+    });
+
+    test("the checker and ajv agree on the Codex 0.166 schemas, for encode replies and for broken replies", async () => {
+      const { default: Ajv } = await import("ajv");
+      const ajv = new Ajv({ strict: false });
+      const broken = [
+        { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "block" } }, { hookSpecificOutput: { additionalContext: "x" } },
+        { hookSpecificOutput: { hookEventName: "SessionStart", extra: 1 } }, { decision: "allow" }, { continue: "no" }, { unknown: true }, [], "x",
+      ];
+      for (const event of Object.keys(events)) {
+        const check = ajv.compile(HOST_SHAPES.codex.output[event]);
+        const replies = decisions.map((d) => getAdapter("codex").encode({ ...events[event], agent: "codex" }, d).stdout).filter((s) => s !== "").map((s) => JSON.parse(s));
+        for (const v of [...replies, ...broken]) {
+          assert.equal(shapeErrors(HOST_SHAPES.codex.output[event], v).length === 0, check(v), `${event} ${JSON.stringify(v)}`);
+        }
+      }
     });
   });
 });

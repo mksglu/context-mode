@@ -1,0 +1,146 @@
+{
+  "host": "vscode",
+  "source": "VS Code Copilot Chat 0.44.0 (5863f5a) src/platform/chat/common/hookCommandTypes.ts (IPreToolUseHookSpecificCommandOutput, IPostToolUseHookSpecificCommandOutput) and chatHookService.ts (UserPromptSubmitHookOutput, SessionStartHookOutput, IPostToolUseHookResult decision 'block').",
+  "output": {
+    "PreToolUse": {
+      "title": "VS Code Copilot Chat 0.44.0 PreToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "permissionDecision": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "deny",
+                "ask"
+              ]
+            },
+            "permissionDecisionReason": {
+              "type": "string"
+            },
+            "updatedInput": {
+              "type": "object"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "PostToolUse": {
+      "title": "VS Code Copilot Chat 0.44.0 PostToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "const": "block"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "UserPromptSubmit": {
+      "title": "VS Code Copilot Chat 0.44.0 UserPromptSubmit reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "const": "block"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "SessionStart": {
+      "title": "VS Code Copilot Chat 0.44.0 SessionStart reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,282 @@
+{
+  "host": "claude-code",
+  "source": "Claude Code 2.1.274 native binary, zod hook output schemas: top level eW, hookSpecificOutput union members xF (PreToolUse, permissionDecision enum FK), DF (UserPromptSubmit), UF (SessionStart), the PostToolUse member. zod drops keys it does not read, so each object lists only the keys the host reads.",
+  "output": {
+    "PreToolUse": {
+      "title": "Claude Code 2.1.274 PreToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "PreToolUse"
+            },
+            "permissionDecision": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "deny",
+                "ask",
+                "defer"
+              ]
+            },
+            "permissionDecisionReason": {
+              "type": "string"
+            },
+            "updatedInput": {
+              "type": "object"
+            },
+            "additionalContext": {
+              "type": "string"
+            },
+            "permissionDisplay": {
+              "description": "@internal Desktop host only"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "terminalSequence": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "PostToolUse": {
+      "title": "Claude Code 2.1.274 PostToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "PostToolUse"
+            },
+            "additionalContext": {
+              "type": "string"
+            },
+            "classifierContext": {
+              "type": "string"
+            },
+            "updatedToolOutput": {
+              "description": "the tool's own output object"
+            },
+            "updatedMCPToolOutput": {
+              "description": "an MCP tool's own output"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "terminalSequence": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "UserPromptSubmit": {
+      "title": "Claude Code 2.1.274 UserPromptSubmit reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "UserPromptSubmit"
+            },
+            "additionalContext": {
+              "type": "string"
+            },
+            "sessionTitle": {
+              "type": "string"
+            },
+            "suppressOriginalPrompt": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "terminalSequence": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "SessionStart": {
+      "title": "Claude Code 2.1.274 SessionStart reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "SessionStart"
+            },
+            "additionalContext": {
+              "type": "string"
+            },
+            "initialUserMessage": {
+              "type": "string"
+            },
+            "sessionTitle": {
+              "type": "string"
+            },
+            "watchPaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "reloadSkills": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "terminalSequence": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "host": "pi",
+  "source": "@earendil-works/pi-coding-agent 1.5.0 dist/core/extensions/types.d.ts (ToolCallEventResult {block, reason}, ToolResultEventResult content, BeforeAgentStartEventResult) and runner.js l.895-1010. The hook runs in process (src/entries/pi.ts): plain stdout becomes the reason, the replaced content or the added context; exit 2 blocks the tool call.",
+  "stdout": "text",
+  "output": {
+    "PreToolUse": {
+      "type": "string",
+      "description": "plain text read by src/entries/pi.ts"
+    },
+    "PostToolUse": {
+      "type": "string",
+      "description": "plain text read by src/entries/pi.ts"
+    },
+    "UserPromptSubmit": {
+      "type": "string",
+      "description": "plain text read by src/entries/pi.ts"
+    },
+    "SessionStart": {
+      "type": "string",
+      "description": "plain text read by src/entries/pi.ts"
+    }
+  }
+}

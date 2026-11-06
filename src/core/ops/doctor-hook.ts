@@ -9,6 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
+import { replyErrors } from "./hook-shape.ts";
 import {
   AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_RANGE_DETAIL, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
@@ -90,34 +91,13 @@ export function payloadFor(agent: AgentId, payload: unknown, worktree: string | 
   return worktree !== undefined && isObject(payload) ? { ...payload, [CWD_KEY[agent]]: worktree } : payload;
 }
 
-// D-D5-ALL-AGENTS-1: the answer shape of each adapter's encode. "claude": hookSpecificOutput.hookEventName is the event
-// (encodeClaudeShape). "gemini": {decision, reason} or {hookSpecificOutput}. "copilot": a flat object (permissionDecision,
-// additionalContext, modifiedResult). "text": plain stdout, exit 2 on deny (kiro, pi, opencode).
-type Shape = "claude" | "gemini" | "copilot" | "text";
-const SHAPE: Readonly<Record<AgentId, Shape>> = {
-  "claude-code": "claude", codex: "claude", qwen: "claude", vscode: "claude", zcode: "claude",
-  gemini: "gemini", "copilot-cli": "copilot", kiro: "text", pi: "text", opencode: "text",
-};
-const COPILOT_KEYS = ["permissionDecision", "additionalContext", "modifiedResult"];
-
 /**
- * Native shape (D-M5-D3-1): exit 0 or 2, not killed, and stdout is empty (allow) or the agent's own answer shape (SHAPE).
+ * Native shape (D-M5-D3-1): exit 0 or 2, not killed, and stdout is empty (allow) or valid for the host's own reply schema
+ * of the event (D-HOST-SCHEMAS-1: tests/fixtures/host-schemas/<agent>.json, the same files the adapter unit tests use).
  */
 function isNativeShape(agent: AgentId, stdout: string, exitCode: number | null, killed: string | null, event: string): boolean {
   if (killed !== null || (exitCode !== 0 && exitCode !== 2)) return false;
-  if (stdout.length === 0 || SHAPE[agent] === "text") return true;
-  let out: unknown;
-  try {
-    out = JSON.parse(stdout);
-  } catch {
-    return false;
-  }
-  if (!isObject(out)) return false;
-  switch (SHAPE[agent]) {
-    case "claude": return isObject(out.hookSpecificOutput) && out.hookSpecificOutput.hookEventName === event;
-    case "gemini": return typeof out.decision === "string" || isObject(out.hookSpecificOutput);
-    default: return COPILOT_KEYS.some((k) => Object.hasOwn(out, k));
-  }
+  return stdout.length === 0 || replyErrors(agent, event, stdout).length === 0;
 }
 
 // D-D5-READ-SHAPE-1 (#1304): "D5 passes because the round trip does not check the shape of updatedToolOutput for Read".

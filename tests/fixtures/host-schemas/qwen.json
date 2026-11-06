@@ -1,0 +1,248 @@
+{
+  "host": "qwen",
+  "source": "@qwen-code/qwen-code 0.26.7: bundled/qc-helper/docs/features/hooks.md (Hook Output Structure, per-event Output Options) and chunks/chunk-6GTPLW7K.js HookOutput (getPermissionDecision reads hookSpecificOutput.permissionDecision allow|deny|ask, then decision allow|approve|deny|block|ask; a missing permissionDecision is no decision).",
+  "output": {
+    "PreToolUse": {
+      "title": "Qwen Code 0.26.7 PreToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "PreToolUse"
+            },
+            "permissionDecision": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "deny",
+                "ask"
+              ]
+            },
+            "permissionDecisionReason": {
+              "type": "string"
+            },
+            "updatedInput": {
+              "type": "object"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "PostToolUse": {
+      "title": "Qwen Code 0.26.7 PostToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "PostToolUse"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "UserPromptSubmit": {
+      "title": "Qwen Code 0.26.7 UserPromptSubmit reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "UserPromptSubmit"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "SessionStart": {
+      "title": "Qwen Code 0.26.7 SessionStart reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string",
+              "const": "SessionStart"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

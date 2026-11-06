@@ -1,0 +1,260 @@
+{
+  "host": "zcode",
+  "source": "ZCode 0.17.1 (a9fe401e) apps/zcode-cli/packages/contracts/src/hooks/index.ts: HookJSONOutputSchema and HookSpecificOutputSchema (zod discriminatedUnion on hookEventName). zod drops keys it does not read, so each object lists only the keys the host reads.",
+  "output": {
+    "PreToolUse": {
+      "title": "ZCode 0.17.1 PreToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "type": "string"
+            },
+            "hookEventName": {
+              "type": "string",
+              "const": "PreToolUse"
+            },
+            "permissionDecision": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "ask",
+                "deny"
+              ]
+            },
+            "permissionDecisionReason": {
+              "type": "string"
+            },
+            "updatedInput": {
+              "description": "z.unknown()"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "additional_context": {
+          "type": "string"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "PostToolUse": {
+      "title": "ZCode 0.17.1 PostToolUse reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "type": "string"
+            },
+            "hookEventName": {
+              "type": "string",
+              "const": "PostToolUse"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "additional_context": {
+          "type": "string"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "UserPromptSubmit": {
+      "title": "ZCode 0.17.1 UserPromptSubmit reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "type": "string"
+            },
+            "hookEventName": {
+              "type": "string",
+              "const": "UserPromptSubmit"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "additional_context": {
+          "type": "string"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "SessionStart": {
+      "title": "ZCode 0.17.1 SessionStart reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "additionalContext": {
+              "type": "string"
+            },
+            "hookEventName": {
+              "type": "string",
+              "const": "SessionStart"
+            }
+          },
+          "required": [
+            "hookEventName"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "additional_context": {
+          "type": "string"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "block"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

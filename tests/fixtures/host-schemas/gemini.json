@@ -1,0 +1,230 @@
+{
+  "host": "gemini",
+  "source": "@google/gemini-cli 0.67.0: bundle/docs/hooks/reference.md (Common output fields; BeforeTool, AfterTool, BeforeAgent, SessionStart output fields) and bundle/chunk-O7MGOE2I.js HookOutput (isBlockingDecision block|deny, isAskDecision ask). Keys are canonical events; each title names the native event.",
+  "output": {
+    "PreToolUse": {
+      "title": "Gemini CLI 0.67.0 BeforeTool reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "tool_input": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "systemMessage": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "PostToolUse": {
+      "title": "Gemini CLI 0.67.0 AfterTool reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "additionalContext": {
+              "type": "string"
+            },
+            "tailToolCallRequest": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "args": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "name",
+                "args"
+              ]
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "systemMessage": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "UserPromptSubmit": {
+      "title": "Gemini CLI 0.67.0 BeforeAgent reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "systemMessage": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    "SessionStart": {
+      "title": "Gemini CLI 0.67.0 SessionStart reply",
+      "definitions": {
+        "Specific": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hookEventName": {
+              "type": "string"
+            },
+            "additionalContext": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "systemMessage": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "continue": {
+          "type": "boolean"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

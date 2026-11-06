@@ -1095,6 +1095,13 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.equal(r.status, "PASS");
   });
 
+  // D-HOST-SCHEMAS-1: D5 checks the reply against the host's own schema (tests/fixtures/host-schemas), not only hookEventName.
+  test("[M5] doctor-hook/D5-reply-outside-the-host-schema-FAILs-shape", async (t) => {
+    const bad = JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "block" } });
+    const r = await checkHookRoundTrip(input(bundle(t, bad)));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_SHAPE_DETAIL, fixCommand: C.D5_FIX });
+  });
+
   test("[M5] doctor-hook/D5-non-json-output-FAILs-shape", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, "not json")));
     assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_SHAPE_DETAIL, fixCommand: C.D5_FIX });

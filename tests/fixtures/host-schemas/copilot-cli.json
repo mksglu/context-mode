@@ -1,0 +1,135 @@
+{
+  "host": "copilot-cli",
+  "source": "GitHub Copilot CLI 1.0.105 copilot-sdk/types.d.ts: PreToolUseHookOutput, PostToolUseHookOutput (modifiedResult: ToolResultObject, ToolResultType), UserPromptSubmittedHookOutput, SessionStartHookOutput. Replies are flat objects with no hookSpecificOutput.",
+  "output": {
+    "PreToolUse": {
+      "title": "Copilot CLI 1.0.105 preToolUse reply",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permissionDecision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "ask"
+          ]
+        },
+        "permissionDecisionReason": {
+          "type": "string"
+        },
+        "modifiedArgs": {
+          "description": "unknown"
+        },
+        "additionalContext": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        }
+      }
+    },
+    "PostToolUse": {
+      "title": "Copilot CLI 1.0.105 postToolUse reply",
+      "definitions": {
+        "ToolResultObject": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "textResultForLlm": {
+              "type": "string"
+            },
+            "binaryResultsForLlm": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "resultType": {
+              "type": "string",
+              "enum": [
+                "success",
+                "failure",
+                "rejected",
+                "denied",
+                "timeout"
+              ]
+            },
+            "error": {
+              "type": "string"
+            },
+            "sessionLog": {
+              "type": "string"
+            },
+            "toolTelemetry": {
+              "type": "object"
+            },
+            "toolReferences": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "textResultForLlm",
+            "resultType"
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modifiedResult": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/ToolResultObject"
+            }
+          ]
+        },
+        "additionalContext": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        }
+      }
+    },
+    "UserPromptSubmit": {
+      "title": "Copilot CLI 1.0.105 userPromptSubmitted reply",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modifiedPrompt": {
+          "type": "string"
+        },
+        "additionalContext": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "decision": {
+          "type": "string",
+          "const": "block"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "SessionStart": {
+      "title": "Copilot CLI 1.0.105 sessionStart reply",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "modifiedConfig": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}
