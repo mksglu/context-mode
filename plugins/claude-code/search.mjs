@@ -258,6 +258,31 @@ var SED_QUIET_FLAGS = Object.freeze(["-n", "--quiet", "--silent"]);
 var JQ_COMMAND = "jq";
 var READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path", "filePath"]);
 var READ_PATH_LIST_KEY = "filePaths";
+var READ_MEDIA_TYPES = Object.freeze({
+  png: { exts: [".png"], sig: [{ at: 0, bytes: [137, 80, 78, 71, 13, 10, 26, 10] }] },
+  jpeg: { exts: [".jpg", ".jpeg"], sig: [{ at: 0, bytes: [255, 216, 255] }] },
+  gif: { exts: [".gif"], sig: [{ at: 0, bytes: [71, 73, 70, 56] }] },
+  // "GIF8"
+  webp: { exts: [".webp"], sig: [{ at: 0, bytes: [82, 73, 70, 70] }, { at: 8, bytes: [87, 69, 66, 80] }] },
+  // "RIFF" .... "WEBP"
+  pdf: { exts: [".pdf"], sig: [{ at: 0, bytes: [37, 80, 68, 70, 45] }] }
+  // "%PDF-"
+});
+var READ_MEDIA_SNIFF_BYTES = 12;
+var READ_IMAGES = Object.freeze(["png", "jpeg", "gif", "webp"]);
+var READ_IMAGES_AND_PDF = Object.freeze([...READ_IMAGES, "pdf"]);
+var READ_MEDIA_BY_AGENT = Object.freeze({
+  "claude-code": READ_IMAGES_AND_PDF,
+  gemini: READ_IMAGES_AND_PDF,
+  qwen: READ_IMAGES_AND_PDF,
+  opencode: READ_IMAGES_AND_PDF,
+  pi: READ_IMAGES,
+  vscode: READ_IMAGES,
+  "copilot-cli": [],
+  codex: [],
+  kiro: [],
+  zcode: []
+});
 var EDIT_TOOLS = Object.freeze(["Write", "Edit"]);
 var EDIT_PATH_KEYS = Object.freeze(["file_path", "path"]);
 var STATS_COLUMNS = Object.freeze(["Scope", "Produced", "Returned", "Saved", "Reduction %"]);
@@ -719,10 +744,17 @@ function encode(ev, d, _extra) {
 // src/adapters/codex.ts
 var TOOL_NAME_PREFIX2 = "mcp__context_mode__";
 var CODEX_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact", fork: "resume" };
+var STOP_EVENT = "Stop";
+var EMPTY = { stdout: "", exitCode: 0 };
 function decode2(raw) {
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === STOP_EVENT) {
+    const p = raw;
+    return { event: STOP_EVENT, agent: "codex", sessionId: String(p.session_id ?? ""), cwd: String(p.cwd ?? "") };
+  }
   return decodeClaudeShape(raw, "codex", TOOL_NAME_PREFIX2, CODEX_SOURCES);
 }
 function encode2(ev, d, _extra) {
+  if (ev.event === STOP_EVENT) return EMPTY;
   return encodeClaudeShape(ev, d, false);
 }
 
@@ -738,7 +770,7 @@ var GEMINI_EVENTS = {
 var GEMINI_SOURCES = { startup: "startup", resume: "resume", clear: "clear" };
 var HINT_EVENTS = ["SessionStart", "UserPromptSubmit", "PostToolUse"];
 var DENY_EVENTS = ["UserPromptSubmit", "PreToolUse"];
-var EMPTY = { stdout: "", exitCode: 0 };
+var EMPTY2 = { stdout: "", exitCode: 0 };
 var GEMINI_REPLACE_LEAD = "the tool ran and succeeded; context-mode indexed its full output, and this is the part that answers the call:\n";
 function own(p, key) {
   return Object.hasOwn(p, key) ? p[key] : void 0;
@@ -779,7 +811,13 @@ function readResult2(resp) {
   const llm = obj === void 0 ? void 0 : own(obj, "llmContent");
   const text = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : partsText(llm) ?? JSON.stringify(resp);
   const err = obj === void 0 ? void 0 : own(obj, "error");
-  return { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
+  const info = { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
+  if (hasMediaPart(llm)) info.keep = true;
+  return info;
+}
+function hasMediaPart(llm) {
+  const parts = Array.isArray(llm) ? llm : [llm];
+  return parts.some((p) => typeof p === "object" && p !== null && (Object.hasOwn(p, "inlineData") || Object.hasOwn(p, "fileData")));
 }
 var URL_STARTS = ["https://", "http://"];
 var URL_TRAIL = `.,;:!?)]}>'"`;
@@ -846,15 +884,15 @@ function decode3(raw) {
 function encode3(ev, d, _extra) {
   switch (d.kind) {
     case "allow":
-      return EMPTY;
+      return EMPTY2;
     case "hint":
-      if (!HINT_EVENTS.includes(ev.event)) return EMPTY;
+      if (!HINT_EVENTS.includes(ev.event)) return EMPTY2;
       return { stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: d.text } }), exitCode: 0 };
     case "deny":
-      if (!DENY_EVENTS.includes(ev.event)) return EMPTY;
+      if (!DENY_EVENTS.includes(ev.event)) return EMPTY2;
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
-      if (ev.event !== "PostToolUse") return EMPTY;
+      if (ev.event !== "PostToolUse") return EMPTY2;
       return { stdout: JSON.stringify({ decision: "deny", reason: GEMINI_REPLACE_LEAD + d.output }), exitCode: 0 };
   }
 }
@@ -974,21 +1012,21 @@ function decode5(raw) {
   if (event === "PostToolUse") ev.result = readResult3(raw[k.result], native.casing, native.failure);
   return ev;
 }
-var EMPTY2 = { stdout: "", exitCode: 0 };
+var EMPTY3 = { stdout: "", exitCode: 0 };
 function encode5(ev, d, _extra) {
   switch (d.kind) {
     case "allow":
-      return EMPTY2;
+      return EMPTY3;
     case "hint":
-      return ev.event === "PostToolUse" ? EMPTY2 : { stdout: JSON.stringify({ additionalContext: d.text }), exitCode: 0 };
+      return ev.event === "PostToolUse" ? EMPTY3 : { stdout: JSON.stringify({ additionalContext: d.text }), exitCode: 0 };
     case "deny":
-      if (ev.event !== "PreToolUse") return EMPTY2;
+      if (ev.event !== "PreToolUse") return EMPTY3;
       return {
         stdout: JSON.stringify({ permissionDecision: "deny", permissionDecisionReason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }),
         exitCode: 0
       };
     case "replace":
-      if (ev.event !== "PostToolUse") return EMPTY2;
+      if (ev.event !== "PostToolUse") return EMPTY3;
       return { stdout: JSON.stringify({ modifiedResult: { resultType: RESULT_SUCCESS, textResultForLlm: d.output } }), exitCode: 0 };
   }
 }
@@ -4208,7 +4246,7 @@ var HEAD_BYTES = "-c";
 var HEAD_BYTES_LONG = "--bytes";
 var GREP_COUNT_SHORT = "c";
 var GREP_COUNT_LONG = "--count";
-var EMPTY3 = () => ({ cmds: [], simple: null });
+var EMPTY4 = () => ({ cmds: [], simple: null });
 var at = (p, k = 0) => p.toks[p.i + k];
 var isOp = (t, text) => t !== void 0 && t.kind === "op" && t.text === text;
 var isWord = (t, text) => t !== void 0 && t.kind === "word" && t.text === text;
@@ -4325,7 +4363,7 @@ function compound(p, body) {
   p.depth++;
   if (p.depth > MAX_NEST_DEPTH) {
     p.err = "nesting-too-deep";
-    return EMPTY3();
+    return EMPTY4();
   }
   const cmds = body();
   p.depth--;
@@ -4453,7 +4491,7 @@ function simple(p) {
     words2.push(t);
     p.i++;
   }
-  if (p.i === first) return EMPTY3();
+  if (p.i === first) return EMPTY4();
   const raw = p.src.slice(p.toks[first].start, p.toks[p.i - 1].end);
   if (words2.length === 0) return { cmds: carrier(raw), simple: null };
   const text = (t) => t.kind === "word" ? dequote(t.text) : t.text;
@@ -4464,9 +4502,9 @@ function simple(p) {
 }
 function element(p) {
   const t = at(p);
-  if (t === void 0) return EMPTY3();
+  if (t === void 0) return EMPTY4();
   if (t.kind === "op") {
-    if (t.text !== SUBSHELL_OPEN) return EMPTY3();
+    if (t.text !== SUBSHELL_OPEN) return EMPTY4();
     return compound(p, () => {
       p.i++;
       const body = list(p, NO_STOP);
@@ -4499,10 +4537,10 @@ function element(p) {
         return compound(p, () => caseBody(p));
       case KW.coproc:
         p.err = "coproc";
-        return EMPTY3();
+        return EMPTY4();
       case KW.select:
         p.err = "select";
-        return EMPTY3();
+        return EMPTY4();
       case KW.function: {
         p.i++;
         const nameTok = at(p);
@@ -4526,7 +4564,7 @@ function element(p) {
 function pipeline(p) {
   if (isWord(at(p), NOT)) p.i++;
   const all = [];
-  let last = EMPTY3();
+  let last = EMPTY4();
   while (p.err === null) {
     last = element(p);
     append(all, last.cmds);
@@ -4883,21 +4921,21 @@ function cdTarget(words2) {
 function walk(script, cwd, depth, found) {
   let dir = cwd;
   for (const stages of psParse(script)) {
-    const head = stages[0];
-    if (head.words.length === 0) continue;
-    const name = cmdName(head.words[0]);
+    const head2 = stages[0];
+    if (head2.words.length === 0) continue;
+    const name = cmdName(head2.words[0]);
     if (stages.length === 1 && CD_COMMANDS.includes(name)) {
-      const t = cdTarget(head.words);
+      const t = cdTarget(head2.words);
       if (t !== null) dir = resolve(dir, t);
       continue;
     }
-    const inner = depth < MAX_NEST_DEPTH ? nestedScript(name, head.words) : null;
+    const inner = depth < MAX_NEST_DEPTH ? nestedScript(name, head2.words) : null;
     if (inner !== null) {
       walk(inner, dir, depth + 1, found);
       continue;
     }
-    if (head.toFile || head.chained) continue;
-    const d = psDump(head.words);
+    if (head2.toFile || head2.chained) continue;
+    const d = psDump(head2.words);
     if (d === null || d.bounded) continue;
     let shown = true;
     for (let k = 1; k < stages.length; k++) {
@@ -5232,6 +5270,33 @@ function READ_DENY_MESSAGE(path3, size, prefix = "") {
   return prefixToolNames(READ_DENY_TEMPLATE, prefix).split(SIZE).join(String(size)).split(PATH).join(path3);
 }
 
+// src/core/policy/read-media.ts
+import { extname } from "node:path";
+var { closeSync, openSync, readSync } = process.getBuiltinModule("node:fs");
+function head(abs) {
+  let fd = null;
+  try {
+    fd = openSync(abs, "r");
+    const buf = Buffer.alloc(READ_MEDIA_SNIFF_BYTES);
+    const n = readSync(fd, buf, 0, READ_MEDIA_SNIFF_BYTES, 0);
+    return buf.subarray(0, n);
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) closeSync(fd);
+  }
+}
+function isMediaRead(agent, abs) {
+  const types = READ_MEDIA_BY_AGENT[agent] ?? [];
+  if (types.length === 0) return false;
+  const ext = extname(abs).toLowerCase();
+  const named = types.filter((t) => READ_MEDIA_TYPES[t].exts.includes(ext));
+  if (named.length === 0) return false;
+  const bytes2 = head(abs);
+  if (bytes2 === null) return false;
+  return named.some((t) => READ_MEDIA_TYPES[t].sig.every((s) => s.bytes.every((b, i) => bytes2[s.at + i] === b)));
+}
+
 // src/core/policy/decide.ts
 var { statSync } = process.getBuiltinModule("node:fs");
 var BASH = "Bash";
@@ -5435,7 +5500,7 @@ function read(ev, row, input) {
     for (const p of readPaths(input)) {
       const abs = resolve3(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
     }
   }
   return ALLOW;
@@ -6126,14 +6191,14 @@ function lineBlocks(src, md) {
       close();
     } else {
       const opener = md ? fenceOf(line) : "";
-      const head = md && opener === "" ? headingOf(line) : void 0;
-      const table = md && opener === "" && head === void 0 && line.includes("|");
-      if (md && start >= 0 && (table !== inTable || opener !== "" || head !== void 0)) close();
+      const head2 = md && opener === "" ? headingOf(line) : void 0;
+      const table = md && opener === "" && head2 === void 0 && line.includes("|");
+      if (md && start >= 0 && (table !== inTable || opener !== "" || head2 !== void 0)) close();
       add(pos, eol, table);
       fence = opener;
       if (opener !== "") fenceInfo = { fence: opener, openEnd: eol, closeStart: -1 };
-      if (head !== void 0) {
-        heading = head;
+      if (head2 !== void 0) {
+        heading = head2;
         close();
       }
     }
@@ -6434,14 +6499,14 @@ async function runWrapperMain(argv, env) {
     if (r.exitCode === null) throw new CtxError("SPAWN_FAILED", { detail: runtime + " gave no exit code in " + cwd });
     const exitCode = r.exitCode;
     const combined = r.stdout.toString("utf8") + (exitCode !== 0 ? r.stderr.toString("utf8") : "");
-    const head = "exit " + exitCode + " \xB7 " + bytes(combined) + " B";
+    const head2 = "exit " + exitCode + " \xB7 " + bytes(combined) + " B";
     const db = await openDb(project);
     let text;
     try {
       const { sourceId } = indexText(db, project, sessionId, sourceLabel(command), combined, "text");
       const more = moreLine2(dirname4(argv[1] ?? ""), sourceId, description);
-      const picked = selectChunks(db, sourceId, description, OUTPUT_CAP - bytes(head) - bytes(more) - 2);
-      text = head + "\n" + picked.text + (picked.more === null ? "" : "\n" + more);
+      const picked = selectChunks(db, sourceId, description, OUTPUT_CAP - bytes(head2) - bytes(more) - 2);
+      text = head2 + "\n" + picked.text + (picked.more === null ? "" : "\n" + more);
     } finally {
       closeDb(db);
     }

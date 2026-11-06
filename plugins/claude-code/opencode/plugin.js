@@ -322,6 +322,31 @@ var SED_QUIET_FLAGS = Object.freeze(["-n", "--quiet", "--silent"]);
 var JQ_COMMAND = "jq";
 var READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path", "filePath"]);
 var READ_PATH_LIST_KEY = "filePaths";
+var READ_MEDIA_TYPES = Object.freeze({
+  png: { exts: [".png"], sig: [{ at: 0, bytes: [137, 80, 78, 71, 13, 10, 26, 10] }] },
+  jpeg: { exts: [".jpg", ".jpeg"], sig: [{ at: 0, bytes: [255, 216, 255] }] },
+  gif: { exts: [".gif"], sig: [{ at: 0, bytes: [71, 73, 70, 56] }] },
+  // "GIF8"
+  webp: { exts: [".webp"], sig: [{ at: 0, bytes: [82, 73, 70, 70] }, { at: 8, bytes: [87, 69, 66, 80] }] },
+  // "RIFF" .... "WEBP"
+  pdf: { exts: [".pdf"], sig: [{ at: 0, bytes: [37, 80, 68, 70, 45] }] }
+  // "%PDF-"
+});
+var READ_MEDIA_SNIFF_BYTES = 12;
+var READ_IMAGES = Object.freeze(["png", "jpeg", "gif", "webp"]);
+var READ_IMAGES_AND_PDF = Object.freeze([...READ_IMAGES, "pdf"]);
+var READ_MEDIA_BY_AGENT = Object.freeze({
+  "claude-code": READ_IMAGES_AND_PDF,
+  gemini: READ_IMAGES_AND_PDF,
+  qwen: READ_IMAGES_AND_PDF,
+  opencode: READ_IMAGES_AND_PDF,
+  pi: READ_IMAGES,
+  vscode: READ_IMAGES,
+  "copilot-cli": [],
+  codex: [],
+  kiro: [],
+  zcode: []
+});
 var OWN_TOOL_PREFIX = "ctx_";
 var SHELL_TOOL = "Bash";
 var EDIT_TOOLS = Object.freeze(["Write", "Edit"]);
@@ -431,7 +456,7 @@ var DECISION_ANSWERS_KEY = "answers";
 var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "b496e208f503714cb28500a0b5767799ba882039" : void 0;
+var BUNDLE_SHA = true ? "f75e51d580374d518a8ceefc1422a009ffe67311" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -684,10 +709,12 @@ var REGEX_ESCAPE = "\\";
 var CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"]);
 var D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
 var D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the replace trigger came back replaced: a bounded Read must reach the model whole";
+var D5_READ_MEDIA_DETAIL = "PreToolUse Read of a PNG over the one-read limit came back denied: an image Read must reach the model as an image block (#1321)";
 var D5_READ_SHAPE_DETAIL = `PostToolUse Read replace is not Read's output shape {type:"text", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning`;
 function D5_SLOW_DETAIL(ms) {
   return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`;
 }
+var D5_STOP_DETAIL = "Codex Stop event: the hook did not give an empty or Codex Stop reply, or it logged a hook error";
 var D5_FIX = "run ctx_upgrade";
 var PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";
 function D10_DETAIL(mode) {
@@ -1235,10 +1262,17 @@ function encode(ev, d, _extra) {
 // src/adapters/codex.ts
 var TOOL_NAME_PREFIX2 = "mcp__context_mode__";
 var CODEX_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact", fork: "resume" };
+var STOP_EVENT = "Stop";
+var EMPTY = { stdout: "", exitCode: 0 };
 function decode2(raw) {
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === STOP_EVENT) {
+    const p = raw;
+    return { event: STOP_EVENT, agent: "codex", sessionId: String(p.session_id ?? ""), cwd: String(p.cwd ?? "") };
+  }
   return decodeClaudeShape(raw, "codex", TOOL_NAME_PREFIX2, CODEX_SOURCES);
 }
 function encode2(ev, d, _extra) {
+  if (ev.event === STOP_EVENT) return EMPTY;
   return encodeClaudeShape(ev, d, false);
 }
 
@@ -1254,7 +1288,7 @@ var GEMINI_EVENTS = {
 var GEMINI_SOURCES = { startup: "startup", resume: "resume", clear: "clear" };
 var HINT_EVENTS = ["SessionStart", "UserPromptSubmit", "PostToolUse"];
 var DENY_EVENTS = ["UserPromptSubmit", "PreToolUse"];
-var EMPTY = { stdout: "", exitCode: 0 };
+var EMPTY2 = { stdout: "", exitCode: 0 };
 var GEMINI_REPLACE_LEAD = "the tool ran and succeeded; context-mode indexed its full output, and this is the part that answers the call:\n";
 function own(p, key) {
   return Object.hasOwn(p, key) ? p[key] : void 0;
@@ -1295,7 +1329,13 @@ function readResult2(resp) {
   const llm = obj === void 0 ? void 0 : own(obj, "llmContent");
   const text = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : partsText(llm) ?? JSON.stringify(resp);
   const err = obj === void 0 ? void 0 : own(obj, "error");
-  return { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
+  const info = { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
+  if (hasMediaPart(llm)) info.keep = true;
+  return info;
+}
+function hasMediaPart(llm) {
+  const parts = Array.isArray(llm) ? llm : [llm];
+  return parts.some((p) => typeof p === "object" && p !== null && (Object.hasOwn(p, "inlineData") || Object.hasOwn(p, "fileData")));
 }
 var URL_STARTS = ["https://", "http://"];
 var URL_TRAIL = `.,;:!?)]}>'"`;
@@ -1362,15 +1402,15 @@ function decode3(raw) {
 function encode3(ev, d, _extra) {
   switch (d.kind) {
     case "allow":
-      return EMPTY;
+      return EMPTY2;
     case "hint":
-      if (!HINT_EVENTS.includes(ev.event)) return EMPTY;
+      if (!HINT_EVENTS.includes(ev.event)) return EMPTY2;
       return { stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: d.text } }), exitCode: 0 };
     case "deny":
-      if (!DENY_EVENTS.includes(ev.event)) return EMPTY;
+      if (!DENY_EVENTS.includes(ev.event)) return EMPTY2;
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
-      if (ev.event !== "PostToolUse") return EMPTY;
+      if (ev.event !== "PostToolUse") return EMPTY2;
       return { stdout: JSON.stringify({ decision: "deny", reason: GEMINI_REPLACE_LEAD + d.output }), exitCode: 0 };
   }
 }
@@ -1490,21 +1530,21 @@ function decode5(raw) {
   if (event === "PostToolUse") ev.result = readResult3(raw[k.result], native.casing, native.failure);
   return ev;
 }
-var EMPTY2 = { stdout: "", exitCode: 0 };
+var EMPTY3 = { stdout: "", exitCode: 0 };
 function encode5(ev, d, _extra) {
   switch (d.kind) {
     case "allow":
-      return EMPTY2;
+      return EMPTY3;
     case "hint":
-      return ev.event === "PostToolUse" ? EMPTY2 : { stdout: JSON.stringify({ additionalContext: d.text }), exitCode: 0 };
+      return ev.event === "PostToolUse" ? EMPTY3 : { stdout: JSON.stringify({ additionalContext: d.text }), exitCode: 0 };
     case "deny":
-      if (ev.event !== "PreToolUse") return EMPTY2;
+      if (ev.event !== "PreToolUse") return EMPTY3;
       return {
         stdout: JSON.stringify({ permissionDecision: "deny", permissionDecisionReason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }),
         exitCode: 0
       };
     case "replace":
-      if (ev.event !== "PostToolUse") return EMPTY2;
+      if (ev.event !== "PostToolUse") return EMPTY3;
       return { stdout: JSON.stringify({ modifiedResult: { resultType: RESULT_SUCCESS, textResultForLlm: d.output } }), exitCode: 0 };
   }
 }
@@ -2636,7 +2676,7 @@ var HEAD_BYTES = "-c";
 var HEAD_BYTES_LONG = "--bytes";
 var GREP_COUNT_SHORT = "c";
 var GREP_COUNT_LONG = "--count";
-var EMPTY3 = () => ({ cmds: [], simple: null });
+var EMPTY4 = () => ({ cmds: [], simple: null });
 var at = (p, k = 0) => p.toks[p.i + k];
 var isOp = (t, text) => t !== void 0 && t.kind === "op" && t.text === text;
 var isWord = (t, text) => t !== void 0 && t.kind === "word" && t.text === text;
@@ -2753,7 +2793,7 @@ function compound(p, body) {
   p.depth++;
   if (p.depth > MAX_NEST_DEPTH) {
     p.err = "nesting-too-deep";
-    return EMPTY3();
+    return EMPTY4();
   }
   const cmds = body();
   p.depth--;
@@ -2881,7 +2921,7 @@ function simple(p) {
     words2.push(t);
     p.i++;
   }
-  if (p.i === first) return EMPTY3();
+  if (p.i === first) return EMPTY4();
   const raw = p.src.slice(p.toks[first].start, p.toks[p.i - 1].end);
   if (words2.length === 0) return { cmds: carrier(raw), simple: null };
   const text = (t) => t.kind === "word" ? dequote(t.text) : t.text;
@@ -2892,9 +2932,9 @@ function simple(p) {
 }
 function element(p) {
   const t = at(p);
-  if (t === void 0) return EMPTY3();
+  if (t === void 0) return EMPTY4();
   if (t.kind === "op") {
-    if (t.text !== SUBSHELL_OPEN) return EMPTY3();
+    if (t.text !== SUBSHELL_OPEN) return EMPTY4();
     return compound(p, () => {
       p.i++;
       const body = list(p, NO_STOP);
@@ -2927,10 +2967,10 @@ function element(p) {
         return compound(p, () => caseBody(p));
       case KW.coproc:
         p.err = "coproc";
-        return EMPTY3();
+        return EMPTY4();
       case KW.select:
         p.err = "select";
-        return EMPTY3();
+        return EMPTY4();
       case KW.function: {
         p.i++;
         const nameTok = at(p);
@@ -2954,7 +2994,7 @@ function element(p) {
 function pipeline(p) {
   if (isWord(at(p), NOT)) p.i++;
   const all = [];
-  let last2 = EMPTY3();
+  let last2 = EMPTY4();
   while (p.err === null) {
     last2 = element(p);
     append(all, last2.cmds);
@@ -3311,21 +3351,21 @@ function cdTarget(words2) {
 function walk(script, cwd, depth, found) {
   let dir = cwd;
   for (const stages of psParse(script)) {
-    const head = stages[0];
-    if (head.words.length === 0) continue;
-    const name = cmdName(head.words[0]);
+    const head2 = stages[0];
+    if (head2.words.length === 0) continue;
+    const name = cmdName(head2.words[0]);
     if (stages.length === 1 && CD_COMMANDS.includes(name)) {
-      const t = cdTarget(head.words);
+      const t = cdTarget(head2.words);
       if (t !== null) dir = resolve(dir, t);
       continue;
     }
-    const inner = depth < MAX_NEST_DEPTH ? nestedScript(name, head.words) : null;
+    const inner = depth < MAX_NEST_DEPTH ? nestedScript(name, head2.words) : null;
     if (inner !== null) {
       walk(inner, dir, depth + 1, found);
       continue;
     }
-    if (head.toFile || head.chained) continue;
-    const d = psDump(head.words);
+    if (head2.toFile || head2.chained) continue;
+    const d = psDump(head2.words);
     if (d === null || d.bounded) continue;
     let shown2 = true;
     for (let k = 1; k < stages.length; k++) {
@@ -3968,6 +4008,33 @@ function READ_DENY_MESSAGE(path8, size, prefix = "") {
   return prefixToolNames(READ_DENY_TEMPLATE, prefix).split(SIZE).join(String(size)).split(PATH).join(path8);
 }
 
+// src/core/policy/read-media.ts
+import { extname } from "node:path";
+var { closeSync, openSync, readSync } = process.getBuiltinModule("node:fs");
+function head(abs) {
+  let fd = null;
+  try {
+    fd = openSync(abs, "r");
+    const buf = Buffer.alloc(READ_MEDIA_SNIFF_BYTES);
+    const n = readSync(fd, buf, 0, READ_MEDIA_SNIFF_BYTES, 0);
+    return buf.subarray(0, n);
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) closeSync(fd);
+  }
+}
+function isMediaRead(agent, abs) {
+  const types = READ_MEDIA_BY_AGENT[agent] ?? [];
+  if (types.length === 0) return false;
+  const ext = extname(abs).toLowerCase();
+  const named2 = types.filter((t) => READ_MEDIA_TYPES[t].exts.includes(ext));
+  if (named2.length === 0) return false;
+  const bytes5 = head(abs);
+  if (bytes5 === null) return false;
+  return named2.some((t) => READ_MEDIA_TYPES[t].sig.every((s) => s.bytes.every((b, i) => bytes5[s.at + i] === b)));
+}
+
 // src/core/policy/decide.ts
 var { statSync } = process.getBuiltinModule("node:fs");
 var BASH = "Bash";
@@ -4171,7 +4238,7 @@ function read(ev, row5, input) {
     for (const p of readPaths(input)) {
       const abs = resolve3(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row5.toolNamePrefix));
+      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) return deny(READ_DENY_MESSAGE(abs, size, row5.toolNamePrefix));
     }
   }
   return ALLOW;
@@ -7935,14 +8002,14 @@ function lineBlocks(src, md) {
       close();
     } else {
       const opener = md ? fenceOf(line) : "";
-      const head = md && opener === "" ? headingOf(line) : void 0;
-      const table3 = md && opener === "" && head === void 0 && line.includes("|");
-      if (md && start >= 0 && (table3 !== inTable || opener !== "" || head !== void 0)) close();
+      const head2 = md && opener === "" ? headingOf(line) : void 0;
+      const table3 = md && opener === "" && head2 === void 0 && line.includes("|");
+      if (md && start >= 0 && (table3 !== inTable || opener !== "" || head2 !== void 0)) close();
       add(pos, eol, table3);
       fence = opener;
       if (opener !== "") fenceInfo = { fence: opener, openEnd: eol, closeStart: -1 };
-      if (head !== void 0) {
-        heading = head;
+      if (head2 !== void 0) {
+        heading = head2;
         close();
       }
     }
@@ -8374,9 +8441,9 @@ function hasDigit(t) {
   return false;
 }
 function similarity(tpl, toks) {
-  let same = 0;
-  for (let i = 0; i < tpl.length; i++) if (tpl[i] === toks[i] || tpl[i] === "<*>" || toks[i] === "<*>") same++;
-  return same / tpl.length;
+  let same2 = 0;
+  for (let i = 0; i < tpl.length; i++) if (tpl[i] === toks[i] || tpl[i] === "<*>" || toks[i] === "<*>") same2++;
+  return same2 / tpl.length;
 }
 function lineShape(text) {
   const all = text.split("\n");
@@ -8670,10 +8737,10 @@ function bigFile(abs) {
     return false;
   }
 }
-function bigRead(input, cwd) {
+function bigRead(agent, input, cwd) {
   if ((input.offset ?? null) !== null || (input.limit ?? null) !== null) return false;
   const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? input[READ_PATH_LIST_KEY].filter((x) => typeof x === "string") : [];
-  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve5(cwd, p)));
+  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve5(cwd, p)) && !isMediaRead(agent, resolve5(cwd, p)));
 }
 function failureOutput(agent, raw, err, cwdFallback = "") {
   const row5 = getAdapter(agent);
@@ -8686,7 +8753,7 @@ function failureOutput(agent, raw, err, cwdFallback = "") {
     const kind = kindOf(row5, name);
     if (kind === null) return allow();
     const cwd = firstString(raw, HOOK_FAIL_CWD_KEYS) || cwdFallback;
-    if (kind === "read" && !bigRead(inputOf(raw), cwd)) return allow();
+    if (kind === "read" && !bigRead(agent, inputOf(raw), cwd)) return allow();
     const redirect = kind === "read" ? HOOK_FAIL_REDIRECT.read : HOOK_FAIL_REDIRECT[kind];
     const reason = prefixToolNames(redirect, row5.toolNamePrefix) + "\n" + HOOK_FAIL_LINE(errorLabel(err), row5.toolNamePrefix);
     return row5.encode({ event: "PreToolUse", agent, sessionId: "", cwd, turn: 0 }, { kind: "deny", reason });
@@ -8701,7 +8768,7 @@ var { read: read2, writeSync } = process.getBuiltinModule("node:fs");
 // src/core/hooks/dispatch.ts
 var { lstatSync: lstatSync2, readFileSync: readFileSync4 } = process.getBuiltinModule("node:fs");
 var ALLOW2 = { kind: "allow" };
-var EMPTY4 = { stdout: "", exitCode: 0 };
+var EMPTY5 = { stdout: "", exitCode: 0 };
 var DIGIT_0 = 48;
 function isAgentId(s) {
   return AGENT_IDS.includes(s);
@@ -8715,7 +8782,7 @@ function str2(v) {
 async function handleHook(agent, raw, env) {
   if (!isAgentId(agent)) {
     process.stderr.write("hooks: unknown agent " + JSON.stringify(agent) + "\n");
-    return EMPTY4;
+    return EMPTY5;
   }
   const row5 = getAdapter(agent);
   const fail7 = (stage, err, line) => {
@@ -8731,6 +8798,7 @@ async function handleHook(agent, raw, env) {
   } catch (err) {
     return fail7("decode", err);
   }
+  if (ev.event === "Stop") return row5.encode(ev, ALLOW2);
   let project;
   try {
     fault(env, "project");
@@ -9090,16 +9158,16 @@ function hostToolResult(file2, sessionId, env) {
   return st.isFile() && st.size <= PERSISTED_OUTPUT_MAX_BYTES && isInside(projects, file2);
 }
 function wholeOutput(result, sessionId, env) {
-  const head = result.text ?? "";
-  if (result.persistedPath === void 0) return head;
+  const head2 = result.text ?? "";
+  if (result.persistedPath === void 0) return head2;
   try {
     if (!hostToolResult(result.persistedPath, sessionId, env)) {
       logHookError(env, "claude-code", "persisted-output", new Error("persisted output path is outside this session's tool-results dir or too large; kept the head"));
-      return head;
+      return head2;
     }
     return readFileSync4(result.persistedPath, "utf8");
   } catch {
-    return head;
+    return head2;
   }
 }
 async function lastPrompt(project, sessionId) {
@@ -9112,8 +9180,8 @@ async function lastPrompt(project, sessionId) {
 function mainLabel(tool, ev) {
   const cmd = str2(tool.input.command) ?? str2(tool.input.file_path) ?? "";
   const nl = cmd.indexOf("\n");
-  const head = (tool.canonicalName + ":" + (nl < 0 ? cmd : cmd.slice(0, nl))).slice(0, SOURCE_LABEL_MAX_CHARS);
-  return head + "#" + (tool.callId ?? String(ev.turn ?? 0));
+  const head2 = (tool.canonicalName + ":" + (nl < 0 ? cmd : cmd.slice(0, nl))).slice(0, SOURCE_LABEL_MAX_CHARS);
+  return head2 + "#" + (tool.callId ?? String(ev.turn ?? 0));
 }
 function indexDetached(project, sessionId, sourceId, label2, text, chunks) {
   void openDb(project).then((db) => {
@@ -11830,7 +11898,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject6 = isObject3;
+  const isObject7 = isObject3;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -11839,7 +11907,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject6(input)) {
+    if (!isObject7(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -20459,10 +20527,10 @@ function startArgv(argv) {
   return sh === null ? null : [sh, ...argv];
 }
 function runProcess(argv, o) {
-  return new Promise((resolve9) => {
+  return new Promise((resolve10) => {
     const isWin2 = process.platform === "win32";
     const start = startArgv(argv);
-    if (start === null) return resolve9(NOT_STARTED);
+    if (start === null) return resolve10(NOT_STARTED);
     let child;
     try {
       child = spawn(start[0], start.slice(1), {
@@ -20476,7 +20544,7 @@ function runProcess(argv, o) {
         windowsHide: true
       });
     } catch {
-      return resolve9(NOT_STARTED);
+      return resolve10(NOT_STARTED);
     }
     const stdoutChunks = [];
     const stderrChunks = [];
@@ -20501,7 +20569,7 @@ function runProcess(argv, o) {
       settled = true;
       clearTimeout(timer);
       o.signal.removeEventListener("abort", onAbort);
-      resolve9({
+      resolve10({
         stdout: Buffer.concat(stdoutChunks),
         stderr: Buffer.concat(stderrChunks),
         exitCode,
@@ -20775,9 +20843,9 @@ function relevance(db, given, scope, ctx, nm, ms, indexed) {
       more.push({ q, pos: offset });
       return;
     }
-    const head = "Query " + JSON.stringify(q) + ":";
-    lines.push(head);
-    used += bytes2(head) + 1;
+    const head2 = "Query " + JSON.stringify(q) + ":";
+    lines.push(head2);
+    used += bytes2(head2) + 1;
     const again = /* @__PURE__ */ new Map();
     const mine = /* @__PURE__ */ new Set();
     let cut = -1;
@@ -21035,8 +21103,8 @@ function answer2(db, ctx, ownIds, queries, share, own2) {
     if (ctx.signal.aborted) break;
     let hits = ownIds.length === 0 ? [] : ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0, void 0, ownIds);
     if (hits.length === 0) hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0);
-    const head = "## " + (bytes3(q) > ECHO_MAX_BYTES ? "query " + (qi + 1) : q);
-    let used = bytes3(head) + 1;
+    const head2 = "## " + (bytes3(q) > ECHO_MAX_BYTES ? "query " + (qi + 1) : q);
+    let used = bytes3(head2) + 1;
     const body = [];
     for (const h of hits) {
       const key = chunkKey(h.sourceId, h.ord);
@@ -21054,7 +21122,7 @@ function answer2(db, ctx, ownIds, queries, share, own2) {
     }
     if (hits.length === 0) body.push("No hits.");
     else if (body.length === 0) body.push("No new section.");
-    lines.push(head, ...body);
+    lines.push(head2, ...body);
   }
   return { lines, seen };
 }
@@ -24697,20 +24765,20 @@ function highestTag(stdout, tag2) {
   }
   return best;
 }
-function versionRow(head, installed, tag2, source, latest, tail) {
+function versionRow(head2, installed, tag2, source, latest, tail) {
   const cmp = compareVersions(installed, latest) ?? (installed === latest ? 0 : -1);
-  if (cmp === 0) return pass3("D1", head + D1_LATEST_PASS(tag2, source) + tail);
-  if (cmp > 0) return pass3("D1", head + D1_LATEST_AHEAD(tag2, source, latest) + tail);
-  return fail4("D1", head + D1_LATEST_UPDATE(tag2, source, latest) + tail, DOCTOR_FIX_UPGRADE);
+  if (cmp === 0) return pass3("D1", head2 + D1_LATEST_PASS(tag2, source) + tail);
+  if (cmp > 0) return pass3("D1", head2 + D1_LATEST_AHEAD(tag2, source, latest) + tail);
+  return fail4("D1", head2 + D1_LATEST_UPDATE(tag2, source, latest) + tail, DOCTOR_FIX_UPGRADE);
 }
 async function checkVersion(i) {
   if (i.bundleSha === void 0) return unknown3("D1", D1_DEV_BUILD_DETAIL);
-  const head = D1_PREFIX(i.version, i.bundleSha) + ": ";
-  if (i.version === void 0) return unknown3("D1", head + D1_LATEST_UNKNOWN + ", " + D1_NO_VERSION, D1_NPM_CHECK_FIX);
+  const head2 = D1_PREFIX(i.version, i.bundleSha) + ": ";
+  if (i.version === void 0) return unknown3("D1", head2 + D1_LATEST_UNKNOWN + ", " + D1_NO_VERSION, D1_NPM_CHECK_FIX);
   const tag2 = channelOf(i.version);
   const git2 = findRuntime(GIT_BIN, i.env);
   const npm = await npmLatest(i.registryUrl, tag2, i.signal, i.timeoutMs);
-  if (npm.ok) return versionRow(head, i.version, tag2, D1_SOURCE_NPM, npm.version, "");
+  if (npm.ok) return versionRow(head2, i.version, tag2, D1_SOURCE_NPM, npm.version, "");
   let cause = D1_GIT_MISSING;
   if (git2 !== null) {
     const r = await runProcess([git2, GIT_LS_REMOTE, ...GIT_LS_REMOTE_TAG_ARGS, RELEASE_REPO_URL, RELEASE_TAG_PATTERN], {
@@ -24721,13 +24789,13 @@ async function checkVersion(i) {
     });
     if (r.exitCode === 0 && r.killed === null) {
       const latest = highestTag(r.stdout.toString("utf8"), tag2);
-      if (latest !== void 0) return versionRow(head, i.version, tag2, D1_SOURCE_TAGS, latest, D1_CAUSE_JOIN + npm.cause);
+      if (latest !== void 0) return versionRow(head2, i.version, tag2, D1_SOURCE_TAGS, latest, D1_CAUSE_JOIN + npm.cause);
       cause = D1_GIT_NO_TAG(tag2);
     } else {
       cause = gitCause(r, i.timeoutMs);
     }
   }
-  return unknown3("D1", head + D1_LATEST_UNKNOWN + ", " + npm.cause + D1_CAUSE_JOIN + cause, git2 === null ? D1_NPM_CHECK_FIX : D1_GIT_CHECK_FIX);
+  return unknown3("D1", head2 + D1_LATEST_UNKNOWN + ", " + npm.cause + D1_CAUSE_JOIN + cause, git2 === null ? D1_NPM_CHECK_FIX : D1_GIT_CHECK_FIX);
 }
 function numbers(v) {
   const bare2 = v.startsWith(NODE_VERSION_PREFIX) ? v.slice(NODE_VERSION_PREFIX.length) : v;
@@ -24784,9 +24852,1820 @@ function checkShell(env) {
 }
 
 // src/core/ops/doctor-hook.ts
-import { existsSync as existsSync12, mkdtempSync, readFileSync as readFileSync11, realpathSync as realpathSync8, rmSync as rmSync2 } from "node:fs";
+import { existsSync as existsSync12, mkdtempSync, readFileSync as readFileSync11, realpathSync as realpathSync8, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import path7 from "node:path";
+
+// tests/fixtures/host-schemas/claude-code.json
+var claude_code_default = {
+  host: "claude-code",
+  source: "Claude Code 2.1.274 native binary, zod hook output schemas: top level eW, hookSpecificOutput union members xF (PreToolUse, permissionDecision enum FK), DF (UserPromptSubmit), UF (SessionStart), the PostToolUse member. zod drops keys it does not read, so each object lists only the keys the host reads.",
+  output: {
+    PreToolUse: {
+      title: "Claude Code 2.1.274 PreToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "PreToolUse"
+            },
+            permissionDecision: {
+              type: "string",
+              enum: [
+                "allow",
+                "deny",
+                "ask",
+                "defer"
+              ]
+            },
+            permissionDecisionReason: {
+              type: "string"
+            },
+            updatedInput: {
+              type: "object"
+            },
+            additionalContext: {
+              type: "string"
+            },
+            permissionDisplay: {
+              description: "@internal Desktop host only"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        systemMessage: {
+          type: "string"
+        },
+        terminalSequence: {
+          type: "string"
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    PostToolUse: {
+      title: "Claude Code 2.1.274 PostToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "PostToolUse"
+            },
+            additionalContext: {
+              type: "string"
+            },
+            classifierContext: {
+              type: "string"
+            },
+            updatedToolOutput: {
+              description: "the tool's own output object"
+            },
+            updatedMCPToolOutput: {
+              description: "an MCP tool's own output"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        systemMessage: {
+          type: "string"
+        },
+        terminalSequence: {
+          type: "string"
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    UserPromptSubmit: {
+      title: "Claude Code 2.1.274 UserPromptSubmit reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "UserPromptSubmit"
+            },
+            additionalContext: {
+              type: "string"
+            },
+            sessionTitle: {
+              type: "string"
+            },
+            suppressOriginalPrompt: {
+              type: "boolean"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        systemMessage: {
+          type: "string"
+        },
+        terminalSequence: {
+          type: "string"
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    SessionStart: {
+      title: "Claude Code 2.1.274 SessionStart reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "SessionStart"
+            },
+            additionalContext: {
+              type: "string"
+            },
+            initialUserMessage: {
+              type: "string"
+            },
+            sessionTitle: {
+              type: "string"
+            },
+            watchPaths: {
+              type: "array",
+              items: {
+                type: "string"
+              }
+            },
+            reloadSkills: {
+              type: "boolean"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        systemMessage: {
+          type: "string"
+        },
+        terminalSequence: {
+          type: "string"
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/codex.json
+var codex_default = {
+  host: "codex",
+  source: "github.com/openai/codex tag rust-v0.166.0 codex-rs/hooks/schema/generated/*.command.output.schema.json",
+  output: {
+    PreToolUse: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      additionalProperties: false,
+      definitions: {
+        PreToolUseDecisionWire: {
+          enum: [
+            "approve",
+            "block"
+          ],
+          type: "string"
+        },
+        PreToolUseHookSpecificOutputWire: {
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              default: null,
+              type: "string"
+            },
+            hookEventName: {
+              const: "PreToolUse",
+              type: "string"
+            },
+            permissionDecision: {
+              allOf: [
+                {
+                  $ref: "#/definitions/PreToolUsePermissionDecisionWire"
+                }
+              ],
+              default: null
+            },
+            permissionDecisionReason: {
+              default: null,
+              type: "string"
+            },
+            updatedInput: {
+              default: null
+            }
+          },
+          required: [
+            "hookEventName"
+          ],
+          type: "object"
+        },
+        PreToolUsePermissionDecisionWire: {
+          enum: [
+            "allow",
+            "deny",
+            "ask"
+          ],
+          type: "string"
+        }
+      },
+      properties: {
+        continue: {
+          default: true,
+          type: "boolean"
+        },
+        decision: {
+          allOf: [
+            {
+              $ref: "#/definitions/PreToolUseDecisionWire"
+            }
+          ],
+          default: null
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/PreToolUseHookSpecificOutputWire"
+            }
+          ],
+          default: null
+        },
+        reason: {
+          default: null,
+          type: "string"
+        },
+        stopReason: {
+          default: null,
+          type: "string"
+        },
+        suppressOutput: {
+          default: false,
+          type: "boolean"
+        },
+        systemMessage: {
+          default: null,
+          type: "string"
+        }
+      },
+      title: "pre-tool-use.command.output",
+      type: "object"
+    },
+    PostToolUse: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      additionalProperties: false,
+      definitions: {
+        BlockDecisionWire: {
+          enum: [
+            "block"
+          ],
+          type: "string"
+        },
+        PostToolUseHookSpecificOutputWire: {
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              default: null,
+              type: "string"
+            },
+            hookEventName: {
+              const: "PostToolUse",
+              type: "string"
+            },
+            updatedMCPToolOutput: {
+              default: null
+            }
+          },
+          required: [
+            "hookEventName"
+          ],
+          type: "object"
+        }
+      },
+      properties: {
+        continue: {
+          default: true,
+          type: "boolean"
+        },
+        decision: {
+          allOf: [
+            {
+              $ref: "#/definitions/BlockDecisionWire"
+            }
+          ],
+          default: null
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/PostToolUseHookSpecificOutputWire"
+            }
+          ],
+          default: null
+        },
+        reason: {
+          default: null,
+          type: "string"
+        },
+        stopReason: {
+          default: null,
+          type: "string"
+        },
+        suppressOutput: {
+          default: false,
+          type: "boolean"
+        },
+        systemMessage: {
+          default: null,
+          type: "string"
+        }
+      },
+      title: "post-tool-use.command.output",
+      type: "object"
+    },
+    SessionStart: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      additionalProperties: false,
+      definitions: {
+        SessionStartHookSpecificOutputWire: {
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              default: null,
+              type: "string"
+            },
+            hookEventName: {
+              const: "SessionStart",
+              type: "string"
+            }
+          },
+          required: [
+            "hookEventName"
+          ],
+          type: "object"
+        }
+      },
+      properties: {
+        continue: {
+          default: true,
+          type: "boolean"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/SessionStartHookSpecificOutputWire"
+            }
+          ],
+          default: null
+        },
+        stopReason: {
+          default: null,
+          type: "string"
+        },
+        suppressOutput: {
+          default: false,
+          type: "boolean"
+        },
+        systemMessage: {
+          default: null,
+          type: "string"
+        }
+      },
+      title: "session-start.command.output",
+      type: "object"
+    },
+    UserPromptSubmit: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      additionalProperties: false,
+      definitions: {
+        BlockDecisionWire: {
+          enum: [
+            "block"
+          ],
+          type: "string"
+        },
+        UserPromptSubmitHookSpecificOutputWire: {
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              default: null,
+              type: "string"
+            },
+            hookEventName: {
+              const: "UserPromptSubmit",
+              type: "string"
+            }
+          },
+          required: [
+            "hookEventName"
+          ],
+          type: "object"
+        }
+      },
+      properties: {
+        continue: {
+          default: true,
+          type: "boolean"
+        },
+        decision: {
+          allOf: [
+            {
+              $ref: "#/definitions/BlockDecisionWire"
+            }
+          ],
+          default: null
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/UserPromptSubmitHookSpecificOutputWire"
+            }
+          ],
+          default: null
+        },
+        reason: {
+          default: null,
+          type: "string"
+        },
+        stopReason: {
+          default: null,
+          type: "string"
+        },
+        suppressOutput: {
+          default: false,
+          type: "boolean"
+        },
+        systemMessage: {
+          default: null,
+          type: "string"
+        }
+      },
+      title: "user-prompt-submit.command.output",
+      type: "object"
+    },
+    Stop: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      additionalProperties: false,
+      definitions: {
+        BlockDecisionWire: {
+          enum: [
+            "block"
+          ],
+          type: "string"
+        }
+      },
+      properties: {
+        continue: {
+          default: true,
+          type: "boolean"
+        },
+        decision: {
+          allOf: [
+            {
+              $ref: "#/definitions/BlockDecisionWire"
+            }
+          ],
+          default: null
+        },
+        reason: {
+          default: null,
+          description: "Claude requires `reason` when `decision` is `block`; we enforce that semantic rule during output parsing rather than in the JSON schema.",
+          type: "string"
+        },
+        stopReason: {
+          default: null,
+          type: "string"
+        },
+        suppressOutput: {
+          default: false,
+          type: "boolean"
+        },
+        systemMessage: {
+          default: null,
+          type: "string"
+        }
+      },
+      title: "stop.command.output",
+      type: "object"
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/gemini.json
+var gemini_default = {
+  host: "gemini",
+  source: "@google/gemini-cli 0.67.0: bundle/docs/hooks/reference.md (Common output fields; BeforeTool, AfterTool, BeforeAgent, SessionStart output fields) and bundle/chunk-O7MGOE2I.js HookOutput (isBlockingDecision block|deny, isAskDecision ask). Keys are canonical events; each title names the native event.",
+  output: {
+    PreToolUse: {
+      title: "Gemini CLI 0.67.0 BeforeTool reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            tool_input: {
+              type: "object"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        systemMessage: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    PostToolUse: {
+      title: "Gemini CLI 0.67.0 AfterTool reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            additionalContext: {
+              type: "string"
+            },
+            tailToolCallRequest: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                name: {
+                  type: "string"
+                },
+                args: {
+                  type: "object"
+                }
+              },
+              required: [
+                "name",
+                "args"
+              ]
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        systemMessage: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    UserPromptSubmit: {
+      title: "Gemini CLI 0.67.0 BeforeAgent reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        systemMessage: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    SessionStart: {
+      title: "Gemini CLI 0.67.0 SessionStart reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        systemMessage: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/qwen.json
+var qwen_default = {
+  host: "qwen",
+  source: "@qwen-code/qwen-code 0.26.7: bundled/qc-helper/docs/features/hooks.md (Hook Output Structure, per-event Output Options) and chunks/chunk-6GTPLW7K.js HookOutput (getPermissionDecision reads hookSpecificOutput.permissionDecision allow|deny|ask, then decision allow|approve|deny|block|ask; a missing permissionDecision is no decision).",
+  output: {
+    PreToolUse: {
+      title: "Qwen Code 0.26.7 PreToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "PreToolUse"
+            },
+            permissionDecision: {
+              type: "string",
+              enum: [
+                "allow",
+                "deny",
+                "ask"
+              ]
+            },
+            permissionDecisionReason: {
+              type: "string"
+            },
+            updatedInput: {
+              type: "object"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    PostToolUse: {
+      title: "Qwen Code 0.26.7 PostToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "PostToolUse"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    UserPromptSubmit: {
+      title: "Qwen Code 0.26.7 UserPromptSubmit reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "UserPromptSubmit"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    SessionStart: {
+      title: "Qwen Code 0.26.7 SessionStart reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string",
+              const: "SessionStart"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continue: {
+          type: "boolean"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "allow",
+            "approve",
+            "deny",
+            "block",
+            "ask"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/copilot-cli.json
+var copilot_cli_default = {
+  host: "copilot-cli",
+  source: "GitHub Copilot CLI 1.0.105 copilot-sdk/types.d.ts: PreToolUseHookOutput, PostToolUseHookOutput (modifiedResult: ToolResultObject, ToolResultType), UserPromptSubmittedHookOutput, SessionStartHookOutput. Replies are flat objects with no hookSpecificOutput.",
+  output: {
+    PreToolUse: {
+      title: "Copilot CLI 1.0.105 preToolUse reply",
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        permissionDecision: {
+          type: "string",
+          enum: [
+            "allow",
+            "deny",
+            "ask"
+          ]
+        },
+        permissionDecisionReason: {
+          type: "string"
+        },
+        modifiedArgs: {
+          description: "unknown"
+        },
+        additionalContext: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        }
+      }
+    },
+    PostToolUse: {
+      title: "Copilot CLI 1.0.105 postToolUse reply",
+      definitions: {
+        ToolResultObject: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            textResultForLlm: {
+              type: "string"
+            },
+            binaryResultsForLlm: {
+              type: "array",
+              items: {
+                type: "object"
+              }
+            },
+            resultType: {
+              type: "string",
+              enum: [
+                "success",
+                "failure",
+                "rejected",
+                "denied",
+                "timeout"
+              ]
+            },
+            error: {
+              type: "string"
+            },
+            sessionLog: {
+              type: "string"
+            },
+            toolTelemetry: {
+              type: "object"
+            },
+            toolReferences: {
+              type: "array",
+              items: {
+                type: "string"
+              }
+            }
+          },
+          required: [
+            "textResultForLlm",
+            "resultType"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        modifiedResult: {
+          allOf: [
+            {
+              $ref: "#/definitions/ToolResultObject"
+            }
+          ]
+        },
+        additionalContext: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        }
+      }
+    },
+    UserPromptSubmit: {
+      title: "Copilot CLI 1.0.105 userPromptSubmitted reply",
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        modifiedPrompt: {
+          type: "string"
+        },
+        additionalContext: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        decision: {
+          type: "string",
+          const: "block"
+        },
+        reason: {
+          type: "string"
+        }
+      }
+    },
+    SessionStart: {
+      title: "Copilot CLI 1.0.105 sessionStart reply",
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        additionalContext: {
+          type: "string"
+        },
+        modifiedConfig: {
+          type: "object"
+        }
+      }
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/vscode.json
+var vscode_default = {
+  host: "vscode",
+  source: "VS Code Copilot Chat 0.44.0 (5863f5a) src/platform/chat/common/hookCommandTypes.ts (IPreToolUseHookSpecificCommandOutput, IPostToolUseHookSpecificCommandOutput) and chatHookService.ts (UserPromptSubmitHookOutput, SessionStartHookOutput, IPostToolUseHookResult decision 'block').",
+  output: {
+    PreToolUse: {
+      title: "VS Code Copilot Chat 0.44.0 PreToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            permissionDecision: {
+              type: "string",
+              enum: [
+                "allow",
+                "deny",
+                "ask"
+              ]
+            },
+            permissionDecisionReason: {
+              type: "string"
+            },
+            updatedInput: {
+              type: "object"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    PostToolUse: {
+      title: "VS Code Copilot Chat 0.44.0 PostToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        decision: {
+          type: "string",
+          const: "block"
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    UserPromptSubmit: {
+      title: "VS Code Copilot Chat 0.44.0 UserPromptSubmit reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        decision: {
+          type: "string",
+          const: "block"
+        },
+        reason: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    SessionStart: {
+      title: "VS Code Copilot Chat 0.44.0 SessionStart reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            hookEventName: {
+              type: "string"
+            },
+            additionalContext: {
+              type: "string"
+            }
+          }
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/kiro.json
+var kiro_default = {
+  host: "kiro",
+  source: "kiro-cli 3.0.0 (BUILD_HASH 21067db0a7cc, 2026-11-02), V3 engine KAS 3.0.0-e315409f JS bundle (acp-server.js, unpacked by `kiro-cli serve`)",
+  mcpToolId: {
+    from: "function uel(server, tool): r = server + '_' + tool; r = r.replace(/[\\s-]/g, '_'); r = r.replace(/[^a-zA-Z0-9_]/g, ''); id = 'mcp_' + r.toLowerCase(); cut to 64 chars",
+    prefix: "mcp_",
+    join: "_",
+    maxLength: 64
+  },
+  hookStdin: {
+    from: "function sJn: {session_id, hook_event_name, cwd} plus per trigger fields",
+    UserPromptSubmit: ["session_id", "hook_event_name", "cwd", "prompt"],
+    PreToolUse: ["session_id", "hook_event_name", "cwd", "tool_name", "tool_input"],
+    PostToolUse: ["session_id", "hook_event_name", "cwd", "tool_name", "tool_input", "tool_response"],
+    SessionStart: ["session_id", "hook_event_name", "cwd"]
+  },
+  hookOutputCapChars: 3e3,
+  windowsHookShell: "child_process.spawn(command, {shell: true}) in the V3 hook process runner (class tje): COMSPEC (cmd.exe /d /s /c) on win32",
+  stdout: "text",
+  output: {
+    PreToolUse: { type: "string", description: "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" },
+    PostToolUse: { type: "string", description: "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" },
+    UserPromptSubmit: { type: "string", description: "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" },
+    SessionStart: { type: "string", description: "plain stdout added to the agent context (kiro-cli 3.0.0 V3 hook process runner, cut at hookOutputCapChars); exit 2 blocks with stderr as the reason" }
+  }
+};
+
+// tests/fixtures/host-schemas/zcode.json
+var zcode_default = {
+  host: "zcode",
+  source: "ZCode 0.17.1 (a9fe401e) apps/zcode-cli/packages/contracts/src/hooks/index.ts: HookJSONOutputSchema and HookSpecificOutputSchema (zod discriminatedUnion on hookEventName). zod drops keys it does not read, so each object lists only the keys the host reads.",
+  output: {
+    PreToolUse: {
+      title: "ZCode 0.17.1 PreToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              type: "string"
+            },
+            hookEventName: {
+              type: "string",
+              const: "PreToolUse"
+            },
+            permissionDecision: {
+              type: "string",
+              enum: [
+                "allow",
+                "ask",
+                "deny"
+              ]
+            },
+            permissionDecisionReason: {
+              type: "string"
+            },
+            updatedInput: {
+              description: "z.unknown()"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        additionalContext: {
+          type: "string"
+        },
+        additional_context: {
+          type: "string"
+        },
+        continue: {
+          type: "boolean"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    PostToolUse: {
+      title: "ZCode 0.17.1 PostToolUse reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              type: "string"
+            },
+            hookEventName: {
+              type: "string",
+              const: "PostToolUse"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        additionalContext: {
+          type: "string"
+        },
+        additional_context: {
+          type: "string"
+        },
+        continue: {
+          type: "boolean"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    UserPromptSubmit: {
+      title: "ZCode 0.17.1 UserPromptSubmit reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              type: "string"
+            },
+            hookEventName: {
+              type: "string",
+              const: "UserPromptSubmit"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        additionalContext: {
+          type: "string"
+        },
+        additional_context: {
+          type: "string"
+        },
+        continue: {
+          type: "boolean"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    },
+    SessionStart: {
+      title: "ZCode 0.17.1 SessionStart reply",
+      definitions: {
+        Specific: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            additionalContext: {
+              type: "string"
+            },
+            hookEventName: {
+              type: "string",
+              const: "SessionStart"
+            }
+          },
+          required: [
+            "hookEventName"
+          ]
+        }
+      },
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        additionalContext: {
+          type: "string"
+        },
+        additional_context: {
+          type: "string"
+        },
+        continue: {
+          type: "boolean"
+        },
+        decision: {
+          type: "string",
+          enum: [
+            "approve",
+            "block"
+          ]
+        },
+        reason: {
+          type: "string"
+        },
+        stopReason: {
+          type: "string"
+        },
+        suppressOutput: {
+          type: "boolean"
+        },
+        systemMessage: {
+          type: "string"
+        },
+        hookSpecificOutput: {
+          allOf: [
+            {
+              $ref: "#/definitions/Specific"
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/pi.json
+var pi_default = {
+  host: "pi",
+  source: "@earendil-works/pi-coding-agent 1.5.0 dist/core/extensions/types.d.ts (ToolCallEventResult {block, reason}, ToolResultEventResult content, BeforeAgentStartEventResult) and runner.js l.895-1010. The hook runs in process (src/entries/pi.ts): plain stdout becomes the reason, the replaced content or the added context; exit 2 blocks the tool call.",
+  stdout: "text",
+  output: {
+    PreToolUse: {
+      type: "string",
+      description: "plain text read by src/entries/pi.ts"
+    },
+    PostToolUse: {
+      type: "string",
+      description: "plain text read by src/entries/pi.ts"
+    },
+    UserPromptSubmit: {
+      type: "string",
+      description: "plain text read by src/entries/pi.ts"
+    },
+    SessionStart: {
+      type: "string",
+      description: "plain text read by src/entries/pi.ts"
+    }
+  }
+};
+
+// tests/fixtures/host-schemas/opencode.json
+var opencode_default = {
+  host: "opencode",
+  source: "@opencode/cli 2.2.5 plugin hooks (tool.execute.before throws to block, session hooks add text). The plugin runs the hook and reads plain stdout; exit 2 blocks the tool call with stdout as the reason.",
+  stdout: "text",
+  output: {
+    PreToolUse: {
+      type: "string",
+      description: "plain text read by the context-mode OpenCode plugin"
+    },
+    PostToolUse: {
+      type: "string",
+      description: "plain text read by the context-mode OpenCode plugin"
+    },
+    UserPromptSubmit: {
+      type: "string",
+      description: "plain text read by the context-mode OpenCode plugin"
+    },
+    SessionStart: {
+      type: "string",
+      description: "plain text read by the context-mode OpenCode plugin"
+    }
+  }
+};
+
+// src/core/ops/hook-shape.ts
+var HOST_SHAPES = {
+  "claude-code": claude_code_default,
+  codex: codex_default,
+  gemini: gemini_default,
+  qwen: qwen_default,
+  "copilot-cli": copilot_cli_default,
+  vscode: vscode_default,
+  kiro: kiro_default,
+  zcode: zcode_default,
+  pi: pi_default,
+  opencode: opencode_default
+};
+var NOTE_KEYS = /* @__PURE__ */ new Set(["$schema", "title", "description", "definitions", "default"]);
+var RULE_KEYS = /* @__PURE__ */ new Set(["type", "enum", "const", "required", "properties", "additionalProperties", "items", "allOf", "$ref"]);
+function isObject5(v) {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function typeOf(v) {
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "array";
+  return typeof v;
+}
+function hasType(v, t) {
+  if (t === "integer") return Number.isInteger(v);
+  return typeOf(v) === t;
+}
+function same(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+function resolve7(root, ref) {
+  const parts = ref.split("/");
+  if (parts[0] !== "#") throw new Error(`hook-shape: only local $ref is read, got ${ref}`);
+  let at2 = root;
+  for (const p of parts.slice(1)) at2 = isObject5(at2) ? at2[p] : void 0;
+  if (!isObject5(at2)) throw new Error(`hook-shape: $ref ${ref} names nothing`);
+  return at2;
+}
+function shapeErrors(schema, value, root = schema, at2 = "$") {
+  for (const k of Object.keys(schema)) {
+    if (!NOTE_KEYS.has(k) && !RULE_KEYS.has(k)) throw new Error(`hook-shape: keyword ${k} at ${at2} is not read by the checker`);
+  }
+  const errs = [];
+  if (typeof schema.$ref === "string") errs.push(...shapeErrors(resolve7(root, schema.$ref), value, root, at2));
+  if (Array.isArray(schema.allOf)) for (const s of schema.allOf) errs.push(...shapeErrors(s, value, root, at2));
+  if (schema.type !== void 0) {
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    if (!types.some((t) => hasType(value, String(t)))) return [...errs, `${at2}: ${typeOf(value)} is not ${types.join(" or ")}`];
+  }
+  if (Array.isArray(schema.enum) && !schema.enum.some((e) => same(e, value))) errs.push(`${at2}: ${JSON.stringify(value)} is not one of ${JSON.stringify(schema.enum)}`);
+  if (Object.hasOwn(schema, "const") && !same(schema.const, value)) errs.push(`${at2}: ${JSON.stringify(value)} is not ${JSON.stringify(schema.const)}`);
+  if (isObject5(value)) {
+    const props = isObject5(schema.properties) ? schema.properties : {};
+    if (Array.isArray(schema.required)) {
+      for (const r of schema.required) if (!Object.hasOwn(value, String(r))) errs.push(`${at2}: ${String(r)} is required`);
+    }
+    for (const [k, v] of Object.entries(value)) {
+      if (Object.hasOwn(props, k)) errs.push(...shapeErrors(props[k], v, root, `${at2}.${k}`));
+      else if (schema.additionalProperties === false) errs.push(`${at2}: ${k} is not a known key`);
+      else if (isObject5(schema.additionalProperties)) errs.push(...shapeErrors(schema.additionalProperties, v, root, `${at2}.${k}`));
+    }
+  }
+  if (Array.isArray(value) && isObject5(schema.items)) {
+    const items = schema.items;
+    value.forEach((v, n) => errs.push(...shapeErrors(items, v, root, `${at2}[${n}]`)));
+  }
+  return errs;
+}
+function replyErrors(agent, event, stdout) {
+  const host = HOST_SHAPES[agent];
+  const schema = host.output[event];
+  if (schema === void 0) return [`${agent} has no ${event} reply schema`];
+  if (host.stdout === "text") return shapeErrors(schema, stdout);
+  let value;
+  try {
+    value = JSON.parse(stdout);
+  } catch {
+    return [`${agent} ${event}: stdout is not JSON`];
+  }
+  return shapeErrors(schema, value);
+}
 
 // src/core/sandbox/host-node.ts
 var BUN_BE_BUN_ENV = "BUN_BE_BUN";
@@ -24916,14 +26795,14 @@ function pluginHooksFromReply(m, pluginId) {
 function askPluginHooks(env, pluginId, cwd) {
   const bin = whichBin("codex", env);
   if (!bin) return Promise.resolve({ kind: "absent" });
-  return new Promise((resolve9) => {
+  return new Promise((resolve10) => {
     let asked;
     const done_ = (hooks) => hooks === void 0 ? { kind: "silent" } : { kind: "list", hooks, codexHome: asked };
     let f;
     try {
       f = spawnForm(bin, ["app-server"], env);
     } catch {
-      resolve9({ kind: "silent" });
+      resolve10({ kind: "silent" });
       return;
     }
     const child = spawn2(f.command, f.args, { env, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
@@ -24933,7 +26812,7 @@ function askPluginHooks(env, pluginId, cwd) {
     let result;
     const settle = () => {
       clearTimeout(grace);
-      resolve9(done_(result));
+      resolve10(done_(result));
     };
     let grace;
     const finish2 = (v) => {
@@ -25017,7 +26896,7 @@ var D5_CODEX_SILENT_DETAIL = (home) => `codex app-server gave no hooks/list answ
 var D5_CODEX_OTHER_HOME_DETAIL = (asked, home) => `codex answers for ${asked}, but the context-mode plugin runs from ${home}`;
 var D5_CODEX_NONE_DETAIL = (home) => `codex lists no context-mode plugin hooks in ${home}, so they do not run`;
 var row = (status, detail, fixCommand) => fixCommand === void 0 ? { id: "D5", label: DOCTOR_LABEL.D5, status, detail } : { id: "D5", label: DOCTOR_LABEL.D5, status, detail, fixCommand };
-function isObject5(v) {
+function isObject6(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 function loadFixture(bundleDir2, agent) {
@@ -25029,10 +26908,10 @@ function loadFixture(bundleDir2, agent) {
   } catch (err) {
     return { cause: D5_FIXTURE_PARSE(file2, err instanceof Error ? err.message : String(err)) };
   }
-  if (!isObject5(all)) return { cause: D5_FIXTURE_PARSE(file2, "top level is not an object") };
+  if (!isObject6(all)) return { cause: D5_FIXTURE_PARSE(file2, "top level is not an object") };
   if (!Object.hasOwn(all, agent)) return { cause: D5_NO_FIXTURE_DETAIL(agent) + ": " + D5_FIXTURE_AGENT_ABSENT(file2, Object.keys(all)) };
   const e = all[agent];
-  if (!isObject5(e) || typeof e.event !== "string" || !Object.hasOwn(e, "payload")) {
+  if (!isObject6(e) || typeof e.event !== "string" || !Object.hasOwn(e, "payload")) {
     return { cause: D5_NO_FIXTURE_DETAIL(agent) + ": the entry lacks an event name or a payload" };
   }
   return { event: e.event, payload: e.payload };
@@ -25050,39 +26929,11 @@ var CWD_KEY = {
   opencode: "directory"
 };
 function payloadFor(agent, payload, worktree) {
-  return worktree !== void 0 && isObject5(payload) ? { ...payload, [CWD_KEY[agent]]: worktree } : payload;
+  return worktree !== void 0 && isObject6(payload) ? { ...payload, [CWD_KEY[agent]]: worktree } : payload;
 }
-var SHAPE = {
-  "claude-code": "claude",
-  codex: "claude",
-  qwen: "claude",
-  vscode: "claude",
-  zcode: "claude",
-  gemini: "gemini",
-  "copilot-cli": "copilot",
-  kiro: "text",
-  pi: "text",
-  opencode: "text"
-};
-var COPILOT_KEYS = ["permissionDecision", "additionalContext", "modifiedResult"];
 function isNativeShape(agent, stdout, exitCode, killed, event) {
   if (killed !== null || exitCode !== 0 && exitCode !== 2) return false;
-  if (stdout.length === 0 || SHAPE[agent] === "text") return true;
-  let out;
-  try {
-    out = JSON.parse(stdout);
-  } catch {
-    return false;
-  }
-  if (!isObject5(out)) return false;
-  switch (SHAPE[agent]) {
-    case "claude":
-      return isObject5(out.hookSpecificOutput) && out.hookSpecificOutput.hookEventName === event;
-    case "gemini":
-      return typeof out.decision === "string" || isObject5(out.hookSpecificOutput);
-    default:
-      return COPILOT_KEYS.some((k) => Object.hasOwn(out, k));
-  }
+  return stdout.length === 0 || replyErrors(agent, event, stdout).length === 0;
 }
 var READ_PROBE_LINES = 4 * Math.ceil(REPLACE_TRIGGER_BYTES / 40);
 function readProbePayload(cwd, ranged) {
@@ -25107,9 +26958,9 @@ function isReadShape(stdout) {
   } catch {
     return false;
   }
-  if (!isObject5(out) || !isObject5(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput")) return true;
+  if (!isObject6(out) || !isObject6(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput")) return true;
   const r = out.hookSpecificOutput.updatedToolOutput;
-  if (!isObject5(r) || r.type !== "text" || !isObject5(r.file)) return false;
+  if (!isObject6(r) || r.type !== "text" || !isObject6(r.file)) return false;
   const f = r.file;
   return typeof f.filePath === "string" && typeof f.content === "string" && ["numLines", "startLine", "totalLines"].every((k) => typeof f[k] === "number");
 }
@@ -25137,11 +26988,49 @@ function isPassThrough(stdout) {
   } catch {
     return false;
   }
-  return !isObject5(out) || !isObject5(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput");
+  return !isObject6(out) || !isObject6(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput");
+}
+var PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+async function mediaProbe(i, timeoutMs) {
+  const home = mkdtempSync(path7.join(tmpdir2(), "cm-d5-media-"));
+  try {
+    const filePath = path7.join(home, "d5-media-probe.png");
+    writeFileSync2(filePath, Buffer.concat([PNG_SIGNATURE, Buffer.alloc(OUTPUT_CAP + 1)]));
+    const node = nodeLaunch({ ...i.env, HOME: home, USERPROFILE: home });
+    const r = await runProcess([node.file, path7.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir,
+      env: node.env,
+      signal: i.signal,
+      timeoutMs,
+      stdin: JSON.stringify({
+        session_id: "d5-media-probe",
+        transcript_path: "",
+        cwd: home,
+        hook_event_name: "PreToolUse",
+        tool_name: "Read",
+        tool_use_id: "toolu_d5_media_probe",
+        tool_input: { file_path: filePath }
+      })
+    });
+    return r.stdout.toString("utf8");
+  } finally {
+    rmSync2(home, { recursive: true, force: true });
+  }
+}
+function isDeny(stdout) {
+  if (stdout.trim() === "") return false;
+  let out;
+  try {
+    out = JSON.parse(stdout);
+  } catch {
+    return false;
+  }
+  return isObject6(out) && isObject6(out.hookSpecificOutput) && out.hookSpecificOutput.permissionDecision === "deny";
 }
 async function readProbeDetail(i, timeoutMs) {
   if (!isReadShape(await readProbe(i, timeoutMs, false))) return D5_READ_SHAPE_DETAIL;
   if (!isPassThrough(await readProbe(i, timeoutMs, true))) return D5_READ_RANGE_DETAIL;
+  if (isDeny(await mediaProbe(i, timeoutMs))) return D5_READ_MEDIA_DETAIL;
   return null;
 }
 function codexHookJournaled(db) {
@@ -25171,6 +27060,36 @@ async function codexPluginTrust(i) {
   }
   if (reply4.hooks.length === 0) return row("FAIL", D5_CODEX_NONE_DETAIL(home), D5_CODEX_TRUST_FIX);
   return null;
+}
+function codexStopPayload(cwd) {
+  return {
+    session_id: "d5-stop-probe",
+    turn_id: "d5-stop-turn",
+    transcript_path: null,
+    cwd,
+    hook_event_name: "Stop",
+    model: "d5-probe",
+    permission_mode: "default",
+    stop_hook_active: false,
+    last_assistant_message: "d5 stop probe"
+  };
+}
+async function codexStopDetail(i, timeoutMs) {
+  const home = mkdtempSync(path7.join(tmpdir2(), "cm-d5-stop-"));
+  try {
+    const node = nodeLaunch({ ...i.env, HOME: home, USERPROFILE: home, [DATA_DIR_ENV]: home });
+    const r = await runProcess([node.file, path7.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir,
+      env: node.env,
+      signal: i.signal,
+      timeoutMs,
+      stdin: JSON.stringify(codexStopPayload(i.worktree ?? home))
+    });
+    const logged = existsSync12(path7.join(home, HOOK_ERROR_LOG_FILE));
+    return !logged && isNativeShape(i.agent, r.stdout.toString("utf8"), r.exitCode, r.killed, "Stop") ? null : D5_STOP_DETAIL;
+  } finally {
+    rmSync2(home, { recursive: true, force: true });
+  }
 }
 async function checkHookRoundTrip(i) {
   if (i.agent === "codex") {
@@ -25213,7 +27132,7 @@ async function checkHookRoundTrip(i) {
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
-  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : null;
+  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
   if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
@@ -25223,7 +27142,7 @@ import { existsSync as existsSync13, mkdirSync as mkdirSync5, rmSync as rmSync4 
 import { basename as basename4, dirname as dirname8, join as join16 } from "node:path";
 
 // src/core/store/owners.ts
-import { mkdirSync as mkdirSync4, readdirSync as readdirSync5, readFileSync as readFileSync12, rmSync as rmSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync4, readdirSync as readdirSync5, readFileSync as readFileSync12, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { basename as basename3, join as join15 } from "node:path";
 function ownersDir(configDir, projectKey) {
   return join15(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
@@ -25410,7 +27329,7 @@ function buildReportHead(input) {
 
 // src/core/ops/doctor-issue.ts
 import { spawnSync as spawnSync3 } from "node:child_process";
-import { closeSync, existsSync as existsSync14, fstatSync, mkdirSync as mkdirSync6, openSync, readFileSync as readFileSync13, readSync, realpathSync as realpathSync9, writeFileSync as writeFileSync3 } from "node:fs";
+import { closeSync as closeSync2, existsSync as existsSync14, fstatSync, mkdirSync as mkdirSync6, openSync as openSync2, readFileSync as readFileSync13, readSync as readSync2, realpathSync as realpathSync9, writeFileSync as writeFileSync4 } from "node:fs";
 import { delimiter, join as join17 } from "node:path";
 var TOKEN_PREFIXES = ["ghp_", "gho_", "github_pat_", "sk-", "xoxb-", "AKIA"];
 function tildeOf(env) {
@@ -25463,31 +27382,31 @@ function hookLogTail(env) {
   const file2 = hookLogPath(env);
   if (file2 === "" || !existsSync14(file2)) return [`(${file2 || "hook-errors.log"} holds zero lines)`];
   try {
-    const fd = openSync(file2, "r");
+    const fd = openSync2(file2, "r");
     try {
       const size = fstatSync(fd).size;
       const start = Math.max(0, size - DOCTOR_LOG_TAIL_BYTES);
       const buf = Buffer.alloc(size - start);
-      readSync(fd, buf, 0, buf.length, start);
+      readSync2(fd, buf, 0, buf.length, start);
       const lines = buf.toString("utf8").split("\n").filter((l) => l.trim() !== "");
       if (start > 0) lines.shift();
       return lines.slice(-DOCTOR_HOOK_LOG_LINES).map(maskLine);
     } finally {
-      closeSync(fd);
+      closeSync2(fd);
     }
   } catch (err) {
     return [`hook-errors.log read: ${err instanceof Error ? err.message : String(err)}`];
   }
 }
 async function journalRows(ctx) {
-  const head = ["| kind | tool | bytes | ok | exit_code | created_at |", "|---|---|---|---|---|---|"];
+  const head2 = ["| kind | tool | bytes | ok | exit_code | created_at |", "|---|---|---|---|---|---|"];
   if (!existsSync14(ctx.project.dbPath)) return [`(context.db is absent at ${ctx.project.dbPath})`];
   try {
     const db = await openDb(ctx.project, { readOnly: true });
     try {
       const rows = db.raw.prepare(`SELECT kind, tool, bytes, ok, exit_code, created_at FROM events ORDER BY seq DESC LIMIT ${DOCTOR_JOURNAL_ROWS}`).all();
       const cell5 = (v) => v === null || v === void 0 ? "" : String(v);
-      return head.concat(rows.map((r) => `| ${cell5(r.kind)} | ${cell5(r.tool)} | ${cell5(r.bytes)} | ${cell5(r.ok)} | ${cell5(r.exit_code)} | ${typeof r.created_at === "number" ? new Date(r.created_at).toISOString() : cell5(r.created_at)} |`));
+      return head2.concat(rows.map((r) => `| ${cell5(r.kind)} | ${cell5(r.tool)} | ${cell5(r.bytes)} | ${cell5(r.ok)} | ${cell5(r.exit_code)} | ${typeof r.created_at === "number" ? new Date(r.created_at).toISOString() : cell5(r.created_at)} |`));
     } finally {
       closeDb(db);
     }
@@ -25586,7 +27505,7 @@ async function writeIssueReport(i) {
   const dir = join17(resolveConfigDir(i.env), DOCTOR_REPORTS_DIR);
   mkdirSync6(dir, { recursive: true });
   const file2 = join17(dir, `${DOCTOR_REPORT_FILE_PREFIX}${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.md`);
-  writeFileSync3(file2, body);
+  writeFileSync4(file2, body);
   const shown2 = tilde(file2);
   const title = issueTitle(i.adapter.id, i.rows);
   const gh = [`gh issue create --repo ${ISSUE_REPO_SLUG} --label bug \\`, `${DOCTOR_GH_NEXT}title ${JSON.stringify(title)} \\`, `${DOCTOR_GH_NEXT}body-file ${shown2}`];
@@ -25741,9 +27660,9 @@ var ctxDoctor = Object.freeze({
 });
 
 // src/core/tools/execute.ts
-import { existsSync as existsSync16, mkdtempSync as mkdtempSync2, rmSync as rmSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { existsSync as existsSync16, mkdtempSync as mkdtempSync2, rmSync as rmSync5, writeFileSync as writeFileSync5 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { dirname as dirname10, join as join19, parse as parse3, resolve as resolve7 } from "node:path";
+import { dirname as dirname10, join as join19, parse as parse3, resolve as resolve8 } from "node:path";
 
 // src/core/sandbox/win-build.ts
 var SEPARATORS2 = ";&|(\n";
@@ -25862,16 +27781,16 @@ async function finish(input, ctx, r, exitCode, journal) {
   const isError = exitCode !== 0 && !(input.language === "shell" && exitCode === SOFT_EXIT && r.stderr.length === 0);
   const combined = r.stdout.toString("utf8") + (exitCode !== 0 ? r.stderr.toString("utf8") : "");
   const fullBytes = Buffer.byteLength(combined, "utf8");
-  const head = summaryLine(exitCode, fullBytes);
+  const head2 = summaryLine(exitCode, fullBytes);
   const intent = input.intent ?? "";
   const bare2 = exitCode === 0 && input.summary !== true && combined !== "";
-  const direct = (bare2 ? "" : head + "\n") + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined;
-  const fits = Buffer.byteLength(head + "\n" + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined, "utf8") <= OUTPUT_CAP;
+  const direct = (bare2 ? "" : head2 + "\n") + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined;
+  const fits = Buffer.byteLength(head2 + "\n" + (input.summary === true ? echoBlock(input.language, input.code) + "\n" : "") + combined, "utf8") <= OUTPUT_CAP;
   if (intent === "" && fits) {
     return { text: direct, isError, sandboxBytes: fullBytes, journal };
   }
   const label2 = sourceLabel(input.code);
-  const budget = (fits ? OUTPUT_CAP : EXEC_PREVIEW_BYTES) - Buffer.byteLength(head, "utf8") - 2 - moreReserve(intent, label2);
+  const budget = (fits ? OUTPUT_CAP : EXEC_PREVIEW_BYTES) - Buffer.byteLength(head2, "utf8") - 2 - moreReserve(intent, label2);
   const db = await openDb(ctx.project);
   let picked;
   try {
@@ -25880,7 +27799,7 @@ async function finish(input, ctx, r, exitCode, journal) {
   } finally {
     closeDb(db);
   }
-  const text = head + "\n" + picked.text + (picked.more === null ? "" : "\n" + picked.more);
+  const text = head2 + "\n" + picked.text + (picked.more === null ? "" : "\n" + picked.more);
   return { text: capBytes(text, OUTPUT_CAP).text, isError, sandboxBytes: fullBytes, journal };
 }
 async function handler3(raw, ctx) {
@@ -25890,7 +27809,7 @@ async function handler3(raw, ctx) {
   const cwd = ctx.project.worktree;
   const extra = { ...PLAIN_OUTPUT_ENV2 };
   if (input.file !== void 0) {
-    const abs = resolve7(cwd, input.file);
+    const abs = resolve8(cwd, input.file);
     const bad = fileError(input.file, abs, ctx.project.containmentRoot);
     if (bad !== null) return fail5(bad);
     extra.CTX_FILE = abs;
@@ -25909,7 +27828,7 @@ async function handler3(raw, ctx) {
     } else {
       tmpDir = mkdtempSync2(join19(tmpdir3(), TMP_PREFIX));
       const file2 = join19(tmpDir, SCRIPT_NAME + (SCRIPT_EXT[input.language] ?? ""));
-      writeFileSync4(file2, scriptText(input.language, input.code), "utf8");
+      writeFileSync5(file2, scriptText(input.language, input.code), "utf8");
       argv = scriptArgv(input.language, runtime, file2);
     }
     if (input.background === true) {
@@ -25945,7 +27864,7 @@ var ctxExecute = {
 
 // src/core/tools/index.ts
 import { existsSync as existsSync17, readFileSync as readFileSync16, statSync as statSync8 } from "node:fs";
-import { dirname as dirname11, extname, join as join21, relative as relative5, resolve as resolve8 } from "node:path";
+import { dirname as dirname11, extname as extname2, join as join21, relative as relative5, resolve as resolve9 } from "node:path";
 
 // src/core/index/walk.ts
 import { readdirSync as readdirSync7, readFileSync as readFileSync15, realpathSync as realpathSync10, statSync as statSync7 } from "node:fs";
@@ -26190,9 +28109,9 @@ function ipv6Words(address) {
   };
   const gap = a.indexOf("::");
   if (gap < 0) return words2(a);
-  const head = words2(a.slice(0, gap));
+  const head2 = words2(a.slice(0, gap));
   const tail = words2(a.slice(gap + 2));
-  return [...head, ...new Array(8 - head.length - tail.length).fill(0), ...tail];
+  return [...head2, ...new Array(8 - head2.length - tail.length).fill(0), ...tail];
 }
 function dotted(hi, lo) {
   return [hi >> 8, hi & 255, lo >> 8, lo & 255].join(".");
@@ -26232,18 +28151,18 @@ function request(u, conn, proxy, signal) {
   const host = bare(u.hostname);
   const port = u.port === "" ? defaultPort(u.protocol) : Number(u.port);
   const path8 = u.pathname + u.search;
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     const onErr = (err) => reject(fail6(causeCode(err)));
     if (proxy === void 0) {
       const mod = u.protocol === "https:" ? https : http;
       const req = mod.request({ host: conn.address, port, path: path8, signal, servername: tlsName(host), headers: { host: u.host } });
-      req.on("response", resolve9).on("error", onErr).end();
+      req.on("response", resolve10).on("error", onErr).end();
       return;
     }
     const proxyHeaders = proxy.auth === void 0 ? {} : { "proxy-authorization": proxy.auth };
     if (u.protocol === "http:") {
       const req = http.request({ host: conn.address, port: conn.port, path: u.href, signal, headers: { host: u.host, ...proxyHeaders } });
-      req.on("response", resolve9).on("error", onErr).end();
+      req.on("response", resolve10).on("error", onErr).end();
       return;
     }
     const authority = (isIP(host) === 6 ? "[" + host + "]" : host) + ":" + port;
@@ -26263,16 +28182,16 @@ function request(u, conn, proxy, signal) {
         headers: { host: u.host },
         createConnection: () => tlsConnect({ socket, host, servername: tlsName(host) })
       });
-      req.on("response", resolve9).on("error", onErr).end();
+      req.on("response", resolve10).on("error", onErr).end();
     });
     tunnel.end();
   });
 }
 function readBody(res) {
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     const parts = [];
     res.on("data", (b) => parts.push(b));
-    res.on("end", () => resolve9(Buffer.concat(parts)));
+    res.on("end", () => resolve10(Buffer.concat(parts)));
     res.on("error", (err) => reject(fail6(causeCode(err))));
     res.on("aborted", () => reject(fail6("ECONNRESET")));
   });
@@ -30129,7 +32048,7 @@ function userLabel(label2) {
   return label2 === DECISION_SOURCE ? DECISION_USER_LABEL : label2;
 }
 function kindOfPath(p) {
-  return EXT_KIND[extname(p).toLowerCase()] ?? "text";
+  return EXT_KIND[extname2(p).toLowerCase()] ?? "text";
 }
 function kindOfType(contentType) {
   const semi = contentType.indexOf(";");
@@ -30150,7 +32069,7 @@ function missingOrOutside(given, abs, root) {
   return new CtxError("OUTSIDE_ROOT", { p: given, root });
 }
 function pathItems(input, project) {
-  const abs = resolve8(project.worktree, input.path);
+  const abs = resolve9(project.worktree, input.path);
   if (!isInside(project.containmentRoot, abs)) throw missingOrOutside(input.path, abs, project.containmentRoot);
   const base = relative5(project.worktree, abs);
   if (statSync8(abs).isDirectory()) {
@@ -30228,8 +32147,8 @@ async function handler4(input, ctx) {
     } finally {
       closeDb(db);
     }
-    const head = "Indexed " + sources + " source(s), " + chunks + " chunk(s) from ";
-    const first = sources === 1 && lastId > 0 ? head + sourceHandle(lastId) + ". " + indexedLabelLine(from, lastId) : head + shownLabel(from, null) + ".";
+    const head2 = "Indexed " + sources + " source(s), " + chunks + " chunk(s) from ";
+    const first = sources === 1 && lastId > 0 ? head2 + sourceHandle(lastId) + ". " + indexedLabelLine(from, lastId) : head2 + shownLabel(from, null) + ".";
     const line = [first, ...notes].join("\n");
     return {
       text: capBytes(line, OUTPUT_CAP).text,
@@ -30401,7 +32320,7 @@ function readWeek(raw, lastMs) {
   }
   return days;
 }
-var EMPTY5 = Object.freeze({ calls: 0, produced: 0, returned: 0, saved: 0 });
+var EMPTY6 = Object.freeze({ calls: 0, produced: 0, returned: 0, saved: 0 });
 function totals(r) {
   const produced = Number(r.produced);
   const returned = Number(r.returned);
@@ -30441,7 +32360,7 @@ function sum(groups) {
     produced: t.produced + g.produced,
     returned: t.returned + g.returned,
     saved: t.saved + g.saved
-  }), EMPTY5);
+  }), EMPTY6);
 }
 function reductionPct(t) {
   if (t.calls === 0) return 0;
@@ -30499,8 +32418,8 @@ function plural(n, word) {
 }
 function table2(title, rows) {
   const max = Math.max(0, ...rows.map((r) => r.saved));
-  const head = "  " + title.padEnd(LABEL_W) + right("Calls", STATS_CALLS_W) + right("Made", NUM_W) + right("Sent", NUM_W) + right("Kept out", NUM_W) + right("%", PCT_W);
-  return [head, ...rows.map((r) => ("  " + label(r.name) + right(count(r.calls), STATS_CALLS_W) + right(bytes4(r.produced), NUM_W) + right(bytes4(r.returned), NUM_W) + right(bytes4(r.saved), NUM_W) + right(pct(r), PCT_W) + " " + bar(r.saved, max, STATS_ROW_BAR)).trimEnd())];
+  const head2 = "  " + title.padEnd(LABEL_W) + right("Calls", STATS_CALLS_W) + right("Made", NUM_W) + right("Sent", NUM_W) + right("Kept out", NUM_W) + right("%", PCT_W);
+  return [head2, ...rows.map((r) => ("  " + label(r.name) + right(count(r.calls), STATS_CALLS_W) + right(bytes4(r.produced), NUM_W) + right(bytes4(r.returned), NUM_W) + right(bytes4(r.saved), NUM_W) + right(pct(r), PCT_W) + " " + bar(r.saved, max, STATS_ROW_BAR)).trimEnd())];
 }
 function bySaved(a, b) {
   return b.saved - a.saved || b.produced - a.produced || a.returned - b.returned || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
@@ -30544,10 +32463,10 @@ function windowLine(saved) {
   const t = saved / STATS_BYTES_PER_TOKEN;
   const share = t / STATS_WINDOW_TOKENS;
   const win = `a ${tokens(STATS_WINDOW_TOKENS)} window`;
-  const head = `  about ${tokens(t)} tokens kept out`;
-  if (share >= 1) return `${head}, ${whole(share)} times ${win}`;
+  const head2 = `  about ${tokens(t)} tokens kept out`;
+  if (share >= 1) return `${head2}, ${whole(share)} times ${win}`;
   const p = share * PERCENT_SCALE;
-  return p * STATS_WHOLE_FROM < 1 ? head : `${head}, ${whole(p)}% of ${win}`;
+  return p * STATS_WHOLE_FROM < 1 ? head2 : `${head2}, ${whole(p)}% of ${win}`;
 }
 function ymd(day) {
   return new Date(day * MS_PER_DAY).toISOString().slice(0, "yyyy-mm-dd".length);
@@ -30578,14 +32497,14 @@ function lastDays(week, allCalls) {
   const all = saved.reduce((a, b) => a + b, 0);
   const calls = week.reduce((a, d) => a + d.calls, 0);
   const max = Math.max(0, ...saved);
-  const head = `Last ${STATS_DAYS} days of use \xB7 ${ymd(week[0].day)} to ${ymd(week[week.length - 1].day)}`;
+  const head2 = `Last ${STATS_DAYS} days of use \xB7 ${ymd(week[0].day)} to ${ymd(week[week.length - 1].day)}`;
   const card = calls < allCalls ? [
     cards(["Kept out", "Tokens kept out", "Calls", "Kept out per call"]),
     cards([bytes4(all), "about " + tokens(all / STATS_BYTES_PER_TOKEN), count(calls), bytes4(calls > 0 ? all / calls : 0)]),
     ""
   ] : [];
   return [
-    head,
+    head2,
     ...card,
     ...week.flatMap((d, i) => saved[i] > 0 ? ["  " + mmdd(d.day) + " " + stack(STATS_WAYS.map(([w]) => d.ways[w]), max, STATS_DAY_BAR).padEnd(STATS_DAY_BAR) + right(bytes4(saved[i]), NUM_W)] : []),
     "  " + STATS_WAYS.map(([, ch, name]) => `${ch} ${name}`).join("  "),
@@ -30604,15 +32523,15 @@ function fit(line) {
   return chars.length <= STATS_WIDTH ? line : chars.slice(0, STATS_WIDTH - 1).join("") + "\u2026";
 }
 function report(f, sessionId, agent) {
-  const head = [STATS_REPORT_TITLE, "\u2500".repeat(STATS_WIDTH), ""];
+  const head2 = [STATS_REPORT_TITLE, "\u2500".repeat(STATS_WIDTH), ""];
   const project = sum(f.groups);
-  if (project.calls === 0) return [...head, ...STATS_EMPTY_LINES].join("\n");
+  if (project.calls === 0) return [...head2, ...STATS_EMPTY_LINES].join("\n");
   const session = sum(f.groups.filter((g) => g.session === sessionId));
   const [scopeName, focus] = session.calls > 0 ? ["This session", session] : ["This project", project];
   const top = Math.max(focus.produced, focus.returned);
   const extra = session.calls > 0 ? ` \xB7 ${span(f.span)} active` : "";
   const lines = [
-    ...head,
+    ...head2,
     `${scopeName} \xB7 ${plural(focus.calls, "call")}${extra}`,
     `  ${bytes4(focus.produced)} became ${bytes4(focus.returned)}: ${bytes4(focus.saved)} kept out (${pct(focus)})`,
     "  " + "Without context-mode".padEnd(LABEL_W) + "|" + bar(focus.produced, top, STATS_HEAD_BAR, "\u2588", "\u2591") + "|" + right(bytes4(focus.produced), NUM_W),
@@ -30635,8 +32554,8 @@ function report(f, sessionId, agent) {
     ] : []
   ];
   const agents = /* @__PURE__ */ new Map();
-  for (const g of f.groups) agents.set(g.agent, sum([agents.get(g.agent) ?? EMPTY5, g]));
-  if (!agents.has(agent)) agents.set(agent, EMPTY5);
+  for (const g of f.groups) agents.set(g.agent, sum([agents.get(g.agent) ?? EMPTY6, g]));
+  if (!agents.has(agent)) agents.set(agent, EMPTY6);
   lines.push("By agent (this project)", ...table2("Agent", [...agents].map(([name, t]) => ({ name, ...t })).sort(bySaved)), "");
   const maxKind = Math.max(0, ...[...f.kinds.values()].map((k) => k.project));
   lines.push("Kept in the session journal", "  " + "Journal".padEnd(LABEL_W) + right("Session", STATS_KIND_W) + right("Project", STATS_KIND_W));
@@ -30696,10 +32615,10 @@ var ctxStats = Object.freeze({
 });
 
 // src/core/ops/host-write.ts
-import { copyFileSync, existsSync as existsSync18, mkdirSync as mkdirSync7, writeFileSync as writeFileSync5 } from "node:fs";
+import { copyFileSync, existsSync as existsSync18, mkdirSync as mkdirSync7, writeFileSync as writeFileSync6 } from "node:fs";
 import { dirname as dirname12, join as join22 } from "node:path";
 function defaultWrite(file2, text) {
-  writeFileSync5(file2, text, "utf8");
+  writeFileSync6(file2, text, "utf8");
 }
 function hostConfigPath(agent, home, env) {
   const own2 = OWN_MCP_ENTRY[agent];
@@ -30766,7 +32685,7 @@ function regenerateHostConfig(row5, home, opts = {}) {
 }
 
 // src/core/ops/uninstall.ts
-import { existsSync as existsSync19, readdirSync as readdirSync8, rmSync as rmSync6, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync19, readdirSync as readdirSync8, rmSync as rmSync6, writeFileSync as writeFileSync7 } from "node:fs";
 import { join as join23 } from "node:path";
 function row2(area, before, after) {
   return { area, before, after };
@@ -30774,7 +32693,7 @@ function row2(area, before, after) {
 function stopServers(configDir, projectKey) {
   const stopped = listLiveOwners(configDir, projectKey);
   const dir = join23(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
-  for (const serverId of stopped) writeFileSync6(join23(dir, serverId + OWNER_STOP_EXT), "", "utf8");
+  for (const serverId of stopped) writeFileSync7(join23(dir, serverId + OWNER_STOP_EXT), "", "utf8");
   return stopped.length === 0 ? { row: row2(UPGRADE_SERVER_AREA, "", UPGRADE_NOT_FOUND), stopped } : { row: row2(UPGRADE_SERVER_AREA, UPGRADE_SERVER_RUNNING, UPGRADE_SERVER_STOPPED), stopped };
 }
 function rootOrNull(adapter, env) {
@@ -31327,9 +33246,9 @@ async function server(input, _options) {
   });
   return { ...hooks, tool };
 }
-var opencode_default = { id: PLUGIN_ID, server, setup };
+var opencode_default2 = { id: PLUGIN_ID, server, setup };
 export {
-  opencode_default as default,
+  opencode_default2 as default,
   id,
   server,
   setup,

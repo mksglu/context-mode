@@ -297,6 +297,30 @@ var DUMP_COUNT_COMMANDS = Object.freeze(["head", "tail"]);
 var DUMP_COUNT_FLAGS = Object.freeze(["-n", "-c", "--lines", "--bytes"]);
 var SED_QUIET_FLAGS = Object.freeze(["-n", "--quiet", "--silent"]);
 var READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path", "filePath"]);
+var READ_MEDIA_TYPES = Object.freeze({
+  png: { exts: [".png"], sig: [{ at: 0, bytes: [137, 80, 78, 71, 13, 10, 26, 10] }] },
+  jpeg: { exts: [".jpg", ".jpeg"], sig: [{ at: 0, bytes: [255, 216, 255] }] },
+  gif: { exts: [".gif"], sig: [{ at: 0, bytes: [71, 73, 70, 56] }] },
+  // "GIF8"
+  webp: { exts: [".webp"], sig: [{ at: 0, bytes: [82, 73, 70, 70] }, { at: 8, bytes: [87, 69, 66, 80] }] },
+  // "RIFF" .... "WEBP"
+  pdf: { exts: [".pdf"], sig: [{ at: 0, bytes: [37, 80, 68, 70, 45] }] }
+  // "%PDF-"
+});
+var READ_IMAGES = Object.freeze(["png", "jpeg", "gif", "webp"]);
+var READ_IMAGES_AND_PDF = Object.freeze([...READ_IMAGES, "pdf"]);
+var READ_MEDIA_BY_AGENT = Object.freeze({
+  "claude-code": READ_IMAGES_AND_PDF,
+  gemini: READ_IMAGES_AND_PDF,
+  qwen: READ_IMAGES_AND_PDF,
+  opencode: READ_IMAGES_AND_PDF,
+  pi: READ_IMAGES,
+  vscode: READ_IMAGES,
+  "copilot-cli": [],
+  codex: [],
+  kiro: [],
+  zcode: []
+});
 var OWN_TOOL_PREFIX = "ctx_";
 var EDIT_TOOLS = Object.freeze(["Write", "Edit"]);
 var EDIT_PATH_KEYS = Object.freeze(["file_path", "path"]);
@@ -823,10 +847,17 @@ function encode(ev, d, _extra) {
 // src/adapters/codex.ts
 var TOOL_NAME_PREFIX2 = "mcp__context_mode__";
 var CODEX_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact", fork: "resume" };
+var STOP_EVENT = "Stop";
+var EMPTY = { stdout: "", exitCode: 0 };
 function decode2(raw) {
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === STOP_EVENT) {
+    const p3 = raw;
+    return { event: STOP_EVENT, agent: "codex", sessionId: String(p3.session_id ?? ""), cwd: String(p3.cwd ?? "") };
+  }
   return decodeClaudeShape(raw, "codex", TOOL_NAME_PREFIX2, CODEX_SOURCES);
 }
 function encode2(ev, d, _extra) {
+  if (ev.event === STOP_EVENT) return EMPTY;
   return encodeClaudeShape(ev, d, false);
 }
 
@@ -842,7 +873,7 @@ var GEMINI_EVENTS = {
 var GEMINI_SOURCES = { startup: "startup", resume: "resume", clear: "clear" };
 var HINT_EVENTS = ["SessionStart", "UserPromptSubmit", "PostToolUse"];
 var DENY_EVENTS = ["UserPromptSubmit", "PreToolUse"];
-var EMPTY = { stdout: "", exitCode: 0 };
+var EMPTY2 = { stdout: "", exitCode: 0 };
 var GEMINI_REPLACE_LEAD = "the tool ran and succeeded; context-mode indexed its full output, and this is the part that answers the call:\n";
 function own(p3, key) {
   return Object.hasOwn(p3, key) ? p3[key] : void 0;
@@ -883,7 +914,13 @@ function readResult2(resp) {
   const llm = obj === void 0 ? void 0 : own(obj, "llmContent");
   const text2 = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : partsText(llm) ?? JSON.stringify(resp);
   const err2 = obj === void 0 ? void 0 : own(obj, "error");
-  return { isError: err2 !== void 0 && err2 !== null, bytes: Buffer.byteLength(text2), text: text2 };
+  const info = { isError: err2 !== void 0 && err2 !== null, bytes: Buffer.byteLength(text2), text: text2 };
+  if (hasMediaPart(llm)) info.keep = true;
+  return info;
+}
+function hasMediaPart(llm) {
+  const parts = Array.isArray(llm) ? llm : [llm];
+  return parts.some((p3) => typeof p3 === "object" && p3 !== null && (Object.hasOwn(p3, "inlineData") || Object.hasOwn(p3, "fileData")));
 }
 var URL_STARTS = ["https://", "http://"];
 var URL_TRAIL = `.,;:!?)]}>'"`;
@@ -950,15 +987,15 @@ function decode3(raw) {
 function encode3(ev, d, _extra) {
   switch (d.kind) {
     case "allow":
-      return EMPTY;
+      return EMPTY2;
     case "hint":
-      if (!HINT_EVENTS.includes(ev.event)) return EMPTY;
+      if (!HINT_EVENTS.includes(ev.event)) return EMPTY2;
       return { stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: d.text } }), exitCode: 0 };
     case "deny":
-      if (!DENY_EVENTS.includes(ev.event)) return EMPTY;
+      if (!DENY_EVENTS.includes(ev.event)) return EMPTY2;
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
-      if (ev.event !== "PostToolUse") return EMPTY;
+      if (ev.event !== "PostToolUse") return EMPTY2;
       return { stdout: JSON.stringify({ decision: "deny", reason: GEMINI_REPLACE_LEAD + d.output }), exitCode: 0 };
   }
 }
@@ -1078,21 +1115,21 @@ function decode5(raw) {
   if (event === "PostToolUse") ev.result = readResult3(raw[k.result], native.casing, native.failure);
   return ev;
 }
-var EMPTY2 = { stdout: "", exitCode: 0 };
+var EMPTY3 = { stdout: "", exitCode: 0 };
 function encode5(ev, d, _extra) {
   switch (d.kind) {
     case "allow":
-      return EMPTY2;
+      return EMPTY3;
     case "hint":
-      return ev.event === "PostToolUse" ? EMPTY2 : { stdout: JSON.stringify({ additionalContext: d.text }), exitCode: 0 };
+      return ev.event === "PostToolUse" ? EMPTY3 : { stdout: JSON.stringify({ additionalContext: d.text }), exitCode: 0 };
     case "deny":
-      if (ev.event !== "PreToolUse") return EMPTY2;
+      if (ev.event !== "PreToolUse") return EMPTY3;
       return {
         stdout: JSON.stringify({ permissionDecision: "deny", permissionDecisionReason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }),
         exitCode: 0
       };
     case "replace":
-      if (ev.event !== "PostToolUse") return EMPTY2;
+      if (ev.event !== "PostToolUse") return EMPTY3;
       return { stdout: JSON.stringify({ modifiedResult: { resultType: RESULT_SUCCESS, textResultForLlm: d.output } }), exitCode: 0 };
   }
 }
@@ -4824,11 +4861,17 @@ function dataRootOf(env, home) {
 
 // src/core/ops/doctor-issue.ts
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync as existsSync9, fstatSync, mkdirSync as mkdirSync4, openSync, readFileSync as readFileSync5, readSync, realpathSync as realpathSync5, writeFileSync as writeFileSync2 } from "node:fs";
+import { closeSync as closeSync2, existsSync as existsSync9, fstatSync, mkdirSync as mkdirSync4, openSync as openSync2, readFileSync as readFileSync5, readSync as readSync2, realpathSync as realpathSync5, writeFileSync as writeFileSync2 } from "node:fs";
 import { delimiter, join as join10 } from "node:path";
 
 // src/core/hooks/fallback.ts
 import { join as join3, resolve as resolve2 } from "node:path";
+
+// src/core/policy/read-media.ts
+import { extname } from "node:path";
+var { closeSync, openSync, readSync } = process.getBuiltinModule("node:fs");
+
+// src/core/hooks/fallback.ts
 var fs = process.getBuiltinModule("node:fs");
 
 // src/core/store/schema.ts
@@ -8018,7 +8061,7 @@ function extensionPlugin(bin, id) {
   };
 }
 var NATIVE_PLUGIN = {
-  codex: { bin: "codex", args: ["plugin", "list"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path4.join("codex", SKILLS_DIR_NAME), format: "table", hookTrust: true },
+  codex: { bin: "codex", args: ["plugin", "list", "--json"], plugin: PLUGIN_ID, hooksVia: ".codex-plugin", skillsVia: path4.join("codex", SKILLS_DIR_NAME), format: "codex-json", hookTrust: true },
   qwen: extensionPlugin("qwen", "qwen"),
   gemini: extensionPlugin("gemini", "gemini"),
   // D-R44-ZCODE-NATIVE-1 (host audit zcode-1/2): `zcode plugins install context-mode@context-mode` lists as JSON; ZCode loads
@@ -8874,7 +8917,7 @@ function listCopilotHooks(env, file, cwd) {
 
 // src/setup/engine.ts
 import { spawn as spawn3, spawnSync as spawnSync4 } from "node:child_process";
-import { closeSync as closeSync2, existsSync as existsSync16, mkdirSync as mkdirSync5, mkdtempSync, openSync as openSync2, readFileSync as readFileSync10, readSync as readSync2, readdirSync as readdirSync5, realpathSync as realpathSync9, rmSync as rmSync2, statSync as statSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { closeSync as closeSync3, existsSync as existsSync16, mkdirSync as mkdirSync5, mkdtempSync, openSync as openSync3, readFileSync as readFileSync10, readSync as readSync3, readdirSync as readdirSync5, realpathSync as realpathSync9, rmSync as rmSync2, statSync as statSync2, writeFileSync as writeFileSync3 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import path12 from "node:path";
 
@@ -8960,11 +9003,11 @@ var REAL_HOST = Object.freeze({
 var BINARY_MAGICS = Object.freeze(["cffaedfe", "cefaedfe", "7f454c46", "4d5a"]);
 function isNativeBinary(file) {
   const head = Buffer.alloc(4);
-  const fd = openSync2(file, "r");
+  const fd = openSync3(file, "r");
   try {
-    readSync2(fd, head, 0, 4, 0);
+    readSync3(fd, head, 0, 4, 0);
   } finally {
-    closeSync2(fd);
+    closeSync3(fd);
   }
   const hex = head.toString("hex");
   return BINARY_MAGICS.some((m3) => hex.startsWith(m3));
@@ -9004,7 +9047,7 @@ function installExitOk(status, listed, platform = process.platform) {
   return platform === "win32" && status === WIN_EXIT_CRASH && listed;
 }
 function runBin(bin, args, env, input, timeout = VERIFY_TIMEOUT_MS) {
-  return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout });
+  return spawnShim(hostBin(bin, env).file ?? bin, args, env, { encoding: "utf8", input, timeout, maxBuffer: Infinity });
 }
 function readOr(file) {
   return existsSync16(file) ? hostText(readFileSync10(file, "utf8")) : void 0;
@@ -9564,16 +9607,21 @@ function skillsCheck(row, pkgDir) {
   const bad = s.files.filter((f2) => readRaw(f2.file) !== (existsSync16(f2.src) ? renderSkill(readFileSync10(f2.src, "utf8"), s.prefixes) : void 0));
   return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f2) => f2.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : void 0 };
 }
-var PLUGIN_ENABLED = "enabled";
-var WORD_TRIM = ",;";
 var CODEX_CONFIG_FILE2 = "config.toml";
 var EXT_ENABLED_USER = "Enabled (User):";
 var EXT_ENABLED_WORKSPACE = "Enabled (Workspace):";
 var EXT_TRUE = "true";
-function tableState(n3, text2) {
-  const line = text2.split("\n").find((l2) => l2.split(" ").includes(n3.plugin));
-  if (line === void 0) return void 0;
-  return line.split(" ").map((w) => trimChars(w, WORD_TRIM)).includes(PLUGIN_ENABLED) ? "enabled" : "disabled";
+function codexJsonState(n3, text2) {
+  let doc;
+  try {
+    doc = JSON.parse(text2);
+  } catch {
+    return void 0;
+  }
+  const list2 = isObj5(doc) && Array.isArray(doc.installed) ? doc.installed : [];
+  const mine = list2.find((p3) => isObj5(p3) && p3.pluginId === n3.plugin);
+  if (!isObj5(mine)) return void 0;
+  return mine.enabled === true ? "enabled" : "disabled";
 }
 function extensionState(n3, text2) {
   let mine = false;
@@ -9618,9 +9666,15 @@ function nativeState(row, env) {
   const n3 = row.nativePlugin;
   if (!n3 || !hostBin(n3.bin, env).file) return none;
   const r2 = runBin(n3.bin, n3.args, env);
+  const why = r2.error?.code ?? r2.signal;
+  if (why && `${r2.stdout}`.includes(n3.plugin)) {
+    const cmd = [n3.bin, ...n3.args].join(" ");
+    return { ...none, stopped: `${cmd} stopped before it finished (${why}); it names ${n3.plugin}, run ${cmd} in a terminal` };
+  }
   if (r2.status !== 0) return none;
   if (n3.format === "json") return jsonState(n3, `${r2.stdout}`);
-  return n3.format === "extension" ? extensionState(n3, `${r2.stdout}${r2.stderr}`) : { state: tableState(n3, `${r2.stdout}`), workspaceOff: false };
+  if (n3.format === "codex-json") return { state: codexJsonState(n3, `${r2.stdout}`), workspaceOff: false };
+  return extensionState(n3, `${r2.stdout}${r2.stderr}`);
 }
 function nativeRow(row, n3) {
   return {
@@ -9634,18 +9688,12 @@ function nativeRow(row, n3) {
     skillInstall: { kind: "package", via: n3.skillsVia }
   };
 }
-function trimChars(w, chars) {
-  let a2 = 0;
-  let b3 = w.length;
-  while (a2 < b3 && chars.includes(w.charAt(a2))) a2++;
-  while (b3 > a2 && chars.includes(w.charAt(b3 - 1))) b3--;
-  return w.slice(a2, b3);
-}
 async function nativeResult(row, ctx, apply2) {
   const n3 = row.nativePlugin;
-  const { state, workspaceOff, hookGate } = nativeState(row, ctx.env);
+  const { state, workspaceOff, hookGate, stopped } = nativeState(row, ctx.env);
+  const bin = n3 ? hostBin(n3.bin, ctx.env).file : void 0;
+  if (stopped) return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin, reason: stopped };
   if (!n3 || state === void 0) return void 0;
-  const bin = hostBin(n3.bin, ctx.env).file;
   if (state === "disabled") {
     if (!n3.enable) return void 0;
     return {
