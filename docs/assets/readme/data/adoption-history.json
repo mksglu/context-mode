@@ -1,5 +1,5 @@
 {
-  "read_at": "2026-11-05",
+  "read_at": "2026-11-06",
   "series": {
     "github_clones": "[day, clones, unique cloners] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/clones (keeps 14 days). Counts git clones and fetches of the repo: Claude Code, Codex, Gemini CLI and Qwen Code plugin installs and updates, CI machines and people.",
     "github_views": "[day, views, unique visitors] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/views (keeps 14 days).",
@@ -26,7 +26,8 @@
     ["2026-10-31",31250,8093],
     ["2026-11-01",36698,8071],
     ["2026-11-02",45007,11288],
-    ["2026-11-03",48731,12155]
+    ["2026-11-03",48731,12155],
+    ["2026-11-04",60207,12911]
   ],
   "github_views": [
     ["2026-10-20",1608,1086],
@@ -43,37 +44,44 @@
     ["2026-10-31",1869,1202],
     ["2026-11-01",2537,1543],
     ["2026-11-02",3400,2093],
-    ["2026-11-03",3128,2040]
+    ["2026-11-03",3128,2040],
+    ["2026-11-04",3160,1787]
   ],
   "github_clones_14d": [
     ["2026-11-03",646294,63364],
     ["2026-11-04",627866,63586],
-    ["2026-11-05",627866,63586]
+    ["2026-11-05",627866,63586],
+    ["2026-11-06",629433,63799]
   ],
   "github_views_14d": [
     ["2026-11-03",34391,17382],
     ["2026-11-04",35911,18017],
-    ["2026-11-05",35911,18017]
+    ["2026-11-05",35911,18017],
+    ["2026-11-06",37947,18661]
   ],
   "github_referrers": [
     ["2026-11-03",[["github.com",6959,5029],["Google",6856,4628],["t.co",788,634],["Bing",652,439],["youtube.com",414,321],["search.brave.com",374,230],["teams.public.onecdn.static.microsoft",182,126],["linkedin.com",153,119],["reddit.com",141,101],["DuckDuckGo",125,88]]],
     ["2026-11-04",[["Google",7335,4876],["github.com",7194,5199],["t.co",680,530],["Bing",677,456],["youtube.com",413,322],["search.brave.com",407,253],["teams.public.onecdn.static.microsoft",188,128],["linkedin.com",159,124],["reddit.com",154,112],["insidersai.com.br",153,139]]],
-    ["2026-11-05",[["Google",7335,4876],["github.com",7194,5199],["t.co",680,530],["Bing",677,456],["youtube.com",413,322],["search.brave.com",407,253],["teams.public.onecdn.static.microsoft",188,128],["linkedin.com",159,124],["reddit.com",154,112],["insidersai.com.br",153,139]]]
+    ["2026-11-05",[["Google",7335,4876],["github.com",7194,5199],["t.co",680,530],["Bing",677,456],["youtube.com",413,322],["search.brave.com",407,253],["teams.public.onecdn.static.microsoft",188,128],["linkedin.com",159,124],["reddit.com",154,112],["insidersai.com.br",153,139]]],
+    ["2026-11-06",[["Google",7889,5094],["github.com",7508,5396],["Bing",710,476],["t.co",576,429],["youtube.com",426,328],["search.brave.com",422,267],["teams.public.onecdn.static.microsoft",211,143],["insidersai.com.br",186,163],["linkedin.com",165,129],["reddit.com",162,119]]]
   ],
   "stars": [
     ["2026-11-03",33327],
     ["2026-11-04",33420],
-    ["2026-11-05",33497]
+    ["2026-11-05",33497],
+    ["2026-11-06",33567]
   ],
   "npm_totals": [
     ["2026-11-03",709316,39992,100405],
     ["2026-11-04",712242,39992,100405],
-    ["2026-11-05",718599,40914,103931]
+    ["2026-11-05",718599,40914,103931],
+    ["2026-11-06",731609,45207,108803]
   ],
   "npm_versions_last_week": [
     ["2026-11-03",35411,4498,83,246],
     ["2026-11-04",35411,4498,83,246],
-    ["2026-11-05",35462,5369,83,252]
+    ["2026-11-05",35462,5369,83,252],
+    ["2026-11-06",36524,5708,2975,257]
   ],
   "v1_marketplace": [
     ["2026-02-25",211,"0b70e68d458516b0f9944bc8a555988341553a9c"],
