@@ -15,7 +15,7 @@ Three groups of work are open on 2.1.4.
 
 ## Decision
 
-1. **Stored source enters the sandbox, never the context (#1325).** `ctx_execute` gets an optional `source` input. It takes the short pointer (`s81`) or the full label (`mcp:<server>:<tool>:#<tool-use-id>`). The server writes the full stored text, chunks joined in order, to a temp file in the run's own sandbox folder, and gives the script its path in `CTX_SOURCE` (and on stdin for `shell`). Only what the script prints enters the context, through the normal OUTPUT_CAP path. There is no `ctx_get` that returns the whole text into the context.
+1. **Stored source enters the sandbox, never the context (#1325).** `ctx_execute` gets an optional `source` input. It takes the short pointer (`s81`) or the full label (`mcp:<server>:<tool>:#<tool-use-id>`). The server writes the full stored text, chunks joined in order, to a temp file in the run's own sandbox folder, and gives the script its path in `CTX_SOURCE` (and on stdin for `shell`). The file is read only, in the same project scope, under a size cap, and no user path is used, so no path escape is possible. Only what the script prints enters the context, through the normal OUTPUT_CAP path (Thinking in Code; the TRUNCATE rule keeps the stored source whole). Owner rule: no new MCP tool. The tool count does not change. Rejected: a `ctx_get` tool, because it adds a new tool (owner rule: no new tools) and would also return the whole text into the context.
 2. **The large-read deny applies to text only (#1321, #1324).** The Read deny (ADR-0008 step 6, `src/core/policy/decide.ts` `read()`) checks the file type first. Images, PDFs and other binary or media files that the host renders itself (the host sends them as an image or document block, never as file bytes in the text) pass through. Text over OUTPUT_CAP keeps the deny, on every host with the same rule.
 3. **Codex `Stop` decodes as a known event (#1323).** The Claude-shape decoder accepts `Stop` and answers it with the empty allow reply. Setup and `ctx_upgrade` remove a context-mode `Stop` entry they find from an older install. Doctor D5 shows a past decode error as WARN with the event name, so a user sees it.
 4. **Codex doctor reads the full plugin list (#1322).** The host list command runs with a 16 MiB buffer. When the list command itself fails (ENOBUFS, timeout, exit code), doctor reports that error by name and does not take the legacy-entry path.
@@ -41,9 +41,10 @@ Three groups of work are open on 2.1.4.
 - Input: `ctx_execute({language, code, source: "s81" | "<label>"})`. `source` and `file` can both be set; `source` fills `CTX_SOURCE`.
 - Paging and limits: the temp file holds the whole source up to a size cap (default 64 MiB, the store's own source cap if lower). Over the cap the call returns a clear error with the source size and the cap. Inside the script the agent pages as it likes (`readline`, `json.load`); paging is a script concern, never a context concern.
 - Scope: the current project and worktree database only. Sources from other sessions of the same project resolve. No cross-project read.
-- Security: the source id resolves by id or exact label in the project DB, never as a path; the temp file sits in the run's sandbox folder, mode 0600, and goes away with the run folder. No path escape is possible because no user path is used.
+- Security: the source id resolves by id or exact label in the project DB, never as a path; the temp file sits in the run's sandbox folder, read only (mode 0400), and goes away with the run folder. No path escape is possible because no user path is used.
 - Doctor: D9 reports "stored sources readable in sandbox: yes". A doctor self-test writes a small source, reads it through `source`, and compares the byte count.
-- Docs: the ctx_execute tool description and the routing text name the `source` input next to the ctx_search pointer, so the pointer line reads "search it, or pass source to ctx_execute to process all of it".
+- Tool count: unchanged. `source` is an input of the existing `ctx_execute`. GP2 tool-description budget: the `ctx_execute` description grows by one short line at most.
+- Docs: the routing text names the `source` input next to the ctx_search pointer, so the pointer line reads "search it, or pass source to ctx_execute to process all of it".
 - Why ctx_search stays ranked: it answers "find", where the top chunks are the right answer and the reply must fit the context. Returning every chunk from search would put the whole text into the context and break ADR-0016.
 - Side note from the issue: sandbox Python on Windows prints with `cp1252`. Sandbox runs set `PYTHONUTF8=1` (small, same release as `source`).
 
@@ -93,13 +94,13 @@ Users on 2.1.4 meet four blockers (images and PDFs blocked, a Codex hook error, 
 3. R3: Codex doctor gives PASS with a plugin list over 1 MiB and names a list command error by name.
 4. R4: One Copilot hooks file serves Copilot CLI and VS Code with the right tool prefix for each.
 5. R5: The build ships `.github/plugin/plugin.json` for Copilot CLI with working MCP args and hooks.
-6. R6 (after the patch): `ctx_execute` takes `source`; the script gets the full stored text through `CTX_SOURCE`; only printed output enters the context.
+6. R6 (after the patch): `ctx_execute` takes `source` (no new tool); the script gets the full stored text as a read-only file path in `CTX_SOURCE`; only printed output enters the context.
 7. R7: Each change has one DEVIATIONS row quoting its issue, a red test in the ADR-grouped test files, a doctor check that catches the case, and a profiling number before and after (hook p95 for R1 and R2, doctor wall time for R3).
 8. R8: R1 to R5 ship in one patch release. Comments on the fixed issues say the fix is on main and ships in the next patch.
 
 ## Non-goals
 
-- A `ctx_get` tool that returns a whole source into the context.
+- Any new MCP tool for stored sources (owner rule: no new tools). `ctx_get` is rejected for this reason.
 - An unranked mode for ctx_search.
 - Cross-project source reads.
 - A setting to change OUTPUT_CAP per file type.
