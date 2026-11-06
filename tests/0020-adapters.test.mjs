@@ -1095,11 +1095,12 @@ describe("ADR-0020 adapters", () => {
       const text = FX.AfterTool.tool_response.llmContent;
       assert.deepEqual(ok.result, { isError: false, bytes: Buffer.byteLength(text), text });
       // D-R38-GEMINI-PARTS-1: a text-only Part list is the joined text; a Part list with a non-text Part stays JSON text.
+      // D-R47-READ-MEDIA-1 (#1321): an inlineData Part is media, so the result keeps the host's own shape (keep: true).
       const parts = { llmContent: [{ text: "a" }, { text: "b" }], returnDisplay: "ab" };
       assert.deepEqual(decode({ ...FX.AfterTool, tool_response: parts }).result, { isError: false, bytes: 2, text: "ab" });
       const mixed = { llmContent: [{ text: "a" }, { inlineData: { mimeType: "image/png", data: "x" } }], returnDisplay: "a" };
       const mj = JSON.stringify(mixed);
-      assert.deepEqual(decode({ ...FX.AfterTool, tool_response: mixed }).result, { isError: false, bytes: Buffer.byteLength(mj), text: mj });
+      assert.deepEqual(decode({ ...FX.AfterTool, tool_response: mixed }).result, { isError: false, bytes: Buffer.byteLength(mj), text: mj, keep: true });
       const bad = decode({ ...FX.AfterTool, tool_response: { llmContent: "", returnDisplay: "", error: { message: "boom" } } });
       assert.equal(bad.result.isError, true);
       const nullErr = decode({ ...FX.AfterTool, tool_response: { llmContent: "x", error: null } });

@@ -5,13 +5,13 @@
 // the hook's own cost against HOOK_P95_MS. An agent with no recorded payload is UNKNOWN, never a guessed payload.
 // D-D5-BARE-1: the cost is hook wall minus bare `node -e ""` wall, the D3 rule (ADR-0019 D3), fastest of 3 to 9 pairs (D-D5-MORE-PAIRS-1).
 // node.exe start is paid by the host with or without the hook (42.7 ms p50 on windows-latest), so it is not in the budget.
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
 import { replyErrors } from "./hook-shape.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_RANGE_DETAIL, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
@@ -151,10 +151,40 @@ function isPassThrough(stdout: string): boolean {
   return !isObject(out) || !isObject(out.hookSpecificOutput) || !Object.hasOwn(out.hookSpecificOutput, "updatedToolOutput");
 }
 
-/** null when both Read probes pass, else the FAIL detail. */
+// D-R47-READ-MEDIA-1 (#1321): a third probe sends a PreToolUse Read of a PNG over OUTPUT_CAP (real PNG signature);
+// the hook must not deny it, Claude Code shows it as an image block.
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+async function mediaProbe(i: HookCheckInput, timeoutMs: number): Promise<string> {
+  const home = mkdtempSync(path.join(tmpdir(), "cm-d5-media-"));
+  try {
+    const filePath = path.join(home, "d5-media-probe.png");
+    writeFileSync(filePath, Buffer.concat([PNG_SIGNATURE, Buffer.alloc(OUTPUT_CAP + 1)]));
+    const node = nodeLaunch({ ...i.env, HOME: home, USERPROFILE: home });
+    const r = await runProcess([node.file, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs,
+      stdin: JSON.stringify({ session_id: "d5-media-probe", transcript_path: "", cwd: home, hook_event_name: "PreToolUse",
+        tool_name: "Read", tool_use_id: "toolu_d5_media_probe", tool_input: { file_path: filePath } }),
+    });
+    return r.stdout.toString("utf8");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
+/** True when the hook's PreToolUse output says deny. */
+function isDeny(stdout: string): boolean {
+  if (stdout.trim() === "") return false;
+  let out: unknown;
+  try { out = JSON.parse(stdout); } catch { return false; }
+  return isObject(out) && isObject(out.hookSpecificOutput) && out.hookSpecificOutput.permissionDecision === "deny";
+}
+
+/** null when all Read probes pass, else the FAIL detail. */
 async function readProbeDetail(i: HookCheckInput, timeoutMs: number): Promise<string | null> {
   if (!isReadShape(await readProbe(i, timeoutMs, false))) return D5_READ_SHAPE_DETAIL;
   if (!isPassThrough(await readProbe(i, timeoutMs, true))) return D5_READ_RANGE_DETAIL;
+  if (isDeny(await mediaProbe(i, timeoutMs))) return D5_READ_MEDIA_DETAIL;
   return null;
 }
 

@@ -80,7 +80,16 @@ function readResult(resp: unknown): ToolResultInfo {
   const llm = obj === undefined ? undefined : own(obj, "llmContent");
   const text = resp === undefined ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : partsText(llm) ?? JSON.stringify(resp);
   const err = obj === undefined ? undefined : own(obj, "error");
-  return { isError: err !== undefined && err !== null, bytes: Buffer.byteLength(text), text };
+  const info: ToolResultInfo = { isError: err !== undefined && err !== null, bytes: Buffer.byteLength(text), text };
+  // D-R47-READ-MEDIA-1 (#1321): an image/PDF read_file is llmContent {inlineData} (gemini-cli fileUtils.ts); a Part that is
+  // not text is a block the model sees as media, so the result stays as the host made it (as D-M2-MCP-1 keep).
+  if (hasMediaPart(llm)) info.keep = true;
+  return info;
+}
+
+function hasMediaPart(llm: unknown): boolean {
+  const parts = Array.isArray(llm) ? llm : [llm];
+  return parts.some((p) => typeof p === "object" && p !== null && (Object.hasOwn(p, "inlineData") || Object.hasOwn(p, "fileData")));
 }
 
 // D-R38-GEMINI-URL-1 (host audit gemini-5): web_fetch takes only `prompt`, with the URLs inside the free text.

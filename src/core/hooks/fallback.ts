@@ -14,6 +14,7 @@ import {
 } from "../contracts/constants.ts";
 import type { AdapterRow, HookOutput } from "../contracts/types.ts";
 import { getAdapter } from "../../adapters/table.ts";
+import { isMediaRead } from "../policy/read-media.ts";
 
 type Rec = Record<string, unknown>;
 type Kind = "shell" | "read" | "grep" | "fetch";
@@ -149,10 +150,11 @@ function bigFile(abs: string): boolean {
 }
 
 /** True when the Read target is a whole file over the output cap. An unreadable, unnamed or ranged target is not denied. */
-function bigRead(input: Rec, cwd: string): boolean {
+function bigRead(agent: AgentId, input: Rec, cwd: string): boolean {
   if ((input.offset ?? null) !== null || (input.limit ?? null) !== null) return false; // a ranged Read is never denied (same as decide)
   const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? (input[READ_PATH_LIST_KEY] as unknown[]).filter((x): x is string => typeof x === "string") : [];
-  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve(cwd, p)));
+  // D-R47-READ-MEDIA-1: an image or PDF the host shows as a block is not denied (same as decide).
+  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve(cwd, p)) && !isMediaRead(agent, resolve(cwd, p)));
 }
 
 /**
@@ -170,7 +172,7 @@ export function failureOutput(agent: AgentId, raw: unknown, err: unknown, cwdFal
     const kind = kindOf(row, name);
     if (kind === null) return allow();
     const cwd = firstString(raw, HOOK_FAIL_CWD_KEYS) || cwdFallback;
-    if (kind === "read" && !bigRead(inputOf(raw), cwd)) return allow();
+    if (kind === "read" && !bigRead(agent, inputOf(raw), cwd)) return allow();
     const redirect = kind === "read" ? HOOK_FAIL_REDIRECT.read : HOOK_FAIL_REDIRECT[kind];
     const reason = prefixToolNames(redirect, row.toolNamePrefix) + "\n" + HOOK_FAIL_LINE(errorLabel(err), row.toolNamePrefix);
     return row.encode({ event: "PreToolUse", agent, sessionId: "", cwd, turn: 0 }, { kind: "deny", reason });

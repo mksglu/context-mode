@@ -1053,7 +1053,7 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     // D-WIN-RM-RETRY-1: Windows can hold a child's cwd after "close" (EPERM); see rmTempDir.
     t.after(() => rmTempDir(dir));
     writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE),
-      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s);process.stderr.write(process.argv.slice(2).join(" "));process.stdout.write(${JSON.stringify(out)});process.exitCode=${exit};});`);
+      `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);process.stderr.write(process.argv.slice(2).join(" "));process.stdout.write(p.tool_name==="Read"&&p.hook_event_name==="PreToolUse"?"":${JSON.stringify(out)});process.exitCode=${exit};});`);
     if (fixture !== null) {
       mkdirSync(path.join(dir, C.HOOK_FIXTURE_DIR));
       writeFileSync(path.join(dir, C.HOOK_FIXTURE_DIR, C.HOOK_FIXTURE_FILE), JSON.stringify(fixture));
@@ -1115,12 +1115,12 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
 
   // D-D5-READ-SHAPE-1 (#1304): claude-code D5 also sends a large PostToolUse Read and checks updatedToolOutput.
   // D-R41-READ-OFFSET-1 (#1314): `full` true replaces only a Read with no offset/limit, as the fixed hook does.
-  const readHook = (out, full) => `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
+  const readHook = (out, full, mediaDeny = false) => `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
     `const bounded=${full ? "p.tool_input.offset!==undefined||p.tool_input.limit!==undefined" : "false"};` +
-    `process.stdout.write(p.hook_event_name!=="PostToolUse"?${JSON.stringify(native)}:bounded?"":JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",updatedToolOutput:${out}}}));});`;
-  function readBundle(t, out, full = true) {
+    `process.stdout.write(p.hook_event_name!=="PostToolUse"?(p.tool_name==="Read"&&!${mediaDeny}?"":${JSON.stringify(native)}):bounded?"":JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",updatedToolOutput:${out}}}));});`;
+  function readBundle(t, out, full = true, mediaDeny = false) {
     const dir = bundle(t, native);
-    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), readHook(out, full));
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), readHook(out, full, mediaDeny));
     return dir;
   }
 
@@ -1139,6 +1139,13 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     const obj = JSON.stringify({ type: "text", file: { filePath: "/a", content: "c", numLines: 1, startLine: 1, totalLines: 1 } });
     const r = await checkHookRoundTrip(input(readBundle(t, obj, false)));
     assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_RANGE_DETAIL, fixCommand: C.D5_FIX });
+  });
+
+  // D-R47-READ-MEDIA-1 (#1321): D5 passed while the hook denied every PNG Read over OUTPUT_CAP. A third probe sends one.
+  test("[M5] doctor-hook/D5-image-read-denied-FAILs (#1321)", async (t) => {
+    const obj = JSON.stringify({ type: "text", file: { filePath: "/a", content: "c", numLines: 1, startLine: 1, totalLines: 1 } });
+    const r = await checkHookRoundTrip(input(readBundle(t, obj, true, true)));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_MEDIA_DETAIL, fixCommand: C.D5_FIX });
   });
 
   test("[M5] doctor-hook/D5-bad-exit-code-FAILs-shape", async (t) => {

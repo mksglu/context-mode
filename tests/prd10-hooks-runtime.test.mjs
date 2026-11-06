@@ -2332,6 +2332,28 @@ describe("PRD-v2 section 10: saving on live payload shapes", () => {
     assert.deepEqual(out, { stdout: "", exitCode: 0 });
   });
 
+  // D-R47-READ-MEDIA-1 (#1321, #1324): an image read result is an image block, never a ctx_search pointer.
+  // gemini-cli fileUtils.ts: read_file of an image returns llmContent {inlineData: {data, mimeType}}; pi read returns
+  // [{type:"text", text:"Read image file [image/png]"}, {type:"image", data, mimeType}] (pi-mono read.ts).
+  test("gemini AfterTool of an image read_file (inlineData) is not replaced (#1321)", async (t) => {
+    const { repo, env } = sandbox(t);
+    const data = Buffer.alloc(51571, 7).toString("base64");
+    for (const llmContent of [{ inlineData: { data, mimeType: "image/png" } }, [{ text: "x" }, { inlineData: { data, mimeType: "image/png" } }]]) {
+      const out = await handleHook("gemini", { session_id: "g2", transcript_path: "", cwd: repo, hook_event_name: "AfterTool", timestamp: "2026-11-07T00:00:00Z",
+        tool_name: "read_file", tool_input: { file_path: path.join(repo, "shot.png") }, tool_response: { llmContent, returnDisplay: "Read image file: shot.png" } }, env);
+      assert.deepEqual(out, { stdout: "", exitCode: 0 });
+    }
+  });
+
+  test("pi tool_result of an image `read` is not replaced (#1324)", async (t) => {
+    const { repo } = sandbox(t);
+    const { handlers, ctx } = await piHandlers(repo);
+    const input = { path: "shot.png" };
+    const r = await handlers.tool_result({ type: "tool_result", toolCallId: "c4", toolName: "read", input,
+      content: [{ type: "text", text: "Read image file [image/png]" }, { type: "image", data: Buffer.alloc(51571, 7).toString("base64"), mimeType: "image/png" }], isError: false, details: undefined }, ctx);
+    assert.equal(r, undefined);
+  });
+
   test("copilot-cli postToolUse of a bounded `view` (view_range) is not replaced (#1314)", async (t) => {
     const { repo, big, env } = sandbox(t);
     const out = await handleHook("copilot-cli", { hookEventName: "postToolUse", sessionId: "c1", timestamp: 1, cwd: repo,

@@ -17,6 +17,7 @@ import { lintHookText } from "../build/prompt-lint.mjs";
 import { buildMatcher } from "../build/manifests.ts";
 import { getAdapter } from "../src/adapters/table.ts";
 import { decide, denyMessage } from "../src/core/policy/decide.ts";
+import { failureOutput } from "../src/core/hooks/fallback.ts";
 import { decode as decodeCodex } from "../src/adapters/codex.ts";
 import { decode as decodeQwen } from "../src/adapters/qwen.ts";
 import { decode as decodeKiro } from "../src/adapters/kiro.ts";
@@ -511,6 +512,45 @@ describe("ADR-0008 read-deny hook text", { concurrency: CONC }, () => {
       assert.equal(decide(ev({ filePath: big }), row, null).kind, "deny");
       assert.equal(decide(ev({ filePaths: [big] }), row, null).kind, "deny");
       assert.equal(decide(ev({ filePath: big, offset: 1, limit: 10 }), row, null).kind, "allow");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // D-R47-READ-MEDIA-1 (#1321 Aston77, #1324 hoho51): an unranged Read of a 51,571 B PNG (the #1324 size) and a 339,869 B
+  // PNG (the #1321 size) was denied. The host shows images (and PDFs where it can) as blocks, not text: no deny. Media is the
+  // extension AND the first bytes; a text file named .png, a .log, and a host with no media path keep the deny.
+  test("[D-R47-READ-MEDIA-1] a large image or PDF Read is allowed where the host shows it as a block (#1321, #1324)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-media-"));
+    try {
+      const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      const put = (name, head, size) => { const f = join(dir, name); writeFileSync(f, Buffer.concat([head, Buffer.alloc(size - head.length, 0x41)])); return f; };
+      const png = put("shot.png", PNG, 51571), big = put("top skin bend.PNG", PNG, 339869);
+      const jpg = put("a.jpg", Buffer.from([0xff, 0xd8, 0xff, 0xe0]), OUTPUT_CAP + 1);
+      const webp = put("a.webp", Buffer.from("RIFF\x00\x00\x00\x00WEBP", "latin1"), OUTPUT_CAP + 1);
+      const pdf = put("doc.pdf", Buffer.from("%PDF-1.4\n"), OUTPUT_CAP + 1);
+      const fake = put("fake.png", Buffer.from("not a png\n"), OUTPUT_CAP + 1);
+      const log = put("app.log", Buffer.from("x"), 51571);
+      const kind = (agent, input) => {
+        const row = getAdapter(agent);
+        return decide({ event: "PreToolUse", agent, sessionId: "s", cwd: dir, tool: { name: "Read", canonicalName: "Read", input } }, row, null).kind;
+      };
+      for (const f of [png, big, jpg, webp, pdf]) assert.equal(kind("claude-code", { file_path: f }), "allow", f);
+      assert.equal(kind("claude-code", { file_path: pdf, pages: "1-3" }), "allow");
+      assert.equal(kind("claude-code", { file_path: fake }), "deny", "a text file named .png is text");
+      assert.equal(kind("claude-code", { file_path: log }), "deny", "a large text Read keeps the deny");
+      assert.equal(kind("pi", { path: png }), "allow");
+      assert.equal(kind("pi", { path: pdf }), "deny", "Pi read returns a PDF as text");
+      assert.equal(kind("gemini", { absolute_path: pdf }), "allow");
+      assert.equal(kind("copilot-cli", { path: png }), "deny", "no checked media path on copilot-cli view");
+      const oc = getAdapter("opencode");
+      const ocKind = (args) => decide(oc.decode({ type: "execute.before", sessionID: "s", tool: "read", args, directory: dir }), oc, null).kind;
+      assert.equal(ocKind({ filePath: png }), "allow");
+      assert.equal(ocKind({ filePaths: [png, log] }), "deny", "one text file over the cap in the list keeps the deny");
+      // The hook-fail path (fallback.ts) follows decide: an image Read passes, a text Read gets the redirect.
+      const fail = (file_path) => failureOutput("claude-code", { hook_event_name: "PreToolUse", tool_name: "Read", cwd: dir, tool_input: { file_path } }, new Error("x")).stdout;
+      assert.ok(!fail(png).includes("deny"), fail(png));
+      assert.ok(fail(log).includes("deny"));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

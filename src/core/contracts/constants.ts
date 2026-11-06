@@ -308,6 +308,28 @@ export const JQ_COMMAND = "jq"; // a dump only with the identity filter (D-M3-E4
 // impl/08 §6.1 step 6: Read input path key per host shape (Claude file_path, Gemini/Qwen absolute_path, path). D-M3-E4-4.
 export const READ_PATH_KEYS = Object.freeze(["file_path", "absolute_path", "path", "filePath"] as const); // filePath: OpenCode (D-R44-OC-READ-1)
 export const READ_PATH_LIST_KEY = "filePaths"; // OpenCode 2 multi-read: an array of paths (D-R44-OC-READ-1)
+// D-R47-READ-MEDIA-1 (#1321, #1324): a read the host shows as an image or document block costs image tokens, not
+// text bytes, so the Read size deny and the replace skip it. A file is media when its extension AND its first bytes
+// name the same type (Claude Code picks by extension, Pi and OpenCode by the first bytes; both must agree).
+export const READ_MEDIA_TYPES = Object.freeze({
+  png: { exts: [".png"], sig: [{ at: 0, bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }] },
+  jpeg: { exts: [".jpg", ".jpeg"], sig: [{ at: 0, bytes: [0xff, 0xd8, 0xff] }] },
+  gif: { exts: [".gif"], sig: [{ at: 0, bytes: [0x47, 0x49, 0x46, 0x38] }] }, // "GIF8"
+  webp: { exts: [".webp"], sig: [{ at: 0, bytes: [0x52, 0x49, 0x46, 0x46] }, { at: 8, bytes: [0x57, 0x45, 0x42, 0x50] }] }, // "RIFF" .... "WEBP"
+  pdf: { exts: [".pdf"], sig: [{ at: 0, bytes: [0x25, 0x50, 0x44, 0x46, 0x2d] }] }, // "%PDF-"
+} as const);
+export type ReadMediaType = keyof typeof READ_MEDIA_TYPES;
+export const READ_MEDIA_SNIFF_BYTES = 12; // the longest signature end (webp: 8 + 4)
+const READ_IMAGES: readonly ReadMediaType[] = Object.freeze(["png", "jpeg", "gif", "webp"]);
+const READ_IMAGES_AND_PDF: readonly ReadMediaType[] = Object.freeze([...READ_IMAGES, "pdf"]);
+/** Per host, the media its own read tool returns as a block (host source checked, D-R47-READ-MEDIA-1). Claude Code
+ *  Read: images + PDF blocks. Gemini/Qwen read_file: inlineData. OpenCode read: MEDIA_MIMES (png, jpeg, gif, webp, pdf).
+ *  Pi read: image attachments, a PDF comes back as text. VS Code read_file: images go to its own view_image tool.
+ *  A host with no checked media path keeps the size deny for every file. */
+export const READ_MEDIA_BY_AGENT: Readonly<Record<AgentId, readonly ReadMediaType[]>> = Object.freeze({
+  "claude-code": READ_IMAGES_AND_PDF, gemini: READ_IMAGES_AND_PDF, qwen: READ_IMAGES_AND_PDF, opencode: READ_IMAGES_AND_PDF,
+  pi: READ_IMAGES, vscode: READ_IMAGES, "copilot-cli": [], codex: [], kiro: [], zcode: [],
+});
 
 // impl/09 §4 hooks dispatch (DEVIATIONS D-M3-H2-1..6). Keys and texts the dispatch reads; no numbers.
 export const OWN_TOOL_PREFIX = "ctx_"; // §4.6 step 1: canonical names of this server's own tools
@@ -682,6 +704,7 @@ export const D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
 // D-D5-READ-SHAPE-1 (#1304): the PostToolUse Read probe got an updatedToolOutput that is not Read's own output object.
 // D-R41-READ-OFFSET-1 (#1314): the PostToolUse probe of a bounded Read (offset/limit) got a replace instead of the lines.
 export const D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the replace trigger came back replaced: a bounded Read must reach the model whole";
+export const D5_READ_MEDIA_DETAIL = "PreToolUse Read of a PNG over the one-read limit came back denied: an image Read must reach the model as an image block (#1321)";
 export const D5_READ_SHAPE_DETAIL = "PostToolUse Read replace is not Read's output shape {type:\"text\", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning";
 export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`; }
 export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken install

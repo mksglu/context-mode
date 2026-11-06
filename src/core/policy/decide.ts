@@ -22,6 +22,7 @@ import { isSubagentCall } from "./subagent.ts";
 import { unwrap } from "./unwrap.ts";
 import { denyPatternFromAny, matchesAnyDenyPattern } from "./user-deny.ts";
 import { READ_DENY_MESSAGE } from "./read-deny.ts";
+import { isMediaRead } from "./read-media.ts";
 
 // Canonical tool names (impl/01 §2) and input field values; names, not tunable values.
 const BASH = "Bash";
@@ -284,7 +285,8 @@ function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
     for (const p of readPaths(input)) {
       const abs = resolve(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+      // D-R47-READ-MEDIA-1 (#1321, #1324): an image or PDF the host shows as a block costs no text bytes.
+      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
     }
   }
   return ALLOW; // ranged Read is never denied; no Read hint (D-M7-RR-2)
