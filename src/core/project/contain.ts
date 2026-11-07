@@ -33,6 +33,31 @@ export function isInside(root: string, p: string): boolean {
   return true;
 }
 
+// D-R48-OWN-FILE-1 (#1326): the realpath of a fixed dir (project root, agent config dir) is asked on every Read the
+// hooks check; only a found realpath is kept, so a dir made later is still seen.
+const rootReal = new Map<string, string>();
+function realRoot(root: string): string | undefined {
+  const hit = rootReal.get(root);
+  if (hit !== undefined) return hit;
+  const r = real(root);
+  if (r !== undefined) rootReal.set(root, r);
+  return r;
+}
+
+/** isInside for several fixed roots: one realpath of `p`, the roots' realpaths kept. True when any root holds `p`. */
+export function isInsideAny(roots: readonly string[], p: string): boolean {
+  if (roots.length === 0) return false;
+  const q = real(p);
+  if (q === undefined) return false;
+  const qc = components(q);
+  return roots.some((root) => {
+    const r = realRoot(root);
+    if (r === undefined) return false;
+    const rc = components(r);
+    return qc.length >= rc.length && rc.every((c, i) => c === qc[i]);
+  });
+}
+
 /**
  * D-M2-R7-1 (#954): the deepest dir that holds every path, by realpath components.
  * A path that cannot be realpath'd holds no files and is left out.

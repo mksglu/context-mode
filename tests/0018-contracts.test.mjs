@@ -566,3 +566,13 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
     });
   });
 });
+
+// D-R48-TRIGGER-1 (#1326 coreycoburn): REPLACE_TRIGGER_BYTES is a documented setting, env CTX_REPLACE_TRIGGER_BYTES.
+test("D-R48-TRIGGER-1: CTX_REPLACE_TRIGGER_BYTES sets the replace trigger; a bad value keeps 4096 (#1326)", () => {
+  assert.equal(C.REPLACE_TRIGGER_ENV, "CTX_REPLACE_TRIGGER_BYTES");
+  assert.equal(C.REPLACE_TRIGGER_BYTES_DEFAULT, 4096);
+  assert.equal(C.readReplaceTrigger(undefined), 4096);
+  assert.equal(C.readReplaceTrigger(""), 4096);
+  assert.equal(C.readReplaceTrigger("8192"), 8192);
+  for (const bad of ["0", "-5", "1.5", "abc", "1e400"]) assert.equal(C.readReplaceTrigger(bad), 4096, bad);
+});

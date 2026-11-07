@@ -1,0 +1,1 @@
+context-mode: {size}-byte file, over the one-read limit. Read "{path}" in parts with offset and limit, or sed -n '1,200p'.

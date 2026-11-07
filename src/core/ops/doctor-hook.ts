@@ -5,13 +5,13 @@
 // the hook's own cost against HOOK_P95_MS. An agent with no recorded payload is UNKNOWN, never a guessed payload.
 // D-D5-BARE-1: the cost is hook wall minus bare `node -e ""` wall, the D3 rule (ADR-0019 D3), fastest of 3 to 9 pairs (D-D5-MORE-PAIRS-1).
 // node.exe start is paid by the host with or without the hook (42.7 ms p50 on windows-latest), so it is not in the budget.
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { hostText } from "./host-text.ts";
 import { replyErrors } from "./hook-shape.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL, D5_STOP_DETAIL, DATA_DIR_ENV, HOOK_ERROR_LOG_FILE,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_OWN_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL, D5_STOP_DETAIL, DATA_DIR_ENV, HOOK_ERROR_LOG_FILE,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
@@ -172,6 +172,28 @@ async function mediaProbe(i: HookCheckInput, timeoutMs: number): Promise<string>
   }
 }
 
+// D-R48-OWN-FILE-1 (#1326): a fourth probe sends a PreToolUse Read of a skill reference over OUTPUT_CAP under a temp
+// CLAUDE_CONFIG_DIR (skills/<skill>/references/*.md); the hook must not deny it. The temp dir is the probe's own.
+async function ownProbe(i: HookCheckInput, timeoutMs: number): Promise<string> {
+  const home = mkdtempSync(path.join(tmpdir(), "cm-d5-own-"));
+  try {
+    const cfg = path.join(home, ".claude");
+    const refs = path.join(cfg, "skills", "d5-probe", "references");
+    mkdirSync(refs, { recursive: true });
+    const filePath = path.join(refs, "d5-own-probe.md");
+    writeFileSync(filePath, "# d5 own probe\n".repeat(Math.ceil((OUTPUT_CAP + 1) / 15)));
+    const node = nodeLaunch({ ...i.env, HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: cfg });
+    const r = await runProcess([node.file, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
+      cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs,
+      stdin: JSON.stringify({ session_id: "d5-own-probe", transcript_path: "", cwd: home, hook_event_name: "PreToolUse",
+        tool_name: "Read", tool_use_id: "toolu_d5_own_probe", tool_input: { file_path: filePath } }),
+    });
+    return r.stdout.toString("utf8");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 /** True when the hook's PreToolUse output says deny. */
 function isDeny(stdout: string): boolean {
   if (stdout.trim() === "") return false;
@@ -185,6 +207,7 @@ async function readProbeDetail(i: HookCheckInput, timeoutMs: number): Promise<st
   if (!isReadShape(await readProbe(i, timeoutMs, false))) return D5_READ_SHAPE_DETAIL;
   if (!isPassThrough(await readProbe(i, timeoutMs, true))) return D5_READ_RANGE_DETAIL;
   if (isDeny(await mediaProbe(i, timeoutMs))) return D5_READ_MEDIA_DETAIL;
+  if (isDeny(await ownProbe(i, timeoutMs))) return D5_READ_OWN_DETAIL;
   return null;
 }
 

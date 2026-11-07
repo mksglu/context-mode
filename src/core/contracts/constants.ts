@@ -26,7 +26,18 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 // D-M7-SV-1: the PostToolUse replace path has its own sizes, separate from OUTPUT_CAP (which stays the cap for
 // replies and the Read deny threshold). A result over REPLACE_TRIGGER_BYTES is indexed whole and the model gets
 // whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
-export const REPLACE_TRIGGER_BYTES = 4096;
+// D-R48-TRIGGER-1 (#1326 coreycoburn): a documented setting, env CTX_REPLACE_TRIGGER_BYTES (a positive safe integer),
+// read once at process start; default 4096. Bench (bench/replay.mjs, 602 files, 28,390 calls, 37.9 MB): trigger 4096
+// saves 41.99% (1,878 replaces), 6144 saves 30.89% (998), 8192 saves 23.34% (582): raising it costs a quarter to
+// half of the saving, so the default stays; a user who wants 2-6 KB outputs whole sets the env var.
+export const REPLACE_TRIGGER_BYTES_DEFAULT = 4096;
+export const REPLACE_TRIGGER_ENV = "CTX_REPLACE_TRIGGER_BYTES";
+export function readReplaceTrigger(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === "") return REPLACE_TRIGGER_BYTES_DEFAULT;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n > 0 ? n : REPLACE_TRIGGER_BYTES_DEFAULT;
+}
+export const REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 // D-R41-READ-OFFSET-1 (#1314): a read-like tool (canonical name) called with a range key is the user's own window:
 // PostToolUse lets it through whole. Claude Code, Pi, Gemini: offset/limit; VS Code read_file and Copilot view map to them.
 export const RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
@@ -210,6 +221,8 @@ export const MAX_NEST_DEPTH = 32; // impl/08 §2.3 step 2a, ADR-0008 "Parse erro
 // impl/08 §6.1 step 6: Read (or one-file shell dump) over OUTPUT_CAP with no offset/limit. The text is the
 // src/prompt/hooks/read-deny.md template (D-DU-DENY-1, src/core/policy/read-deny.ts); this caps its fixed bytes.
 export const READ_DENY_FIXED_CAP = 120;
+// D-R48-OWN-FILE-1 (#1326): the shared skill dir of the Agent Skills layout (~/.agents/skills), read by several agents.
+export const SHARED_SKILLS_DIR = Object.freeze([".agents", "skills"] as const);
 
 // impl/08 §6.2, ADR-0008 "Deny message" (kept verbatim). Lines, joined by "\n":
 //   DENY_PREFIX + DENY_WHAT[kind] + DENY_WHAT_SUFFIX
@@ -712,6 +725,8 @@ export const D5_SHAPE_DETAIL = "hook output is not the agent's native shape";
 // D-D5-READ-SHAPE-1 (#1304): the PostToolUse Read probe got an updatedToolOutput that is not Read's own output object.
 // D-R41-READ-OFFSET-1 (#1314): the PostToolUse probe of a bounded Read (offset/limit) got a replace instead of the lines.
 export const D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the replace trigger came back replaced: a bounded Read must reach the model whole";
+// D-R48-OWN-FILE-1 (#1326): a PreToolUse Read of a skill reference over the one-read limit under the agent's own config dir.
+export const D5_READ_OWN_DETAIL = "PreToolUse Read of a skill file over the one-read limit under the agent's own config dir came back denied: skill and rule files must reach the model whole (#1326)";
 export const D5_READ_MEDIA_DETAIL = "PreToolUse Read of a PNG over the one-read limit came back denied: an image Read must reach the model as an image block (#1321)";
 export const D5_READ_SHAPE_DETAIL = "PostToolUse Read replace is not Read's output shape {type:\"text\", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning";
 export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`; }

@@ -457,6 +457,22 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(typeof parsed(await handleHook("claude-code", full, env)).updatedToolOutput, "object", "a full Read over the trigger still replaces");
   });
 
+  // D-R48-OWN-FILE-1 (#1326): "skill references and rule files under ~/.claude no longer load in full". A full Read of the
+  // agent's own skill file over the trigger reaches the model whole; a project file of the same size still replaces.
+  test("D-R48-OWN-FILE-1: a full Read of a skill reference under ~/.claude is never replaced (#1326)", async () => {
+    const content = bigText(REPLACE_TRIGGER_BYTES * 3);
+    const n = content.split("\n").length;
+    const ref = join(root, ".claude", "skills", "deploy", "references", "api.md");
+    mkdirSync(join(ref, ".."), { recursive: true });
+    writeFileSync(ref, content);
+    const own = { filePath: ref, content, numLines: n, startLine: 1, totalLines: n };
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: ref }, tool_use_id: "toolu_own", tool_response: { type: "text", file: own } });
+    assert.equal(parsed(await handleHook("claude-code", p, env)), null);
+    const proj = join(repo, "big.md");
+    const q = cc({ hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: proj }, tool_use_id: "toolu_proj", tool_response: { type: "text", file: { ...own, filePath: proj } } });
+    assert.equal(typeof parsed(await handleHook("claude-code", q, env)).updatedToolOutput, "object", "a project file still replaces");
+  });
+
   test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {
     const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
     const p = mainBashPost(text);

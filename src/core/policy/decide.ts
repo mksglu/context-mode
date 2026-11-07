@@ -14,14 +14,16 @@ import {
   READ_PATH_KEYS, READ_PATH_LIST_KEY, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS, SHELL_FAMILY,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
-import type { AdapterRow, CanonicalHookEvent, Decision, DenyKind, SimpleCommand } from "../contracts/types.ts";
+import type { AdapterRow, CanonicalHookEvent, Decision, DenyKind, SimpleCommand, ProjectContext } from "../contracts/types.ts";
 import { dumpRunsThenReplaces, hasReplace } from "../../adapters/table.ts";
 import { parseShell } from "./parse.ts";
 import { psDumpFiles } from "./powershell.ts";
 import { isSubagentCall } from "./subagent.ts";
 import { unwrap } from "./unwrap.ts";
 import { denyPatternFromAny, matchesAnyDenyPattern } from "./user-deny.ts";
-import { READ_DENY_MESSAGE } from "./read-deny.ts";
+import { READ_DENY_MESSAGE, READ_DENY_RANGE_MESSAGE } from "./read-deny.ts";
+import { isOwnFile } from "./own-file.ts";
+import { isInsideAny } from "../project/contain.ts";
 import { isMediaRead } from "./read-media.ts";
 
 // Canonical tool names (impl/01 §2) and input field values; names, not tunable values.
@@ -49,7 +51,12 @@ const present = (v: unknown): boolean => v !== undefined && v !== null;
 const has = (list: readonly string[], v: string): boolean => list.includes(v);
 
 /** impl/08 §6.1. `userDeny === null`: a present policy file could not be read (DECISIONS-r9 E2). */
-export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string[] | null): Decision {
+/** D-R48-DENY-ROUTE-1: the folders ctx_execute(file=) may read. `containmentRoot` is read only for a path outside
+ *  `worktree` (on a ProjectContext it is a lazy getter that spawns git), so a PreToolUse call spawns nothing. */
+export type DenyRoot = string | Pick<ProjectContext, "worktree" | "containmentRoot">;
+
+/** `root`: the project of this call (D-R48-DENY-ROUTE-1); defaults to ev.cwd. */
+export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string[] | null, root: DenyRoot = ev.cwd): Decision {
   const tool = ev.tool;
   if (tool === undefined) return ALLOW; // a PreToolUse with no tool is a dispatch bug (§6.1 input)
   const canonical = tool.canonicalName;
@@ -66,8 +73,8 @@ export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string
   if (hit !== null) return deny(USER_DENY_REASON_PREFIX + hit);
 
   if (canonical === WEBFETCH) return webFetch(input, row); // step 4
-  if (canonical === BASH) return bash(ev, row, input, rules); // steps 5, 6a
-  if (canonical === READ) return read(ev, row, input); // step 6
+  if (canonical === BASH) return bash(ev, row, input, rules, root); // steps 5, 6a
+  if (canonical === READ) return read(ev, row, input, root); // step 6
   // Steps 5d, 7, 8 (Bash/PowerShell/Read/Grep/other-MCP hints) are retired: D-M7-RR-2, DECISIONS-r10 (2).
   return ALLOW; // step 9
 }
@@ -208,10 +215,10 @@ function webFetch(input: Record<string, unknown>, row: AdapterRow): Decision {
 
 // ---------- step 5: Bash ----------
 
-function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>, rules: string[]): Decision {
+function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>, rules: string[], root: DenyRoot): Decision {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : psShellDump(cmd, ev.cwd, row) ?? ALLOW; // 5b, Q4
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : psShellDump(ev, cmd, row, root) ?? ALLOW; // 5b, Q4
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -225,7 +232,7 @@ function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
       if (kind !== null) return deny(denyMessage(kind, cmd, row, str(input.description)));
     }
   }
-  return shellDump(cmds, ev.cwd, row) ?? psShellDump(cmd, ev.cwd, row) ?? ALLOW; // 6a: file size known by stat, kept (D-M7-RR-1)
+  return shellDump(ev, cmds, row, root) ?? psShellDump(ev, cmd, row, root) ?? ALLOW; // 6a: file size known by stat, kept (D-M7-RR-1)
 }
 
 /** 5c, in the §6.1 order: curl/wget, inline HTTP, build tool. */
@@ -280,13 +287,35 @@ function fileSize(abs: string): number {
   }
 }
 
-function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>): Decision {
+/** D-R48-OWN-FILE-1 (#1326): the agent's own skill and rule files pass whole. D-R48-DENY-ROUTE-1 (#1326): the deny names
+ *  ctx_execute(file=) only for a path ctx_execute can open (inside `root`); any other path gets the ranged-read route. */
+function bigDeny(ev: CanonicalHookEvent, row: AdapterRow, abs: string, size: number, root: DenyRoot): Decision | null {
+  if (size <= OUTPUT_CAP || isOwnFile(ev.agent, abs)) return null;
+  return deny(executeCanOpen(root, abs) ? READ_DENY_MESSAGE(abs, size, row.toolNamePrefix) : READ_DENY_RANGE_MESSAGE(abs, size));
+}
+
+/** True when ctx_execute(file=abs) passes its containment check. A failed git lookup counts as outside: the ranged
+ *  route works for every path. */
+function executeCanOpen(root: DenyRoot, abs: string): boolean {
+  if (typeof root === "string") return isInsideAny([root], abs);
+  if (isInsideAny([root.worktree], abs)) return true;
+  try {
+    return isInsideAny([root.containmentRoot], abs);
+  } catch {
+    return false;
+  }
+}
+
+function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>, root: DenyRoot): Decision {
   if (!present(input.offset) && !present(input.limit)) {
     for (const p of readPaths(input)) {
       const abs = resolve(ev.cwd, p);
       const size = fileSize(abs);
       // D-R47-READ-MEDIA-1 (#1321, #1324): an image or PDF the host shows as a block costs no text bytes.
-      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) {
+        const d = bigDeny(ev, row, abs, size, root);
+        if (d !== null) return d;
+      }
     }
   }
   return ALLOW; // ranged Read is never denied; no Read hint (D-M7-RR-2)
@@ -294,10 +323,10 @@ function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
 
 /** 6a: null = not a dump, ALLOW = bounded dump, deny = unbounded dump over the cap. Skipped only on a row with a
  *  Read tool where the dump runs and PostToolUse replaces it (D-HA-QWEN-DUMP-1, D-HA-GEMINI-DUMP-1). */
-function shellDump(cmds: SimpleCommand[], cwd: string, row: AdapterRow): Decision | null {
+function shellDump(ev: CanonicalHookEvent, cmds: SimpleCommand[], row: AdapterRow, root: DenyRoot): Decision | null {
   if (row.nativeTools.read !== undefined && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
   // D-CDX-CAT-1: every command whose stdout reaches the tool result is checked, also inside a chain (`cd x && cat f`).
-  let dir = cwd;
+  let dir = ev.cwd;
   let verdict: Decision | null = null;
   for (const c of cmds) {
     const name = c.argv0.toLowerCase();
@@ -308,19 +337,19 @@ function shellDump(cmds: SimpleCommand[], cwd: string, row: AdapterRow): Decisio
     if (d === null) continue;
     if (d.bounded) { verdict = ALLOW; continue; }
     const abs = resolve(dir, d.file);
-    const size = fileSize(abs);
-    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+    const big = bigDeny(ev, row, abs, fileSize(abs), root);
+    if (big !== null) return big;
   }
   return verdict;
 }
 
 /** D-PWSH-DUMP-1: 6a for PowerShell (Codex on Windows, Copilot CLI powershell, VS Code). Its own word reader keeps
  *  `C:\\logs\\app.log` whole. Same skip rule, same deny text as shellDump. null = no unbounded dump of a large file. */
-function psShellDump(cmd: string, cwd: string, row: AdapterRow): Decision | null {
+function psShellDump(ev: CanonicalHookEvent, cmd: string, row: AdapterRow, root: DenyRoot): Decision | null {
   if (row.nativeTools.read !== undefined && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
-  for (const abs of psDumpFiles(cmd, cwd)) {
-    const size = fileSize(abs);
-    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+  for (const abs of psDumpFiles(cmd, ev.cwd)) {
+    const d = bigDeny(ev, row, abs, fileSize(abs), root);
+    if (d !== null) return d;
   }
   return null;
 }

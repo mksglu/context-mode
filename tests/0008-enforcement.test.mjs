@@ -12,7 +12,7 @@ import { MAX_NEST_DEPTH, OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LI
 import { unwrap } from "../src/core/policy/unwrap.ts";
 import { psDump, psWords } from "../src/core/policy/powershell.ts";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { READ_DENY_MESSAGE, READ_DENY_TEMPLATE } from "../src/core/policy/read-deny.ts";
+import { READ_DENY_MESSAGE, READ_DENY_RANGE_MESSAGE, READ_DENY_RANGE_TEMPLATE, READ_DENY_TEMPLATE } from "../src/core/policy/read-deny.ts";
 import { lintHookText } from "../build/prompt-lint.mjs";
 import { buildMatcher } from "../build/manifests.ts";
 import { getAdapter } from "../src/adapters/table.ts";
@@ -595,6 +595,14 @@ describe("ADR-0008 read-deny hook text", { concurrency: CONC }, () => {
     assert.ok(Buffer.byteLength(json1) <= 220, String(Buffer.byteLength(json1)));
   });
 
+  test("D-R48-DENY-ROUTE-1: golden range deny text, one line, under the fixed cap, lint clean (#1326)", () => {
+    assert.equal(READ_DENY_RANGE_MESSAGE("/home/u/.x/a.md", 53827),
+      'context-mode: 53827-byte file, over the one-read limit. Read "/home/u/.x/a.md" in parts with offset and limit, or sed -n \'1,200p\'.');
+    assert.equal(READ_DENY_RANGE_TEMPLATE.includes("\n"), false);
+    assert.ok(Buffer.byteLength(READ_DENY_RANGE_TEMPLATE.split("{path}").join("").split("{size}").join("")) <= READ_DENY_FIXED_CAP);
+    assert.deepEqual(lintHookText("read-deny-range", READ_DENY_RANGE_TEMPLATE, ["ctx_execute", "ctx_search"]), []);
+  });
+
   test("D-DU-DENY-1: the prompt lint covers the hook template, and fails a bad one", () => {
     const names = ["ctx_execute", "ctx_search"];
     assert.deepEqual(lintHookText("read-deny", READ_DENY_TEMPLATE, names), []);
@@ -663,6 +671,7 @@ describe("ADR-0008 security rules (ported from v1)", { concurrency: CONC }, () =
   const RULES = ["Bash(sudo *)", "Bash(rm -rf /*)"];
   const ev = (name, input, cwd = "/tmp") => ({ event: "PreToolUse", agent: "claude-code", sessionId: "s", cwd, tool: { name, canonicalName: name, input } });
   const bash = (command, deny = RULES) => decide(ev("Bash", { command }), CC, deny);
+  const CODEX_ROW = () => getAdapter("codex"); // a row whose shell dump is denied before it runs (no Read tool)
 
   // security.test.ts "Chained Command Evaluation" + "Chained Command Splitting" + "extractSubshellCommands"
   for (const c of [
@@ -735,6 +744,70 @@ describe("ADR-0008 security rules (ported from v1)", { concurrency: CONC }, () =
       rmSync(root, { recursive: true, force: true });
       rmSync(outside, { recursive: true, force: true });
     }
+  });
+
+  // #1326 (suntimental, coreycoburn): "skill references and rule files under ~/.claude no longer load in full; the Read
+  // deny points to ctx_execute(file=...), which refuses them (OUTSIDE_ROOT)". Reporter's layout: skills/<s>/references/*.md,
+  // plugins/cache/<m>/<p>/<v>/skills/<s>/..., and a rule file next to CLAUDE.md, all over 16,384 B.
+  function ownLayout() {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-1326p-")));
+    const cfg = realpathSync(mkdtempSync(join(tmpdir(), "cm-1326c-")));
+    const files = {
+      ref: join(cfg, "skills", "deploy", "references", "api.md"),
+      plugin: join(cfg, "plugins", "cache", "context-mode", "context-mode", "2.1.4", "skills", "ctx", "SKILL.md"),
+      rule: join(cfg, "rules", "testing.md"),
+      claudeMd: join(cfg, "CLAUDE.md"),
+      transcript: join(cfg, "projects", "p", "s.jsonl"),
+      outside: join(cfg, "..", cfg.split(sep).pop() + "-other.log"),
+      inside: join(root, "big.log"),
+    };
+    for (const f of Object.values(files)) { mkdirSync(join(f, ".."), { recursive: true }); writeFileSync(f, "# rule line\n".repeat(2000)); }
+    const old = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = cfg;
+    const done = () => {
+      if (old === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = old;
+      for (const d of [root, cfg]) rmSync(d, { recursive: true, force: true });
+      rmSync(files.outside, { force: true });
+    };
+    return { root, cfg, files, done };
+  }
+
+  test("D-R48-OWN-FILE-1: the agent's own skill, rule and CLAUDE.md files over the cap are never denied (#1326)", () => {
+    const { root, files, done } = ownLayout();
+    try {
+      for (const k of ["ref", "plugin", "rule", "claudeMd"]) {
+        assert.deepEqual(decide(ev("Read", { file_path: files[k] }, root), CC, [], root), { kind: "allow" }, k);
+        assert.deepEqual(decide(ev("Bash", { command: "cat " + files[k] }, root), CODEX_ROW(), [], root).kind, "allow", "cat " + k);
+        assert.equal(failureOutput("claude-code", { hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: files[k] }, cwd: root }, new Error("x")).stdout?.includes("deny") ?? false, false, "fallback " + k);
+      }
+      // data in the same dir keeps the rule: a transcript is not an instruction file
+      assert.equal(decide(ev("Read", { file_path: files.transcript }, root), CC, [], root).kind, "deny");
+    } finally { done(); }
+  });
+
+  test("D-R48-DENY-ROUTE-1: every Read deny names a call that works for its path (#1326)", async () => {
+    const { ctxExecute } = await import("../src/core/tools/execute.ts");
+    const { root, files, done } = ownLayout();
+    try {
+      const k = "1".repeat(16);
+      const ctx = { project: { projectKey: k, projectDir: join(root, "p"), dbPath: join(root, "p", "c.db"), worktree: root, containmentRoot: root, agent: "claude-code", source: "env:CLAUDE_PROJECT_DIR" }, sessionId: "s", turn: 1, signal: new AbortController().signal };
+      for (const [k2, f] of [["inside", files.inside], ["outside", files.outside], ["transcript", files.transcript]]) {
+        for (const d of [decide(ev("Read", { file_path: f }, root), CC, [], root), decide(ev("Bash", { command: "cat " + f }, root), CODEX_ROW(), [], root)]) {
+          assert.equal(d.kind, "deny", k2);
+          const at = d.reason.indexOf('file="');
+          if (at >= 0) {
+            const named = d.reason.slice(at + 6, d.reason.indexOf('"', at + 6));
+            const r = await ctxExecute.handler({ language: "shell", code: "wc -c < \"$CTX_FILE\"", file: named }, ctx);
+            assert.equal(r.isError, false, k2 + ": the named ctx_execute call must work: " + r.text);
+          } else {
+            assert.ok(d.reason.includes("offset and limit"), k2 + ": " + d.reason);
+            assert.deepEqual(decide(ev("Read", { file_path: f, offset: 1, limit: 200 }, root), CC, [], root), { kind: "allow" }, k2 + " ranged");
+            assert.deepEqual(decide(ev("Bash", { command: "sed -n '1,200p' " + f }, root), CODEX_ROW(), [], root), { kind: "allow" }, k2 + " sed range");
+          }
+        }
+      }
+      assert.equal(decide(ev("Read", { file_path: files.outside }, root), CC, [], root).reason, READ_DENY_RANGE_MESSAGE(files.outside, 24000));
+    } finally { done(); }
   });
 });
 

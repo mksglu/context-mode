@@ -6,3 +6,4 @@ import type { TOOL_ORDER } from "../core/contracts/constants.js";
 export declare const INSTRUCTIONS: string;
 export declare const TOOL_DESCRIPTIONS: Readonly<Record<(typeof TOOL_ORDER)[number], string>>;
 export declare const READ_DENY_TEMPLATE: string;
+export declare const READ_DENY_RANGE_TEMPLATE: string;

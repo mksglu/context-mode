@@ -15,6 +15,7 @@ import {
 import type { AdapterRow, HookOutput } from "../contracts/types.ts";
 import { getAdapter } from "../../adapters/table.ts";
 import { isMediaRead } from "../policy/read-media.ts";
+import { isOwnFile } from "../policy/own-file.ts";
 
 type Rec = Record<string, unknown>;
 type Kind = "shell" | "read" | "grep" | "fetch";
@@ -154,7 +155,9 @@ function bigRead(agent: AgentId, input: Rec, cwd: string): boolean {
   if ((input.offset ?? null) !== null || (input.limit ?? null) !== null) return false; // a ranged Read is never denied (same as decide)
   const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? (input[READ_PATH_LIST_KEY] as unknown[]).filter((x): x is string => typeof x === "string") : [];
   // D-R47-READ-MEDIA-1: an image or PDF the host shows as a block is not denied (same as decide).
-  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve(cwd, p)) && !isMediaRead(agent, resolve(cwd, p)));
+  // D-R48-OWN-FILE-1 (#1326): the agent's own skill and rule files are not denied (same as decide).
+  return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve(cwd, p))
+    && !isMediaRead(agent, resolve(cwd, p)) && !isOwnFile(agent, resolve(cwd, p)));
 }
 
 /**

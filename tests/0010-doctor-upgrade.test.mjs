@@ -1164,6 +1164,19 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_MEDIA_DETAIL, fixCommand: C.D5_FIX });
   });
 
+  // D-R48-OWN-FILE-1 (#1326): D5 passed while the hook denied every skill reference over OUTPUT_CAP under ~/.claude.
+  // A fourth probe sends a PreToolUse Read of skills/<s>/references/*.md under a temp CLAUDE_CONFIG_DIR.
+  test("[M5] doctor-hook/D5-own-skill-read-denied-FAILs (#1326)", async (t) => {
+    const obj = JSON.stringify({ type: "text", file: { filePath: "/a", content: "c", numLines: 1, startLine: 1, totalLines: 1 } });
+    const dir = bundle(t, native);
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);` +
+      `const own=p.tool_name==="Read"&&String(p.tool_input.file_path).includes("references");` +
+      `process.stdout.write(p.hook_event_name==="PostToolUse"?(p.tool_input.offset!==undefined||p.tool_input.limit!==undefined?"":JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",updatedToolOutput:${obj}}})):` +
+      `p.tool_name==="Read"&&!own?"":${JSON.stringify(native)});});`);
+    const r = await checkHookRoundTrip(input(dir));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_OWN_DETAIL, fixCommand: C.D5_FIX });
+  });
+
   // #1333 (feiyulike): on ZCode D5 passed while the hook denied every PNG Read over OUTPUT_CAP. ZCode sends the Claude
   // PreToolUse shape, so D5 for zcode sends the same media probe.
   const ZFIXTURE = { zcode: { event: "PreToolUse", payload: { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } } } };
