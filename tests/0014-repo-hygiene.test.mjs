@@ -2471,9 +2471,105 @@ describe("ADR-0014 issue intake: score, one comment, issue state stays with main
     const text = readRepo(".github/AGENT_ISSUE.md");
     const a = text.indexOf("````\n", text.indexOf("## 6. A filled example")) + 5;
     const p = plan({ result: score(text.slice(a, text.indexOf("\n````", a))), author: "NONE", labels: [], comments: [] });
-    assert.deepEqual(p.actions.map((x) => x.op), ["label-create", "label-add"]);
+    assert.deepEqual(p.actions.map((x) => x.op + " " + x.name), ["label-create repro-ready", "label-add repro-ready", "label-create bug", "label-add bug"]);
     const src = readRepo(".github/scripts/issue-intake-act.mjs") + readRepo(".github/workflows/issue-intake.yml");
     for (const verb of ['"close"', '"reopen"', "issue close", "issue reopen", "state_reason"]) assert.ok(!src.includes(verb), "intake must leave issue state alone: " + verb);
+  });
+
+  // D-INTAKE-LABELS-1 (owner 2026-11-07: "GitHub Actions, labelleri kendisi otomatik yapmali"). Real bodies and titles.
+  const REAL = {
+    1325: "Feature request: return a stored source in full (`ctx_get`)",
+    1326: "[claude-code] 2.x: skill references and rule files under ~/.claude no longer load in full; the Read deny points to ctx_execute(file=…), which refuses them (OUTSIDE_ROOT)",
+    1328: "setup FAIL: codex (2e26442450f2)",
+    1329: "setup FAIL: codex (2e26442450f2)",
+    1334: "Feature request: stateless shared daemon mode (one process per machine, Streamable HTTP) so RAM stops scaling with session count",
+  };
+  const real = async (n) => (await intake()).score(readRepo(`tests/fixtures/issue-intake/${n}.md`), REAL[n]);
+
+  test("#1325, #1326, #1328, #1329, #1334 (real bodies): the type is read from the title, the form and the report", async () => {
+    const { score } = await intake();
+    const kinds = {};
+    for (const n of Object.keys(REAL)) kinds[n] = (await real(n)).kind;
+    assert.deepEqual(kinds, { 1325: "feature", 1326: "bug", 1328: "bug", 1329: "bug", 1334: "feature" });
+    assert.equal(score("x", "[Bug]: OpenCode 2.x ctx_* tools never check OpenCode permissions").kind, "bug");
+    assert.equal(score("x", "[codex] D3 fails").kind, "bug");
+    assert.equal(score("### Agent\n\npi\n\n### Problem\n\nidea\n\n### Evidence links\n\n_No response_", "an idea").kind, "feature");
+    assert.equal(score(emptyForm(), "anything").kind, "bug", "the agent-report form is a bug form");
+    assert.equal(score("hello", "a question").kind, null);
+    // Free Markdown with version, steps and output (#1306, #1307: no form, no title tag) is a bug report.
+    for (const n of ["1306", "1307"]) assert.equal(score(readRepo(`tests/fixtures/issue-intake/${n}.md`), "Read hook denies a file").kind, "bug", n);
+    // The lists mirror feature.yml: its agent dropdown and its field labels.
+    const { AGENT_IDS, FEATURE_FORM_HEADS } = await intake();
+    const form = readRepo(".github/ISSUE_TEMPLATE/feature.yml");
+    const lines = form.split("\n").map((l) => l.trim());
+    assert.deepEqual(lines.filter((l) => l.startsWith("label: ")).map((l) => l.slice(7)), FEATURE_FORM_HEADS);
+    const opts = lines.slice(lines.indexOf("options:") + 1);
+    assert.deepEqual(opts.slice(0, opts.findIndex((l) => !l.startsWith("- "))).map((l) => l.slice(2)), AGENT_IDS);
+  });
+
+  test("#1328 and #1329 (real setup reports): repro-ready with the fingerprint, version, node and platform", async () => {
+    const { setupReport } = await intake();
+    for (const n of [1328, 1329]) {
+      const r = await real(n);
+      assert.deepEqual([r.status, r.fingerprint], ["repro-ready", "2e26442450f2"], `#${n} ${JSON.stringify(r)}`);
+      for (const k of ["report", "version", "os", "node", "steps", "observed", "output"]) assert.ok(r.have[k], `#${n} ${k}`);
+    }
+    assert.deepEqual(setupReport(readRepo("tests/fixtures/issue-intake/1328.md")),
+      { fingerprint: "2e26442450f2", version: "2.1.5", node: "v23.9.0", platform: "darwin-arm64" });
+    assert.equal(setupReport("# context-mode setup report\n\nfingerprint: <fp>\nversion: 2.1.5\nnode: v1\nplatform: x"), null);
+    assert.equal((await real(1326)).fingerprint, null);
+  });
+
+  test("plan(): a feature request gets enhancement + priority: low and a short thanks, with no checklist", async () => {
+    const { plan, MARKER } = await act();
+    for (const n of [1325, 1334]) {
+      const p = plan({ result: await real(n), author: "NONE", labels: [], comments: [] });
+      assert.deepEqual(p.actions.filter((a) => a.op === "label-add").map((a) => a.name), ["enhancement", "priority: low"], `#${n}`);
+      const c = p.actions.find((a) => a.op === "comment-create");
+      assert.ok(c && c.body.startsWith(MARKER) && c.body.includes("Thanks for the idea"), `#${n}`);
+      assert.ok(!c.body.includes("- [ ]") && !c.body.includes("ctx_doctor"), c.body);
+      const again = plan({ result: await real(n), author: "NONE", labels: ["enhancement", "priority: low"], comments: [{ id: 3, body: c.body, bot: true, assoc: "NONE" }] });
+      assert.deepEqual(again.actions, [], `#${n} second run`);
+    }
+    const old = plan({ result: await real(1334), author: "NONE", labels: ["needs-info"], comments: [{ id: 9, body: MARKER + "\nold checklist", bot: true, assoc: "NONE" }] });
+    assert.deepEqual(old.actions.map((a) => a.op + " " + (a.name ?? a.id)),
+      ["label-remove needs-info", "label-create enhancement", "label-add enhancement", "label-create priority: low", "label-add priority: low", "comment-edit 9"]);
+  });
+
+  test("plan(): a bug report gets bug + its status; #1326 keeps its labels as they are", async () => {
+    const { plan } = await act();
+    assert.deepEqual(plan({ result: await real(1326), author: "NONE", labels: ["bug", "repro-ready"], comments: [] }).actions, []);
+    const p = plan({ result: await real(1328), author: "NONE", labels: [], comments: [] });
+    assert.deepEqual(p.actions.filter((a) => a.op === "label-add").map((a) => a.name), ["repro-ready", "bug"]);
+    // The setup report holds version, Node, platform, command and output; the comment lists only what speeds the replay.
+    const c = p.actions.find((a) => a.op === "comment-create");
+    assert.ok(c.body.includes("**Intake check: repro-ready**") && c.body.includes("make the replay faster"), c.body);
+    assert.deepEqual((await real(1328)).missing, ["agent"]);
+  });
+
+  test("plan(): a second open issue with the same setup report fingerprint gets duplicate and one link line; nothing closes", async () => {
+    const { plan, firstWithFingerprint, commentBody } = await act();
+    const open = [1326, 1328, 1329].map((n) => ({ number: n, body: readRepo(`tests/fixtures/issue-intake/${n}.md`) }));
+    assert.equal(firstWithFingerprint(open, "2e26442450f2", 1329), 1328);
+    assert.equal(firstWithFingerprint(open, "2e26442450f2", 1328), null, "the first one is no duplicate");
+    assert.equal(firstWithFingerprint(open, null, 1329), null);
+    const r = await real(1329);
+    const p = plan({ result: r, author: "NONE", labels: ["bug"], comments: [], duplicateOf: 1328 });
+    assert.deepEqual(p.actions.filter((a) => a.op === "label-add").map((a) => a.name), ["repro-ready", "duplicate"]);
+    const c = p.actions.find((a) => a.op === "comment-create");
+    assert.equal(c.body.split("\n").filter((l) => l.includes("#1328")).length, 1, c.body);
+    assert.ok(c.body.includes("`2e26442450f2`"), c.body);
+    assert.ok(!p.actions.some((a) => ["close", "issue-close", "state"].includes(a.op)));
+    assert.equal(commentBody(r, null).includes("#1328"), false);
+  });
+
+  test("intake profile: score() of the 5 real bodies, median of 50 runs, stays under 20 ms", async () => {
+    const { score } = await intake();
+    const bodies = Object.keys(REAL).map((n) => [readRepo(`tests/fixtures/issue-intake/${n}.md`), REAL[n]]);
+    const t = [];
+    for (let i = 0; i < 50; i++) { const a = performance.now(); for (const [b, ti] of bodies) score(b, ti); t.push(performance.now() - a); }
+    t.sort((x, y) => x - y);
+    assert.ok(t[25] < 20, `median ${t[25]} ms`);
   });
 
   test("plan(): steps back for a maintainer author, the maintainer-ack label, or a maintainer comment", async () => {

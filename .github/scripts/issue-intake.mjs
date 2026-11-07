@@ -5,6 +5,8 @@
 // D-INTAKE-SCORE-1 (owner 2026-11-05: "bu GitHub Actions bot u cok kati calisiyor"; #1306 and #1307
 // were clear reports with steps, output and the source line, and the old check closed both).
 // ADR-0014 §2/§3/§5, DEVIATIONS D-M6-arch-6, D-M6-I2-1.
+// D-INTAKE-LABELS-1 (owner 2026-11-07: "GitHub Actions, labelleri kendisi otomatik yapmali"): score() also
+// returns the issue type ("bug", "feature" or null) and the fingerprint of a context-mode setup/doctor report.
 import { pathToFileURL } from "node:url";
 
 // Mirror of the ctx_doctor report (src/core/ops/report.ts, src/core/contracts/constants.ts):
@@ -51,6 +53,20 @@ const STEP_HEAD_MARKERS = ["step", "repro"];
 const VERSION_FILLERS = [" ", "\t", ":", "@", "=", "(", "version", "-cli", "cli", "v"];
 // ADR-0014 §3: a substring scan for secret prefixes; a hit adds a note to the comment and changes nothing else.
 const SECRET_MARKERS = ["github_pat_", "ghp_", "sk-ant-", "sk-proj-", "TOKEN="];
+
+// D-INTAKE-LABELS-1: the type of an issue, read from its title and its form headings.
+export const FEATURE_TITLES = ["feature request", "[feature request]", "[feature]"];
+export const BUG_TITLE = "bug"; // "[Bug]: ..." titles of bug.yml
+// = the agent dropdown of .github/ISSUE_TEMPLATE/feature.yml; "[<agent>] ..." titles are bug reports.
+export const AGENT_IDS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"];
+// = the field labels of feature.yml; a body with all three came from the feature form.
+export const FEATURE_FORM_HEADS = ["Agent", "Problem", "Evidence links"];
+// = the first field of bug.yml and REPORT_FIELD of agent-report.yml; a body with one came from a bug form.
+export const BUG_FORM_HEADS = ["Did you run `/ctx-doctor`?", REPORT_FIELD];
+// = buildIssueReport in src/cli/commands.ts: "# context-mode <command> report" and these field lines.
+const SETUP_HEAD = "# context-mode ";
+const SETUP_HEAD_END = " report";
+export const SETUP_FIELDS = ["fingerprint", "version", "node", "platform"];
 
 const isDigit = (c) => c !== undefined && c >= "0" && c <= "9";
 const isWordChar = (c) => c !== undefined && ((c >= "a" && c <= "z") || isDigit(c) || c === "_" || c === "-" || c === ".");
@@ -170,8 +186,41 @@ export function reportKeys(lines) {
   return { keys, bad };
 }
 
+const isHex = (v) => v.length >= 8 && v.length <= 64 && [...v].every((c) => isDigit(c) || (c >= "a" && c <= "f"));
+
+/** The fields of a context-mode setup/doctor report ("# context-mode setup report"), or null. */
+export function setupReport(body) {
+  const lines = (body || "").split("\n").map((l) => l.trim());
+  if (!lines.some((l) => l.startsWith(SETUP_HEAD) && l.endsWith(SETUP_HEAD_END))) return null;
+  const out = {};
+  for (const f of SETUP_FIELDS) {
+    const line = lines.find((l) => l.startsWith(f + ": "));
+    if (line === undefined) return null;
+    out[f] = line.slice(f.length + 2).trim();
+  }
+  return isHex(out.fingerprint) && isDigit(out.version[0]) ? out : null;
+}
+
+/** The fingerprint of the setup/doctor report in a body, or null. */
+export const fingerprintOf = (body) => setupReport(body)?.fingerprint ?? null;
+
+/** "bug", "feature" or null, from the title prefix, then the form headings, then a report or a replayable repro. */
+export function kindOf(title, heads, report, ready = false) {
+  const t = (title || "").trim().toLowerCase();
+  if (FEATURE_TITLES.some((p) => t.startsWith(p))) return "feature";
+  const close = t.indexOf("]");
+  if (t.startsWith("[") && close !== -1) {
+    const tag = t.slice(1, close).trim();
+    if (tag === BUG_TITLE || AGENT_IDS.includes(tag) || AGENT_MARKERS.includes(tag)) return "bug";
+  }
+  const has = (h) => heads.includes(h.toLowerCase());
+  if (FEATURE_FORM_HEADS.every(has)) return "feature";
+  if (BUG_FORM_HEADS.some(has) || report || ready) return "bug";
+  return null;
+}
+
 /** Scores a body: which ITEMS it holds, which are missing, and "repro-ready" or "needs-info". */
-export function score(body) {
+export function score(body, title = "") {
   const { sections, fences } = parse(body || "");
   const textLines = filled(sections.flatMap((s) => s.lines));
   const codeLines = filled(fences.flat());
@@ -193,12 +242,16 @@ export function score(body) {
     observed: said(OBSERVED_MARKERS),
     output: fences.some((f) => filled(f).length > 0),
   };
+  // A setup/doctor report holds the version, Node, platform, the command it ran and its result table.
+  const setup = setupReport(body);
+  if (setup) for (const k of ["report", "version", "os", "node", "steps", "observed", "output"]) have[k] = true;
   const missing = ITEMS.filter((i) => !have[i.key]).map((i) => i.key);
   const status = READY_KEYS.every((k) => have[k]) ? "repro-ready" : "needs-info";
   const warnings = SECRET_MARKERS.filter((m) => (body || "").includes(m));
-  return { status, have, missing, warnings };
+  const kind = kindOf(title, sections.map((s) => s.head.toLowerCase()), have.report, status === "repro-ready");
+  return { status, kind, fingerprint: setup ? setup.fingerprint : null, have, missing, warnings };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.stdout.write(JSON.stringify(score(process.env.BODY || "")));
+  process.stdout.write(JSON.stringify(score(process.env.BODY || "", process.env.TITLE || "")));
 }

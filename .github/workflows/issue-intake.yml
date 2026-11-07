@@ -1,5 +1,7 @@
 # Must live on the default branch: GitHub runs `issues` workflows only from there.
 # D-INTAKE-SCORE-1: scores the report, sets "repro-ready" or "needs-info", keeps one comment up to date.
+# D-INTAKE-LABELS-1: also sets the type labels (bug; enhancement + priority: low) and "duplicate" for a
+# second open issue with the same setup report fingerprint.
 # Issue state stays with maintainers.
 name: issue-intake
 on:
@@ -29,6 +31,7 @@ jobs:
       - name: Score body and act
         env:
           BODY: ${{ github.event.issue.body }}
+          TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
