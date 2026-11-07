@@ -532,8 +532,9 @@ export const D1_REGISTRY_URL = "https://registry.npmjs.org/-/package/context-mod
 export const D1_PRERELEASE_SEP = "-"; // 2.0.0-next.26: the text after "-" up to "." is the dist-tag
 export const D1_DEFAULT_TAG = "latest"; // a version with no prerelease part
 export const GIT_LS_REMOTE = "ls-remote"; // git ls-remote --tags --refs <RELEASE_REPO_URL> v*
-export const D2_NODE_FIX = `install Node ${NODE_MIN} or later`;
-export function D2_NODE_DETAIL(version: string): string { return `Node ${version} is below ${NODE_MIN}`; }
+// #1328 D-NODE-OLD-1: one text for cli, server (ctx_doctor D2), hook and setup; errors.ts NODE_TOO_OLD is the same line.
+export const D2_NODE_FIX = `nvm install ${NODE_MIN.split(".")[0]}, or install it from https://nodejs.org`;
+export function D2_NODE_DETAIL(version: string): string { return `Context Mode needs Node ${NODE_MIN} or newer; you have ${version}`; }
 export const D2_SQLITE_DETAIL = "node:sqlite failed to load";
 export const D2_SQLITE_FIX = "run ctx_doctor";
 export function D2_BUN_DETAIL(version: string): string { return `running under Bun ${version}`; }

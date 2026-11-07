@@ -27,7 +27,7 @@ import { checkHookRoundTrip, codexHookJournaled, codexStopDetail, codexStopPaylo
 import { DDL } from "../src/core/store/schema.ts";
 import { healD8 } from "../src/core/ops/db-heal.ts";
 import { writeOwnerPid } from "../src/core/store/owners.ts";
-import { CtxError } from "../src/core/contracts/errors.ts";
+import { CtxError, formatError } from "../src/core/contracts/errors.ts";
 import { buildReport } from "../src/core/ops/report.ts";
 import { verifySums } from "../src/core/ops/verify-sums.ts";
 import { ctxDoctor, runDoctorChecks } from "../src/core/tools/doctor.ts";
@@ -969,7 +969,11 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
 
   test("[M5] doctor-env/D2-old-node-FAIL-with-NODE_TOO_OLD-text", async () => {
     const row = await checkNode({ nodeVersion: "v24.14.9", bunVersion: undefined });
-    assert.deepEqual(row, { id: "D2", label: "node", status: "FAIL", detail: "Node v24.14.9 is below 24.15.0", fixCommand: "install Node 24.15.0 or later" });
+    assert.deepEqual(row, { id: "D2", label: "node", status: "FAIL", detail: "Context Mode needs Node 24.15.0 or newer; you have v24.14.9", fixCommand: "nvm install 24, or install it from https://nodejs.org" });
+    // #1328 (lisandroprada): the reporter's Node; D2 says the same line as setup, the hook and NODE_TOO_OLD.
+    const reporter = await checkNode({ nodeVersion: "v23.9.0", bunVersion: undefined });
+    assert.equal(reporter.status, "FAIL");
+    assert.equal(`${reporter.detail}. Fix: ${reporter.fixCommand}.`, formatError("NODE_TOO_OLD", { v: "v23.9.0" }));
     const major = await checkNode({ nodeVersion: "v22.20.0", bunVersion: undefined });
     assert.equal(major.status, "FAIL");
   });
@@ -980,7 +984,7 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     assert.equal(row.detail, "running under Bun 1.2.3");
     const old = await checkNode({ nodeVersion: "v20.0.0", bunVersion: "1.2.3" });
     assert.equal(old.status, "FAIL");
-    assert.ok(old.detail.includes("Node v20.0.0 is below 24.15.0") && old.detail.includes("running under Bun 1.2.3"));
+    assert.ok(old.detail.includes("Context Mode needs Node 24.15.0 or newer; you have v20.0.0") && old.detail.includes("running under Bun 1.2.3"));
   });
 
   test("[M5] doctor-env/D6-missing-both-is-UNKNOWN-never-FAIL", () => {

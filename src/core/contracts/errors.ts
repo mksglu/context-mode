@@ -8,7 +8,7 @@ export type ErrorCode =
   | "NO_GIT_BASH" | "PLUGIN_ROOT_MISSING" | "BUNDLE_HASH_MISMATCH" | "CONFIG_PARSE_FAILED"; // tools-ops additions, impl/07 A-T2
 
 export const ERROR_TEXT: Readonly<Record<ErrorCode, string>> = Object.freeze({
-  NODE_TOO_OLD: "Node <v> is below 24.15.0. Fix: install Node 24.15.0 or later.",
+  NODE_TOO_OLD: "Context Mode needs Node 24.15.0 or newer; you have <v>. Fix: nvm install 24, or install it from https://nodejs.org.", // #1328 D-NODE-OLD-1
   NO_SQLITE: "node:sqlite failed to load. Fix: run ctx_doctor.",
   DB_GONE: "context.db is gone and its WAL file is still in place. Fix: run ctx_doctor once; it keeps the WAL file in a dated folder and starts a new index.", // D-ORPHAN-WAL-1
   NO_PROJECT: "Project source <kind> is missing. Fix: run ctx_doctor.",

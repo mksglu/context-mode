@@ -12,6 +12,8 @@ import { ADAPTERS } from "../adapters/table.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
 import { dataRootOf, homeDirOf } from "../core/project/config-dir.ts";
 import { formUrl } from "../core/ops/doctor-issue.ts";
+import { formatError } from "../core/contracts/errors.ts";
+import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { buildRegistry, detectAgents, printPlan, printText, runDoctor, runRemove, runSetup } from "../setup/index.ts";
 import type { AgentResult, SetupContext, SetupResult } from "../setup/index.ts";
 import { HELP, parseFlags, UsageError, type Command, type Flags } from "./args.ts";
@@ -279,6 +281,8 @@ async function setup(ui: Ui): Promise<number> {
   if (f.print) return printManual(ui, f.print);
   if (f.list) return list(ui);
   if (f.remove) return remove(ui);
+  // #1328 D-NODE-OLD-1: Node first, before the agent prompt and any write; one line, no rollback, no report.
+  if (nodeTooOld(process.version)) { err(`context-mode: ${formatError("NODE_TOO_OLD", { v: process.version })}`); return EXIT_FAIL; }
   if (f.dryRun) {
     const plan = await apply(ui, f.agents, true);
     if (f.json) out(JSON.stringify({ command: "setup", dryRun: true, ...plan }));

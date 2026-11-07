@@ -239,6 +239,33 @@ rl.on("line", (l) => {
     assert.equal(readFileSync(toml, "utf8"), text);
   });
 
+  // #1328 / #1329 (lisandroprada, fingerprint 2e26442450f2): on Node v23.9.0 setup failed with "mcp: tools/list returned
+  // ctx_doctor, expected ..." and rolled back. Node is checked first: one line with the fix, no write, no rollback.
+  test("[#1328] setup on Node v23.9.0 stops first with one NODE_TOO_OLD line and writes nothing", async (t) => {
+    const s = sandbox(t);
+    const codexToml = put(path.join(s.home, ".codex", "config.toml"), CODEX_V1);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r1", nodeVersion: "v23.9.0" });
+    assert.equal(res.exitCode, 1);
+    assert.deepEqual(res.agents, []);
+    assert.equal(res.error, "Context Mode needs Node 24.15.0 or newer; you have v23.9.0. Fix: nvm install 24, or install it from https://nodejs.org.");
+    assert.equal(readFileSync(codexToml, "utf8"), CODEX_V1);
+    assert.equal(existsSync(path.join(s.home, ".context-mode")), false, "no backup, no lock");
+  });
+
+  test("[#1328] a server that lists only ctx_doctor under an old node is reported as Node too old, not a tools/list mismatch", async (t) => {
+    const s = sandbox(t);
+    const pkgDir = fakePkg(path.join(s.root, "old"), { tools: ["ctx_doctor"] });
+    // The node setup writes into the host config is the one that answers: a shim that reports v23.9.0.
+    const pre = put(path.join(s.root, "oldnode.cjs"), "Object.defineProperty(process, 'version', { value: 'v23.9.0' });");
+    put(path.join(s.home, ".codex", "config.toml"), CODEX_V1);
+    const env = { ...s.env, NODE_OPTIONS: `--require ${pre}` };
+    const res = await runSetup({ home: s.home, pkgDir, env, agents: ["codex"], runId: "r1" });
+    const codex = res.agents.find((a) => a.id === "codex");
+    assert.equal(codex.status, "FAIL", JSON.stringify(res, null, 2));
+    assert.ok(codex.reason.includes("mcp: Node too old: Context Mode needs Node 24.15.0 or newer; you have v23.9.0. Fix: nvm install 24"), codex.reason);
+    assert.ok(!codex.reason.includes("tools/list returned"), codex.reason);
+  });
+
   test("setup: second run changes nothing and makes no backup", async (t) => {
     const s = sandbox(t);
     const codexToml = put(path.join(s.home, ".codex", "config.toml"), CODEX_V1);

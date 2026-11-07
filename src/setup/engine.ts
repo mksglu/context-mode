@@ -15,8 +15,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
-import { CtxError } from "../core/contracts/errors.ts";
+import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { CtxError, formatError } from "../core/contracts/errors.ts";
+import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
@@ -56,6 +57,8 @@ export interface AgentResult {
 export interface SetupResult { exitCode: number; agents: AgentResult[]; backupDir?: string; error?: string; }
 export interface SetupOptions extends SetupContext {
   agents?: AgentId[]; runId?: string; dryRun?: boolean;
+  /** #1328 D-NODE-OLD-1: the Node that runs setup and the server it writes (default process.version). */
+  nodeVersion?: string;
   /** D7 Ctrl-C: on abort the agent in progress is rolled back and the lock released, synchronously. */
   signal?: AbortSignal;
   /** Live checklist: called before and after each agent. */
@@ -509,6 +512,15 @@ function copyCheck(row: CheckRow, pkgDir: string): Check | undefined {
   return { name: "copy", ok: false, detail: `${c.host} runs context-mode ${old}, the installed package is ${pkg}; run ${c.bin} ${c.refresh.join(" ")}` };
 }
 
+// #1328 D-NODE-OLD-1: a server that lists only ctx_doctor runs in degraded mode (server.ts isDegraded): its Node is
+// below NODE_MIN, or node:sqlite failed to load. Ask that same node binary for its version to name the cause.
+function degradedDetail(node: string, env: SetupContext["env"]): string {
+  const r = spawnSync(node, ["-p", "process.version"], { env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
+  const v = `${r.stdout ?? ""}`.trim();
+  if (v && nodeTooOld(v)) return `Node too old: ${D2_NODE_DETAIL(v)}. Fix: ${D2_NODE_FIX}`;
+  return `only ctx_doctor is served: ${D2_SQLITE_DETAIL} under ${node}${v ? ` ${v}` : ""}. Fix: ${D2_SQLITE_FIX}`;
+}
+
 function mcpCheck(cmd: string[], env: SetupContext["env"]): Promise<Check> {
   return new Promise((resolve) => {
     // Own process group on POSIX: a terminal Ctrl-C then reaches only the CLI, whose SIGINT handler rolls back and
@@ -540,7 +552,7 @@ function mcpCheck(cmd: string[], env: SetupContext["env"]): Promise<Check> {
           const want = [...TOOL_ORDER].sort();
           const got = [...tools].sort();
           const ok = JSON.stringify(got) === JSON.stringify(want);
-          done(ok, ok ? undefined : `tools/list returned ${got.join(",")}, expected ${want.join(",")}`);
+          done(ok, ok ? undefined : got.length === 1 && got[0] === "ctx_doctor" ? degradedDetail(cmd[0], env) : `tools/list returned ${got.join(",")}, expected ${want.join(",")}`);
         }
       }
     });
@@ -1010,7 +1022,10 @@ export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
   const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const runId = opts.runId ?? new Date().toISOString().split(":").join("-").split(".").join("-");
   const reg = buildRegistry(ctx);
-  // preflight
+  // preflight. #1328 D-NODE-OLD-1: Node first. Below NODE_MIN the server serves only ctx_doctor, so every agent
+  // would fail verify and roll back; one line names the cause and the fix instead.
+  const nodeVersion = opts.nodeVersion ?? process.version;
+  if (nodeTooOld(nodeVersion)) return { exitCode: 1, agents: [], error: formatError("NODE_TOO_OLD", { v: nodeVersion }) };
   for (const f of ["server.mjs", "hook.mjs"]) {
     if (!existsSync(path.join(ctx.pkgDir, f))) return { exitCode: 1, agents: [], error: `preflight: ${path.join(ctx.pkgDir, f)} is missing` };
   }

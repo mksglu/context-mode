@@ -154,6 +154,19 @@ describe("ADR-0019 cli", () => {
       assert.match(bad.stderr, /Did you mean "setup"/);
     });
 
+    // #1328 / #1329 (lisandroprada): "context-mode setup --agents codex" on Node v23.9.0. One line, exit 1, nothing written.
+    test("[#1328] cli: setup on Node v23.9.0 prints one NODE_TOO_OLD line and writes nothing", (t) => {
+      const s = sandbox(t);
+      const f = codexHome(s);
+      const pre = path.join(s.root, "oldnode.cjs");
+      writeFileSync(pre, "Object.defineProperty(process, 'version', { value: 'v23.9.0' });");
+      const r = run(s, ["setup", "--yes", "--agents", "codex"], { env: { NODE_OPTIONS: `--require ${pre}` } });
+      assert.equal(r.status, 1, r.stderr);
+      assert.equal(r.stderr, "context-mode: Context Mode needs Node 24.15.0 or newer; you have v23.9.0. Fix: nvm install 24, or install it from https://nodejs.org.\n");
+      assert.doesNotMatch(r.stdout + r.stderr, /tools\/list|rolled back|rollback/);
+      assert.equal(readFileSync(f, "utf8"), CODEX_V1);
+    });
+
     test("[M7] cli/parse-fail-line: a broken config says the agent id once (what, why, fix)", (t) => {
       const s = sandbox(t);
       const f = codexHome(s, '[mcp_servers.x\ncommand = = "bad"\n');

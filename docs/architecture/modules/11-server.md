@@ -184,7 +184,7 @@ No return value; this function runs for the life of the process and only resolve
 
 | Case | Behavior | Text |
 |---|---|---|
-| Node too old | `degraded = true`, only `ctx_doctor` served; `ctx_doctor` handler returns | `NODE_TOO_OLD`: `Node <v> is below 24.15.0. Fix: install Node 24.15.0 or later.` |
+| Node too old | `degraded = true`, only `ctx_doctor` served; `ctx_doctor` handler returns | `NODE_TOO_OLD`: `Context Mode needs Node 24.15.0 or newer; you have <v>. Fix: nvm install 24, or install it from https://nodejs.org.` |
 | `node:sqlite` import fails | `degraded = true`, only `ctx_doctor` served | `NO_SQLITE`: `node:sqlite failed to load. Fix: run ctx_doctor.` |
 | Agent id unresolved at startup | Server still starts; first tool call that needs a project fails | `NO_PROJECT`: `Project source <kind> is missing. Fix: run ctx_doctor.` |
 | Handler throws a non-`CtxError` | Caught in dispatch wrapper, logged to stderr only | `"Internal error. Fix: run ctx_doctor."` |
