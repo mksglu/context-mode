@@ -135,7 +135,7 @@ function userDenyHit(canonical: string, input: Record<string, unknown>, cwd: str
 }
 
 /** D-DENY-SHELL-LANG-1: "shell" or a shell of the `-c` family, by base name (any case, ".exe" or a path allowed). */
-function isShellLanguage(language: unknown): boolean {
+export function isShellLanguage(language: unknown): boolean {
   if (typeof language !== "string") return false;
   let name = language.toLowerCase();
   const slash = Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\"));

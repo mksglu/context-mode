@@ -1,14 +1,19 @@
 // impl/12 §4 (OpenCode 2 plugin), impl/10 §11; DEVIATIONS D-M5-arch-2, D-M5-A1-1, D-M5-P2-1..4.
 // In-process: no spawn, no MCP hop (impl/12 §1). Every hook builds the raw call-site object the
 // opencode adapter decodes (D-M5-A1-1) and calls handleHook; this file never opens context.db.
-import { INTERNAL_ERROR_LINE, PLUGIN_ID } from "../core/contracts/constants.ts";
+import {
+  INTERNAL_ERROR_LINE, OC_ANY_RESOURCE, OC_LEGACY_SHELL_ACTION, OC_READ_ACTION, OC_SHELL_ACTION, OC_WEBFETCH_ACTION, PLUGIN_ID,
+} from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
-import type { HookOutput, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
+import type { HookOutput, HostPermission, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
 import { handleHook } from "../core/hooks/dispatch.ts";
+import { isShellLanguage } from "../core/policy/decide.ts";
+import { parseShell } from "../core/policy/parse.ts";
 import { ownJournal } from "../core/journal/own-call.ts";
 import { resolveProject } from "../core/project/resolve.ts";
 import { TOOLS, checkCall, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "../prompt/_generated.ts";
+import { resolve } from "node:path";
 import { z } from "zod/v4";
 
 const AGENT = "opencode";
@@ -17,13 +22,84 @@ const AGENT = "opencode";
 export interface OpenCodeApp {
   directory?: string;
   tool(name: string, def: OpenCodeToolDef): void;
+  /** D-1331-OC-PERM-1: the host permission check; it rejects on deny. Absent = the 1.19 `toolCtx.ask` path. */
+  assert?: (req: PermissionRequest, toolCtx: OpenCodeToolCtx) => Promise<void>;
+  permission?: HostPermission;
+}
+
+/** The tool call context OpenCode passes to a plugin tool (1.19: sessionID, abort, ask; 2.x: agent, messageID, callID). */
+export interface OpenCodeToolCtx {
+  sessionID?: string;
+  abort?: AbortSignal;
+  agent?: string;
+  messageID?: string;
+  callID?: string;
+  ask?: (input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise<void>;
+}
+
+/** D-1331-OC-PERM-1: one OpenCode permission check, the shape the built-in tools assert. */
+export interface PermissionRequest { action: string; resources: string[]; save: string[] }
+
+const slash = (p: string): string => p.replaceAll("\\", "/");
+
+function shellRequest(commands: readonly string[]): PermissionRequest {
+  const resources: string[] = [];
+  for (const cmd of commands) {
+    const parsed = parseShell(cmd);
+    const raws = parsed.ok ? parsed.commands.map((c) => c.raw.trim()).filter((r) => r !== "") : [];
+    resources.push(...(raws.length > 0 ? raws : [cmd.trim()]));
+  }
+  return { action: OC_SHELL_ACTION, resources, save: resources };
+}
+
+/** D-1331-OC-PERM-1 (#1331): the OpenCode permission checks a ctx_* call needs, in order. The first names the tool
+ *  itself (a per-tool rule, or the catch-all "*"); then the built-in action the call matches: shell for shell code
+ *  and ctx_batch commands, read for a file, webfetch for a URL (the actions OpenCode 2.2.5's own tools assert). */
+export function permissionRequests(tool: string, input: unknown, base: string): PermissionRequest[] {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v !== "" ? v : undefined);
+  const out: PermissionRequest[] = [];
+  const read = (p: string): PermissionRequest => {
+    const abs = slash(resolve(base, p));
+    return { action: OC_READ_ACTION, resources: [abs], save: [abs] };
+  };
+  if (tool === "ctx_execute") {
+    const language = str(i.language) ?? OC_ANY_RESOURCE;
+    out.push({ action: tool, resources: [language], save: [language] });
+    if (isShellLanguage(language) && typeof i.code === "string") out.push(shellRequest([i.code]));
+    const file = str(i.file);
+    if (file !== undefined) out.push(read(file));
+    return out;
+  }
+  if (tool === "ctx_batch") {
+    const commands = Array.isArray(i.commands) ? i.commands.filter((c): c is string => typeof c === "string") : [];
+    out.push({ action: tool, resources: commands, save: commands });
+    if (commands.length > 0) out.push(shellRequest(commands));
+    return out;
+  }
+  if (tool === "ctx_index") {
+    const path = str(i.path);
+    const url = str(i.url);
+    const what = path ?? url ?? OC_ANY_RESOURCE;
+    out.push({ action: tool, resources: [what], save: [what] });
+    if (path !== undefined) out.push(read(path));
+    if (url !== undefined) out.push({ action: OC_WEBFETCH_ACTION, resources: [url], save: [OC_ANY_RESOURCE] });
+    return out;
+  }
+  return [{ action: tool, resources: [OC_ANY_RESOURCE], save: [OC_ANY_RESOURCE] }];
+}
+
+/** The OpenCode 1.19 plugin check: `toolCtx.ask` (its shell action is "bash"); it rejects on deny. */
+async function legacyAsk(req: PermissionRequest, toolCtx: OpenCodeToolCtx): Promise<void> {
+  const permission = req.action === OC_SHELL_ACTION ? OC_LEGACY_SHELL_ACTION : req.action;
+  await toolCtx.ask?.({ permission, patterns: req.resources, always: req.save, metadata: {} });
 }
 
 /** One ctx_* tool as OpenCode registers it (#1171). */
 export interface OpenCodeToolDef {
   description: string;
   args: RegisteredTool<unknown>["schema"];
-  execute(args: unknown, toolCtx: { sessionID?: string; abort?: AbortSignal }): Promise<string>;
+  execute(args: unknown, toolCtx: OpenCodeToolCtx): Promise<string>;
 }
 
 interface ToolInput { tool?: string; sessionID?: string; callID?: string; args?: unknown }
@@ -84,6 +160,16 @@ export async function setupLegacy(app: OpenCodeApp) {
           signal: toolCtx.abort ?? new AbortController().signal,
           protocolVersion: "",
         };
+        // D-1331-OC-PERM-1 (#1331): OpenCode's own permission rules run before the handler; a deny or a reject
+        // rejects here and reaches OpenCode unchanged (the built-in tools do the same).
+        const permission = app.permission ?? (typeof toolCtx.ask === "function" ? "wired" : undefined);
+        if (permission !== undefined) ctx.hostPermission = permission;
+        if (permission === "wired") {
+          let base = cwd ?? "";
+          try { base = ctx.project.worktree; } catch { /* an unresolved project keeps the plugin directory */ }
+          const check = app.assert ?? legacyAsk;
+          for (const req of permissionRequests(tool.name, checked.data, base)) await check(req, toolCtx);
+        }
         let reply: ToolReply;
         try {
           reply = await tool.handler(checked.data, ctx);
@@ -171,7 +257,16 @@ interface Oc2Tool {
   description: string;
   input: unknown;
   options: { codemode: boolean };
-  execute(input: unknown, context: { sessionID?: string; signal?: AbortSignal }): Promise<{ content: string }>;
+  execute(input: unknown, context: Oc2CallContext): Promise<{ content: string }>;
+}
+/** @opencode/schema 2.2.5 dist/tool.d.ts `Context`, plus the abort signal the host passes. */
+interface Oc2CallContext { sessionID?: string; agent?: string; messageID?: string; id?: string; signal?: AbortSignal }
+/** @opencode/plugin 2.2.5 dist/promise/permission.d.ts `PermissionDomain.assert` (from OpenCode 2.0.29). */
+interface Oc2Assert {
+  (input: {
+    sessionID: string; agent?: string; action: string; resources: string[]; save?: string[];
+    source?: { type: "tool"; messageID: string; id: string };
+  }): Promise<void>;
 }
 /** The part of the OpenCode 2 `setup(ctx)` argument this plugin uses. */
 export interface OpenCode2Context {
@@ -181,6 +276,7 @@ export interface OpenCode2Context {
     transform(cb: (editor: { add(tool: Oc2Tool): void }) => void): Promise<unknown>;
   };
   session: { hook(name: string, cb: (input: never) => Promise<void> | void): Promise<unknown> };
+  permission?: { assert?: Oc2Assert };
   event: { subscribe(options?: { types?: string[]; signal?: AbortSignal }): AsyncIterable<{ data?: { sessionID?: string } }> };
 }
 
@@ -192,15 +288,26 @@ function oc2Text(content: string | Oc2Content[] | undefined): string {
 /** impl/12 §4.1, OpenCode 2 `{id, setup}`: the same handlers as `setupLegacy`, wired to the 2.x ctx. */
 export async function setup(ctx: OpenCode2Context): Promise<() => void> {
   const tools = new Map<string, Oc2Tool>();
+  const assert = ctx.permission?.assert;
   const hooks = await setupLegacy({
     directory: ctx.location.directory,
+    // D-1331-OC-PERM-1: ctx.permission.assert is the 2.x plugin check (anomalyco/opencode#50652); "missing" feeds D10.
+    permission: typeof assert === "function" ? "wired" : "missing",
+    assert: async (req, t) => {
+      await assert?.({
+        sessionID: t.sessionID ?? "", ...(t.agent === undefined ? {} : { agent: t.agent }),
+        action: req.action, resources: req.resources, save: req.save,
+        ...(t.messageID === undefined || t.callID === undefined ? {} : { source: { type: "tool" as const, messageID: t.messageID, id: t.callID } }),
+      });
+    },
     tool(name, def) {
       tools.set(name, {
         name, description: def.description,
         input: z.toJSONSchema(def.args as z.ZodType, { target: "draft-2020-12", io: "input" }),
         options: { codemode: false }, // a ctx_* tool is listed to the model by name, not behind the host's code tool
         async execute(input, context) {
-          return { content: await def.execute(input, { sessionID: context.sessionID, abort: context.signal }) };
+          const t: OpenCodeToolCtx = { sessionID: context.sessionID, abort: context.signal, agent: context.agent, messageID: context.messageID, callID: context.id };
+          return { content: await def.execute(input, t) };
         },
       });
     },

@@ -118,6 +118,70 @@ describe("ADR-0020 plugins", () => {
       await dispose();
     });
 
+    // D-1331-OC-PERM-1 (#1331): the ctx_* tools go through OpenCode's own permission rules. The fake host below is
+    // OpenCode 2.2.5's rule order: @opencode/core dist/chunks/location-nw8h2gm9.js:100 evaluate3 (the last matching
+    // rule wins, no match = "ask"); ctx.permission.assert rejects on deny (@opencode/plugin dist/promise/permission.d.ts:22-28).
+    // Red run (before the fix): ctx_execute ran "echo hi" with no assert call at all, asked = [].
+    function permissionHost(rules) {
+      const asked = [];
+      const hit = (value, pattern) => pattern === "*" || value === pattern || (pattern.endsWith(" *") && value.startsWith(pattern.slice(0, -1)));
+      const assertFn = async (req) => {
+        asked.push(req);
+        for (const resource of req.resources) {
+          const rule = rules.findLast((r) => hit(req.action, r.action) && hit(resource, r.resource));
+          const effect = rule?.effect ?? "ask";
+          if (effect === "deny") throw new Error(`permission denied: ${req.action} ${resource}`);
+          if (effect === "ask") throw new Error(`permission rejected by the user: ${req.action} ${resource}`);
+        }
+      };
+      return { asked, assertFn };
+    }
+    const call2 = { sessionID: "ses_perm", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal };
+
+    test("[D-1331-OC-PERM-1] the reporter's catch-all ask rule: ctx_execute asks OpenCode before it runs echo hi (#1331)", async () => {
+      const f = fakeCtx(tmpdir());
+      const host = permissionHost([{ action: "*", resource: "*", effect: "ask" }]);
+      f.ctx.permission = { assert: host.assertFn };
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      await assert.rejects(f.tools.get("ctx_execute").execute({ language: "shell", code: "echo hi" }, call2), /rejected by the user/);
+      assert.deepEqual(host.asked[0], { sessionID: "ses_perm", agent: "build", action: "ctx_execute", resources: ["shell"], save: ["shell"], source: { type: "tool", messageID: "msg_1", id: "call_1" } });
+      await dispose();
+    });
+
+    test("[D-1331-OC-PERM-1] a shell deny rule applies to ctx_execute shell code and to every ctx_batch command (#1331)", async () => {
+      const f = fakeCtx(tmpdir());
+      const host = permissionHost([{ action: "*", resource: "*", effect: "allow" }, { action: SHELL, resource: "git push *", effect: "deny" }]);
+      f.ctx.permission = { assert: host.assertFn };
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      await assert.rejects(f.tools.get("ctx_execute").execute({ language: "bash", code: "echo ok && git push origin main" }, call2), /permission denied: shell git push origin main/);
+      await assert.rejects(f.tools.get("ctx_batch").execute({ commands: ["ls", "git push origin main"], queries: ["x"] }, call2), /permission denied: shell git push origin main/);
+      const shell = host.asked.filter((r) => r.action === SHELL);
+      assert.deepEqual(shell.map((r) => r.resources), [["echo ok", "git push origin main"], ["ls", "git push origin main"]]);
+      await dispose();
+    });
+
+    test("[D-1331-OC-PERM-1] a read deny rule applies to ctx_index path and ctx_execute file; a JavaScript call asks no shell check (#1331)", async () => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), "cm-oc-perm-")));
+      const f = fakeCtx(dir);
+      const host = permissionHost([{ action: "*", resource: "*", effect: "allow" }, { action: "read", resource: "*", effect: "deny" }]);
+      f.ctx.permission = { assert: host.assertFn };
+      const dispose = await opencodePlugin.default.setup(f.ctx);
+      await assert.rejects(f.tools.get("ctx_index").execute({ path: "secret.env" }, call2), /permission denied: read .*secret\.env/);
+      await assert.rejects(f.tools.get("ctx_execute").execute({ language: "javascript", code: "1", file: "secret.env" }, call2), /permission denied: read/);
+      assert.ok(!host.asked.some((r) => r.action === SHELL), "a JavaScript call asks no shell check");
+      await dispose();
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    test("[D-1331-OC-PERM-1] OpenCode 1.19: ctx_execute shell code asks toolCtx.ask with the 1.19 bash action (#1331)", async () => {
+      const registered = new Map();
+      await opencodePlugin.setupLegacy({ directory: tmpdir(), tool: (name, def) => registered.set(name, def) });
+      const asked = [];
+      const ask = async (input) => { asked.push(input); if (input.permission === "bash") throw new Error("denied by bash rule"); };
+      await assert.rejects(registered.get("ctx_execute").execute({ language: "shell", code: "rm -rf build" }, { sessionID: "s", abort: new AbortController().signal, ask }), /denied by bash rule/);
+      assert.deepEqual(asked.map((a) => [a.permission, a.patterns]), [["ctx_execute", ["shell"]], ["bash", ["rm -rf build"]]]);
+    });
+
     test("execute.before: the shell tool is routed like every host (curl denied by throwing the ctx_ redirect), webfetch is denied, ls passes", async () => {
       const f = fakeCtx(tmpdir());
       const dispose = await opencodePlugin.default.setup(f.ctx);

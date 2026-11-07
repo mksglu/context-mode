@@ -125,7 +125,7 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
       return r.row;
     },
     D9: () => checkIndex(project),
-    D10: () => checkMode(adapter),
+    D10: () => checkMode(adapter, ctx.hostPermission), // D-1331-OC-PERM-1
     D11: () => checkShell(env),
   };
   const rows: DoctorRow[] = [];

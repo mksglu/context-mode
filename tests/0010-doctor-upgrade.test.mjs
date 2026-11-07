@@ -1036,6 +1036,17 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     assert.equal(checkMode({ denyChannel: "hint-only" }).detail, "enforcement mode: hint-only");
   });
 
+  // D-1331-OC-PERM-1 (#1331): the reporter's doctor said "D10 enforcement mode | PASS" while no ctx_* tool asked OpenCode.
+  test("[D-1331-OC-PERM-1] doctor-env/D10 reports the OpenCode permission wiring: wired is PASS, missing is FAIL with the fix", () => {
+    const wired = checkMode({ denyChannel: "deny-reason" }, "wired");
+    assert.equal(wired.status, "PASS");
+    assert.match(wired.detail, /OpenCode permission rules apply to ctx_\* tools/);
+    const missing = checkMode({ denyChannel: "deny-reason" }, "missing");
+    assert.equal(missing.status, "FAIL");
+    assert.match(missing.detail, /ctx\.permission\.assert/);
+    assert.equal(missing.fixCommand, "opencode upgrade");
+  });
+
   test("[M5] doctor-env/rows-carry-no-baked-build-paths", async (t) => {
     const rows = [await run({ PATH: "" }, undefined), await checkNode({ nodeVersion: process.version, bunVersion: undefined }), checkMcp({ protocolVersion: "" }), checkMode({ denyChannel: "hint-only" })];
     for (const r of rows) assert.ok(!JSON.stringify(r).includes("/Users/"), `row ${r.id} shows a path`);

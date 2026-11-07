@@ -8,13 +8,13 @@ import {
   D1_CAUSE_JOIN, D1_DEFAULT_TAG, D1_DEV_BUILD_DETAIL, D1_GIT_CANCEL, D1_GIT_CHECK_FIX, D1_GIT_EXIT, D1_GIT_MISSING, D1_GIT_NO_START,
   D1_GIT_NO_TAG, D1_GIT_TIMEOUT, D1_LATEST_AHEAD, D1_LATEST_PASS, D1_LATEST_UNKNOWN, D1_LATEST_UPDATE, D1_NO_VERSION, D1_NPM_CHECK_FIX,
   D1_NPM_ERROR, D1_NPM_HTTP, D1_NPM_NO_TAG, D1_NPM_TIMEOUT, D1_PACKAGE_FILE, D1_PREFIX, D1_PRERELEASE_SEP, D1_SOURCE_NPM, D1_SOURCE_TAGS,
-  D10_DETAIL, D11_PASS_DETAIL, D11_POSIX_DETAIL, D11_POSIX_FIX, D11_WIN_DETAIL, D11_WIN_FIX, D2_BUN_DETAIL, D2_NODE_DETAIL, D2_NODE_FIX,
+  D10_DETAIL, D10_PERMISSION_DETAIL, D10_PERMISSION_FIX, D10_PERMISSION_MISSING_DETAIL, D11_PASS_DETAIL, D11_POSIX_DETAIL, D11_POSIX_FIX, D11_WIN_DETAIL, D11_WIN_FIX, D2_BUN_DETAIL, D2_NODE_DETAIL, D2_NODE_FIX,
   D2_SQLITE_DETAIL, D2_SQLITE_FIX, D4_REASON_JOIN, D6_UNKNOWN_DETAIL, D7_DETAIL, D7_FIX, DOCTOR_FIX_UPGRADE,
   DOCTOR_GIT_TIMEOUT_MS, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, GIT_BIN, GIT_LS_REMOTE, GIT_LS_REMOTE_TAG_ARGS, GIT_NO_PROMPT_ENV, GIT_SHA_HEX_LEN,
   LS_REMOTE_FIELD_SEP, NODE_MIN, NODE_VERSION_PREFIX, NODE_VERSION_SEP, RELEASE_REPO_URL, RELEASE_TAG_PATTERN, RELEASE_TAG_REF_PREFIX,
   SQLITE_MODULE,
 } from "../contracts/constants.ts";
-import type { AdapterRow, DoctorCheckId, DoctorRow, ProjectContext, ToolContext } from "../contracts/types.ts";
+import type { AdapterRow, DoctorCheckId, DoctorRow, HostPermission, ProjectContext, ToolContext } from "../contracts/types.ts";
 import { findRuntime } from "../sandbox/runtimes.ts";
 import { runProcess, type RunResult } from "../sandbox/spawn.ts";
 
@@ -265,7 +265,10 @@ export function checkProject(i: ProjectInput): DoctorRow {
 }
 
 // D10: the adapter's denyChannel as row data, always PASS (D-M5-arch-3: no enforcement import).
-export function checkMode(adapter: Pick<AdapterRow, "denyChannel">): DoctorRow {
+// D-1331-OC-PERM-1 (#1331): an OpenCode plugin session also reports its permission wiring; "missing" is FAIL.
+export function checkMode(adapter: Pick<AdapterRow, "denyChannel">, hostPermission?: HostPermission): DoctorRow {
+  if (hostPermission === "missing") return fail("D10", D10_PERMISSION_MISSING_DETAIL, D10_PERMISSION_FIX);
+  if (hostPermission === "wired") return pass("D10", D10_PERMISSION_DETAIL(adapter.denyChannel));
   return pass("D10", D10_DETAIL(adapter.denyChannel));
 }
 

@@ -721,6 +721,16 @@ export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken inst
 // doctor-db.ts: D8 checks, D9 counts, D10 mode (impl/07 §5).
 export const PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";
 export function D10_DETAIL(mode: string): string { return `enforcement mode: ${mode}`; }
+// D-1331-OC-PERM-1 (#1331): D10 also reports whether the host permission check runs before each ctx_* tool.
+export function D10_PERMISSION_DETAIL(mode: string): string { return `enforcement mode: ${mode}; OpenCode permission rules apply to ctx_* tools`; }
+export const D10_PERMISSION_MISSING_DETAIL = "this OpenCode build gives plugins no permission check (ctx.permission.assert), so ctx_* tools cannot follow OpenCode permission rules";
+export const D10_PERMISSION_FIX = "opencode upgrade";
+// D-1331-OC-PERM-1: the action names the OpenCode built-in tools assert (2.x: core chunks shell/read/webfetch tools; 1.x: "bash").
+export const OC_SHELL_ACTION = "shell";
+export const OC_LEGACY_SHELL_ACTION = "bash";
+export const OC_READ_ACTION = "read";
+export const OC_WEBFETCH_ACTION = "webfetch";
+export const OC_ANY_RESOURCE = "*";
 // D11 shell (D-VT-WINBASH-1).
 export const D11_WIN_DETAIL = "Git Bash not found"; export const D11_WIN_FIX = "install Git for Windows";
 export const D11_POSIX_DETAIL = "no sh on PATH"; export const D11_POSIX_FIX = "install sh or add it to PATH";
