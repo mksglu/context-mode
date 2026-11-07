@@ -33,6 +33,7 @@ import { verifySums } from "../src/core/ops/verify-sums.ts";
 import { ctxDoctor, runDoctorChecks } from "../src/core/tools/doctor.ts";
 import { ctxUpgrade, runUpgrade } from "../src/core/tools/upgrade.ts";
 import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
+import { codexRunDirOf, codexSetupHomeOf } from "../src/core/project/config-dir.ts";
 import { generateManifests } from "../build/manifests.ts";
 import { fakeCodexBin, trustedToml } from "./_lib/codex-fake.mjs";
 
@@ -1940,6 +1941,33 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
     assert.equal(d5.detail, C.D5_CODEX_UNTRUSTED_DETAIL);
     const d5home = (await doctor(home, "codex")).rows.find((r) => r.id === "D5");
     assert.notEqual(d5home.detail, C.D5_CODEX_UNTRUSTED_DETAIL);
+  });
+
+  // #1327 (D-1327-CODEX-ENV-1, wwcxbc, Codex Desktop 26.1103, Windows, CODEX_HOME=D:\\Codex\\.codex): Codex Desktop starts the
+  // MCP server without CODEX_HOME, the doctor read ~/.codex, found no entry and D3 said FAIL on a good install.
+  test("[#1327] the Codex home setup wrote into comes from the setup run manifest (Windows path form); CODEX_HOME still wins", (t) => {
+    const home = tmp(t);
+    put(path.join(home, ".context-mode", "backups", "2026-11-06T10-00-00-000Z", "manifest.json"), { runId: "a", entries: [{ agent: "codex", file: "C:\\Users\\wwcxbc\\.codex\\config.toml" }] });
+    put(path.join(home, ".context-mode", "backups", "2026-11-07T10-00-00-000Z", "manifest.json"), { runId: "b", entries: [{ agent: "kiro", file: "/k/mcp.json" }, { agent: "codex", file: "D:\\Codex\\.codex\\hooks.json" }, { agent: "codex", file: "D:\\Codex\\.codex\\config.toml" }] });
+    const env = { HOME: home, USERPROFILE: home };
+    assert.equal(codexSetupHomeOf(env, home), "D:\\Codex\\.codex");
+    assert.equal(codexRunDirOf(env, home, path.join(home, "no-bundle")), "D:\\Codex\\.codex");
+    assert.equal(codexRunDirOf({ ...env, CODEX_HOME: "E:\\x" }, home, path.join(home, "no-bundle")), "E:\\x");
+    assert.equal(codexSetupHomeOf(env, tmp(t)), null);
+  });
+
+  test("[#1327] doctor/D3 and D4 PASS for a codex entry under a custom Codex home when the server env has no CODEX_HOME", async (t) => {
+    const home = tmp(t);
+    const codexHome = path.join(home, "Codex", ".codex");
+    const toml = path.join(codexHome, "config.toml");
+    const serverArgs = JSON.stringify([path.join(path.dirname(process.argv[1] ?? ""), "server.mjs"), "--agent", "codex"]);
+    put(toml, `[mcp_servers.context-mode]\ncommand = "node"\nargs = ${serverArgs}\nomit_tools_from = ["deferred"]\ndefault_tools_approval_mode = "approve"\n\n[mcp_servers.context-mode.env]\nCODEX_HOME = ${JSON.stringify(codexHome)}\n`);
+    put(path.join(home, ".context-mode", "backups", "r1", "manifest.json"), { runId: "r1", entries: [{ agent: "codex", file: toml, existed: false }] });
+    const { rows } = await doctor(home, "codex");
+    const d3 = rows.find((r) => r.id === "D3");
+    const d4 = rows.find((r) => r.id === "D4");
+    assert.ok(!d3.detail.includes("MCP"), d3.detail);
+    assert.equal(d4.status, "PASS", d4.detail);
   });
 
   // D-CODEX-HOME-RUN-1 (tester, candidate baaa3149, Windows, Codex 0.166.0-alpha.5.1): the native plugin sits in

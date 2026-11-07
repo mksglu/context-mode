@@ -781,6 +781,8 @@ export const SETTINGS_FILE = "settings.json"; // claude-code, gemini, qwen; pi u
 export const CLAUDE_USER_CONFIG_FILE = ".claude.json"; // $HOME/.claude.json
 export const HOOKS_JSON_FILE = "hooks.json"; // codex, zcode cli/
 export const CLAUDE_CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR"; // D-WF-CC-CONFIG-1: Claude Code user dir override (default ~/.claude)
+export const SETUP_BACKUP_DIR_NAME = "backups"; // <data root>/backups/<run id>/manifest.json: one setup run (setup/engine.ts Run)
+export const SETUP_MANIFEST_FILE = "manifest.json"; // #1327 D-1327-CODEX-ENV-1: the doctor reads which Codex config.toml setup wrote
 export const CODEX_HOME_ENV = "CODEX_HOME"; // D-N6-CODEX-HOME-2: Codex reads config.toml and hooks.json from here (default ~/.codex)
 export const COPILOT_HOME_ENV = "COPILOT_HOME"; // D-WIN-COPILOT-HOME-1: Copilot CLI replaces ~/.copilot as a whole with it (hooks/, skills/)
 export const GEMINI_CLI_HOME_ENV = "GEMINI_CLI_HOME"; // D-R38-GEMINI-HOME-1: gemini-cli homedir() reads it before os.homedir(); <it>/.gemini holds settings.json and extensions/
@@ -892,6 +894,8 @@ export const HOST_CONFIG_TEXT_PATH = "(given text)"; // CONFIG_PARSE_FAILED <pat
 export const JSON_INDENT_UNIT = "  "; // indent for a file with no indented member to copy from
 export const MCP_COMMAND_FIELD = "command";
 export const MCP_ARGS_FIELD = "args";
+export const MCP_ENV_FIELD = "env"; // #1327 D-1327-CODEX-ENV-1: Codex passes this table to the MCP server process (mcp_types.rs env)
+export const MCP_ENV_VARS_FIELD = "env_vars"; // #1327: Codex forwards these named vars from its own env
 // The one host config file (segments under $HOME; VS Code: the name inside its user dir, ownMcpFileOf) and key path of context-mode's own MCP entry, for the
 // agents whose MCP entry lives in a host config file (installMode config-mcp, mcp-entry, hooks+mcp).
 // fields = host-required members of the entry next to command/args; also = sibling key paths the host needs set

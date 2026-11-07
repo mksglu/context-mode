@@ -5,7 +5,7 @@ import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
-import { AGENT_HOME_DIR, HOST_NODE_COMMAND, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, HOST_NODE_COMMAND, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE, MCP_ENV_FIELD, OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, SERVER_KEY, SETUP_BACKUP_DIR_NAME, TOOL_ORDER } from "../core/contracts/constants.ts";
 import type { AgentId, AdapterRow, HostConfigFormat } from "../core/contracts/types.ts";
 import { claudeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf } from "../core/project/config-dir.ts";
 import { ownMcpValue } from "../core/ops/host-config.ts";
@@ -16,7 +16,7 @@ export const HOOK_BUNDLE = "hook.mjs";
 export const AGENT_FLAG = "--agent";
 export const STATE_DIR = ".context-mode";
 export const LOCK_FILE = "setup.lock";
-export const BACKUP_DIR = "backups";
+export const BACKUP_DIR = SETUP_BACKUP_DIR_NAME;
 const PLUGIN_ID = `${SERVER_KEY}@${SERVER_KEY}`;
 const SKILLS_DIR_NAME = "skills";
 
@@ -212,7 +212,12 @@ function configFor(ctx: SetupContext, id: AgentId): ConfigTarget | undefined {
     const file = id === "vscode" ? ownMcpFileOf(id, own.file, ctx.env, ctx.home) : agentPath(ctx, id, own.file); // D-WIN-VSCODE-MCP-1
     const format: HostConfigFormat = file.endsWith(".toml") ? "toml" : id === "vscode" ? "jsonc" : "json";
     const also = own.also?.map(([k, v]): [readonly string[], unknown] => [k, v]);
-    return { file, format, key: own.key, value: ownMcpValue(id, node, server), ...(also ? { also } : {}) };
+    // #1327 D-1327-CODEX-ENV-1: Codex Desktop starts the MCP server with a short env allowlist that drops CODEX_HOME; the
+    // entry's env table carries the Codex home setup wrote into, so the server (and its doctor) reads the same dir.
+    const codexHome = id === "codex" ? ctx.env[CODEX_HOME_ENV] : undefined;
+    const base = ownMcpValue(id, node, server);
+    const value = codexHome !== undefined && codexHome !== "" ? { ...base, [MCP_ENV_FIELD]: { [CODEX_HOME_ENV]: codexHome } } : base;
+    return { file, format, key: own.key, value, ...(also ? { also } : {}) };
   }
   if (id === "opencode") { // docs/install/opencode.md: a local MCP entry in opencode.json
     return {

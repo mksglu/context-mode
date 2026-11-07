@@ -1,9 +1,9 @@
 // impl/02 §4, impl/00 §2 (store), DEVIATIONS D-M1-6, D-M1-T3-1.
 // The one config-dir reader: every module gets ~/.context-mode from here, none reads HOME again.
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
-const { mkdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
+const { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { basename, dirname, join, posix, resolve, win32 } from "node:path";
-import { AGENT_HOME_DIR, APPDATA_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
+import { AGENT_HOME_DIR, APPDATA_ENV, CONFIG_TOML_FILE, SETUP_BACKUP_DIR_NAME, SETUP_MANIFEST_FILE, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 
 /** The one home rule. An empty value counts as unset; null when nothing is set (D-M3-F-8).
@@ -49,7 +49,31 @@ export function codexPluginHomeOf(bundleDir: string): string | null {
 export function codexRunDirOf(env: NodeJS.ProcessEnv, home: string, bundleDir: string): string {
   const dir = env[CODEX_HOME_ENV];
   if (dir !== undefined && dir !== "") return dir;
-  return codexPluginHomeOf(bundleDir) ?? codexDirOf(env, home);
+  return codexPluginHomeOf(bundleDir) ?? codexSetupHomeOf(env, home) ?? codexDirOf(env, home);
+}
+
+/** #1327 D-1327-CODEX-ENV-1: the Codex home the newest setup run wrote config.toml into, read from the run manifests under
+ *  <data root>/backups. Codex Desktop starts the server without CODEX_HOME (its MCP env allowlist drops it), so an entry
+ *  written before setup put CODEX_HOME in the entry env is found here. Null when no run names a codex config.toml. */
+export function codexSetupHomeOf(env: NodeJS.ProcessEnv, home: string): string | null {
+  if (home === "" && !env[DATA_DIR_ENV]) return null;
+  const base = join(dataRootOf(env, home), SETUP_BACKUP_DIR_NAME);
+  let runs: string[];
+  try { runs = readdirSync(base).sort().reverse(); } catch { return null; }
+  for (const run of runs) {
+    const file = join(base, run, SETUP_MANIFEST_FILE);
+    if (!existsSync(file)) continue;
+    let entries: unknown;
+    try { entries = (JSON.parse(readFileSync(file, "utf8")) as { entries?: unknown }).entries; } catch { continue; }
+    if (!Array.isArray(entries)) continue;
+    for (const e of entries as { agent?: unknown; file?: unknown }[]) {
+      if (e?.agent !== "codex" || typeof e.file !== "string") continue;
+      // The manifest holds the host's own path form: a Windows path (D:\\Codex\\.codex\\config.toml) splits on "\\".
+      const p = e.file.includes(win32.sep) ? win32 : posix;
+      if (p.basename(e.file) === CONFIG_TOML_FILE) return p.dirname(e.file);
+    }
+  }
+  return null;
 }
 
 /** D-WIN-COPILOT-HOME-1: the dir Copilot CLI reads hooks/ and skills/ from: $COPILOT_HOME when set and not empty (it replaces

@@ -19,6 +19,7 @@ import { assertWritable, buildRegistry, hostBin, installExitOk, pathEntries, run
 import { generateManifests } from "../build/manifests.ts";
 import { FAKE_APP_SERVER, PLUGIN_EVENTS, PLUGIN_ID, PLUGIN_KEY, hashOf } from "./_lib/codex-fake.mjs";
 import { vscodeUserDirOf } from "../src/core/project/config-dir.ts";
+import { detectV1 } from "../src/core/ops/detect-v1.ts";
 
   // serial: runSetup and runDoctor share in-process state; the tests fail when they overlap
 describe("ADR-0019 section 3: setup engine (setup, doctor, remove, spawn, lock, backup)", () => {
@@ -211,6 +212,31 @@ rl.on("line", (l) => {
     assert.equal(existsSync(path.join(s.home, ".context-mode")), false, "the default data dir is not created");
     assert.equal(runRemove({ home: s.home, env }).exitCode, 0);
     assert.equal(readFileSync(codexToml, "utf8"), CODEX_V1);
+  });
+
+  // #1327 (D-1327-CODEX-ENV-1, wwcxbc, Codex Desktop 26.1103 on Windows, CODEX_HOME=D:\\Codex\\.codex): Codex Desktop starts
+  // the MCP server with a short env allowlist that drops CODEX_HOME, so the server read ~/.codex and D3 said FAIL.
+  test("[#1327] registry: with CODEX_HOME=D:\\Codex\\.codex the codex MCP entry carries env.CODEX_HOME; without it, no env table", () => {
+    const win = buildRegistry({ home: "C:\\Users\\wwcxbc", pkgDir: "C:\\pkg", env: { CODEX_HOME: "D:\\Codex\\.codex" }, platform: "win32" }).find((r) => r.id === "codex");
+    assert.deepEqual(win.config.value.env, { CODEX_HOME: "D:\\Codex\\.codex" });
+    const plain = buildRegistry({ home: "/h", pkgDir: "/abs/pkg", env: {} }).find((r) => r.id === "codex");
+    assert.equal(plain.config.value.env, undefined);
+  });
+
+  test("[#1327] setup writes [mcp_servers.context-mode.env] CODEX_HOME, keeps the user's env keys and env_vars, and a second run changes nothing", async (t) => {
+    const s = sandbox(t);
+    const codexHome = path.join(s.root, "Codex", ".codex");
+    const env = { ...s.env, CODEX_HOME: codexHome };
+    const toml = put(path.join(codexHome, "config.toml"), 'model = "o3"\n\n[mcp_servers.context-mode]\ncommand = "context-mode"\nenv_vars = ["HTTPS_PROXY"]\n\n[mcp_servers.context-mode.env]\nMY_KEY = "mine"\n');
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env, agents: ["codex"], runId: "r1" });
+    assert.equal(res.exitCode, 0, JSON.stringify(res, null, 2));
+    const text = readFileSync(toml, "utf8");
+    assert.ok(text.includes(`CODEX_HOME = ${JSON.stringify(codexHome)}`), text);
+    assert.ok(text.includes('MY_KEY = "mine"') && text.includes('env_vars = ["HTTPS_PROXY"]'), text);
+    assert.deepEqual(detectV1("codex", s.home, { codexDir: codexHome }).filter((f) => f.file === toml), [], "the env table of the v2 entry is no v1 leftover");
+    const again = await runSetup({ home: s.home, pkgDir: s.pkgDir, env, agents: ["codex"], runId: "r2" });
+    assert.deepEqual(again.agents[0].changes, []);
+    assert.equal(readFileSync(toml, "utf8"), text);
   });
 
   test("setup: second run changes nothing and makes no backup", async (t) => {

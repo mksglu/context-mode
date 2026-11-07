@@ -17,7 +17,7 @@ import {
   V1_BIN_COMMAND, V1_CACHE_HEAL_EXTS, V1_CACHE_HEAL_NAME, V1_CODEX_HOOK_COMMAND, V1_CODEX_HOOKS_DIR,
   V1_DATA_DIR_NAME, V1_DATA_ROOT_ENTRIES, V1_HOOK_COMMAND, V1_HOOKS_DIR_NAME, V1_OPENCODE_PLUGIN_SPEC,
   V1_PATH_SEPS, V1_PI_PACKAGE, V1_REASON, V1_SCRIPT_EXT, V1_SCRIPT_NAMES, V1_SESSIONS_DIR_NAME,
-  V1_STATUSLINE_COMMAND, V1_TMP_PREFIX, V1_TOML_SECTION_ROOT, SERVER_ENTRY_FILE, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, VSCODE_DIR_NAME, VSCODE_MCP_FILE,
+  V1_STATUSLINE_COMMAND, V1_TMP_PREFIX, V1_TOML_SECTION_ROOT, SERVER_ENTRY_FILE, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, MCP_ENV_FIELD, VSCODE_DIR_NAME, VSCODE_MCP_FILE,
   VSCODE_MCP_SERVERS_KEY, ZCODE_CLI_DIR, ZCODE_EVENTS_KEY,
 } from "../contracts/constants.ts";
 
@@ -203,6 +203,8 @@ function scanCodex(agentHome: string, out: V1Finding[]): void {
     // D-DOC-RT-1: v2 setup writes [mcp_servers.context-mode] too. It is v2 when it runs node on our server bundle; any
     // sub-table (v1 [..tools.ctx_*]) or any other command (v1 `context-mode` bin) is the old section.
     if (span.path.length === 2 && isV2McpTable(hostConfigValueAt(config, span.path))) continue;
+    // #1327 D-1327-CODEX-ENV-1: the env table of a v2 entry is the server env Codex passes (setup writes CODEX_HOME there).
+    if (span.path.length === 3 && span.path[2] === MCP_ENV_FIELD && isV2McpTable(hostConfigValueAt(config, span.path.slice(0, 2)))) continue;
     out.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
   }
   dataDir(join(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);

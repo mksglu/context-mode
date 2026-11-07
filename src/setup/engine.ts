@@ -15,13 +15,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, DB_FILE_NAME, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
-import { editHostConfigText, parseHostConfig } from "../core/ops/host-config.ts";
+import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
 import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, LOCK_FILE, SKILL_FILE, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, HookInstall, NativePlugin, SetupContext } from "./registry.ts";
@@ -40,7 +40,7 @@ const HOOK_ROUNDS = 5; // noise only adds time: a real overhead over budget fail
 const P95 = 0.95;
 const VERIFY_TIMEOUT_MS = 10_000;
 const INSTALL_TIMEOUT_MS = 120_000; // D-SETUP-SLOW-1: a first run of an agent CLI can unpack its own package before `mcp add` answers
-const MANIFEST = "manifest.json";
+const MANIFEST = SETUP_MANIFEST_FILE;
 const MANIFEST_DONE = "manifest.removed.json";
 const FILES = "files";
 const V1_HOOK_MARK = "context-mode hook";
@@ -353,7 +353,7 @@ function planRow(row: CheckRow, listed: boolean, stale: boolean, env: SetupConte
     const c = row.config;
     const before = readOr(c.file);
     let res;
-    try { res = editHostConfigText(row.id, c.file, before ?? "", c.format, configEdits(c)); }
+    try { res = editHostConfigText(row.id, c.file, before ?? "", c.format, ownConfigEdits(row, c, before ?? "")); }
     catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, c.file)); throw e; }
     if (res.edits.length) edits.push({ file: c.file, before, after: res.text, changes: res.edits.map((e) => ({ file: c.file, ...e })) });
   }
@@ -587,11 +587,28 @@ function hookCheck(row: CheckRow, env: SetupContext["env"]): Check {
   return best as Check;
 }
 
+/** #1327 D-1327-CODEX-ENV-1: the config edits for a row, with the env table and env_vars list the user keeps on the codex
+ *  MCP entry (other vars, Codex forwards these to the server) merged in; setup sets only its own CODEX_HOME key. */
+function ownConfigEdits(row: CheckRow, c: NonNullable<CheckRow["config"]>, text: string): [readonly string[], unknown][] {
+  const edits = configEdits(c);
+  if (row.id !== "codex" || !isObj(c.value)) return edits;
+  let cur: unknown;
+  try { cur = hostConfigValueAt(parseHostConfig(row.id, c.file, text, c.format), c.key); } catch { return edits; }
+  if (!isObj(cur)) return edits;
+  const value: Json = { ...c.value };
+  const userEnv = cur[MCP_ENV_FIELD];
+  const ownEnv = value[MCP_ENV_FIELD];
+  if (isObj(userEnv) || isObj(ownEnv)) value[MCP_ENV_FIELD] = { ...(isObj(userEnv) ? userEnv : {}), ...(isObj(ownEnv) ? ownEnv : {}) };
+  if (Array.isArray(cur[MCP_ENV_VARS_FIELD])) value[MCP_ENV_VARS_FIELD] = cur[MCP_ENV_VARS_FIELD];
+  return [[c.key, value], ...edits.slice(1)];
+}
+
 function parseCheck(row: CheckRow): Check {
   const c = row.config;
   if (!c) return { name: "parse", ok: true };
   try {
-    const r = editHostConfigText(row.id, c.file, readOr(c.file) ?? "", c.format, configEdits(c));
+    const text = readOr(c.file) ?? "";
+    const r = editHostConfigText(row.id, c.file, text, c.format, ownConfigEdits(row, c, text));
     return { name: "parse", ok: r.edits.length === 0, detail: r.edits.length ? "entry differs after write" : undefined };
   } catch (e) { return { name: "parse", ok: false, detail: (e as Error).message }; }
 }
