@@ -1148,6 +1148,25 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_MEDIA_DETAIL, fixCommand: C.D5_FIX });
   });
 
+  // #1333 (feiyulike): on ZCode D5 passed while the hook denied every PNG Read over OUTPUT_CAP. ZCode sends the Claude
+  // PreToolUse shape, so D5 for zcode sends the same media probe.
+  const ZFIXTURE = { zcode: { event: "PreToolUse", payload: { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } } } };
+  function zBundle(t, mediaDeny) {
+    const dir = bundle(t, native, { fixture: ZFIXTURE });
+    writeFileSync(path.join(dir, C.HOOK_ENTRY_FILE), readHook('""', true, mediaDeny));
+    return dir;
+  }
+
+  test("[M5] doctor-hook/D5-zcode-image-read-denied-FAILs (#1333)", async (t) => {
+    const r = await checkHookRoundTrip(input(zBundle(t, true), { agent: "zcode" }));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "FAIL", detail: C.D5_READ_MEDIA_DETAIL, fixCommand: C.D5_FIX });
+  });
+
+  test("[M5] doctor-hook/D5-zcode-image-read-allowed-PASSes (#1333)", async (t) => {
+    const r = await checkHookRoundTrip(input(zBundle(t, false), { agent: "zcode" }));
+    assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail: C.DOCTOR_PASS_DETAIL });
+  });
+
   test("[M5] doctor-hook/D5-bad-exit-code-FAILs-shape", async (t) => {
     const r = await checkHookRoundTrip(input(bundle(t, native, { exit: 1 })));
     assert.equal(r.status, "FAIL");

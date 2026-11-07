@@ -325,10 +325,14 @@ const READ_IMAGES_AND_PDF: readonly ReadMediaType[] = Object.freeze([...READ_IMA
 /** Per host, the media its own read tool returns as a block (host source checked, D-R47-READ-MEDIA-1). Claude Code
  *  Read: images + PDF blocks. Gemini/Qwen read_file: inlineData. OpenCode read: MEDIA_MIMES (png, jpeg, gif, webp, pdf).
  *  Pi read: image attachments, a PDF comes back as text. VS Code read_file: images go to its own view_image tool.
+ *  ZCode Read (#1333, zai-org/ZCode a9fe401e apps/zcode-cli/packages/core/src/tool/handlers/read.ts:185, read-image.ts:134):
+ *  png/jpeg/gif/webp become an image block; a PDF is a block only when the model has supportsPdf (read.ts:195), else text.
+ *  Codex has no Read tool (images go to its own view_image, codex-rs core/src/tools/handlers/view_image.rs:75); copilot-cli
+ *  ships a closed binary and kiro a closed host, so no media path is checked there.
  *  A host with no checked media path keeps the size deny for every file. */
 export const READ_MEDIA_BY_AGENT: Readonly<Record<AgentId, readonly ReadMediaType[]>> = Object.freeze({
   "claude-code": READ_IMAGES_AND_PDF, gemini: READ_IMAGES_AND_PDF, qwen: READ_IMAGES_AND_PDF, opencode: READ_IMAGES_AND_PDF,
-  pi: READ_IMAGES, vscode: READ_IMAGES, "copilot-cli": [], codex: [], kiro: [], zcode: [],
+  pi: READ_IMAGES, vscode: READ_IMAGES, zcode: READ_IMAGES, "copilot-cli": [], codex: [], kiro: [],
 });
 
 // impl/09 §4 hooks dispatch (DEVIATIONS D-M3-H2-1..6). Keys and texts the dispatch reads; no numbers.

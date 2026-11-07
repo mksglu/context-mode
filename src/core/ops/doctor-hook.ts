@@ -188,6 +188,11 @@ async function readProbeDetail(i: HookCheckInput, timeoutMs: number): Promise<st
   return null;
 }
 
+/** #1333: ZCode sends the Claude PreToolUse shape and its Read shows png/jpeg/gif/webp as image blocks; D5 sends the media probe. */
+async function mediaProbeDetail(i: HookCheckInput, timeoutMs: number): Promise<string | null> {
+  return isDeny(await mediaProbe(i, timeoutMs)) ? D5_READ_MEDIA_DETAIL : null;
+}
+
 /** R6: true when at least one journal row of any Codex session exists in this project's context.db. */
 export function codexHookJournaled(db: DbHandle | null): boolean {
   if (db === null) return false;
@@ -292,7 +297,9 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     if (n >= minPairs && ms <= HOOK_P95_MS) break;
   }
   if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
-  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
+  const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs)
+    : i.agent === "zcode" ? await mediaProbeDetail(i, timeoutMs)
+    : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
   if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
   return row("PASS", DOCTOR_PASS_DETAIL);
 }

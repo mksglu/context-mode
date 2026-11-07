@@ -543,6 +543,13 @@ describe("ADR-0008 read-deny hook text", { concurrency: CONC }, () => {
       assert.equal(kind("pi", { path: pdf }), "deny", "Pi read returns a PDF as text");
       assert.equal(kind("gemini", { absolute_path: pdf }), "allow");
       assert.equal(kind("copilot-cli", { path: png }), "deny", "no checked media path on copilot-cli view");
+      // #1333 (feiyulike, ZCode 3.17.2 native plugin): a Read of a PNG over 16 KB was denied. ZCode Read returns
+      // png/jpeg/gif/webp as an image block (read.ts:185 inferImageMimeFromPath); a PDF is a block only when the model
+      // has supportsPdf (read.ts:195), else ZCode reads it as text, so the PDF keeps the deny.
+      for (const f of [png, big, jpg, webp]) assert.equal(kind("zcode", { file_path: f }), "allow", f);
+      assert.equal(kind("zcode", { file_path: pdf }), "deny", "ZCode reads a PDF as text when the model has no PDF input");
+      assert.equal(kind("zcode", { file_path: fake }), "deny", "a text file named .png is text");
+      assert.equal(kind("zcode", { file_path: log }), "deny");
       const oc = getAdapter("opencode");
       const ocKind = (args) => decide(oc.decode({ type: "execute.before", sessionID: "s", tool: "read", args, directory: dir }), oc, null).kind;
       assert.equal(ocKind({ filePath: png }), "allow");
@@ -551,6 +558,9 @@ describe("ADR-0008 read-deny hook text", { concurrency: CONC }, () => {
       const fail = (file_path) => failureOutput("claude-code", { hook_event_name: "PreToolUse", tool_name: "Read", cwd: dir, tool_input: { file_path } }, new Error("x")).stdout;
       assert.ok(!fail(png).includes("deny"), fail(png));
       assert.ok(fail(log).includes("deny"));
+      const zfail = (file_path) => failureOutput("zcode", { hook_event_name: "PreToolUse", tool_name: "Read", cwd: dir, tool_input: { file_path } }, new Error("x")).stdout;
+      assert.ok(!zfail(png).includes("deny"), zfail(png));
+      assert.ok(zfail(log).includes("deny"));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
