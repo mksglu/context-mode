@@ -10,7 +10,7 @@ import { dataRootOf, resolveConfigDir } from "../src/core/project/config-dir.ts"
 import { hookLogPath } from "../src/core/hooks/fallback.ts";
 import { CtxError } from "../src/core/contracts/errors.ts";
 import { closeDb, metaGet, metaSet, metaTake, openDb, withWrite } from "../src/core/store/db.ts";
-import { DB_TIMEOUT_MS, SCHEMA_VERSION as CONSTANTS_SCHEMA_VERSION } from "../src/core/contracts/constants.ts";
+import { DB_TIMEOUT_MS, RECALL_QUERY_MAX_TERMS, SCHEMA_VERSION as CONSTANTS_SCHEMA_VERSION } from "../src/core/contracts/constants.ts";
 import * as C from "../src/core/contracts/constants.ts";
 import { DatabaseSync } from "node:sqlite";
 import { DDL, DDL_V2, DDL_V3, SCHEMA_VERSION, applyMigrations } from "../src/core/store/schema.ts";
@@ -676,9 +676,18 @@ describe("ADR-0002: shared store helpers", { concurrency: CONC }, () => {
   const UNITS = "SELECT COUNT(*) AS n FROM line_units";
   const CHUNKS = "SELECT COUNT(*) AS n FROM chunks";
 
-  test("[H-1] recallQueryText: the prompt alone when it equals the goal, else prompt, one space, goal", () => {
-    assert.equal(fts.recallQueryText("fix login", "fix login"), "fix login");
-    assert.equal(fts.recallQueryText("fix login", "build the api"), "fix login build the api");
+  // D-1330-RECALL-PROMPT-1 (#1330): the recall query is the current prompt only, its first distinct
+  // non-stopword words, at most RECALL_QUERY_MAX_TERMS of them; no session goal (first prompt) in it.
+  test("[H-1] recallQueryText (#1330): the current prompt's distinct words, stopwords out, at most RECALL_QUERY_MAX_TERMS", () => {
+    assert.equal(fts.recallQueryText("fix the login"), "fix login");
+    assert.equal(fts.recallQueryText("fix login fix Login"), "fix login Login");
+    assert.equal(fts.recallQueryText("what is it"), "what is it"); // only stopwords: all kept
+    assert.equal(fts.recallQueryText(""), "");
+    const long = Array.from({ length: 5000 }, (_, i) => "w" + i).join(" ");
+    const words = fts.recallQueryText(long).split(" ");
+    assert.equal(words.length, RECALL_QUERY_MAX_TERMS);
+    assert.deepEqual(words.slice(0, 3), ["w0", "w1", "w2"]);
+    assert.equal(RECALL_QUERY_MAX_TERMS, 64);
   });
 
   test("[H-2] deleteChunkRows: one source id, one label or all; chunk, trigram and line rows leave together", async () => {

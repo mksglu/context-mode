@@ -6,7 +6,7 @@
 // M2: ftsInsert returns the new id (D-M2-1); ftsQueryTimeline (ADR-0009 §8.1, DECISIONS-r9 M14-M18,
 // D-M2-3, D-M2-T3-1); rankTexts, the in-memory BM25 form selectChunksInMemory calls (impl/05 §5 step 2).
 import { CtxError } from "../contracts/errors.ts";
-import { DECISION_SOURCE, ECHO_MAX_BYTES, INDEX_WRITE_CHUNK, LABEL_PREVIEW_BYTES, MEMORY_LABEL_PREFIX, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
+import { DECISION_SOURCE, ECHO_MAX_BYTES, INDEX_WRITE_CHUNK, LABEL_PREVIEW_BYTES, MEMORY_LABEL_PREFIX, RECALL_QUERY_MAX_TERMS, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow, UnitCandidate } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
@@ -830,10 +830,29 @@ export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, u
   }
 }
 
-// The recall query text: the prompt alone when it equals the session goal, else the prompt, one space, the goal.
+// D-1330-RECALL-PROMPT-1 (#1330): the recall query text is the current prompt only, never the session goal (first
+// prompt): its first RECALL_QUERY_MAX_TERMS distinct non-stopword words, split as toMatch splits them (a prompt
+// made only of stopwords keeps them, as searchTerms does). A 30 KB prompt costs the same as a 64-word one.
 // dispatch.ts (turn-boundary recall) and resume.ts (ctx_resume) both rank line units by this text.
-export function recallQueryText(prompt: string, goal: string): string {
-  return goal === prompt ? prompt : prompt + " " + goal;
+export function recallQueryText(prompt: string): string {
+  const kept = new Set<string>();
+  const all = new Set<string>();
+  const add = (w: string): void => {
+    if (all.size < RECALL_QUERY_MAX_TERMS) all.add(w);
+    if (!STOPWORDS.has(w.toLowerCase())) kept.add(w);
+  };
+  let cur = "";
+  for (const ch of prompt) {
+    if (kept.size >= RECALL_QUERY_MAX_TERMS) break;
+    if (ch.trim() === "" || ch === "\u0000") {
+      if (cur !== "") add(cur);
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur !== "" && kept.size < RECALL_QUERY_MAX_TERMS) add(cur);
+  return [...(kept.size > 0 ? kept : all)].join(" ");
 }
 
 /** One ranked query over this session's line units (any-word form); best first, -bm25 as the score. */
