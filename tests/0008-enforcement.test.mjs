@@ -25,6 +25,9 @@ import { decode as decodeGemini } from "../src/adapters/gemini.ts";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { matchesAnyDenyPattern, readUserDeny } from "../src/core/policy/user-deny.ts";
+import { readRoutePolicy } from "../src/core/policy/route-policy.ts";
+import { handleHook } from "../src/core/hooks/dispatch.ts";
+import { checkMode } from "../src/core/ops/doctor-env.ts";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 
 describe("ADR-0008 lexer", { concurrency: CONC }, () => {
@@ -1551,6 +1554,75 @@ describe("ADR-0008 privacy: network call sites in src (D-PRIVACY-NET-1)", { conc
     const readme = readFileSync(join(ROOT, "README.md"), "utf8");
     for (const need of ["Zero telemetry", "src/core/sandbox/fetch.ts", "git ls-remote", "gh issue create", "npm i -g context-mode", "D-PRIVACY-NET-1"]) {
       assert.ok(readme.includes(need), `README lacks ${need}`);
+    }
+  });
+});
+
+describe("ADR-0008 route policy file (#1336, D-R49-WEBFETCH-POLICY-1)", { concurrency: CONC }, () => {
+  const CC = getAdapter("claude-code");
+  const ev = (name, input) => ({ event: "PreToolUse", agent: "claude-code", sessionId: "s", cwd: "/tmp", tool: { name, canonicalName: name, input } });
+  const policyOf = (doc, raw) => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-route-policy-"));
+    if (doc !== undefined || raw !== undefined) writeFileSync(join(dir, "policy.json"), raw ?? JSON.stringify(doc));
+    const r = readRoutePolicy({ CONTEXT_MODE_DATA_DIR: dir });
+    rmSync(dir, { recursive: true, force: true });
+    return r;
+  };
+  const url = "https://docs.example.com/page";
+
+  test("#1336 routes.webfetch off: WebFetch passes through, the other routes stay as they are", () => {
+    const r = policyOf({ routes: { webfetch: "off" } });
+    assert.equal(r.kind, "ok");
+    assert.deepEqual(decide(ev("WebFetch", { url }), CC, [], "/tmp", r.policy), { kind: "allow" });
+    assert.equal(decide(ev("WebFetch", { url }), CC, [], "/tmp").kind, "deny");
+    const curl = decide(ev("Bash", { command: "curl https://example.com/x" }), getAdapter("codex"), [], "/tmp", r.policy);
+    assert.equal(curl.kind, "deny");
+    const user = decide(ev("Bash", { command: "sudo ls" }), CC, ["Bash(sudo *)"], "/tmp", r.policy);
+    assert.equal(user.kind, "deny");
+    assert.ok(user.reason.startsWith(USER_DENY_REASON_PREFIX), "the user's own deny rule still wins");
+  });
+
+  test("#1336 allowHosts matches the host exactly: no substring, suffix, userinfo or path tricks", () => {
+    const r = policyOf({ allowHosts: ["Docs.Example.com"] });
+    assert.deepEqual(r.policy.allowHosts, ["docs.example.com"]);
+    const d = (u) => decide(ev("WebFetch", { url: u }), CC, [], "/tmp", r.policy).kind;
+    for (const ok of ["https://docs.example.com/a", "http://DOCS.EXAMPLE.COM:8080/a?x=1", "https://docs.example.com"]) assert.equal(d(ok), "allow", ok);
+    for (const bad of [
+      "https://example.com/a", "https://evil.docs.example.com/a", "https://docs.example.com.evil.io/a", "https://notdocs.example.com/a",
+      "https://docs.example.com@evil.io/a", "https://evil.io/docs.example.com", "https://evil.io/?u=docs.example.com", "not a url", "",
+    ]) assert.equal(d(bad), "deny", bad);
+  });
+
+  test("#1336 an invalid or absent policy file applies no setting; doctor D10 names the active policy", () => {
+    assert.equal(policyOf().kind, "absent");
+    for (const raw of ["{", "[]", '{"routes":{"webfetch":"maybe"}}', '{"allowHosts":"docs.example.com"}', '{"allowHosts":[1]}']) {
+      const r = policyOf(undefined, raw);
+      assert.equal(r.kind, "bad", raw);
+      assert.deepEqual(r.policy, { webfetchOff: false, allowHosts: [] });
+      assert.equal(checkMode({ denyChannel: "deny-reason" }, undefined, r).status, "FAIL", raw);
+    }
+    const ok = checkMode({ denyChannel: "deny-reason" }, undefined, policyOf({ routes: { webfetch: "off" }, allowHosts: ["a.io"] }));
+    assert.equal(ok.status, "PASS");
+    assert.equal(ok.detail, "enforcement mode: deny-reason; policy file: WebFetch route off, allowHosts a.io");
+    assert.equal(checkMode({ denyChannel: "deny-reason" }, undefined, policyOf()).detail, "enforcement mode: deny-reason");
+  });
+
+  test("#1336 the PreToolUse hook reads the policy from the data root", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-route-hook-"));
+    const home = join(root, "home");
+    const work = join(root, "work");
+    mkdirSync(home);
+    mkdirSync(work);
+    try {
+      const payload = { session_id: "s", cwd: work, hook_event_name: "PreToolUse", tool_name: "WebFetch", tool_input: { url, prompt: "p" } };
+      const env = { PATH: process.env.PATH, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: work };
+      const run = async () => JSON.stringify(await handleHook("claude-code", payload, env));
+      assert.match(await run(), /deny/);
+      mkdirSync(join(home, ".context-mode"));
+      writeFileSync(join(home, ".context-mode", "policy.json"), JSON.stringify({ routes: { webfetch: "off" } }));
+      assert.doesNotMatch(await run(), /deny/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

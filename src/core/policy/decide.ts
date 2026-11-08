@@ -25,6 +25,7 @@ import { READ_DENY_MESSAGE, READ_DENY_RANGE_MESSAGE } from "./read-deny.ts";
 import { isOwnFile } from "./own-file.ts";
 import { isInsideAny } from "../project/contain.ts";
 import { isMediaRead } from "./read-media.ts";
+import { hostAllowed, NO_ROUTE_POLICY, type RoutePolicy } from "./route-policy.ts";
 
 // Canonical tool names (impl/01 §2) and input field values; names, not tunable values.
 const BASH = "Bash";
@@ -56,7 +57,7 @@ const has = (list: readonly string[], v: string): boolean => list.includes(v);
 export type DenyRoot = string | Pick<ProjectContext, "worktree" | "containmentRoot">;
 
 /** `root`: the project of this call (D-R48-DENY-ROUTE-1); defaults to ev.cwd. */
-export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string[] | null, root: DenyRoot = ev.cwd): Decision {
+export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string[] | null, root: DenyRoot = ev.cwd, policy: RoutePolicy = NO_ROUTE_POLICY): Decision {
   const tool = ev.tool;
   if (tool === undefined) return ALLOW; // a PreToolUse with no tool is a dispatch bug (§6.1 input)
   const canonical = tool.canonicalName;
@@ -72,7 +73,7 @@ export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string
   const hit = userDenyHit(canonical, input, ev.cwd, rules);
   if (hit !== null) return deny(USER_DENY_REASON_PREFIX + hit);
 
-  if (canonical === WEBFETCH) return webFetch(input, row); // step 4
+  if (canonical === WEBFETCH) return webFetch(input, row, policy); // step 4
   if (canonical === BASH) return bash(ev, row, input, rules, root); // steps 5, 6a
   if (canonical === READ) return read(ev, row, input, root); // step 6
   // Steps 5d, 7, 8 (Bash/PowerShell/Read/Grep/other-MCP hints) are retired: D-M7-RR-2, DECISIONS-r10 (2).
@@ -208,8 +209,10 @@ function neverDenied(url: string): boolean {
   return NEVER_DENY_HOSTS.some((h) => host === h || host.endsWith(HOST_SEP + h));
 }
 
-function webFetch(input: Record<string, unknown>, row: AdapterRow): Decision {
+// D-R49-WEBFETCH-POLICY-1 (#1336): the user policy file turns the route off, or lets exact hosts through to the host.
+function webFetch(input: Record<string, unknown>, row: AdapterRow, policy: RoutePolicy): Decision {
   const url = str(input.url) ?? "";
+  if (policy.webfetchOff || hostAllowed(url, policy.allowHosts)) return ALLOW;
   return neverDenied(url) ? ALLOW : deny(denyMessage("webfetch", url, row));
 }
 

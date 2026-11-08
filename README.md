@@ -578,8 +578,25 @@ Commands in the agent: `/ctx-stats` shows the `ctx_stats` result, `/ctx-doctor` 
 - The guard test D-PRIVACY-NET-1 in [tests/0008-enforcement.test.mjs](tests/0008-enforcement.test.mjs) scans the source for HTTP clients, sockets, DNS lookups, git network calls and gh or npm spawns. It flags each new call site, so this table stays true.
 - Doctor and the debug report remove secrets by their structure before they print.
 
-Code from `ctx_execute` runs on your host as your user, with your files, your network and your environment except the preload variables, so keep your agent's own permission prompts on. Here "sandbox" means the output stays in the sandbox and out of the context.
-What the plugin stores, where, and how to delete it: [Privacy](https://contextmode.ai/docs/engine/privacy?utm_source=github&utm_medium=readme&utm_content=privacy).
+### Policy file: WebFetch route
+
+By default the hook sends WebFetch to the index tools of Context Mode. To send WebFetch to your agent and your own hooks, create the file `policy.json` in the data folder.
+The data folder is `~/.context-mode`, or the folder in the variable `CONTEXT_MODE_DATA_DIR`.
+
+```json
+{
+  "routes": { "webfetch": "off" },
+  "allowHosts": ["docs.example.com"]
+}
+```
+
+- `routes.webfetch`: the value `"off"` lets every WebFetch call through.
+- `routes.webfetch`: the value `"on"` is the default.
+- `allowHosts`: a list of host names whose WebFetch goes through. A name matches the host of the URL in full, in lower case.
+- A sub-domain or a longer host needs its own entry. A wildcard is a literal text.
+- The hook reads the file on each WebFetch call, so an edit applies at once. Your own deny rules from the agent settings run first.
+- A file with invalid JSON or a wrong value is ignored. Doctor shows a failed check D10 with the file path.
+- A valid file shows on D10 as `policy file: WebFetch route off, allowHosts docs.example.com`.
 
 ## Context Mode Gateway
 

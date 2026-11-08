@@ -69,6 +69,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 - `claude mcp add` by hand adds the MCP server only, with no hooks. Use `context-mode setup --print claude-code` instead.
 - Skill and rule files under `~/.claude` (or `$CLAUDE_CONFIG_DIR`), such as `skills/<skill>/references/*.md`, rule files and `CLAUDE.md`, reach the model whole at any size (#1326).
 - A tool output over 4,096 bytes comes back as a short search pointer. To get larger outputs whole, set `CTX_REPLACE_TRIGGER_BYTES` (a positive integer of bytes, for example `8192`) in the environment Claude Code starts from. A higher value saves less context: 8192 saves about 23% of tool bytes against 42% at 4096 on our bench.
+- To use your own WebFetch hook, turn the WebFetch route off or allow single hosts in `~/.context-mode/policy.json` (`{"routes":{"webfetch":"off"},"allowHosts":["docs.example.com"]}`). Details: the README section "Policy file: turn off the WebFetch route" (#1336).
 
 ## Report a problem
 

@@ -18,6 +18,7 @@ import { ownBundleDir } from "../ops/bundle-dir.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers } from "../ops/doctor-config.ts";
 import { checkDb, checkIndex } from "../ops/doctor-db.ts";
 import type { DbCheck } from "../ops/doctor-db.ts";
+import { readRoutePolicy } from "../policy/route-policy.ts";
 import { bundleVersion, checkMcp, checkMode, checkNode, checkProject, checkShell, checkVersion } from "../ops/doctor-env.ts";
 import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
 import { lastHookError } from "../hooks/fallback.ts";
@@ -125,7 +126,7 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
       return r.row;
     },
     D9: () => checkIndex(project),
-    D10: () => checkMode(adapter, ctx.hostPermission), // D-1331-OC-PERM-1
+    D10: () => checkMode(adapter, ctx.hostPermission, readRoutePolicy(env)), // D-1331-OC-PERM-1
     D11: () => checkShell(env),
   };
   const rows: DoctorRow[] = [];
