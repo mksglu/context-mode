@@ -620,6 +620,16 @@ describe("ADR-0010 doctor on every unsupported host: one clear line, no false FA
     for (const id of ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"]) assert.equal(unsupportedHostByName(id), undefined, id);
   });
 
+  test("[D-UNSUPPORTED-HOSTS-1] Pi and Pi-Bolt are never unsupported; PI_CODING_AGENT_DIR is not an OMP signal", () => {
+    const env = { PI_CODING_AGENT_DIR: "/x/pi-agent", PI_BOLT: "1" };
+    assert.equal(unsupportedHostOf({ env }), undefined);
+    assert.equal(unsupportedHostOf({ clientName: "pi", env }), undefined);
+    assert.equal(unsupportedHostOf({ clientName: "pi-bolt", env }), undefined);
+    assert.equal(unsupportedHostOf({ bundleDir: "/home/u/.pi/agent/git/context-mode/pi", env }), undefined);
+    assert.equal(C.UNSUPPORTED_HOSTS.some((h) => /^pi/.test(h.id) || h.envVars.includes("PI_CODING_AGENT_DIR")), false);
+    for (const n of ["pi", "pi-bolt", "pibolt"]) assert.equal(unsupportedHostByName(n), undefined, n);
+  });
+
   test("[D-UNSUPPORTED-HOSTS-1] the File it issue text says the host is unsupported", () => {
     const fail = [{ id: "D8", label: "context.db", status: "FAIL", detail: "x" }];
     const host = C.UNSUPPORTED_HOSTS.find((h) => h.id === "cursor");

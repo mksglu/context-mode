@@ -1,5 +1,12 @@
 // src/core/ops/unsupported-host.ts: D-UNSUPPORTED-HOSTS-1. Which known unsupported host (constants.UNSUPPORTED_HOSTS) runs the server.
-import { UNSUPPORTED_HOSTS, V1_PATH_SEPS, type UnsupportedHost } from "../contracts/constants.ts";
+import { AGENT_IDS } from "../contracts/agents.ts";
+import { SUPPORTED_AGENTS_DOCS_URL, UNSUPPORTED_HOSTS, V1_PATH_SEPS, type UnsupportedHost } from "../contracts/constants.ts";
+
+/** The supported agents, linked to the install docs: the tail of every "not supported" and "unknown agent" line. */
+export const SUPPORTED_AGENTS_LINE = `Supported agents: ${AGENT_IDS.join(", ")} (${SUPPORTED_AGENTS_DOCS_URL}).`;
+/** D-UNSUPPORTED-HOSTS-1: the one positive line for a known unsupported host. */
+export function UNSUPPORTED_HOST_LINE(name: string): string { return `${name} is not a supported host today. The MCP server runs here; hooks are not checked. ${SUPPORTED_AGENTS_LINE}`; }
+export function UNSUPPORTED_SETUP_LINE(name: string): string { return `${name} is not a supported host today. Setup writes nothing for it. ${SUPPORTED_AGENTS_LINE}`; }
 
 export interface HostSignals { clientName?: string; bundleDir?: string; env?: NodeJS.ProcessEnv; }
 

@@ -1,5 +1,5 @@
 // impl/01 §3, impl/00 §3.2, TECH-SPEC §11, DECISIONS-r9. Every constant lives here; no other module writes these literals.
-import { AGENT_IDS, type AgentId } from "./agents.ts";
+import type { AgentId } from "./agents.js";
 
 export const SERVER_KEY = "context-mode"; // TECH-SPEC §3.8 rule 3
 export const TOOL_ORDER = Object.freeze(["ctx_execute","ctx_batch","ctx_index","ctx_search","ctx_resume","ctx_stats","ctx_doctor","ctx_upgrade","ctx_purge"] as const); // PRD §8, Q3b
@@ -709,11 +709,6 @@ export const UNSUPPORTED_HOSTS: readonly UnsupportedHost[] = Object.freeze([
     pluginPaths: [], configDirs: [".config/JetBrains"], binaries: [], source: "v1.0.169:src/adapters/client-map.ts:23-25; detect.ts:213,600" }),
 ]);
 export const SUPPORTED_AGENTS_DOCS_URL = "https://github.com/mksglu/context-mode/blob/main/docs/install/README.md";
-/** The supported agents, linked to the install docs: the tail of every "not supported" and "unknown agent" line. */
-export const SUPPORTED_AGENTS_LINE = `Supported agents: ${AGENT_IDS.join(", ")} (${SUPPORTED_AGENTS_DOCS_URL}).`;
-/** D-UNSUPPORTED-HOSTS-1: the one positive line for a known unsupported host. */
-export function UNSUPPORTED_HOST_LINE(name: string): string { return `${name} is not a supported host today. The MCP server runs here; hooks are not checked. ${SUPPORTED_AGENTS_LINE}`; }
-export function UNSUPPORTED_SETUP_LINE(name: string): string { return `${name} is not a supported host today. Setup writes nothing for it. ${SUPPORTED_AGENTS_LINE}`; }
 export const D3_ROOT_FIX_JOIN = " or ";
 export function D3_ROOT_FIX(installs: readonly { key: string; scope: string }[]): string {
   return `remove the extra install: ${installs.map((i) => `claude plugin uninstall ${i.key} --scope ${i.scope}`).join(D3_ROOT_FIX_JOIN)}`;

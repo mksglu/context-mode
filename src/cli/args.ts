@@ -1,7 +1,7 @@
 // src/cli/args.ts: flags, help text and typo hints for setup, doctor and upgrade (ADR-0019 section 8, D7).
 // Pure module: no I/O, so the golden --help tests and the usage-error tests need no TTY.
 import { ADAPTERS } from "../adapters/table.ts";
-import { SUPPORTED_AGENTS_LINE, UNSUPPORTED_SETUP_LINE } from "../core/contracts/constants.ts";
+import { SUPPORTED_AGENTS_LINE, UNSUPPORTED_SETUP_LINE } from "../core/ops/unsupported-host.ts";
 import { unsupportedHostByName } from "../core/ops/unsupported-host.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
 

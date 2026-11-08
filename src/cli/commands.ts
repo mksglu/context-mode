@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { UNSUPPORTED_HOST_LINE } from "../core/contracts/constants.ts";
+import { UNSUPPORTED_HOST_LINE } from "../core/ops/unsupported-host.ts";
 import { unsupportedHostOf } from "../core/ops/unsupported-host.ts";
 import * as clack from "@clack/prompts";
 import { ADAPTERS } from "../adapters/table.ts";
