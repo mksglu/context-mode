@@ -14,6 +14,14 @@ function prefixToolNames(text, prefix) {
 }
 var OUTPUT_CAP = 16384;
 var INDEX_WRITE_CHUNK = 1048576;
+var REPLACE_TRIGGER_BYTES_DEFAULT = 4096;
+var REPLACE_TRIGGER_ENV = "CTX_REPLACE_TRIGGER_BYTES";
+function readReplaceTrigger(raw) {
+  if (raw === void 0 || raw.trim() === "") return REPLACE_TRIGGER_BYTES_DEFAULT;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n > 0 ? n : REPLACE_TRIGGER_BYTES_DEFAULT;
+}
+var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var MAX_CHUNK_BYTES = 4096;
@@ -188,6 +196,7 @@ var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
 var DATA_DIR_ENV = "CONTEXT_MODE_DATA_DIR";
 var REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY";
+var AGENT_FILE_EXT = ".md";
 var PROJECT_PLUGIN_SCOPES = Object.freeze(["local", "project"]);
 var PLUGIN_SCOPE_RANK = Object.freeze({ local: 0, project: 1, user: 2, managed: 2 });
 var MCP_HINT_EVERY_DEFAULT = 10;
@@ -198,6 +207,7 @@ function readHintEvery(raw) {
 }
 var MCP_HINT_EVERY = readHintEvery(process.env.CTX_MCP_HINT_EVERY);
 var MAX_NEST_DEPTH = 32;
+var SHARED_SKILLS_DIR = Object.freeze([".agents", "skills"]);
 var DENY_PREFIX = "context-mode: ";
 var DENY_WHAT = Object.freeze({
   curl: "This curl/wget call",
@@ -278,10 +288,10 @@ var READ_MEDIA_BY_AGENT = Object.freeze({
   opencode: READ_IMAGES_AND_PDF,
   pi: READ_IMAGES,
   vscode: READ_IMAGES,
+  zcode: READ_IMAGES,
   "copilot-cli": [],
   codex: [],
-  kiro: [],
-  zcode: []
+  kiro: []
 });
 var EDIT_TOOLS = Object.freeze(["Write", "Edit"]);
 var EDIT_PATH_KEYS = Object.freeze(["file_path", "path"]);
@@ -334,7 +344,7 @@ var REPORT_POINTER = `ctx_search({queries:["FAIL","PASS","UNKNOWN"], source:${JS
 var GIT_LS_REMOTE_TAG_ARGS = Object.freeze(["--tags", "--refs"]);
 var RELEASE_TAG_PATTERN = "v*";
 var D1_GIT_CHECK_FIX = `git ls-remote --tags --refs ${RELEASE_REPO_URL} "${RELEASE_TAG_PATTERN}"`;
-var D2_NODE_FIX = `install Node ${NODE_MIN} or later`;
+var D2_NODE_FIX = `nvm install ${NODE_MIN.split(".")[0]}, or install it from https://nodejs.org`;
 var D3_PARTS = Object.freeze(["MCP entry", "hook entries", "hook timeout"]);
 var AGENT_HOME_DIR = Object.freeze({
   "claude-code": [".claude"],
@@ -416,10 +426,19 @@ var V1_SCRIPT_NAMES = Object.freeze([
 var V1_CODEX_HOOKS_DIR = Object.freeze(["hooks", "codex"]);
 var V1_CACHE_HEAL_EXTS = Object.freeze([".mjs", ".sh"]);
 var V1_PI_PACKAGE = "npm:context-mode";
+var CLAUDE_CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR";
+var CODEX_HOME_ENV = "CODEX_HOME";
+var COPILOT_HOME_ENV = "COPILOT_HOME";
+var GEMINI_CLI_HOME_ENV = "GEMINI_CLI_HOME";
+var KIRO_HOME_ENV = "KIRO_HOME";
+var OPENCODE_CONFIG_DIR_ENV = "OPENCODE_CONFIG_DIR";
+var APPDATA_ENV = "APPDATA";
 var VSCODE_USER_DIR_SEGMENTS = Object.freeze(["Code", "User"]);
+var XDG_CONFIG_HOME_ENV = "XDG_CONFIG_HOME";
 var VSCODE_MCP_FILE = "mcp.json";
 var KIRO_AGENT_FILE = Object.freeze(["agents", "default.json"]);
 var KIRO_STEERING_FILE = Object.freeze(["steering", "KIRO.md"]);
+var PI_AGENT_DIR = "agent";
 var OPENCODE_CONFIG_FILES = Object.freeze(["opencode.jsonc", "opencode.json"]);
 var OPENCODE_NPM_SPEC_PREFIX = `${SERVER_KEY}@`;
 var NPM_VERSION_SEP = "@";
@@ -427,6 +446,7 @@ var OPENCODE_NPM_LATEST = `${OPENCODE_NPM_SPEC_PREFIX}latest`;
 var PI_NPM_LATEST = `${V1_PI_PACKAGE}${NPM_VERSION_SEP}latest`;
 var V1_DATA_ROOT_ENTRIES = Object.freeze(["content", "platform.json"]);
 var PI_ROLE = "custom";
+var PI_AGENT_DIR_ENV = "PI_CODING_AGENT_DIR";
 var V1_PATH_SEPS = Object.freeze(["/", "\\"]);
 var HOST_SEP_TOKEN = "${/}";
 var HOOK_SCRIPT_SEPS = Object.freeze([...V1_PATH_SEPS, HOST_SEP_TOKEN]);
@@ -547,7 +567,7 @@ var ISSUE_FORM_URL = `https://github.com/${ISSUE_REPO_SLUG}/issues/new?template=
 
 // src/core/tools/run-wrapper.ts
 import { randomUUID } from "node:crypto";
-import { dirname as dirname4, join as join6 } from "node:path";
+import { dirname as dirname4, join as join7 } from "node:path";
 
 // src/adapters/claude-code.ts
 var TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
@@ -1581,7 +1601,8 @@ function getAdapter(id) {
 
 // src/core/contracts/errors.ts
 var ERROR_TEXT = Object.freeze({
-  NODE_TOO_OLD: "Node <v> is below 24.15.0. Fix: install Node 24.15.0 or later.",
+  NODE_TOO_OLD: "Context Mode needs Node 24.15.0 or newer; you have <v>. Fix: nvm install 24, or install it from https://nodejs.org.",
+  // #1328 D-NODE-OLD-1
   NO_SQLITE: "node:sqlite failed to load. Fix: run ctx_doctor.",
   DB_GONE: "context.db is gone and its WAL file is still in place. Fix: run ctx_doctor once; it keeps the WAL file in a dated folder and starts a new index.",
   // D-ORPHAN-WAL-1
@@ -4958,7 +4979,7 @@ import { join as join2 } from "node:path";
 
 // src/core/project/config-dir.ts
 import { basename, dirname, join, posix, resolve as resolve2, win32 } from "node:path";
-var { mkdirSync: mkdirSync2, realpathSync } = process.getBuiltinModule("node:fs");
+var { existsSync: existsSync2, mkdirSync: mkdirSync2, readFileSync, readdirSync, realpathSync } = process.getBuiltinModule("node:fs");
 function homeDirOf(env, platform = process.platform) {
   const set = (v) => v !== void 0 && v !== "";
   if (platform === "win32") {
@@ -4968,6 +4989,67 @@ function homeDirOf(env, platform = process.platform) {
   }
   if (set(env.HOME)) return env.HOME;
   return set(env.USERPROFILE) ? env.USERPROFILE : null;
+}
+function codexDirOf(env, home) {
+  const dir = env[CODEX_HOME_ENV];
+  return dir !== void 0 && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR.codex);
+}
+function copilotDirOf(env, home) {
+  const dir = env[COPILOT_HOME_ENV];
+  return dir !== void 0 && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR["copilot-cli"]);
+}
+function geminiDirOf(env, home) {
+  const dir = env[GEMINI_CLI_HOME_ENV];
+  return join(dir !== void 0 && dir !== "" ? dir : home, ...AGENT_HOME_DIR.gemini);
+}
+function kiroDirOf(env, home, platform = process.platform) {
+  const p = platform === "win32" ? win32 : posix;
+  const fallback = p.join(home, ...AGENT_HOME_DIR.kiro);
+  const dir = env[KIRO_HOME_ENV]?.trim();
+  if (dir === void 0 || dir === "" || !p.isAbsolute(dir)) return fallback;
+  if (platform === "win32" && p.parse(dir).root.length < 2) return fallback;
+  const abs = p.resolve(dir);
+  const real2 = platform === process.platform ? realOrSelf : (x) => x;
+  const target = real2(abs);
+  if (p.parse(target).root === target) return fallback;
+  const up = p.relative(target, real2(p.resolve(home)));
+  if (!p.isAbsolute(up) && up.split(p.sep)[0] !== "..") return fallback;
+  return abs;
+}
+function realOrSelf(path3) {
+  const tail = [];
+  for (let at2 = path3; ; ) {
+    try {
+      return join(realpathSync.native(at2), ...tail.reverse());
+    } catch {
+      const up = dirname(at2);
+      if (up === at2) return path3;
+      tail.push(basename(at2));
+      at2 = up;
+    }
+  }
+}
+function claudeDirOf(env, home) {
+  const dir = env[CLAUDE_CONFIG_DIR_ENV];
+  return dir !== void 0 && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR["claude-code"]);
+}
+function opencodeDirOf(env, home) {
+  const own2 = env[OPENCODE_CONFIG_DIR_ENV];
+  if (own2 !== void 0 && own2 !== "") return own2;
+  const xdg = env[XDG_CONFIG_HOME_ENV];
+  if (xdg !== void 0 && xdg !== "") return join(xdg, AGENT_HOME_DIR.opencode[AGENT_HOME_DIR.opencode.length - 1]);
+  return join(home, ...AGENT_HOME_DIR.opencode);
+}
+function piAgentDirOf(env, home) {
+  const dir = env[PI_AGENT_DIR_ENV];
+  return dir !== void 0 && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR.pi, PI_AGENT_DIR);
+}
+function vscodeUserDirOf(env, home, platform = process.platform) {
+  const set = (v) => v !== void 0 && v !== "";
+  const p = platform === "win32" ? win32 : posix;
+  if (platform === "win32") return p.join(set(env[APPDATA_ENV]) ? env[APPDATA_ENV] : p.join(home, "AppData", "Roaming"), ...VSCODE_USER_DIR_SEGMENTS);
+  if (platform === "darwin") return p.join(home, "Library", "Application Support", ...VSCODE_USER_DIR_SEGMENTS);
+  return p.join(set(env[XDG_CONFIG_HOME_ENV]) ? env[XDG_CONFIG_HOME_ENV] : p.join(home, ".config"), ...VSCODE_USER_DIR_SEGMENTS);
 }
 function requireHomeDir(env, platform = process.platform) {
   const home = homeDirOf(env, platform);
@@ -4986,7 +5068,7 @@ function resolveConfigDir(env) {
 }
 
 // src/core/policy/subagent.ts
-var { readFileSync } = process.getBuiltinModule("node:fs");
+var { readFileSync: readFileSync2 } = process.getBuiltinModule("node:fs");
 function isSubagentCall(ev) {
   return ev.agentId !== void 0 && ev.agentId !== "";
 }
@@ -5118,7 +5200,7 @@ function unwrap(commands) {
 
 // src/core/policy/user-deny.ts
 import { isAbsolute, join as join3, relative, sep } from "node:path";
-var { readFileSync: readFileSync2 } = process.getBuiltinModule("node:fs");
+var { readFileSync: readFileSync3 } = process.getBuiltinModule("node:fs");
 var BASH_TOOL = "Bash";
 var READ_TOOL = "Read";
 var PREFIX_RULE = ":*";
@@ -5262,6 +5344,7 @@ var TOOL_DESCRIPTIONS = Object.freeze({
   ctx_purge: 'Example: `ctx_purge({source:"old-docs"})`. Required: one of session, source, project.\nDeletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data.'
 });
 var READ_DENY_TEMPLATE = 'context-mode: {size}-byte file, over the one-read limit. Run ctx_execute(language, code, file="{path}") and print only the answer.';
+var READ_DENY_RANGE_TEMPLATE = `context-mode: {size}-byte file, over the one-read limit. Read "{path}" in parts with offset and limit, or sed -n '1,200p'.`;
 
 // src/core/policy/read-deny.ts
 var SIZE = "{size}";
@@ -5269,9 +5352,78 @@ var PATH = "{path}";
 function READ_DENY_MESSAGE(path3, size, prefix = "") {
   return prefixToolNames(READ_DENY_TEMPLATE, prefix).split(SIZE).join(String(size)).split(PATH).join(path3);
 }
+function READ_DENY_RANGE_MESSAGE(path3, size) {
+  return READ_DENY_RANGE_TEMPLATE.split(SIZE).join(String(size)).split(PATH).join(path3);
+}
+
+// src/core/policy/own-file.ts
+import { extname, join as join5 } from "node:path";
+
+// src/core/project/contain.ts
+import { dirname as dirname2, join as join4, relative as relative2, sep as sep2 } from "node:path";
+var { lstatSync, realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
+function real(p) {
+  try {
+    return realpathSync2.native(p);
+  } catch {
+    return void 0;
+  }
+}
+function components(p) {
+  return p.split(sep2).filter((c) => c !== "");
+}
+var rootReal = /* @__PURE__ */ new Map();
+function realRoot(root) {
+  const hit = rootReal.get(root);
+  if (hit !== void 0) return hit;
+  const r = real(root);
+  if (r !== void 0) rootReal.set(root, r);
+  return r;
+}
+function isInsideAny(roots, p) {
+  if (roots.length === 0) return false;
+  const q = real(p);
+  if (q === void 0) return false;
+  const qc = components(q);
+  return roots.some((root) => {
+    const r = realRoot(root);
+    if (r === void 0) return false;
+    const rc = components(r);
+    return qc.length >= rc.length && rc.every((c, i) => c === qc[i]);
+  });
+}
+function commonRoot(paths) {
+  const reals = paths.map(real).filter((r) => r !== void 0);
+  if (reals.length === 0) throw new RangeError("commonRoot needs at least one existing path");
+  const first = reals[0];
+  let n = components(first).length;
+  for (const r of reals) {
+    const rc = components(r);
+    const fc = components(first);
+    let i = 0;
+    while (i < n && i < rc.length && rc[i] === fc[i]) i += 1;
+    n = i;
+  }
+  let q = first;
+  while (components(q).length > n && dirname2(q) !== q) q = dirname2(q);
+  return q;
+}
+
+// src/core/policy/own-file.ts
+function ownDirsOf(agent, env) {
+  const home = homeDirOf(env);
+  if (home === null) return [];
+  const shared = join5(home, ...SHARED_SKILLS_DIR);
+  const own2 = agent === "claude-code" ? [claudeDirOf(env, home)] : agent === "codex" ? [codexDirOf(env, home)] : agent === "gemini" ? [geminiDirOf(env, home)] : agent === "copilot-cli" ? [copilotDirOf(env, home)] : agent === "kiro" ? [kiroDirOf(env, home)] : agent === "opencode" ? [opencodeDirOf(env, home)] : agent === "pi" ? [piAgentDirOf(env, home)] : agent === "vscode" ? [join5(home, ...AGENT_HOME_DIR.vscode), vscodeUserDirOf(env, home)] : [join5(home, ...AGENT_HOME_DIR[agent])];
+  return [...own2, shared];
+}
+function isOwnFile(agent, abs, env = process.env) {
+  if (extname(abs).toLowerCase() !== AGENT_FILE_EXT) return false;
+  return isInsideAny(ownDirsOf(agent, env), abs);
+}
 
 // src/core/policy/read-media.ts
-import { extname } from "node:path";
+import { extname as extname2 } from "node:path";
 var { closeSync, openSync, readSync } = process.getBuiltinModule("node:fs");
 function head(abs) {
   let fd = null;
@@ -5289,7 +5441,7 @@ function head(abs) {
 function isMediaRead(agent, abs) {
   const types = READ_MEDIA_BY_AGENT[agent] ?? [];
   if (types.length === 0) return false;
-  const ext = extname(abs).toLowerCase();
+  const ext = extname2(abs).toLowerCase();
   const named = types.filter((t) => READ_MEDIA_TYPES[t].exts.includes(ext));
   if (named.length === 0) return false;
   const bytes2 = head(abs);
@@ -5320,7 +5472,7 @@ var deny = (reason) => ({ kind: "deny", reason });
 var str = (v) => typeof v === "string" ? v : void 0;
 var present = (v) => v !== void 0 && v !== null;
 var has = (list2, v) => list2.includes(v);
-function decide(ev, row, userDeny) {
+function decide(ev, row, userDeny, root = ev.cwd) {
   const tool = ev.tool;
   if (tool === void 0) return ALLOW;
   const canonical = tool.canonicalName;
@@ -5334,8 +5486,8 @@ function decide(ev, row, userDeny) {
   const hit = userDenyHit(canonical, input, ev.cwd, rules);
   if (hit !== null) return deny(USER_DENY_REASON_PREFIX + hit);
   if (canonical === WEBFETCH) return webFetch(input, row);
-  if (canonical === BASH) return bash(ev, row, input, rules);
-  if (canonical === READ) return read(ev, row, input);
+  if (canonical === BASH) return bash(ev, row, input, rules, root);
+  if (canonical === READ) return read(ev, row, input, root);
   return ALLOW;
 }
 function denyMessage(kind, match, row, intent) {
@@ -5437,10 +5589,10 @@ function webFetch(input, row) {
   const url = str(input.url) ?? "";
   return neverDenied(url) ? ALLOW : deny(denyMessage("webfetch", url, row));
 }
-function bash(ev, row, input, rules) {
+function bash(ev, row, input, rules, root) {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : psShellDump(cmd, ev.cwd, row) ?? ALLOW;
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : psShellDump(ev, cmd, row, root) ?? ALLOW;
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -5452,7 +5604,7 @@ function bash(ev, row, input, rules) {
       if (kind !== null) return deny(denyMessage(kind, cmd, row, str(input.description)));
     }
   }
-  return shellDump(cmds, ev.cwd, row) ?? psShellDump(cmd, ev.cwd, row) ?? ALLOW;
+  return shellDump(ev, cmds, row, root) ?? psShellDump(ev, cmd, row, root) ?? ALLOW;
 }
 function denyKind(c) {
   const name = c.argv0.toLowerCase();
@@ -5495,19 +5647,35 @@ function fileSize(abs) {
     return -1;
   }
 }
-function read(ev, row, input) {
+function bigDeny(ev, row, abs, size, root) {
+  if (size <= OUTPUT_CAP || isOwnFile(ev.agent, abs)) return null;
+  return deny(executeCanOpen(root, abs) ? READ_DENY_MESSAGE(abs, size, row.toolNamePrefix) : READ_DENY_RANGE_MESSAGE(abs, size));
+}
+function executeCanOpen(root, abs) {
+  if (typeof root === "string") return isInsideAny([root], abs);
+  if (isInsideAny([root.worktree], abs)) return true;
+  try {
+    return isInsideAny([root.containmentRoot], abs);
+  } catch {
+    return false;
+  }
+}
+function read(ev, row, input, root) {
   if (!present(input.offset) && !present(input.limit)) {
     for (const p of readPaths(input)) {
       const abs = resolve3(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+      if (size > OUTPUT_CAP && !isMediaRead(ev.agent, abs)) {
+        const d = bigDeny(ev, row, abs, size, root);
+        if (d !== null) return d;
+      }
     }
   }
   return ALLOW;
 }
-function shellDump(cmds, cwd, row) {
+function shellDump(ev, cmds, row, root) {
   if (row.nativeTools.read !== void 0 && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
-  let dir = cwd;
+  let dir = ev.cwd;
   let verdict = null;
   for (const c of cmds) {
     const name = c.argv0.toLowerCase();
@@ -5521,16 +5689,16 @@ function shellDump(cmds, cwd, row) {
       continue;
     }
     const abs = resolve3(dir, d.file);
-    const size = fileSize(abs);
-    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+    const big = bigDeny(ev, row, abs, fileSize(abs), root);
+    if (big !== null) return big;
   }
   return verdict;
 }
-function psShellDump(cmd, cwd, row) {
+function psShellDump(ev, cmd, row, root) {
   if (row.nativeTools.read !== void 0 && row.nativeTools.read.length > 0 && dumpRunsThenReplaces(row)) return null;
-  for (const abs of psDumpFiles(cmd, cwd)) {
-    const size = fileSize(abs);
-    if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
+  for (const abs of psDumpFiles(cmd, ev.cwd)) {
+    const d = bigDeny(ev, row, abs, fileSize(abs), root);
+    if (d !== null) return d;
   }
   return null;
 }
@@ -5591,37 +5759,7 @@ function dumpTarget(name, args) {
 }
 
 // src/core/project/resolve.ts
-import { basename as basename2, dirname as dirname3, join as join5, resolve as resolve4 } from "node:path";
-
-// src/core/project/contain.ts
-import { dirname as dirname2, join as join4, relative as relative2, sep as sep2 } from "node:path";
-var { lstatSync, realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
-function real(p) {
-  try {
-    return realpathSync2.native(p);
-  } catch {
-    return void 0;
-  }
-}
-function components(p) {
-  return p.split(sep2).filter((c) => c !== "");
-}
-function commonRoot(paths) {
-  const reals = paths.map(real).filter((r) => r !== void 0);
-  if (reals.length === 0) throw new RangeError("commonRoot needs at least one existing path");
-  const first = reals[0];
-  let n = components(first).length;
-  for (const r of reals) {
-    const rc = components(r);
-    const fc = components(first);
-    let i = 0;
-    while (i < n && i < rc.length && rc[i] === fc[i]) i += 1;
-    n = i;
-  }
-  let q = first;
-  while (components(q).length > n && dirname2(q) !== q) q = dirname2(q);
-  return q;
-}
+import { basename as basename2, dirname as dirname3, join as join6, resolve as resolve4 } from "node:path";
 
 // src/core/project/sha256.ts
 var K = new Uint32Array([
@@ -5736,7 +5874,7 @@ function sha256Hex(text) {
 }
 
 // src/core/project/resolve.ts
-var { existsSync: existsSync2, readFileSync: readFileSync3, realpathSync: realpathSync3, statSync: statSync2 } = process.getBuiltinModule("node:fs");
+var { existsSync: existsSync3, readFileSync: readFileSync4, realpathSync: realpathSync3, statSync: statSync2 } = process.getBuiltinModule("node:fs");
 function sourceOf(agent) {
   switch (agent) {
     case "claude-code":
@@ -5783,9 +5921,9 @@ function gitDirs(dir) {
   }
   const start = cur;
   for (; ; ) {
-    const gitDir = gitDirAt(join5(cur, GIT_DIR_NAME));
+    const gitDir = gitDirAt(join6(cur, GIT_DIR_NAME));
     if (gitDir !== null) {
-      const common = firstLine(join5(gitDir, GIT_COMMONDIR_FILE));
+      const common = firstLine(join6(gitDir, GIT_COMMONDIR_FILE));
       return { commonDir: realpathSync3.native(common === null ? gitDir : resolve4(gitDir, common)), worktree: cur, start };
     }
     const up = dirname3(cur);
@@ -5806,12 +5944,12 @@ function gitDirAt(dotGit) {
   } catch {
     return null;
   }
-  return existsSync2(join5(gitDir, GIT_HEAD_FILE)) ? gitDir : null;
+  return existsSync3(join6(gitDir, GIT_HEAD_FILE)) ? gitDir : null;
 }
 function firstLine(file) {
   let text;
   try {
-    text = readFileSync3(file, "utf8");
+    text = readFileSync4(file, "utf8");
   } catch {
     return null;
   }
@@ -5847,11 +5985,11 @@ function resolveProject(agent, src) {
       return key;
     },
     get projectDir() {
-      pdir ??= join5(resolveConfigDir(process.env), PROJECTS_DIR_NAME, this.projectKey);
+      pdir ??= join6(resolveConfigDir(process.env), PROJECTS_DIR_NAME, this.projectKey);
       return pdir;
     },
     get dbPath() {
-      return join5(this.projectDir, DB_FILE_NAME);
+      return join6(this.projectDir, DB_FILE_NAME);
     },
     worktree,
     get containmentRoot() {
@@ -6343,7 +6481,7 @@ function cutPoint(src, start, end, scratch) {
   const r = encoder.encodeInto(src.slice(start, limit), scratch);
   return { end: start + r.read, written: r.written };
 }
-function merge(src, blocks, join7, cap, lineCut) {
+function merge(src, blocks, join8, cap, lineCut) {
   const out = [];
   const scratch = new Uint8Array(cap);
   let wide;
@@ -6353,7 +6491,7 @@ function merge(src, blocks, join7, cap, lineCut) {
     out.push({ ord: out.length, text: src.slice(start, end), bytes: bytes2 });
   };
   for (const b of blocks) {
-    if (cur !== void 0 && !join7) {
+    if (cur !== void 0 && !join8) {
       emit(cur.start, cur.end, curBytes);
       cur = void 0;
     }
@@ -6461,7 +6599,7 @@ function sourceLabel(command) {
   return Array.from(RUN_LABEL_PREFIX + first).slice(0, SOURCE_LABEL_MAX_CHARS).join("");
 }
 function moreLine2(bundleDir, sourceId, terms) {
-  return RUN_MORE_PREFIX + JSON.stringify(join6(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
+  return RUN_MORE_PREFIX + JSON.stringify(join7(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
 }
 function bytes(s) {
   return Buffer.byteLength(s, "utf8");
