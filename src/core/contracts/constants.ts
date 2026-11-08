@@ -519,7 +519,7 @@ export function DOCTOR_FAIL_LINE(host: string, check: string, cause: string, com
 }
 export const DOCTOR_FIX_UPGRADE = "run ctx_upgrade"; // D1, D3, D4, D8 stale schema
 export const D1_DEV_BUILD_DETAIL = "dev build: source checkout; release builds stamp the sha"; // D-DOCTOR-FIX-1 shorter row; // UNKNOWN: BUNDLE_SHA unset (D-M5-arch-5, D-DOCTOR-ISSUE-1 names the cause)
-export const D1_UPDATE_DETAIL = "update available"; // FAIL (D-M5-arch-5)
+export const D1_UPDATE_DETAIL = "update available"; // WARN with the agent's own update command (D-R49-DOCTOR-1339-1; was FAIL in D-M5-arch-5)
 // D-DOCTOR-D1-CAUSE-1: every D1 detail starts with the installed version and the short bundle sha, then names the exact cause.
 export const D1_SHORT_SHA_LEN = 7;
 export const D1_PACKAGE_FILE = "package.json"; // <bundleDir>/package.json holds the installed version (OUT_PACKAGE_JSON)
@@ -569,6 +569,7 @@ export const D5B_FIX = "disable chat.useClaudeHooks or the Claude Code hooks blo
 export const VSCODE_CLAUDE_HOOKS_SETTING = "chat.useClaudeHooks"; // D5b
 export const VSCODE_SETTINGS_FILE = "settings.json"; // <repo>/.vscode/settings.json (D5b)
 export const D6_UNKNOWN_DETAIL = "no clientInfo or protocolVersion on the request"; // UNKNOWN, never FAIL
+export const D6_IN_PROCESS_DETAIL = "in-process plugin: this call ran inside the agent, no MCP session to read"; // PASS (D-R49-DOCTOR-1339-3)
 export function D7_DETAIL(got: string): string { return `resolved project source ${got} does not match the host's actual cwd`; }
 export const D7_FIX = "restart the agent in the correct directory";
 export function D8_STALE_SCHEMA_DETAIL(got: number, want: number): string { return `stale schema (v${got}, expected v${want})`; }

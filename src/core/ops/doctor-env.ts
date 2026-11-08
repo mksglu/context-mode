@@ -9,7 +9,7 @@ import {
   D1_GIT_NO_TAG, D1_GIT_TIMEOUT, D1_LATEST_AHEAD, D1_LATEST_PASS, D1_LATEST_UNKNOWN, D1_LATEST_UPDATE, D1_NO_VERSION, D1_NPM_CHECK_FIX,
   D1_NPM_ERROR, D1_NPM_HTTP, D1_NPM_NO_TAG, D1_NPM_TIMEOUT, D1_PACKAGE_FILE, D1_PREFIX, D1_PRERELEASE_SEP, D1_SOURCE_NPM, D1_SOURCE_TAGS,
   D10_DETAIL, D10_PERMISSION_DETAIL, D10_PERMISSION_FIX, D10_PERMISSION_MISSING_DETAIL, D11_PASS_DETAIL, D11_POSIX_DETAIL, D11_POSIX_FIX, D11_WIN_DETAIL, D11_WIN_FIX, D2_BUN_DETAIL, D2_NODE_DETAIL, D2_NODE_FIX,
-  D2_SQLITE_DETAIL, D2_SQLITE_FIX, D4_REASON_JOIN, D6_UNKNOWN_DETAIL, D7_DETAIL, D7_FIX, DOCTOR_FIX_UPGRADE,
+  D2_SQLITE_DETAIL, D2_SQLITE_FIX, D4_REASON_JOIN, D6_IN_PROCESS_DETAIL, D6_UNKNOWN_DETAIL, D7_DETAIL, D7_FIX, DOCTOR_FIX_UPGRADE,
   DOCTOR_GIT_TIMEOUT_MS, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, GIT_BIN, GIT_LS_REMOTE, GIT_LS_REMOTE_TAG_ARGS, GIT_NO_PROMPT_ENV, GIT_SHA_HEX_LEN,
   LS_REMOTE_FIELD_SEP, NODE_MIN, NODE_VERSION_PREFIX, NODE_VERSION_SEP, RELEASE_REPO_URL, RELEASE_TAG_PATTERN, RELEASE_TAG_REF_PREFIX,
   SQLITE_MODULE,
@@ -27,6 +27,9 @@ function unknown(id: DoctorCheckId, detail: string, fixCommand?: string): Doctor
 function fail(id: DoctorCheckId, detail: string, fixCommand: string): DoctorRow {
   return { id, label: DOCTOR_LABEL[id], status: "FAIL", detail, fixCommand };
 }
+function warn(id: DoctorCheckId, detail: string, fixCommand: string): DoctorRow {
+  return { id, label: DOCTOR_LABEL[id], status: "WARN", detail, fixCommand };
+}
 
 export interface VersionInput {
   bundleSha: string | undefined; // BUNDLE_SHA; undefined in dev/test builds (D-M5-arch-5)
@@ -36,6 +39,7 @@ export interface VersionInput {
   env: Record<string, string>;   // live env: PATH finds git, HOME for its config
   cwd: string;
   signal: AbortSignal;
+  updateCommand?: string;        // the agent's own update command (UPGRADE_HOST_COMMAND); default "run ctx_upgrade"
 }
 
 /** D-DOCTOR-D1-CAUSE-1: the version in <bundleDir>/package.json; no file or no string version is undefined. */
@@ -153,11 +157,11 @@ function highestTag(stdout: string, tag: string): string | undefined {
 }
 
 // The installed version vs the latest of its channel from one source. Unparseable versions fall back to equal-or-not.
-function versionRow(head: string, installed: string, tag: string, source: string, latest: string, tail: string): DoctorRow {
+function versionRow(head: string, installed: string, tag: string, source: string, latest: string, tail: string, update: string): DoctorRow {
   const cmp = compareVersions(installed, latest) ?? (installed === latest ? 0 : -1);
   if (cmp === 0) return pass("D1", head + D1_LATEST_PASS(tag, source) + tail);
   if (cmp > 0) return pass("D1", head + D1_LATEST_AHEAD(tag, source, latest) + tail);
-  return fail("D1", head + D1_LATEST_UPDATE(tag, source, latest) + tail, DOCTOR_FIX_UPGRADE);
+  return warn("D1", head + D1_LATEST_UPDATE(tag, source, latest) + tail, update); // D-R49-DOCTOR-1339-1: an update works today, so WARN
 }
 
 // D1 (D-DOCTOR-D1-TAGS-1, D-DOCTOR-D1-CAUSE-1): the installed version vs the latest version of its channel (channelOf:
@@ -167,7 +171,7 @@ function versionRow(head: string, installed: string, tag: string, source: string
 //      without an npm publish, as v2.0.0-next.31 did).
 //   2. Only when npm does not answer: the highest v* tag of the channel from `git ls-remote --tags --refs`, through the
 //      git binary found on PATH (git.exe on Windows, started directly).
-// Equal is PASS, lower is FAIL with both versions and ctx_upgrade, higher (a build ahead of the releases) is PASS naming
+// Equal is PASS, lower is WARN with both versions and the agent's own update command, higher (a build ahead of the releases) is PASS naming
 // both. Every detail starts with "<version> (<short sha>): " and names the exact cause of a source that failed. A dev
 // build, no version, or no answer from either source is UNKNOWN with the command that checks it by hand, never FAIL
 // (ADR-0010 D1). Never throws.
@@ -176,9 +180,10 @@ export async function checkVersion(i: VersionInput): Promise<DoctorRow> {
   const head = D1_PREFIX(i.version, i.bundleSha) + ": ";
   if (i.version === undefined) return unknown("D1", head + D1_LATEST_UNKNOWN + ", " + D1_NO_VERSION, D1_NPM_CHECK_FIX);
   const tag = channelOf(i.version);
+  const update = i.updateCommand ?? DOCTOR_FIX_UPGRADE;
   const git = findRuntime(GIT_BIN, i.env); // found before the first await: a sync PATH lookup, read only if npm fails
   const npm = await npmLatest(i.registryUrl, tag, i.signal, i.timeoutMs);
-  if (npm.ok) return versionRow(head, i.version, tag, D1_SOURCE_NPM, npm.version, "");
+  if (npm.ok) return versionRow(head, i.version, tag, D1_SOURCE_NPM, npm.version, "", update);
   let cause = D1_GIT_MISSING;
   if (git !== null) {
     const r = await runProcess([git, GIT_LS_REMOTE, ...GIT_LS_REMOTE_TAG_ARGS, RELEASE_REPO_URL, RELEASE_TAG_PATTERN], {
@@ -189,7 +194,7 @@ export async function checkVersion(i: VersionInput): Promise<DoctorRow> {
     });
     if (r.exitCode === 0 && r.killed === null) {
       const latest = highestTag(r.stdout.toString("utf8"), tag);
-      if (latest !== undefined) return versionRow(head, i.version, tag, D1_SOURCE_TAGS, latest, D1_CAUSE_JOIN + npm.cause);
+      if (latest !== undefined) return versionRow(head, i.version, tag, D1_SOURCE_TAGS, latest, D1_CAUSE_JOIN + npm.cause, update);
       cause = D1_GIT_NO_TAG(tag);
     } else {
       cause = gitCause(r, i.timeoutMs);
@@ -237,10 +242,13 @@ export async function checkNode(i: NodeInput): Promise<DoctorRow> {
 }
 
 // D6: client name and protocol version from the live request. Missing both is UNKNOWN, never FAIL (PRD §13).
-export function checkMcp(ctx: Pick<ToolContext, "clientInfo" | "protocolVersion">): DoctorRow {
+// D-R49-DOCTOR-1339-3 (#1339): an in-process plugin (OpenCode, Pi) has no MCP session; the tool call that built this row
+// ran inside the agent, which is the channel it checks, so that is a PASS that says so.
+export function checkMcp(ctx: Pick<ToolContext, "clientInfo" | "protocolVersion">, adapter?: Pick<AdapterRow, "installMode">): DoctorRow {
   const named = ctx.clientInfo !== undefined && ctx.clientInfo.name !== "";
   const versioned = ctx.protocolVersion !== undefined && ctx.protocolVersion !== "";
-  return named || versioned ? pass("D6") : unknown("D6", D6_UNKNOWN_DETAIL);
+  if (named || versioned) return pass("D6");
+  return adapter?.installMode === "in-process" ? pass("D6", D6_IN_PROCESS_DETAIL) : unknown("D6", D6_UNKNOWN_DETAIL);
 }
 
 export interface ProjectInput {

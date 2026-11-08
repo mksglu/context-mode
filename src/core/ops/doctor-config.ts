@@ -3,20 +3,21 @@
 // D3 diffs parsed data (never text): the MCP entry, the own hook entries (command + matcher composed from the
 // row), and the hook timeout. D4 folds detectV1's findings into one row. D5b flags Claude Code hooks that VS
 // Code's chat.useClaudeHooks re-runs in the same repo.
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
-  OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_MCP_COMMAND_FIELD, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGIN_PATH, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
+  OPENCODE_BASE_CONFIG_FILE, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_MCP_COMMAND_FIELD, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGIN_PATH, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
   REGEX_SPECIAL_CHARS, SETTINGS_FILE, SHELL_QUOTE, TOOL_HOOK_EVENTS, V1_PATH_SEPS, VSCODE_CLAUDE_HOOKS_SETTING,
   VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE,
 } from "../contracts/constants.ts";
 import type { AdapterRow, AgentId, DoctorRow } from "../contracts/types.ts";
 import { hasReplace } from "../../adapters/table.ts";
 import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
+import { hostText } from "./host-text.ts";
 import { detectV1, type V1Scope } from "./detect-v1.ts";
 import { hostConfigValueAt, isNodeCommand, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
 import { marketplaceChoice, resolvePluginRoot } from "./plugin-root.ts";
@@ -179,10 +180,11 @@ function nativeMcpWrong(dir: string, row: AdapterRow): boolean {
 
 // D-OC2-D3-PLUGINS-1 (#1307): OpenCode loads context-mode from a list entry: "plugin" (1.x) or "plugins" (2.x), as the
 // npm spec ("context-mode@2.0.1", "context-mode@latest"), the release git spec, the package dir setup writes, or an
-// object with "package". On 2.x `opencode plugin add context-mode` writes the bare name; under 1.x "plugin" the bare
+// object with "package", or a tuple [spec, options]. On 2.x `opencode plugin add context-mode` writes the bare name; under 1.x "plugin" the bare
 // name is the v1 entry that D4 reports.
 function isOwnOpencodeEntry(entry: unknown, key: string, own: readonly string[]): boolean {
-  const spec = isObject(entry) ? entry[OPENCODE_PACKAGE_FIELD] : entry;
+  // D-R49-DOCTOR-1339-2: the tuple form [spec, options] (the 1.x "plugin" schema; 2.x still reads it) names the spec first.
+  const spec = isObject(entry) ? entry[OPENCODE_PACKAGE_FIELD] : Array.isArray(entry) ? entry[0] : entry;
   if (typeof spec !== "string") return false;
   if (spec === OPENCODE_GIT_SPEC || spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || own.includes(spec)) return true;
   return key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
@@ -197,14 +199,25 @@ function opencodeMcpOwn(entry: unknown): boolean {
   return isNodeCommand(node) && typeof script === "string" && lastSegment(script) === SERVER_ENTRY_FILE && flag === AGENT_ARG && agent === "opencode";
 }
 
-/** True when the OpenCode config (the .jsonc wins, #849) lists context-mode under "plugin" or "plugins", or runs its server as a local MCP entry. */
-function opencodeListed(file: string): boolean {
-  const { value } = readParsed("opencode", file);
+/** D-R49-DOCTOR-1339-2: OpenCode loads and merges every config file it finds (opencode.jsonc and opencode.json in the
+ *  config dir, and in the project). Each file that exists is read on its own; a missing file holds nothing. */
+function opencodeFileValue(file: string): unknown {
+  if (!existsSync(file)) return {};
+  return parseHostConfig("opencode", file, hostText(readFileSync(file, "utf8")), "jsonc");
+}
+
+function opencodeValueListed(value: unknown): boolean {
   const bundle = opencodePluginFile();
   const own = [bundle, join(bundle, ...OPENCODE_PLUGIN_PATH)]; // D-R44-OC-D3-1: the package dir, or the plugin file inside it
   if ([OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY].some((key) => list(isObject(value) ? value[key] : undefined).some((e) => isOwnOpencodeEntry(e, key, own)))) return true;
   const mcp = isObject(value) && isObject(value.mcp) ? value.mcp : {};
   return opencodeMcpOwn(mcp[SERVER_KEY]) || (isObject(mcp.servers) && opencodeMcpOwn(mcp.servers[SERVER_KEY]));
+}
+
+/** True when any OpenCode config file (config dir, then project) lists context-mode under "plugin" or "plugins", or runs its server as a local MCP entry. */
+function opencodeListed(file: string, worktree: string): boolean {
+  const dirs = [dirname(file), worktree];
+  return dirs.some((dir) => OPENCODE_CONFIG_FILES.some((name) => opencodeValueListed(opencodeFileValue(join(dir, name)))));
 }
 
 function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): boolean {
@@ -216,7 +229,7 @@ function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktre
       resolvePluginRoot(row, env, worktree);
       return false;
     }
-    if (row.id === "opencode") return !opencodeListed(file);
+    if (row.id === "opencode") return !opencodeListed(file, worktree);
     const cur = readHostConfig(row.id, file);
     // D-DOC-RT-1: accept the entry setup writes (absolute node, OpenCode plugin file), not only the ctx_upgrade form.
     return mergeOwnEntries(row.id, cur.text, cur.format, row, { nodePath: true, listEntries: [opencodePluginFile()] }).edits.length > 0;

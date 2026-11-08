@@ -458,6 +458,9 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     ["the plugins array with the bare name (opencode plugin add context-mode)", "{\n  \"plugins\": [\"context-mode\"]\n}\n", "PASS"],
     ["the plugin array with name@tag (OpenCode 1.x native install)", "{\n  \"plugin\": [\"context-mode@latest\"]\n}\n", "PASS"],
     ["the plugins array with the release git spec", `{ "plugins": ["${C.OPENCODE_GIT_SPEC}"] }`, "PASS"],
+    ["a tuple [spec, options] under plugin (#1339)", "{\n    \"plugin\": [\n        [\n            \"context-mode@2.1.5\",\n            {}\n        ]\n    ]\n}\n", "PASS"],
+    ["a tuple [spec, options] under plugins (#1339)", "{\n  \"plugins\": [[\"context-mode@2.1.5\", { \"a\": 1 }]]\n}\n", "PASS"],
+    ["a tuple that names another plugin", "{\n  \"plugins\": [[\"other@1.0.0\", {}]]\n}\n", "FAIL"],
     ["a plugins array that holds only another plugin", "{\n  \"plugins\": [\"other-plugin@1.0.0\", \"context-mode-extra@1.0.0\"]\n}\n", "FAIL"],
   ];
   for (const [name, text, want] of OC2_CASES) {
@@ -468,6 +471,23 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
       assert.equal(d3.status, want, d3.detail);
     });
   }
+
+  // D-R49-DOCTOR-1339-2 (#1339): the reporter's opencode.json holds the entry; an empty opencode.jsonc beside it hid it (.jsonc won).
+  test("[R49] doctor-config/D3 opencode: opencode.json lists the plugin while an empty opencode.jsonc sits beside it is PASS (#1339)", (t) => {
+    const home = tmp(t);
+    put(path.join(home, ".config", "opencode", "opencode.json"), '{\n  "plugins": [\n    "context-mode@2.1.5"\n  ]\n}\n');
+    put(path.join(home, ".config", "opencode", "opencode.jsonc"), "{}\n");
+    const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home);
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
+
+  test("[R49] doctor-config/D3 opencode: the project opencode.json lists the plugin is PASS (#1339)", (t) => {
+    const home = tmp(t);
+    const wt = tmp(t);
+    put(path.join(wt, "opencode.json"), '{ "plugin": ["context-mode@2.1.5"] }');
+    const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, wt);
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
 
   // D-R44-OC-D3-1 (#1310, host audit opencode-4): the plugin file path and the local MCP entry (2.x mcp.servers, 1.x mcp) are own entries.
   const bundle = ownBundleDir();
@@ -902,17 +922,17 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     assert.equal(existsSync(path.join(env.HOME, "git-argv")), false);
   });
 
-  test("[M5] doctor-env/D1-npm-newer-is-FAIL-with-both-versions", { skip: !posix }, async (t) => {
+  test("[M5] doctor-env/D1-npm-newer-is-WARN-with-both-versions", { skip: !posix }, async (t) => {
     const row = await run(fakeGit(t, tagsGit([`v${VER}`])), SHA_A, { registryUrl: await registry(t, 200, { latest: "1.0.169", next: "2.0.0-next.29" }) });
-    assert.deepEqual(row, { id: "D1", label: "version", status: "FAIL", detail: `${HEAD}update available, next on npm is 2.0.0-next.29`, fixCommand: "run ctx_upgrade" });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "WARN", detail: `${HEAD}update available, next on npm is 2.0.0-next.29`, fixCommand: "run ctx_upgrade" });
   });
 
-  test("[M5] doctor-env/D1-npm-down-git-tags-higher-next-is-FAIL-numeric-compare", { skip: !posix }, async (t) => {
+  test("[M5] doctor-env/D1-npm-down-git-tags-higher-next-is-WARN-numeric-compare", { skip: !posix }, async (t) => {
     const ver = "2.0.0-next.9";
     const env = fakeGit(t, tagsGit(["v2.0.0-next.10", "v2.0.0-next.9", "v2.0.0-next.2"]));
     const row = await run(env, SHA_A, { version: ver, registryUrl: await registry(t, 503, {}) });
     assert.deepEqual(row, {
-      id: "D1", label: "version", status: "FAIL",
+      id: "D1", label: "version", status: "WARN",
       detail: `${ver} (aaaaaaa): update available, next on GitHub tags is 2.0.0-next.10; npm registry answered HTTP 503`, fixCommand: "run ctx_upgrade",
     });
   });
@@ -1087,11 +1107,11 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     assert.deepEqual(row, { id: "D1", label: "version", status: "PASS", detail: `${HEAD}latest next on npm` });
   });
 
-  test("[M5] doctor-env/D1-git-missing-registry-newer-is-FAIL-with-both-versions", async (t) => {
+  test("[M5] doctor-env/D1-git-missing-registry-newer-is-WARN-with-both-versions", async (t) => {
     const url = await registry(t, 200, { latest: "1.0.168", next: "2.0.0-next.29" });
     const row = await run(noGit(t), SHA_A, { registryUrl: url });
     assert.deepEqual(row, {
-      id: "D1", label: "version", status: "FAIL",
+      id: "D1", label: "version", status: "WARN",
       detail: `${HEAD}update available, next on npm is 2.0.0-next.29`, fixCommand: "run ctx_upgrade",
     });
   });
@@ -1138,6 +1158,34 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
   test("[M5] doctor-env/D6-missing-both-is-UNKNOWN-never-FAIL", () => {
     const row = checkMcp({ clientInfo: undefined, protocolVersion: "" });
     assert.deepEqual(row, { id: "D6", label: "MCP", status: "UNKNOWN", detail: "no clientInfo or protocolVersion on the request" });
+  });
+
+  // D-R49-DOCTOR-1339-1 (#1339, raidexter, OpenCode 2.x, context-mode 2.1.5): "D1 FAIL ... update available, latest on npm is 2.1.6".
+  test("[R49] doctor-env/D1-update-available-is-WARN-with-the-agents-own-update-command", async (t) => {
+    const url = await registry(t, 200, { latest: "2.1.6" });
+    const row = await checkVersion({
+      bundleSha: SHA_A, version: "2.1.5", registryUrl: url, timeoutMs: 10000, env: noGit(t), cwd: tmpdir(),
+      signal: new AbortController().signal, updateCommand: C.UPGRADE_HOST_COMMAND.opencode,
+    });
+    assert.deepEqual(row, { id: "D1", label: "version", status: "WARN", detail: "2.1.5 (aaaaaaa): update available, latest on npm is 2.1.6", fixCommand: "opencode plugin update" });
+  });
+
+  test("[R49] doctor-env/D1-update-available-WARN-names-each-agents-own-command", async (t) => {
+    const url = await registry(t, 200, { latest: "2.1.6" });
+    for (const [agent, cmd] of Object.entries(C.UPGRADE_HOST_COMMAND)) {
+      const row = await checkVersion({ bundleSha: SHA_A, version: "2.1.5", registryUrl: url, timeoutMs: 10000, env: noGit(t), cwd: tmpdir(), signal: new AbortController().signal, updateCommand: cmd });
+      assert.equal(row.status, "WARN", agent);
+      assert.equal(row.fixCommand, cmd, agent);
+    }
+  });
+
+  // D-R49-DOCTOR-1339-3: OpenCode's plugin runs in the agent; its ToolContext has protocolVersion "" and no clientInfo.
+  test("[R49] doctor-env/D6-in-process-plugin-is-PASS-and-says-why-other-hosts-stay-UNKNOWN", () => {
+    const none = { clientInfo: undefined, protocolVersion: "" };
+    assert.deepEqual(checkMcp(none, getAdapter("opencode")), { id: "D6", label: "MCP", status: "PASS", detail: C.D6_IN_PROCESS_DETAIL });
+    assert.equal(checkMcp(none, getAdapter("pi")).status, "PASS");
+    assert.equal(checkMcp(none, getAdapter("claude-code")).status, "UNKNOWN");
+    assert.equal(checkMcp(none).status, "UNKNOWN");
   });
 
   test("[M5] doctor-env/D6-client-or-protocol-present-PASS", () => {
