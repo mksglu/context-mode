@@ -14,6 +14,8 @@ pi update --extensions
 
 Check: `context-mode doctor`
 
+Pi-Bolt (the Pi coding agent compiled to native code) runs Pi extensions unchanged, with the same command: `pi install npm:context-mode`. It reads the same `~/.pi/agent/settings.json`. The `pi-bolt` command takes the same arguments.
+
 Pi gets the hooks and the skills from the package. Restart Pi after the install.
 
 `npm i -g context-mode` also gives the `context-mode` command for doctor.
