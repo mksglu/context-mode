@@ -295,8 +295,6 @@ export const TOOL_PREFIX_SLOT = "{prefix}";
 export const DENY_WEBFETCH_JOIN = ", then "; // "Tool: <p>ctx_index, then <p>ctx_search"
 export const POLICY_UNREADABLE_WARNING = "context-mode: your deny rules could not be read, so they are not applied. Fix: run ctx_doctor."; // E2, flag unset (stderr)
 // ADR-0008 item 6, #1006/#945: WebFetch to these hosts (or a subdomain) is never denied (claude.ai artifacts).
-// D-R49-WEBFETCH-POLICY-1 (#1336): the user policy file in the data root; see policy/route-policy.ts.
-export const ROUTE_POLICY_FILE = "policy.json";
 export const NEVER_DENY_HOSTS = Object.freeze(["claude.ai", "claude.site", "claudeusercontent.com"] as const);
 
 // impl/08 §6.1 step 5c rule tables (argv0 compared lowercased, after unwrap and baseName).
@@ -745,10 +743,6 @@ export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken inst
 // doctor-db.ts: D8 checks, D9 counts, D10 mode (impl/07 §5).
 export const PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";
 export function D10_DETAIL(mode: string): string { return `enforcement mode: ${mode}`; }
-// D-R49-WEBFETCH-POLICY-1 (#1336): D10 also names the active policy file settings, or fails when the file is invalid.
-export function D10_POLICY_DETAIL(webfetchOff: boolean, hosts: readonly string[]): string { return `policy file: WebFetch route ${webfetchOff ? "off" : "on"}, allowHosts ${hosts.length === 0 ? "none" : hosts.join(", ")}`; }
-export function D10_POLICY_BAD_DETAIL(file: string, why: string): string { return `policy file ${file} is ignored: ${why}; WebFetch keeps its route`; }
-export function D10_POLICY_BAD_FIX(file: string): string { return `fix the JSON in ${file}`; }
 // D-1331-OC-PERM-1 (#1331): D10 also reports whether the host permission check runs before each ctx_* tool.
 export function D10_PERMISSION_DETAIL(mode: string): string { return `enforcement mode: ${mode}; OpenCode permission rules apply to ctx_* tools`; }
 export const D10_PERMISSION_MISSING_DETAIL = "this OpenCode build gives plugins no permission check (ctx.permission.assert), so ctx_* tools cannot follow OpenCode permission rules";

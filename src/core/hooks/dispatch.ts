@@ -21,7 +21,6 @@ import { decide } from "../policy/decide.ts";
 import { isOwnFile } from "../policy/own-file.ts";
 import { isSubagentCall, pickSubagentCase, toolSetForAgentType } from "../policy/subagent.ts";
 import { readUserDeny } from "../policy/user-deny.ts";
-import { NO_ROUTE_POLICY, readRoutePolicy } from "../policy/route-policy.ts";
 import { resolveProject } from "../project/resolve.ts";
 import { claudeDirOf, homeDirOf } from "../project/config-dir.ts";
 import { isInside } from "../project/contain.ts";
@@ -325,9 +324,7 @@ function askDetached(ev: CanonicalHookEvent, project: ProjectContext, tool: Tool
 
 async function preToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv): Promise<Decision> {
   const userDeny = readUserDeny(project.worktree, ev.agent);
-  // D-R49-WEBFETCH-POLICY-1 (#1336): the policy file is read for a WebFetch call only; every other route pays nothing.
-  const policy = ev.tool?.canonicalName === "WebFetch" ? readRoutePolicy(env).policy : NO_ROUTE_POLICY;
-  const decision0 = decide(ev, row, userDeny, project, policy);
+  const decision0 = decide(ev, row, userDeny, project);
   let decision = decision0;
   if (decision0.kind === "deny" && isSubagentCall(ev) && !isUserPolicyDeny(decision0.reason, row)) {
     // Case A keeps decision0 (D-M3-H2-4); case B names the run.mjs wrapper for a shell call.
