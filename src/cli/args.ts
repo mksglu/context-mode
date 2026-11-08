@@ -1,6 +1,8 @@
 // src/cli/args.ts: flags, help text and typo hints for setup, doctor and upgrade (ADR-0019 section 8, D7).
 // Pure module: no I/O, so the golden --help tests and the usage-error tests need no TTY.
 import { ADAPTERS } from "../adapters/table.ts";
+import { SUPPORTED_AGENTS_LINE, UNSUPPORTED_SETUP_LINE } from "../core/contracts/constants.ts";
+import { unsupportedHostByName } from "../core/ops/unsupported-host.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
 
 export type Command = "setup" | "doctor" | "upgrade";
@@ -24,6 +26,13 @@ const VALUE_FLAGS = new Set(["--agents", "--tag", "--print"]);
 const TAG_RE = /^[a-z0-9][a-z0-9.+-]*$/i; // npm dist-tag or semver; never reaches a shell unquoted
 
 export class UsageError extends Error {}
+
+/** D-UNSUPPORTED-HOSTS-1: a known unsupported host gets the positive line; any other name gets the supported list. */
+function badAgent(name: string): UsageError {
+  const h = unsupportedHostByName(name);
+  if (h !== undefined) return new UsageError(UNSUPPORTED_SETUP_LINE(h.name));
+  return new UsageError(`unknown agent "${name}".${suggest(name, AGENT_IDS)} ${SUPPORTED_AGENTS_LINE} Run context-mode setup --list.`);
+}
 
 /** Levenshtein distance, small inputs only (commands, flags, agent ids). */
 function distance(a: string, b: string): number {
@@ -83,13 +92,13 @@ export function parseFlags(cmd: Command, argv: readonly string[]): Flags {
         f.tag = value!;
         break;
       case "--print":
-        if (!(AGENT_IDS as readonly string[]).includes(value!)) throw new UsageError(`unknown agent "${value}".${suggest(value!, AGENT_IDS)} Run context-mode setup --list.`);
+        if (!(AGENT_IDS as readonly string[]).includes(value!)) throw badAgent(value!);
         f.print = value as AgentId;
         break;
       case "--agents": {
         const ids = value!.split(",").map((s) => s.trim()).filter(Boolean);
         for (const id of ids) {
-          if (!(AGENT_IDS as readonly string[]).includes(id)) throw new UsageError(`unknown agent "${id}".${suggest(id, AGENT_IDS)} Run context-mode setup --list.`);
+          if (!(AGENT_IDS as readonly string[]).includes(id)) throw badAgent(id);
         }
         f.agents = [...new Set(ids)] as AgentId[];
         break;

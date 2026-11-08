@@ -7,6 +7,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { UNSUPPORTED_HOST_LINE } from "../core/contracts/constants.ts";
+import { unsupportedHostOf } from "../core/ops/unsupported-host.ts";
 import * as clack from "@clack/prompts";
 import { ADAPTERS } from "../adapters/table.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
@@ -332,9 +334,11 @@ async function doctor(ui: Ui): Promise<number> {
     onAgent: (id, phase) => { if (phase === "start") { spin.stop(); spin.start(`${id}: checking`); } else spin.stop(); },
   });
   spin.stop();
+  const other = unsupportedHostOf({ env: process.env }); // D-UNSUPPORTED-HOSTS-1
+  if (other !== undefined && !ui.f.json) out(UNSUPPORTED_HOST_LINE(other.name));
   if (!res.agents.length && !res.error && !ui.f.json) { out("No agents found. Run context-mode setup --list."); return EXIT_OK; }
   // doctor is read-only: no report file; --debug prints the report to stderr.
-  const code = await finish({ ...ui, clack: undefined }, "doctor", res, false);
+  const code = await finish({ ...ui, clack: undefined }, "doctor", other === undefined ? res : { ...res, unsupportedHost: other.id } as SetupResult, false);
   const p = ui.clack;
   if (!p || code === EXIT_OK) return code;
   let worst = code;

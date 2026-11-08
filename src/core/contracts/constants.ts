@@ -1,5 +1,5 @@
 // impl/01 §3, impl/00 §3.2, TECH-SPEC §11, DECISIONS-r9. Every constant lives here; no other module writes these literals.
-import type { AgentId } from "./agents.js";
+import { AGENT_IDS, type AgentId } from "./agents.ts";
 
 export const SERVER_KEY = "context-mode"; // TECH-SPEC §3.8 rule 3
 export const TOOL_ORDER = Object.freeze(["ctx_execute","ctx_batch","ctx_index","ctx_search","ctx_resume","ctx_stats","ctx_doctor","ctx_upgrade","ctx_purge"] as const); // PRD §8, Q3b
@@ -683,13 +683,37 @@ export const D3_PART_JOIN = ", ";
 export function D3_DETAIL(parts: readonly string[]): string { return `wrong: ${parts.join(D3_PART_JOIN)}`; }
 // D-DOC-D3-SCOPE-1: two or more live installs and none is the one Claude Code runs for this project.
 export function D3_ROOT_DETAIL(paths: readonly string[]): string { return `pick one install for this project: ${paths.join(D3_PART_JOIN)}`; }
-// D-1340-AGY-D3-1 (#1340): Google Antigravity is not a supported host. It starts our gemini-mode server from a plugin dir
-// and reads no Gemini CLI settings or extension, so D3 names the host once instead of "wrong" entries it never uses.
-export const ANTIGRAVITY_CLIENT_NAMES: readonly string[] = Object.freeze(["antigravity", "antigravity-cli", "antigravity-client", "agy"]); // lower case; MCP clientInfo.name
-export const ANTIGRAVITY_DIR_NAMES: readonly string[] = Object.freeze(["config", "antigravity", "antigravity-cli", "antigravity-ide"]); // ~/.gemini/<one of these>/plugins/<plugin>
-export const ANTIGRAVITY_PLUGINS_DIR = "plugins";
-export const GEMINI_HOME_DIR_NAME = ".gemini";
-export const D3_ANTIGRAVITY_DETAIL = "Antigravity is not a supported host yet; the MCP server runs (see D6); hooks are not checked there; supported agents: docs/install/README.md";
+// D-UNSUPPORTED-HOSTS-1 (owner: "Sadece Antigravity icin degil desteklemediklerimize desteklemiyoruz diye desin"; #1340 first case).
+// Hosts that 1.x supported and 2.0 does not. Every field comes from v1.0.169 (src/adapters/client-map.ts, detect.ts), not a guess.
+// clientNames: MCP clientInfo.name, lower case. envVars: set by the host itself. pluginPaths: dir segments a plugin bundle sits in.
+// configDirs: the host's home dirs (data for the docs; a dir alone never proves the host runs, so detection ignores it).
+export interface UnsupportedHost { id: string; name: string; clientNames: readonly string[]; envVars: readonly string[]; pluginPaths: readonly (readonly string[])[]; configDirs: readonly string[]; binaries: readonly string[]; source: string; }
+const unsupported = (h: UnsupportedHost): UnsupportedHost => Object.freeze(h);
+export const UNSUPPORTED_HOSTS: readonly UnsupportedHost[] = Object.freeze([
+  unsupported({ id: "antigravity", name: "Antigravity", clientNames: ["antigravity", "antigravity-client", "antigravity-cli", "agy"], envVars: ["ANTIGRAVITY_CLI_ALIAS"],
+    pluginPaths: [[".gemini", "config", "plugins"], [".gemini", "antigravity", "plugins"], [".gemini", "antigravity-cli", "plugins"], [".gemini", "antigravity-ide", "plugins"]],
+    configDirs: [".gemini/antigravity", ".gemini/antigravity-cli", ".gemini/config"], binaries: ["agy"], source: "v1.0.169:src/adapters/client-map.ts:15-17; detect.ts:156,481-483; #1340" }),
+  unsupported({ id: "cursor", name: "Cursor", clientNames: ["cursor-vscode"], envVars: ["CURSOR_TRACE_ID", "CURSOR_CLI", "CURSOR_CWD"],
+    pluginPaths: [], configDirs: [".cursor"], binaries: [], source: "v1.0.169:src/adapters/client-map.ts:18; detect.ts:163-165,584" }),
+  unsupported({ id: "omp", name: "OMP (oh-my-pi)", clientNames: ["omp-coding-agent"], envVars: [],
+    pluginPaths: [], configDirs: [".omp"], binaries: ["omp"], source: "v1.0.169:src/adapters/client-map.ts:37; detect.ts:543 (PI_CODING_AGENT_DIR is not a signal: supported Pi reads it too)" }),
+  unsupported({ id: "openclaw", name: "OpenClaw", clientNames: [], envVars: [],
+    pluginPaths: [], configDirs: [".openclaw"], binaries: [], source: "v1.0.169:src/adapters/detect.ts:252,575 (the runtime sets no env var)" }),
+  unsupported({ id: "kimi", name: "Kimi Code", clientNames: ["kimi-code", "kimi"], envVars: [],
+    pluginPaths: [], configDirs: [".kimi-code"], binaries: ["kimi"], source: "v1.0.169:src/adapters/client-map.ts:42-44; detect.ts:567; adapters/kimi/index.ts:127" }),
+  unsupported({ id: "kilo", name: "Kilo Code", clientNames: ["kilo code"], envVars: ["KILO", "KILO_PID"],
+    pluginPaths: [], configDirs: [".config/kilo"], binaries: [], source: "v1.0.169:src/adapters/client-map.ts:28; detect.ts:170-171,592" }),
+  unsupported({ id: "zed", name: "Zed", clientNames: ["zed"], envVars: ["ZED_SESSION_ID", "ZED_TERM"],
+    pluginPaths: [], configDirs: [".config/zed"], binaries: [], source: "v1.0.169:src/adapters/client-map.ts:38-39; detect.ts:189-190,616" }),
+  unsupported({ id: "jetbrains-copilot", name: "JetBrains Copilot", clientNames: ["jetbrains client", "intellij idea", "pycharm"], envVars: ["IDEA_INITIAL_DIRECTORY"],
+    pluginPaths: [], configDirs: [".config/JetBrains"], binaries: [], source: "v1.0.169:src/adapters/client-map.ts:23-25; detect.ts:213,600" }),
+]);
+export const SUPPORTED_AGENTS_DOCS_URL = "https://github.com/mksglu/context-mode/blob/main/docs/install/README.md";
+/** The supported agents, linked to the install docs: the tail of every "not supported" and "unknown agent" line. */
+export const SUPPORTED_AGENTS_LINE = `Supported agents: ${AGENT_IDS.join(", ")} (${SUPPORTED_AGENTS_DOCS_URL}).`;
+/** D-UNSUPPORTED-HOSTS-1: the one positive line for a known unsupported host. */
+export function UNSUPPORTED_HOST_LINE(name: string): string { return `${name} is not a supported host today. The MCP server runs here; hooks are not checked. ${SUPPORTED_AGENTS_LINE}`; }
+export function UNSUPPORTED_SETUP_LINE(name: string): string { return `${name} is not a supported host today. Setup writes nothing for it. ${SUPPORTED_AGENTS_LINE}`; }
 export const D3_ROOT_FIX_JOIN = " or ";
 export function D3_ROOT_FIX(installs: readonly { key: string; scope: string }[]): string {
   return `remove the extra install: ${installs.map((i) => `claude plugin uninstall ${i.key} --scope ${i.scope}`).join(D3_ROOT_FIX_JOIN)}`;

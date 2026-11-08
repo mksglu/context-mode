@@ -23,6 +23,8 @@ import { checkHookRoundTrip } from "../ops/doctor-hook.ts";
 import { lastHookError } from "../hooks/fallback.ts";
 import { healD8, healOrphan } from "../ops/db-heal.ts";
 import { buildReport, buildReportHead } from "../ops/report.ts";
+import { unsupportedHostOf } from "../ops/unsupported-host.ts";
+import { UNSUPPORTED_HOST_LINE, type UnsupportedHost } from "../contracts/constants.ts";
 import { environmentLine, writeIssueReport } from "../ops/doctor-issue.ts";
 import { claudeDirOf, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { indexText } from "../index/text.ts";
@@ -63,6 +65,10 @@ async function codexDb(ctx: ToolContext, adapter: AdapterRow): Promise<DbHandle 
   } catch {
     return null; // a stale or corrupt DB is D8's row; D5 then sees no journal
   }
+}
+
+function unsupportedRow(id: "D3" | "D5", h: UnsupportedHost): DoctorRow {
+  return { id, label: DOCTOR_LABEL[id], status: "WARN", detail: UNSUPPORTED_HOST_LINE(h.name) }; // no fix command: setup never writes config for it
 }
 
 async function hookRow(ctx: ToolContext, adapter: AdapterRow, host: DoctorHost): Promise<DoctorRow> {
@@ -107,14 +113,15 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
   const host = adapter.id === "codex" ? { ...host0, env: { ...host0.env, CODEX_HOME: codexRunDirOf(host0.env, homeDirOf(host0.env) ?? "", host0.bundleDir) } } : host0;
   const env = host.env;
   const project = ctx.project;
+  const other = unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env }); // D-UNSUPPORTED-HOSTS-1: the host is known and not supported
   let integrityFailed = false;
   let orphan: DbCheck["orphan"] = [];
   const checks: Record<DoctorCheckId, () => DoctorRow | Promise<DoctorRow>> = {
     D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal }),
     D2: () => checkNode({ nodeVersion: process.version, bunVersion: process.versions.bun }),
-    D3: () => checkHostConfig(adapter, env, project.worktree, { clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir }), // D-1340-AGY-D3-1
+    D3: () => other !== undefined ? unsupportedRow("D3", other) : checkHostConfig(adapter, env, project.worktree), // D-UNSUPPORTED-HOSTS-1
     D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { project: project.worktree, piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), codexDir: codexDirOf(env, requireHomeDir(env)), geminiDir: geminiDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
-    D5: () => hookRow(ctx, adapter, host),
+    D5: () => other !== undefined ? unsupportedRow("D5", other) : hookRow(ctx, adapter, host),
     D5b: () => checkDoubleFire(adapter.id, project.worktree),
     D6: () => checkMcp(ctx),
     D7: () => checkProject({ project, adapter, piCwd: host.piCwd }),
@@ -174,7 +181,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   let notes: string[] = [];
   if (failed) {
     try {
-      notes = await writeIssueReport({ ctx, adapter, env: host.env, bundleDir: host.bundleDir, rows, envLine, table });
+      notes = await writeIssueReport({ unsupported: unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env: host.env }), ctx, adapter, env: host.env, bundleDir: host.bundleDir, rows, envLine, table });
     } catch (err) {
       notes = [`Report file: ${lineOf(err)}`]; // ADR-0010: doctor always answers
     }

@@ -13,6 +13,8 @@ import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
+import { unsupportedHostOf, unsupportedHostByName } from "../src/core/ops/unsupported-host.ts";
+import { issueTitle, summaryOf } from "../src/core/ops/doctor-issue.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
 import { bundleDirOf, ownBundleDir } from "../src/core/ops/bundle-dir.ts";
 import { openReadOnlyHandle } from "../src/core/store/open-read.ts";
@@ -516,7 +518,7 @@ describe("ADR-0010 doctor D3 on Antigravity: one clear line, no Gemini CLI claim
     const d3 = await run(home, undefined, path.join(home, ".gemini", "config", "plugins", "context-mode", "server"));
     assert.notEqual(d3.status, "FAIL", d3.detail);
     assert.equal(d3.detail.includes("wrong:"), false, d3.detail);
-    assert.ok(d3.detail.includes("Antigravity is not a supported host yet"), d3.detail);
+    assert.ok(d3.detail.includes("Antigravity is not a supported host today"), d3.detail);
     assert.ok(d3.detail.includes("docs/install/README.md"), d3.detail);
     assert.equal(String(d3.fixCommand ?? "").includes("gemini extensions install"), false);
     assert.equal(String(d3.fixCommand ?? "").includes("setup --agents gemini"), false);
@@ -527,8 +529,8 @@ describe("ADR-0010 doctor D3 on Antigravity: one clear line, no Gemini CLI claim
       const home = tmp(t);
       const d3 = await run(home, name);
       assert.notEqual(d3.status, "FAIL", d3.detail);
-      assert.ok(d3.detail.includes("Antigravity is not a supported host yet"), d3.detail);
-      assert.ok(d3.detail.includes("the MCP server runs"), d3.detail);
+      assert.ok(d3.detail.includes("Antigravity is not a supported host today"), d3.detail);
+      assert.ok(d3.detail.includes("The MCP server runs"), d3.detail);
       assert.ok(d3.detail.includes("hooks are not checked"), d3.detail);
     });
   }
@@ -536,7 +538,7 @@ describe("ADR-0010 doctor D3 on Antigravity: one clear line, no Gemini CLI claim
   test("[D-1340-AGY-D3-1] the CLI plugin dir ~/.gemini/antigravity-cli/plugins is Antigravity too", async (t) => {
     const home = tmp(t);
     const d3 = await run(home, undefined, path.join(home, ".gemini", "antigravity-cli", "plugins", "context-mode", "server"));
-    assert.ok(d3.detail.includes("Antigravity is not a supported host yet"), d3.detail);
+    assert.ok(d3.detail.includes("Antigravity is not a supported host today"), d3.detail);
   });
 
   test("[D-1340-AGY-D3-1] Gemini CLI itself (clientInfo gemini-cli-mcp-client, extension dir) keeps the real D3 verdict", async (t) => {
@@ -544,6 +546,86 @@ describe("ADR-0010 doctor D3 on Antigravity: one clear line, no Gemini CLI claim
     const d3 = await run(home, "gemini-cli-mcp-client", path.join(home, ".gemini", "extensions", "context-mode", "server"));
     assert.equal(d3.status, "FAIL");
     assert.ok(d3.detail.startsWith("wrong:"), d3.detail);
+  });
+});
+
+describe("ADR-0010 doctor on every unsupported host: one clear line, no false FAIL (D-UNSUPPORTED-HOSTS-1)", { concurrency: CONC }, () => {
+  // Owner: "Sadece Antigravity icin degil desteklemediklerimize desteklemiyoruz diye desin." One list, C.UNSUPPORTED_HOSTS.
+  const KEY = "f".repeat(16);
+  const DOCS = "https://github.com/mksglu/context-mode/blob/main/docs/install/README.md";
+  function tmp(t) {
+    const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-doctor-unsup-")));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    return dir;
+  }
+  function rows(home, agent, { clientName, bundleDir, env = {} } = {}) {
+    const projectDir = path.join(home, ".context-mode", "projects", KEY);
+    const ctx = {
+      project: { projectKey: KEY, projectDir, dbPath: path.join(projectDir, "context.db"), worktree: home, containmentRoot: home, agent, source: getAdapter(agent).projectSource },
+      sessionId: "s1", turn: 1, signal: new AbortController().signal, protocolVersion: "2025-06-18",
+      ...(clientName === undefined ? {} : { clientInfo: { name: clientName, version: "1.0.0" } }),
+    };
+    const host = { env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "", ...env }, bundleDir: bundleDir ?? path.join(home, "no-bundle"), piCwd: undefined };
+    return runDoctorChecks(ctx, getAdapter(agent), host);
+  }
+  function assertLine(rs, host) {
+    for (const id of ["D3", "D5"]) {
+      const r = rs.find((x) => x.id === id);
+      assert.notEqual(r.status, "FAIL", `${host.id} ${id}: ${r.detail}`);
+      assert.ok(r.detail.includes(`${host.name} is not a supported host today.`), r.detail);
+      assert.ok(r.detail.includes("The MCP server runs here; hooks are not checked."), r.detail);
+      assert.ok(r.detail.includes(`Supported agents: ${AGENT_LIST}`), r.detail);
+      assert.ok(r.detail.includes(DOCS), r.detail);
+      assert.equal(r.detail.includes("wrong:"), false);
+      assert.equal(r.fixCommand, undefined);
+    }
+  }
+  const AGENT_LIST = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"].join(", ");
+
+  test("[D-UNSUPPORTED-HOSTS-1] the list holds the removed 2.0 hosts, each with a source line", () => {
+    const ids = C.UNSUPPORTED_HOSTS.map((h) => h.id).sort();
+    assert.deepEqual(ids, ["antigravity", "cursor", "jetbrains-copilot", "kilo", "kimi", "omp", "openclaw", "zed"]);
+    for (const h of C.UNSUPPORTED_HOSTS) assert.ok(h.source.includes(":"), h.id);
+  });
+
+  for (const host of C.UNSUPPORTED_HOSTS) {
+    for (const name of host.clientNames) {
+      test(`[D-UNSUPPORTED-HOSTS-1] ${host.id}: clientInfo.name ${name} gets the line`, async (t) => {
+        const home = tmp(t);
+        assertLine(await rows(home, "claude-code", { clientName: name }), host);
+      });
+    }
+    for (const v of host.envVars) {
+      test(`[D-UNSUPPORTED-HOSTS-1] ${host.id}: env ${v} (no clientInfo) gets the line`, async (t) => {
+        const home = tmp(t);
+        assertLine(await rows(home, "claude-code", { env: { [v]: "1" } }), host);
+      });
+    }
+    for (const seg of host.pluginPaths) {
+      test(`[D-UNSUPPORTED-HOSTS-1] ${host.id}: plugin dir ${seg.join("/")} gets the line`, async (t) => {
+        const home = tmp(t);
+        assertLine(await rows(home, "gemini", { bundleDir: path.join(home, ...seg, "context-mode", "server") }), host);
+      });
+    }
+    test(`[D-UNSUPPORTED-HOSTS-1] ${host.id}: setup name lookup finds it by id, client name and binary`, () => {
+      for (const n of [host.id, ...host.clientNames, ...host.binaries]) assert.equal(unsupportedHostByName(n)?.id, host.id, n);
+    });
+  }
+
+  test("[D-UNSUPPORTED-HOSTS-1] supported agents keep the real verdict even with a foreign env var set", async (t) => {
+    const home = tmp(t);
+    const rs = await rows(home, "claude-code", { clientName: "claude-code", env: { CURSOR_TRACE_ID: "x", ZED_TERM: "true", KILO: "1" } });
+    assert.equal(rs.find((x) => x.id === "D3").status, "FAIL");
+    assert.equal(unsupportedHostOf({ clientName: "gemini-cli-mcp-client" }), undefined);
+    for (const id of ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"]) assert.equal(unsupportedHostByName(id), undefined, id);
+  });
+
+  test("[D-UNSUPPORTED-HOSTS-1] the File it issue text says the host is unsupported", () => {
+    const fail = [{ id: "D8", label: "context.db", status: "FAIL", detail: "x" }];
+    const host = C.UNSUPPORTED_HOSTS.find((h) => h.id === "cursor");
+    assert.ok(issueTitle("claude-code", fail, host).includes("Cursor is not a supported host today"));
+    assert.ok(summaryOf("claude-code", fail, host).includes("Cursor is not a supported host today"));
+    assert.equal(issueTitle("claude-code", fail).includes("not a supported host"), false);
   });
 });
 

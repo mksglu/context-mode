@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import {
-  BUNDLE_SHA, CONFIG_TOML_FILE, DOCTOR_CONFIG_LINES, DOCTOR_ENV_NAMES, DOCTOR_ENV_PREFIX, DOCTOR_GH_LINE, DOCTOR_GH_NEXT,
+  type UnsupportedHost, BUNDLE_SHA, CONFIG_TOML_FILE, DOCTOR_CONFIG_LINES, DOCTOR_ENV_NAMES, DOCTOR_ENV_PREFIX, DOCTOR_GH_LINE, DOCTOR_GH_NEXT,
   DOCTOR_GIT_VERSION_TIMEOUT_MS, DOCTOR_HOOK_LOG_LINES, DOCTOR_JOURNAL_ROWS, DOCTOR_LOG_TAIL_BYTES, DOCTOR_MASK,
   DOCTOR_PATH_TOOLS, DOCTOR_REPORT_FILE_PREFIX, DOCTOR_REPORT_LINE, DOCTOR_REPORTS_DIR, DOCTOR_SECRET_WORDS, DOCTOR_URL_LINE, DOCTOR_RULES_LINE,
   EXE_SUFFIX, ISSUE_FORM_HEADINGS, ISSUE_FORM_URL, ISSUE_GUIDE_URL, ISSUE_REPO_SLUG, ISSUE_URL_MAX, NATIVE_INSTALL, SETTINGS_FILE,
@@ -136,6 +136,7 @@ function agentConfig(adapter: AdapterRow, env: NodeJS.ProcessEnv, worktree: stri
 }
 
 export interface IssueInput {
+  unsupported?: UnsupportedHost; // D-UNSUPPORTED-HOSTS-1
   ctx: ToolContext;
   adapter: AdapterRow;
   env: NodeJS.ProcessEnv;
@@ -149,13 +150,14 @@ function failing(rows: DoctorRow[]): DoctorRow[] {
   return rows.filter((r) => r.status === "FAIL");
 }
 
-export function issueTitle(agent: string, rows: DoctorRow[]): string {
-  return `ctx_doctor ${agent}: ${failing(rows).map((r) => `${r.id} ${r.label}`).join(", ")} FAIL`;
+export function issueTitle(agent: string, rows: DoctorRow[], other?: UnsupportedHost): string {
+  return `ctx_doctor ${agent}${other === undefined ? "" : ` (${other.name} is not a supported host today)`}: ${failing(rows).map((r) => `${r.id} ${r.label}`).join(", ")} FAIL`;
 }
 
-function summaryOf(agent: string, rows: DoctorRow[]): string {
+export function summaryOf(agent: string, rows: DoctorRow[], other?: UnsupportedHost): string {
   const f = failing(rows)[0];
-  return f === undefined ? `ctx_doctor ${agent}` : `${f.id} ${f.label} FAIL on ${agent}: ${f.detail}`;
+  const tag = other === undefined ? "" : `${other.name} is not a supported host today. `;
+  return tag + (f === undefined ? `ctx_doctor ${agent}` : `${f.id} ${f.label} FAIL on ${agent}: ${f.detail}`);
 }
 
 /** The issue body; section order = ISSUE_FORM_HEADINGS (a test pins it). */
@@ -167,7 +169,7 @@ export async function buildIssueBody(i: IssueInput): Promise<string> {
   const envNames = DOCTOR_ENV_NAMES.map((n) => (i.env[n] === undefined ? `${n} (unset)` : `${n}=${i.env[n]}`));
   const pathTools = DOCTOR_PATH_TOOLS.map((t) => `PATH holds ${t}: ${onPath(i.env, t).join(", ") || "(absent)"}`);
   const sections: Record<string, string[]> = {
-    "Summary": [summaryOf(agent, i.rows)],
+    "Summary": [summaryOf(agent, i.rows, i.unsupported)],
     "ctx-report": [i.table],
     "What happened": [
       "Rows that need a look:",
@@ -215,11 +217,11 @@ export async function writeIssueReport(i: IssueInput): Promise<string[]> {
   const file = join(dir, `${DOCTOR_REPORT_FILE_PREFIX}${new Date().toISOString().replace(/[:.]/g, "-")}.md`);
   writeFileSync(file, body);
   const shown = tilde(file);
-  const title = issueTitle(i.adapter.id, i.rows);
+  const title = issueTitle(i.adapter.id, i.rows, i.unsupported);
   // gh refuses --template together with --body-file; the body file already holds the form's sections.
   // D-DOCTOR-FIX-1: the command wraps with a trailing backslash, so each line fits 80 columns and a shell runs it as one.
   const gh = [`gh issue create --repo ${ISSUE_REPO_SLUG} --label bug \\`, `${DOCTOR_GH_NEXT}title ${JSON.stringify(title)} \\`, `${DOCTOR_GH_NEXT}body-file ${shown}`];
-  return [DOCTOR_REPORT_LINE + shown, DOCTOR_GH_LINE + gh[0], gh[1]!, gh[2]!, DOCTOR_URL_LINE + formUrl(title, summaryOf(i.adapter.id, i.rows)), DOCTOR_RULES_LINE + ISSUE_GUIDE_URL];
+  return [DOCTOR_REPORT_LINE + shown, DOCTOR_GH_LINE + gh[0], gh[1]!, gh[2]!, DOCTOR_URL_LINE + formUrl(title, summaryOf(i.adapter.id, i.rows, i.unsupported)), DOCTOR_RULES_LINE + ISSUE_GUIDE_URL];
 }
 
 /** The prefilled agent-report.yml URL: title and summary only, under ISSUE_URL_MAX. */
