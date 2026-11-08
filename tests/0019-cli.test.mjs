@@ -250,6 +250,11 @@ describe("ADR-0019 cli", () => {
       assert.equal(JSON.parse(j.stdout).unsupportedHost, "cursor");
       const plain = run(s, ["doctor"]);
       assert.equal(plain.stdout.includes("not a supported host"), false);
+      // D-R53-REVIEW-1: a supported agent is found, so the terminal env var names nothing.
+      codexHome(s);
+      const sup = run(s, ["doctor", "--json"], { env: { CURSOR_TRACE_ID: "x" } });
+      assert.equal(JSON.parse(sup.stdout).unsupportedHost, undefined, sup.stdout);
+      assert.equal(run(s, ["doctor"], { env: { CURSOR_TRACE_ID: "x" } }).stdout.includes("not a supported host"), false);
     });
 
     test("[M7] cli/exit-ok: setup --yes --agents codex applies, verifies, exit 0; results on stdout", (t) => {

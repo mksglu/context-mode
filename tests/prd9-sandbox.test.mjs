@@ -818,6 +818,7 @@ describe("PRD-v2 section 9: runProcess settles on exit (D-1337-EXIT-SETTLE-1, #1
       const out = await ctxExecute.handler({ language: "shell", code: "sleep 600 & echo hi" }, ctxFor(root));
       assert.match(out.text, /^hi\n/);
       assert.ok(out.text.includes(C.BACKGROUND_HOLD_NOTE));
+      assert.ok(C.BACKGROUND_HOLD_NOTE.includes("was stopped")); // D-R53-REVIEW-1: runProcess kills the group, the note says so
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });

@@ -334,7 +334,8 @@ async function doctor(ui: Ui): Promise<number> {
     onAgent: (id, phase) => { if (phase === "start") { spin.stop(); spin.start(`${id}: checking`); } else spin.stop(); },
   });
   spin.stop();
-  const other = unsupportedHostOf({ env: process.env }); // D-UNSUPPORTED-HOSTS-1
+  // D-UNSUPPORTED-HOSTS-1 / D-R53-REVIEW-1: a terminal env var names the host only when no supported agent was found (Claude Code in a Cursor terminal inherits CURSOR_TRACE_ID).
+  const other = res.agents.length === 0 ? unsupportedHostOf({ env: process.env }) : undefined;
   if (other !== undefined && !ui.f.json) out(UNSUPPORTED_HOST_LINE(other.name));
   if (!res.agents.length && !res.error && !ui.f.json) { out("No agents found. Run context-mode setup --list."); return EXIT_OK; }
   // doctor is read-only: no report file; --debug prints the report to stderr.
