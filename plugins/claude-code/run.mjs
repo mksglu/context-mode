@@ -158,6 +158,8 @@ var DECAY_X1000 = Object.freeze([
 ]);
 var EXEC_TIMEOUT_MS = 6e5;
 var KILL_GRACE_MS = 1e3;
+var PIPE_EOF_GRACE_MS = 250;
+var PIPE_DRAIN_MAX_MS = 2e3;
 var DB_TIMEOUT_MS = 5e3;
 var DB_WAL_SUFFIX = "-wal";
 var DB_SHM_SUFFIX = "-shm";
@@ -378,6 +380,89 @@ var OPS_SPLIT_FILES = Object.freeze([
   "host-write.ts",
   "v1-remove.ts",
   "uninstall.ts"
+]);
+var unsupported = (h) => Object.freeze(h);
+var UNSUPPORTED_HOSTS = Object.freeze([
+  unsupported({
+    id: "antigravity",
+    name: "Antigravity",
+    clientNames: ["antigravity", "antigravity-client", "antigravity-cli", "agy"],
+    envVars: ["ANTIGRAVITY_CLI_ALIAS"],
+    pluginPaths: [[".gemini", "config", "plugins"], [".gemini", "antigravity", "plugins"], [".gemini", "antigravity-cli", "plugins"], [".gemini", "antigravity-ide", "plugins"]],
+    configDirs: [".gemini/antigravity", ".gemini/antigravity-cli", ".gemini/config"],
+    binaries: ["agy"],
+    source: "v1.0.169:src/adapters/client-map.ts:15-17; detect.ts:156,481-483; #1340"
+  }),
+  unsupported({
+    id: "cursor",
+    name: "Cursor",
+    clientNames: ["cursor-vscode"],
+    envVars: ["CURSOR_TRACE_ID", "CURSOR_CLI", "CURSOR_CWD"],
+    pluginPaths: [],
+    configDirs: [".cursor"],
+    binaries: [],
+    source: "v1.0.169:src/adapters/client-map.ts:18; detect.ts:163-165,584"
+  }),
+  unsupported({
+    id: "omp",
+    name: "OMP (oh-my-pi)",
+    clientNames: ["omp-coding-agent"],
+    envVars: [],
+    pluginPaths: [],
+    configDirs: [".omp"],
+    binaries: ["omp"],
+    source: "v1.0.169:src/adapters/client-map.ts:37; detect.ts:543 (PI_CODING_AGENT_DIR is not a signal: supported Pi reads it too)"
+  }),
+  unsupported({
+    id: "openclaw",
+    name: "OpenClaw",
+    clientNames: [],
+    envVars: [],
+    pluginPaths: [],
+    configDirs: [".openclaw"],
+    binaries: [],
+    source: "v1.0.169:src/adapters/detect.ts:252,575 (the runtime sets no env var)"
+  }),
+  unsupported({
+    id: "kimi",
+    name: "Kimi Code",
+    clientNames: ["kimi-code", "kimi"],
+    envVars: [],
+    pluginPaths: [],
+    configDirs: [".kimi-code"],
+    binaries: ["kimi"],
+    source: "v1.0.169:src/adapters/client-map.ts:42-44; detect.ts:567; adapters/kimi/index.ts:127"
+  }),
+  unsupported({
+    id: "kilo",
+    name: "Kilo Code",
+    clientNames: ["kilo code"],
+    envVars: ["KILO", "KILO_PID"],
+    pluginPaths: [],
+    configDirs: [".config/kilo"],
+    binaries: [],
+    source: "v1.0.169:src/adapters/client-map.ts:28; detect.ts:170-171,592"
+  }),
+  unsupported({
+    id: "zed",
+    name: "Zed",
+    clientNames: ["zed"],
+    envVars: ["ZED_SESSION_ID", "ZED_TERM"],
+    pluginPaths: [],
+    configDirs: [".config/zed"],
+    binaries: [],
+    source: "v1.0.169:src/adapters/client-map.ts:38-39; detect.ts:189-190,616"
+  }),
+  unsupported({
+    id: "jetbrains-copilot",
+    name: "JetBrains Copilot",
+    clientNames: ["jetbrains client", "intellij idea", "pycharm"],
+    envVars: ["IDEA_INITIAL_DIRECTORY"],
+    pluginPaths: [],
+    configDirs: [".config/JetBrains"],
+    binaries: [],
+    source: "v1.0.169:src/adapters/client-map.ts:23-25; detect.ts:213,600"
+  })
 ]);
 var HOOK_HOST_FILE = Object.freeze({
   "claude-code": { root: "plugin", file: ["hooks", "claude-code.json"], key: ["hooks"], shape: "nested", timeoutKey: "timeout", matcher: true },
@@ -6121,11 +6206,11 @@ function noRuntimeError(lang) {
 }
 
 // src/core/sandbox/spawn.ts
-import { spawn } from "node:child_process";
+import { spawn as spawn2 } from "node:child_process";
 import path2 from "node:path";
 
 // src/core/sandbox/kill.ts
-import { execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 function signalGroup(pid, signal) {
   try {
     process.kill(-pid, signal);
@@ -6139,7 +6224,10 @@ function killTree(pid) {
     return;
   }
   try {
-    execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
+    const t = spawn("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
+    t.on("error", () => {
+    });
+    t.unref();
   } catch {
   }
 }
@@ -6158,7 +6246,7 @@ function runProcess(argv, o) {
     if (start === null) return resolve5(NOT_STARTED);
     let child;
     try {
-      child = spawn(start[0], start.slice(1), {
+      child = spawn2(start[0], start.slice(1), {
         cwd: o.cwd,
         env: o.env,
         stdio: ["pipe", "pipe", "pipe"],
@@ -6175,8 +6263,14 @@ function runProcess(argv, o) {
     const stderrChunks = [];
     let killedBy = null;
     let settled = false;
+    let held = false;
+    let exited = false;
+    let graceTimer;
+    let drainTimer;
+    let stopTimer;
     const kill = () => {
       if (child.pid !== void 0) killTree(child.pid);
+      if (stopTimer === void 0) stopTimer = setTimeout(() => finishHeld(), KILL_GRACE_MS);
     };
     const onAbort = () => {
       if (killedBy !== null || settled) return;
@@ -6193,17 +6287,46 @@ function runProcess(argv, o) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(graceTimer);
+      clearTimeout(drainTimer);
+      clearTimeout(stopTimer);
       o.signal.removeEventListener("abort", onAbort);
       resolve5({
         stdout: Buffer.concat(stdoutChunks),
         stderr: Buffer.concat(stderrChunks),
         exitCode,
-        killed: killedBy
+        killed: killedBy,
+        ...held ? { held: true } : {}
       });
     };
-    child.stdout.on("data", (chunk) => stdoutChunks.push(chunk));
-    child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
+    const finishHeld = () => {
+      if (settled) return;
+      held = exited && killedBy === null;
+      child.stdout.destroy();
+      child.stderr.destroy();
+      if (child.pid !== void 0) killTree(child.pid);
+      settle(child.exitCode);
+    };
+    const bump = () => {
+      if (!exited || settled) return;
+      clearTimeout(graceTimer);
+      graceTimer = setTimeout(finishHeld, PIPE_EOF_GRACE_MS);
+    };
+    child.stdout.on("data", (chunk) => {
+      stdoutChunks.push(chunk);
+      bump();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderrChunks.push(chunk);
+      bump();
+    });
     child.on("close", (code) => settle(code));
+    child.on("exit", () => {
+      if (settled) return;
+      exited = true;
+      graceTimer = setTimeout(finishHeld, PIPE_EOF_GRACE_MS);
+      drainTimer = setTimeout(finishHeld, PIPE_DRAIN_MAX_MS);
+    });
     child.on("error", () => settle(null));
     child.stdin.on("error", () => {
     });
