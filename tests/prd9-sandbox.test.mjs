@@ -744,6 +744,102 @@ describe("PRD-v2 section 9: runProcess", () => {
   });
 });
 
+describe("PRD-v2 section 9: runProcess settles on exit (D-1337-EXIT-SETTLE-1, #1337)", () => {
+  // #1337 (spimm, Pi-Bolt 1.1.4 on Windows): `sleep 600 & echo hi` never settled because only "close" settled and the
+  // survivor held the pipes. The reporter's target: about 300 ms. Serial: timing.
+  const run = (code, o = {}) => runProcess([findRuntime("shell"), "-c", code], { cwd: process.cwd(), env: buildChildEnv(process.env), signal: new AbortController().signal, timeoutMs: 20000, ...o });
+  const ctxFor = (root) => ({
+    project: { projectKey: "1".repeat(16), projectDir: join(root, "projects", "1".repeat(16)), dbPath: join(root, "projects", "1".repeat(16), "context.db"), worktree: root, containmentRoot: root, agent: "claude-code", source: "env:CLAUDE_PROJECT_DIR" },
+    sessionId: "s1", turn: 1, signal: new AbortController().signal,
+  });
+
+  test("a background survivor that holds the pipes does not hold the call", async () => {
+    if (process.platform === "win32") return;
+    const t0 = Date.now();
+    const r = await run("sleep 600 & echo hi");
+    const ms = Date.now() - t0;
+    assert.equal(r.stdout.toString("utf8").trim(), "hi");
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.killed, null);
+    assert.equal(r.held, true);
+    assert.ok(ms < 1500, `settled in ${ms} ms`);
+  });
+
+  test("a command with no survivor settles at once and is not marked held", async () => {
+    const r = await run("echo plain");
+    assert.equal(r.held, undefined);
+    assert.equal(r.stdout.toString("utf8").trim(), "plain");
+  });
+
+  test("a large output that is still flowing is kept whole next to a survivor", async () => {
+    if (process.platform === "win32") return;
+    const r = await run("seq 1 400000; sleep 30 &");
+    const lines = r.stdout.toString("utf8").trim().split("\n");
+    assert.equal(lines.length, 400000);
+    assert.equal(lines[399999], "400000");
+  });
+
+  test("the survivor is stopped with its process group", async () => {
+    if (process.platform === "win32") return;
+    const r = await run("sleep 600 & echo $!");
+    const pid = Number(r.stdout.toString("utf8").trim());
+    assert.ok(Number.isSafeInteger(pid) && pid > 1);
+    const deadline = Date.now() + C.KILL_GRACE_MS + 2500;
+    let alive = true;
+    while (alive && Date.now() < deadline) {
+      try { process.kill(pid, 0); await new Promise((res) => setTimeout(res, 50)); } catch { alive = false; }
+    }
+    assert.equal(alive, false, "survivor still running");
+  });
+
+  test("a timeout with a survivor that holds the pipes returns TIMEOUT, not a hang", async () => {
+    if (process.platform === "win32") return;
+    const t0 = Date.now();
+    const r = await run("sleep 600 & sleep 30", { timeoutMs: 300 });
+    assert.equal(r.killed, "timeout");
+    assert.ok(Date.now() - t0 < 4000);
+  });
+
+  test("an abort with a survivor that holds the pipes returns cancel, not a hang", async () => {
+    if (process.platform === "win32") return;
+    const ac = new AbortController();
+    const p = run("sleep 600 & sleep 30", { signal: ac.signal });
+    setTimeout(() => ac.abort(), 200);
+    const t0 = Date.now();
+    const r = await p;
+    assert.equal(r.killed, "cancel");
+    assert.ok(Date.now() - t0 < 4000);
+  });
+
+  test("ctx_execute names the held pipes in its reply and keeps the output so far", async () => {
+    if (process.platform === "win32") return;
+    const root = mkdtempSync(join(tmpdir(), "cm-1337-"));
+    try {
+      const out = await ctxExecute.handler({ language: "shell", code: "sleep 600 & echo hi" }, ctxFor(root));
+      assert.match(out.text, /^hi\n/);
+      assert.ok(out.text.includes(C.BACKGROUND_HOLD_NOTE));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+describe("PRD-v2 section 9: killTree never blocks the host loop (D-1337-EXIT-SETTLE-1, #1337)", () => {
+  test("the Windows branch spawns taskkill async: no execFileSync / spawnSync in kill.ts", () => {
+    const src = readFileSync(fileURLToPath(new URL("../src/core/sandbox/kill.ts", import.meta.url)), "utf8");
+    assert.equal(/execFileSync|spawnSync|execSync/.test(src), false);
+    assert.ok(src.includes('spawn("taskkill"'));
+  });
+
+  test("win32 code path: killTree returns void and never throws, even when taskkill is missing", () => {
+    const real = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    try {
+      assert.equal(killTree(999999), undefined);
+    } finally {
+      Object.defineProperty(process, "platform", real);
+    }
+  });
+});
+
 describe("PRD-v2 section 9: killTree", () => {
   // Unit tests for src/core/sandbox/kill.ts (impl/03 §4).
   // killTree(pid): void. SIGTERM, then SIGKILL after KILL_GRACE_MS, process-group on POSIX.

@@ -2,6 +2,7 @@
 // env supplied by the caller (buildChildEnv), raw uncapped Buffers, never rejects.
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
+import { KILL_GRACE_MS, PIPE_DRAIN_MAX_MS, PIPE_EOF_GRACE_MS } from "../contracts/constants.ts";
 import { killTree } from "./kill.ts";
 import { findRuntime } from "./runtimes.ts";
 
@@ -18,6 +19,8 @@ export interface RunResult {
   stderr: Buffer;
   exitCode: number | null;
   killed: "timeout" | "cancel" | null;
+  /** D-1337-EXIT-SETTLE-1: the child exited but a background process still held the pipes; the output is what arrived by then. */
+  held?: boolean;
 }
 
 const NOT_STARTED: RunResult = Object.freeze({ stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: null, killed: null });
@@ -59,8 +62,16 @@ export function runProcess(argv: string[], o: RunOptions): Promise<RunResult> {
     let killedBy: "timeout" | "cancel" | null = null;
     let settled = false;
 
+    let held = false;
+    let exited = false;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopTimer: ReturnType<typeof setTimeout> | undefined;
+
     const kill = (): void => {
       if (child.pid !== undefined) killTree(child.pid);
+      // The direct child may already be gone while a survivor holds the pipes: bound the wait.
+      if (stopTimer === undefined) stopTimer = setTimeout(() => finishHeld(), KILL_GRACE_MS);
     };
     const onAbort = (): void => {
       if (killedBy !== null || settled) return;
@@ -78,19 +89,46 @@ export function runProcess(argv: string[], o: RunOptions): Promise<RunResult> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(graceTimer);
+      clearTimeout(drainTimer);
+      clearTimeout(stopTimer);
       o.signal.removeEventListener("abort", onAbort);
       resolve({
         stdout: Buffer.concat(stdoutChunks),
         stderr: Buffer.concat(stderrChunks),
         exitCode,
         killed: killedBy,
+        ...(held ? { held: true } : {}),
       });
     };
+    // D-1337-EXIT-SETTLE-1 (#1337): the pipes did not end in time. What arrived is kept whole, the pipes are
+    // destroyed, and the process group is killed so a survivor cannot hold them (POSIX: the group outlives its leader).
+    const finishHeld = (): void => {
+      if (settled) return;
+      held = exited && killedBy === null;
+      child.stdout.destroy();
+      child.stderr.destroy();
+      if (child.pid !== undefined) killTree(child.pid);
+      settle(child.exitCode);
+    };
+    // A data chunk restarts the idle grace, so a large output that is still flowing is not cut.
+    const bump = (): void => {
+      if (!exited || settled) return;
+      clearTimeout(graceTimer);
+      graceTimer = setTimeout(finishHeld, PIPE_EOF_GRACE_MS);
+    };
 
-    child.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => { stdoutChunks.push(chunk); bump(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderrChunks.push(chunk); bump(); });
     // DEVIATIONS D-M2-T4-3: "close" (exit + stdio drained), so no tail bytes are lost.
     child.on("close", (code: number | null) => settle(code));
+    // D-1337-EXIT-SETTLE-1: "exit" starts a short bounded drain; "close" inside it settles at once.
+    child.on("exit", () => {
+      if (settled) return;
+      exited = true;
+      graceTimer = setTimeout(finishHeld, PIPE_EOF_GRACE_MS);
+      drainTimer = setTimeout(finishHeld, PIPE_DRAIN_MAX_MS);
+    });
     // Step 7: spawn-level failure (ENOENT argv[0], missing cwd) resolves, never rejects.
     child.on("error", () => settle(null));
 

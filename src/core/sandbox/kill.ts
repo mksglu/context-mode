@@ -1,6 +1,7 @@
 // impl/03 §4, AS1, AS4, AS5, DECISIONS-r9 F6: POSIX process-group SIGTERM then SIGKILL after
 // KILL_GRACE_MS; Windows `taskkill /F /T /PID` with no shell. Never a Job Object (needs a new ADR).
-import { execFileSync } from "node:child_process";
+// D-1337-EXIT-SETTLE-1 (#1337): the Windows kill is an async spawn, so the host event loop never waits on taskkill.exe.
+import { spawn } from "node:child_process";
 import { KILL_GRACE_MS } from "../contracts/constants.ts";
 
 function signalGroup(pid: number, signal: NodeJS.Signals): void {
@@ -12,7 +13,7 @@ function signalGroup(pid: number, signal: NodeJS.Signals): void {
   }
 }
 
-/** Best-effort kill of the tree rooted at `pid`. Returns at once; never throws. */
+/** Best-effort kill of the tree rooted at `pid`. Returns at once; never throws; never blocks the event loop. */
 export function killTree(pid: number): void {
   if (process.platform !== "win32") {
     signalGroup(pid, "SIGTERM");
@@ -22,8 +23,11 @@ export function killTree(pid: number): void {
     return;
   }
   try {
-    execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
+    const t = spawn("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
+    // Non-zero exit or a missing taskkill: the process is already gone (§4 step 2b).
+    t.on("error", () => {});
+    t.unref();
   } catch {
-    // Non-zero exit: the process is already gone (§4 step 2b).
+    // spawn threw (bad argv): the caller still gets its result from the exit path.
   }
 }

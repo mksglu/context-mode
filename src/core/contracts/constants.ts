@@ -102,6 +102,10 @@ export const SOURCE_HANDLE_MAX_DIGITS = 10;
 // Time budgets (ms)
 export const EXEC_TIMEOUT_MS = 600000; // S-TIMEOUT, Q8: default and max
 export const KILL_GRACE_MS = 1000; // GP4
+// D-1337-EXIT-SETTLE-1 (#1337): after the child exits, runProcess waits this long for the pipes to end; each data chunk restarts it.
+export const PIPE_EOF_GRACE_MS = 250;
+// D-1337-EXIT-SETTLE-1: the most time the pipe drain may take after exit, so a survivor that keeps writing cannot hold the call.
+export const PIPE_DRAIN_MAX_MS = 2000;
 export const DB_TIMEOUT_MS = 5000; // ADR-0002, PRD §4
 export const DB_WAL_SUFFIX = "-wal"; // impl/02 §6.1 step 4, DEVIATIONS D-M1-T5-1: WAL sibling of context.db
 export const DB_SHM_SUFFIX = "-shm"; // impl/02 §6.1 step 4, DEVIATIONS D-M1-T5-1: shared-memory sibling of context.db
@@ -145,6 +149,8 @@ export const SHELL_FAMILY: readonly string[] = Object.freeze(["sh", "bash", "zsh
 export const PATHEXT_DEFAULT = ".COM;.EXE;.BAT;.CMD"; // impl/03 §2 step 3: Windows PATHEXT when the env var is unset
 export const FETCH_MAX_HOPS = 5; // impl/03 §6 step 5: redirect hops; one more is FETCH_FAILED
 export const SOURCE_LABEL_MAX_CHARS = 80; // impl/04 §2.3 step 15, §4 step 7: label = "<tool>:" + first line of the code, at most 80 chars
+// D-1337-EXIT-SETTLE-1: appended to a ctx_execute reply when the command exited but a background process still held its output pipes.
+export const BACKGROUND_HOLD_NOTE = "note: the command ended; a background process still holds its output, so output it writes later is not captured.";
 export const CANCELLED_LINE = "Cancelled."; // impl/04 §2.3 step 11: reply on ctx.signal abort (not an ERROR_TEXT key)
 export const BACKGROUND_REPLY_PREFIX = "started in background, pid "; // impl/04 §2.3 step 9, A11 (DECISIONS-r9 S5): + decimal pid, nothing after
 export const PLAIN_OUTPUT_ENV: Readonly<Record<string, string>> = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" }); // impl/04 §2.3 step 6: plain child output (ctx_execute and run.mjs, D-M3-X1-4)
