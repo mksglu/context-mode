@@ -2446,7 +2446,7 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
     const cfg = path.join(home, "Library", "Application Support", "orca", "claude-profiles", "7f3a9c", "cfg");
     mkdirSync(cfg, { recursive: true });
     const reply = await runUpgrade({}, deps(home, "claude-code", { env: { HOME: home, USERPROFILE: home, PATH: "", CLAUDE_CONFIG_DIR: cfg } }));
-    const q = `CLAUDE_CONFIG_DIR='${cfg}' `;
+    const q = process.platform === "win32" ? "" : `CLAUDE_CONFIG_DIR='${cfg}' `; // claudeProfileEnv adds no words on Windows (POSIX quoting only)
     assert.ok(reply.text.includes(`| host update |  | ${q}claude plugin marketplace update context-mode && ${q}claude plugin update context-mode@context-mode |`), reply.text);
   });
 
