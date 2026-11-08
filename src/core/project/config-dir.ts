@@ -3,7 +3,7 @@
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
 const { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { basename, dirname, join, posix, resolve, win32 } from "node:path";
-import { AGENT_HOME_DIR, APPDATA_ENV, CONFIG_TOML_FILE, SETUP_BACKUP_DIR_NAME, SETUP_MANIFEST_FILE, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
+import { AGENT_HOME_DIR, UPGRADE_HOST_COMMAND, APPDATA_ENV, CONFIG_TOML_FILE, SETUP_BACKUP_DIR_NAME, SETUP_MANIFEST_FILE, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 
 /** The one home rule. An empty value counts as unset; null when nothing is set (D-M3-F-8).
@@ -140,6 +140,15 @@ export function claudeProfileEnv(env: NodeJS.ProcessEnv, platform: NodeJS.Platfo
   const dir = env[CLAUDE_CONFIG_DIR_ENV];
   if (dir === undefined || dir === "" || platform === "win32") return "";
   return `${CLAUDE_CONFIG_DIR_ENV}='${dir.split("'").join(`'"'"'`)}' `;
+}
+
+/** #1338: the agent's own update command; for Claude Code each `claude` command carries the profile words, so a copied line reaches that profile.
+ *  One rule for ctx_upgrade and doctor D1. */
+export function hostUpdateCommand(agent: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): string {
+  const cmd = UPGRADE_HOST_COMMAND[agent as keyof typeof UPGRADE_HOST_COMMAND];
+  if (agent !== "claude-code") return cmd;
+  const profile = claudeProfileEnv(env, platform);
+  return profile === "" ? cmd : cmd.split(" && ").map((c) => profile + c).join(" && ");
 }
 
 /** D-WIN-OPENCODE-DIR-1: the dir OpenCode reads opencode.json and skills/ from: $OPENCODE_CONFIG_DIR when set and not

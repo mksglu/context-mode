@@ -11,7 +11,7 @@ import {
 import { CtxError } from "../contracts/errors.ts";
 import type { AdapterRow, CtxUpgradeInput, ProjectContext, ToolContext, ToolReply, UpgradeChangeRow } from "../contracts/types.ts";
 import { getAdapter } from "../../adapters/table.ts";
-import { claudeDirOf, claudeProfileEnv, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir } from "../project/config-dir.ts";
+import { claudeDirOf, hostUpdateCommand, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir } from "../project/config-dir.ts";
 import { detectV1 } from "../ops/detect-v1.ts";
 import { regenerateHostConfig, type HostFileWriter } from "../ops/host-write.ts";
 import { ownBundleDir } from "../ops/bundle-dir.ts";
@@ -59,11 +59,7 @@ function pluginRootRow(adapter: AdapterRow, env: NodeJS.ProcessEnv): UpgradeChan
 }
 
 function hostRow(adapter: AdapterRow, env: NodeJS.ProcessEnv): UpgradeChangeRow {
-  const cmd = UPGRADE_HOST_COMMAND[adapter.id];
-  // #1338: a custom Claude Code profile dir (CLAUDE_CONFIG_DIR) goes in front of each `claude` command, so a copied line reaches that profile.
-  if (adapter.id !== "claude-code") return row(UPGRADE_HOST_AREA, "", cmd);
-  const profile = claudeProfileEnv(env);
-  return row(UPGRADE_HOST_AREA, "", profile === "" ? cmd : cmd.split(" && ").map((c) => profile + c).join(" && "));
+  return row(UPGRADE_HOST_AREA, "", hostUpdateCommand(adapter.id, env)); // #1338: the profile words come from one function, shared with doctor D1
 }
 
 // Steps 4-7. Step 4 is the agent's own update command (the user runs it); step 5 rewrites only context-mode's own

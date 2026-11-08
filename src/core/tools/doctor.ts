@@ -8,7 +8,7 @@ import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
   D5_LAST_HOOK_ERROR, D5_PAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_DOCS_LABEL, DOCTOR_DOCS_LINK, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
-  NATIVE_INSTALL, PI_LIST_COMMAND, UPGRADE_HOST_COMMAND, PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
+  NATIVE_INSTALL, PI_LIST_COMMAND, PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type {
@@ -27,7 +27,7 @@ import { unsupportedHostOf } from "../ops/unsupported-host.ts";
 import type { UnsupportedHost } from "../contracts/constants.ts";
 import { UNSUPPORTED_HOST_LINE } from "../ops/unsupported-host.ts";
 import { environmentLine, writeIssueReport } from "../ops/doctor-issue.ts";
-import { claudeDirOf, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
+import { claudeDirOf, hostUpdateCommand, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { indexText } from "../index/text.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
 import { closeDb, openDb } from "../store/db.ts";
@@ -114,11 +114,11 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
   const host = adapter.id === "codex" ? { ...host0, env: { ...host0.env, CODEX_HOME: codexRunDirOf(host0.env, homeDirOf(host0.env) ?? "", host0.bundleDir) } } : host0;
   const env = host.env;
   const project = ctx.project;
-  const other = unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env }); // D-UNSUPPORTED-HOSTS-1: the host is known and not supported
+  const other = adapter.installMode === "in-process" ? undefined : unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env }); // D-UNSUPPORTED-HOSTS-1: the host is known and not supported; Pi and OpenCode run in process, so a terminal env var (CURSOR_TRACE_ID) never names another host
   let integrityFailed = false;
   let orphan: DbCheck["orphan"] = [];
   const checks: Record<DoctorCheckId, () => DoctorRow | Promise<DoctorRow>> = {
-    D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal, updateCommand: UPGRADE_HOST_COMMAND[adapter.id] }),
+    D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal, updateCommand: hostUpdateCommand(adapter.id, env) }),
     D2: () => checkNode({ nodeVersion: process.version, bunVersion: process.versions.bun }),
     D3: () => other !== undefined ? unsupportedRow("D3", other) : checkHostConfig(adapter, env, project.worktree), // D-UNSUPPORTED-HOSTS-1
     D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { project: project.worktree, piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), codexDir: codexDirOf(env, requireHomeDir(env)), geminiDir: geminiDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
@@ -182,7 +182,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   let notes: string[] = [];
   if (failed) {
     try {
-      notes = await writeIssueReport({ unsupported: unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env: host.env }), ctx, adapter, env: host.env, bundleDir: host.bundleDir, rows, envLine, table });
+      notes = await writeIssueReport({ unsupported: adapter.installMode === "in-process" ? undefined : unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env: host.env }), ctx, adapter, env: host.env, bundleDir: host.bundleDir, rows, envLine, table });
     } catch (err) {
       notes = [`Report file: ${lineOf(err)}`]; // ADR-0010: doctor always answers
     }

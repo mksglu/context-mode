@@ -17,6 +17,7 @@ import { unsupportedHostOf, unsupportedHostByName } from "../src/core/ops/unsupp
 import { issueTitle, summaryOf } from "../src/core/ops/doctor-issue.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
 import { bundleDirOf, ownBundleDir } from "../src/core/ops/bundle-dir.ts";
+import { hostUpdateCommand } from "../src/core/project/config-dir.ts";
 import { openReadOnlyHandle } from "../src/core/store/open-read.ts";
 import { nodeLaunch } from "../src/core/sandbox/host-node.ts";
 import { getAdapter, ADAPTERS } from "../src/adapters/table.ts";
@@ -638,6 +639,14 @@ describe("ADR-0010 doctor on every unsupported host: one clear line, no false FA
     assert.equal(rs.find((x) => x.id === "D3").status, "FAIL");
     assert.equal(unsupportedHostOf({ clientName: "gemini-cli-mcp-client" }), undefined);
     for (const id of ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"]) assert.equal(unsupportedHostByName(id), undefined, id);
+  });
+
+  test("[D-UNSUPPORTED-HOSTS-1] an in-process host (Pi, OpenCode) is the host: a foreign env var from the terminal never marks it unsupported", async (t) => {
+    for (const agent of ["pi", "opencode"]) {
+      const home = tmp(t);
+      const rs = await rows(home, agent, { env: { CURSOR_TRACE_ID: "x", ZED_TERM: "true" } });
+      for (const id of ["D3", "D5"]) assert.equal(rs.find((x) => x.id === id).detail.includes("not a supported host"), false, `${agent} ${id}`);
+    }
   });
 
   test("[D-UNSUPPORTED-HOSTS-1] Pi and Pi-Bolt are never unsupported; PI_CODING_AGENT_DIR is not an OMP signal", () => {
@@ -2439,6 +2448,16 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
     const reply = await runUpgrade({}, deps(home, "claude-code", { env: { HOME: home, USERPROFILE: home, PATH: "", CLAUDE_CONFIG_DIR: cfg } }));
     const q = `CLAUDE_CONFIG_DIR='${cfg}' `;
     assert.ok(reply.text.includes(`| host update |  | ${q}claude plugin marketplace update context-mode && ${q}claude plugin update context-mode@context-mode |`), reply.text);
+  });
+
+  // #1338 review: doctor D1 names the same profile-aware update command as ctx_upgrade.
+  test("[M5] hostUpdateCommand puts the CLAUDE_CONFIG_DIR profile in front of each claude command and leaves other agents alone (#1338)", () => {
+    const q = "CLAUDE_CONFIG_DIR='/p/cfg' ";
+    assert.equal(hostUpdateCommand("claude-code", { CLAUDE_CONFIG_DIR: "/p/cfg" }, "darwin"), `${q}claude plugin marketplace update context-mode && ${q}claude plugin update context-mode@context-mode`);
+    assert.equal(hostUpdateCommand("claude-code", {}, "darwin"), C.UPGRADE_HOST_COMMAND["claude-code"]);
+    assert.equal(hostUpdateCommand("opencode", { CLAUDE_CONFIG_DIR: "/p/cfg" }, "darwin"), C.UPGRADE_HOST_COMMAND.opencode);
+    const doctorSrc = readFileSync(new URL("../src/core/tools/doctor.ts", import.meta.url), "utf8");
+    assert.ok(doctorSrc.includes("updateCommand: hostUpdateCommand(adapter.id, env)"));
   });
 
   test("[M5] upgrade/opencode-release-git-entry-becomes-npm-latest, siblings kept (#1309)", async (t) => {
