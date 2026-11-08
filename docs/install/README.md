@@ -134,7 +134,7 @@ If you update with npm yourself (`npm i -g context-mode`), most agents need noth
 
 | Agent | After `npm i -g` |
 |---|---|
-| Claude Code | Claude Code runs its own copy of the plugin. Run `context-mode setup --repair`, or `claude plugin update context-mode@context-mode`. `context-mode doctor` fails with this fix line while the copy is old. |
+| Claude Code | Claude Code runs its own copy of the plugin. Run `context-mode setup --repair` (it runs `claude plugin marketplace update context-mode` and `claude plugin update context-mode@context-mode` in the profile it found), or run those two commands yourself. `context-mode doctor` fails with this fix line while the copy is old. |
 | Codex, Copilot CLI, Gemini CLI, Kiro, OpenCode, Pi, Qwen Code, VS Code, Z Code | Nothing. Restart the agent. |
 
 Run `context-mode doctor` to check. It changes nothing.

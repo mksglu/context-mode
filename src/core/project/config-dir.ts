@@ -133,6 +133,15 @@ export function claudeDirOf(env: NodeJS.ProcessEnv, home: string): string {
   return dir !== undefined && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR["claude-code"]);
 }
 
+/** #1338: the env words a copied Claude Code command needs to reach the profile in use: `CLAUDE_CONFIG_DIR='<dir>' ` when the
+ *  variable is set (a custom profile dir, e.g. Orca), else "". A HOME-based profile needs none: the shell that runs the
+ *  command already carries that HOME. POSIX quoting; Windows shells differ, so no words there. */
+export function claudeProfileEnv(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): string {
+  const dir = env[CLAUDE_CONFIG_DIR_ENV];
+  if (dir === undefined || dir === "" || platform === "win32") return "";
+  return `${CLAUDE_CONFIG_DIR_ENV}='${dir.split("'").join(`'"'"'`)}' `;
+}
+
 /** D-WIN-OPENCODE-DIR-1: the dir OpenCode reads opencode.json and skills/ from: $OPENCODE_CONFIG_DIR when set and not
  *  empty, else $XDG_CONFIG_HOME/opencode (OpenCode takes its global dir from xdg-basedir), else <home>/.config/opencode.
  *  Same shape as codexDirOf. $OPENCODE_CONFIG (a single extra config file, merged on top) does not move the global dir. */

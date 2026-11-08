@@ -722,7 +722,7 @@ exit 0`);
     writeFileSync(path.join(s.pkgDir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.1" }));
     const stale = await runDoctor(opts);
     assert.equal(stale.agents[0].status, "FAIL");
-    assert.equal(stale.agents[0].reason, "copy: Claude Code runs context-mode 2.0.0, the installed package is 2.0.1; run claude plugin update context-mode@context-mode");
+    assert.equal(stale.agents[0].reason, "copy: Claude Code runs context-mode 2.0.0, the installed package is 2.0.1; run claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode");
     writeFileSync(want, installedPlugins(s.home, "2.0.1"));
     writeFileSync(log, "");
     const fixed = await runSetup({ ...opts, runId: "r2" });
@@ -736,17 +736,79 @@ exit 0`);
     assert.equal(manifest.entries.some((e) => e.undo), false, JSON.stringify(manifest));
   });
 
-  test("[US] claude-code: setup that cannot refresh a stale copy is a FAIL that names the copy check", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  // #1338 (su69ar, macOS, 2.1.6): Claude Code ran inside an Orca profile, ~/Library/Application Support/orca/claude-profiles/<id>/home,
+  // a HOME of its own. The 1.0.169 plugin was still installed there; setup rolled back with "run claude plugin update ...".
+  // Now setup runs the host's own marketplace update and plugin update with that profile's HOME and CLAUDE_CONFIG_DIR, then re-checks.
+  function orca(t) {
     const s = sandbox(t);
-    const ip = put(path.join(s.home, ".claude", "plugins", "installed_plugins.json"), installedPlugins(s.home, "1.9.0"));
+    const profile = path.join(s.root, "Library", "Application Support", "orca", "claude-profiles", "7f3a9c", "home");
+    mkdirSync(profile, { recursive: true });
+    return { ...s, profile, env: { ...s.env, HOME: profile, USERPROFILE: profile } };
+  }
+
+  test("[US] claude-code (#1338): an Orca profile with the 1.0.169 plugin is updated with the host's own commands in that profile, not rolled back", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = orca(t);
+    const log = path.join(s.root, "claude.log");
+    const ip = path.join(s.profile, ".claude", "plugins", "installed_plugins.json");
+    put(ip, installedPlugins(s.profile, "1.0.169"));
+    const want = path.join(s.root, "want.json");
+    writeFileSync(want, installedPlugins(s.profile, "2.0.0"));
+    fakeClaude(s.root, s.bin, `echo "HOME=$HOME $@" >> "${log}"
+case "$1 $2" in
+  "plugin list") echo "context-mode@context-mode" ;;
+  "plugin update") cp "${want}" "${ip}" ;;
+esac
+exit 0`);
+    const res = await runSetup({ home: s.profile, pkgDir: s.pkgDir, env: s.env, agents: ["claude-code"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.equal(res.agents[0].rolledBack, undefined);
+    const lines = readFileSync(log, "utf8").split("\n");
+    const market = lines.findIndex((l) => l.endsWith("plugin marketplace update context-mode"));
+    const update = lines.findIndex((l) => l.endsWith("plugin update context-mode@context-mode"));
+    assert.ok(market >= 0 && update > market, "marketplace update runs before plugin update: " + lines.join("|"));
+    assert.ok(lines[update].startsWith(`HOME=${s.profile} `), "the update runs with the profile HOME: " + lines[update]);
+    assert.equal(JSON.parse(readFileSync(ip, "utf8")).plugins["context-mode@context-mode"][0].version, "2.0.0");
+    assert.ok(res.agents[0].checks.find((c) => c.name === "copy").ok);
+  });
+
+  test("[US] claude-code (#1338): an update that cannot run ends in a WARN with the exact commands, never a rollback", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = orca(t);
+    const ip = put(path.join(s.profile, ".claude", "plugins", "installed_plugins.json"), installedPlugins(s.profile, "1.0.169"));
+    fakeClaude(s.root, s.bin, `case "$1 $2" in
+  "plugin list") echo "context-mode@context-mode" ;;
+  "plugin marketplace") echo "network down" >&2; exit 1 ;;
+  "plugin update") echo "network down" >&2; exit 1 ;;
+esac
+exit 0`);
+    const res = await runSetup({ home: s.profile, pkgDir: s.pkgDir, env: s.env, agents: ["claude-code"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.equal(res.agents[0].rolledBack, undefined);
+    const copy = res.agents[0].checks.find((c) => c.name === "copy");
+    assert.equal(copy.warn, true);
+    assert.match(copy.detail, /still runs context-mode 1\.0\.169, the installed package is 2\.0\.0/);
+    assert.match(copy.detail, /network down/);
+    assert.ok(copy.detail.endsWith("run claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode"), copy.detail);
+    assert.equal(JSON.parse(readFileSync(ip, "utf8")).plugins["context-mode@context-mode"][0].version, "1.0.169");
+    // doctor tells the truth: the old copy is a FAIL with the same commands.
+    const doc = await runDoctor({ home: s.profile, pkgDir: s.pkgDir, env: s.env, agents: ["claude-code"] });
+    assert.equal(doc.agents[0].status, "FAIL");
+    assert.match(doc.agents[0].reason, /^copy: Claude Code runs context-mode 1\.0\.169, the installed package is 2\.0\.0; run claude plugin marketplace update context-mode && claude plugin update context-mode@context-mode/);
+  });
+
+  test("[US] claude-code (#1338): a CLAUDE_CONFIG_DIR profile is read for the copy and named in the fix commands", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const cfg = path.join(s.root, "Library", "Application Support", "orca", "claude-profiles", "7f3a9c", "cfg dir");
+    const ip = path.join(cfg, "plugins", "installed_plugins.json");
+    put(ip, installedPlugins(s.home, "1.0.169"));
     fakeClaude(s.root, s.bin, `case "$1 $2" in
   "plugin list") echo "context-mode@context-mode" ;;
 esac
 exit 0`);
-    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["claude-code"], runId: "r" });
-    assert.equal(res.agents[0].status, "FAIL");
-    assert.match(res.agents[0].reason, /^copy: Claude Code runs context-mode 1\.9\.0, the installed package is 2\.0\.0/);
-    assert.equal(JSON.parse(readFileSync(ip, "utf8")).plugins["context-mode@context-mode"][0].version, "1.9.0");
+    const env = { ...s.env, CLAUDE_CONFIG_DIR: cfg };
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env, agents: ["claude-code"] });
+    assert.equal(doc.agents[0].status, "FAIL");
+    const q = `CLAUDE_CONFIG_DIR='${cfg}' `;
+    assert.ok(doc.agents[0].reason.endsWith(`run ${q}claude plugin marketplace update context-mode && ${q}claude plugin update context-mode@context-mode`), doc.agents[0].reason);
   });
 
   // D-NI-CODEX-DOCTOR-1 (ADR-0023): `codex plugin add context-mode@context-mode` installs the npm package as a Codex plugin.

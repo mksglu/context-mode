@@ -2383,6 +2383,16 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
     });
   }
 
+  // #1338: ctx_upgrade names the update command for the profile in use; a CLAUDE_CONFIG_DIR profile goes in front of each claude command.
+  test("[M5] upgrade/claude-code names the CLAUDE_CONFIG_DIR profile in its update command (#1338)", async (t) => {
+    const home = tmp(t);
+    const cfg = path.join(home, "Library", "Application Support", "orca", "claude-profiles", "7f3a9c", "cfg");
+    mkdirSync(cfg, { recursive: true });
+    const reply = await runUpgrade({}, deps(home, "claude-code", { env: { HOME: home, USERPROFILE: home, PATH: "", CLAUDE_CONFIG_DIR: cfg } }));
+    const q = `CLAUDE_CONFIG_DIR='${cfg}' `;
+    assert.ok(reply.text.includes(`| host update |  | ${q}claude plugin marketplace update context-mode && ${q}claude plugin update context-mode@context-mode |`), reply.text);
+  });
+
   test("[M5] upgrade/opencode-release-git-entry-becomes-npm-latest, siblings kept (#1309)", async (t) => {
     const home = tmp(t);
     const dir = path.join(home, ".config", "opencode");

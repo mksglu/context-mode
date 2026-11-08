@@ -365,7 +365,7 @@ function planRow(row: CheckRow, listed: boolean, stale: boolean, env: SetupConte
   planSkills(row, edits);
   const cli = row.config || !row.cli || listed ? [] : row.cli.install;
   // D-US-1: a listed plugin whose copy is older than the package gets the host's own update command, not a reinstall.
-  const refresh = listed && stale && row.copy ? [row.copy.refresh] : [];
+  const refresh = listed && stale && row.copy ? [row.copy.marketplace, row.copy.refresh] : []; // #1338: `plugin update` reads the marketplace listing, so that is refreshed first
   // D-CC-HOOKS-RUN-1: a listed but disabled plugin runs no hooks; the host's own enable command turns it on.
   if (listed && disabled && row.copy) refresh.push(row.copy.enable);
   return { edits, cli, refresh };
@@ -493,8 +493,13 @@ function packageVersion(pkgDir: string): string | undefined {
   } catch { return undefined; }
 }
 
-/** D-US-1: a host that runs a copy of the package must run the installed version. No record, no check: list covers it. */
-function copyCheck(row: CheckRow, pkgDir: string): Check | undefined {
+/** #1338: the two host commands that renew the copy, with the env words of the profile setup found (CLAUDE_CONFIG_DIR). */
+function copyFix(c: NonNullable<CheckRow["copy"]>): string {
+  return `${c.profile}${c.bin} ${c.marketplace.join(" ")} && ${c.profile}${c.bin} ${c.refresh.join(" ")}`;
+}
+
+/** The recorded copy version that differs from the package, when there is one. */
+function staleCopy(row: CheckRow, pkgDir: string): { old: string; pkg: string } | undefined | Check {
   const c = row.copy;
   const pkg = packageVersion(pkgDir);
   const text = c ? readOr(c.file) : undefined;
@@ -503,13 +508,29 @@ function copyCheck(row: CheckRow, pkgDir: string): Check | undefined {
   try {
     const doc: unknown = JSON.parse(text);
     entries = isObj(doc) && isObj(doc.plugins) ? doc.plugins[c.plugin] : undefined;
-  } catch { return { name: "copy", ok: false, detail: `${c.file} is not valid JSON; run ${c.bin} ${c.refresh.join(" ")}` }; }
+  } catch { return { name: "copy", ok: false, detail: `${c.file} is not valid JSON; run ${copyFix(c)}` }; }
   if (!Array.isArray(entries)) return undefined;
   const versions = entries.filter(isObj).map((e) => e.version).filter((v): v is string => typeof v === "string");
   if (!versions.length) return undefined;
   const old = versions.find((v) => v !== pkg);
-  if (old === undefined) return { name: "copy", ok: true };
-  return { name: "copy", ok: false, detail: `${c.host} runs context-mode ${old}, the installed package is ${pkg}; run ${c.bin} ${c.refresh.join(" ")}` };
+  return old === undefined ? { name: "copy", ok: true } : { old, pkg };
+}
+
+/** D-US-1: a host that runs a copy of the package must run the installed version. No record, no check: list covers it. */
+function copyCheck(row: CheckRow, pkgDir: string): Check | undefined {
+  const r = staleCopy(row, pkgDir);
+  if (r === undefined || "name" in r) return r;
+  const c = row.copy as NonNullable<CheckRow["copy"]>;
+  return { name: "copy", ok: false, detail: `${c.host} runs context-mode ${r.old}, the installed package is ${r.pkg}; run ${copyFix(c)}` };
+}
+
+/** #1338: setup ran the host's own update and the copy is still old. The good install stays: a WARN with the exact commands. */
+function copyWarn(row: CheckRow, pkgDir: string, refreshNotes: string[]): Check | undefined {
+  const r = staleCopy(row, pkgDir);
+  if (r === undefined || "name" in r) return undefined;
+  const c = row.copy as NonNullable<CheckRow["copy"]>;
+  const why = refreshNotes.length ? ` (${refreshNotes.join("; ")})` : "";
+  return { name: "copy", ok: true, warn: true, detail: `${c.host} still runs context-mode ${r.old}, the installed package is ${r.pkg}${why}; run ${copyFix(c)}` };
 }
 
 // #1328 D-NODE-OLD-1: a server that lists only ctx_doctor runs in degraded mode (server.ts isDegraded): its Node is
@@ -1095,13 +1116,21 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       if (!installExitOk(r.status, r.status === WIN_EXIT_CRASH && listCheck(row, ctx.env)?.ok === true)) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
     }
     if (plan.cli.length) for (const args of row.cli!.remove) run.record({ agent: row.id, undo: { bin: row.cli!.bin, args } });
+    const refreshNotes: string[] = [];
     for (const args of plan.refresh) { // a refresh is not an install: recorded, never undone
       const r = runBin(row.cli!.bin, args, ctx.env, undefined, INSTALL_TIMEOUT_MS);
-      if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
+      const failed = `${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`;
+      // #1338: a copy refresh that cannot run leaves the good install in place; the copy check below ends in a WARN.
+      if (r.status !== 0 && !isCopyRefresh(row, args)) throw new Error(failed);
+      if (r.status !== 0) { refreshNotes.push(failed); continue; }
       run.record({ agent: row.id, ran: { bin: row.cli!.bin, args } });
     }
     res.changes.push(...await enableCopilotHooks(row, ctx, run));
     res.checks = await verifyRow(row, ctx);
+    if (plan.refresh.length) { // the re-check: a copy that is still old after the host's update
+      const w = copyWarn(row, ctx.pkgDir, refreshNotes);
+      if (w) res.checks = res.checks.map((c) => (c.name === "copy" ? w : c));
+    }
     const bad = res.checks.filter((c) => !c.ok);
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
   } catch (e) {
@@ -1176,7 +1205,13 @@ function isRefresh(row: CheckRow, c: Change): boolean {
   const r = row.copy;
   if (r === undefined || c.command === undefined) return false;
   const cmd = c.command.join(" ");
-  return cmd === [r.bin, ...r.refresh].join(" ") || cmd === [r.bin, ...r.enable].join(" "); // D-CC-HOOKS-RUN-1
+  return isCopyRefresh(row, c.command.slice(1)) || cmd === [r.bin, ...r.enable].join(" "); // D-CC-HOOKS-RUN-1
+}
+/** #1338: the marketplace update and the plugin update that renew a stale copy. */
+function isCopyRefresh(row: CheckRow, args: string[]): boolean {
+  const r = row.copy;
+  const a = args.join(" ");
+  return r !== undefined && (a === r.refresh.join(" ") || a === r.marketplace.join(" "));
 }
 function isTrust(row: CheckRow, c: Change): boolean {
   const h = row.hookInstall;
