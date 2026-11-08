@@ -25,6 +25,7 @@ import { healD8, healOrphan } from "../ops/db-heal.ts";
 import { buildReport, buildReportHead } from "../ops/report.ts";
 import { unsupportedHostOf } from "../ops/unsupported-host.ts";
 import type { UnsupportedHost } from "../contracts/constants.ts";
+import type { AgentId } from "../contracts/agents.ts";
 import { UNSUPPORTED_HOST_LINE } from "../ops/unsupported-host.ts";
 import { environmentLine, writeIssueReport } from "../ops/doctor-issue.ts";
 import { claudeDirOf, hostUpdateCommand, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
@@ -66,6 +67,11 @@ async function codexDb(ctx: ToolContext, adapter: AdapterRow): Promise<DbHandle 
   } catch {
     return null; // a stale or corrupt DB is D8's row; D5 then sees no journal
   }
+}
+
+/** D-1340-AGY-D1-1: the D1 update hint. On a host we do not support, the supported agent's own update command would be false advice (#1340), so D1 shows the unsupported-host line instead. */
+export function d1UpdateCommand(agent: AgentId, env: NodeJS.ProcessEnv, other: UnsupportedHost | undefined): string {
+  return other === undefined ? hostUpdateCommand(agent, env) : UNSUPPORTED_HOST_LINE(other.name);
 }
 
 function unsupportedRow(id: "D3" | "D5", h: UnsupportedHost): DoctorRow {
@@ -118,7 +124,7 @@ export async function runDoctorChecks(ctx: ToolContext, adapter: AdapterRow, hos
   let integrityFailed = false;
   let orphan: DbCheck["orphan"] = [];
   const checks: Record<DoctorCheckId, () => DoctorRow | Promise<DoctorRow>> = {
-    D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal, updateCommand: hostUpdateCommand(adapter.id, env) }),
+    D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: project.worktree, signal: ctx.signal, updateCommand: d1UpdateCommand(adapter.id, env, other) }),
     D2: () => checkNode({ nodeVersion: process.version, bunVersion: process.versions.bun }),
     D3: () => other !== undefined ? unsupportedRow("D3", other) : checkHostConfig(adapter, env, project.worktree), // D-UNSUPPORTED-HOSTS-1
     D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { project: project.worktree, piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), codexDir: codexDirOf(env, requireHomeDir(env)), geminiDir: geminiDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
