@@ -2468,7 +2468,7 @@ describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {
     assert.equal(hostUpdateCommand("claude-code", {}, "darwin"), C.UPGRADE_HOST_COMMAND["claude-code"]);
     assert.equal(hostUpdateCommand("opencode", { CLAUDE_CONFIG_DIR: "/p/cfg" }, "darwin"), C.UPGRADE_HOST_COMMAND.opencode);
     const doctorSrc = readFileSync(new URL("../src/core/tools/doctor.ts", import.meta.url), "utf8");
-    assert.ok(doctorSrc.includes("updateCommand: hostUpdateCommand(adapter.id, env)"));
+    assert.ok(doctorSrc.includes("hostUpdateCommand(agent, env)"), "D1 still reaches hostUpdateCommand through d1UpdateCommand");
   });
 
   test("[M5] upgrade/opencode-release-git-entry-becomes-npm-latest, siblings kept (#1309)", async (t) => {
