@@ -677,6 +677,13 @@ export const D3_PART_JOIN = ", ";
 export function D3_DETAIL(parts: readonly string[]): string { return `wrong: ${parts.join(D3_PART_JOIN)}`; }
 // D-DOC-D3-SCOPE-1: two or more live installs and none is the one Claude Code runs for this project.
 export function D3_ROOT_DETAIL(paths: readonly string[]): string { return `pick one install for this project: ${paths.join(D3_PART_JOIN)}`; }
+// D-1340-AGY-D3-1 (#1340): Google Antigravity is not a supported host. It starts our gemini-mode server from a plugin dir
+// and reads no Gemini CLI settings or extension, so D3 names the host once instead of "wrong" entries it never uses.
+export const ANTIGRAVITY_CLIENT_NAMES: readonly string[] = Object.freeze(["antigravity", "antigravity-cli", "antigravity-client", "agy"]); // lower case; MCP clientInfo.name
+export const ANTIGRAVITY_DIR_NAMES: readonly string[] = Object.freeze(["config", "antigravity", "antigravity-cli", "antigravity-ide"]); // ~/.gemini/<one of these>/plugins/<plugin>
+export const ANTIGRAVITY_PLUGINS_DIR = "plugins";
+export const GEMINI_HOME_DIR_NAME = ".gemini";
+export const D3_ANTIGRAVITY_DETAIL = "Antigravity is not a supported host yet; the MCP server runs (see D6); hooks are not checked there; supported agents: docs/install/README.md";
 export const D3_ROOT_FIX_JOIN = " or ";
 export function D3_ROOT_FIX(installs: readonly { key: string; scope: string }[]): string {
   return `remove the extra install: ${installs.map((i) => `claude plugin uninstall ${i.key} --scope ${i.scope}`).join(D3_ROOT_FIX_JOIN)}`;

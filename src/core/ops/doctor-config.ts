@@ -6,7 +6,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  ANTIGRAVITY_CLIENT_NAMES, ANTIGRAVITY_DIR_NAMES, ANTIGRAVITY_PLUGINS_DIR, D3_ANTIGRAVITY_DETAIL, GEMINI_HOME_DIR_NAME, AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
@@ -271,9 +271,30 @@ function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktr
   return [...(hooksBad ? [PART_HOOKS] : []), ...(timeoutBad ? [PART_TIMEOUT] : [])];
 }
 
+/** What the running server tells D3 about its host: the MCP clientInfo.name and the bundle directory (D-1340-AGY-D3-1). */
+export interface D3Host { clientName?: string; bundleDir?: string; }
+
+/** True when `bundleDir` sits at ~/.gemini/<config|antigravity|antigravity-cli|antigravity-ide>/plugins/<plugin>/... (segment match, no pattern). */
+function inAntigravityPluginDir(bundleDir: string): boolean {
+  let parts = [bundleDir];
+  for (const sep of V1_PATH_SEPS) parts = parts.flatMap((p) => p.split(sep));
+  for (let i = 0; i + 2 < parts.length; i++) {
+    if (parts[i] === GEMINI_HOME_DIR_NAME && ANTIGRAVITY_DIR_NAMES.includes(parts[i + 1]) && parts[i + 2] === ANTIGRAVITY_PLUGINS_DIR) return true;
+  }
+  return false;
+}
+
+/** D-1340-AGY-D3-1 (#1340): the gemini-mode server runs inside Antigravity (clientInfo or plugin path says so). */
+export function isAntigravityHost(row: AdapterRow, host: D3Host): boolean {
+  if (row.id !== "gemini") return false;
+  if (host.clientName !== undefined && ANTIGRAVITY_CLIENT_NAMES.includes(host.clientName.toLowerCase())) return true;
+  return host.bundleDir !== undefined && inAntigravityPluginDir(host.bundleDir);
+}
+
 /** D3 — host config. FAIL names which of the 3 parts is wrong; fix setup for the MCP entry, else "run ctx_upgrade". Pi also names the
  *  settings file it read (PI_CODING_AGENT_DIR, else ~/.pi/agent), never a legacy path (#1168 #1266, D-M7-G2-1). */
-export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktree: string): DoctorRow {
+export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktree: string, host: D3Host = {}): DoctorRow {
+  if (isAntigravityHost(row, host)) return { id: "D3", label: DOCTOR_LABEL.D3, status: "WARN", detail: D3_ANTIGRAVITY_DETAIL }; // D-1340-AGY-D3-1: no Gemini CLI claim, no gemini fix
   const home = homeDirOf(env);
   if (home === null) return fail("D3", D3_DETAIL(D3_PARTS), DOCTOR_FIX_UPGRADE);
   if (row.installMode === "marketplace") { // D-DOC-D3-SCOPE-1: no install to judge is its own finding, not wrong entries

@@ -491,6 +491,62 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
   });
 });
 
+describe("ADR-0010 doctor D3 on Antigravity: one clear line, no Gemini CLI claims (D-1340-AGY-D3-1)", { concurrency: CONC }, () => {
+  // #1340 (nahiarhd, filed by an Antigravity agent): "D3 host config FAIL: wrong: MCP entry, hook entries", fix
+  // "context-mode setup --agents gemini", bundle ~/.gemini/config/plugins/context-mode/server, D5 D6 D8 PASS.
+  const KEY = "e".repeat(16);
+  function tmp(t) {
+    const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-doctor-agy-")));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    return dir;
+  }
+  function run(home, clientName, bundleDir) {
+    const projectDir = path.join(home, ".context-mode", "projects", KEY);
+    const ctx = {
+      project: { projectKey: KEY, projectDir, dbPath: path.join(projectDir, "context.db"), worktree: home, containmentRoot: home, agent: "gemini", source: getAdapter("gemini").projectSource },
+      sessionId: "s1", turn: 1, signal: new AbortController().signal, protocolVersion: "2025-06-18",
+      ...(clientName === undefined ? {} : { clientInfo: { name: clientName, version: "1.0.0" } }),
+    };
+    const host = { env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "" }, bundleDir: bundleDir ?? path.join(home, "no-bundle"), piCwd: undefined };
+    return runDoctorChecks(ctx, getAdapter("gemini"), host).then((rows) => rows.find((r) => r.id === "D3"));
+  }
+
+  test("[D-1340-AGY-D3-1] the reporter's layout (plugin under ~/.gemini/config/plugins/context-mode) gets the Antigravity line, not wrong entries", async (t) => {
+    const home = tmp(t);
+    const d3 = await run(home, undefined, path.join(home, ".gemini", "config", "plugins", "context-mode", "server"));
+    assert.notEqual(d3.status, "FAIL", d3.detail);
+    assert.equal(d3.detail.includes("wrong:"), false, d3.detail);
+    assert.ok(d3.detail.includes("Antigravity is not a supported host yet"), d3.detail);
+    assert.ok(d3.detail.includes("docs/install/README.md"), d3.detail);
+    assert.equal(String(d3.fixCommand ?? "").includes("gemini extensions install"), false);
+    assert.equal(String(d3.fixCommand ?? "").includes("setup --agents gemini"), false);
+  });
+
+  for (const name of ["antigravity-cli", "antigravity-client", "agy", "Antigravity"]) {
+    test(`[D-1340-AGY-D3-1] clientInfo.name ${name} gets the Antigravity line`, async (t) => {
+      const home = tmp(t);
+      const d3 = await run(home, name);
+      assert.notEqual(d3.status, "FAIL", d3.detail);
+      assert.ok(d3.detail.includes("Antigravity is not a supported host yet"), d3.detail);
+      assert.ok(d3.detail.includes("the MCP server runs"), d3.detail);
+      assert.ok(d3.detail.includes("hooks are not checked"), d3.detail);
+    });
+  }
+
+  test("[D-1340-AGY-D3-1] the CLI plugin dir ~/.gemini/antigravity-cli/plugins is Antigravity too", async (t) => {
+    const home = tmp(t);
+    const d3 = await run(home, undefined, path.join(home, ".gemini", "antigravity-cli", "plugins", "context-mode", "server"));
+    assert.ok(d3.detail.includes("Antigravity is not a supported host yet"), d3.detail);
+  });
+
+  test("[D-1340-AGY-D3-1] Gemini CLI itself (clientInfo gemini-cli-mcp-client, extension dir) keeps the real D3 verdict", async (t) => {
+    const home = tmp(t);
+    const d3 = await run(home, "gemini-cli-mcp-client", path.join(home, ".gemini", "extensions", "context-mode", "server"));
+    assert.equal(d3.status, "FAIL");
+    assert.ok(d3.detail.startsWith("wrong:"), d3.detail);
+  });
+});
+
 describe("ADR-0010 doctor D3 fix: setup fixes a wrong or missing MCP entry (D-D3-SETUP-FIX-1)", { concurrency: CONC }, () => {
   // Tester, next.34 (Windows, OpenCode, empty profile): "FAIL opencode: D3 — wrong: MCP entry. Fix: run ctx_upgrade" while the
   // closing line says "Run in a terminal: context-mode setup --agents opencode". One rule: an MCP part in D3 -> the setup command.
