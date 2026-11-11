@@ -689,6 +689,62 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       assert.equal(registered(await runDoctor(opts(s))).ok, true);
     });
 
+    // D-R54-OC2-BARE-NATIVE-1 (#1344): `opencode plugin add context-mode` on OpenCode 2.2.6 writes the bare name
+    // {"plugins":["context-mode"]}; terminal doctor said "opencode FAIL not set up, run context-mode setup, or run:
+    // opencode plugin add context-mode" (the command the user had just run), and setup added a second, path entry.
+    test("bare native entry plugins:[\"context-mode\"] (opencode plugin add, 2.x): setup adds no path entry, doctor passes hook-registered (#1344)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      put(s, { plugins: ["context-mode"] });
+      const res = await runSetup({ ...opts(s), runId: "h" });
+      assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+      assert.equal(plugins(s), undefined, "no path entry next to the native plugins entry (it would load twice)");
+      assert.deepEqual(JSON.parse(readFileSync(s.file, "utf8")).plugins, ["context-mode"]);
+      const d = await runDoctor(opts(s));
+      assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));
+    });
+
+    test("bare native entry in opencode.jsonc only: setup writes no path entry into opencode.json (#1344)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      const jsonc = path.join(path.dirname(s.file), "opencode.jsonc");
+      mkdirSync(path.dirname(jsonc), { recursive: true });
+      writeFileSync(jsonc, `{\n  // added by opencode plugin add\n  "plugins": ["context-mode"]\n}\n`);
+      const res = await runSetup({ ...opts(s), runId: "i" });
+      assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+      const written = [s.file, jsonc].filter((f) => existsSync(f)).map((f) => readFileSync(f, "utf8"));
+      assert.ok(!written.some((t) => t.includes(own(s).split("\\").join("\\\\") + "\"") && t.includes("\"plugin\"")), written.join("\n----\n"));
+    });
+
+    test("our path entry next to a bare native plugins entry loads twice: doctor FAILs hook-registered (#1344)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      put(s, { plugin: [own(s)], plugins: ["context-mode"] });
+      const d = await runDoctor(opts(s));
+      assert.equal(d.agents[0].status, "FAIL", JSON.stringify(d.agents[0]));
+      const c = registered(d);
+      assert.ok(c && !c.ok && c.detail.includes("twice") && c.detail.includes("context-mode setup"), JSON.stringify(d.agents[0]));
+    });
+
+    test("bare native entry but no MCP entry: the doctor fix line names context-mode setup, not the plugin add the user already ran (#1344)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      put(s, { plugins: ["context-mode"] });
+      const d = await runDoctor(opts(s));
+      assert.equal(d.agents[0].status, "FAIL", JSON.stringify(d.agents[0]));
+      assert.ok(!d.agents[0].reason.includes("opencode plugin add"), d.agents[0].reason);
+      assert.ok(d.agents[0].reason.includes("context-mode setup"), d.agents[0].reason);
+    });
+
+    test("1.19 control: the bare name under the 1.x plugin key stays the v1 entry (D4), unchanged by #1344", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "1.19.5");
+      put(s, { plugin: ["context-mode"] });
+      const d = await runDoctor(opts(s));
+      assert.equal(d.agents[0].status, "FAIL", JSON.stringify(d.agents[0]));
+      assert.ok(d.agents[0].reason.includes("old context-mode entry"), d.agents[0].reason);
+    });
+
     test("remove after the native-entry setup restores the original bytes", async (t) => {
       const s = sandbox(t);
       put(s, { plugin: ["context-mode@next", own(s)] });
