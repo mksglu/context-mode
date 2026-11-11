@@ -782,26 +782,43 @@ createInterface({ input: process.stdin }).on("line", (l) => {
 
     // Review round 1: OpenCode 2.2.6 also loads <project>/.opencode/plugins; setup wrote plugin:[<pkgDir>] next to it
     // and `opencode debug agents --print-logs` showed two plugin loads while doctor said PASS.
-    test("a project .opencode/plugins file of ours: setup adds no plugin list entry, then doctor passes (#1349)", SKIP_SH_OC, async (t) => {
+    // Review round 2 (real 2.2.6): setup then dropped the global path entry because of one project's file, so OpenCode
+    // loaded no hooks in every other project. Setup edits only the global file: only the config dir decides it. The
+    // project file is the one to remove, so the fix line names it.
+    const otherProject = (s) => {
+      const other = path.join(s.root, "other");
+      mkdirSync(other, { recursive: true });
+      return other;
+    };
+
+    test("a project .opencode/plugins file of ours: setup there keeps the global path entry, doctor in another project passes (#1349)", SKIP_SH_OC, async (t) => {
       const s = sandbox(t);
       fakeOpencode(s, "opencode v2.2.6");
       const proj = inProject(s);
-      dirPlugin(path.join(proj, ".opencode"), proj);
-      const res = await runSetup({ ...opts(s), cwd: proj, runId: "k" });
-      assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
-      assert.equal(plugins(s), undefined, "no plugin list entry next to the project plugins file");
-      const d = await runDoctor({ ...opts(s), cwd: proj });
+      const other = otherProject(s);
+      const projFile = dirPlugin(path.join(proj, ".opencode"), proj);
+      const first = await runSetup({ ...opts(s), cwd: other, runId: "k" });
+      assert.equal(first.exitCode, 0, JSON.stringify(first.agents.map((a) => [a.id, a.status, a.reason])));
+      assert.deepEqual(plugins(s), [own(s)], "the global path entry loads the hooks in every project");
+      const res = await runSetup({ ...opts(s), cwd: proj, runId: "k2" });
+      assert.deepEqual(plugins(s), [own(s)], "setup in the project keeps the global entry");
+      assert.ok(res.agents[0].reason?.includes(projFile), JSON.stringify(res.agents[0]));
+      const d = await runDoctor({ ...opts(s), cwd: other });
       assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));
     });
 
-    test("our path entry next to a project .opencode/plugins file of ours loads twice: doctor FAILs hook-registered (#1349)", SKIP_SH_OC, async (t) => {
+    test("our path entry next to a project .opencode/plugins file of ours loads twice: doctor names the project file to remove (#1349)", SKIP_SH_OC, async (t) => {
       const s = sandbox(t);
       fakeOpencode(s, "opencode v2.2.6");
       const proj = inProject(s);
-      dirPlugin(path.join(proj, ".opencode"), proj);
+      const projFile = dirPlugin(path.join(proj, ".opencode"), proj);
       put(s, { plugin: [own(s)] });
-      const c = registered(await runDoctor({ ...opts(s), cwd: proj }));
-      assert.ok(c && !c.ok && c.detail.includes("twice"), JSON.stringify(c));
+      const d = await runDoctor({ ...opts(s), cwd: proj });
+      assert.equal(d.agents[0].status, "FAIL", JSON.stringify(d.agents[0]));
+      const c = registered(d);
+      assert.ok(c && !c.ok && c.detail.includes("twice") && c.detail.includes(`remove ${projFile}`), JSON.stringify(c));
+      assert.ok(!c.detail.includes("run: context-mode setup"), "setup cannot fix a project file; it is not ours to edit");
+      assert.deepEqual(plugins(s), [own(s)], "doctor writes nothing");
     });
 
     // Review round 1: a plugins dir file that re-exports "context-mode/server" with no node_modules/context-mode makes
