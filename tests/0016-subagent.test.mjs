@@ -3,9 +3,8 @@
 import { test, before, after, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from "node:fs";
-import path, { basename, join, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
+import path, { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { TOOL_ORDER, SERVER_KEY } from "../src/core/contracts/constants.ts";
 import * as C from "../src/core/contracts/constants.ts";
@@ -17,28 +16,6 @@ import { handleHook } from "../src/core/hooks/dispatch.ts";
 import { buildRegistry } from "../src/setup/index.ts";
 import { decode } from "../src/adapters/vscode.ts";
 import { generateManifests } from "../build/manifests.ts";
-
-// The words a POSIX shell passes for a line of single-quoted, backslash-escaped and bare words (D-CC-POINTER-5).
-function posixWords(line) {
-  const words = [];
-  let cur = null;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === "'") { const end = line.indexOf("'", i + 1); cur = (cur ?? "") + line.slice(i + 1, end); i = end; }
-    else if (ch === "\\") { cur = (cur ?? "") + line[i + 1]; i++; }
-    else if (ch === " ") { if (cur !== null) words.push(cur); cur = null; }
-    else cur = (cur ?? "") + ch;
-  }
-  if (cur !== null) words.push(cur);
-  return words;
-}
-// Runs a printed `node ...` line in a real shell with `node` as a function that prints its arguments, one per line.
-// A $( ), a backtick or a $VAR the shell runs or expands shows up as a file or as changed terms.
-function shellArgs(nodeLine, cwd) {
-  const sh = process.platform === "win32" ? "bash" : "sh";
-  const r = spawnSync(sh, ["-c", "node() { for a in \"$@\"; do printf '%s\\n' \"$a\"; done; }; " + nodeLine], { cwd, encoding: "utf8", env: { PATH: process.env.PATH, HOME: cwd } });
-  return { status: r.status, args: r.stdout.split("\n").slice(0, -1), stderr: r.stderr };
-}
 
 describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
   // Unit tests for src/core/policy/subagent.ts (impl/08 §5, Assumption B4; ADR-0016; DECISIONS-r3 Q23).
@@ -168,62 +145,14 @@ describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
     } finally { f.done(); }
   });
 
-  // #1342 (LV8 filled from the Claude Code 2.1.322 binary): general-purpose and fork have tools ["*"]; Explore and
-  // Plan have all tools minus their disallowedTools (no MCP removal). claude-code-guide and statusline-setup keep a
-  // fixed list with no ctx tool; an unknown name stays null -> C.
-  test("#1342 built-in Claude Code types: general-purpose, fork, Explore, Plan -> ctx tools -> A", () => {
+  test("unknown built-in type before LV8 (Explore, Plan, general-purpose) -> null -> C, never A or allow", () => {
     const f = fixture();
     try {
-      for (const t of ["general-purpose", "fork", "Explore", "Plan"]) {
+      for (const t of ["Explore", "Plan", "general-purpose", "nope"]) {
         const set = toolSetForAgentType(sub("claude-code", t), { projectDir: f.project, env: f.env });
-        assert.ok(Array.isArray(set) && set.includes(CC + "ctx_search"), t);
-        assert.equal(pickSubagentCase(sub("claude-code", t), set), "A", t);
+        assert.equal(set, null);
+        assert.equal(pickSubagentCase(sub("claude-code", t), set), "C");
       }
-      for (const t of ["Explore", "Plan"]) {
-        const set = toolSetForAgentType(sub("claude-code", t), { projectDir: f.project, env: f.env });
-        for (const n of ["Agent", "Artifact", "ArtifactComments", "ArtifactData", "ArtifactCheck", "ExitPlanMode", "Edit", "Write", "NotebookEdit"]) assert.equal(set.includes(n), false, t + " " + n);
-      }
-    } finally { f.done(); }
-  });
-
-  test("#1342 claude-code-guide, statusline-setup and an unknown type are never A; other rows keep null", () => {
-    const f = fixture();
-    try {
-      for (const t of ["claude-code-guide", "statusline-setup", "nope"]) {
-        const set = toolSetForAgentType(sub("claude-code", t), { projectDir: f.project, env: f.env });
-        assert.notEqual(pickSubagentCase(sub("claude-code", t), set), "A", t);
-      }
-      assert.equal(toolSetForAgentType(sub("claude-code", "nope"), { projectDir: f.project, env: f.env }), null);
-      // The built-in row keys on claude-code: a Qwen type with the same name is unchanged.
-      assert.equal(toolSetForAgentType(sub("qwen", "general-purpose"), { projectDir: f.project, env: f.env }), null);
-    } finally { f.done(); }
-  });
-
-  test("#1342 a project agent file still wins over a built-in name", () => {
-    const f = fixture();
-    try {
-      f.put(f.project, "Explore", "tools: Read\n");
-      assert.deepEqual(toolSetForAgentType(sub("claude-code", "Explore"), { projectDir: f.project, env: f.env }), ["Read"]);
-    } finally { f.done(); }
-  });
-
-  test("#1342 synced plugin agents: plugins/synced/<id>/<plugin>/agents/<agent>.md; dot dirs are never read", () => {
-    const f = fixture();
-    try {
-      const synced = join(f.home, ".claude/plugins/synced");
-      const put = (id, agent, front) => {
-        mkdirSync(join(synced, id, "organon/agents"), { recursive: true });
-        writeFileSync(join(synced, id, "organon/agents", agent + ".md"), "---\nname: " + agent + "\n" + front + "---\nbody\n");
-      };
-      put("abc", "canvas-author", "tools: Read, " + CC + "ctx_search\n");
-      put("abc", "plain", "tools: Read, Bash\n");
-      put(".trash", "hidden", "tools: " + CC + "ctx_search\n");
-      const s = { projectDir: f.project, env: f.env };
-      const a = toolSetForAgentType(sub("claude-code", "organon:canvas-author"), s);
-      assert.deepEqual(a, ["Read", CC + "ctx_search"]);
-      assert.equal(pickSubagentCase(sub("claude-code", "organon:canvas-author"), a), "A");
-      assert.equal(pickSubagentCase(sub("claude-code", "organon:plain"), toolSetForAgentType(sub("claude-code", "organon:plain"), s)), "B");
-      assert.equal(toolSetForAgentType(sub("claude-code", "organon:hidden"), s), null);
     } finally { f.done(); }
   });
 
@@ -280,122 +209,6 @@ describe("ADR-0016: Agent input is never changed (#1319)", { concurrency: CONC }
     } finally {
       rmSync(home, { recursive: true, force: true, maxRetries: 3 });
     }
-  });
-});
-
-// #1342, #1358 (ADR-0016 line 16): the replace keeps one budget everywhere, and its follow-up line names only a
-// tool the caller can call. Serial: the store dir comes from process.env (D-M1-T3-5).
-describe("ADR-0016: replace pointer the caller can call (#1342, #1358)", () => {
-  const CC = getAdapter("claude-code").toolNamePrefix;
-  const ENTRY = resolve(fileURLToPath(import.meta.url), "../../src/entries/run.ts");
-  let root, repo, data, env, oldData, shim;
-
-  before(() => {
-    root = mkdtempSync(join(tmpdir(), "cm-ptr-"));
-    repo = join(root, "repo");
-    data = join(root, "data");
-    mkdirSync(join(repo, ".claude/agents"), { recursive: true });
-    execFileSync("git", ["init", "-q", repo]);
-    writeFileSync(join(repo, ".claude/agents/reader.md"), "---\nname: reader\ntools: Read, mcp__x__y\n---\nb\n");
-    writeFileSync(join(repo, ".claude/agents/sheller.md"), "---\nname: sheller\ntools: Read, Bash\n---\nb\n");
-    shim = join(root, "bundle", C.SEARCH_WRAPPER_FILE);
-    mkdirSync(join(root, "bundle"));
-    writeFileSync(shim, `import ${JSON.stringify(pathToFileURL(ENTRY).href)};\n`);
-    oldData = process.env[C.DATA_DIR_ENV];
-    process.env[C.DATA_DIR_ENV] = data;
-    env = { HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo, PATH: process.env.PATH, [C.DATA_DIR_ENV]: data };
-  });
-
-  after(() => {
-    if (oldData === undefined) delete process.env[C.DATA_DIR_ENV]; else process.env[C.DATA_DIR_ENV] = oldData;
-    rmSync(root, { recursive: true, force: true, maxRetries: 3 });
-  });
-
-  const big = (n, word = "row") => Array.from({ length: n }, (_, i) => word + "-" + i + " filler words for the line " + i).join("\n") + "\n";
-  const post = (fields) => ({ hook_event_name: "PostToolUse", session_id: "s-" + Math.random().toString(36).slice(2), cwd: repo, ...fields });
-  const textOf = (o) => typeof o === "string" ? o : Array.isArray(o) ? o.map((b) => b.text ?? "").join("\n")
-    : o.stdout ?? o.content ?? o.file?.content ?? JSON.stringify(o);
-  const replaced = async (p) => {
-    const out = await handleHook("claude-code", p, env);
-    assert.notEqual(out.stdout, "", "a replace, not a passthrough");
-    return textOf(JSON.parse(out.stdout).hookSpecificOutput.updatedToolOutput);
-  };
-  const labels = (sessionId) => {
-    const projects = join(data, "projects");
-    const db = new DatabaseSync(join(projects, readdirSync(projects)[0], "context.db"), { readOnly: true });
-    try { return db.prepare("SELECT label FROM sources WHERE session_id = ? ORDER BY id").all(sessionId).map((r) => r.label); } finally { db.close(); }
-  };
-  const argsOf = posixWords;
-  const runTwin = (line, terms) => {
-    const at = line.indexOf("node ");
-    assert.ok(at >= 0, line);
-    const args = argsOf(line.slice(at + "node ".length));
-    assert.equal(basename(args[0]), C.SEARCH_WRAPPER_FILE, line);
-    args[2] = terms;
-    return spawnSync(process.execPath, [shim, ...args.slice(1)], { cwd: tmpdir(), encoding: "utf8", env });
-  };
-
-  test("#1342 case C subagent (tools: Read, mcp__x__y): a replace in budget that names no ctx tool", async () => {
-    const text = big(1200);
-    const r = await replaced(post({ agent_id: "a1", agent_type: "reader", tool_use_id: "tu-c", tool_name: "Read", tool_input: { file_path: "/big.log" }, tool_response: text }));
-    assert.equal(r.includes("ctx_"), false, r);
-    assert.ok(Buffer.byteLength(r) < 1024, "within the replace budget: " + Buffer.byteLength(r));
-    assert.ok(r.includes(String(Buffer.byteLength(text) - 1)) || r.includes(String(Buffer.byteLength(text))), "states the size: " + r);
-  });
-
-  test("#1342 case B subagent (Bash, no ctx): names the search.mjs line and no ctx tool; the line works", async () => {
-    const p = post({ agent_id: "a1", agent_type: "sheller", tool_use_id: "tu-b", tool_name: "Bash", tool_input: { command: "seq-like" }, tool_response: { stdout: big(1200), stderr: "", interrupted: false } });
-    const r = await replaced(p);
-    assert.equal(r.includes("ctx_"), false, r);
-    const s = runTwin(r.slice(r.lastIndexOf("\n") + 1), "row-777");
-    assert.equal(s.status, 0, s.stderr);
-    assert.ok(s.stdout.includes("row-777 "), s.stdout.slice(0, 300));
-  });
-
-  test("#1342 case A general-purpose subagent: still a replace, with the callable ctx_search pointer", async () => {
-    const r = await replaced(post({ agent_id: "a1", agent_type: "general-purpose", tool_use_id: "tu-a", tool_name: "Read", tool_input: { file_path: "/big.log" }, tool_response: big(1200) }));
-    assert.ok(r.includes(CC + "ctx_search({queries:["), r);
-  });
-
-  test("#1342 two subagent calls (tool_use_id tu1, tu2) are two sources with two labels", async () => {
-    const sid = "s-two-" + Math.random().toString(36).slice(2);
-    for (const [a, tu] of [["ag1", "tu1"], ["ag2", "tu2"]]) {
-      await replaced({ ...post({ agent_id: a, agent_type: "Explore", tool_use_id: tu, tool_name: "Grep", tool_input: { pattern: "row" }, tool_response: big(1200) }), session_id: sid });
-    }
-    const l = labels(sid);
-    assert.equal(l.length, 2, JSON.stringify(l));
-    assert.notEqual(l[0], l[1], JSON.stringify(l));
-  });
-
-  // D-CC-POINTER-5: the intent is the Bash command, Grep pattern, path or URL. The twin quotes it for the shell, so
-  // running the printed line never runs a $( ), a backtick or a $VAR in it, and search.mjs gets the terms unchanged.
-  test("#1358 the search.mjs line quotes $( ), a backtick and $HOME: the shell runs nothing and passes the terms whole", async () => {
-    const box = mkdtempSync(join(tmpdir(), "cm-ptr-q-"));
-    try {
-      const pattern = "row-777 $(touch " + join(box, "PWNED") + ") `touch " + join(box, "PWNED2") + "` $HOME it's";
-      const r = await replaced(post({ tool_use_id: "tu-q", tool_name: "Grep", tool_input: { pattern }, tool_response: big(1200) }));
-      const line = r.slice(r.lastIndexOf("\n") + 1);
-      const s = shellArgs(line.slice(line.indexOf("node ")), box);
-      assert.equal(s.status, 0, s.stderr);
-      assert.equal(existsSync(join(box, "PWNED")), false, "the shell ran $( ): " + line);
-      assert.equal(existsSync(join(box, "PWNED2")), false, "the shell ran a backtick: " + line);
-      assert.equal(basename(s.args[0]), C.SEARCH_WRAPPER_FILE, line);
-      assert.equal(s.args[2], pattern, "terms reach search.mjs unchanged: " + line);
-      assert.deepEqual(posixWords(line.slice(line.indexOf("node ") + "node ".length)), s.args);
-      const found = runTwin(line, "row-777");
-      assert.equal(found.status, 0, found.stderr);
-      assert.ok(found.stdout.includes("row-777 "), found.stdout.slice(0, 300));
-    } finally { rmSync(box, { recursive: true, force: true }); }
-  });
-
-  test("#1358 main-session MCP result: query is never empty, and the search.mjs line returns a middle line from any cwd", async () => {
-    const p = post({ tool_use_id: "tu-mcp", tool_name: "mcp__atlassian__getJiraIssue", tool_input: { issueIdOrKey: "X" }, tool_response: [{ type: "text", text: big(400, "JIRA") }] });
-    const r = await replaced(p);
-    assert.equal(r.includes('queries:[""]'), false, r);
-    assert.ok(r.includes(CC + "ctx_search({queries:["), "the main pointer stays: " + r);
-    const s = runTwin(r.slice(r.lastIndexOf("\n") + 1), "JIRA-150");
-    assert.equal(s.status, 0, s.stderr);
-    assert.ok(s.stdout.includes("JIRA-150 "), s.stdout.slice(0, 300));
   });
 });
 
@@ -478,12 +291,11 @@ describe("ADR-0016: run wrapper", { concurrency: CONC }, () => {
     assert.ok(lines[0].startsWith("exit 0 · "), lines[0]);
     assert.ok(lines.includes("39999"), "the chunk that matches the description is in the reply");
     const more = lines[lines.length - 1];
-    assert.ok(more.startsWith(C.RUN_MORE_PREFIX), more);
-    const words = posixWords(more.slice(C.RUN_MORE_PREFIX.length));
-    assert.equal(words[0], join(bundle, C.SEARCH_WRAPPER_FILE), more);
-    assert.equal(words[2], "39999", more);
-    // The more: line works: search.mjs <source-id> '<terms>' reads the same indexed output.
-    const id = words[1];
+    const want = C.RUN_MORE_PREFIX + JSON.stringify(join(bundle, C.SEARCH_WRAPPER_FILE)) + " ";
+    assert.ok(more.startsWith(want), more);
+    assert.ok(more.endsWith(' "39999"'), more);
+    // The more: line works: search.mjs <source-id> "<terms>" reads the same indexed output.
+    const id = more.slice(want.length).split(" ")[0];
     const s = search([id, "12345"]);
     assert.equal(s.status, 0, s.stderr);
     assert.ok(s.stdout.split("\n").includes("12345"), "search.mjs returns the matching chunk");

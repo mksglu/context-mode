@@ -55,24 +55,6 @@ export function REPLACE_HANDLE_LINE(intent: string, handle: string, bytes: numbe
   const queries = asked === "" ? [intent] : [intent, asked];
   return prefix + "ctx_search({queries:[" + queries.map((q) => JSON.stringify(q)).join(",") + "], source:" + JSON.stringify(handle) + "}) searches the whole output (" + bytes + " B).";
 }
-// D-CC-POINTER-1 (#1342, ADR-0016 line 16): the handle line of a subagent replace in case B or C. It names no ctx
-// tool (the subagent cannot call one). It states the size and the short id; it names Read with offset and limit
-// only when the subagent has Read and the call was a read.
-export function SUBAGENT_HANDLE_LINE(handle: string, bytes: number, read: boolean): string {
-  return "The full output (" + bytes + " B) is stored as " + handle + "; above is the best-matching part."
-    + (read ? " Read the file with offset and limit for other lines." : "");
-}
-// D-CC-POINTER-2 (#1358, #1342): the MCP-free twin of the search call, for a caller with a shell on the claude-code
-// row. search.mjs takes the short id and the project dir, so it works from any cwd and with no MCP server.
-// D-CC-POINTER-5: every word is a POSIX single-quoted word, so the shell runs no $( ), backtick or $VAR in it.
-export function SEARCH_TWIN_LINE(searchPath: string, handle: string, terms: string, projectDir: string): string {
-  return " Or run: node " + shellWord(searchPath) + " " + handle + " " + shellWord(terms) + " " + shellWord(projectDir);
-}
-// D-CC-POINTER-5: one POSIX shell word. Inside single quotes sh, bash and Git Bash expand nothing; a ' closes the
-// quote, adds an escaped ', and opens it again.
-export function shellWord(s: string): string {
-  return "'" + s.split("'").join("'\\''") + "'";
-}
 export const HANDLE_PROMPT_WORDS = 3; // D-HA-GEMINI-HINT-1: prompt words the handle-line query may add
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
@@ -175,11 +157,11 @@ export const PLAIN_OUTPUT_ENV: Readonly<Record<string, string>> = Object.freeze(
 
 // impl/04 §4, ADR-0016 case B: the run.mjs wrapper and its search.mjs follow-up (DEVIATIONS D-M3-X1-1..5).
 export const RUN_USAGE_LINE = "Usage: run.mjs <base64>"; // §4 step 1
-export const SEARCH_USAGE_LINE = "Usage: search.mjs <source-id> <terms> [project-dir]"; // D-M3-X1-2
+export const SEARCH_USAGE_LINE = "Usage: search.mjs <source-id> <terms>"; // D-M3-X1-2
 export const RUN_FAIL_EXIT = 1; // §4 steps 1, 4: usage error or deny, the command never runs
 export const RUN_TIMEOUT_EXIT = 124; // §4 step 11, A18: POSIX timeout convention
 export const RUN_LABEL_PREFIX = "run.mjs:"; // §4 step 7 source label, + first line of the command
-export const RUN_MORE_PREFIX = "more: node "; // §4 step 9, ADR-0016 template: + '<bundle>/search.mjs' <source-id> '<terms>' (D-CC-POINTER-5)
+export const RUN_MORE_PREFIX = "more: node "; // §4 step 9, ADR-0016 template: + "<bundle>/search.mjs" <source-id> "<terms>"
 export const SEARCH_WRAPPER_FILE = "search.mjs"; // ADR-0016 more: line target, next to run.mjs (D-M3-X1-2)
 export const RUN_WRAPPER_AGENT = "claude-code"; // D-M3-X1-3: case B deny + rewrite is the Claude Code mechanism (ADR-0016 Q3)
 export const RUN_SESSION_PREFIX = "mcp:"; // §4 step 5, 00 A8: no MCP _meta, + a process-local id
@@ -198,7 +180,6 @@ export const REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY"; // v1 issue
 export const HOST_CONFIG_DIR_NAME = ".claude"; // project and user agents: <root>/.claude/agents/<type>.md
 export const AGENTS_DIR_NAME = "agents"; // also the plugin's own agents/ dir under its installPath
 export const AGENT_FILE_EXT = ".md";
-export const SYNCED_PLUGINS_DIR_NAME = "synced"; // D-CC-POINTER-3 (#1342): <claude dir>/plugins/synced/<id>/<plugin>/agents
 export const HOST_PLUGINS_DIR_NAME = "plugins"; // ~/.claude/plugins/installed_plugins.json
 export const INSTALLED_PLUGINS_FILE = "installed_plugins.json";
 export const PLUGIN_AGENT_SEPARATOR = ":"; // plugin agent type "<plugin>:<agent>"

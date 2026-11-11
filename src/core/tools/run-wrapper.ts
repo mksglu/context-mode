@@ -24,14 +24,12 @@ import {
   RUN_WRAPPER_AGENT,
   SEARCH_USAGE_LINE,
   SEARCH_WRAPPER_FILE,
-  shellWord,
   SOURCE_LABEL_MAX_CHARS,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type { CanonicalHookEvent, ProjectContext } from "../contracts/types.ts";
 import { selectChunks } from "../index/select.ts";
-import { parseSourceHandle, SOURCE_ID_PREFIX } from "../store/fts.ts";
 import { decide } from "../policy/decide.ts";
 import { resolveProject } from "../project/resolve.ts";
 import { capBytes } from "../sandbox/cap.ts";
@@ -86,10 +84,9 @@ function sourceLabel(command: string): string {
   return Array.from(RUN_LABEL_PREFIX + first).slice(0, SOURCE_LABEL_MAX_CHARS).join("");
 }
 
-// §4 step 9, ADR-0016 template: more: node '<bundle>/search.mjs' <source-id> '<terms>'.
-// D-CC-POINTER-5: POSIX single-quoted words, so the shell runs no $( ), backtick or $VAR in the description.
+// §4 step 9, ADR-0016 template: more: node "<bundle>/search.mjs" <source-id> "<terms>".
 function moreLine(bundleDir: string, sourceId: number, terms: string): string {
-  return RUN_MORE_PREFIX + shellWord(join(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + shellWord(terms);
+  return RUN_MORE_PREFIX + JSON.stringify(join(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
 }
 
 function bytes(s: string): number {
@@ -154,19 +151,15 @@ export async function runWrapperMain(argv: string[], env: NodeJS.ProcessEnv): Pr
   }
 }
 
-/** D-M3-X1-2: search.mjs <source-id> '<terms>' [<project dir>]: the chunks of one indexed output that match the terms.
- * D-CC-POINTER-2 (#1358): the source id is the number or the short handle (s<base36>) a replace names; the
- * optional project dir lets the call work from any cwd. */
+/** D-M3-X1-2: search.mjs <source-id> "<terms>": the chunks of one indexed run.mjs output that match the terms. */
 export async function searchWrapperMain(argv: string[], _env: NodeJS.ProcessEnv): Promise<never> {
-  const raw = argv[2] ?? "";
-  const id = raw.startsWith(SOURCE_ID_PREFIX) ? parseSourceHandle(raw) ?? -1 : Number(raw);
+  const id = Number(argv[2] ?? "");
   const terms = argv[3] ?? "";
-  const dir = argv[4] ?? "";
-  if (raw === "" || !Number.isSafeInteger(id) || id < 0) {
+  if (argv[2] === undefined || argv[2] === "" || !Number.isSafeInteger(id) || id < 0) {
     return exit(RUN_FAIL_EXIT, "", SEARCH_USAGE_LINE + "\n");
   }
   try {
-    const db = await openDb(projectOf(argv, dir !== "" ? dir : process.cwd()));
+    const db = await openDb(projectOf(argv, process.cwd()));
     let text: string;
     try {
       text = selectChunks(db, id, terms, OUTPUT_CAP).text;

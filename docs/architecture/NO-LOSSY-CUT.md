@@ -17,7 +17,7 @@ proves it cuts nothing real: the budget math keeps head, chunks and pointer unde
 | src/core/tools/stats.ts:93 | capBytes final guard | Fixed-size table; size is bounded by the agent count, far under OUTPUT_CAP (test). Nothing is dropped. | lossless |
 | src/core/tools/batch.ts:266 | capBytes final guard | Every command output is indexed; each query gets a share of whole chunks; footer pointer fixed. A long query is named `query N`. | lossless |
 | src/core/tools/index.ts:146 | capBytes final guard | One-line reply. Content is stored whole; a label over ECHO_MAX_BYTES is shown as its handle `sN`. | lossless |
-| src/core/tools/run-wrapper.ts:147 | capBytes final guard | run.mjs output is indexed first; pointer `more: node 'search.mjs' <id> '<terms>'` (terms shown whole; shell budget reserves it). | lossless |
+| src/core/tools/run-wrapper.ts:147 | capBytes final guard | run.mjs output is indexed first; pointer `more: node search.mjs <id> "<terms>"` (terms shown whole; shell budget reserves it). | lossless |
 | src/core/tools/run-wrapper.ts:169 | capBytes final guard | search.mjs returns whole chunks of one stored source with the budget OUTPUT_CAP. | lossless |
 
 ## Other places that shorten content
