@@ -650,18 +650,56 @@ exit 0`);
   // D-HF-OPENCODE-LIST-1: with our plugin entry in opencode.json, OpenCode 1.19.4 first installs @opencode-ai/plugin
   // (30-60 s, network) before `mcp list` prints, so the 10 s list check timed out and setup rolled back on a fresh
   // HOME. `mcp list --pure` (run without external plugins) lists the MCP servers without that install.
-  test("setup: the opencode list check does not load plugins (D-HF-OPENCODE-LIST-1)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
-    const s = sandbox(t);
-    const log = path.join(s.root, "opencode.log");
+  // D-OC1-LIST-2 (#1362): `mcp list` connects every MCP server of the user, so one user server that never answers holds
+  // it past the 10 s budget: "opencode FAIL list: opencode mcp list --pure does not list context-mode (rolled back)",
+  // while the real `opencode mcp list --pure` (1.19.5) printed "✓ context-mode connected / ✗ slowsrv failed" after 32.6 s.
+  // On 1.x the list check reads `opencode debug config --pure` (the config the CLI loaded, no server started, no plugin
+  // load), as D-OC2-LIST-1 does on 2.x.
+  function fakeOpencode1(s, log, { version = `echo "1.19.5"`, config } = {}) {
+    const file = path.join(s.home, ".config", "opencode", "opencode.json");
+    const dump = path.join(s.root, "dump.mjs");
+    writeFileSync(dump, config ?? `import { readFileSync } from "node:fs"; let d = {}; try { d = JSON.parse(readFileSync(${JSON.stringify(file)}, "utf8")); } catch {}
+process.stdout.write(JSON.stringify({ ...d, agent: {}, plugin: d.plugin ?? [] }, null, 2));\n`);
     fakeBin(s.root, "opencode", `echo "$@" >> "${log}"
-case " $* " in
-  *" --pure "*) echo "context-mode connected" ;;
-  *) exit 1 ;;
+case "$1 $2" in
+  "--version ") ${version} ;;
+  "mcp list") sleep 15; echo "context-mode connected" ;;
+  "debug config") "${NODE}" "${dump}" ;;
 esac
 exit 0`);
+    return dump;
+  }
+
+  test("setup: on OpenCode 1.x a slow user MCP server does not fail the list check; it reads debug config --pure (D-OC1-LIST-2, #1362)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "opencode.log");
+    fakeOpencode1(s, log);
     const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
     assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
-    assert.ok(readFileSync(log, "utf8").includes("mcp list --pure"), readFileSync(log, "utf8"));
+    const ran = readFileSync(log, "utf8");
+    assert.ok(ran.includes("debug config --pure"), ran); // D-HF-OPENCODE-LIST-1: --pure, so no plugin install is waited on
+    assert.ok(!ran.includes("mcp list"), ran);
+  });
+
+  test("setup: on OpenCode 1.x the list check FAILs when the loaded config has no mcp.context-mode, and names what it loaded (D-OC1-LIST-2, #1362)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "opencode.log");
+    fakeOpencode1(s, log, { config: `process.stdout.write(JSON.stringify({ mcp: { slowsrv: { type: "local" } }, plugin: [] }));\n` });
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0], null, 2));
+    const list = res.agents[0].checks.find((c) => c.name === "list");
+    assert.ok(list && !list.ok && list.detail.includes("debug config --pure") && list.detail.includes("mcp.context-mode") && list.detail.includes("slowsrv"), JSON.stringify(res.agents[0].checks));
+  });
+
+  test("setup: when opencode --version prints no version the list check says so and runs no --pure fallback (D-OC1-LIST-2, #1362)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "opencode.log");
+    fakeOpencode1(s, log, { version: `echo "error: unknown option"; exit 1` });
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0], null, 2));
+    const list = res.agents[0].checks.find((c) => c.name === "list");
+    assert.ok(list && !list.ok && list.detail.includes("opencode --version printed no version") && list.detail.includes("error: unknown option"), JSON.stringify(res.agents[0].checks));
+    assert.ok(!readFileSync(log, "utf8").includes("--pure"), readFileSync(log, "utf8"));
   });
 
   // D-OC2-LIST-1 (#1308, Raidan-Ai, Windows, OpenCode 2): "list: opencode mcp list --standalone does not list
