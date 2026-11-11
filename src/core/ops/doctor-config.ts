@@ -200,6 +200,64 @@ function isOwnOpencodeEntry(entry: unknown, key: string, own: readonly string[])
   return spec === OPENCODE_GIT_SPEC || own.includes(spec) || isNativeOpencodeEntry(entry, key);
 }
 
+/** D-R54-OC-PLUGINS-DIR-1 (#1349): the string literals of a JS/TS source, read with a quote-aware scan (comments are
+ *  skipped, escapes kept as written). No regex: the plugin file is code, and only its quoted module names matter. */
+function stringLiterals(src: string): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === "/" && src[i + 1] === "/") { const n = src.indexOf("\n", i); i = n < 0 ? src.length : n; continue; }
+    if (c === "/" && src[i + 1] === "*") { const n = src.indexOf("*/", i + 2); i = n < 0 ? src.length : n + 2; continue; }
+    if (c === "\"" || c === "'" || c === "`") {
+      let j = i + 1;
+      let s = "";
+      while (j < src.length && src[j] !== c) { if (src[j] === "\\") { s += src[j + 1] ?? ""; j += 2; continue; } s += src[j]; j++; }
+      out.push(s);
+      i = j + 1;
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+const OPENCODE_PLUGINS_DIR = "plugins"; // <config dir>/plugins and <project>/.opencode/plugins (OpenCode 2.2.6 loads each file)
+const OPENCODE_PROJECT_DIR = ".opencode"; // the project config dir OpenCode reads plugins from
+const OPENCODE_PLUGIN_EXTS = [".js", ".mjs", ".ts"];
+const OPENCODE_PLUGIN_INDEX = "index";
+const OPENCODE_DIR_FILE_MAX = 64 * 1024; // a re-export is one line; a large file is not a stub of ours
+const OWN_PLUGIN_MODULES = [SERVER_KEY, `${SERVER_KEY}/server`];
+
+/** D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file in an OpenCode plugins dir loads context-mode when one of its module
+ *  names is the package ("context-mode", "context-mode/server") or a path to our bundle's opencode/plugin.js. */
+export function opencodeDirPlugin(dirs: readonly string[]): string | undefined {
+  const bundle = opencodePluginFile();
+  const ownFile = join(bundle, ...OPENCODE_PLUGIN_PATH).split("\\").join("/");
+  const own = (s: string) => {
+    const p = s.split("\\").join("/");
+    if (OWN_PLUGIN_MODULES.includes(p) || p === ownFile || p === `file://${ownFile}`) return true;
+    const seg = p.split("/");
+    const n = seg.length;
+    return n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === SERVER_KEY;
+  };
+  for (const dir of dirs) {
+    const pdir = join(dir, OPENCODE_PLUGINS_DIR);
+    let names: string[];
+    try { names = readdirSync(pdir); } catch { continue; }
+    for (const name of names) {
+      const loose = OPENCODE_PLUGIN_EXTS.some((x) => name.endsWith(x)) ? [join(pdir, name)] : [];
+      const files = [...loose, ...OPENCODE_PLUGIN_EXTS.map((x) => join(pdir, name, `${OPENCODE_PLUGIN_INDEX}${x}`))];
+      for (const f of files) {
+        let text: string;
+        try { const b = readFileSync(f); if (b.length > OPENCODE_DIR_FILE_MAX) continue; text = b.toString("utf8"); } catch { continue; }
+        if (stringLiterals(text).some(own)) return f;
+      }
+    }
+  }
+  return undefined;
+}
+
 /** D-R44-OC-D3-1 (#1310): a local MCP entry runs our server: command is a node (or a command array that starts with one),
  *  the script is a server.mjs, and the args name this agent. OpenCode 2 reads it as mcp.servers.<name>, 1.x as mcp.<name>. */
 function opencodeMcpOwn(entry: unknown): boolean {
@@ -227,7 +285,9 @@ function opencodeValueListed(value: unknown): boolean {
 /** True when any OpenCode config file (config dir, then project) lists context-mode under "plugin" or "plugins", or runs its server as a local MCP entry. */
 function opencodeListed(file: string, worktree: string): boolean {
   const dirs = [dirname(file), worktree];
-  return dirs.some((dir) => OPENCODE_CONFIG_FILES.some((name) => opencodeValueListed(opencodeFileValue(join(dir, name)))));
+  if (dirs.some((dir) => OPENCODE_CONFIG_FILES.some((name) => opencodeValueListed(opencodeFileValue(join(dir, name)))))) return true;
+  // D-R54-OC-PLUGINS-DIR-1 (#1349): OpenCode also loads a plugin file from the plugins dir, no config entry needed.
+  return opencodeDirPlugin([dirname(file), join(worktree, OPENCODE_PROJECT_DIR)]) !== undefined;
 }
 
 function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): boolean {

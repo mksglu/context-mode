@@ -21,7 +21,7 @@ import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
-import { isNativeOpencodeEntry } from "../core/ops/doctor-config.ts";
+import { isNativeOpencodeEntry, opencodeDirPlugin } from "../core/ops/doctor-config.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
@@ -299,6 +299,8 @@ function nativePluginsKey(doc: unknown, file: string): boolean {
     return Array.isArray(v) && v.some((e) => isNativeOpencodeEntry(e, k));
   });
   if (native(doc)) return true;
+  // D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file of ours in <config dir>/plugins loads the hooks with no list entry.
+  if (opencodeDirPlugin([path.dirname(file)]) !== undefined) return true;
   return OPENCODE_CONFIG_FILES.map((n) => path.join(path.dirname(file), n)).filter((f) => f !== file).some((f) => {
     const text = readOr(f);
     if (text === undefined || text.trim() === "") return false;
