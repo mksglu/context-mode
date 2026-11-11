@@ -785,6 +785,29 @@ describe("ADR-0008 security rules (ported from v1)", { concurrency: CONC }, () =
     } finally { done(); }
   });
 
+  // D-R54-OWN-FILE-LINK-1 (#1345, EarthChen): "~/.claude/skills/<skill> as a symlink to a dir outside ~/.claude": the Read
+  // of a 24,051 B reference .md is denied, the same file in a real dir is allowed. A link the user made in their own config
+  // dir counts; data through the link and the link target by its own path keep the normal rules.
+  test("D-R54-OWN-FILE-LINK-1: a skill file over the cap under a symlinked skill dir is never denied (#1345)", () => {
+    const { root, cfg, done } = ownLayout();
+    const target = realpathSync(mkdtempSync(join(tmpdir(), "cm-1345t-")));
+    try {
+      mkdirSync(join(target, "references"), { recursive: true });
+      writeFileSync(join(target, "references", "api.md"), "# rule line\n".repeat(2000));
+      writeFileSync(join(target, "references", "log.jsonl"), "# rule line\n".repeat(2000));
+      symlinkSync(target, join(cfg, "skills", "linked"));
+      const ref = join(cfg, "skills", "linked", "references", "api.md");
+      assert.deepEqual(decide(ev("Read", { file_path: ref }, root), CC, [], root), { kind: "allow" }, "linked ref");
+      assert.equal(decide(ev("Bash", { command: "cat " + ref }, root), CODEX_ROW(), [], root).kind, "allow", "cat linked ref");
+      assert.equal(failureOutput("claude-code", { hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: ref }, cwd: root }, new Error("x")).stdout?.includes("deny") ?? false, false, "fallback linked ref");
+      assert.equal(decide(ev("Read", { file_path: join(cfg, "skills", "linked", "references", "log.jsonl") }, root), CC, [], root).kind, "deny", "data through the link");
+      assert.equal(decide(ev("Read", { file_path: join(target, "references", "api.md") }, root), CC, [], root).kind, "deny", "the target by its own path");
+    } finally {
+      done();
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
   test("D-R48-DENY-ROUTE-1: every Read deny names a call that works for its path (#1326)", async () => {
     const { ctxExecute } = await import("../src/core/tools/execute.ts");
     const { root, files, done } = ownLayout();

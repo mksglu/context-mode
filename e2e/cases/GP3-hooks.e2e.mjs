@@ -2,7 +2,7 @@
 // Merged from GP3-hook-perf, GP3-hooks and GP3-zcode-names. Plain blocks, not describe: e2e/cases/run.mjs counts every pass event, and a describe adds one. Names unchanged.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runHookFixture } from "../harness/hook-runner.mjs";
@@ -361,6 +361,41 @@ import { DatabaseSync } from "node:sqlite";
         `${p}: tool name "${name}" matches neither the zcode nativeTools nor "${OWN_PREFIX}ctx_*"; correct impl/10 §1.3/§1.3a/§1.5 zcode row`
       );
     }
+  });
+}
+
+// GP3: the agent's own skill files reach the model whole (D-R48-OWN-FILE-1, D-R54-OWN-FILE-LINK-1)
+{
+  // #1345 (EarthChen): "~/.claude/skills/<skill> is a symlink to a dir outside ~/.claude; a Read of a >4096 B reference
+  // .md is replaced by a ctx_search pointer". Black box (GS4): release-out/hook.mjs with a Claude Code PostToolUse Read.
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const HOOK_BUNDLE = path.join(path.resolve(__dirname, "..", ".."), "release-out", "hook.mjs");
+
+  test("[R54] GP3/own-file-symlinked-skill: a skill reference under a symlinked ~/.claude/skills dir passes whole (#1345)", (t) => {
+    const root = mkdtempSync(path.join(tmpdir(), "cm-gp3-1345-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const repo = path.join(root, "repo");
+    execFileSync("git", ["init", "-q", repo]);
+    const target = path.join(root, "dotfiles", "skills", "python3");
+    mkdirSync(path.join(target, "references"), { recursive: true });
+    const content = "## Reference line for the python3 skill\n".repeat(150);
+    for (const f of ["api.md", "log.jsonl"]) writeFileSync(path.join(target, "references", f), content);
+    mkdirSync(path.join(root, ".claude", "skills"), { recursive: true });
+    symlinkSync(target, path.join(root, ".claude", "skills", "python3"));
+    const env = { PATH: process.env.PATH, HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo };
+    const read = (name) => {
+      const filePath = path.join(root, ".claude", "skills", "python3", "references", name);
+      const n = content.split("\n").length;
+      const payload = {
+        session_id: "gp3-1345", cwd: repo, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: filePath }, tool_use_id: "toolu_gp3_1345_" + name,
+        tool_response: { type: "text", file: { filePath, content, numLines: n, startLine: 1, totalLines: n } },
+      };
+      const r = spawnSync(process.execPath, [HOOK_BUNDLE, "--agent", "claude-code"], { input: JSON.stringify(payload), cwd: repo, env, encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout;
+    };
+    assert.equal(read("api.md"), "", "the linked skill reference reaches the model whole");
+    assert.ok(read("log.jsonl").includes("updatedToolOutput"), "data through the same link still replaces");
   });
 }
 
