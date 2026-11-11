@@ -803,6 +803,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       const res = await runSetup({ ...opts(s), cwd: proj, runId: "k2" });
       assert.deepEqual(plugins(s), [own(s)], "setup in the project keeps the global entry");
       assert.ok(res.agents[0].reason?.includes(projFile), JSON.stringify(res.agents[0]));
+      assert.equal(res.agents[0].fix, `remove ${projFile}`, JSON.stringify(res.agents[0]));
       const d = await runDoctor({ ...opts(s), cwd: other });
       assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));
     });
@@ -818,6 +819,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       const c = registered(d);
       assert.ok(c && !c.ok && c.detail.includes("twice") && c.detail.includes(`remove ${projFile}`), JSON.stringify(c));
       assert.ok(!c.detail.includes("run: context-mode setup"), "setup cannot fix a project file; it is not ours to edit");
+      assert.equal(d.agents[0].fix, `remove ${projFile}`, "the CLI Fix: line names the project file, not the setup command");
       assert.deepEqual(plugins(s), [own(s)], "doctor writes nothing");
     });
 
