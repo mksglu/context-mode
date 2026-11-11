@@ -798,6 +798,8 @@ describe("ADR-0008 security rules (ported from v1)", { concurrency: CONC }, () =
       symlinkSync(target, join(cfg, "skills", "linked"));
       const ref = join(cfg, "skills", "linked", "references", "api.md");
       assert.deepEqual(decide(ev("Read", { file_path: ref }, root), CC, [], root), { kind: "allow" }, "linked ref");
+      // The POSIX fast path in isLexicallyInsideAny drops "." steps the way path.resolve does.
+      assert.deepEqual(decide(ev("Read", { file_path: [cfg, "skills", ".", "linked", "references", "api.md"].join(sep) }, root), CC, [], root), { kind: "allow" }, "linked ref with a . step");
       assert.equal(decide(ev("Bash", { command: "cat " + ref }, root), CODEX_ROW(), [], root).kind, "allow", "cat linked ref");
       assert.equal(failureOutput("claude-code", { hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: ref }, cwd: root }, new Error("x")).stdout?.includes("deny") ?? false, false, "fallback linked ref");
       assert.equal(decide(ev("Read", { file_path: join(cfg, "skills", "linked", "references", "log.jsonl") }, root), CC, [], root).kind, "deny", "data through the link");
