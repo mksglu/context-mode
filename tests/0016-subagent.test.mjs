@@ -18,6 +18,28 @@ import { buildRegistry } from "../src/setup/index.ts";
 import { decode } from "../src/adapters/vscode.ts";
 import { generateManifests } from "../build/manifests.ts";
 
+// The words a POSIX shell passes for a line of single-quoted, backslash-escaped and bare words (D-CC-POINTER-5).
+function posixWords(line) {
+  const words = [];
+  let cur = null;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "'") { const end = line.indexOf("'", i + 1); cur = (cur ?? "") + line.slice(i + 1, end); i = end; }
+    else if (ch === "\\") { cur = (cur ?? "") + line[i + 1]; i++; }
+    else if (ch === " ") { if (cur !== null) words.push(cur); cur = null; }
+    else cur = (cur ?? "") + ch;
+  }
+  if (cur !== null) words.push(cur);
+  return words;
+}
+// Runs a printed `node ...` line in a real shell with `node` as a function that prints its arguments, one per line.
+// A $( ), a backtick or a $VAR the shell runs or expands shows up as a file or as changed terms.
+function shellArgs(nodeLine, cwd) {
+  const sh = process.platform === "win32" ? "bash" : "sh";
+  const r = spawnSync(sh, ["-c", "node() { for a in \"$@\"; do printf '%s\\n' \"$a\"; done; }; " + nodeLine], { cwd, encoding: "utf8", env: { PATH: process.env.PATH, HOME: cwd } });
+  return { status: r.status, args: r.stdout.split("\n").slice(0, -1), stderr: r.stderr };
+}
+
 describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
   // Unit tests for src/core/policy/subagent.ts (impl/08 §5, Assumption B4; ADR-0016; DECISIONS-r3 Q23).
   // GP3 ADR-0016 golden cases at the pick level: case A/B/C, unknown built-in type, no tools: line,
@@ -303,8 +325,7 @@ describe("ADR-0016: replace pointer the caller can call (#1342, #1358)", () => {
     const db = new DatabaseSync(join(projects, readdirSync(projects)[0], "context.db"), { readOnly: true });
     try { return db.prepare("SELECT label FROM sources WHERE session_id = ? ORDER BY id").all(sessionId).map((r) => r.label); } finally { db.close(); }
   };
-  // The last line of a replace, split into the words a shell would pass (JSON strings or bare words).
-  const argsOf = (line) => [...line.matchAll(/"(?:[^"\\]|\\.)*"|\S+/g)].map((m) => m[0].startsWith('"') ? JSON.parse(m[0]) : m[0]);
+  const argsOf = posixWords;
   const runTwin = (line, terms) => {
     const at = line.indexOf("node ");
     assert.ok(at >= 0, line);
@@ -344,6 +365,27 @@ describe("ADR-0016: replace pointer the caller can call (#1342, #1358)", () => {
     const l = labels(sid);
     assert.equal(l.length, 2, JSON.stringify(l));
     assert.notEqual(l[0], l[1], JSON.stringify(l));
+  });
+
+  // D-CC-POINTER-5: the intent is the Bash command, Grep pattern, path or URL. The twin quotes it for the shell, so
+  // running the printed line never runs a $( ), a backtick or a $VAR in it, and search.mjs gets the terms unchanged.
+  test("#1358 the search.mjs line quotes $( ), a backtick and $HOME: the shell runs nothing and passes the terms whole", async () => {
+    const box = mkdtempSync(join(tmpdir(), "cm-ptr-q-"));
+    try {
+      const pattern = "row-777 $(touch " + join(box, "PWNED") + ") `touch " + join(box, "PWNED2") + "` $HOME it's";
+      const r = await replaced(post({ tool_use_id: "tu-q", tool_name: "Grep", tool_input: { pattern }, tool_response: big(1200) }));
+      const line = r.slice(r.lastIndexOf("\n") + 1);
+      const s = shellArgs(line.slice(line.indexOf("node ")), box);
+      assert.equal(s.status, 0, s.stderr);
+      assert.equal(existsSync(join(box, "PWNED")), false, "the shell ran $( ): " + line);
+      assert.equal(existsSync(join(box, "PWNED2")), false, "the shell ran a backtick: " + line);
+      assert.equal(basename(s.args[0]), C.SEARCH_WRAPPER_FILE, line);
+      assert.equal(s.args[2], pattern, "terms reach search.mjs unchanged: " + line);
+      assert.deepEqual(posixWords(line.slice(line.indexOf("node ") + "node ".length)), s.args);
+      const found = runTwin(line, "row-777");
+      assert.equal(found.status, 0, found.stderr);
+      assert.ok(found.stdout.includes("row-777 "), found.stdout.slice(0, 300));
+    } finally { rmSync(box, { recursive: true, force: true }); }
   });
 
   test("#1358 main-session MCP result: query is never empty, and the search.mjs line returns a middle line from any cwd", async () => {
@@ -436,11 +478,12 @@ describe("ADR-0016: run wrapper", { concurrency: CONC }, () => {
     assert.ok(lines[0].startsWith("exit 0 · "), lines[0]);
     assert.ok(lines.includes("39999"), "the chunk that matches the description is in the reply");
     const more = lines[lines.length - 1];
-    const want = C.RUN_MORE_PREFIX + JSON.stringify(join(bundle, C.SEARCH_WRAPPER_FILE)) + " ";
-    assert.ok(more.startsWith(want), more);
-    assert.ok(more.endsWith(' "39999"'), more);
-    // The more: line works: search.mjs <source-id> "<terms>" reads the same indexed output.
-    const id = more.slice(want.length).split(" ")[0];
+    assert.ok(more.startsWith(C.RUN_MORE_PREFIX), more);
+    const words = posixWords(more.slice(C.RUN_MORE_PREFIX.length));
+    assert.equal(words[0], join(bundle, C.SEARCH_WRAPPER_FILE), more);
+    assert.equal(words[2], "39999", more);
+    // The more: line works: search.mjs <source-id> '<terms>' reads the same indexed output.
+    const id = words[1];
     const s = search([id, "12345"]);
     assert.equal(s.status, 0, s.stderr);
     assert.ok(s.stdout.split("\n").includes("12345"), "search.mjs returns the matching chunk");
