@@ -2,14 +2,14 @@
 // Merged from GP3-hook-perf, GP3-hooks and GP3-zcode-names. Plain blocks, not describe: e2e/cases/run.mjs counts every pass event, and a describe adds one. Names unchanged.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runHookFixture } from "../harness/hook-runner.mjs";
 import { normalize } from "../harness/normalize.mjs";
 import { checkGolden } from "../harness/golden.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 
 // GP3: hook files, fixture replay and Pi/OpenCode parity
@@ -273,6 +273,52 @@ import { DatabaseSync } from "node:sqlite";
     assert.equal(typeof (mod.default ?? mod), "function");
   });
 
+  // #1352: Pi's own ExtensionRunner.emitToolResult with the built Pi bundle as the extension (ADR-0016:48 Pi row:
+  // content AND structuredContent together). The Pi host package comes from PI_HOST_DIR, the managed Pi install
+  // (~/.pi/agent/install/releases/<current-version>) or the global npm root; no Pi on the machine skips the case.
+  function piHostPackage() {
+    const roots = [];
+    if (process.env.PI_HOST_DIR) roots.push(path.join(process.env.PI_HOST_DIR, "node_modules"));
+    try {
+      const agentDir = path.join(homedir(), ".pi", "agent");
+      const ver = readFileSync(path.join(agentDir, "install", "current-version"), "utf8").trim();
+      roots.push(path.join(agentDir, "install", "releases", ver, "node_modules"));
+    } catch { /* no managed Pi install */ }
+    const npmRoot = spawnSync("npm", ["root", "-g"], { encoding: "utf8", shell: process.platform === "win32" });
+    if (npmRoot.status === 0) roots.push(npmRoot.stdout.trim());
+    return roots.map((r) => path.join(r, "@earendil-works", "pi-coding-agent")).find((d) => existsSync(path.join(d, "dist", "index.js")));
+  }
+  const PI_HOST = piHostPackage();
+
+  test("[M5] GP3/pi-tool-result-keeps-metadata: Pi's runner keeps details and structuredContent on a replace; excludeTools keeps the result whole (#1352)", { skip: PI_HOST === undefined ? "Pi not installed" : false }, async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "gp3-pi-1352-"));
+    const oldEnv = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR };
+    try {
+      const repo = path.join(root, "repo");
+      execFileSync("git", ["init", "-q", repo]);
+      process.env.HOME = root; process.env.USERPROFILE = root; process.env.PI_CODING_AGENT_DIR = path.join(root, ".pi", "agent");
+      const host = await import(pathToFileURL(path.join(PI_HOST, "dist", "index.js")).href);
+      const loader = await import(pathToFileURL(path.join(PI_HOST, "dist", "core", "extensions", "loader.js")).href);
+      const bundle = await import(pathToFileURL(path.join(REPO_ROOT, "release-out", "pi", "index.js")).href);
+      const runtime = host.createExtensionRuntime();
+      const settings = host.SettingsManager.inMemory({ contextMode: { excludeTools: ["kept_tool"] } });
+      runtime.getSettings = () => settings.getSettings();
+      const ext = await loader.loadExtensionFromFactory(bundle.default, repo, host.createEventBus(), runtime, "context-mode");
+      const runner = new host.ExtensionRunner([ext], runtime, repo, host.SessionManager.inMemory(repo), undefined);
+      const page = "# Requested page\n" + Array.from({ length: 300 }, (_, i) => "Section " + i + ": a distinct paragraph about the requested page and its source " + i + ".\n").join("");
+      const meta = { responseId: "r-1352", successful: 1 };
+      const ev = (toolName) => ({ type: "tool_result", toolName, toolCallId: "c-" + toolName, input: { url: "https://example.invalid/p" }, content: [{ type: "text", text: page }], details: { ...meta }, structuredContent: { ...meta }, isError: false });
+      const replaced = await runner.emitToolResult(ev("fetch_content"));
+      assert.ok(replaced && Buffer.byteLength(replaced.content[0].text) < Buffer.byteLength(page) / 2, "the large result is replaced");
+      assert.deepEqual(replaced.details, meta, "details survive the replace");
+      assert.deepEqual(replaced.structuredContent, meta, "structuredContent survives the replace");
+      assert.equal(await runner.emitToolResult(ev("kept_tool")), undefined, "an excludeTools entry leaves the result whole");
+    } finally {
+      for (const [k, v] of Object.entries(oldEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("[M5] GP3/tool-name-map-opencode-webfetch: OpenCode's webfetch call gets the WebFetch hint (#1052)", async () => {
     const bundlePath = path.join(path.resolve(__dirname, "..", ".."), "release-out", "opencode", "plugin.js");
     const mod = await import(`file://${bundlePath}`);
@@ -315,6 +361,43 @@ import { DatabaseSync } from "node:sqlite";
         `${p}: tool name "${name}" matches neither the zcode nativeTools nor "${OWN_PREFIX}ctx_*"; correct impl/10 §1.3/§1.3a/§1.5 zcode row`
       );
     }
+  });
+}
+
+// GP3: the agent's own skill files reach the model whole (D-R48-OWN-FILE-1, D-R54-OWN-FILE-LINK-1)
+{
+  // #1345 (EarthChen): "~/.claude/skills/<skill> is a symlink to a dir outside ~/.claude; a Read of a >4096 B reference
+  // .md is replaced by a ctx_search pointer". Black box (GS4): release-out/hook.mjs with a Claude Code PostToolUse Read.
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const HOOK_BUNDLE = path.join(path.resolve(__dirname, "..", ".."), "release-out", "hook.mjs");
+
+  test("[R54] GP3/own-file-symlinked-skill: a skill reference under a symlinked ~/.claude/skills dir passes whole (#1345)", (t) => {
+    const root = mkdtempSync(path.join(tmpdir(), "cm-gp3-1345-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const repo = path.join(root, "repo");
+    execFileSync("git", ["init", "-q", repo]);
+    const target = path.join(root, "dotfiles", "skills", "python3");
+    mkdirSync(path.join(target, "references"), { recursive: true });
+    const content = "## Reference line for the python3 skill\n".repeat(150);
+    for (const f of ["api.md", "log.jsonl"]) writeFileSync(path.join(target, "references", f), content);
+    mkdirSync(path.join(root, ".claude", "skills"), { recursive: true });
+    symlinkSync(target, path.join(root, ".claude", "skills", "python3"));
+    const env = { PATH: process.env.PATH, HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo };
+    writeFileSync(path.join(root, "dotfiles", "skills", "outside.md"), content);
+    const read = (name, filePath = path.join(root, ".claude", "skills", "python3", "references", name)) => {
+      const n = content.split("\n").length;
+      const payload = {
+        session_id: "gp3-1345", cwd: repo, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: filePath }, tool_use_id: "toolu_gp3_1345_" + name,
+        tool_response: { type: "text", file: { filePath, content, numLines: n, startLine: 1, totalLines: n } },
+      };
+      const r = spawnSync(process.execPath, [HOOK_BUNDLE, "--agent", "claude-code"], { input: JSON.stringify(payload), cwd: repo, env, encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout;
+    };
+    assert.equal(read("api.md"), "", "the linked skill reference reaches the model whole");
+    assert.ok(read("log.jsonl").includes("updatedToolOutput"), "data through the same link still replaces");
+    // A ".." step through the link reads dotfiles/skills/outside.md on disk, which is not an own file: it still replaces.
+    assert.ok(read("dotdot", [root, ".claude", "skills", "python3", "..", "outside.md"].join(path.sep)).includes("updatedToolOutput"), "a .. step through the link still replaces");
   });
 }
 

@@ -141,6 +141,21 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
       assert.ok(r.out.includes("ctx_execute"), r.out.slice(0, 400));
       assert.ok(r.out.length < 4000, "the model got " + r.out.length + " bytes, not the file");
     });
+    // D-R54-OC-REPLACE-1 (#1347): a large output that runs (not a whole-file cat) comes back replaced. Red before the fix:
+    // the model got the whole grep output (208000 bytes) on both hosts.
+    const GREP = "grep lorem big.log";
+    test("D-R54-OC-REPLACE-1: OpenCode 1.19 runs a large grep and the model gets the replace, not the output", opts, async () => {
+      const b = buildPlugin();
+      const r = await runHost(GREP, b.plugin, HOST_1);
+      assert.ok(r.out.includes("ctx_search"), r.out.slice(0, 400));
+      assert.ok(r.out.length < 20000, "the model got " + r.out.length + " bytes, not the replace");
+    });
+    test("D-R54-OC-REPLACE-1: OpenCode 2 runs a large grep and the model gets the replace in result.content", opts2, async () => {
+      const b = buildPlugin();
+      const r = await runHost(GREP, b.out, HOST_2);
+      assert.ok(r.out.includes("ctx_search"), r.out.slice(0, 400));
+      assert.ok(r.out.length < 20000, "the model got " + r.out.length + " bytes, not the replace");
+    });
     test.after?.(() => { if (built) rmSync(built.out, { recursive: true, force: true }); });
   });
 

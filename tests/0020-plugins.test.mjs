@@ -10,6 +10,8 @@ import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import piExtension from "../src/entries/pi.ts";
 import { resolveProject } from "../src/core/project/resolve.ts";
+import { openDb } from "../src/core/store/db.ts";
+import { readSessionEvents } from "../src/core/journal/read.ts";
 import { INSTRUCTIONS } from "../src/entries/server.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -182,12 +184,13 @@ describe("ADR-0020 plugins", () => {
       assert.deepEqual(asked.map((a) => [a.permission, a.patterns]), [["ctx_execute", ["shell"]], ["bash", ["rm -rf build"]]]);
     });
 
-    test("execute.before: the shell tool is routed like every host (curl denied by throwing the ctx_ redirect), webfetch is denied, ls passes", async () => {
+    test("execute.before: the shell tool is routed like every replace host (curl runs, execute.after replaces a large result), webfetch is denied, ls passes", async () => {
       const f = fakeCtx(tmpdir());
       const dispose = await opencodePlugin.default.setup(f.ctx);
       const before = f.hooks.tool["execute.before"];
       const call = (tool, input) => ({ tool, sessionID: "ses_b", agent: "build", messageID: "msg_1", id: "call_1", input });
-      await assert.rejects(before(call(SHELL, { command: "curl https://example.com" })), (e) => e instanceof Error && e.message.includes("ctx_"));
+      // D-M7-RR-1 + D-R54-OC-REPLACE-1 (#1347): a replace row runs the main agent's curl; no size-guess deny.
+      await before(call(SHELL, { command: "curl https://example.com" }));
       await assert.rejects(before(call("webfetch", { url: "https://example.com" })), (e) => e instanceof Error && e.message !== "");
       await before(call(SHELL, { command: "ls" }));
       await dispose();
@@ -218,6 +221,96 @@ describe("ADR-0020 plugins", () => {
       await f.hooks.session.prompt({ sessionID: "ses_c", prompt: { text: "hello" } });
       await f.hooks.session.compaction({ sessionID: "ses_c", system: [], messages: [], tools: {}, options: {} });
       await dispose();
+    });
+
+    // #1348, ADR-0016 l.23 (OpenCode 2 tool set from the agent at spawn time) and l.91 (D-SUB-NOCTX-1): the 2.x event carries
+    // `agent`, and ctx.agent.get returns Agent.Info {mode, permissions:[{action, resource, effect}]} (@opencode/plugin 2.2.6
+    // promise/agent.d.ts, client AgentGetOutput {location, data}). Red on main f681b458: the bridge drops i.agent, so a
+    // subagent whose permissions deny every ctx_* tool gets "Tool: ctx_index, then ctx_search" and cannot do its task.
+    // #1347, ADR-0016 l.49 + 12-plugins §4.5 step 3: the 2.x host reads afterEvent.result back after the hook (core
+    // persistent-pty-fre27jqt.js:124-139); red on main: a 278889-byte result reaches the model unchanged.
+    describe("agent tool set and in-process replace (#1348, #1347)", () => {
+      const NO_CTX = [{ action: "ctx_*", resource: "*", effect: "deny" }, { action: "webfetch", resource: "*", effect: "allow" }];
+      const agents = {
+        "arch-review": { id: "arch-review", mode: "subagent", permissions: NO_CTX },
+        "ctx-helper": { id: "ctx-helper", mode: "subagent", permissions: [{ action: "*", resource: "*", effect: "allow" }] },
+        build: { id: "build", mode: "primary", permissions: NO_CTX },
+      };
+      let home, oldEnv;
+      before(() => {
+        home = mkdtempSync(join(tmpdir(), "cm-oc2-agent-"));
+        oldEnv = { HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, XDG_DATA_HOME: process.env.XDG_DATA_HOME };
+        process.env.HOME = home; process.env.XDG_CONFIG_HOME = join(home, ".config"); process.env.XDG_DATA_HOME = join(home, ".local", "share");
+      });
+      after(() => {
+        for (const [k, v] of Object.entries(oldEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+        rmSync(home, { recursive: true, force: true });
+      });
+      function agentCtx(directory) {
+        const f = fakeCtx(directory);
+        f.ctx.agent = { get: async ({ agentID }) => ({ location: { directory }, data: agents[agentID] }) };
+        return f;
+      }
+      const ev = (tool, agent, input) => ({ tool, sessionID: "ses_ag", agent, messageID: "msg_1", id: "call_1", input });
+
+      test("#1348: a subagent whose permissions deny every ctx_* tool runs webfetch; the deny names no tool it lacks", async () => {
+        const f = agentCtx(mkdtempSync(join(home, "p-")));
+        const dispose = await opencodePlugin.default.setup(f.ctx);
+        await f.hooks.tool["execute.before"](ev("webfetch", "arch-review", { url: "https://example.com/" }));
+        await dispose();
+      });
+
+      test("#1348: a subagent that has the ctx_* tools keeps the webfetch redirect (case A)", async () => {
+        const f = agentCtx(mkdtempSync(join(home, "p-")));
+        const dispose = await opencodePlugin.default.setup(f.ctx);
+        await assert.rejects(f.hooks.tool["execute.before"](ev("webfetch", "ctx-helper", { url: "https://example.com/" })), (e) => e.message.includes("ctx_"));
+        await dispose();
+      });
+
+      test("#1348: a primary agent and a call with no agent keep the webfetch redirect", async () => {
+        const f = agentCtx(mkdtempSync(join(home, "p-")));
+        const dispose = await opencodePlugin.default.setup(f.ctx);
+        await assert.rejects(f.hooks.tool["execute.before"](ev("webfetch", "build", { url: "https://example.com/" })), (e) => e.message.includes("ctx_"));
+        await assert.rejects(f.hooks.tool["execute.before"](ev("webfetch", undefined, { url: "https://example.com/" })), (e) => e.message.includes("ctx_"));
+        await dispose();
+      });
+
+      test("#1347: a large completed shell result is replaced in result.content; output and metadata stay", async () => {
+        const f = agentCtx(mkdtempSync(join(home, "p-")));
+        const dispose = await opencodePlugin.default.setup(f.ctx);
+        const big = Array.from({ length: 4000 }, (_, i) => `commit ${i.toString(16).padStart(40, "0")} fix thing number ${i}`).join("\n");
+        const a = { ...ev(SHELL, "build", { command: "git log" }), status: "completed", result: { content: [{ type: "text", text: big }], output: { exit: 0 }, metadata: { m: 1 } } };
+        await f.hooks.tool["execute.after"](a);
+        const text = a.result.content.map((c) => c.text).join("");
+        assert.ok(text.length < 8000, "the model gets " + text.length + " bytes, not " + big.length);
+        assert.ok(text.includes("ctx_search"), text.slice(0, 300));
+        assert.deepEqual(a.result.output, { exit: 0 });
+        assert.deepEqual(a.result.metadata, { m: 1 });
+        await dispose();
+      });
+
+      test("#1347: a small result and an error result stay as the host made them", async () => {
+        const f = agentCtx(mkdtempSync(join(home, "p-")));
+        const dispose = await opencodePlugin.default.setup(f.ctx);
+        const small = { ...ev(SHELL, "build", { command: "git status" }), status: "completed", result: { content: [{ type: "text", text: "clean" }] } };
+        await f.hooks.tool["execute.after"](small);
+        assert.deepEqual(small.result.content, [{ type: "text", text: "clean" }]);
+        const err = { ...ev(SHELL, "build", { command: "x" }), id: "call_2", status: "error", error: { _tag: "Tool.Error", message: "boom ".repeat(3000) } };
+        await f.hooks.tool["execute.after"](err);
+        assert.equal(err.result, undefined);
+        assert.equal(err.error.message, "boom ".repeat(3000));
+        await dispose();
+      });
+
+      test("#1347: OpenCode 1.19 tool.execute.after replaces output.output (the host returns that object to the model)", async () => {
+        const dir = mkdtempSync(join(home, "p-"));
+        const hooks = await opencodePlugin.default.server({ directory: dir });
+        const big = "line lorem ipsum dolor sit amet\n".repeat(6500);
+        const out = { title: "git log", metadata: {}, output: big };
+        await hooks["tool.execute.after"]({ tool: "bash", sessionID: "ses_l", callID: "c1", args: { command: "git log" } }, out);
+        assert.ok(out.output.length < 8000, "the model gets " + out.output.length + " bytes");
+        assert.ok(out.output.includes("ctx_search"), out.output.slice(0, 300));
+      });
     });
   });
 
@@ -279,11 +372,9 @@ describe("ADR-0020 plugins", () => {
         hooks["tool.execute.before"]({ tool: "webfetch", sessionID: "s-block", callID: "c1" }, { args: { url: "https://example.com" } }),
         (err) => err instanceof Error && err.message !== "",
       );
-      // D-HF-OPENCODE-SHELL-1: the row lists shell ["bash"], so an inline HTTP call is denied like on every other host.
-      await assert.rejects(
-        hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c2" }, { args: { command: "curl https://example.com" } }),
-        (err) => err instanceof Error && err.message.includes("ctx_"),
-      );
+      // D-HF-OPENCODE-SHELL-1: the row lists shell ["bash"], so the user's own Bash rules apply. A curl runs on this
+      // replace row and execute.after replaces a large result (D-M7-RR-1, D-R54-OC-REPLACE-1, #1347).
+      await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c2" }, { args: { command: "curl https://example.com" } });
       await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c3" }, { args: { command: "ls" } });
     });
 
@@ -630,6 +721,106 @@ describe("ADR-0020 plugins", () => {
       const text = (await tools.get("ctx_resume").execute("r1", {})).content[0].text;
       assert.ok(text.includes("pi-edited.txt"), text);
       assert.ok(text.includes("pi-written.txt"), text);
+    });
+  });
+
+  describe("ADR-0020 pi plugin tool_result metadata and excludeTools (#1352)", () => {
+    // #1352 (xz-dev, hoho51): a large extension result (fetch_content, session_search) came back with `details`
+    // overwritten by {text} and with `structuredContent` dropped, so the tool lost its continuation id (responseId).
+    // ADR-0016:48 Pi row: "set `content` AND `structuredContent` together post-call (`tool_result`)". Pi >= 1.4
+    // drops structuredContent on a content-only patch (types.d.ts "Return it along with `content` to keep it") and
+    // keeps `details` when the patch omits it. contextMode.excludeTools in Pi settings leaves a named tool whole.
+    let root;
+    let repo;
+    let oldHome;
+
+    before(() => {
+      root = realpathSync(mkdtempSync(join(tmpdir(), "cm-pi-1352-")));
+      repo = join(root, "repo");
+      mkdirSync(repo);
+      execFileSync("git", ["init", "-q", repo]);
+      oldHome = process.env.HOME;
+      process.env.HOME = root; process.env.USERPROFILE = root;
+    });
+
+    after(() => {
+      process.env.HOME = oldHome;
+      try { rmSync(root, { recursive: true, force: true, maxRetries: 3 }); } catch (err) { if (process.platform !== "win32") throw err; }
+    });
+
+    const PAGE = "# Requested page\n" + Array.from({ length: 300 }, (_, i) => "Section " + i + ": a distinct paragraph about the requested page and its source " + i + ".\n").join("");
+    const META = { responseId: "stored-response-for-continuation", successful: 1 };
+
+    function resultEvent(toolName, id, extra = {}) {
+      return {
+        toolName, toolCallId: id, input: { url: "https://example.invalid/" + id },
+        content: [{ type: "text", text: PAGE }], details: { ...META }, structuredContent: { ...META }, isError: false, ...extra,
+      };
+    }
+
+    async function start(sid, getSettings) {
+      const handlers = new Map();
+      const pi = { on: (n, f) => handlers.set(n, f), registerTool() {} };
+      if (getSettings !== undefined) pi.getSettings = getSettings;
+      piExtension(pi);
+      const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
+      await handlers.get("before_agent_start")({ systemPrompt: "" }, ctx);
+      return (ev) => handlers.get("tool_result")(ev, ctx);
+    }
+
+    // The journal write is detached: wait until the row lands.
+    async function rowsOf(sid, kind) {
+      const db = await openDb(resolveProject("pi", { env: process.env, argv: [], cwd: repo, piCwd: repo }));
+      let rows = [];
+      for (let i = 0; i < 100; i++) {
+        rows = readSessionEvents(db, sid, kind);
+        if (rows.length > 0) break;
+        await sleep(20);
+      }
+      return rows;
+    }
+
+    test("[#1352] a large replace keeps the tool's details (no details key) and returns its structuredContent", async () => {
+      const toolResult = await start("pi-1352-a");
+      const out = await toolResult(resultEvent("fetch_content", "a1"));
+      assert.ok(out && Buffer.byteLength(out.content[0].text) < Buffer.byteLength(PAGE) / 2, "the content is replaced");
+      assert.equal(Object.hasOwn(out, "details"), false, "details stays as the tool made it: " + JSON.stringify(out.details));
+      assert.deepEqual(out.structuredContent, META, "structuredContent goes back with the new content, so Pi keeps it");
+      const plain = await toolResult(resultEvent("fetch_content", "a2", { structuredContent: undefined }));
+      assert.equal(Object.hasOwn(plain, "structuredContent"), false, "no structuredContent in, none out");
+    });
+
+    test("[#1352] excludeTools: a listed tool's 23 KB result stays whole, a cmd row is still journaled, another tool is still replaced", async () => {
+      const toolResult = await start("pi-1352-b", () => ({ contextMode: { excludeTools: ["fetch_content", "bash"] } }));
+      assert.equal(await toolResult(resultEvent("fetch_content", "b1")), undefined, "fetch_content is left as the host made it");
+      const bash = { toolName: "bash", toolCallId: "b2", input: { command: "cat page.md" }, content: [{ type: "text", text: PAGE }], isError: false };
+      assert.equal(await toolResult(bash), undefined, "bash is listed, so it is left whole too");
+      assert.equal((await rowsOf("pi-1352-b", "cmd")).length, 1, "the kept bash call still has its journal row");
+      const other = await toolResult(resultEvent("web_search", "b3"));
+      assert.ok(other && Buffer.byteLength(other.content[0].text) < Buffer.byteLength(PAGE) / 2, "a tool not on the list is still replaced");
+    });
+
+    test("[#1352] missing, empty or malformed excludeTools settings, and a Pi with no getSettings, give the default replace", async () => {
+      const variants = [
+        undefined,
+        () => ({}),
+        () => ({ contextMode: null }),
+        () => ({ contextMode: { excludeTools: [] } }),
+        () => ({ contextMode: { excludeTools: "fetch_content" } }),
+        () => ({ contextMode: { excludeTools: [1, null, { name: "fetch_content" }] } }),
+        () => { throw new Error("Extension runtime not initialized"); },
+      ];
+      for (const [i, getSettings] of variants.entries()) {
+        const toolResult = await start("pi-1352-c" + i, getSettings);
+        const out = await toolResult(resultEvent("fetch_content", "c" + i));
+        assert.ok(out && Buffer.byteLength(out.content[0].text) < Buffer.byteLength(PAGE) / 2, "variant " + i + " replaces");
+      }
+    });
+
+    test("[#1352] an excluded tool's large error result stays unchanged and is journaled as toolerr", async () => {
+      const toolResult = await start("pi-1352-d", () => ({ contextMode: { excludeTools: ["fetch_content"] } }));
+      assert.equal(await toolResult(resultEvent("fetch_content", "d1", { isError: true })), undefined);
+      assert.equal((await rowsOf("pi-1352-d", "toolerr")).length, 1, "the error row is written");
     });
   });
 

@@ -57,7 +57,7 @@ function table(agents: readonly AgentResult[]): string {
 }
 
 function failLines(agents: readonly AgentResult[]): string[] {
-  return agents.filter((a) => a.status === "FAIL").map((a) => `FAIL ${a.id}: ${a.reason ?? "failed"}. Fix: ${fixFor(a.id)}`);
+  return agents.filter((a) => a.status === "FAIL").map((a) => `FAIL ${a.id}: ${a.reason ?? "failed"}. Fix: ${a.fix ?? fixFor(a.id)}`);
 }
 
 function verboseLines(agents: readonly AgentResult[]): string[] {
@@ -343,7 +343,7 @@ async function doctor(ui: Ui): Promise<number> {
   const p = ui.clack;
   if (!p || code === EXIT_OK) return code;
   let worst = code;
-  for (const a of res.agents.filter((x) => x.status === "FAIL")) {
+  for (const a of res.agents.filter((x) => x.status === "FAIL" && x.fix === undefined)) { // a.fix: setup cannot fix it
     const ok = await p.confirm({ message: `Fix ${a.id} now? (runs ${fixFor(a.id)})`, initialValue: true });
     if (p.isCancel(ok)) return EXIT_SIGINT;
     if (!ok) continue;

@@ -247,6 +247,23 @@ test("[M4] GP6/resume-seq-pointer", async (t) => {
   assert.equal(textOf(whole), big, "ctx_resume(seq) returns the row whole");
 });
 
+// #1353 (D-1353-RESUME-BLANK-1): a JSON-schema client sends session:"" for the optional field;
+// the built server answers with the caller's state block, the same as {}.
+test("[M4] GP6/resume-blank-session-falls-back", async (t) => {
+  const f = fixture(t);
+  const sid = "gp6-blank";
+  await f.hook("claude-code", sid, { hook_event_name: "UserPromptSubmit", prompt: "blank session check" });
+  const c = await f.server();
+  const bare = await call(c, "ctx_resume", {}, { sessionId: sid });
+  const blank = await call(c, "ctx_resume", { session: "" }, { sessionId: sid });
+  assert.equal(blank.isError, false, textOf(blank));
+  assertStateBlock(textOf(blank), sid);
+  // Each call adds its own journal row, so only upto differs between the two replies.
+  const body = (r) => textOf(r).replace(/ upto="\d+">/, ">");
+  assert.equal(body(blank), body(bare));
+  assert.ok(textOf(blank).includes("now: blank session check"), textOf(blank));
+});
+
 // Golden cases: not the user role (#1263), bare tool names (#1028), no "directive" text (#911, #1259).
 test("[M4] GP6/code-echo-default", async (t) => {
   const f = fixture(t);

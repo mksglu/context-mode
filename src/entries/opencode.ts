@@ -4,6 +4,7 @@
 import {
   INTERNAL_ERROR_LINE, OC_ANY_RESOURCE, OC_LEGACY_SHELL_ACTION, OC_READ_ACTION, OC_SHELL_ACTION, OC_WEBFETCH_ACTION, PLUGIN_ID,
 } from "../core/contracts/constants.ts";
+import { READ_TOOL_NAME, SHELL_TOOL_NAMES } from "../adapters/opencode.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { HookOutput, HostPermission, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
 import { handleHook } from "../core/hooks/dispatch.ts";
@@ -102,7 +103,8 @@ export interface OpenCodeToolDef {
   execute(args: unknown, toolCtx: OpenCodeToolCtx): Promise<string>;
 }
 
-interface ToolInput { tool?: string; sessionID?: string; callID?: string; args?: unknown }
+/** agentID/agentTools: set by the 2.x bridge for a subagent only (#1348); 1.19 never sends them. */
+interface ToolInput { tool?: string; sessionID?: string; callID?: string; args?: unknown; agentID?: string; agentTools?: string[] }
 interface TextPart { type?: string; text?: string }
 interface BusEvent { type?: string; properties?: { part?: { type?: string; sessionID?: string } } }
 
@@ -198,19 +200,22 @@ export async function setupLegacy(app: OpenCodeApp) {
       await payloadFor(sessionId);
       const out = await call({
         type: "execute.before", sessionID: sessionId, tool: input.tool, callID: input.callID, args: output.args,
-        turn: turnOf(sessionId),
+        agentID: input.agentID, agentTools: input.agentTools, turn: turnOf(sessionId),
       });
       if (out.exitCode === 2) throw new Error(out.stdout);
     },
 
-    // §4.5. OpenCode's encode has no replace field (impl/10 §11), so output.output is never changed here.
+    // §4.5 step 3, case C: a replace comes back as stdout and is written into output.output in-process. OpenCode 1.19
+    // returns this same object to the model after the trigger; the 2.x bridge copies it into result.content (#1347).
     "tool.execute.after": async (input: ToolInput, output: { output?: unknown; isError?: boolean }) => {
       const sessionId = input.sessionID ?? "";
       await payloadFor(sessionId);
-      await call({
+      const out = await call({
         type: "execute.after", sessionID: sessionId, tool: input.tool, callID: input.callID, args: input.args,
-        output: output.output, isError: output.isError, turn: turnOf(sessionId),
+        output: output.output, isError: output.isError, agentID: input.agentID, agentTools: input.agentTools,
+        turn: turnOf(sessionId),
       });
+      if (out.stdout !== "") output.output = out.stdout;
     },
 
     // §4.6: one system entry per session, the same bytes on every request (#1085, Q12). A second
@@ -245,12 +250,16 @@ export async function setupLegacy(app: OpenCodeApp) {
 // ("session.step.ended"), plugin tools -> ctx.tool.transform(editor.add). setup returns a dispose function.
 
 interface Oc2Content { type?: string; text?: string }
-interface Oc2BeforeInput { tool?: string; sessionID?: string; id?: string; input?: unknown }
+interface Oc2BeforeInput { tool?: string; sessionID?: string; agent?: string; id?: string; input?: unknown }
 interface Oc2AfterInput extends Oc2BeforeInput {
   status?: string;
-  result?: { content?: string | Oc2Content[]; output?: unknown };
+  result?: { content?: string | Oc2Content[]; output?: unknown; metadata?: unknown };
   error?: { message?: string };
 }
+/** @opencode/schema 2.2.6 Agent.Info, the fields this plugin reads. */
+interface Oc2AgentInfo { mode?: string; permissions?: { action?: string; resource?: string; effect?: string }[] }
+/** @opencode/plugin 2.2.6 promise/agent.d.ts `AgentApi.get`; the result is AgentGetOutput {location, data}. */
+interface Oc2AgentApi { get?(input: { agentID: string; location?: { directory?: string } }): Promise<unknown> }
 interface Oc2Part { type?: string; text?: string }
 interface Oc2Tool {
   name: string;
@@ -277,12 +286,66 @@ export interface OpenCode2Context {
   };
   session: { hook(name: string, cb: (input: never) => Promise<void> | void): Promise<unknown> };
   permission?: { assert?: Oc2Assert };
+  agent?: Oc2AgentApi;
   event: { subscribe(options?: { types?: string[]; signal?: AbortSignal }): AsyncIterable<{ data?: { sessionID?: string } }> };
 }
 
 function oc2Text(content: string | Oc2Content[] | undefined): string {
   if (typeof content === "string") return content;
   return (content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+}
+
+/** OpenCode's permission wildcard (core match3): `*` is any run, `?` is one character, whole string. */
+function wildcard(pattern: string, text: string): boolean {
+  let row = new Uint8Array(text.length + 1);
+  row[0] = 1;
+  for (const c of pattern) {
+    const next = new Uint8Array(text.length + 1);
+    for (let j = 0; j <= text.length; j++) {
+      if (c === "*") next[j] = row[j] === 1 || (j > 0 && next[j - 1] === 1) ? 1 : 0;
+      else if (j > 0 && row[j - 1] === 1 && (c === "?" || c === text[j - 1])) next[j] = 1;
+    }
+    row = next;
+  }
+  return row[text.length] === 1;
+}
+
+/** Core whollyDisabled: the last rule whose action matches the tool decides; resource "*" with effect deny turns it off. */
+function toolOff(name: string, rules: NonNullable<Oc2AgentInfo["permissions"]>): boolean {
+  for (let k = rules.length - 1; k >= 0; k--) {
+    const r = rules[k];
+    if (typeof r.action === "string" && wildcard(r.action, name)) return r.resource === "*" && r.effect === "deny";
+  }
+  return false;
+}
+
+interface SubagentFields { agentID?: string; agentTools?: string[] }
+
+/**
+ * D-R54-OC-AGENT-1 (#1348, ADR-0016 l.23): the 2.x event names its agent. ctx.agent.get gives Agent.Info once per agent
+ * (cached); a "subagent" mode agent gets agentID and the tools its permissions leave on. Any other agent, or a host
+ * without ctx.agent, gets no fields: the call stays a main-agent call.
+ */
+function agentResolver(ctx: OpenCode2Context, ownTools: string[]): (agent: string | undefined) => Promise<SubagentFields> {
+  const cache = new Map<string, Promise<SubagentFields>>();
+  const known = [...SHELL_TOOL_NAMES, READ_TOOL_NAME, "webfetch", ...ownTools];
+  const resolveOne = async (agent: string): Promise<SubagentFields> => {
+    const raw = await ctx.agent?.get?.({ agentID: agent, location: { directory: ctx.location.directory } });
+    const box = raw !== null && typeof raw === "object" ? raw as { data?: unknown; mode?: unknown } : {};
+    const info = (box.mode !== undefined ? box : box.data) as Oc2AgentInfo | undefined;
+    if (info?.mode !== "subagent") return {};
+    const rules = info.permissions ?? [];
+    return { agentID: agent, agentTools: known.filter((t) => !toolOff(t, rules)) };
+  };
+  return (agent) => {
+    if (agent === undefined || agent === "" || ctx.agent?.get === undefined) return Promise.resolve({});
+    let p = cache.get(agent);
+    if (p === undefined) {
+      p = resolveOne(agent).catch(() => ({})); // a hook never errors (ADR-0001): no Agent.Info = a main-agent call
+      cache.set(agent, p);
+    }
+    return p;
+  };
 }
 
 /** impl/12 §4.1, OpenCode 2 `{id, setup}`: the same handlers as `setupLegacy`, wired to the 2.x ctx. */
@@ -315,13 +378,21 @@ export async function setup(ctx: OpenCode2Context): Promise<() => void> {
 
   await ctx.tool.transform((editor) => { for (const t of tools.values()) editor.add(t); });
 
+  const subagentOf = agentResolver(ctx, [...tools.keys()]);
   await ctx.tool.hook("execute.before", async (i: Oc2BeforeInput) => {
-    await hooks["tool.execute.before"]({ tool: i.tool, sessionID: i.sessionID, callID: i.id }, { args: i.input });
+    const sub = await subagentOf(i.agent);
+    await hooks["tool.execute.before"]({ tool: i.tool, sessionID: i.sessionID, callID: i.id, ...sub }, { args: i.input });
   });
   await ctx.tool.hook("execute.after", async (i: Oc2AfterInput) => {
     const failed = i.status === "error";
-    const output = failed ? i.error?.message ?? "" : oc2Text(i.result?.content);
-    await hooks["tool.execute.after"]({ tool: i.tool, sessionID: i.sessionID, callID: i.id, args: i.input }, { output, isError: failed });
+    const text = failed ? i.error?.message ?? "" : oc2Text(i.result?.content);
+    const out: { output?: unknown; isError?: boolean } = { output: text, isError: failed };
+    const sub = await subagentOf(i.agent);
+    await hooks["tool.execute.after"]({ tool: i.tool, sessionID: i.sessionID, callID: i.id, args: i.input, ...sub }, out);
+    // §4.5 step 3, case C (#1347): the host reads afterEvent.result back after the hook; output and metadata stay.
+    if (!failed && typeof out.output === "string" && out.output !== text) {
+      i.result = { ...i.result, content: [{ type: "text", text: out.output }] };
+    }
   });
   await ctx.session.hook("prompt", async (p: { sessionID?: string; prompt?: { text?: string } }) => {
     await hooks["chat.message"]({ sessionID: p.sessionID }, { parts: [{ type: "text", text: p.prompt?.text ?? "" }] });

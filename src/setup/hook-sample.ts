@@ -53,7 +53,8 @@ export function hookSample(id: AgentId, cwd: string, text: string): HookSample {
     case "pi":
       return { effect, payload: { type: event, sessionId: SAMPLE_SESSION, cwd, toolName: tool, input: command, content: text, isError: false } };
     case "opencode":
-      return { effect, payload: { type: event, sessionID: SAMPLE_SESSION, directory: cwd, tool, args: command } };
+      // D-R54-OC-REPLACE-1 (#1347): a replace row gets execute.after with the output the plugin passes on.
+      return { effect, payload: { type: event, sessionID: SAMPLE_SESSION, directory: cwd, tool, args: command, ...(effect === "replace" ? { output: text } : {}) } };
     case "codex":
     case "qwen":
     case "vscode":

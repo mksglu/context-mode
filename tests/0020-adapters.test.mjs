@@ -208,7 +208,9 @@ describe("ADR-0020 adapters", () => {
       assert.deepEqual(r.encode({ ...base, event: "PreToolUse" }, { kind: "hint", text: "t", onceKey: "k" }), { stdout: "", exitCode: 0 });
       assert.deepEqual(r.encode({ ...base, event: "PreToolUse" }, { kind: "deny", reason: "why" }), { stdout: "why", exitCode: 2 });
       assert.deepEqual(r.encode({ ...base, event: "UserPromptSubmit" }, { kind: "deny", reason: "why" }), { stdout: "", exitCode: 0 });
-      assert.deepEqual(r.encode({ ...base, event: "PostToolUse" }, { kind: "replace", output: "o" }), { stdout: "", exitCode: 0 });
+      // D-R54-OC-REPLACE-1 (#1347): a PostToolUse replace comes back as stdout; the plugin writes it into the host result.
+      assert.deepEqual(r.encode({ ...base, event: "PostToolUse" }, { kind: "replace", output: "o" }), { stdout: "o", exitCode: 0 });
+      assert.deepEqual(r.encode({ ...base, event: "PreToolUse" }, { kind: "replace", output: "o" }), { stdout: "", exitCode: 0 });
     });
 
     // D-FU-RM-KIRO-2: every native name a row's eventMap emits (the build writes these into hooks/<id>.json) must
@@ -1541,6 +1543,15 @@ describe("ADR-0020 adapters", () => {
       const hintPi = pi.hintFor?.("Read", 60000);
       const hintCc = cc.hintFor?.("Read", 60000);
       assert.equal(hintPi, hintCc);
+    });
+
+    test("[#1352] pi decode: a tool_result with keep: true marks the result keep; any other value leaves it unset", () => {
+      const row = getRow("pi");
+      const base = { type: "tool_result", sessionId: "s", cwd: "/p", toolName: "fetch_content", input: {}, content: "abc", isError: false };
+      assert.deepEqual(row.decode({ ...base, keep: true }).result, { isError: false, bytes: 3, text: "abc", keep: true });
+      for (const keep of [undefined, false, "true", 1]) {
+        assert.equal(Object.hasOwn(row.decode({ ...base, keep }).result, "keep"), false, String(keep));
+      }
     });
 
     test("[M5] adapters/pi-project-permissions-honored: a deny rule in the project permissions file denies with reason (#1019)", () => {

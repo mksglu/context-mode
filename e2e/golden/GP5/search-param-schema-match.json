@@ -5,6 +5,8 @@
     "source": false,
     "offset": false,
     "sort": false,
-    "after": false
+    "after": false,
+    "zeroTimeline": false,
+    "zeroRelevance": false
   }
 }

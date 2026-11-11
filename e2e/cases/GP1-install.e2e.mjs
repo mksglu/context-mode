@@ -713,3 +713,39 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
     });
   }
 }
+
+// GP1: OpenCode 1.x setup with a user MCP server that never answers (#1362, D-OC1-LIST-2)
+{
+  // `opencode mcp list` connects every user server, so one server that never answers held setup's list check past
+  // its 10 s budget and setup FAILed "does not list context-mode (rolled back)". Setup reads `debug config --pure`
+  // now. Real opencode-ai 1.x from PATH (CI installs 1.19.5); skipped with no 1.x opencode there.
+  const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const CLI = path.join(REPO_ROOT, "release-out", "cli.mjs");
+  const version = (() => {
+    try { return execFileSync("opencode", ["--version"], { encoding: "utf8", timeout: 30000 }).trim(); } catch { return ""; }
+  })();
+  const skip = !version.startsWith("1.") ? `no opencode 1.x on PATH (${version || "none"})` : !existsSync(CLI) ? "no release-out/cli.mjs" : false;
+
+  test("[M6] GP1/opencode1-slow-mcp-server: setup PASSes in under 10 s next to a user MCP server that never answers (#1362)", { skip }, (t) => {
+    const root = mkdtempSync(path.join(tmpdir(), "cm-gp1-oc1-slow-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const home = path.join(root, "home");
+    const slow = path.join(root, "slow.mjs");
+    writeFileSync(slow, "setInterval(() => {}, 1000);\n"); // reads nothing, answers nothing
+    const cfg = path.join(home, ".config", "opencode");
+    mkdirSync(cfg, { recursive: true });
+    writeFileSync(path.join(cfg, "opencode.json"), JSON.stringify({ mcp: { slowsrv: { type: "local", command: [process.execPath, slow], enabled: true } } }, null, 2) + "\n");
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    for (const k of ["XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG"]) delete env[k];
+    const t0 = Date.now();
+    let out = "";
+    let code = 0;
+    try { out = execFileSync(process.execPath, [CLI, "setup", "--yes", "--agents", "opencode"], { cwd: root, env, encoding: "utf8", timeout: 60000, stdio: ["ignore", "pipe", "pipe"] }); }
+    catch (e) { code = e.status ?? 1; out = `${e.stdout}${e.stderr}`; }
+    const ms = Date.now() - t0;
+    assert.equal(code, 0, out);
+    assert.ok(ms < 10000, `setup took ${ms} ms`);
+    const doc = JSON.parse(readFileSync(path.join(cfg, "opencode.json"), "utf8"));
+    assert.ok(doc.mcp["context-mode"] && doc.mcp.slowsrv, JSON.stringify(doc));
+  });
+}

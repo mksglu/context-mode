@@ -111,6 +111,29 @@ describe("ADR-0011: detect v1", { concurrency: CONC }, () => {
     assert.equal(detectV1("gemini", home, { tmp: tmp(t) }).length, 2);
   });
 
+  // #1364 (Korayem, Codex CLI 0.167.0, 2.1.7) and #1359 (HengYangDS): ctx_upgrade removed the user's own security hooks
+  // `node "$HOME/.agents/hooks/codex/secret-guard-*.mjs"` from ~/.codex/hooks.json, because any .mjs under a hooks/codex/
+  // folder read as v1. v1.0.169 wrote only hooks/codex/<event>.mjs for its six Codex events (LEGACY_HOOK_PATH_SUFFIXES)
+  // and `context-mode hook codex <event>` (D-1364-CODEX-V1-SCRIPT-1).
+  test("[#1364] detect-v1/codex keeps user .mjs hooks under a hooks/codex/ folder; v1 event scripts are still flagged", (t) => {
+    const home = tmp(t);
+    const file = path.join(home, ".codex", "hooks.json");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ hooks: {
+      PreToolUse: [{ hooks: [{ type: "command", command: 'node "$HOME/.agents/hooks/codex/secret-guard-pre-tool.mjs"' }] }],
+      PostToolUse: [{ hooks: [
+        { type: "command", command: "node C:\\Users\\u\\.agents\\hooks\\codex\\guard.mjs" },
+        { type: "command", command: "node /x/dotfiles/hooks/codex/notify.mjs" },
+        { type: "command", command: "node /x/dotfiles/hooks/codex/my-pretooluse.mjs" },
+      ] }],
+      SessionStart: [{ hooks: [{ type: "command", command: "node C:\\cm\\hooks\\codex\\sessionstart.mjs" }] }],
+      Stop: [{ hooks: [{ type: "command", command: "node /a/hooks/codex/stop.mjs" }, { type: "command", command: "context-mode hook codex stop" }] }],
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: 'node "${PLUGIN_ROOT}/hooks/codex/userpromptsubmit.mjs"' }] }],
+    } }), "utf8");
+    assert.deepEqual(detectV1("codex", home, { tmp: tmp(t) }).map((f) => f.path),
+      ["hooks.SessionStart.0.hooks.0", "hooks.Stop.0.hooks.0", "hooks.Stop.0.hooks.1", "hooks.UserPromptSubmit.0.hooks.0"]);
+  });
+
   test("[M5] detect-v1/pi-npm-entry-found-via-PI_CODING_AGENT_DIR and after the git entry (#1035, #901, #1309)", (t) => {
     const home = tmp(t);
     const piDir = tmp(t);
@@ -297,6 +320,20 @@ describe("ADR-0011: remove v1", { concurrency: CONC }, () => {
     assert.ok(!after.includes("context-mode"));
     assert.ok(after.includes("[features]") && after.includes("[mcp_servers.other]") && after.includes("command = \"o\""));
     r.commit();
+  });
+
+  // #1364 (D-1364-CODEX-V1-SCRIPT-1): the reporter's hooks.json lost its user entry and no copy was left.
+  test("[#1364] v1-remove/codex removes only the v1 hook entry; the user hook under ~/.agents/hooks/codex/ stays as it was", (t) => {
+    const home = tmp(t);
+    const mine = { type: "command", command: 'node "$HOME/.agents/hooks/codex/secret-guard-pre-tool.mjs"', timeout: 7 };
+    const file = put(path.join(home, ".codex", "hooks.json"), { hooks: {
+      PreToolUse: [{ hooks: [mine] }],
+      Stop: [{ hooks: [{ type: "command", command: "node /x/hooks/codex/stop.mjs" }] }],
+    } });
+    const r = removeV1("codex", detectV1("codex", home, { tmp: tmp(t) }));
+    assert.deepEqual(r.rows, [{ area: `${file}: hooks.Stop.0.hooks.0`, before: V1_REASON.codexHook, after: UPGRADE_REMOVED }]);
+    r.commit();
+    assert.deepEqual(json(file).hooks.PreToolUse, [{ hooks: [mine] }]);
   });
 
   test("[M5] v1-remove/pi-npm-entries-dropped-git-entry-kept-jsonc-comments-kept", (t) => {
@@ -498,5 +535,67 @@ describe("GP11: v1 migration setup plants detectable footprints", { concurrency:
     writeFileSync(path.join(dir, "settings.json"), "USER");
     assert.throws(() => plantV1Install("claude-code", home), /EEXIST|exists/);
     assert.equal(readFileSync(path.join(dir, "settings.json"), "utf8"), "USER");
+  });
+});
+
+describe("ADR-0011: v1 upgrade stop", { concurrency: CONC }, () => {
+  // #1363 (DEVIATIONS D-V1-UPGRADE-STOP-1). v1 `context-mode upgrade` and v1 ctx_upgrade clone `main`, compare the
+  // package.json version, run `npm install` and the `build` script in the clone, and only then copy files over the
+  // install. Since the MAIN-ONLY merge (30b95f76) main carries the v2 version, so the frozen-main guard of ADR-0011 is
+  // gone: v1 copied package.json 2.x and src/ over a 1.0.x tree and kept the 1.0.x bin (a hybrid install). The one input
+  // we own that v1 reads before any write is the clone's `build` script. It must stop there and name the native command.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const pkg = JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8"));
+  const STOP = "scripts/v1-upgrade-stop.mjs";
+
+  test("[M7] v1-upgrade-stop/build-script-stops-writes-nothing-and-names-npm-i-g (#1363)", (t) => {
+    assert.equal(pkg.scripts.build, `node ${STOP}`);
+    const cwd = mkdtempSync(path.join(tmpdir(), "cm-v1-stop-"));
+    t.after(() => rmSync(cwd, { recursive: true, force: true }));
+    const r = spawnSync(process.execPath, [path.join(REPO, STOP)], { cwd, encoding: "utf8" });
+    assert.notEqual(r.status, 0, "the stop must fail the v1 build step");
+    assert.ok(r.stderr.includes("npm i -g context-mode"), r.stderr);
+    assert.ok(r.stderr.includes("https://github.com/mksglu/context-mode/blob/main/docs/install/README.md"), r.stderr);
+    assert.ok(r.stderr.includes("node build/build.mjs --out release-out"), "contributors get the real build command: " + r.stderr);
+    assert.deepEqual(readdirSync(cwd), []);
+  });
+
+  test("[M7] v1-upgrade-stop/no-ci-doc-or-script-calls-the-build-script (#1363)", () => {
+    // The stop is safe only while no contributor path depends on `npm run build`: CI, docs and release scripts call
+    // build/build.mjs directly (ci.yml, docs/install/README.md "From source", package.json build:release).
+    const roots = [".github", "docs/install", "scripts", "build", "e2e/cases", "e2e/checks", "e2e/harness"];
+    const files = ["README.md", "CONTRIBUTING.md"].map((f) => path.join(REPO, f)).filter((f) => existsSync(f));
+    const walk = (d) => readdirSync(d, { withFileTypes: true }).forEach((e) => {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p); else files.push(p);
+    });
+    for (const r of roots) if (existsSync(path.join(REPO, r))) walk(path.join(REPO, r));
+    const callers = files.filter((f) => { const s = readFileSync(f, "utf8"); return s.includes("npm run build ") || s.includes("npm run build\n") || s.includes("npm run build`") || s.includes('"run", "build"]'); });
+    assert.deepEqual(callers.map((f) => path.relative(REPO, f)), []);
+    assert.equal(pkg.scripts["build:release"], "node build/build.mjs --out release-out");
+  });
+
+  test("[M7] v1-upgrade-stop/release-package-json-has-no-scripts (#1363)", async () => {
+    // The stop lives in the dev tree only; the published D1 package.json has no scripts (ADR-0019 D1).
+    const { npmPackageJson } = await import("../build/manifests.ts");
+    assert.ok(!("scripts" in npmPackageJson("2.1.7")));
+  });
+
+  test("[M7] v1-upgrade-stop/docs-state-the-build-script-guard (#1363)", () => {
+    // The docs must say what is true since the MAIN-ONLY merge: main carries the v2 version and the build script is the
+    // guard; the install guide claims only what GP11 proves (the installed package stays as it is).
+    const doc = (rel) => readFileSync(path.join(REPO, rel), "utf8");
+    const adr11 = doc("docs/architecture/adr/0011-release-and-v1-transition.md");
+    assert.ok(!adr11.includes("keeps the frozen v1 `package.json`"), "ADR-0011 still says main keeps the v1 package.json");
+    assert.ok(adr11.includes("gets the v2 source and the v2 `package.json` version"));
+    const mod15 = doc("docs/architecture/modules/15-v1-transition.md");
+    assert.ok(mod15.includes("D-V1-UPGRADE-STOP-1") && mod15.includes("scripts/v1-upgrade-stop.mjs"), "module 15 §1.3 step 4 has no #1363 amendment");
+    const adr17 = doc("docs/architecture/adr/0017-e2e-every-step-and-v1-retention.md");
+    assert.ok(adr17.includes("`main` stayed frozen until the MAIN-ONLY merge"));
+    const install = doc("docs/install/README.md");
+    assert.ok(install.includes("prints the native command and leaves the installed package as it is"));
+    assert.ok(!install.includes("prints the native command and changes nothing"));
+    const row = doc("docs/architecture/DEVIATIONS.md").split("\n").find((l) => l.startsWith("| D-V1-UPGRADE-STOP-1 |"));
+    assert.ok(row && row.includes("docs/architecture/modules/15-v1-transition.md"), "DEVIATIONS row does not list module 15");
   });
 });

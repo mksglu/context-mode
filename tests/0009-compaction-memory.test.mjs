@@ -811,6 +811,23 @@ describe("ADR-0009 section 6: ctx_resume delivery", { concurrency: CONC }, () =>
     assert.deepEqual([out.isError, out.text], [true, RESUME_NO_SESSION_LINE]);
   }));
 
+  // #1353 (D-1353-RESUME-BLANK-1): JSON-schema clients send session:"" for the optional field.
+  // A blank session counts as absent and falls back to the caller's session.
+  test("[M4] resume/blank-session-falls-back", () => withRoot(async (root) => {
+    const ctx = ctxFor(root);
+    const [seq] = await add(ctx, [["s1", { body: "hello", turn: 1 }], ["s1", { body: "second", turn: 1 }]]);
+    const bare = await ctxResume.handler({}, ctx);
+    assert.equal(bare.isError, false, bare.text);
+    for (const blank of ["", "   "]) {
+      const out = await ctxResume.handler({ session: blank }, ctx);
+      assert.deepEqual([out.isError, out.text], [false, bare.text], JSON.stringify(blank));
+      const one = await ctxResume.handler({ session: blank, seq }, ctx);
+      assert.deepEqual([one.isError, one.text], [false, "hello"], JSON.stringify(blank));
+    }
+    const none = await ctxResume.handler({ session: "" }, ctxFor(root, ""));
+    assert.deepEqual([none.isError, none.text], [true, RESUME_NO_SESSION_LINE]);
+  }));
+
   test("[M4] resume/fresh-session: no rows -> the empty line, not an error", () => withRoot(async (root) => {
     const ctx = ctxFor(root);
     await add(ctx, [["other", { body: "foreign" }]]);
@@ -1280,14 +1297,35 @@ describe("ADR-0009 section 8: decision tag, timeline and cross-session ranking i
 
   test("[M4] GP5/timeline-offset-and-relevance-after-invalid-args", withRoot("cm-sd12-", async (root) => {
     const ctx = ctxAt(root, "s1");
-    const a = await ctxSearch.handler({ queries: [], sort: "timeline", offset: 0 }, ctx);
+    const a = await ctxSearch.handler({ queries: [], sort: "timeline", offset: 20 }, ctx);
     assert.equal(a.isError, true);
     assert.ok(a.text.startsWith("Invalid argument offset."), a.text);
-    const b = await ctxSearch.handler({ queries: ["x"], after: 0 }, ctx);
+    const b = await ctxSearch.handler({ queries: ["x"], after: 1700000000 }, ctx);
     assert.equal(b.isError, true);
     assert.ok(b.text.startsWith("Invalid argument after."), b.text);
-    const c = await ctxSearch.handler({ queries: ["x"], sort: "relevance", after: 0, source: C.DECISION_SOURCE }, ctx);
+    const c = await ctxSearch.handler({ queries: ["x"], sort: "relevance", after: 1700000000, source: C.DECISION_SOURCE }, ctx);
     assert.equal(c.isError, true);
+  }));
+
+  // #1354 (D-R54-SEARCH-ZERO-1): a client that sends the whole schema fills offset:0, after:0 and source:"".
+  // 0 is the first page of either cursor and a blank source names no source, so the call answers as if the
+  // fields were absent and finds the indexed row.
+  test("[M4] GP5/explicit-zero-is-not-paging", withRoot("cm-sd12z-", async (root) => {
+    const ctx = ctxAt(root, "s1");
+    await ctxIndex.handler({ content: "README overview: how the project starts", source: "readme-notes" }, ctx);
+    const pairs = [
+      [{ queries: ["README overview"], scope: "session", sort: "timeline", offset: 0, after: 0 }, { queries: ["README overview"], scope: "session", sort: "timeline" }],
+      [{ queries: ["README overview"], scope: "session", offset: 0, after: 0 }, { queries: ["README overview"], scope: "session" }],
+      [{ queries: ["README overview"], source: "", offset: 0, after: 0 }, { queries: ["README overview"] }],
+      [{ queries: ["README overview"], source: "  ", sort: "timeline", offset: 0, after: 0 }, { queries: ["README overview"], sort: "timeline" }],
+    ];
+    for (const [zero, bare] of pairs) {
+      const z = await ctxSearch.handler(zero, ctx);
+      const b = await ctxSearch.handler(bare, ctx);
+      assert.equal(z.isError, false, JSON.stringify(zero) + " -> " + z.text);
+      assert.ok(b.text.includes("README overview"), JSON.stringify(bare) + " -> " + b.text);
+      assert.equal(z.text, b.text, JSON.stringify(zero));
+    }
   }));
 
   // ---- cross-session ranking (§8.3, D4, #895; ADR-0009 §8.4 last case) ----

@@ -2,7 +2,7 @@
 // never imports src/ (ADR-0003). covers: src/core/tools/doctor.ts, src/core/tools/upgrade.ts, src/core/ops/*, build/build.mjs.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -327,6 +327,48 @@ describe("GP11 doctor and upgrade", () => {
     assert.ok(!flat.includes("v1/server.js"));
   });
 
+  // #1359 (HengYangDS) and #1364 (Korayem), Codex 0.167.0 on 2.1.7: the reporter's exact replay. Codex documents
+  // [mcp_servers.<id>.tools.<tool>] approval_mode as user config; doctor said FAIL on it, then setup and ctx_upgrade deleted
+  // it, and ctx_upgrade also removed the user's own hook under ~/.agents/hooks/codex/ (D-1359-CODEX-TOOLS-1, D-1364-CODEX-V1-SCRIPT-1).
+  test("[M5] GP11/codex-user-approvals-and-hooks-kept (#1359 #1364): doctor exits 0, setup and ctx_upgrade keep them", async (t) => {
+    const { home, repo } = fixture(t);
+    const CLI = path.join(path.dirname(SERVER_BUNDLE), "cli.mjs");
+    const codexDir = path.join(home, ".codex");
+    const env = { PATH: [path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter), HOME: home, USERPROFILE: home,
+      TMPDIR: home, XDG_CONFIG_HOME: path.join(home, ".config"), CODEX_HOME: codexDir };
+    const cli = (...args) => {
+      try { execFileSync(process.execPath, [CLI, ...args, "--agents", "codex", "--no-input", "--json"], { env, cwd: repo, stdio: "ignore" }); return 0; }
+      catch (e) { return e.status; }
+    };
+    assert.equal(cli("setup", "--yes"), 0);
+    const toml = path.join(codexDir, "config.toml");
+    const approvals = '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "auto"\n\n[mcp_servers.context-mode.tools.ctx_batch]\napproval_mode = "prompt"\n';
+    writeFileSync(toml, readFileSync(toml, "utf8") + approvals);
+    const tomlBefore = readFileSync(toml, "utf8");
+    assert.equal(cli("doctor"), 0, "the user's tool approval tables are no v1 leftover");
+    assert.equal(cli("setup", "--yes"), 0);
+    assert.equal(readFileSync(toml, "utf8"), tomlBefore, "setup again keeps the approval tables");
+
+    const hooks = path.join(codexDir, "hooks.json");
+    const doc = JSON.parse(readFileSync(hooks, "utf8"));
+    const mine = { type: "command", command: 'node "$HOME/.agents/hooks/codex/secret-guard-pre-tool.mjs"' };
+    (doc.hooks.PreToolUse ??= []).push({ hooks: [mine] });
+    (doc.hooks.Stop ??= []).push({ hooks: [{ type: "command", command: "node /x/hooks/codex/stop.mjs" }] }); // a real v1 entry
+    writeFileSync(hooks, JSON.stringify(doc, null, 2));
+    const c = spawnBundle(SERVER_BUNDLE, env, ["--agent", "codex"], { cwd: repo });
+    t.after(() => c.kill());
+    await c.request("initialize", INIT);
+    const reply = text(await call(c, "ctx_upgrade", {}));
+    await c.close();
+    const removed = reply.split("\n").filter((l) => l.endsWith("| removed |"));
+    assert.equal(removed.length, 1, reply);
+    assert.ok(removed[0].includes("hooks.Stop."), reply);
+    const after = JSON.parse(readFileSync(hooks, "utf8"));
+    assert.ok(after.hooks.PreToolUse.some((g) => g.hooks.some((h) => h.command === mine.command)), JSON.stringify(after));
+    assert.ok(!JSON.stringify(after).includes("/x/hooks/codex/stop.mjs"));
+    assert.ok(readFileSync(toml, "utf8").includes(approvals.trim()), readFileSync(toml, "utf8"));
+  });
+
   test("[M5] GP11/no-baked-paths: ctx_upgrade never writes the build host's own path into config", async (t) => {
     const { home, repo, spawn } = fixture(t);
     mkdirSync(path.join(home, ".claude"), { recursive: true });
@@ -426,4 +468,57 @@ describe("GP11 doctor and upgrade", () => {
   });
 
   // 14a GP11/pi-discovery-dirs-doctor (#1168). Pi 0.85: doctor reports the actual extension path,
+});
+
+// #1363 (ADR-0011, DEVIATIONS D-V1-UPGRADE-STOP-1): the published 1.0.169 `context-mode upgrade` clones `main`, sees a
+// newer package.json version, installs and runs the `build` script in the clone, then copies package.json and src/ over
+// the install. With the v2 version on main this left a hybrid tree (package.json 2.x, bin still cli.bundle.mjs 1.0.x).
+// The clone's build script must stop the v1 upgrade before any write; the native `npm i -g` then installs 2.x cleanly.
+// Black box: the real 1.0.169 package from the npm registry, git clone redirected to this checkout's committed HEAD
+// (GIT_CONFIG_GLOBAL url.insteadOf), a fake pgrep so v1 never stops a real MCP server, temp prefix, HOME and TMPDIR.
+// Network (npm registry), POSIX only (v1 finds siblings with pgrep there), so it is tagged M7 and not in the M6 CI gate.
+describe("GP11 v1 upgrade against main", () => {
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const V1 = "1.0.169";
+
+  test("[M7] GP11/v1-upgrade-against-main-writes-nothing: 1.0.169 upgrade keeps the tree, npm i -g gives 2.x (#1363)", { skip: process.platform === "win32", timeout: 600_000 }, (t) => {
+    const tmp = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-gp11-v1up-")));
+    t.after(() => rmSync(tmp, { recursive: true, force: true }));
+    const [prefix, home, proj, fakeBin, tmpd, pack] = ["g", "home", "proj", "fakebin", "tmp", "pack"].map((d) => path.join(tmp, d));
+    for (const d of [prefix, home, proj, fakeBin, tmpd, pack]) mkdirSync(d, { recursive: true });
+    writeFileSync(path.join(fakeBin, "pgrep"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const gitcfg = path.join(tmp, "gitconfig");
+    writeFileSync(gitcfg, `[url "${ROOT}"]\n\tinsteadOf = https://github.com/mksglu/context-mode.git\n`);
+    const cache = execFileSync("npm", ["config", "get", "cache"], { encoding: "utf8" }).trim();
+    const env = {
+      PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`, HOME: home, USERPROFILE: home, TMPDIR: tmpd,
+      CLAUDE_CONFIG_DIR: path.join(home, ".claude"), GIT_CONFIG_GLOBAL: gitcfg, GIT_CONFIG_NOSYSTEM: "1",
+      npm_config_cache: cache, npm_config_prefer_offline: "true", npm_config_update_notifier: "false", npm_config_fund: "false", npm_config_audit: "false",
+    };
+    const npm = (args, cwd = tmp) => execFileSync("npm", args, { cwd, env, encoding: "utf8", stdio: "pipe" });
+    const pkgDir = path.join(prefix, "lib", "node_modules", "context-mode");
+    const bin = path.join(prefix, "bin", "context-mode");
+
+    npm(["i", "-g", "--prefix", prefix, "--ignore-scripts", `context-mode@${V1}`]);
+    const before = readdirSync(pkgDir).sort();
+
+    const r = spawnSync(bin, ["upgrade", "--platform", "claude-code"], { cwd: proj, env, encoding: "utf8", timeout: 400_000 });
+    const out = `${r.stdout}\n${r.stderr}`;
+    const after = JSON.parse(readFileSync(path.join(pkgDir, "package.json"), "utf8"));
+    assert.equal(after.version, V1, "v1 upgrade must leave package.json at " + V1 + "\n" + out);
+    assert.ok(!existsSync(path.join(pkgDir, "src")), "v1 upgrade copied src/ over the install\n" + out);
+    assert.deepEqual(readdirSync(pkgDir).sort(), before, out);
+    assert.ok(out.includes("npm i -g context-mode"), "the stop line names the native npm command\n" + out);
+
+    // The native command repairs it: a release tree at the repo version (release-out may be a 0.0.0-dev build), packed
+    // and installed over the same prefix, the way `npm i -g context-mode` lands it.
+    const want = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
+    assert.ok(want.startsWith("2."), want);
+    const rel = path.join(tmp, "release-out");
+    execFileSync(process.execPath, [path.join(ROOT, "build", "build.mjs"), "--out", rel, "--version", want], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+    const tgz = JSON.parse(npm(["pack", "--json", "--pack-destination", pack], rel))[0].filename;
+    npm(["i", "-g", "--prefix", prefix, path.join(pack, tgz)]);
+    assert.equal(path.basename(realpathSync(bin)), "cli.mjs");
+    assert.ok(execFileSync(bin, ["--version"], { env, encoding: "utf8" }).includes(want));
+  });
 });

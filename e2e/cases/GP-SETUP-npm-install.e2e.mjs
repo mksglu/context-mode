@@ -35,7 +35,14 @@ const state = path.join(process.env.FAKE_STATE, agent);
 const home = process.env.HOME;
 const has = (w) => args.includes(w);
 const fileHolds = (f) => existsSync(f) && readFileSync(f, "utf8").includes("context-mode");
-if (has("list")) {
+const ocConf = path.join(home, ".config", "opencode", "opencode.json");
+// D-OC1-LIST-2 (#1362): the OpenCode list check reads the version, then the config that \`debug config --pure\` prints.
+if (agent === "opencode" && has("--version")) {
+  console.log("1.19.5");
+} else if (agent === "opencode" && has("debug") && has("config")) {
+  if (!existsSync(ocConf)) process.exit(1);
+  process.stdout.write(readFileSync(ocConf, "utf8"));
+} else if (has("list")) {
   const own = agent === "codex" ? fileHolds(path.join(home, ".codex", "config.toml"))
     : agent === "opencode" ? fileHolds(path.join(home, ".config", "opencode", "opencode.json")) : existsSync(state);
   if (own) console.log("context-mode");
@@ -194,4 +201,40 @@ test("[M6] GP-SETUP/npm-pack-install-setup-twice-remove: the packed npm bin sets
   assert.deepEqual([...restored.keys()].sort(), [...before.keys()].sort(), "same file set as before setup");
   for (const [rel, h] of before) assert.equal(restored.get(rel), h, `${rel} restored byte for byte`);
   assert.deepEqual(walk(fakeState), [], "every fake CLI install was undone");
+});
+
+// D-SETUP-COPILOT-SHIM-1 (#1360, dup #1361): VS Code's `copilot` launcher (microsoft/vscode copilot_shim, Linux
+// /usr/bin/copilot) is on PATH but the Copilot CLI is not installed. With no terminal it prints "GitHub Copilot CLI was
+// not found. ..." and exits 127 (app.rs l.42, l.485). The user ran `context-mode setup` and got FAIL (rolled back),
+// exit 1 and a gh issue prompt. The built bin must report SKIPPED with Copilot CLI's own npm install, exit 0, no prompt.
+test("[M6] GP-SETUP/copilot-launcher-without-cli: setup reports copilot-cli SKIPPED with npm install -g @github/copilot, exit 0, no issue prompt (#1360)", { timeout: 300_000, skip: WIN && "the stand-in launcher is a sh script" }, () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), "cm-setup-copilot-shim-"));
+  try {
+    const home = path.join(tmp, "home");
+    const bin = path.join(tmp, "bin");
+    const outDir = path.join(tmp, "out");
+    for (const d of [home, bin]) mkdirSync(d, { recursive: true });
+    execFileSync(process.execPath, [path.join(REPO_ROOT, "build", "build.mjs"), "--out", outDir, "--version", VERSION], { cwd: REPO_ROOT, stdio: "pipe" });
+    const log = path.join(tmp, "copilot.log");
+    writeFileSync(path.join(bin, "copilot"), `#!/bin/sh
+echo "$@" >> "${log}"
+echo "GitHub Copilot CLI was not found. Run copilot in a terminal to install it, or see https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli" >&2
+exit 127
+`);
+    chmodSync(path.join(bin, "copilot"), 0o755);
+    const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), PATH: [bin, path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter) };
+    delete env.CLAUDE_PROJECT_DIR;
+    let code = 0, out = "";
+    try {
+      out = execFileSync(process.execPath, [path.join(outDir, "cli.mjs"), "setup", "--agents", "copilot-cli", "--yes", "--no-input"], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) { code = e.status; out = `${e.stdout ?? ""}${e.stderr ?? ""}`; }
+    assert.equal(code, 0, out);
+    const row = out.split("\n").find((l) => l.trimStart().startsWith("copilot-cli") && l.includes("SKIPPED"));
+    assert.ok(row, `a copilot-cli SKIPPED row: ${out}`);
+    assert.ok(out.includes("npm install -g @github/copilot"), `the fix line names Copilot CLI's own install: ${out}`);
+    assert.equal(out.includes("gh issue create"), false, `no issue prompt for a missing host: ${out}`);
+    assert.equal(out.includes("FAIL"), false, out);
+    assert.equal(existsSync(path.join(home, ".copilot")), false, "nothing written for a missing host");
+    assert.equal(readFileSync(log, "utf8").includes("mcp add"), false, readFileSync(log, "utf8"));
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 });

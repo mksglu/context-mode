@@ -298,7 +298,7 @@ The server never imports `node:sqlite` statically: if Node or `node:sqlite` fail
 - `main`: v1, frozen, protected by GitHub branch protection (decision Q14). `v2`: development. `release`: built output only. It carries the one publishable `package.json` (ADR-0019 D1: `bin`, `type`, `engines`, `files`, `pi`; no `dependencies`, no `scripts`).
 - One release command, `/release` (repo skill): it runs the tests and the live harness (§15), shows the version and notes, then starts `release.yml` (`workflow_dispatch`), which builds, publishes to a `release-staging` ref, smoke-tests installs from it, and only then fast-forwards `release`.
 - v1 users must not leave (ADR-0017 R1–R8, release gate):
-  - `main` stays frozen, so v1's own `/ctx-upgrade` keeps being a no-op.
+  - v1's own `/ctx-upgrade` keeps being a no-op: `main` stayed frozen until the MAIN-ONLY merge; since #1363 `main`'s `scripts.build` (`scripts/v1-upgrade-stop.mjs`) stops it before any write.
   - The install order is **install v2 → run `/ctx-upgrade` → only then `npm uninstall -g`** (ADR-0011) — this order keeps Codex/Copilot CLI/VS Code hooks, which call the global npm binary, working through the switch.
   - Nothing the user configured (hook timeouts, `permissions.deny`, added MCP entries) is removed, only reported.
   - The README names a per-agent rollback command.

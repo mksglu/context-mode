@@ -26,7 +26,7 @@ Goal: on release day a v1 user keeps a working setup at every moment, gets a cle
 
 | # | Requirement | How |
 |---|---|---|
-| R1 | Nothing breaks before the user acts | `main` stays frozen (branch protection, Q14); v1 `/ctx-upgrade` stays a no-op; npm v1 keeps working |
+| R1 | Nothing breaks before the user acts | `main` stayed frozen until the MAIN-ONLY merge (branch protection, Q14); v1 `/ctx-upgrade` stays a no-op (since #1363: `main`'s `scripts.build` stops it before any write, D-V1-UPGRADE-STOP-1); npm v1 keeps working |
 | R2 | The user learns about v2 inside the agent, not only on GitHub | the last v1 build (one owner-approved v1 patch, the only change to `main`'s code) adds one line to `ctx_doctor` / `ctx_stats` output: "context-mode v2 is available: <link to Upgrading from v1>". No other v1 change |
 | R3 | One command per agent, and the order keeps hooks working | install v2 first, run `/ctx-upgrade` (removes v1 entries, ADR-0011 table), and only then `npm uninstall -g` (fixes the gap where v1 Codex/Copilot/VS Code hooks call the global bin) |
 | R4 | Nothing the user configured is lost | user hook timeouts, user hooks, `permissions.deny`, MCP entries they added: kept and reported, never removed (ADR-0010) |

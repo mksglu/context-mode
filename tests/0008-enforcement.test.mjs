@@ -18,6 +18,7 @@ import { buildMatcher } from "../build/manifests.ts";
 import { getAdapter } from "../src/adapters/table.ts";
 import { decide, denyMessage } from "../src/core/policy/decide.ts";
 import { failureOutput } from "../src/core/hooks/fallback.ts";
+import { isOwnFile } from "../src/core/policy/own-file.ts";
 import { decode as decodeCodex } from "../src/adapters/codex.ts";
 import { decode as decodeQwen } from "../src/adapters/qwen.ts";
 import { decode as decodeKiro } from "../src/adapters/kiro.ts";
@@ -783,6 +784,41 @@ describe("ADR-0008 security rules (ported from v1)", { concurrency: CONC }, () =
       // data in the same dir keeps the rule: a transcript is not an instruction file
       assert.equal(decide(ev("Read", { file_path: files.transcript }, root), CC, [], root).kind, "deny");
     } finally { done(); }
+  });
+
+  // D-R54-OWN-FILE-LINK-1 (#1345, EarthChen): "~/.claude/skills/<skill> as a symlink to a dir outside ~/.claude": the Read
+  // of a 24,051 B reference .md is denied, the same file in a real dir is allowed. A link the user made in their own config
+  // dir counts; data through the link and the link target by its own path keep the normal rules.
+  test("D-R54-OWN-FILE-LINK-1: a skill file over the cap under a symlinked skill dir is never denied (#1345)", () => {
+    const { root, cfg, done } = ownLayout();
+    const ext = realpathSync(mkdtempSync(join(tmpdir(), "cm-1345t-")));
+    const target = join(ext, "linked");
+    try {
+      mkdirSync(join(target, "references"), { recursive: true });
+      writeFileSync(join(target, "references", "api.md"), "# rule line\n".repeat(2000));
+      writeFileSync(join(target, "references", "log.jsonl"), "# rule line\n".repeat(2000));
+      symlinkSync(target, join(cfg, "skills", "linked"));
+      const ref = join(cfg, "skills", "linked", "references", "api.md");
+      assert.deepEqual(decide(ev("Read", { file_path: ref }, root), CC, [], root), { kind: "allow" }, "linked ref");
+      // The POSIX fast path in isLexicallyInsideAny drops "." steps the way path.resolve does.
+      assert.deepEqual(decide(ev("Read", { file_path: [cfg, "skills", ".", "linked", "references", "api.md"].join(sep) }, root), CC, [], root), { kind: "allow" }, "linked ref with a . step");
+      assert.equal(decide(ev("Bash", { command: "cat " + ref }, root), CODEX_ROW(), [], root).kind, "allow", "cat linked ref");
+      assert.equal(failureOutput("claude-code", { hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: ref }, cwd: root }, new Error("x")).stdout?.includes("deny") ?? false, false, "fallback linked ref");
+      assert.equal(decide(ev("Read", { file_path: join(cfg, "skills", "linked", "references", "log.jsonl") }, root), CC, [], root).kind, "deny", "data through the link");
+      assert.equal(decide(ev("Read", { file_path: join(target, "references", "api.md") }, root), CC, [], root).kind, "deny", "the target by its own path");
+      // isOwnFile gets the path as the tool gave it, before path.resolve: resolve folds "linked/.." to "skills", but the OS
+      // reads <link target>/../outside.md, which is outside every own dir (review r54 cc-skill-symlink round 2).
+      writeFileSync(join(ext, "outside.md"), "# rule line\n".repeat(2000));
+      const dotdot = [cfg, "skills", "linked", "..", "outside.md"].join(sep);
+      assert.equal(isOwnFile("claude-code", root, ref), true, "linked ref, raw path");
+      assert.equal(isOwnFile("claude-code", root, [cfg, "skills", ".", "linked", "references", "api.md"].join(sep)), true, "linked ref with a . step");
+      assert.equal(isOwnFile("claude-code", root, dotdot), false, "a .. step through the link");
+      assert.equal(isOwnFile("claude-code", [cfg, "skills", "linked", ".."].join(sep), "outside.md"), false, "a .. step in cwd");
+      assert.equal(isOwnFile("claude-code", join(cfg, "skills", "linked"), join("references", "api.md")), true, "a relative path under a linked cwd");
+    } finally {
+      done();
+      rmSync(ext, { recursive: true, force: true });
+    }
   });
 
   test("D-R48-DENY-ROUTE-1: every Read deny names a call that works for its path (#1326)", async () => {

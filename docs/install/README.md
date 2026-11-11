@@ -139,6 +139,8 @@ If you update with npm yourself (`npm i -g context-mode`), most agents need noth
 
 Run `context-mode doctor` to check. It changes nothing.
 
+On a 1.0.x global npm install, `context-mode upgrade` prints the native command and leaves the installed package as it is. Run `npm i -g context-mode` once; after that `context-mode upgrade` works as above. Plugin installs update with the agent's own command in the table at the top.
+
 ## Uninstall
 
 ```sh

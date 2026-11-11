@@ -35,6 +35,7 @@ import { buildReport } from "../src/core/ops/report.ts";
 import { verifySums } from "../src/core/ops/verify-sums.ts";
 import { ctxDoctor, d1UpdateCommand, runDoctorChecks } from "../src/core/tools/doctor.ts";
 import { ctxUpgrade, runUpgrade } from "../src/core/tools/upgrade.ts";
+import { detectV1 } from "../src/core/ops/detect-v1.ts";
 import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
 import { codexRunDirOf, codexSetupHomeOf } from "../src/core/project/config-dir.ts";
 import { generateManifests } from "../build/manifests.ts";
@@ -506,6 +507,37 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
       assert.equal(d3.status, "PASS", d3.detail);
     });
   }
+
+  // D-R54-OC-PLUGINS-DIR-1 (#1349, OpenCode 2.2.6): `npm i --prefix ~/.config/opencode context-mode` plus
+  // ~/.config/opencode/plugins/context-mode/index.js = `export { default } from "context-mode/server";`, no opencode.json.
+  // OpenCode logs one "loading plugin" line for it; D3 said "wrong: MCP entry".
+  // A bare module name loads only when OpenCode finds node_modules/context-mode next to the file or above it (Node
+  // resolution); with no package, OpenCode logs "failed to load plugin ... Cannot find package 'context-mode'".
+  const OC_PKG = ["node_modules", "context-mode", "package.json"];
+  const OC_DIR = [
+    ["a plugins dir file that re-exports context-mode/server, no opencode.json", ["plugins", "context-mode", "index.js"], 'export { default } from "context-mode/server";\n', true, "PASS"],
+    ["a loose plugins dir file that imports context-mode", ["plugins", "cm.ts"], "import plugin from 'context-mode';\nexport default plugin;\n", true, "PASS"],
+    ["a plugins dir file of another plugin", ["plugins", "other", "index.js"], 'export { default } from "other-plugin/server"; // context-mode is better\n', true, "FAIL"],
+    ["a plugins dir file that re-exports context-mode/server with no node_modules/context-mode", ["plugins", "context-mode", "index.js"], 'export { default } from "context-mode/server";\n', false, "FAIL"],
+  ];
+  for (const [name, rel, text, installed, want] of OC_DIR) {
+    test(`[D-R54-OC-PLUGINS-DIR-1] doctor-config/D3 opencode: ${name} is ${want} (#1349)`, (t) => {
+      const home = tmp(t);
+      put(path.join(home, ".config", "opencode", ...rel), text);
+      if (installed) put(path.join(home, ".config", "opencode", ...OC_PKG), '{ "name": "context-mode" }');
+      const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home);
+      assert.equal(d3.status, want, d3.detail);
+    });
+  }
+
+  test("[D-R54-OC-PLUGINS-DIR-1] doctor-config/D3 opencode: a project .opencode/plugins file with the package in <project>/node_modules is PASS (#1349)", (t) => {
+    const home = tmp(t);
+    const wt = tmp(t);
+    put(path.join(wt, ".opencode", "plugins", "context-mode", "index.js"), 'export { default } from "context-mode/server";\n');
+    put(path.join(wt, ...OC_PKG), '{ "name": "context-mode" }');
+    const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, wt);
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
 
   test("[D-R44-OC-D3-1] doctor-config/D3 opencode: an mcp entry that runs another script is FAIL", (t) => {
     const home = tmp(t);
@@ -2657,9 +2689,14 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     assert.equal(res.exitCode, 0, JSON.stringify(res.agents));
     const d3 = await asServer(s.pkgDir, () => checkHostConfig(getAdapter("codex"), env, s.home));
     assert.deepEqual([d3.status, d3.detail], ["PASS", "ok"]);
-    // v1 left a section in the Codex dir that CODEX_HOME names: D4 must look there, not only in ~/.codex.
+    // v1 left its data dir in the Codex dir that CODEX_HOME names: D4 must look there, not only in ~/.codex.
+    // #1359 D-1359-CODEX-TOOLS-1: a tools.<tool> table under this v2 entry is user config, so it is no leftover here.
     writeFileSync(path.join(env.CODEX_HOME, "config.toml"), readFileSync(path.join(env.CODEX_HOME, "config.toml"), "utf8") + '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "approve"\n');
-    assert.match(checkV1Leftovers("codex", s.home, { tmp: s.tmp, codexDir: env.CODEX_HOME }).detail, /config\.toml/);
+    assert.equal(checkV1Leftovers("codex", s.home, { tmp: s.tmp, codexDir: env.CODEX_HOME }).status, "PASS");
+    mkdirSync(path.join(env.CODEX_HOME, "context-mode"));
+    const d4 = checkV1Leftovers("codex", s.home, { tmp: s.tmp, codexDir: env.CODEX_HOME });
+    assert.equal(d4.status, "WARN");
+    assert.ok(d4.detail.includes("old context-mode data dir"), d4.detail);
   });
 
   // The real v1 1.0.169 file (package/configs/codex/config.toml) and its tool tables (Codex adapter removes
@@ -2684,6 +2721,46 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, '[mcp_servers.context-mode]\ncommand = "/usr/bin/node"\nargs = ["/p/server.mjs", "--agent", "codex"]\n\n[mcp_servers.context-mode-other]\ncommand = "x"\n');
     assert.equal(checkV1Leftovers("codex", s.home, { tmp: s.tmp }).status, "PASS");
+  });
+
+  // #1359 (HengYangDS, Codex 0.167.0, 2.1.7): Codex documents [mcp_servers.<id>.tools.<tool>] approval_mode as user config.
+  // D4 called the reporter's two approval tables "old context-mode config.toml section", doctor exited 1, and setup and
+  // ctx_upgrade then deleted them. v1.0.169 never wrote a tools table; its parent table ran the `context-mode` bin
+  // (D-1359-CODEX-TOOLS-1).
+  const V2_ENTRY = '[mcp_servers.context-mode]\ncommand = "/usr/bin/node"\nargs = ["/p/server.mjs", "--agent", "codex"]\n';
+  const APPROVALS = '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "auto"\n\n[mcp_servers.context-mode.tools.ctx_batch]\napproval_mode = "prompt"\n';
+
+  test("[#1359] D4 PASS for a v2 entry with the user's tool approval tables; a tools table under a v1 parent is still flagged", (t) => {
+    const s = sandbox(t);
+    mkdirSync(s.tmp, { recursive: true });
+    const file = path.join(s.home, ".codex", "config.toml");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, V2_ENTRY + APPROVALS);
+    assert.deepEqual(detectV1("codex", s.home, { tmp: s.tmp }), []);
+    assert.equal(checkV1Leftovers("codex", s.home, { tmp: s.tmp }).status, "PASS");
+    writeFileSync(file, '[mcp_servers.context-mode]\ncommand = "context-mode"\n' + APPROVALS);
+    assert.deepEqual(detectV1("codex", s.home, { tmp: s.tmp }).map((f) => f.path),
+      ["[mcp_servers.context-mode]", "[mcp_servers.context-mode.tools.ctx_execute]", "[mcp_servers.context-mode.tools.ctx_batch]"]);
+  });
+
+  test("[#1359] ctx_upgrade keeps the user's approval tables and a user hook under hooks/codex/ byte for byte", async (t) => {
+    const s = sandbox(t);
+    const dir = path.join(s.home, ".codex");
+    mkdirSync(dir, { recursive: true });
+    const toml = path.join(dir, "config.toml");
+    const hooks = path.join(dir, "hooks.json");
+    // TOML basic string: JSON.stringify escapes the backslashes of a Windows path.
+    writeFileSync(toml, V2_ENTRY.replace('"/p/server.mjs"', JSON.stringify(path.join(s.pkgDir, "server.mjs"))) + APPROVALS);
+    writeFileSync(hooks, JSON.stringify({ hooks: { PostToolUse: [{ hooks: [{ type: "command", command: "node /Users/me/dotfiles/hooks/codex/notify.mjs" }] }] } }, null, 2));
+    const tomlBefore = readFileSync(toml, "utf8");
+    const hooksBefore = readFileSync(hooks, "utf8");
+    const deps = { project: { projectKey: "0123456789abcdef", worktree: path.join(s.home, "repo"), agent: "codex" },
+      env: { HOME: s.home, USERPROFILE: s.home, PATH: process.env.PATH }, signal: new AbortController().signal };
+    const reply = await asServer(s.pkgDir, () => runUpgrade({ mode: "upgrade" }, deps));
+    assert.ok(!reply.text.includes("| removed |"), reply.text);
+    assert.equal(readFileSync(hooks, "utf8"), hooksBefore);
+    assert.ok(readFileSync(toml, "utf8").includes(APPROVALS.trim()), readFileSync(toml, "utf8"));
+    assert.equal(readFileSync(toml, "utf8").includes(tomlBefore.slice(tomlBefore.indexOf("[mcp_servers.context-mode.tools"))), true);
   });
 
   test("[D-DOC-RT-1] all 10 hosts: after setup, D4 is clean and D3 names no MCP entry for a host whose entry setup wrote", async (t) => {

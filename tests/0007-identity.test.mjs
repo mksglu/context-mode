@@ -758,12 +758,13 @@ describe("ADR-0007: OpenCode config dir", { concurrency: CONC }, () => {
     const xdg = path.join(root, "xdg cfg");
     const bin = path.join(root, "bin");
     mkdirSync(home, { recursive: true }); mkdirSync(bin, { recursive: true });
-    // The fake opencode lists context-mode only when the config sits where OpenCode reads it.
+    // The fake opencode 1.x prints its version, and its `debug config --pure` prints the config only when it sits where
+    // OpenCode reads it (D-OC1-LIST-2, #1362: the list check reads debug config, and a version with no digits is a FAIL).
     const conf = path.join(xdg, "opencode", "opencode.json");
     if (process.platform === "win32") {
-      writeFileSync(path.join(bin, "opencode.cmd"), `@if exist "${conf}" (echo context-mode connected) else (exit /b 1)\r\n`);
+      writeFileSync(path.join(bin, "opencode.cmd"), `@if "%1"=="--version" (echo 1.19.5& exit /b 0)\r\n@if exist "${conf}" (type "${conf}") else (exit /b 1)\r\n`);
     } else {
-      writeFileSync(path.join(bin, "opencode"), `#!/bin/sh\nif [ -f "${conf}" ]; then echo "context-mode connected"; else exit 1; fi\n`, { mode: 0o755 });
+      writeFileSync(path.join(bin, "opencode"), `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.19.5; exit 0; fi\nif [ -f "${conf}" ]; then cat "${conf}"; else exit 1; fi\n`, { mode: 0o755 });
     }
     const repo = path.resolve(import.meta.dirname, "..");
     const pkgDir = path.join(root, "pkg");

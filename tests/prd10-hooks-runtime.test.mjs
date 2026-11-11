@@ -476,6 +476,31 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(typeof parsed(await handleHook("claude-code", q, env)).updatedToolOutput, "object", "a project file still replaces");
   });
 
+  // D-R54-OWN-FILE-LINK-1 (#1345, EarthChen): "~/.claude/skills/<skill> is a symlink to a dir outside ~/.claude; a Read of
+  // a >4096 B reference .md is replaced by a ctx_search pointer, the same file in a real dir passes whole".
+  test("D-R54-OWN-FILE-LINK-1: a full Read of a skill reference under a symlinked ~/.claude/skills dir is never replaced (#1345)", async () => {
+    const content = bigText(REPLACE_TRIGGER_BYTES * 3);
+    const n = content.split("\n").length;
+    const target = join(root, "dotfiles", "skills", "linked");
+    mkdirSync(join(target, "references"), { recursive: true });
+    writeFileSync(join(target, "references", "api.md"), content);
+    writeFileSync(join(target, "references", "log.jsonl"), content);
+    mkdirSync(join(root, ".claude", "skills"), { recursive: true });
+    symlinkSync(target, join(root, ".claude", "skills", "linked"));
+    const read = (filePath, id) => cc({ hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: filePath }, tool_use_id: id, tool_response: { type: "text", file: { filePath, content, numLines: n, startLine: 1, totalLines: n } } });
+    const ref = join(root, ".claude", "skills", "linked", "references", "api.md");
+    assert.equal(parsed(await handleHook("claude-code", read(ref, "toolu_link"), env)), null, "the linked skill reference reaches the model whole");
+    const data = join(root, ".claude", "skills", "linked", "references", "log.jsonl");
+    assert.equal(typeof parsed(await handleHook("claude-code", read(data, "toolu_link_data"), env)).updatedToolOutput, "object", "data through the same link still replaces");
+    const direct = join(target, "references", "api.md");
+    assert.equal(typeof parsed(await handleHook("claude-code", read(direct, "toolu_link_direct"), env)).updatedToolOutput, "object", "the link target read by its own path is not an own file");
+    // A ".." step through the link: path.resolve folds it to ~/.claude/skills/outside.md, the OS reads
+    // dotfiles/skills/outside.md. That file is not an own file, so the Read still replaces (review r54 round 2).
+    writeFileSync(join(root, "dotfiles", "skills", "outside.md"), content);
+    const dotdot = [root, ".claude", "skills", "linked", "..", "outside.md"].join(sep);
+    assert.equal(typeof parsed(await handleHook("claude-code", read(dotdot, "toolu_link_dotdot"), env)).updatedToolOutput, "object", "a .. step through the link still replaces");
+  });
+
   test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {
     const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
     const p = mainBashPost(text);
@@ -2187,7 +2212,7 @@ describe("PRD-v2 section 10: saving decision per host (ADR-0020)", () => {
   // the ctx tool on PreToolUse everywhere else. One effect per host, no fallback.
   const SAVING = {
     "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "R",
-    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "D",
+    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "R", // opencode R: D-R54-OC-REPLACE-1 (#1347)
   };
   // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
   // an open file, so temp cleanup there is best-effort. The assertions are unchanged.

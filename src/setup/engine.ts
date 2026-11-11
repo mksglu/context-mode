@@ -15,12 +15,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError, formatError } from "../core/contracts/errors.ts";
 import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
+import { isNativeOpencodeEntry, OPENCODE_PACKAGE_DIR_HINT, opencodeDirPlugin, opencodeDirPlugins, opencodePluginDirs, opencodeProjectDir } from "../core/ops/doctor-config.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
@@ -53,6 +54,8 @@ export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
   /** OPEN-ITEMS H8: the host CLI file setup and doctor ran for this agent (absolute, resolved). */
   bin?: string;
+  /** D-R54-OC-PLUGINS-DIR-1: the fix line when it is not the setup command. */
+  fix?: string;
 }
 export interface SetupResult { exitCode: number; agents: AgentResult[]; backupDir?: string; error?: string; }
 export interface SetupOptions extends SetupContext {
@@ -272,8 +275,7 @@ function planCodexTrust(row: CheckRow, edits: FileEdit[], hooksFile: string, fil
  *  error. The native install writes "context-mode@<tag>" (opencode plugin ...): with it our path entry would load the
  *  plugin twice (every hook fires twice), so the path entry is dropped; a stale path entry of ours (the file is gone,
  *  .../context-mode/opencode/plugin.js) never loads, so it is dropped too. Entries of the user are kept. */
-const NATIVE_PLUGIN_PREFIX = "context-mode@";
-function isNativeSpec(e: unknown): boolean { return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX); }
+function isNativeSpec(e: unknown): boolean { return isNativeOpencodeEntry(e, OPENCODE_PLUGIN_KEY); }
 function isStaleOwnPlugin(e: unknown, entry: string): boolean {
   if (typeof e !== "string" || e === entry || !path.isAbsolute(e)) return false;
   // D-OC2-ENTRY-1: the file form <pkg>/opencode/plugin.js of an earlier setup loads twice next to the dir entry and
@@ -290,12 +292,39 @@ function wantedPluginList(list: unknown[], entry: string, nativeElsewhere = fals
   const kept = list.filter((e) => !(native && e === entry) && !isStaleOwnPlugin(e, entry));
   return native || kept.includes(entry) ? kept : [...kept, entry];
 }
-/** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin"). */
-const OC2_NATIVE_KEY = "plugins";
-function nativePluginsKey(doc: unknown): boolean {
-  const v = isObj(doc) ? doc[OC2_NATIVE_KEY] : undefined;
-  return Array.isArray(v) && v.some(isNativeSpec);
+/** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin").
+ *  D-R54-OC2-BARE-NATIVE-1 (#1344): 2.2.6 writes the bare name there, and OpenCode merges every config file of its
+ *  config dir (D-R49-DOCTOR-1339-2), so a native entry in opencode.jsonc counts for the opencode.json list too. */
+function nativePluginsKey(doc: unknown, file: string): boolean {
+  const native = (d: unknown) => isObj(d) && [OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_KEY].some((k) => {
+    const v = d[k];
+    return Array.isArray(v) && v.some((e) => isNativeOpencodeEntry(e, k));
+  });
+  if (native(doc)) return true;
+  // D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file of ours in <config dir>/plugins loads the hooks with no list entry.
+  // A file whose package OpenCode cannot find loads nothing. Review round 2: only the config dir counts here, because
+  // setup edits only the global file; a <project>/.opencode/plugins file loads in that one project (pluginListIssue).
+  if (opencodeDirPlugin([path.dirname(file)]) !== undefined) return true;
+  return OPENCODE_CONFIG_FILES.map((n) => path.join(path.dirname(file), n)).filter((f) => f !== file).some((f) => {
+    const text = readOr(f);
+    if (text === undefined || text.trim() === "") return false;
+    try { return native(parseHostConfig("opencode", f, text, "jsonc")); } catch { return false; }
+  });
 }
+/** D-R54-OC-PLUGINS-DIR-1 (review round 2): a <project>/.opencode/plugins file of ours that OpenCode loads. */
+function projectPluginFile(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
+  return opencodeDirPlugin([opencodeProjectDir(h.worktree)]);
+}
+
+/** The fix line for an agent FAIL when setup is not the fix: our global entry next to a project plugins file of ours
+ *  is fixed by removing that file (setup never edits a project file). undefined = the setup command. */
+export function fixLineOf(row: CheckRow): string | undefined {
+  const h = row.hookInstall;
+  if (h.kind !== "plugin-list") return undefined;
+  const proj = projectPluginFile(h);
+  return proj !== undefined && pluginListIssue(h)?.startsWith(proj) ? `remove ${proj}` : undefined;
+}
+
 /** The one-line reason hook-registered fails on a plugin-list channel, from the file as it is now. */
 function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
   const text = readOr(h.file);
@@ -304,7 +333,12 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   try { doc = parseHostConfig("opencode", h.file, text, fileFormat({ id: "opencode" } as CheckRow, h.file)); } catch { return undefined; }
   const cur = isObj(doc) ? doc[h.key[0]] : undefined;
   const list = Array.isArray(cur) ? cur : [];
-  if ((list.some(isNativeSpec) || nativePluginsKey(doc)) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  const listed = list.includes(h.entry);
+  if (listed && nativePluginsKey(doc, h.file)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  // D-R54-OC-PLUGINS-DIR-1 (review round 2): the global entry loads the hooks in every project, a project plugins file
+  // only in its own project, so the fix is to remove the project file (setup never edits a project file).
+  const proj = listed ? projectPluginFile(h) : undefined;
+  if (proj !== undefined) return `${proj}: context-mode loads twice in this project (this file and ${h.entry} in ${h.file}), every hook fires twice; remove ${proj}, the ${h.file} entry loads the hooks in every project`;
   const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
   if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
   return undefined;
@@ -331,7 +365,7 @@ function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["en
     planJsonKeys(row, edits, h.file, fileFormat(row, h.file), (doc) => {
       const cur = doc[h.key[0]];
       const list = Array.isArray(cur) ? cur : [];
-      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc));
+      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc, h.file));
       if (cur === undefined && want.length === 0) return [];
       return [[h.key, want.length === list.length && want.every((e, i) => e === list[i]) ? list : want]];
     });
@@ -397,55 +431,74 @@ function statusOf(row: CheckRow, text: string): PluginStatus {
 
 /** D-OC2-DOCTOR-1: OpenCode 2 (npm @opencode/cli) has no --pure and talks to a background service unless --standalone
  *  is given; OpenCode 1.x keeps --pure (D-HF-OPENCODE-LIST-1). The host version picks the form. */
-function opencodeMajor(bin: string, env: SetupContext["env"]): number {
+function opencodeVersion(bin: string, env: SetupContext["env"]): { major: number } | { error: string } {
   const r = runBin(bin, ["--version"], env);
   const text = `${r.stdout}${r.stderr}`;
   const digits = text.split("").filter((c) => (c >= "0" && c <= "9") || c === ".").join("");
-  return Number(digits.split(".")[0]);
+  // D-OC1-LIST-2 (#1362): no digits is no version. Number("") is 0, which used to pick the 1.x form for any host.
+  if (!digits.split(".")[0]) return { error: `${bin} --version printed no version: ${text.trim().split("\n")[0] ?? ""}` };
+  return { major: Number(digits.split(".")[0]) };
 }
-function opencodeListArgs(major: number): string[] {
-  return major >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+function opencodeMajor(bin: string, env: SetupContext["env"]): number {
+  const v = opencodeVersion(bin, env);
+  return "major" in v ? v.major : Number.NaN;
 }
 
-/** D-OC2-LIST-1 (#1308): OpenCode 2.2.5 `mcp list --standalone` prints before its private server has connected the
- *  MCP servers, so it says "No MCP servers configured" for a correct entry. `debug config --standalone` prints the
- *  documents the CLI itself loaded, after its own parse (1.x form mcp.<name> becomes mcp.servers.<name>), so the
- *  check reads that: same file choice, same Windows path, same JSONC rules as the host. */
-const OC2_CONFIG_ARGS = ["debug", "config", "--standalone"];
-function opencode2ListCheck(bin: string, env: SetupContext["env"]): Check {
-  const r = runBin(bin, OC2_CONFIG_ARGS, env);
-  const what = `${bin} ${OC2_CONFIG_ARGS.join(" ")}`;
-  let docs: unknown;
-  try { docs = JSON.parse(`${r.stdout}`); } catch { docs = undefined; }
-  if (r.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r.status}: ${`${r.stderr}`.trim().split("\n")[0] ?? ""}` };
-  if (!Array.isArray(docs)) return { name: "list", ok: false, detail: `${what} printed no config list: ${`${r.stdout}`.trim().split("\n")[0] ?? ""}` };
-  const listed = docs.some((d) => isObj(d) && isObj(d.info) && isObj(d.info.mcp) && isObj(d.info.mcp.servers) && isObj(d.info.mcp.servers[SERVER_KEY]));
-  const read = docs.filter(isObj).map((d) => d.path).filter((p): p is string => typeof p === "string");
-  return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+/** The list check on OpenCode reads the config the CLI itself loaded, after its own parse: same file choice, same
+ *  Windows path, same JSONC rules as the host, and no MCP server is started.
+ *  D-OC2-LIST-1 (#1308): OpenCode 2.2.5 `mcp list --standalone` prints before its private server has connected the
+ *  MCP servers ("No MCP servers configured" for a correct entry). `debug config --standalone` prints one document per
+ *  file it read, the entry at info.mcp.servers.<name>.
+ *  D-OC1-LIST-2 (#1362): OpenCode 1.x `mcp list --pure` connects every MCP server of the user, so one server that never
+ *  answers holds it past the budget (32.6 s on 1.19.5). `debug config --pure` prints the merged config, the entry at
+ *  mcp.<name>; --pure keeps the D-HF-OPENCODE-LIST-1 rule (no plugin install is waited on). */
+const OC_CONFIG_ARGS = { 1: ["debug", "config", "--pure"], 2: ["debug", "config", "--standalone"] } as const;
+function opencodeListCheck(bin: string, major: number, env: SetupContext["env"]): Check {
+  const args = major >= 2 ? OC_CONFIG_ARGS[2] : OC_CONFIG_ARGS[1];
+  const r = runBin(bin, [...args], env);
+  const what = `${bin} ${args.join(" ")}`;
+  const first = (s: unknown) => `${s}`.trim().split("\n")[0] ?? "";
+  let out: unknown;
+  try { out = JSON.parse(`${r.stdout}`); } catch { out = undefined; }
+  if (r.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r.status}: ${first(r.stderr)}` };
+  if (major >= 2) {
+    if (!Array.isArray(out)) return { name: "list", ok: false, detail: `${what} printed no config list: ${first(r.stdout)}` };
+    const listed = out.some((d) => isObj(d) && isObj(d.info) && isObj(d.info.mcp) && isObj(d.info.mcp.servers) && isObj(d.info.mcp.servers[SERVER_KEY]));
+    const read = out.filter(isObj).map((d) => d.path).filter((p): p is string => typeof p === "string");
+    return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+  }
+  if (!isObj(out)) return { name: "list", ok: false, detail: `${what} printed no config: ${first(r.stdout)}` };
+  const mcp = isObj(out.mcp) ? out.mcp : {};
+  const listed = isObj(mcp[SERVER_KEY]);
+  return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.${SERVER_KEY}; it loads mcp: ${Object.keys(mcp).join(", ") || "none"}` };
 }
 
 /** D-SETUP-HOST-BROKEN-1 (#1308): a host CLI that cannot start names its own fix. Setup reports SKIPPED with that fix
- *  line first and writes nothing: there is nothing to roll back and nothing of ours to fix. */
-const HOST_BROKEN: Partial<Record<string, { text: string; fix: string }>> = {
-  copilot: { text: "no platform package found", fix: "npm install -g @github/copilot" },
-};
+ *  line first and writes nothing: there is nothing to roll back and nothing of ours to fix.
+ *  D-SETUP-COPILOT-SHIM-1 (#1360): VS Code's `copilot` launcher (copilot_shim) is on PATH with no Copilot CLI behind it;
+ *  with no terminal it prints "GitHub Copilot CLI was not found. ..." and exits 127. All its variants share that prefix. */
 export const HOST_BROKEN_PREFIX = "host broken: run ";
+const HOST_BROKEN: Partial<Record<string, readonly { text: string; prefix: string; fix: string }[]>> = {
+  copilot: [
+    { text: "no platform package found", prefix: HOST_BROKEN_PREFIX, fix: "npm install -g @github/copilot" },
+    { text: "GitHub Copilot CLI was not found", prefix: "copilot not installed: run ", fix: "npm install -g @github/copilot" },
+  ],
+};
 function hostBroken(bin: string, out: string): string | undefined {
-  const b = HOST_BROKEN[bin];
-  if (!b || !out.includes(b.text)) return undefined;
-  return `${HOST_BROKEN_PREFIX}${b.fix} (${out.trim().split("\n")[0]})`;
+  const b = HOST_BROKEN[bin]?.find((e) => out.includes(e.text));
+  if (!b) return undefined;
+  const lines = out.trim().split("\n");
+  return `${b.prefix}${b.fix} (${(lines.find((l) => l.includes(b.text)) ?? lines[0]).trim()})`;
 }
 
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
 function listState(row: CheckRow, env: SetupContext["env"]): { check?: Check; status: PluginStatus; broken?: string } {
-  let l0 = row.listCommand;
-  if (!l0 || !hostBin(l0.bin, env).file) return { status: undefined };
+  const l = row.listCommand;
+  if (!l || !hostBin(l.bin, env).file) return { status: undefined };
   if (row.id === "opencode") {
-    const major = opencodeMajor(l0.bin, env);
-    if (major >= 2) return { check: opencode2ListCheck(l0.bin, env), status: undefined };
-    l0 = { bin: l0.bin, args: opencodeListArgs(major) };
+    const v = opencodeVersion(l.bin, env);
+    return { check: "major" in v ? opencodeListCheck(l.bin, v.major, env) : { name: "list", ok: false, detail: v.error }, status: undefined };
   }
-  const l = l0;
   const r = runBin(l.bin, l.args, env);
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
   const out = `${r.stdout}${r.stderr}`;
@@ -621,7 +674,8 @@ function hookCheck(row: CheckRow, env: SetupContext["env"]): Check {
 }
 
 /** #1327 D-1327-CODEX-ENV-1: the config edits for a row, with the env table and env_vars list the user keeps on the codex
- *  MCP entry (other vars, Codex forwards these to the server) merged in; setup sets only its own CODEX_HOME key. */
+ *  MCP entry (other vars, Codex forwards these to the server) merged in; setup sets only its own CODEX_HOME key.
+ *  #1359 D-1359-CODEX-TOOLS-1: the user's tools table (per-tool approval_mode) is kept as it is. */
 function ownConfigEdits(row: CheckRow, c: NonNullable<CheckRow["config"]>, text: string): [readonly string[], unknown][] {
   const edits = configEdits(c);
   if (row.id !== "codex" || !isObj(c.value)) return edits;
@@ -633,6 +687,7 @@ function ownConfigEdits(row: CheckRow, c: NonNullable<CheckRow["config"]>, text:
   const ownEnv = value[MCP_ENV_FIELD];
   if (isObj(userEnv) || isObj(ownEnv)) value[MCP_ENV_FIELD] = { ...(isObj(userEnv) ? userEnv : {}), ...(isObj(ownEnv) ? ownEnv : {}) };
   if (Array.isArray(cur[MCP_ENV_VARS_FIELD])) value[MCP_ENV_VARS_FIELD] = cur[MCP_ENV_VARS_FIELD];
+  if (isObj(cur[MCP_TOOLS_FIELD])) value[MCP_TOOLS_FIELD] = cur[MCP_TOOLS_FIELD];
   return [[c.key, value], ...edits.slice(1)];
 }
 
@@ -658,7 +713,9 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   }
   const edits: FileEdit[] = [];
   try { planHookInstall(row, edits, env); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
-  if (!edits.length) return { name: "hook-registered", ok: true };
+  // D-R54-OC-PLUGINS-DIR-1 (review round 2): a project plugins file next to the global entry needs no edit of ours and still loads twice.
+  const kept = !edits.length && h.kind === "plugin-list" ? pluginListIssue(h) : undefined;
+  if (!edits.length) return kept === undefined ? { name: "hook-registered", ok: true } : { name: "hook-registered", ok: false, detail: kept };
   const trust = h.kind === "file" ? h.trust : undefined;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
   const issue = h.kind === "plugin-list" ? pluginListIssue(h) : h.kind === "file" && row.id === "kiro" ? kiroDisabledIssue(h) : undefined;
@@ -1040,7 +1097,7 @@ export function detectAgents(reg: CheckRow[], ctx: SetupContext): AgentId[] {
 // ---------- entry points ----------
 
 export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
-  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env, cwd: opts.cwd };
   const runId = opts.runId ?? new Date().toISOString().split(":").join("-").split(".").join("-");
   const reg = buildRegistry(ctx);
   // preflight. #1328 D-NODE-OLD-1: Node first. Below NODE_MIN the server serves only ctx_doctor, so every agent
@@ -1132,13 +1189,19 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       if (w) res.checks = res.checks.map((c) => (c.name === "copy" ? w : c));
     }
     const bad = res.checks.filter((c) => !c.ok);
+    // D-R54-OC-PLUGINS-DIR-1 (review round 3): the one bad check is a project plugins file next to our global entry.
+    // What setup wrote is right (it loads the hooks in every other project); the fix is to remove that file, which
+    // setup never edits. A rollback would leave no MCP entry and a Fix: line that says setup again (a loop).
+    const keep = bad.length === 1 && bad[0].name === "hook-registered" ? fixLineOf(row) : undefined;
+    if (keep) return { ...res, status: "FAIL", reason: `${bad[0].name}: ${bad[0].detail}`, fix: keep };
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
   } catch (e) {
+    const fix = fixLineOf(row); // before the rollback: it reads the files as setup left them
     run.rollback(row.id, ctx.env);
     // D-SETUP-HOST-BROKEN-1: the host broke on the install step itself (the list passed): the same SKIPPED line.
     const broken = row.cli ? hostBroken(row.cli.bin, (e as Error).message) : undefined;
     if (broken) return { ...res, status: "SKIPPED", reason: broken };
-    return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
+    return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true, ...(fix ? { fix } : {}) };
   }
   return res;
 }
@@ -1148,7 +1211,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
 export const V1_FORM_REASON = "old context-mode entry, run: context-mode setup";
 export const NOT_SET_UP_REASON = "not set up, run context-mode setup";
 export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
-  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env, cwd: opts.cwd };
   const reg = buildRegistry(ctx);
   for (const f of ["server.mjs", "hook.mjs"]) {
     if (!existsSync(path.join(ctx.pkgDir, f))) return { exitCode: 1, agents: [], error: `preflight: ${path.join(ctx.pkgDir, f)} is missing` };
@@ -1170,7 +1233,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
       else {
         res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
-        if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); }
+        if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); const fix = fixLineOf(row); if (fix) res.fix = fix; }
       }
     }
     agents.push(res);
@@ -1184,7 +1247,11 @@ function notSetUpReason(row: CheckRow, res: AgentResult, env: SetupContext["env"
   const h = row.hookInstall;
   const missing = row.id === "opencode" && h.kind === "plugin-list" && res.changes.some((c) => c.path === h.key[0]);
   const oc2 = missing && hostBin("opencode", env).file !== undefined && opencodeMajor("opencode", env) >= 2;
-  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode`;
+  // D-R54-OC-PLUGINS-DIR-1 (review round 1): a plugins dir file of ours that OpenCode cannot load is named with what it needs.
+  const dead = missing ? opencodeDirPlugins(opencodePluginDirs(path.dirname(h.file), h.worktree)).find((p) => !p.loads) : undefined;
+  const hint = dead ? `; ${dead.file} loads context-mode once ${OPENCODE_PACKAGE_DIR_HINT} is next to it or above it` : "";
+  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode${hint}`;
+  if (hint) return NOT_SET_UP_REASON + hint;
   // D-R44-GEMINI-NATIVE-CMD-1 (host audit gemini-1): gemini is on PATH and lists no context-mode extension, so the fix
   // line names the host's own install command too.
   if (row.id === "gemini" && hostBin("gemini", env).file !== undefined) return `${NOT_SET_UP_REASON}, or run: ${NATIVE_INSTALL.gemini[0]}`;

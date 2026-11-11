@@ -120,7 +120,9 @@ const BY_ID = new Map<AgentId, AdapterRow>(ADAPTERS.map((r) => [r.id, r]));
 // pi tool_result rewrite). On these rows the main agent gets "run, then replace" and no Bash size-guess deny;
 // every other row keeps its one path (ADR-0001).
 // gemini: AfterTool decision deny + reason replaces the result (D-HA-GEMINI-REPLACE-1).
-const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "copilot-cli", "pi"]);
+// opencode: the plugin sets result.content (2.x) or output.output (1.19) in-process; both hosts read that object back
+// after the hook (D-R54-OC-REPLACE-1, #1347). Not in DUMP_REPLACE_ROWS: execute.before can deny a large cat first.
+const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "copilot-cli", "pi", "opencode"]);
 
 export function hasReplace(row: AdapterRow): boolean {
   return REPLACE_ROWS.has(row.id);

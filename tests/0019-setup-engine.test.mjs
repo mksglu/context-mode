@@ -239,6 +239,23 @@ rl.on("line", (l) => {
     assert.equal(readFileSync(toml, "utf8"), text);
   });
 
+  // #1359 (HengYangDS, D-1359-CODEX-TOOLS-1): re-running `setup --yes --agents codex` deleted the user's
+  // [mcp_servers.context-mode.tools.<tool>] approval_mode tables (Codex-native user config) from config.toml.
+  test("[#1359] setup again keeps the user's [mcp_servers.context-mode.tools.*] approval tables and their values", async (t) => {
+    const s = sandbox(t);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r1" });
+    assert.equal(res.exitCode, 0, JSON.stringify(res.agents));
+    const toml = path.join(s.home, ".codex", "config.toml");
+    const approvals = '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "auto"\n\n[mcp_servers.context-mode.tools.ctx_batch]\napproval_mode = "prompt"\n';
+    writeFileSync(toml, readFileSync(toml, "utf8") + approvals);
+    const before = readFileSync(toml, "utf8");
+    const again = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r2" });
+    assert.equal(again.exitCode, 0, JSON.stringify(again.agents));
+    assert.deepEqual(again.agents[0].v1.filter((f) => f.file === toml), []);
+    assert.deepEqual(again.agents[0].changes, []);
+    assert.equal(readFileSync(toml, "utf8"), before);
+  });
+
   // #1328 / #1329 (lisandroprada, fingerprint 2e26442450f2): on Node v23.9.0 setup failed with "mcp: tools/list returned
   // ctx_doctor, expected ..." and rolled back. Node is checked first: one line with the fix, no write, no rollback.
   test("[#1328] setup on Node v23.9.0 stops first with one NODE_TOO_OLD line and writes nothing", async (t) => {
@@ -633,18 +650,56 @@ exit 0`);
   // D-HF-OPENCODE-LIST-1: with our plugin entry in opencode.json, OpenCode 1.19.4 first installs @opencode-ai/plugin
   // (30-60 s, network) before `mcp list` prints, so the 10 s list check timed out and setup rolled back on a fresh
   // HOME. `mcp list --pure` (run without external plugins) lists the MCP servers without that install.
-  test("setup: the opencode list check does not load plugins (D-HF-OPENCODE-LIST-1)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
-    const s = sandbox(t);
-    const log = path.join(s.root, "opencode.log");
+  // D-OC1-LIST-2 (#1362): `mcp list` connects every MCP server of the user, so one user server that never answers holds
+  // it past the 10 s budget: "opencode FAIL list: opencode mcp list --pure does not list context-mode (rolled back)",
+  // while the real `opencode mcp list --pure` (1.19.5) printed "✓ context-mode connected / ✗ slowsrv failed" after 32.6 s.
+  // On 1.x the list check reads `opencode debug config --pure` (the config the CLI loaded, no server started, no plugin
+  // load), as D-OC2-LIST-1 does on 2.x.
+  function fakeOpencode1(s, log, { version = `echo "1.19.5"`, config } = {}) {
+    const file = path.join(s.home, ".config", "opencode", "opencode.json");
+    const dump = path.join(s.root, "dump.mjs");
+    writeFileSync(dump, config ?? `import { readFileSync } from "node:fs"; let d = {}; try { d = JSON.parse(readFileSync(${JSON.stringify(file)}, "utf8")); } catch {}
+process.stdout.write(JSON.stringify({ ...d, agent: {}, plugin: d.plugin ?? [] }, null, 2));\n`);
     fakeBin(s.root, "opencode", `echo "$@" >> "${log}"
-case " $* " in
-  *" --pure "*) echo "context-mode connected" ;;
-  *) exit 1 ;;
+case "$1 $2" in
+  "--version ") ${version} ;;
+  "mcp list") sleep 15; echo "context-mode connected" ;;
+  "debug config") "${NODE}" "${dump}" ;;
 esac
 exit 0`);
+    return dump;
+  }
+
+  test("setup: on OpenCode 1.x a slow user MCP server does not fail the list check; it reads debug config --pure (D-OC1-LIST-2, #1362)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "opencode.log");
+    fakeOpencode1(s, log);
     const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
     assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
-    assert.ok(readFileSync(log, "utf8").includes("mcp list --pure"), readFileSync(log, "utf8"));
+    const ran = readFileSync(log, "utf8");
+    assert.ok(ran.includes("debug config --pure"), ran); // D-HF-OPENCODE-LIST-1: --pure, so no plugin install is waited on
+    assert.ok(!ran.includes("mcp list"), ran);
+  });
+
+  test("setup: on OpenCode 1.x the list check FAILs when the loaded config has no mcp.context-mode, and names what it loaded (D-OC1-LIST-2, #1362)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "opencode.log");
+    fakeOpencode1(s, log, { config: `process.stdout.write(JSON.stringify({ mcp: { slowsrv: { type: "local" } }, plugin: [] }));\n` });
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0], null, 2));
+    const list = res.agents[0].checks.find((c) => c.name === "list");
+    assert.ok(list && !list.ok && list.detail.includes("debug config --pure") && list.detail.includes("mcp.context-mode") && list.detail.includes("slowsrv"), JSON.stringify(res.agents[0].checks));
+  });
+
+  test("setup: when opencode --version prints no version the list check says so and runs no --pure fallback (D-OC1-LIST-2, #1362)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "opencode.log");
+    fakeOpencode1(s, log, { version: `echo "error: unknown option"; exit 1` });
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0], null, 2));
+    const list = res.agents[0].checks.find((c) => c.name === "list");
+    assert.ok(list && !list.ok && list.detail.includes("opencode --version printed no version") && list.detail.includes("error: unknown option"), JSON.stringify(res.agents[0].checks));
+    assert.ok(!readFileSync(log, "utf8").includes("--pure"), readFileSync(log, "utf8"));
   });
 
   // D-OC2-LIST-1 (#1308, Raidan-Ai, Windows, OpenCode 2): "list: opencode mcp list --standalone does not list
@@ -694,6 +749,36 @@ exit 1`);
     const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"] });
     assert.equal(doc.agents[0].status, "SKIPPED", JSON.stringify(doc.agents[0], null, 2));
   });
+
+  // D-SETUP-COPILOT-SHIM-1 (#1360, dup #1361): VS Code puts its own `copilot` launcher on PATH (microsoft/vscode
+  // copilot_shim, Linux /usr/bin/copilot). With no Copilot CLI installed and no terminal it prints "GitHub Copilot CLI
+  // was not found. ..." and exits 127 (app.rs l.42, l.485). That is a missing host, not a setup fault of ours: SKIPPED
+  // with Copilot CLI's own npm install as the fix line, nothing written, no mcp add, run exit 0, doctor SKIPPED too.
+  const COPILOT_SHIM_TEXTS = [
+    ["no terminal (app.rs l.485)", "GitHub Copilot CLI was not found. Run copilot in a terminal to install it, or see https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli"],
+    ["policy (app.rs l.475)", "GitHub Copilot CLI was not found. Installing it from VS Code is turned off by the CopilotCliCommand policy; contact your administrator."],
+  ];
+  for (const [variant, text] of COPILOT_SHIM_TEXTS) {
+    test(`setup: VS Code's copilot launcher with no Copilot CLI is SKIPPED with npm install -g @github/copilot, nothing written, run exit 0 (${variant}; D-SETUP-COPILOT-SHIM-1, #1360)`, { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+      const s = sandbox(t);
+      const log = path.join(s.root, "copilot.log");
+      fakeBin(s.root, "copilot", `echo "$@" >> "${log}"
+echo "${text}" >&2
+exit 127`);
+      const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"], runId: "r" });
+      const a = res.agents[0];
+      assert.equal(a.status, "SKIPPED", JSON.stringify(a, null, 2));
+      assert.equal(a.rolledBack, undefined);
+      assert.ok(a.reason.startsWith("copilot not installed: run npm install -g @github/copilot"), a.reason);
+      assert.ok(a.reason.includes("GitHub Copilot CLI was not found"), `the reason holds the host line: ${a.reason}`);
+      assert.equal(res.exitCode, 0);
+      assert.equal(existsSync(path.join(s.home, ".copilot")), false, "nothing written for a missing host (no empty hooks/skills dirs)");
+      assert.equal(readFileSync(log, "utf8").includes("mcp add"), false, readFileSync(log, "utf8"));
+      const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"] });
+      assert.equal(doc.agents[0].status, "SKIPPED", JSON.stringify(doc.agents[0], null, 2));
+      assert.ok(doc.agents[0].reason.startsWith("copilot not installed: run npm install -g @github/copilot"), doc.agents[0].reason);
+    });
+  }
 
   // D-US-1 (upgrade-sync): Claude Code runs a copy of the package under ~/.claude/plugins/cache/<mp>/context-mode/<version>
   // and records it in ~/.claude/plugins/installed_plugins.json. npm i -g does not refresh that copy.
