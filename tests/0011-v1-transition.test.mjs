@@ -580,4 +580,22 @@ describe("ADR-0011: v1 upgrade stop", { concurrency: CONC }, () => {
     const { npmPackageJson } = await import("../build/manifests.ts");
     assert.ok(!("scripts" in npmPackageJson("2.1.7")));
   });
+
+  test("[M7] v1-upgrade-stop/docs-state-the-build-script-guard (#1363)", () => {
+    // The docs must say what is true since the MAIN-ONLY merge: main carries the v2 version and the build script is the
+    // guard; the install guide claims only what GP11 proves (the installed package stays as it is).
+    const doc = (rel) => readFileSync(path.join(REPO, rel), "utf8");
+    const adr11 = doc("docs/architecture/adr/0011-release-and-v1-transition.md");
+    assert.ok(!adr11.includes("keeps the frozen v1 `package.json`"), "ADR-0011 still says main keeps the v1 package.json");
+    assert.ok(adr11.includes("gets the v2 source and the v2 `package.json` version"));
+    const mod15 = doc("docs/architecture/modules/15-v1-transition.md");
+    assert.ok(mod15.includes("D-V1-UPGRADE-STOP-1") && mod15.includes("scripts/v1-upgrade-stop.mjs"), "module 15 §1.3 step 4 has no #1363 amendment");
+    const adr17 = doc("docs/architecture/adr/0017-e2e-every-step-and-v1-retention.md");
+    assert.ok(adr17.includes("`main` stayed frozen until the MAIN-ONLY merge"));
+    const install = doc("docs/install/README.md");
+    assert.ok(install.includes("prints the native command and leaves the installed package as it is"));
+    assert.ok(!install.includes("prints the native command and changes nothing"));
+    const row = doc("docs/architecture/DEVIATIONS.md").split("\n").find((l) => l.startsWith("| D-V1-UPGRADE-STOP-1 |"));
+    assert.ok(row && row.includes("docs/architecture/modules/15-v1-transition.md"), "DEVIATIONS row does not list module 15");
+  });
 });
