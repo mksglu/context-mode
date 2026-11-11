@@ -695,6 +695,36 @@ exit 1`);
     assert.equal(doc.agents[0].status, "SKIPPED", JSON.stringify(doc.agents[0], null, 2));
   });
 
+  // D-SETUP-COPILOT-SHIM-1 (#1360, dup #1361): VS Code puts its own `copilot` launcher on PATH (microsoft/vscode
+  // copilot_shim, Linux /usr/bin/copilot). With no Copilot CLI installed and no terminal it prints "GitHub Copilot CLI
+  // was not found. ..." and exits 127 (app.rs l.42, l.485). That is a missing host, not a setup fault of ours: SKIPPED
+  // with Copilot CLI's own npm install as the fix line, nothing written, no mcp add, run exit 0, doctor SKIPPED too.
+  const COPILOT_SHIM_TEXTS = [
+    ["no terminal (app.rs l.485)", "GitHub Copilot CLI was not found. Run copilot in a terminal to install it, or see https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli"],
+    ["policy (app.rs l.475)", "GitHub Copilot CLI was not found. Installing it from VS Code is turned off by the CopilotCliCommand policy; contact your administrator."],
+  ];
+  for (const [variant, text] of COPILOT_SHIM_TEXTS) {
+    test(`setup: VS Code's copilot launcher with no Copilot CLI is SKIPPED with npm install -g @github/copilot, nothing written, run exit 0 (${variant}; D-SETUP-COPILOT-SHIM-1, #1360)`, { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+      const s = sandbox(t);
+      const log = path.join(s.root, "copilot.log");
+      fakeBin(s.root, "copilot", `echo "$@" >> "${log}"
+echo "${text}" >&2
+exit 127`);
+      const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"], runId: "r" });
+      const a = res.agents[0];
+      assert.equal(a.status, "SKIPPED", JSON.stringify(a, null, 2));
+      assert.equal(a.rolledBack, undefined);
+      assert.ok(a.reason.startsWith("copilot not installed: run npm install -g @github/copilot"), a.reason);
+      assert.ok(a.reason.includes("GitHub Copilot CLI was not found"), `the reason holds the host line: ${a.reason}`);
+      assert.equal(res.exitCode, 0);
+      assert.equal(existsSync(path.join(s.home, ".copilot")), false, "nothing written for a missing host (no empty hooks/skills dirs)");
+      assert.equal(readFileSync(log, "utf8").includes("mcp add"), false, readFileSync(log, "utf8"));
+      const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli"] });
+      assert.equal(doc.agents[0].status, "SKIPPED", JSON.stringify(doc.agents[0], null, 2));
+      assert.ok(doc.agents[0].reason.startsWith("copilot not installed: run npm install -g @github/copilot"), doc.agents[0].reason);
+    });
+  }
+
   // D-US-1 (upgrade-sync): Claude Code runs a copy of the package under ~/.claude/plugins/cache/<mp>/context-mode/<version>
   // and records it in ~/.claude/plugins/installed_plugins.json. npm i -g does not refresh that copy.
   function installedPlugins(home, version) {
