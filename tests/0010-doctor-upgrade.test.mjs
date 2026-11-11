@@ -2718,7 +2718,8 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     mkdirSync(dir, { recursive: true });
     const toml = path.join(dir, "config.toml");
     const hooks = path.join(dir, "hooks.json");
-    writeFileSync(toml, V2_ENTRY.replace("/p/server.mjs", path.join(s.pkgDir, "server.mjs")) + APPROVALS);
+    // TOML basic string: JSON.stringify escapes the backslashes of a Windows path.
+    writeFileSync(toml, V2_ENTRY.replace('"/p/server.mjs"', JSON.stringify(path.join(s.pkgDir, "server.mjs"))) + APPROVALS);
     writeFileSync(hooks, JSON.stringify({ hooks: { PostToolUse: [{ hooks: [{ type: "command", command: "node /Users/me/dotfiles/hooks/codex/notify.mjs" }] }] } }, null, 2));
     const tomlBefore = readFileSync(toml, "utf8");
     const hooksBefore = readFileSync(hooks, "utf8");
