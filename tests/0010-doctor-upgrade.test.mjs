@@ -511,19 +511,33 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
   // D-R54-OC-PLUGINS-DIR-1 (#1349, OpenCode 2.2.6): `npm i --prefix ~/.config/opencode context-mode` plus
   // ~/.config/opencode/plugins/context-mode/index.js = `export { default } from "context-mode/server";`, no opencode.json.
   // OpenCode logs one "loading plugin" line for it; D3 said "wrong: MCP entry".
+  // A bare module name loads only when OpenCode finds node_modules/context-mode next to the file or above it (Node
+  // resolution); with no package, OpenCode logs "failed to load plugin ... Cannot find package 'context-mode'".
+  const OC_PKG = ["node_modules", "context-mode", "package.json"];
   const OC_DIR = [
-    ["a plugins dir file that re-exports context-mode/server, no opencode.json", ["plugins", "context-mode", "index.js"], 'export { default } from "context-mode/server";\n', "PASS"],
-    ["a loose plugins dir file that imports context-mode", ["plugins", "cm.ts"], "import plugin from 'context-mode';\nexport default plugin;\n", "PASS"],
-    ["a plugins dir file of another plugin", ["plugins", "other", "index.js"], 'export { default } from "other-plugin/server"; // context-mode is better\n', "FAIL"],
+    ["a plugins dir file that re-exports context-mode/server, no opencode.json", ["plugins", "context-mode", "index.js"], 'export { default } from "context-mode/server";\n', true, "PASS"],
+    ["a loose plugins dir file that imports context-mode", ["plugins", "cm.ts"], "import plugin from 'context-mode';\nexport default plugin;\n", true, "PASS"],
+    ["a plugins dir file of another plugin", ["plugins", "other", "index.js"], 'export { default } from "other-plugin/server"; // context-mode is better\n', true, "FAIL"],
+    ["a plugins dir file that re-exports context-mode/server with no node_modules/context-mode", ["plugins", "context-mode", "index.js"], 'export { default } from "context-mode/server";\n', false, "FAIL"],
   ];
-  for (const [name, rel, text, want] of OC_DIR) {
+  for (const [name, rel, text, installed, want] of OC_DIR) {
     test(`[D-R54-OC-PLUGINS-DIR-1] doctor-config/D3 opencode: ${name} is ${want} (#1349)`, (t) => {
       const home = tmp(t);
       put(path.join(home, ".config", "opencode", ...rel), text);
+      if (installed) put(path.join(home, ".config", "opencode", ...OC_PKG), '{ "name": "context-mode" }');
       const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home);
       assert.equal(d3.status, want, d3.detail);
     });
   }
+
+  test("[D-R54-OC-PLUGINS-DIR-1] doctor-config/D3 opencode: a project .opencode/plugins file with the package in <project>/node_modules is PASS (#1349)", (t) => {
+    const home = tmp(t);
+    const wt = tmp(t);
+    put(path.join(wt, ".opencode", "plugins", "context-mode", "index.js"), 'export { default } from "context-mode/server";\n');
+    put(path.join(wt, ...OC_PKG), '{ "name": "context-mode" }');
+    const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, wt);
+    assert.equal(d3.status, "PASS", d3.detail);
+  });
 
   test("[D-R44-OC-D3-1] doctor-config/D3 opencode: an mcp entry that runs another script is FAIL", (t) => {
     const home = tmp(t);
