@@ -505,7 +505,6 @@ describe("ADR-0020 plugins", () => {
           tools.set(t.name, t);
         },
       };
-      if (opts.getSettings !== undefined) pi.getSettings = opts.getSettings;
       return { pi, handlers, tools };
     }
     const ctxFor = (sid, cwd = repo) => ({ cwd, sessionManager: { getSessionId: () => sid } });
