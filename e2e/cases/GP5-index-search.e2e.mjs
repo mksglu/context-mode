@@ -677,8 +677,9 @@ test("[M4] GP5/timeline-repeat-and-session-scope", async () => {
 
 test("[M4] GP5/timeline-offset-relevance-after-invalid-args", async () => {
   const out = await twoSessions(async ({ a }) => ({
-    offset: await a("ctx_search", { queries: [], sort: "timeline", offset: 0 }),
-    after: await a("ctx_search", { queries: ["x"], after: 0 }),
+    // Real cursors: 0 is the first page and is accepted (#1354, D-R54-SEARCH-ZERO-1).
+    offset: await a("ctx_search", { queries: [], sort: "timeline", offset: 20 }),
+    after: await a("ctx_search", { queries: ["x"], after: 1700000000 }),
   }));
   assert.equal(out.offset.isError, true);
   assert.equal(out.after.isError, true);

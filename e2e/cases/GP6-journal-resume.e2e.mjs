@@ -258,7 +258,10 @@ test("[M4] GP6/resume-blank-session-falls-back", async (t) => {
   const blank = await call(c, "ctx_resume", { session: "" }, { sessionId: sid });
   assert.equal(blank.isError, false, textOf(blank));
   assertStateBlock(textOf(blank), sid);
-  assert.equal(textOf(blank), textOf(bare));
+  // Each call adds its own journal row, so only upto differs between the two replies.
+  const body = (r) => textOf(r).replace(/ upto="\d+">/, ">");
+  assert.equal(body(blank), body(bare));
+  assert.ok(textOf(blank).includes("now: blank session check"), textOf(blank));
 });
 
 // Golden cases: not the user role (#1263), bare tool names (#1028), no "directive" text (#911, #1259).

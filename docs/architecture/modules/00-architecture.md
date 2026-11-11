@@ -302,7 +302,7 @@ All errors are one line: `<cause>. Fix: <action>` (P1, PRD §13). Table keys are
 | `FETCH_FAILED` | `Fetch failed: <code>. Fix: check the URL or proxy.` (#1135) |
 | `SSRF` | `Blocked private address <host>. Fix: use a public URL.` |
 | `OUTSIDE_ROOT` | `Path <p> is outside the project. Fix: use a path inside <root>.` |
-| `INVALID_ARGS` | `Invalid argument <field>. Fix: <action>.` (`ctx_search` `offset` with `sort:"timeline"`, or `after` with `sort:"relevance"`; DECISIONS-r9 M23) |
+| `INVALID_ARGS` | `Invalid argument <field>. Fix: <action>.` (`ctx_search` non-zero `offset` with `sort:"timeline"`, or non-zero `after` with `sort:"relevance"`; `0` is accepted; DECISIONS-r9 M23, D-R54-SEARCH-ZERO-1) |
 | `ONE_OF_INPUT` | `Pass exactly one of <names>. Fix: drop the extra field.` (DECISIONS-r9 M23) |
 | `SPAWN_FAILED` | `Failed to start the process: <detail>. Fix: check the command and PATH.` (DECISIONS-r9 M23) |
 

@@ -212,7 +212,7 @@ This reuses the RRF fusion already in v1's `store.ts` (`const K = 60`, `bm25(chu
 - timeline sort gives identical merged order on repeated calls for the same journal state
 - a timestamp tie is broken by `seq`, not source order
 - `scope:"session"` on `sort:"timeline"` excludes SessionDB/auto-memory rows from other sessions
-- `offset` with `sort:"timeline"`, and `after` with `sort:"relevance"`, both return `isError` `INVALID_ARGS`
+- A non-zero `offset` with `sort:"timeline"`, and a non-zero `after` with `sort:"relevance"`, both return `isError` `INVALID_ARGS`; `0` is the first page of either cursor and is accepted (#1354, D-R54-SEARCH-ZERO-1)
 - an `AskUserQuestion` tool answer writes a `decision` row; a free-prose message that merely looks like a decision does not
 - an option echoed verbatim in the next prompt writes a `decision` row with the correct `ref` seq
 - `decision` rows never appear in the compaction block's candidate list

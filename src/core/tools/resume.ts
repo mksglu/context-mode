@@ -34,7 +34,9 @@ function reply(text: string, isError: boolean): ToolReply {
 
 async function handler(input: CtxResumeInput, ctx: ToolContext): Promise<ToolReply> {
   // Step 2: the server already resolved _meta.sessionId or "mcp:<serverId>" (D-M4-arch-3).
-  const sessionId = input.session ?? ctx.sessionId;
+  // A blank session counts as absent: JSON-schema clients send "" for the optional field (D-1353-RESUME-BLANK-1).
+  const given = input.session !== undefined && input.session.trim() !== "" ? input.session : undefined;
+  const sessionId = given ?? ctx.sessionId;
   if (sessionId === "") return reply(RESUME_NO_SESSION_LINE, true);
 
   const db = await openDb(ctx.project, { readOnly: true }); // step 3
