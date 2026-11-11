@@ -15,12 +15,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError, formatError } from "../core/contracts/errors.ts";
 import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
+import { isNativeOpencodeEntry } from "../core/ops/doctor-config.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
@@ -272,8 +273,7 @@ function planCodexTrust(row: CheckRow, edits: FileEdit[], hooksFile: string, fil
  *  error. The native install writes "context-mode@<tag>" (opencode plugin ...): with it our path entry would load the
  *  plugin twice (every hook fires twice), so the path entry is dropped; a stale path entry of ours (the file is gone,
  *  .../context-mode/opencode/plugin.js) never loads, so it is dropped too. Entries of the user are kept. */
-const NATIVE_PLUGIN_PREFIX = "context-mode@";
-function isNativeSpec(e: unknown): boolean { return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX); }
+function isNativeSpec(e: unknown): boolean { return isNativeOpencodeEntry(e, OPENCODE_PLUGIN_KEY); }
 function isStaleOwnPlugin(e: unknown, entry: string): boolean {
   if (typeof e !== "string" || e === entry || !path.isAbsolute(e)) return false;
   // D-OC2-ENTRY-1: the file form <pkg>/opencode/plugin.js of an earlier setup loads twice next to the dir entry and
@@ -290,11 +290,20 @@ function wantedPluginList(list: unknown[], entry: string, nativeElsewhere = fals
   const kept = list.filter((e) => !(native && e === entry) && !isStaleOwnPlugin(e, entry));
   return native || kept.includes(entry) ? kept : [...kept, entry];
 }
-/** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin"). */
-const OC2_NATIVE_KEY = "plugins";
-function nativePluginsKey(doc: unknown): boolean {
-  const v = isObj(doc) ? doc[OC2_NATIVE_KEY] : undefined;
-  return Array.isArray(v) && v.some(isNativeSpec);
+/** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin").
+ *  D-R54-OC2-BARE-NATIVE-1 (#1344): 2.2.6 writes the bare name there, and OpenCode merges every config file of its
+ *  config dir (D-R49-DOCTOR-1339-2), so a native entry in opencode.jsonc counts for the opencode.json list too. */
+function nativePluginsKey(doc: unknown, file: string): boolean {
+  const native = (d: unknown) => isObj(d) && [OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_KEY].some((k) => {
+    const v = d[k];
+    return Array.isArray(v) && v.some((e) => isNativeOpencodeEntry(e, k));
+  });
+  if (native(doc)) return true;
+  return OPENCODE_CONFIG_FILES.map((n) => path.join(path.dirname(file), n)).filter((f) => f !== file).some((f) => {
+    const text = readOr(f);
+    if (text === undefined || text.trim() === "") return false;
+    try { return native(parseHostConfig("opencode", f, text, "jsonc")); } catch { return false; }
+  });
 }
 /** The one-line reason hook-registered fails on a plugin-list channel, from the file as it is now. */
 function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
@@ -304,7 +313,7 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   try { doc = parseHostConfig("opencode", h.file, text, fileFormat({ id: "opencode" } as CheckRow, h.file)); } catch { return undefined; }
   const cur = isObj(doc) ? doc[h.key[0]] : undefined;
   const list = Array.isArray(cur) ? cur : [];
-  if ((list.some(isNativeSpec) || nativePluginsKey(doc)) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  if (nativePluginsKey(doc, h.file) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
   const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
   if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
   return undefined;
@@ -331,7 +340,7 @@ function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["en
     planJsonKeys(row, edits, h.file, fileFormat(row, h.file), (doc) => {
       const cur = doc[h.key[0]];
       const list = Array.isArray(cur) ? cur : [];
-      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc));
+      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc, h.file));
       if (cur === undefined && want.length === 0) return [];
       return [[h.key, want.length === list.length && want.every((e, i) => e === list[i]) ? list : want]];
     });

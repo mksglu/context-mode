@@ -182,12 +182,22 @@ function nativeMcpWrong(dir: string, row: AdapterRow): boolean {
 // npm spec ("context-mode@2.0.1", "context-mode@latest"), the release git spec, the package dir setup writes, or an
 // object with "package", or a tuple [spec, options]. On 2.x `opencode plugin add context-mode` writes the bare name; under 1.x "plugin" the bare
 // name is the v1 entry that D4 reports.
-function isOwnOpencodeEntry(entry: unknown, key: string, own: readonly string[]): boolean {
+function opencodeEntrySpec(entry: unknown): unknown {
   // D-R49-DOCTOR-1339-2: the tuple form [spec, options] (the 1.x "plugin" schema; 2.x still reads it) names the spec first.
-  const spec = isObject(entry) ? entry[OPENCODE_PACKAGE_FIELD] : Array.isArray(entry) ? entry[0] : entry;
+  return isObject(entry) ? entry[OPENCODE_PACKAGE_FIELD] : Array.isArray(entry) ? entry[0] : entry;
+}
+/** D-R54-OC2-BARE-NATIVE-1 (#1344): the entry the host's own install writes, which OpenCode loads from npm: the npm spec
+ *  "context-mode@<tag>" under either key, or the bare name under the 2.x "plugins" key (`opencode plugin add context-mode`).
+ *  Setup and doctor share this one rule. */
+export function isNativeOpencodeEntry(entry: unknown, key: string): boolean {
+  const spec = opencodeEntrySpec(entry);
   if (typeof spec !== "string") return false;
-  if (spec === OPENCODE_GIT_SPEC || spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || own.includes(spec)) return true;
-  return key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
+  return spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || (key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY);
+}
+function isOwnOpencodeEntry(entry: unknown, key: string, own: readonly string[]): boolean {
+  const spec = opencodeEntrySpec(entry);
+  if (typeof spec !== "string") return false;
+  return spec === OPENCODE_GIT_SPEC || own.includes(spec) || isNativeOpencodeEntry(entry, key);
 }
 
 /** D-R44-OC-D3-1 (#1310): a local MCP entry runs our server: command is a node (or a command array that starts with one),
