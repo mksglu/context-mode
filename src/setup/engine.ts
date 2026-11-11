@@ -428,18 +428,18 @@ function opencode2ListCheck(bin: string, env: SetupContext["env"]): Check {
  *  line first and writes nothing: there is nothing to roll back and nothing of ours to fix.
  *  D-SETUP-COPILOT-SHIM-1 (#1360): VS Code's `copilot` launcher (copilot_shim) is on PATH with no Copilot CLI behind it;
  *  with no terminal it prints "GitHub Copilot CLI was not found. ..." and exits 127. All its variants share that prefix. */
+export const HOST_BROKEN_PREFIX = "host broken: run ";
 const HOST_BROKEN: Partial<Record<string, readonly { text: string; prefix: string; fix: string }[]>> = {
   copilot: [
-    { text: "no platform package found", prefix: "host broken: run ", fix: "npm install -g @github/copilot" },
+    { text: "no platform package found", prefix: HOST_BROKEN_PREFIX, fix: "npm install -g @github/copilot" },
     { text: "GitHub Copilot CLI was not found", prefix: "copilot not installed: run ", fix: "npm install -g @github/copilot" },
   ],
 };
-export const HOST_BROKEN_PREFIX = "host broken: run ";
 function hostBroken(bin: string, out: string): string | undefined {
   const b = HOST_BROKEN[bin]?.find((e) => out.includes(e.text));
   if (!b) return undefined;
-  const line = out.trim().split("\n").find((l) => l.includes(b.text)) ?? out.trim().split("\n")[0];
-  return `${b.prefix}${b.fix} (${line.trim()})`;
+  const lines = out.trim().split("\n");
+  return `${b.prefix}${b.fix} (${(lines.find((l) => l.includes(b.text)) ?? lines[0]).trim()})`;
 }
 
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
