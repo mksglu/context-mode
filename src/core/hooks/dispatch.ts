@@ -501,7 +501,8 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // within the same budget, plus the handle. No shape or no named rare unit -> the BM25 pick below, unchanged.
   // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
   // replace is the size bound of D-CR3-HANDLE-1 (REPLACE_RETURN_BYTES of selection + the more line with the full
-  // label); the selection gets that budget minus the handle line, so a replace never grows.
+  // label); the selection gets that budget minus the handle line, so the selection plus the handle line never grows.
+  // D-CC-POINTER-2: on claude-code the search.mjs twin comes on top of that bound (two absolute paths, about 120-250 B).
   // D-HA-GEMINI-HINT-1: a second query of the prompt words the output holds, so the call returns the asked line.
   const handleLine = caller.ctx
     ? REPLACE_HANDLE_LINE(intent, handle, result.bytes, row.toolNamePrefix, askedWords(intent, prompt, text))

@@ -442,6 +442,20 @@ process.on("exit", () => {
 
   // GP3/subagent-pointer-callable (#1342, ADR-0016 lines 11 and 16, D-CC-POINTER-1): a large subagent output gets the
   // same replace budget as the main session, and the pointer names only tools the subagent can call.
+  // The words a POSIX shell passes for single-quoted, backslash-escaped and bare words.
+  const posixWords = (line) => {
+    const words = [];
+    let cur = null;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === "'") { const end = line.indexOf("'", i + 1); cur = (cur ?? "") + line.slice(i + 1, end); i = end; }
+      else if (ch === "\\") { cur = (cur ?? "") + line[i + 1]; i++; }
+      else if (ch === " ") { if (cur !== null) words.push(cur); cur = null; }
+      else cur = (cur ?? "") + ch;
+    }
+    if (cur !== null) words.push(cur);
+    return words;
+  };
   const subBash = (repo, sid, type, n) => ({
     session_id: sid, cwd: repo, hook_event_name: "PostToolUse", agent_id: "a-" + n, agent_type: type, tool_name: "Bash",
     tool_input: { command: "seq 1 4000" }, tool_use_id: "toolu_gp3_sub_" + n,
@@ -459,6 +473,14 @@ process.on("exit", () => {
     assert.ok(out.length < 18892, "replaced, not the full output");
     assert.equal(out.includes("ctx_"), false, out);
     assert.ok(out.includes("search.mjs"), "the subagent has Bash, so it gets the MCP-free search call: " + out);
+    // D-CC-POINTER-5: the printed line runs as is (POSIX single-quoted words) and returns a middle line.
+    const text = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+    const line = text.slice(text.lastIndexOf("\n") + 1);
+    const words = posixWords(line.slice(line.indexOf("node ") + "node ".length));
+    assert.equal(path.basename(words[0]), "search.mjs", line);
+    const s = spawnSync(process.execPath, [words[0], words[1], "2000", words[3]], { cwd: tmpdir(), env: { PATH: process.env.PATH, HOME: path.dirname(f.repo), USERPROFILE: path.dirname(f.repo) }, encoding: "utf8" });
+    assert.equal(s.status, 0, s.stderr);
+    assert.ok(s.stdout.split("\n").includes("2000"), s.stdout.slice(0, 300));
   });
 
   test("[M3] GP3/subagent-pointer-callable: general-purpose gets the callable ctx_search pointer, not the full output (#1342)", (t) => {
