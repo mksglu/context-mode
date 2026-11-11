@@ -13,6 +13,7 @@ export interface CanonicalHookEvent {
   cwd: string;
   agentId?: string;        // subagent marker; presence = subagent (Q23)
   agentType?: string;      // selects tool-set row only
+  agentTools?: string[];   // in-process hosts (OpenCode 2): the agent's tool set read at spawn time (ADR-0016 l.23, #1348)
   source?: "startup" | "resume" | "clear" | "compact"; // SessionStart
   prompt?: string;         // UserPromptSubmit
   tool?: ToolCall;         // Pre/PostToolUse

@@ -51,8 +51,11 @@ export function decode(raw: unknown): CanonicalHookEvent {
   const native = typeof p.type === "string" ? p.type : "";
   const event = Object.prototype.hasOwnProperty.call(OPENCODE_EVENTS, native) ? OPENCODE_EVENTS[native] : undefined;
   if (event === undefined) throw new Error("opencode: unknown hook event " + String(p.type));
-  // No documented subagent field on OpenCode: agentId/agentType stay undefined (impl/10 §11).
   const ev: CanonicalHookEvent = { event, agent: "opencode", sessionId: String(p.sessionID ?? ""), cwd: String(p.directory ?? "") };
+  // D-R54-OC-AGENT-1 (#1348): 1.19 has no agent field, so these stay undefined there. The 2.x bridge sets them for an
+  // agent whose Agent.Info.mode is "subagent", with the tools its permissions leave on (ADR-0016 l.23).
+  if (typeof p.agentID === "string" && p.agentID !== "") { ev.agentId = p.agentID; ev.agentType = p.agentID; }
+  if (Array.isArray(p.agentTools)) ev.agentTools = p.agentTools.filter((t): t is string => typeof t === "string");
   if (event === "UserPromptSubmit" && typeof p.message === "string") ev.prompt = p.message;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const name = String(p.tool ?? "");
@@ -76,7 +79,7 @@ export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): Ho
     case "deny":
       if (ev.event !== "PreToolUse") return { stdout: "", exitCode: 0 };
       return { stdout: d.rewritten === undefined ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
-    case "replace":
-      return { stdout: "", exitCode: 0 };
+    case "replace": // D-R54-OC-REPLACE-1 (#1347): the plugin writes stdout back into the host's result object
+      return { stdout: ev.event === "PostToolUse" ? d.output : "", exitCode: 0 };
   }
 }

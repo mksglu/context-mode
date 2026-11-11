@@ -2205,7 +2205,7 @@ describe("PRD-v2 section 10: saving decision per host (ADR-0020)", () => {
   // the ctx tool on PreToolUse everywhere else. One effect per host, no fallback.
   const SAVING = {
     "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "R",
-    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "D",
+    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "R", // opencode R: D-R54-OC-REPLACE-1 (#1347)
   };
   // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
   // an open file, so temp cleanup there is best-effort. The assertions are unchanged.

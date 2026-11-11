@@ -184,12 +184,13 @@ describe("ADR-0020 plugins", () => {
       assert.deepEqual(asked.map((a) => [a.permission, a.patterns]), [["ctx_execute", ["shell"]], ["bash", ["rm -rf build"]]]);
     });
 
-    test("execute.before: the shell tool is routed like every host (curl denied by throwing the ctx_ redirect), webfetch is denied, ls passes", async () => {
+    test("execute.before: the shell tool is routed like every replace host (curl runs, execute.after replaces a large result), webfetch is denied, ls passes", async () => {
       const f = fakeCtx(tmpdir());
       const dispose = await opencodePlugin.default.setup(f.ctx);
       const before = f.hooks.tool["execute.before"];
       const call = (tool, input) => ({ tool, sessionID: "ses_b", agent: "build", messageID: "msg_1", id: "call_1", input });
-      await assert.rejects(before(call(SHELL, { command: "curl https://example.com" })), (e) => e instanceof Error && e.message.includes("ctx_"));
+      // D-M7-RR-1 + D-R54-OC-REPLACE-1 (#1347): a replace row runs the main agent's curl; no size-guess deny.
+      await before(call(SHELL, { command: "curl https://example.com" }));
       await assert.rejects(before(call("webfetch", { url: "https://example.com" })), (e) => e instanceof Error && e.message !== "");
       await before(call(SHELL, { command: "ls" }));
       await dispose();
@@ -371,11 +372,9 @@ describe("ADR-0020 plugins", () => {
         hooks["tool.execute.before"]({ tool: "webfetch", sessionID: "s-block", callID: "c1" }, { args: { url: "https://example.com" } }),
         (err) => err instanceof Error && err.message !== "",
       );
-      // D-HF-OPENCODE-SHELL-1: the row lists shell ["bash"], so an inline HTTP call is denied like on every other host.
-      await assert.rejects(
-        hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c2" }, { args: { command: "curl https://example.com" } }),
-        (err) => err instanceof Error && err.message.includes("ctx_"),
-      );
+      // D-HF-OPENCODE-SHELL-1: the row lists shell ["bash"], so the user's own Bash rules apply. A curl runs on this
+      // replace row and execute.after replaces a large result (D-M7-RR-1, D-R54-OC-REPLACE-1, #1347).
+      await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c2" }, { args: { command: "curl https://example.com" } });
       await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c3" }, { args: { command: "ls" } });
     });
 

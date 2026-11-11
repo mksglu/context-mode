@@ -208,7 +208,9 @@ describe("ADR-0020 adapters", () => {
       assert.deepEqual(r.encode({ ...base, event: "PreToolUse" }, { kind: "hint", text: "t", onceKey: "k" }), { stdout: "", exitCode: 0 });
       assert.deepEqual(r.encode({ ...base, event: "PreToolUse" }, { kind: "deny", reason: "why" }), { stdout: "why", exitCode: 2 });
       assert.deepEqual(r.encode({ ...base, event: "UserPromptSubmit" }, { kind: "deny", reason: "why" }), { stdout: "", exitCode: 0 });
-      assert.deepEqual(r.encode({ ...base, event: "PostToolUse" }, { kind: "replace", output: "o" }), { stdout: "", exitCode: 0 });
+      // D-R54-OC-REPLACE-1 (#1347): a PostToolUse replace comes back as stdout; the plugin writes it into the host result.
+      assert.deepEqual(r.encode({ ...base, event: "PostToolUse" }, { kind: "replace", output: "o" }), { stdout: "o", exitCode: 0 });
+      assert.deepEqual(r.encode({ ...base, event: "PreToolUse" }, { kind: "replace", output: "o" }), { stdout: "", exitCode: 0 });
     });
 
     // D-FU-RM-KIRO-2: every native name a row's eventMap emits (the build writes these into hooks/<id>.json) must
