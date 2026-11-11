@@ -35,7 +35,14 @@ const state = path.join(process.env.FAKE_STATE, agent);
 const home = process.env.HOME;
 const has = (w) => args.includes(w);
 const fileHolds = (f) => existsSync(f) && readFileSync(f, "utf8").includes("context-mode");
-if (has("list")) {
+const ocConf = path.join(home, ".config", "opencode", "opencode.json");
+// D-OC1-LIST-2 (#1362): the OpenCode list check reads the version, then the config that \`debug config --pure\` prints.
+if (agent === "opencode" && has("--version")) {
+  console.log("1.19.5");
+} else if (agent === "opencode" && has("debug") && has("config")) {
+  if (!existsSync(ocConf)) process.exit(1);
+  process.stdout.write(readFileSync(ocConf, "utf8"));
+} else if (has("list")) {
   const own = agent === "codex" ? fileHolds(path.join(home, ".codex", "config.toml"))
     : agent === "opencode" ? fileHolds(path.join(home, ".config", "opencode", "opencode.json")) : existsSync(state);
   if (own) console.log("context-mode");
