@@ -9,7 +9,7 @@ import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
   OWN_TOOL_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, RANGE_READ_TOOLS, READ_PATH_KEYS, READ_RANGE_KEYS, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
-  RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
+  RUN_WRAPPER_AGENT, RUN_WRAPPER_NODE, SEARCH_TWIN_LINE, SEARCH_WRAPPER_FILE, SUBAGENT_HANDLE_LINE, ECHO_MAX_BYTES, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
   SUBAGENT_RUN_DENY, WORKSPACE_FOLDER_FLAG, PROJECTS_DIR_NAME, CLAUDE_TOOL_RESULTS_DIR_NAME, PERSISTED_OUTPUT_MAX_BYTES,
 } from "../contracts/constants.ts";
@@ -458,17 +458,25 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // ADR-0001: one path per row, no runtime fallback. A row with no replace channel gets no replace decision on
   // any path, the subagent one too (D-STATS-RET-2): its encoder drops it, so the model gets the whole output.
   if (!hasReplace(row)) return ALLOW;
+  // D-CC-POINTER-1 (#1342, ADR-0016 line 16): every caller keeps the same replace budget; case A is no passthrough.
+  // The pointer names only what the caller can call: ctx_search for the main session and case A, the plain
+  // SUBAGENT_HANDLE_LINE for case B and C. D-CC-POINTER-4: the subagent label carries the call id, as mainLabel does.
   let label: string;
+  let caller: Caller = { ctx: true, shell: true, read: false };
   if (isSubagentCall(ev)) {
-    const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
-    if (subCase === "A") return ALLOW;
-    label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + String(ev.turn ?? 0);
+    const set = toolSetForAgentType(ev, { projectDir: project.worktree, env });
+    const subCase = pickSubagentCase(ev, set);
+    const has = (names: readonly string[]): boolean => set !== null && names.some((n) => set.includes(n));
+    caller = { ctx: subCase === "A", shell: has(row.nativeTools.shell),
+      read: RANGE_READ_TOOLS.includes(tool.canonicalName) && has(row.nativeTools.read ?? []) };
+    label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + (tool.callId ?? String(ev.turn ?? 0));
   } else {
     label = mainLabel(tool, ev);
   }
   // D-M7-RR-3: no description -> the command text, file path, pattern or URL, never an empty query.
-  const intent = [tool.input.description, tool.input.command, tool.input.file_path, tool.input.pattern, tool.input.url]
-    .map(str).find((v) => v.trim() !== "") ?? "";
+  // D-CC-POINTER-2 (#1358): an MCP input has none of them, so the tool name is the last field.
+  const intent = [tool.input.description, tool.input.command, tool.input.file_path, tool.input.pattern, tool.input.url, tool.name]
+    .map(str).find((v) => v.trim() !== "") ?? tool.canonicalName;
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
   const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES); // D-M7-SV-1: small chunks, line-aligned cuts
@@ -495,12 +503,25 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // replace is the size bound of D-CR3-HANDLE-1 (REPLACE_RETURN_BYTES of selection + the more line with the full
   // label); the selection gets that budget minus the handle line, so a replace never grows.
   // D-HA-GEMINI-HINT-1: a second query of the prompt words the output holds, so the call returns the asked line.
-  const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes, row.toolNamePrefix, askedWords(intent, prompt, text));
+  const handleLine = caller.ctx
+    ? REPLACE_HANDLE_LINE(intent, handle, result.bytes, row.toolNamePrefix, askedWords(intent, prompt, text))
+    : SUBAGENT_HANDLE_LINE(handle, result.bytes, caller.read);
   const budget = replaceBudget(handleLine, moreLine(intent, label));
+  // D-CC-POINTER-2 (#1358): on the claude-code row a caller with a shell also gets the MCP-free search.mjs call,
+  // which works when the MCP server is not connected. It sits after the budget: the selection is unchanged.
+  const pointer = handleLine + (caller.shell && ev.agent === RUN_WRAPPER_AGENT ? searchTwin(handle, intent, project) : "");
   const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES); // D-M2-JSON-1
-  if (digest !== null) return { kind: "replace", output: replaceOutput(digest, handleLine) };
+  if (digest !== null) return { kind: "replace", output: replaceOutput(digest, pointer) };
   const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
-  return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, handleLine) : selected.text };
+  return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, pointer) : selected.text };
+}
+
+type Caller = { ctx: boolean; shell: boolean; read: boolean };
+
+// search.mjs sits next to hook.mjs (D-M3-arch-3, as caseB's run.mjs). A long intent is not echoed (D-NO-LOSSY-CUT-2).
+function searchTwin(handle: string, intent: string, project: ProjectContext): string {
+  const terms = Buffer.byteLength(intent, "utf8") > ECHO_MAX_BYTES ? "" : intent;
+  return SEARCH_TWIN_LINE(join(dirname(process.argv[1] ?? ""), SEARCH_WRAPPER_FILE), handle, terms, project.worktree);
 }
 
 // D-R41-READ-OFFSET-1 (#1314): a read-like tool called with offset, limit or view_range is a bounded window.
