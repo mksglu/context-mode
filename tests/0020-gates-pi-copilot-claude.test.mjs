@@ -808,6 +808,26 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));
     });
 
+    // Review round 3 (real 2.2.6, fresh HOME): setup in a project with a .opencode/plugins file of ours FAILed, rolled
+    // back opencode.json (no MCP entry, no global entry) and its Fix: line said setup again, so the user looped.
+    // The global entry and the MCP entry are right; only the project file is extra, and setup cannot fix it.
+    test("fresh HOME, setup in a project with a .opencode/plugins file of ours: keeps the MCP and global entry, the fix names the project file (#1349)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      const proj = inProject(s);
+      const projFile = dirPlugin(path.join(proj, ".opencode"), proj);
+      const res = await runSetup({ ...opts(s), cwd: proj, runId: "k3" });
+      assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0]));
+      assert.equal(res.agents[0].fix, `remove ${projFile}`, JSON.stringify(res.agents[0]));
+      const doc = JSON.parse(readFileSync(s.file, "utf8"));
+      assert.deepEqual(doc.plugin, [own(s)], "the global path entry stays: it loads the hooks in every other project");
+      assert.ok(doc.mcp && typeof doc.mcp["context-mode"] === "object", JSON.stringify(doc));
+      const again = await runSetup({ ...opts(s), cwd: proj, runId: "k4" });
+      assert.equal(again.agents[0].fix, `remove ${projFile}`, JSON.stringify(again.agents[0]));
+      const d = await runDoctor({ ...opts(s), cwd: otherProject(s) });
+      assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));
+    });
+
     test("our path entry next to a project .opencode/plugins file of ours loads twice: doctor names the project file to remove (#1349)", SKIP_SH_OC, async (t) => {
       const s = sandbox(t);
       fakeOpencode(s, "opencode v2.2.6");
