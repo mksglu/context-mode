@@ -491,6 +491,11 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(typeof parsed(await handleHook("claude-code", read(data, "toolu_link_data"), env)).updatedToolOutput, "object", "data through the same link still replaces");
     const direct = join(target, "references", "api.md");
     assert.equal(typeof parsed(await handleHook("claude-code", read(direct, "toolu_link_direct"), env)).updatedToolOutput, "object", "the link target read by its own path is not an own file");
+    // A ".." step through the link: path.resolve folds it to ~/.claude/skills/outside.md, the OS reads
+    // dotfiles/skills/outside.md. That file is not an own file, so the Read still replaces (review r54 round 2).
+    writeFileSync(join(root, "dotfiles", "skills", "outside.md"), content);
+    const dotdot = [root, ".claude", "skills", "linked", "..", "outside.md"].join(sep);
+    assert.equal(typeof parsed(await handleHook("claude-code", read(dotdot, "toolu_link_dotdot"), env)).updatedToolOutput, "object", "a .. step through the link still replaces");
   });
 
   test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {

@@ -383,8 +383,8 @@ import { DatabaseSync } from "node:sqlite";
     mkdirSync(path.join(root, ".claude", "skills"), { recursive: true });
     symlinkSync(target, path.join(root, ".claude", "skills", "python3"));
     const env = { PATH: process.env.PATH, HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo };
-    const read = (name) => {
-      const filePath = path.join(root, ".claude", "skills", "python3", "references", name);
+    writeFileSync(path.join(root, "dotfiles", "skills", "outside.md"), content);
+    const read = (name, filePath = path.join(root, ".claude", "skills", "python3", "references", name)) => {
       const n = content.split("\n").length;
       const payload = {
         session_id: "gp3-1345", cwd: repo, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: filePath }, tool_use_id: "toolu_gp3_1345_" + name,
@@ -396,6 +396,8 @@ import { DatabaseSync } from "node:sqlite";
     };
     assert.equal(read("api.md"), "", "the linked skill reference reaches the model whole");
     assert.ok(read("log.jsonl").includes("updatedToolOutput"), "data through the same link still replaces");
+    // A ".." step through the link reads dotfiles/skills/outside.md on disk, which is not an own file: it still replaces.
+    assert.ok(read("dotdot", [root, ".claude", "skills", "python3", "..", "outside.md"].join(path.sep)).includes("updatedToolOutput"), "a .. step through the link still replaces");
   });
 }
 
