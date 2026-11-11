@@ -2,7 +2,7 @@
 // never imports src/ (ADR-0003). covers: src/core/tools/doctor.ts, src/core/tools/upgrade.ts, src/core/ops/*, build/build.mjs.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -468,4 +468,56 @@ describe("GP11 doctor and upgrade", () => {
   });
 
   // 14a GP11/pi-discovery-dirs-doctor (#1168). Pi 0.85: doctor reports the actual extension path,
+});
+
+// #1363 (ADR-0011, DEVIATIONS D-V1-UPGRADE-STOP-1): the published 1.0.169 `context-mode upgrade` clones `main`, sees a
+// newer package.json version, installs and runs the `build` script in the clone, then copies package.json and src/ over
+// the install. With the v2 version on main this left a hybrid tree (package.json 2.x, bin still cli.bundle.mjs 1.0.x).
+// The clone's build script must stop the v1 upgrade before any write; the native `npm i -g` then installs 2.x cleanly.
+// Black box: the real 1.0.169 package from the npm registry, git clone redirected to this checkout's committed HEAD
+// (GIT_CONFIG_GLOBAL url.insteadOf), a fake pgrep so v1 never stops a real MCP server, temp prefix, HOME and TMPDIR.
+// Network (npm registry), POSIX only (v1 finds siblings with pgrep there), so it is tagged M7 and not in the M6 CI gate.
+describe("GP11 v1 upgrade against main", () => {
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const OUT = path.join(ROOT, "release-out");
+  const V1 = "1.0.169";
+
+  test("[M7] GP11/v1-upgrade-against-main-writes-nothing: 1.0.169 upgrade keeps the tree, npm i -g gives 2.x (#1363)", { skip: process.platform === "win32", timeout: 600_000 }, (t) => {
+    assert.ok(existsSync(path.join(OUT, "package.json")), "release-out missing (run build/build.mjs first)");
+    const tmp = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-gp11-v1up-")));
+    t.after(() => rmSync(tmp, { recursive: true, force: true }));
+    const [prefix, home, proj, fakeBin, tmpd, pack] = ["g", "home", "proj", "fakebin", "tmp", "pack"].map((d) => path.join(tmp, d));
+    for (const d of [prefix, home, proj, fakeBin, tmpd, pack]) mkdirSync(d, { recursive: true });
+    writeFileSync(path.join(fakeBin, "pgrep"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const gitcfg = path.join(tmp, "gitconfig");
+    writeFileSync(gitcfg, `[url "${ROOT}"]\n\tinsteadOf = https://github.com/mksglu/context-mode.git\n`);
+    const cache = execFileSync("npm", ["config", "get", "cache"], { encoding: "utf8" }).trim();
+    const env = {
+      PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`, HOME: home, USERPROFILE: home, TMPDIR: tmpd,
+      CLAUDE_CONFIG_DIR: path.join(home, ".claude"), GIT_CONFIG_GLOBAL: gitcfg, GIT_CONFIG_NOSYSTEM: "1",
+      npm_config_cache: cache, npm_config_prefer_offline: "true", npm_config_update_notifier: "false", npm_config_fund: "false", npm_config_audit: "false",
+    };
+    const npm = (args, cwd = tmp) => execFileSync("npm", args, { cwd, env, encoding: "utf8", stdio: "pipe" });
+    const pkgDir = path.join(prefix, "lib", "node_modules", "context-mode");
+    const bin = path.join(prefix, "bin", "context-mode");
+
+    npm(["i", "-g", "--prefix", prefix, "--ignore-scripts", `context-mode@${V1}`]);
+    const before = readdirSync(pkgDir).sort();
+
+    const r = spawnSync(bin, ["upgrade", "--platform", "claude-code"], { cwd: proj, env, encoding: "utf8", timeout: 400_000 });
+    const out = `${r.stdout}\n${r.stderr}`;
+    const after = JSON.parse(readFileSync(path.join(pkgDir, "package.json"), "utf8"));
+    assert.equal(after.version, V1, "v1 upgrade must leave package.json at " + V1 + "\n" + out);
+    assert.ok(!existsSync(path.join(pkgDir, "src")), "v1 upgrade copied src/ over the install\n" + out);
+    assert.deepEqual(readdirSync(pkgDir).sort(), before, out);
+    assert.ok(out.includes("npm i -g context-mode"), "the stop line names the native npm command\n" + out);
+
+    // The native command repairs it: the packed release tree, installed over the same prefix.
+    const tgz = JSON.parse(npm(["pack", "--json", "--pack-destination", pack], OUT))[0].filename;
+    npm(["i", "-g", "--prefix", prefix, path.join(pack, tgz)]);
+    assert.equal(path.basename(realpathSync(bin)), "cli.mjs");
+    const want = JSON.parse(readFileSync(path.join(OUT, "package.json"), "utf8")).version;
+    assert.ok(want.startsWith("2."), want);
+    assert.ok(execFileSync(bin, ["--version"], { env, encoding: "utf8" }).includes(want));
+  });
 });

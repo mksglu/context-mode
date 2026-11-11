@@ -537,3 +537,47 @@ describe("GP11: v1 migration setup plants detectable footprints", { concurrency:
     assert.equal(readFileSync(path.join(dir, "settings.json"), "utf8"), "USER");
   });
 });
+
+describe("ADR-0011: v1 upgrade stop", { concurrency: CONC }, () => {
+  // #1363 (DEVIATIONS D-V1-UPGRADE-STOP-1). v1 `context-mode upgrade` and v1 ctx_upgrade clone `main`, compare the
+  // package.json version, run `npm install` and the `build` script in the clone, and only then copy files over the
+  // install. Since the MAIN-ONLY merge (30b95f76) main carries the v2 version, so the frozen-main guard of ADR-0011 is
+  // gone: v1 copied package.json 2.x and src/ over a 1.0.x tree and kept the 1.0.x bin (a hybrid install). The one input
+  // we own that v1 reads before any write is the clone's `build` script. It must stop there and name the native command.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const pkg = JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8"));
+  const STOP = "scripts/v1-upgrade-stop.mjs";
+
+  test("[M7] v1-upgrade-stop/build-script-stops-writes-nothing-and-names-npm-i-g (#1363)", (t) => {
+    assert.equal(pkg.scripts.build, `node ${STOP}`);
+    const cwd = mkdtempSync(path.join(tmpdir(), "cm-v1-stop-"));
+    t.after(() => rmSync(cwd, { recursive: true, force: true }));
+    const r = spawnSync(process.execPath, [path.join(REPO, STOP)], { cwd, encoding: "utf8" });
+    assert.notEqual(r.status, 0, "the stop must fail the v1 build step");
+    assert.ok(r.stderr.includes("npm i -g context-mode"), r.stderr);
+    assert.ok(r.stderr.includes("https://github.com/mksglu/context-mode/blob/main/docs/install/README.md"), r.stderr);
+    assert.ok(r.stderr.includes("node build/build.mjs --out release-out"), "contributors get the real build command: " + r.stderr);
+    assert.deepEqual(readdirSync(cwd), []);
+  });
+
+  test("[M7] v1-upgrade-stop/no-ci-doc-or-script-calls-the-build-script (#1363)", () => {
+    // The stop is safe only while no contributor path depends on `npm run build`: CI, docs and release scripts call
+    // build/build.mjs directly (ci.yml, docs/install/README.md "From source", package.json build:release).
+    const roots = [".github", "docs/install", "scripts", "build", "e2e/cases", "e2e/checks", "e2e/harness"];
+    const files = ["README.md", "CONTRIBUTING.md"].map((f) => path.join(REPO, f)).filter((f) => existsSync(f));
+    const walk = (d) => readdirSync(d, { withFileTypes: true }).forEach((e) => {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p); else files.push(p);
+    });
+    for (const r of roots) if (existsSync(path.join(REPO, r))) walk(path.join(REPO, r));
+    const callers = files.filter((f) => { const s = readFileSync(f, "utf8"); return s.includes("npm run build ") || s.includes("npm run build\n") || s.includes("npm run build`") || s.includes('"run", "build"]'); });
+    assert.deepEqual(callers.map((f) => path.relative(REPO, f)), []);
+    assert.equal(pkg.scripts["build:release"], "node build/build.mjs --out release-out");
+  });
+
+  test("[M7] v1-upgrade-stop/release-package-json-has-no-scripts (#1363)", async () => {
+    // The stop lives in the dev tree only; the published D1 package.json has no scripts (ADR-0019 D1).
+    const { npmPackageJson } = await import("../build/manifests.ts");
+    assert.ok(!("scripts" in npmPackageJson("2.1.7")));
+  });
+});
